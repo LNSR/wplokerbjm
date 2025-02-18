@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Astra Child Theme Functions
  * 
@@ -11,11 +12,16 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-// Register autoloader
-require_once get_stylesheet_directory() . '/inc/Core/Loader.php';
-AstraChild\Core\Loader::register();
+// Register Composer autoloader
+require_once get_stylesheet_directory() . '/vendor/autoload.php';
 
-$init = new AstraChild\Core\Init();
+use AstraChild\Core\Container;
+
+// Initialize the DI container
+$container = Container::getContainer();
+
+// Bootstrap the theme
+$init = $container->get(AstraChild\Core\Init::class);
 $init->initialize();
 
 // BEGIN ENQUEUE PARENT ACTION

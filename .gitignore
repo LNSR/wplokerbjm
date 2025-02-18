@@ -1,3 +1,8 @@
 tailwind.config.js
 ecs.php
 style.css.bak
+vendor
+cache/
+composer.lock
+package-lock.json
+node_modules

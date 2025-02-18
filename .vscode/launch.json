@@ -1,0 +1,21 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Listen for Xdebug (Child Theme)",
+      "type": "php",
+      "request": "launch",
+      "port": 9004,
+      "pathMappings": {
+        "/var/www/html/wp-content/themes/astra-child": "${workspaceFolder}"
+      },
+      "ignore": [
+        "**/wp-admin/**",
+        "**/wp-includes/**",
+        "**/wp-content/plugins/**",
+        "**/wp-content/themes/!(astra-child|astra)/**",
+        "vendor/**"
+      ]
+    }
+  ]
+}

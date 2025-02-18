@@ -1,4 +1,5 @@
 <?php
+
 namespace AstraChild\Models\Schema;
 
 /**
@@ -6,29 +7,95 @@ namespace AstraChild\Models\Schema;
  * 
  * Defines custom taxonomies for job listings
  */
-class Taxonomies {
+class Taxonomies
+{
     /**
      * Register all taxonomies
      * 
      * @return void
      */
-    public function register(): void {
+    public function register(): void
+    {
+        add_action('init', [$this, 'registerPerusahaanTaxonomy']);
         add_action('init', [$this, 'registerKategoriTaxonomy']);
         add_action('init', [$this, 'registerLokasiTaxonomy']);
         add_action('init', [$this, 'registerJenisPekerjaanTaxonomy']);
         add_action('init', [$this, 'registerGenderTaxonomy']);
         add_action('init', [$this, 'registerPendidikanTaxonomy']);
-        add_action('init', [$this, 'registerPengalamanTaxonomy']);
-        add_action('init', [$this, 'registerGajiTaxonomy']);
-        add_action('init', [$this, 'registerUsiaTaxonomy']);
     }
-    
+
+    /**
+     * Register perusahaan taxonomy
+     * 
+     * @return void
+     */
+    public function registerPerusahaanTaxonomy(): void
+    {
+        $labels = [
+            'name'                       => esc_html__('Perusahaan', 'astra-child'),
+            'singular_name'              => esc_html__('Perusahaan', 'astra-child'),
+            'menu_name'                  => esc_html__('Perusahaan', 'astra-child'),
+            'search_items'               => esc_html__('Search Perusahaan', 'astra-child'),
+            'popular_items'              => esc_html__('Popular Perusahaan', 'astra-child'),
+            'all_items'                  => esc_html__('All Perusahaan', 'astra-child'),
+            'parent_item'                => esc_html__('Parent Perusahaan', 'astra-child'),
+            'parent_item_colon'          => esc_html__('Parent Perusahaan:', 'astra-child'),
+            'edit_item'                  => esc_html__('Edit Perusahaan', 'astra-child'),
+            'view_item'                  => esc_html__('View Perusahaan', 'astra-child'),
+            'update_item'                => esc_html__('Update Perusahaan', 'astra-child'),
+            'add_new_item'               => esc_html__('Add New Perusahaan', 'astra-child'),
+            'new_item_name'              => esc_html__('New Perusahaan Name', 'astra-child'),
+            'separate_items_with_commas' => esc_html__('Separate perusahaan with commas', 'astra-child'),
+            'add_or_remove_items'        => esc_html__('Add or remove perusahaan', 'astra-child'),
+            'choose_from_most_used'      => esc_html__('Choose most used perusahaan', 'astra-child'),
+            'not_found'                  => esc_html__('No perusahaan found.', 'astra-child'),
+            'no_terms'                   => esc_html__('No perusahaan', 'astra-child'),
+            'filter_by_item'             => esc_html__('Filter by perusahaan', 'astra-child'),
+            'items_list_navigation'      => esc_html__('Perusahaan list pagination', 'astra-child'),
+            'items_list'                 => esc_html__('Perusahaan list', 'astra-child'),
+            'most_used'                  => esc_html__('Most Used', 'astra-child'),
+            'back_to_items'              => esc_html__('&larr; Go to Perusahaan', 'astra-child'),
+            'text_domain'                => esc_html__('astra-child', 'astra-child'),
+        ];
+        $args = [
+            'label'              => esc_html__('Perusahaan', 'astra-child'),
+            'labels'             => $labels,
+            'description'        => '',
+            'public'             => true,
+            'publicly_queryable' => true,
+            'hierarchical'       => true,
+            'show_ui'            => true,
+            'show_in_menu'       => true,
+            'show_in_nav_menus'  => true,
+            'show_in_rest'       => true,
+            'show_tagcloud'      => true,
+            'show_in_quick_edit' => true,
+            'show_admin_column'  => true,
+            'query_var'          => true,
+            'sort'               => true,
+            'capabilities'       => [
+                'manage_terms' => 'manage_categories',
+                'edit_terms'   => 'manage_categories',
+                'delete_terms' => 'manage_categories',
+                'assign_terms' => 'edit_posts'
+            ],
+            'meta_box_cb'        => 'post_categories_meta_box',
+            'rest_base'          => '',
+            'rewrite'            => [
+                'with_front'   => false,
+                'hierarchical' => true,
+            ],
+        ];
+        register_taxonomy('perusahaan', ['lowongan'], $args);
+    }
+
     /**
      * Register kategori-lowongan taxonomy
      * 
      * @return void
      */
-    public function registerKategoriTaxonomy(): void {
+    public function registerKategoriTaxonomy(): void
+    {
         $labels = [
             'name'                       => esc_html__('Kategori Pekerjaan', 'astra-child'),
             'singular_name'              => esc_html__('Kategori Pekerjaan', 'astra-child'),
@@ -54,7 +121,7 @@ class Taxonomies {
             'most_used'                  => esc_html__('Most Used', 'astra-child'),
             'back_to_items'              => esc_html__('&larr; Go to Kategori Pekerjaan', 'astra-child'),
         ];
-        
+
         $args = [
             'label'              => esc_html__('Kategori Pekerjaan', 'astra-child'),
             'labels'             => $labels,
@@ -82,19 +149,20 @@ class Taxonomies {
             'rewrite'            => [
                 'slug'         => 'kategori-lowongan',
                 'with_front'   => false,
-                'hierarchical' => false,
+                'hierarchical' => true,
             ],
         ];
-        
+
         register_taxonomy('kategori-lowongan', ['lowongan'], $args);
     }
-    
+
     /**
      * Register lokasi-pekerjaan taxonomy
      * 
      * @return void
      */
-    public function registerLokasiTaxonomy(): void {
+    public function registerLokasiTaxonomy(): void
+    {
         $labels = [
             'name'                       => esc_html__('Lokasi Pekerjaan', 'astra-child'),
             'singular_name'              => esc_html__('Lokasi Pekerjaan', 'astra-child'),
@@ -120,7 +188,7 @@ class Taxonomies {
             'most_used'                  => esc_html__('Most Used', 'astra-child'),
             'back_to_items'              => esc_html__('&larr; Go to Lokasi Pekerjaan', 'astra-child'),
         ];
-        
+
         $args = [
             'label'              => esc_html__('Lokasi Pekerjaan', 'astra-child'),
             'labels'             => $labels,
@@ -148,19 +216,20 @@ class Taxonomies {
             'rewrite'            => [
                 'slug'         => 'lokasi-pekerjaan',
                 'with_front'   => false,
-                'hierarchical' => false,
+                'hierarchical' => true,
             ],
         ];
-        
+
         register_taxonomy('lokasi-pekerjaan', ['lowongan'], $args);
     }
-    
+
     /**
      * Register jenis-pekerjaan taxonomy
      * 
      * @return void
      */
-    public function registerJenisPekerjaanTaxonomy(): void {
+    public function registerJenisPekerjaanTaxonomy(): void
+    {
         $labels = [
             'name'                       => esc_html__('Jenis Pekerjaan', 'astra-child'),
             'singular_name'              => esc_html__('Jenis Pekerjaan', 'astra-child'),
@@ -186,7 +255,7 @@ class Taxonomies {
             'most_used'                  => esc_html__('Most Used', 'astra-child'),
             'back_to_items'              => esc_html__('&larr; Go to Jenis Pekerjaan', 'astra-child'),
         ];
-        
+
         $args = [
             'label'              => esc_html__('Jenis Pekerjaan', 'astra-child'),
             'labels'             => $labels,
@@ -214,19 +283,20 @@ class Taxonomies {
             'rewrite'            => [
                 'slug'         => 'jenis-pekerjaan',
                 'with_front'   => false,
-                'hierarchical' => false,
+                'hierarchical' => true,
             ],
         ];
-        
+
         register_taxonomy('jenis-pekerjaan', ['lowongan'], $args);
     }
-    
+
     /**
      * Register gender taxonomy
      * 
      * @return void
      */
-    public function registerGenderTaxonomy(): void {
+    public function registerGenderTaxonomy(): void
+    {
         $labels = [
             'name'                       => esc_html__('Gender', 'astra-child'),
             'singular_name'              => esc_html__('Gender', 'astra-child'),
@@ -252,7 +322,7 @@ class Taxonomies {
             'most_used'                  => esc_html__('Most Used', 'astra-child'),
             'back_to_items'              => esc_html__('&larr; Go to Gender', 'astra-child'),
         ];
-        
+
         $args = [
             'label'              => esc_html__('Gender', 'astra-child'),
             'labels'             => $labels,
@@ -283,16 +353,17 @@ class Taxonomies {
                 'hierarchical' => false,
             ],
         ];
-        
+
         register_taxonomy('gender', ['lowongan'], $args);
     }
-    
+
     /**
      * Register pendidikan taxonomy
      * 
      * @return void
      */
-    public function registerPendidikanTaxonomy(): void {
+    public function registerPendidikanTaxonomy(): void
+    {
         $labels = [
             'name'                       => esc_html__('Pendidikan', 'astra-child'),
             'singular_name'              => esc_html__('Pendidikan', 'astra-child'),
@@ -318,7 +389,7 @@ class Taxonomies {
             'most_used'                  => esc_html__('Most Used', 'astra-child'),
             'back_to_items'              => esc_html__('&larr; Go to Pendidikan', 'astra-child'),
         ];
-        
+
         $args = [
             'label'              => esc_html__('Pendidikan', 'astra-child'),
             'labels'             => $labels,
@@ -346,208 +417,10 @@ class Taxonomies {
             'rewrite'            => [
                 'slug'         => 'pendidikan',
                 'with_front'   => false,
-                'hierarchical' => false,
+                'hierarchical' => true,
             ],
         ];
-        
+
         register_taxonomy('pendidikan', ['lowongan'], $args);
-    }
-    
-    /**
-     * Register pengalaman taxonomy
-     * 
-     * @return void
-     */
-    public function registerPengalamanTaxonomy(): void {
-        $labels = [
-            'name'                       => esc_html__('Pengalaman', 'astra-child'),
-            'singular_name'              => esc_html__('Pengalaman', 'astra-child'),
-            'menu_name'                  => esc_html__('Pengalaman', 'astra-child'),
-            'search_items'               => esc_html__('Search Pengalaman', 'astra-child'),
-            'popular_items'              => esc_html__('Popular Pengalaman', 'astra-child'),
-            'all_items'                  => esc_html__('All Pengalaman', 'astra-child'),
-            'parent_item'                => esc_html__('Parent Pengalaman', 'astra-child'),
-            'parent_item_colon'          => esc_html__('Parent Pengalaman:', 'astra-child'),
-            'edit_item'                  => esc_html__('Edit Pengalaman', 'astra-child'),
-            'view_item'                  => esc_html__('View Pengalaman', 'astra-child'),
-            'update_item'                => esc_html__('Update Pengalaman', 'astra-child'),
-            'add_new_item'               => esc_html__('Add New Pengalaman', 'astra-child'),
-            'new_item_name'              => esc_html__('New Pengalaman Name', 'astra-child'),
-            'separate_items_with_commas' => esc_html__('Separate pengalaman with commas', 'astra-child'),
-            'add_or_remove_items'        => esc_html__('Add or remove pengalaman', 'astra-child'),
-            'choose_from_most_used'      => esc_html__('Choose most used pengalaman', 'astra-child'),
-            'not_found'                  => esc_html__('No pengalaman found.', 'astra-child'),
-            'no_terms'                   => esc_html__('No pengalaman', 'astra-child'),
-            'filter_by_item'             => esc_html__('Filter by pengalaman', 'astra-child'),
-            'items_list_navigation'      => esc_html__('Pengalaman list pagination', 'astra-child'),
-            'items_list'                 => esc_html__('Pengalaman list', 'astra-child'),
-            'most_used'                  => esc_html__('Most Used', 'astra-child'),
-            'back_to_items'              => esc_html__('&larr; Go to Pengalaman', 'astra-child'),
-        ];
-        
-        $args = [
-            'label'              => esc_html__('Pengalaman', 'astra-child'),
-            'labels'             => $labels,
-            'description'        => '',
-            'public'             => true,
-            'publicly_queryable' => true,
-            'hierarchical'       => true,
-            'show_ui'            => true,
-            'show_in_menu'       => true,
-            'show_in_nav_menus'  => true,
-            'show_in_rest'       => true,
-            'show_tagcloud'      => false,
-            'show_in_quick_edit' => true,
-            'show_admin_column'  => true,
-            'query_var'          => true,
-            'sort'               => false,
-            'capabilities'       => [
-                'manage_terms' => 'manage_categories',
-                'edit_terms'   => 'manage_categories',
-                'delete_terms' => 'manage_categories',
-                'assign_terms' => 'edit_posts'
-            ],
-            'meta_box_cb'        => 'post_categories_meta_box',
-            'rest_base'          => '',
-            'rewrite'            => [
-                'slug'         => 'pengalaman',
-                'with_front'   => false,
-                'hierarchical' => false,
-            ],
-        ];
-        
-        register_taxonomy('pengalaman', ['lowongan'], $args);
-    }
-    
-    /**
-     * Register gaji taxonomy
-     * 
-     * @return void
-     */
-    public function registerGajiTaxonomy(): void {
-        $labels = [
-            'name'                       => esc_html__('Gaji', 'astra-child'),
-            'singular_name'              => esc_html__('Gaji', 'astra-child'),
-            'menu_name'                  => esc_html__('Gaji', 'astra-child'),
-            'search_items'               => esc_html__('Search Gaji', 'astra-child'),
-            'popular_items'              => esc_html__('Popular Gaji', 'astra-child'),
-            'all_items'                  => esc_html__('All Gaji', 'astra-child'),
-            'parent_item'                => esc_html__('Parent Gaji', 'astra-child'),
-            'parent_item_colon'          => esc_html__('Parent Gaji:', 'astra-child'),
-            'edit_item'                  => esc_html__('Edit Gaji', 'astra-child'),
-            'view_item'                  => esc_html__('View Gaji', 'astra-child'),
-            'update_item'                => esc_html__('Update Gaji', 'astra-child'),
-            'add_new_item'               => esc_html__('Add New Gaji', 'astra-child'),
-            'new_item_name'              => esc_html__('New Gaji Name', 'astra-child'),
-            'separate_items_with_commas' => esc_html__('Separate gaji with commas', 'astra-child'),
-            'add_or_remove_items'        => esc_html__('Add or remove gaji', 'astra-child'),
-            'choose_from_most_used'      => esc_html__('Choose most used gaji', 'astra-child'),
-            'not_found'                  => esc_html__('No gaji found.', 'astra-child'),
-            'no_terms'                   => esc_html__('No gaji', 'astra-child'),
-            'filter_by_item'             => esc_html__('Filter by gaji', 'astra-child'),
-            'items_list_navigation'      => esc_html__('Gaji list pagination', 'astra-child'),
-            'items_list'                 => esc_html__('Gaji list', 'astra-child'),
-            'most_used'                  => esc_html__('Most Used', 'astra-child'),
-            'back_to_items'              => esc_html__('&larr; Go to Gaji', 'astra-child'),
-        ];
-        
-        $args = [
-            'label'              => esc_html__('Gaji', 'astra-child'),
-            'labels'             => $labels,
-            'description'        => '',
-            'public'             => true,
-            'publicly_queryable' => true,
-            'hierarchical'       => true,
-            'show_ui'            => true,
-            'show_in_menu'       => true,
-            'show_in_nav_menus'  => true,
-            'show_in_rest'       => true,
-            'show_tagcloud'      => false,
-            'show_in_quick_edit' => true,
-            'show_admin_column'  => true,
-            'query_var'          => true,
-            'sort'               => false,
-            'capabilities'       => [
-                'manage_terms' => 'manage_categories',
-                'edit_terms'   => 'manage_categories',
-                'delete_terms' => 'manage_categories',
-                'assign_terms' => 'edit_posts'
-            ],
-            'meta_box_cb'        => 'post_categories_meta_box',
-            'rest_base'          => '',
-            'rewrite'            => [
-                'slug'         => 'gaji',
-                'with_front'   => false,
-                'hierarchical' => false,
-            ],
-        ];
-        
-        register_taxonomy('gaji', ['lowongan'], $args);
-    }
-    
-    /**
-     * Register usia taxonomy
-     * 
-     * @return void
-     */
-    public function registerUsiaTaxonomy(): void {
-        $labels = [
-            'name'                       => esc_html__('Usia', 'astra-child'),
-            'singular_name'              => esc_html__('Usia', 'astra-child'),
-            'menu_name'                  => esc_html__('Usia', 'astra-child'),
-            'search_items'               => esc_html__('Search Usia', 'astra-child'),
-            'popular_items'              => esc_html__('Popular Usia', 'astra-child'),
-            'all_items'                  => esc_html__('All Usia', 'astra-child'),
-            'parent_item'                => esc_html__('Parent Usia', 'astra-child'),
-            'parent_item_colon'          => esc_html__('Parent Usia:', 'astra-child'),
-            'edit_item'                  => esc_html__('Edit Usia', 'astra-child'),
-            'view_item'                  => esc_html__('View Usia', 'astra-child'),
-            'update_item'                => esc_html__('Update Usia', 'astra-child'),
-            'add_new_item'               => esc_html__('Add New Usia', 'astra-child'),
-            'new_item_name'              => esc_html__('New Usia Name', 'astra-child'),
-            'separate_items_with_commas' => esc_html__('Separate usia with commas', 'astra-child'),
-            'add_or_remove_items'        => esc_html__('Add or remove usia', 'astra-child'),
-            'choose_from_most_used'      => esc_html__('Choose most used usia', 'astra-child'),
-            'not_found'                  => esc_html__('No usia found.', 'astra-child'),
-            'no_terms'                   => esc_html__('No usia', 'astra-child'),
-            'filter_by_item'             => esc_html__('Filter by usia', 'astra-child'),
-            'items_list_navigation'      => esc_html__('Usia list pagination', 'astra-child'),
-            'items_list'                 => esc_html__('Usia list', 'astra-child'),
-            'most_used'                  => esc_html__('Most Used', 'astra-child'),
-            'back_to_items'              => esc_html__('&larr; Go to Usia', 'astra-child'),
-        ];
-        
-        $args = [
-            'label'              => esc_html__('Usia', 'astra-child'),
-            'labels'             => $labels,
-            'description'        => '',
-            'public'             => true,
-            'publicly_queryable' => true,
-            'hierarchical'       => true,
-            'show_ui'            => true,
-            'show_in_menu'       => true,
-            'show_in_nav_menus'  => true,
-            'show_in_rest'       => true,
-            'show_tagcloud'      => false,
-            'show_in_quick_edit' => true,
-            'show_admin_column'  => true,
-            'query_var'          => true,
-            'sort'               => false,
-            'capabilities'       => [
-                'manage_terms' => 'manage_categories',
-                'edit_terms'   => 'manage_categories',
-                'delete_terms' => 'manage_categories',
-                'assign_terms' => 'edit_posts'
-            ],
-            'meta_box_cb'        => 'post_categories_meta_box',
-            'rest_base'          => '',
-            'rewrite'            => [
-                'slug'         => 'usia',
-                'with_front'   => false,
-                'hierarchical' => false,
-            ],
-        ];
-        
-        register_taxonomy('usia', ['lowongan'], $args);
     }
 }

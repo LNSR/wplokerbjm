@@ -1,0 +1,8 @@
+@import "tailwindcss";
+@import "./AstraChildStyle.css";
+@import "glider-js/glider.min.css";
+@import "@fortawesome/fontawesome-free/css/all.min.css";
+
+@plugin "daisyui";
+
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));

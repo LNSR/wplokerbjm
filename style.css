@@ -6,35 +6,8 @@ Author: Brainstorm Force
 Author URI: https://wpastra.com/about/?utm_source=theme_preview&utm_medium=author_link&utm_campaign=astra_theme
 Description: The Astra WordPress theme is lightning-fast and highly customizable. It has over 1 million downloads and the only theme in the world with 5,700+ five-star reviews! It’s ideal for professional web designers, solopreneurs, small businesses, eCommerce, membership sites and any type of website. It offers special features and templates so it works perfectly with all page builders like Spectra, Elementor, Beaver Builder, etc. Fast performance, clean code, mobile-first design and schema markup are all built-in, making the theme exceptionally SEO-friendly. It’s fully compatible with WooCommerce, SureCart and other eCommerce plugins and comes with lots of store-friendly features and templates. Astra also provides expert support for free users. A dedicated team of fully trained WordPress experts are on hand to help with every aspect of the theme. Try it out on a free dummy site: https://zipwp.org/themes/astra/
 Tags: custom-menu,custom-logo,entertainment,one-column,two-columns,left-sidebar,e-commerce,right-sidebar,custom-colors,editor-style,featured-images,full-width-template,microformats,post-formats,rtl-language-support,theme-options,threaded-comments,translation-ready,blog
-Version: 4.8.11.1740555420
-Updated: 2025-02-26 08:37:00
+Version: 4.7.11.1746283613
+Updated: 2025-05-03 22:46:53
 
 */
 
-.section {
-    : pt-4 last:pb-4;
-}
-.company-description p, .section p, .requirements p {
-    : mb-0;
-}
-.summary-item {
-    : translate-y-[-3px] hover:shadow-lg hover:bg-white;
-}
-.contact-list li {
-    : bg-gray-50 rounded-lg transition-colors duration-200;
-}
-.contact-list a {
-    : underline;
-    : text-blue-600 transition-colors duration-200;
-}
-.social-icon {
-    : underline;
-    : bg-blue-50 hover:border-blue-200 hover:translate-y-[-2px];
-}
-
-/* Reduce spacing between paragraphs and lists */
-.prose > p,
-.prose > ul,
-.prose > ol {
-    margin-bottom: 1rem;
-}

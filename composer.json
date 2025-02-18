@@ -1,0 +1,10 @@
+{
+  "require": {
+    "php-di/php-di": "*"
+  },
+  "autoload": {
+    "psr-4": {
+      "AstraChild\\": "./inc"
+    }
+  }
+}

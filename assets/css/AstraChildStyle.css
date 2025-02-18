@@ -1,0 +1,109 @@
+.ast-site-title-wrap,
+.ast-site-title,
+.site-title {
+  display: none !important;
+}
+
+/* Light Mode */
+:root {
+  --ast-global-color-0: #0067ff;
+  --ast-global-color-1: #005ee9;
+  --ast-global-color-2: #0f172a;
+  --ast-global-color-3: #364151;
+  --ast-global-color-4: #ffffff;
+  --ast-global-color-5: #e7f6ff;
+  --ast-global-color-6: #070614;
+  --ast-global-color-7: #d1dae5;
+  --ast-global-color-8: #222222;
+
+  /* Astra Customizer Colors */
+  --ast-customizer-color-1: #0284c7;
+  --ast-customizer-color-2: #0ea5e9;
+  --ast-customizer-color-3: #2271b1;
+  --ast-customizer-color-4: #1e293b;
+  --ast-customizer-color-5: #334155;
+  --ast-customizer-color-6: #9ca3af;
+  --ast-customizer-color-7: #d1d5db;
+  --ast-customizer-color-8: #4b5563;
+  --ast-customizer-color-9: #fff;
+  --ast-customizer-color-10: #fff;
+  --ast-customizer-color-11: #f5f5f5;
+  --ast-customizer-color-12: #1e293b;
+  --ast-customizer-color-13: #f3f4f6;
+  --ast-customizer-color-14: #cc1818;
+  --icon-color: #000000; /* Sun: */
+}
+
+[data-theme="light"] {
+  /* Astra Global Colors (Light) */
+  --ast-global-color-0: #0067ff;
+  --ast-global-color-1: #005ee9;
+  --ast-global-color-2: #0f172a;
+  --ast-global-color-3: #364151;
+  --ast-global-color-4: #ffffff;
+  --ast-global-color-5: #e7f6ff;
+  --ast-global-color-6: #070614;
+  --ast-global-color-7: #d1dae5;
+  --ast-global-color-8: #222222;
+
+  /* Astra Customizer Colors (Light) */
+  --ast-customizer-color-1: #0284c7;
+  --ast-customizer-color-2: #0ea5e9;
+  --ast-customizer-color-3: #2271b1;
+  --ast-customizer-color-4: #1e293b;
+  --ast-customizer-color-5: #334155;
+  --ast-customizer-color-6: #9ca3af;
+  --ast-customizer-color-7: #d1d5db;
+  --ast-customizer-color-8: #4b5563;
+  --ast-customizer-color-9: #fff;
+  --ast-customizer-color-10: #fff;
+  --ast-customizer-color-11: #f5f5f5;
+  --ast-customizer-color-12: #1e293b;
+  --ast-customizer-color-13: #f3f4f6;
+  --ast-customizer-color-14: #cc1818;
+  --icon-color: #000000; /* Sun: */
+}
+
+[data-theme="dark"] {
+  /* Astra Global Colors (Dark) */
+  --ast-global-color-0: #0085ff;
+  --ast-global-color-1: #0177e3;
+  --ast-global-color-2: #ffffff;
+  --ast-global-color-3: #e7f6ff;
+  --ast-global-color-4: #212a37;
+  --ast-global-color-5: #0f172a;
+  --ast-global-color-6: #4f5b62;
+  --ast-global-color-7: #070614;
+  --ast-global-color-8: #222222;
+
+  /* Astra Customizer Colors (Dark) */
+  --ast-customizer-color-1: #0284c7;
+  --ast-customizer-color-2: #0ea5e9;
+  --ast-customizer-color-3: #2271b1;
+  --ast-customizer-color-4: #1e293b;
+  --ast-customizer-color-5: #334155;
+  --ast-customizer-color-6: #9ca3af;
+  --ast-customizer-color-7: #d1d5db;
+  --ast-customizer-color-8: #4b5563;
+  --ast-customizer-color-9: #fff;
+  --ast-customizer-color-10: #fff;
+  --ast-customizer-color-11: #f5f5f5;
+  --ast-customizer-color-12: #1e293b;
+  --ast-customizer-color-13: #f3f4f6;
+  --ast-customizer-color-14: #cc1818;
+  --icon-color: #f1f5f9; /* Moon: */
+}
+
+[x-cloak] {
+  display: none !important;
+}
+
+.carousel-hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+}
+.carousel-ready {
+  opacity: 1;
+  pointer-events: auto;
+}
