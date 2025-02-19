@@ -69,11 +69,14 @@ add_action('init', 'update_lowongan_taxonomies', 11);
 function handle_job_search() {
     check_ajax_referer('job_search_nonce', '_ajax_nonce');
 
+    $paged = isset($_POST['page']) ? absint($_POST['page']) : 1;
+    
     $args = [
         'post_type' => 'lowongan',
         'posts_per_page' => 6,
         'orderby' => 'date',
         'order' => 'DESC',
+        'paged' => $paged // Add paged parameter
     ];
 
     // Only add search query if not empty
@@ -128,13 +131,31 @@ function handle_job_search() {
 
     if ($query->have_posts()) :
         ?>
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-4">
             <?php
             while ($query->have_posts()) : $query->the_post();
                 get_template_part('template-parts/content', 'job-card');
             endwhile;
             ?>
         </div>
+
+        <?php if ($query->max_num_pages > 1) : ?>
+            <div class="mt-8 flex justify-center gap-2">
+                <?php 
+                for ($i = 1; $i <= $query->max_num_pages; $i++) :
+                    $is_current = $i === $paged;
+                ?>
+                    <button type="button"
+                            data-page="<?php echo $i; ?>"
+                            class="page-number px-4 py-2 rounded-lg <?php echo $is_current ? 
+                                'bg-blue-600 text-white' : 
+                                'bg-white text-blue-600 hover:bg-blue-50'; ?> 
+                                border border-blue-200 transition-colors">
+                        <?php echo $i; ?>
+                    </button>
+                <?php endfor; ?>
+            </div>
+        <?php endif; ?>
         <?php
     else:
         ?>
@@ -147,7 +168,11 @@ function handle_job_search() {
     wp_reset_postdata();
     $html = ob_get_clean();
 
-    wp_send_json_success(['html' => $html]);
+    wp_send_json_success([
+        'html' => $html,
+        'found_posts' => $query->found_posts,
+        'max_pages' => $query->max_num_pages
+    ]);
 }
 
 add_action('wp_ajax_search_jobs', 'handle_job_search');
@@ -176,3 +201,63 @@ function enqueue_job_search_scripts() {
     }
 }
 add_action('wp_enqueue_scripts', 'enqueue_job_search_scripts');
+
+function load_featured_jobs() {
+    check_ajax_referer('featured_jobs_nonce', '_ajax_nonce');
+
+    $page = isset($_POST['page']) ? absint($_POST['page']) : 1;
+    
+    $args = [
+        'post_type' => 'lowongan',
+        'posts_per_page' => 6,
+        'orderby' => 'date',
+        'order' => 'DESC',
+        'paged' => $page
+    ];
+
+    $query = new WP_Query($args);
+    ob_start();
+
+    if ($query->have_posts()) {
+        while ($query->have_posts()) {
+            $query->the_post();
+            get_template_part('template-parts/content', 'job-card');
+        }
+    } else {
+        echo '<p class="text-gray-500 text-center">Tidak ada lowongan tersedia.</p>';
+    }
+
+    wp_reset_postdata();
+    
+    wp_send_json_success([
+        'html' => ob_get_clean(),
+        'found_posts' => $query->found_posts,
+        'max_pages' => $query->max_num_pages
+    ]);
+}
+
+add_action('wp_ajax_load_featured_jobs', 'load_featured_jobs');
+add_action('wp_ajax_nopriv_load_featured_jobs', 'load_featured_jobs');
+
+// Enqueue featured jobs script
+function enqueue_featured_jobs_scripts() {
+    if (is_page_template('page-homepage.php')) {
+        wp_enqueue_script(
+            'featured-jobs',
+            get_stylesheet_directory_uri() . '/assets/js/featured-jobs.js',
+            ['jquery'],
+            '1.0.0',
+            true
+        );
+
+        wp_localize_script(
+            'featured-jobs',
+            'featuredJobsData',
+            [
+                'ajaxurl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('featured_jobs_nonce')
+            ]
+        );
+    }
+}
+add_action('wp_enqueue_scripts', 'enqueue_featured_jobs_scripts');

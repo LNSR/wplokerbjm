@@ -103,99 +103,55 @@ get_header(); ?>
                         <?php endif; ?>
                     </div>
 
-                    <!-- Search Button -->
-                    <button type="submit" 
-                        class="w-full md:w-auto px-8 py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2"
-                        id="search-submit">
-                        <i class="fas fa-search"></i>
-                        <span>Cari Lowongan</span>
-                        <div class="hidden animate-spin" id="search-loading">
-                            <i class="fas fa-circle-notch"></i>
-                        </div>
-                    </button>
+                    <!-- Buttons Container - New separate div -->
+                    <div class="flex flex-col md:flex-row justify-center items-center gap-4">
+                        <!-- Search Button -->
+                        <button type="submit" 
+                            class="w-auto px-4 md:px-8 py-3 md:py-4 bg-blue-600 hover:bg-blue-700 text-white font-semibold rounded-lg transition-colors duration-200 flex items-center justify-center gap-2 text-sm md:text-base"
+                            id="search-submit">
+                            <i class="fas fa-search"></i>
+                            <span>Cari</span>
+                            <div class="hidden animate-spin" id="search-loading">
+                                <i class="fas fa-circle-notch"></i>
+                            </div>
+                        </button>
+
+                        <!-- Reset Button - Will be injected here by JavaScript -->
+                        <div id="reset-button-container"></div>
+                    </div>
                 </form>
             </div>
 
             <!-- Results Container -->
-            <div id="search-results" class="mt-8 animate-fade-in">
-                <!-- Results will be loaded here -->
+            <div id="search-results" class="mt-8 animate-fade-in hidden">
+                <h2 class="text-2xl font-bold text-white mb-6">Hasil Pencarian</h2>
+                <div class="search-results-grid">
+                    <!-- Results will be loaded here -->
+                </div>
             </div>
         </div>
     </section>
 
     <!-- Featured Jobs Section -->
-    <section class="mb-12">
+    <section class="featured-jobs-section mb-12">
         <div class="max-w-7xl mx-auto">
             <h2 class="text-3xl font-bold text-gray-900 mb-8">Lowongan Terbaru</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <div id="featured-jobs-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <?php
+                $paged = get_query_var('paged') ? get_query_var('paged') : 1;
                 $args = [
                     'post_type' => 'lowongan',
                     'posts_per_page' => 6,
                     'orderby' => 'date',
                     'order' => 'DESC',
+                    'paged' => $paged
                 ];
 
                 $query = new WP_Query($args);
 
                 if ($query->have_posts()) :
                     while ($query->have_posts()) : $query->the_post();
-                ?>
-                <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-6">
-                    <div class="mb-4">
-                        <?php if (has_post_thumbnail()) : ?>
-                        <div class="w-16 h-16 mb-4">
-                            <?php the_post_thumbnail('thumbnail', ['class' => 'w-full h-full object-cover rounded-lg']); ?>
-                        </div>
-                        <?php endif; ?>
-                        <h3 class="text-xl font-semibold text-gray-900 hover:text-blue-600 transition-colors">
-                            <a href="<?php the_permalink(); ?>"><?php the_title(); ?></a>
-                        </h3>
-                    </div>
-
-                    <div class="space-y-2 mb-4">
-                        <?php
-                                $company = rwmb_meta('nama_perusahaan');
-                                $location = rwmb_meta('lokasi');
-                                $job_type = rwmb_meta('jenis_pekerjaan');
-                                $education = rwmb_meta('pendidikan');
-                                ?>
-                        <p class="text-gray-600 font-bold"><?php echo esc_html($company); ?></p>
-                        <p class="flex items-center text-gray-500">
-                            <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>
-                            <?php echo esc_html($location); ?>
-                        </p>
-                        <?php /* if ($job_type && $job_type !== 'Hidden / Tidak Diperlukan') : ?>
-                        <p class="flex items-center text-gray-500">
-                            <i class="fas fa-briefcase mr-2 text-blue-600"></i>
-                            <?php echo esc_html($job_type); ?>
-                        </p>
-                        <?php endif; */ ?>
-                        <?php if ($education) : ?>
-                        <p class="flex items-center text-gray-500">
-                            <i class="fas fa-graduation-cap mr-2 text-blue-600"></i>
-                            <?php
-                                        // Check if education is an array
-                                        if (is_array($education)) {
-                                            echo esc_html(implode(', ', $education));
-                                        } else {
-                                            echo esc_html($education);
-                                        }
-                                        ?>
-                        </p>
-                        <?php endif; ?>
-                    </div>
-
-                    <div class="flex items-center justify-between pt-4 border-t border-gray-100">
-                        <span class="text-sm text-gray-500"><?php echo get_the_date(); ?></span>
-                        <a href="<?php the_permalink(); ?>"
-                            class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 transition-colors">
-                            Lihat Detail
-                            <i class="fas fa-arrow-right"></i>
-                        </a>
-                    </div>
-                </div>
-                <?php
+                        get_template_part('template-parts/content', 'job-card');
                     endwhile;
                     wp_reset_postdata();
                 else :
@@ -203,11 +159,28 @@ get_header(); ?>
                 endif;
                 ?>
             </div>
-            <div class="text-center mt-8">
-                <a href="<?php echo get_post_type_archive_link('lowongan'); ?>"
-                    class="inline-block rounded-lg bg-blue-600 px-8 py-4 text-center font-semibold text-white hover:bg-blue-700 transition-colors">
-                    Lihat Semua Lowongan
-                </a>
+
+            <?php if ($query->max_num_pages > 1) : ?>
+                <div class="mt-8 flex justify-center gap-2" id="featured-jobs-pagination">
+                    <?php 
+                    for ($i = 1; $i <= $query->max_num_pages; $i++) :
+                        $is_current = $i === $paged;
+                    ?>
+                        <button type="button"
+                                data-page="<?php echo $i; ?>"
+                                class="page-number px-4 py-2 rounded-lg <?php echo $is_current ? 
+                                    'bg-blue-600 text-white' : 
+                                    'bg-white text-blue-600 hover:bg-blue-50'; ?> 
+                                    border border-blue-200 transition-colors">
+                            <?php echo $i; ?>
+                        </button>
+                    <?php endfor; ?>
+                </div>
+            <?php endif; ?>
+
+            <!-- Loading indicator -->
+            <div id="featured-jobs-loading" class="text-center py-8 hidden">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
             </div>
         </div>
     </section>
