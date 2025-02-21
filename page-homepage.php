@@ -134,7 +134,7 @@ get_header(); ?>
             <section class="featured-jobs-section mb-12">
                 <div class="max-w-7xl mx-auto">
                     <h2 class="text-3xl font-bold text-gray-900 mb-8">Lowongan Terbaru</h2>
-                    <div id="featured-jobs-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div id="featured-jobs-grid" class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-6">
                         <?php
                         $paged = get_query_var('paged') ? get_query_var('paged') : 1;
                         $featured_jobs = get_featured_jobs_data($paged);
