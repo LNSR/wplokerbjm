@@ -18,11 +18,15 @@ while (have_posts()) :
 
                 <!-- Company Section -->
                 <section class="pt-8 group">
-                    <div class="flex items-center gap-3 mb-6 transform transition-transform group-hover:translate-x-2">
-                        <h2 class="text-2xl font-semibold text-gray-800">
-                            <i class="fas fa-building text-blue-600"></i>
-                            <span class="pl-3"><?php echo esc_html($job_data['company']); ?></span>
-                        </h2>
+                    <div class="flex items-start gap-3 mb-6 transform transition-transform group-hover:translate-x-2">
+                        <div class="shrink-0 mt-2">
+                            <i class="fas fa-building text-blue-600 text-2xl"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h2 class="text-2xl font-semibold text-gray-800">
+                                <span class=""><?php echo esc_html($job_data['company']); ?></span>
+                            </h2>
+                        </div>
                     </div>
 
                     <?php if (!is_really_empty($job_data['company_desc'])) : ?>
