@@ -5,12 +5,10 @@
             <h3 class="text-lg font-semibold text-gray-900 mb-4">Lorem Ipsum</h3>
             <div class="space-y-4">
                 <?php
-                $recent_jobs = new WP_Query([
-                    'post_type' => 'lowongan',
-                    'posts_per_page' => 5,
-                    'orderby' => 'date',
-                    'order' => 'DESC'
-                ]);
+                $paged = get_query_var('paged') ? get_query_var('paged') : 1;
+                $query = get_featured_jobs_data($paged);
+                $recent_jobs = $query['query'];
+
 
                 if ($recent_jobs->have_posts()) :
                     while ($recent_jobs->have_posts()) : $recent_jobs->the_post();
