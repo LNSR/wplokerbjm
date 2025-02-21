@@ -261,12 +261,12 @@ function lowongan_meta_boxes( $meta_boxes ) {
                     'Tiktok'      => 'Tiktok',
                     'LinkedIn'    => 'LinkedIn',
                     'Youtube'     => 'Youtube',
+                    'Telegram'    => 'Telegram',
                 ],
                 'required'          => false,
                 'clone'             => false,
                 'clone_empty_start' => false,
                 'hide_from_rest'    => false,
-                'save_field'        => false,
             ],
         ],
     ];

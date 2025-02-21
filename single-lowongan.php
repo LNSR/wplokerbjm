@@ -193,7 +193,9 @@ while (have_posts()) :
                         <span class="pl-2">Kontak</span>
                     </span>
                     <!-- share button -->
-                    <button class="inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors">
+                    <button 
+                        class="share-button inline-flex items-center px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg hover:bg-blue-100 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors"
+                        data-post-id="<?php echo get_the_ID(); ?>">
                         <i class="fas fa-share-alt mr-2"></i>
                         Bagikan
                     </button>

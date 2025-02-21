@@ -28,7 +28,7 @@ class Social_Media {
         ],
         'Whatsapp' => [
             'icon' => 'fab fa-whatsapp',
-            'base_url' => 'https://wa.me/'
+            'base_url' => 'https://wa.me/',
         ],
         'Tiktok' => [
             'icon' => 'fab fa-tiktok',
@@ -37,6 +37,10 @@ class Social_Media {
         'Threads' => [
             'icon' => 'fab fa-threads',
             'base_url' => 'https://threads.net/@'
+        ],
+        'Telegram' => [
+            'icon' => 'fab fa-telegram',
+            'base_url' => 'https://t.me/'
         ]
     ];
 
@@ -44,7 +48,7 @@ class Social_Media {
      * Get social media link data
      * 
      * @param string $platform Social media platform name
-     * @param string $username Username/handle
+     * @param string $username Username/handle or phone number for WhatsApp
      * @return array|null Array containing icon and full URL
      */
     public static function get_link_data($platform, $username) {
@@ -54,15 +58,62 @@ class Social_Media {
 
         $config = self::$platforms[$platform];
         
-        // Clean username for WhatsApp
         if ($platform === 'Whatsapp') {
-            $username = preg_replace('/[^0-9]/', '', $username);
+            // Check if input is already a WhatsApp URL
+            if (preg_match('/^https?:\/\/wa\.me\/qr\/[A-Z0-9]+$/i', $username)) {
+                // Handle QR code link format
+                return [
+                    'icon' => $config['icon'],
+                    'url' => $username,
+                    'username' => $username
+                ];
+            } elseif (preg_match('/^(?:https?:\/\/)?wa\.me\/(\d+)$/i', $username, $matches)) {
+                // Extract number from wa.me link and format for display
+                $number = $matches[1];
+                return [
+                    'icon' => $config['icon'],
+                    'url' => 'https://wa.me/' . $number,
+                    'username' => '+' . $number
+                ];
+            } elseif (preg_match('/^https?:\/\/(api\.whatsapp\.com|web\.whatsapp\.com)/', $username)) {
+                // Handle other WhatsApp links
+                return [
+                    'icon' => $config['icon'],
+                    'url' => $username,
+                    'username' => $username
+                ];
+            }
+            
+            // Handle phone number
+            $clean_number = preg_replace('/[^0-9]/', '', $username);
+            
+            return [
+                'icon' => $config['icon'],
+                'url' => $config['base_url'] . $clean_number,
+                'username' => $username // Keep original format for manually entered numbers
+            ];
         }
 
+        // Handle other platforms
+        // Check if input is already a full URL
+        if (preg_match('/^https?:\/\//i', $username)) {
+            return [
+                'icon' => $config['icon'],
+                'url' => $username,
+                'username' => $username
+            ];
+        }
+
+        // Handle username
+        // Remove @ symbol if present at start
+        $clean_username = ltrim($username, '@');
+        $url = $config['base_url'] . $clean_username;
+        
         return [
             'icon' => $config['icon'],
-            'url' => $config['base_url'] . $username,
-            'username' => $username
+            'url' => $url,
+            'username' => $username // Keep original format
         ];
     }
 }
+?>
