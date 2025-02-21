@@ -1,19 +1,19 @@
 <?php
-
 /**
  * Template Name: Homepage Lowongan
- * 
- * This is the custom homepage template for the job board
  */
+
+// Get all filter data at the start
+$filter_data = get_job_filters_data();
 
 get_header(); ?>
 
 <div class="max-w-7xl mx-auto px-4 py-8">
     <!-- Hero Section with Search -->
-    <section class="bg-gradient-to-r from-blue-600 to-blue-800 rounded-2xl p-8 mb-12">
+    <section class="bg-gradient-to-r rounded-2xl p-8 mb-12">
         <div class="max-w-4xl mx-auto text-center">
             <h1 class="text-4xl font-bold text-white mb-4">Temukan Lowongan Kerja Terbaik</h1>
-            <p class="text-blue-100 mb-8">Temukan ribuan lowongan kerja di Banjarmasin dan sekitarnya</p>
+            <p class="text-blue-100 mx-auto mb-8">Temukan ribuan lowongan kerja di Banjarmasin dan sekitarnya</p>
 
             <!-- Search Form -->
             <div class="bg-white p-6 rounded-xl shadow-lg">
@@ -34,17 +34,15 @@ get_header(); ?>
                     <!-- Filters -->
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <!-- Location Filter -->
-                        <?php
-                        $locations = get_terms(['taxonomy' => 'lokasi-pekerjaan', 'hide_empty' => false]);
-                        if ($locations && !is_wp_error($locations)) : ?>
+                        <?php if (!empty($filter_data['locations'])) : ?>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <i class="fas fa-map-marker-alt text-gray-400"></i>
                             </div>
                             <select name="lokasi-pekerjaan"
                                 class="w-full pl-12 pr-4 py-4 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-700 appearance-none bg-white text-center">
-                                <option value="">Semua Lokasi</option>
-                                <?php foreach ($locations as $location) : ?>
+                                <option value="">Lokasi</option>
+                                <?php foreach ($filter_data['locations'] as $location) : ?>
                                 <option value="<?php echo esc_attr($location->slug); ?>">
                                     <?php echo esc_html($location->name); ?>
                                 </option>
@@ -57,17 +55,15 @@ get_header(); ?>
                         <?php endif; ?>
 
                         <!-- Experience Filter -->
-                        <?php
-                        $experiences = get_terms(['taxonomy' => 'pengalaman', 'hide_empty' => false]);
-                        if ($experiences && !is_wp_error($experiences)) : ?>
+                        <?php if (!empty($filter_data['experiences'])) : ?>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
                                 <i class="fas fa-briefcase text-gray-400"></i>
                             </div>
                             <select name="pengalaman"
                                 class="w-full pl-12 pr-4 py-4 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-700 appearance-none bg-white text-center">
-                                <option value="">Pengalaman Kerja</option>
-                                <?php foreach ($experiences as $exp) : ?>
+                                <option value="">Pengalaman</option>
+                                <?php foreach ($filter_data['experiences'] as $exp) : ?>
                                 <option value="<?php echo esc_attr($exp->slug); ?>">
                                     <?php echo esc_html($exp->name); ?>
                                 </option>
@@ -80,9 +76,7 @@ get_header(); ?>
                         <?php endif; ?>
 
                         <!-- Education Filter -->
-                        <?php
-                        $education = get_terms(['taxonomy' => 'pendidikan', 'hide_empty' => false]);
-                        if ($education && !is_wp_error($education)) : ?>
+                        <?php if (!empty($filter_data['education'])) : ?>
                         <div class="relative">
                             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none ">
                                 <i class="fas fa-graduation-cap text-gray-400"></i>
@@ -90,7 +84,7 @@ get_header(); ?>
                             <select name="pendidikan"
                                 class="w-full pl-12 pr-4 py-4 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-700 appearance-none bg-white text-center">
                                 <option value="">Lulusan</option>
-                                <?php foreach ($education as $edu) : ?>
+                                <?php foreach ($filter_data['education'] as $edu) : ?>
                                 <option value="<?php echo esc_attr($edu->slug); ?>">
                                     <?php echo esc_html($edu->name); ?>
                                 </option>
@@ -139,19 +133,12 @@ get_header(); ?>
             <div id="featured-jobs-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <?php
                 $paged = get_query_var('paged') ? get_query_var('paged') : 1;
-                $args = [
-                    'post_type' => 'lowongan',
-                    'posts_per_page' => 6,
-                    'orderby' => 'date',
-                    'order' => 'DESC',
-                    'paged' => $paged
-                ];
-
-                $query = new WP_Query($args);
+                $featured_jobs = get_featured_jobs_data($paged);
+                $query = $featured_jobs['query'];
 
                 if ($query->have_posts()) :
                     while ($query->have_posts()) : $query->the_post();
-                        get_template_part('template-parts/content', 'job-card');
+                        get_template_part('template-parts/homepage/content-job-card');
                     endwhile;
                     wp_reset_postdata();
                 else :
@@ -160,11 +147,11 @@ get_header(); ?>
                 ?>
             </div>
 
-            <?php if ($query->max_num_pages > 1) : ?>
+            <?php if ($featured_jobs['max_pages'] > 1) : ?>
                 <div class="mt-8 flex justify-center gap-2" id="featured-jobs-pagination">
                     <?php 
-                    for ($i = 1; $i <= $query->max_num_pages; $i++) :
-                        $is_current = $i === $paged;
+                    for ($i = 1; $i <= $featured_jobs['max_pages']; $i++) :
+                        $is_current = $i === $featured_jobs['current_page'];
                     ?>
                         <button type="button"
                                 data-page="<?php echo $i; ?>"
@@ -185,7 +172,6 @@ get_header(); ?>
         </div>
     </section>
 
-    <!-- Job Categories Section -->
     <!-- Job Categories Section -->
     <?php /* 
     <section class="mb-12">

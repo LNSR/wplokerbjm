@@ -5,12 +5,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
     if (!grid || !pagination) return;
 
-    const debug = (message, data = '') => {
-        console.log(`[Featured Jobs Debug] ${message}`, data);
-    };
-
     const loadJobs = (page = 1, append = false) => {
-        debug('Loading page ' + page + ', append: ' + append);
         loading.classList.remove('hidden');
 
         const formData = new FormData();
@@ -25,8 +20,6 @@ document.addEventListener('DOMContentLoaded', function() {
         })
         .then(response => response.json())
         .then(data => {
-            debug('Received response:', data);
-            
             if (data.success) {
                 // Update content
                 if (!append) {

@@ -12,33 +12,6 @@ function is_really_empty($value) {
     return empty($value) && !is_numeric($value);
 }
 
-/**
- * Helper functions for job listing functionality
- */
-
-function get_job_meta_data() {
-    return [
-        'company' => rwmb_meta('nama_perusahaan'),
-        'company_desc' => rwmb_meta('tentang_perusahaan'),
-        'job_desc' => rwmb_meta('deskripsi_pekerjaan'),
-        'education' => rwmb_meta('pendidikan'),
-        'job_type' => rwmb_meta('jenis_pekerjaan'),
-        'gender' => rwmb_meta('gender'),
-        'min_age' => rwmb_meta('umur_min'),
-        'max_age' => rwmb_meta('umur_max'),
-        'experience' => rwmb_meta('pengalaman'),
-        'requirements' => rwmb_meta('persyaratan'),
-        'min_salary' => rwmb_meta('gaji_minimal'),
-        'max_salary' => rwmb_meta('gaji_maksimal'),
-        'location' => rwmb_meta('lokasi'),
-        'deadline' => rwmb_meta('deadline'),
-        'email' => rwmb_meta('email_kontak'),
-        'phone' => rwmb_meta('nomor_kontak'),
-        'website' => rwmb_meta('situs_kontak'),
-        'socials' => rwmb_meta('social_media')
-    ];
-}
-
 function format_age_range($min_age, $max_age) {
     if (!is_really_empty($min_age) && !is_really_empty($max_age)) {
         return "{$min_age} - {$max_age} tahun";
