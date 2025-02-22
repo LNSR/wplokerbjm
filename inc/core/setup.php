@@ -1,6 +1,7 @@
 <?php
 
-function get_job_meta_data() {
+function get_job_meta_data()
+{
     return [
         'company' => rwmb_meta('nama_perusahaan'),
         'company_desc' => rwmb_meta('tentang_perusahaan'),
@@ -30,7 +31,8 @@ function get_job_meta_data() {
  * @param array $args Additional arguments for get_terms()
  * @return array Array of taxonomy terms or empty array if none found
  */
-function get_job_taxonomy_terms($taxonomy_name, $args = []) {
+function get_job_taxonomy_terms($taxonomy_name, $args = [])
+{
     $default_args = [
         'taxonomy' => $taxonomy_name,
         'hide_empty' => false
@@ -51,7 +53,8 @@ function get_job_taxonomy_terms($taxonomy_name, $args = []) {
  * 
  * @return array Associative array of all taxonomy terms
  */
-function get_job_filters_data() {
+function get_job_filters_data()
+{
     return [
         'locations' => get_job_taxonomy_terms('lokasi-pekerjaan'),
         'experiences' => get_job_taxonomy_terms('pengalaman'),
@@ -70,7 +73,8 @@ function get_job_filters_data() {
  * @since 1.0.0
  * @return void
  */
-function update_lowongan_taxonomies() {
+function update_lowongan_taxonomies()
+{
     $taxonomies = [
         'jenis-pekerjaan',    // Job Type
         'lokasi-pekerjaan',   // Job Location
@@ -81,7 +85,7 @@ function update_lowongan_taxonomies() {
         'gaji',              // Salary Range
         'usia'               // Age Requirement
     ];
-    
+
     // Update the post type registration with new taxonomies
     global $wp_post_types;
     if (isset($wp_post_types['lowongan'])) {
@@ -96,7 +100,8 @@ add_action('init', 'update_lowongan_taxonomies', 11);
  * @param int $page Current page number
  * @return array Query results and pagination data
  */
-function get_featured_jobs_data($page = 1) {
+function get_featured_jobs_data($page = 1)
+{
     $args = [
         'post_type' => 'lowongan',
         'posts_per_page' => 6,
@@ -115,4 +120,20 @@ function get_featured_jobs_data($page = 1) {
     ];
 }
 
-?>
+function translate_time_diff($time_diff)
+{
+    // Array of English to Indonesian time translations with word boundaries
+    $translations = array(
+        '/\b(year|years)\b/' => 'tahun',
+        '/\b(month|months)\b/' => 'bulan',
+        '/\b(week|weeks)\b/' => 'minggu',
+        '/\b(day|days)\b/' => 'hari',
+        '/\b(hour|hours)\b/' => 'jam',
+        '/\b(minute|minutes)\b/' => 'menit',
+        '/\b(second|seconds)\b/' => 'detik'
+    );
+
+    // Use preg_replace with word boundaries to prevent partial word matches
+    return preg_replace(array_keys($translations), array_values($translations), $time_diff);
+}
+
