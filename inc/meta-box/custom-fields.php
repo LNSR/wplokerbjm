@@ -1,6 +1,6 @@
 <?php
 // Custom Fields for Lowongan Post Type
-add_filter( 'rwmb_meta_boxes', 'lowongan_meta_boxes' );
+add_filter('rwmb_meta_boxes', 'lowongan_meta_boxes');
 
 function lowongan_meta_boxes( $meta_boxes ) {
     $prefix = '';
@@ -264,6 +264,27 @@ function lowongan_meta_boxes( $meta_boxes ) {
                     'Telegram'    => 'Telegram',
                 ],
                 'required'          => false,
+                'clone'             => false,
+                'clone_empty_start' => false,
+                'hide_from_rest'    => false,
+            ],
+            [
+                'name'              => __('Status Pekerjaan', 'astra-child'),
+                'id'                => $prefix . 'status_pekerjaan',
+                'type'              => 'select',
+                'label_description' => __('Prioritas pekerjaan yang akan ditampilkan di front page', 'astra-child'),
+                'options'           => [
+                    '0' => __('Normal', 'astra-child'),
+                    '2' => __('Urgent', 'astra-child'),
+                    '3' => __('Pinned', 'astra-child'),
+                    '4' => __('Pinned & Urgent', 'astra-child'),
+                ],
+                'std'               => '0',
+                'multiple'          => false,
+                'select_all_none'   => false,
+                'required'          => true,
+                'disabled'          => false,
+                'readonly'          => false,
                 'clone'             => false,
                 'clone_empty_start' => false,
                 'hide_from_rest'    => false,

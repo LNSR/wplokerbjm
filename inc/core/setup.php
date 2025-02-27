@@ -19,7 +19,8 @@ function get_job_meta_data() {
         'email' => rwmb_meta('email_kontak'),
         'phone' => rwmb_meta('nomor_kontak'),
         'website' => rwmb_meta('situs_kontak'),
-        'socials' => rwmb_meta('social_media')
+        'socials' => rwmb_meta('social_media'),
+        'status' => rwmb_meta('status_pekerjaan')
     ];
 }
 
@@ -44,23 +45,6 @@ function get_job_taxonomy_terms($taxonomy_name, $args = []) {
     }
 
     return $terms;
-}
-
-/**
- * Get all job related taxonomies data
- * 
- * @return array Associative array of all taxonomy terms
- */
-function get_job_filters_data() {
-    return [
-        'locations' => get_job_taxonomy_terms('lokasi-pekerjaan'),
-        'experiences' => get_job_taxonomy_terms('pengalaman'),
-        'education' => get_job_taxonomy_terms('pendidikan'),
-        'job_types' => get_job_taxonomy_terms('jenis-pekerjaan'),
-        'genders' => get_job_taxonomy_terms('gender'),
-        'salaries' => get_job_taxonomy_terms('gaji'),
-        'ages' => get_job_taxonomy_terms('usia')
-    ];
 }
 
 /**
@@ -91,6 +75,25 @@ function update_lowongan_taxonomies() {
 add_action('init', 'update_lowongan_taxonomies', 11);
 
 /**
+ * Get all job related taxonomies data
+ * 
+ * @return array Associative array of all taxonomy terms
+ */
+function get_job_filters_data()
+{
+    return [
+        'locations' => get_job_taxonomy_terms('lokasi-pekerjaan'),
+        'experiences' => get_job_taxonomy_terms('pengalaman'),
+        'education' => get_job_taxonomy_terms('pendidikan'),
+        'job_types' => get_job_taxonomy_terms('jenis-pekerjaan'),
+        'genders' => get_job_taxonomy_terms('gender'),
+        'salaries' => get_job_taxonomy_terms('gaji'),
+        'ages' => get_job_taxonomy_terms('usia')
+    ];
+}
+
+
+/**
  * Get featured jobs data
  * 
  * @param int $page Current page number
@@ -111,6 +114,81 @@ function get_featured_jobs_data($page = 1) {
         'query' => $query,
         'max_pages' => $query->max_num_pages,
         'current_page' => $page,
+        'found_posts' => $query->found_posts
+    ];
+}
+
+// Add this to the bottom of your file
+
+/**
+ * Get search results based on query parameters
+ * 
+ * @return array Query results and pagination data
+ */
+function get_search_results_jobs() {
+    $paged = (get_query_var('paged')) ? get_query_var('paged') : 1;
+    
+    $args = [
+        'post_type' => 'lowongan',
+        'posts_per_page' => 10,
+        'orderby' => 'date',
+        'order' => 'DESC',
+        'paged' => $paged
+    ];
+
+    // Search by keywords
+    $keywords = isset($_GET['keywords']) ? sanitize_text_field($_GET['keywords']) : '';
+    if (!empty($keywords)) {
+        $args['s'] = $keywords;
+    }
+
+    // Build taxonomy query
+    $tax_query = [];
+
+    // Location filter
+    $location = isset($_GET['loc']) ? sanitize_text_field($_GET['loc']) : '';
+    if (!empty($location)) {
+        $tax_query[] = [
+            'taxonomy' => 'lokasi-pekerjaan',
+            'field' => 'slug',
+            'terms' => $location
+        ];
+    }
+
+    // Experience filter
+    $experience = isset($_GET['pengalaman']) ? sanitize_text_field($_GET['pengalaman']) : '';
+    if (!empty($experience)) {
+        $tax_query[] = [
+            'taxonomy' => 'pengalaman',
+            'field' => 'slug',
+            'terms' => $experience
+        ];
+    }
+
+    // Education filter
+    $education = isset($_GET['pendidikan']) ? sanitize_text_field($_GET['pendidikan']) : '';
+    if (!empty($education)) {
+        $tax_query[] = [
+            'taxonomy' => 'pendidikan',
+            'field' => 'slug',
+            'terms' => $education
+        ];
+    }
+
+    // Only add tax query if we have any taxonomy conditions
+    if (!empty($tax_query)) {
+        $args['tax_query'] = [
+            'relation' => 'AND',
+            $tax_query
+        ];
+    }
+
+    $query = new WP_Query($args);
+
+    return [
+        'query' => $query,
+        'max_pages' => $query->max_num_pages,
+        'current_page' => $paged,
         'found_posts' => $query->found_posts
     ];
 }

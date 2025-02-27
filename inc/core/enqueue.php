@@ -10,28 +10,6 @@
 
 
 // Enqueue the script
-function enqueue_job_search_scripts() {
-    if (is_page_template('page-homepage.php')) {
-        wp_enqueue_script(
-            'job-search', 
-            get_stylesheet_directory_uri() . '/assets/js/job-search.js',
-            ['jquery'],
-            '1.0.0',
-            true
-        );
-        
-        // Correct way to localize script with an array
-        wp_localize_script(
-            'job-search', 
-            'jobSearchData', 
-            array(
-                'ajaxurl' => admin_url('admin-ajax.php'),
-                'nonce' => wp_create_nonce('job_search_nonce')
-            )
-        );
-    }
-}
-add_action('wp_enqueue_scripts', 'enqueue_job_search_scripts');
 
 // Enqueue featured jobs script
 function enqueue_featured_jobs_scripts() {
@@ -73,4 +51,26 @@ function enqueue_share_scripts() {
     }
 }
 add_action('wp_enqueue_scripts', 'enqueue_share_scripts');
+
+function enqueue_status_carousel_scripts() {
+    if (is_page_template('page-homepage.php')) {
+        wp_enqueue_script(
+            'status-carousel',
+            get_stylesheet_directory_uri() . '/assets/js/status-carousel.js',
+            ['jquery'],
+            '1.0.0',
+            true
+        );
+
+        wp_localize_script(
+            'status-carousel',
+            'statusCarouselData',
+            [
+                'ajaxurl' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('status_carousel_nonce')
+            ]
+        );
+    }
+}
+add_action('wp_enqueue_scripts', 'enqueue_status_carousel_scripts');
 ?>
