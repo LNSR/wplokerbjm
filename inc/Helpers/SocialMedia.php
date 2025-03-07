@@ -1,9 +1,12 @@
 <?php
+namespace AstraChild\Helpers;
+
 /**
  * Helper functions for social media handling
  */
 
-class Social_Media {
+class SocialMedia
+{
     /** @var array Mapping of social media platforms to their configurations */
     private static $platforms = [
         'X / Twitter' => [
@@ -51,7 +54,8 @@ class Social_Media {
      * @param string $username Username/handle or phone number for WhatsApp
      * @return array|null Array containing icon and full URL
      */
-    public static function get_link_data($platform, $username) {
+    public static function getLinkData(string $platform, string $username): ?array
+    {
         if (!isset(self::$platforms[$platform]) || empty($username)) {
             return null;
         }

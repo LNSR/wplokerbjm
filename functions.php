@@ -11,42 +11,12 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-/**
- * Define files to be included in the theme
- * These files contain various functionality components
- */
-$include_files = [
+// Register autoloader
+require_once get_stylesheet_directory() . '/inc/Core/Loader.php';
+AstraChild\Core\Loader::register();
 
-
-    // Meta Box Configuration Files
-    '/inc/meta-box/post-types.php',         // Custom post type definitions
-    '/inc/meta-box/taxonomies.php',         // Custom taxonomy definitions
-    '/inc/meta-box/custom-fields.php',      // Custom field configurations
-        // Meta Box Call
-        '/inc/core/setup.php',
-
-    '/inc/core/enqueue.php',                // Script and style enqueuing
-    
-    // Windpress files
-    '/inc/windpress/scanner.php',           // WindPress Scanner
-    
-    // Helper Files
-    '/inc/helpers/job-helpers.php',         // Job Helper
-    '/inc/helpers/social-media.php',        // Social Media Helper
-    
-    // AJAX Handlers
-    // '/inc/ajax/job-search.php',             // Job search AJAX handler
-    '/inc/ajax/status-carousel.php',        // Homepage slider AJAX handler
-    '/inc/ajax/share.php',                  // Share job AJAX handler
-    '/inc/ajax/featured-jobs.php',          // Featured jobs AJAX handler
-    '/inc/ajax/job-search-scroll.php',      // Infinite search AJAX handler
-];
-
-// Include all defined files
-foreach ($include_files as $file) {
-    require_once get_stylesheet_directory() . $file;
-}
-
+$init = new AstraChild\Core\Init();
+$init->initialize();
 
 // BEGIN ENQUEUE PARENT ACTION
 // AUTO GENERATED - Do not modify or remove comment markers above or below:
