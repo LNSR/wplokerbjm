@@ -1,15 +1,18 @@
 <?php
+
+use AstraChild\Controllers\JobController;
+$searchController = new JobController() ;
 /**
  * Template Name: Job Search Results
  */
-
 get_header(); ?>
 
 <div class="max-w-8xl mx-auto px-4 py-8">
     <!-- Flex container for main content and sidebar -->
     <div class="flex flex-col lg:flex-row gap-8">
         <!-- Main content column -->
-        <div class="w-full lg:w-3/4">
+        <div class="w-full">
+            <!-- <div class="w-full lg:w-3/4"> Replace above if using Sidebar -->
             <!-- Include search form at top of results -->
             <?php get_template_part('template-parts/search/search-section'); ?>
 
@@ -18,7 +21,7 @@ get_header(); ?>
                 <h2 class="text-3xl font-bold text-gray-900">Hasil Pencarian</h2>
                 <div id="search-count" class="text-gray-500 mt-2">
                     <?php 
-                    $jobs = get_search_results_jobs();
+                    $jobs = $searchController->getSearchResultsJobs();
                     echo '<span>' . $jobs['found_posts'] . '</span> lowongan ditemukan';
                     ?>
                 </div>
@@ -49,9 +52,9 @@ get_header(); ?>
         </div>
 
         <!-- Sidebar -->
-        <div class="hidden lg:block w-full lg:w-1/4">
-            <?php get_template_part('template-parts/sidebar'); ?>
-        </div>
+        <!-- <div class="hidden lg:block w-full lg:w-1/4">
+            <?php // get_template_part('template-parts/jobs/sidebar'); ?>
+        </div> -->
     </div>
 </div>
 

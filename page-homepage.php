@@ -3,13 +3,19 @@
  * Template Name: Homepage Lowongan
  */
 
+use AstraChild\Controllers\HomePageController;
+
+// Initialize the controller
+$homeController = new HomePageController();
+
 get_header(); ?>
 
 <div class="max-w-8xl mx-auto px-4 py-8">
     <!-- Flex container for main content and sidebar -->
     <div class="flex flex-col lg:flex-row gap-8">
         <!-- Main content column -->
-        <div class="w-full lg:w-3/4">
+        <div class="w-full">
+        <!-- <div class="w-full lg:w-3/4"> Replace above if using Sidebar -->
             <!-- Hero Section with Search -->
             <?php get_template_part('template-parts/search/search-section'); ?>
 
@@ -23,7 +29,7 @@ get_header(); ?>
                     <div id="featured-jobs-grid" class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-6">
                         <?php
                         $paged = get_query_var('paged') ? get_query_var('paged') : 1;
-                        $featured_jobs = get_featured_jobs_data($paged);
+                        $featured_jobs = $homeController->getFeaturedJobs($paged);
                         $query = $featured_jobs['query'];
 
                         if ($query->have_posts()) :
@@ -63,10 +69,10 @@ get_header(); ?>
             </section>
         </div>
 
-        <!-- Sidebar -->
+        <!-- Sidebar
         <div class="hidden lg:block w-full lg:w-1/4">
-            <?php get_template_part('template-parts/sidebar'); ?>
-        </div>
+            <?php // get_template_part('template-parts/jobs/sidebar'); ?>
+        </div> -->
     </div>
 </div>
 
