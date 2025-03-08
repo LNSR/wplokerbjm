@@ -5,9 +5,16 @@ namespace AstraChild\Views\Jobs;
 use AstraChild\Models\JobEntity;
 use AstraChild\Helpers\JobHelpers;
 use AstraChild\Helpers\SocialMedia;
+use AstraChild\Views\Components\ShareButton;
 
 class Single
 {
+    protected $shareButton;
+
+    public function __construct() {
+        $this->shareButton = new ShareButton();
+    }
+
     /**
      * Render the single job view
      * 
@@ -268,5 +275,15 @@ class Single
             </div>
         </div>
         <?php
+    }
+
+    /**
+     * Render share button
+     * 
+     * @param JobEntity $job The job entity
+     * @return void
+     */
+    public function renderShareButton(JobEntity $job): void {
+        $this->shareButton->render($job);
     }
 }
