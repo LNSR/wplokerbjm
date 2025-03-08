@@ -190,7 +190,7 @@ class JobModel
         foreach ($status_priority as $status) {
             $args = [
                 'post_type' => 'lowongan',
-                'posts_per_page' => 1,
+                'posts_per_page' => 10,
                 'meta_key' => 'status_pekerjaan',
                 'meta_value' => $status,
                 'orderby' => 'date',
@@ -217,6 +217,7 @@ class JobModel
                         'permalink' => get_permalink(),
                         'company' => $job_data['company'],
                         'location' => $job_data['location'],
+                        'deadline' => $job_data['deadline'],
                         'status' => [
                             'label' => $status_attrs['label'],
                             'icon' => $status_attrs['icon'],

@@ -4,6 +4,8 @@ namespace AstraChild\Views\Homepage;
 use AstraChild\Controllers\StatusCarouselController;
 use AstraChild\Controllers\HomePageController;
 use AstraChild\Controllers\JobController;
+use AstraChild\Views\Components\JobStatusBadge;
+use AstraChild\Views\Components\JobDeadlineBadge;
 
 /**
  * Status Carousel View
@@ -26,6 +28,16 @@ class StatusCarousel
      * @var JobController
      */
     protected $jobController;
+
+    /**
+     * @var JobStatusBadge
+     */
+    protected $statusBadge;
+    
+    /**
+     * @var JobDeadlineBadge
+     */
+    protected $deadlineBadge;
     
     /**
      * Initialize the carousel
@@ -35,6 +47,8 @@ class StatusCarousel
         $this->carouselController = new StatusCarouselController();
         $this->homepagecontroller = new HomePageController();
         $this->jobController = new JobController();
+        $this->statusBadge = new JobStatusBadge();
+        $this->deadlineBadge = new JobDeadlineBadge();
     }
     
     /**
@@ -54,13 +68,6 @@ class StatusCarousel
         ];
         
         $options = array_merge($default_options, $options);
-        
-        // Localize the script with required data
-        wp_localize_script('status-carousel-js', 'statusCarouselData', [
-            'ajaxurl' => admin_url('admin-ajax.php'),
-            'action' => 'load_status_carousel',
-            'nonce' => wp_create_nonce('status_carousel_nonce')
-        ]);
         
         ?>
         <section class="job-status-section mb-12">
@@ -85,7 +92,7 @@ class StatusCarousel
                     <?php endif; ?>
 
                     <!-- Carousel Content -->
-                    <div class="overflow-hidden">
+                    <div class="overflow-hidden lg:mx-20">
                         <div id="status-carousel" class="flex gap-6 transition-transform duration-300 px-2" 
                              data-auto-slide="<?php echo $options['auto_slide'] ? 'true' : 'false'; ?>"
                              data-items="<?php echo esc_attr($options['items_to_show']); ?>">
@@ -113,19 +120,18 @@ class StatusCarousel
         // Get initial jobs directly without AJAX for faster initial load
         $carousel_data = $this->homepagecontroller->getStatusCarouselJobs();
         
-        if (!empty($carousel_data['query']) && $carousel_data['query']->have_posts()) {
-            while ($carousel_data['query']->have_posts()) {
-                $carousel_data['query']->the_post();
-                $job_id = get_the_ID();
+        if (!empty($carousel_data)) {
+            foreach ($carousel_data as $job) {
+                // Create a job entity from the array data
+                $job_id = $job['id'];
                 
-                // Create job entity through JOB controller, not homepage controller
+                // Get full job entity
                 $job_entity = $this->jobController->getJobEntity($job_id);
                 
                 if ($job_entity) {
                     $this->renderCarouselItem($job_entity);
                 }
             }
-            wp_reset_postdata();
         } else {
             echo '<div class="text-center p-4 w-full">No featured jobs found</div>';
         }
@@ -140,49 +146,8 @@ class StatusCarousel
     protected function renderCarouselItem($job_entity): void
     {
         ?>
-        <div class="status-carousel-item min-w-[280px] w-[280px] md:min-w-[320px] md:w-[320px]">
-            <div class="bg-white rounded-lg shadow-sm border border-red-200 hover:shadow-md transition-shadow p-4">
-                <div class="flex items-start justify-between gap-2 mb-3">
-                    <h3 class="font-semibold text-gray-900 line-clamp-2">
-                        <a href="<?php echo esc_url($job_entity->getAttribute('permalink')); ?>" class="hover:text-blue-600 transition-colors">
-                            <?php echo esc_html($job_entity->getAttribute('title')); ?>
-                        </a>
-                    </h3>
-                    
-                    <?php if ($job_entity->isUrgent()): ?>
-                    <span class="bg-red-100 text-red-600 text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap">
-                        <i class="fas fa-exclamation-circle mr-1"></i>
-                        Urgent
-                    </span>
-                    <?php endif; ?>
-                </div>
-                
-                <p class="text-sm text-gray-600 mb-3">
-                    <i class="fas fa-building mr-1 text-blue-600"></i>
-                    <?php echo esc_html($job_entity->getAttribute('company')); ?>
-                </p>
-                
-                <?php if ($job_entity->hasAttribute('deadline')): 
-                    $deadline = strtotime($job_entity->getAttribute('deadline'));
-                    $days_left = ceil(($deadline - time()) / (60 * 60 * 24));
-                ?>
-                    <div class="text-xs font-medium <?php echo $days_left > 3 ? 'text-green-600' : 'text-red-600'; ?> mb-3">
-                        <i class="fas fa-clock mr-1"></i>
-                        <?php 
-                        if ($days_left > 0) {
-                            echo 'Berakhir dalam ' . $days_left . ' hari';
-                        } else {
-                            echo 'Berakhir ' . abs($days_left) . ' hari yang lalu';
-                        }
-                        ?>
-                    </div>
-                <?php endif; ?>
-                
-                <a href="<?php echo esc_url($job_entity->getAttribute('permalink')); ?>" 
-                   class="block text-center text-sm bg-blue-600 hover:bg-blue-700 text-white rounded py-1.5 px-4 transition-colors">
-                    Lihat Detail
-                </a>
-            </div>
+        <div class="status-carousel-item">
+            <!-- Load by AJAX -->
         </div>
         <?php
     }

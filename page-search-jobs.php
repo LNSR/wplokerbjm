@@ -31,9 +31,17 @@ get_header(); ?>
             <div id="search-results-container" class="animate-fade-in">
                 <div id="search-results-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">
                     <?php
+                    $job_card_view = new \AstraChild\Views\Jobs\JobCard();
                     if ($jobs['query']->have_posts()) :
                         while ($jobs['query']->have_posts()) : $jobs['query']->the_post();
-                            get_template_part('template-parts/homepage/content-job-card');
+                            $job_card_view->render(null, [
+                                'show_statuses' => [
+                                    '0' => true,   // Show normal jobs
+                                    '2' => true,   // Show urgent jobs 
+                                    '3' => false,  // Hide pinned jobs
+                                    '4' => false   // Hide pinned & urgent jobs
+                                ]
+                            ]);
                         endwhile;
                         wp_reset_postdata();
                     else :

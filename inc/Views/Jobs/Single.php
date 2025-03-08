@@ -1,5 +1,4 @@
 <?php
-// filepath: /home/maulana/Project/Lowker-site/astra-child/inc/Views/Jobs/Single.php
 namespace AstraChild\Views\Jobs;
 
 use AstraChild\Models\JobEntity;

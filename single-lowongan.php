@@ -1,5 +1,4 @@
 <?php
-// filepath: /home/maulana/Project/Lowker-site/astra-child/single-lowongan.php
 /**
  * Single Job Template
  *

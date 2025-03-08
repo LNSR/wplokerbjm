@@ -1,5 +1,4 @@
 <?php
-// filepath: /home/maulana/Project/Lowker-site/astra-child/template-parts/jobs/card-content.php
 /**
  * Template part for displaying job card content
  * 

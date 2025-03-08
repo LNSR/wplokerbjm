@@ -55,7 +55,7 @@ class SearchForm
             <?php endif; ?>
 
             <!-- Search Form -->
-            <div class="bg-white p-6 rounded-xl shadow-lg md:mx-auto lg:mx-15">
+            <div class="bg-white p-6 rounded-xl shadow-lg md:mx-auto lg:mx-75">
             <!-- <div class="bg-white p-6 rounded-xl shadow-lg md:mx-auto lg:mx-30"> Replace above if using Sidebar -->
                 <form action="<?php echo esc_url(home_url('/search-jobs/')); ?>" method="GET" class="space-y-6">
                     <!-- Search Input -->

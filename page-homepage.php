@@ -25,7 +25,7 @@ get_header(); ?>
 
             <!-- Featured Jobs Section -->
             <section class="featured-jobs-section mb-12">
-                <div class="max-w-7xl mx-auto">
+                <div class="max-w-7xl mx-auto lg:mx-50">
                     <h2 class="text-3xl font-bold text-gray-900 mb-8">Lowongan Terbaru</h2>
                     <div id="featured-jobs-grid" class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-6">
                         <?php
