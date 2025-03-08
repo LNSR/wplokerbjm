@@ -6,6 +6,7 @@ use AstraChild\Controllers\HomePageController;
 use AstraChild\Controllers\JobController;
 use AstraChild\Views\Components\JobStatusBadge;
 use AstraChild\Views\Components\JobDeadlineBadge;
+use AstraChild\Helpers\JobHelpers;
 
 /**
  * Status Carousel View
@@ -145,49 +146,81 @@ class StatusCarousel
      */
     protected function renderCarouselItem($job_entity): void
     {
+        // structure same like JS version
+
+        $status = $job_entity->getAttribute('status');
+        $status_attrs = JobHelpers::getJobStatusAttributes($status);
+        
+        $deadline_html = '';
+        if ($job_entity->hasAttribute('deadline')) {
+            $deadline = strtotime($job_entity->getAttribute('deadline'));
+            $current_time = current_time('timestamp');
+            $time_diff = $deadline - $current_time;
+            $days_left = ceil($time_diff / (60 * 60 * 24));
+            
+            if ($time_diff > 0) {
+                if ($days_left <= 3) {
+                    $color_class = 'bg-yellow-100 text-yellow-800';
+                    $deadline_text = $days_left . ' hari lagi';
+                } else {
+                    $color_class = 'bg-green-100 text-green-800';
+                    $deadline_text = $days_left . ' hari lagi';
+                }
+            } else {
+                $color_class = 'bg-red-100 text-red-800';
+                $deadline_text = 'Berakhir ' . abs($days_left) . ' hari lalu';
+            }
+            
+            $deadline_html = '
+                <div class="absolute top-3 right-3 z-10">
+                    <div class="flex items-center rounded-full px-2 py-1 text-xs ' . $color_class . ' shadow-sm">
+                        <i class="fas fa-clock mr-1"></i>
+                        <span class="font-medium">' . $deadline_text . '</span>
+                    </div>
+                </div>';
+        }
         ?>
-        <div class="status-carousel-item min-w-[280px] w-[280px] md:min-w-[320px] md:w-[320px]">
-            <div class="bg-white rounded-lg shadow-sm border border-red-200 hover:shadow-md transition-shadow p-4">
-                <div class="flex items-start justify-between gap-2 mb-3">
-                    <h3 class="font-semibold text-gray-900 line-clamp-2">
-                        <a href="<?php echo esc_url($job_entity->getAttribute('permalink')); ?>" class="hover:text-blue-600 transition-colors">
-                            <?php echo esc_html($job_entity->getAttribute('title')); ?>
-                        </a>
-                    </h3>
+        <div class="status-carousel-item">
+            <div class="relative bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-4 md:p-5 h-full flex flex-col justify-between">
+                <!-- Badges Section -->
+                <div class="badges-container min-h-[40px] relative mb-2">
+                    <!-- Deadline Badge -->
+                    <?php echo $deadline_html; ?>
                     
-                    <?php if ($job_entity->isUrgent()): ?>
-                    <span class="bg-red-100 text-red-600 text-xs font-medium px-2 py-1 rounded-full whitespace-nowrap">
-                        <i class="fas fa-exclamation-circle mr-1"></i>
-                        Urgent
-                    </span>
-                    <?php endif; ?>
+                    <!-- Status Badge -->
+                    <div class="absolute top-3 left-3 z-10">
+                        <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium <?php echo $status_attrs['class']; ?> shadow-sm">
+                            <i class="<?php echo $status_attrs['icon']; ?> mr-1"></i>
+                            <?php echo $status_attrs['label']; ?>
+                        </span>
+                    </div>
                 </div>
                 
-                <p class="text-sm text-gray-600 mb-3">
-                    <i class="fas fa-building mr-1 text-blue-600"></i>
-                    <?php echo esc_html($job_entity->getAttribute('company')); ?>
-                </p>
+                <!-- Visual Divider -->
+                <div class="border-b border-gray-100"></div>
                 
-                <?php if ($job_entity->hasAttribute('deadline')): 
-                    $deadline = strtotime($job_entity->getAttribute('deadline'));
-                    $days_left = ceil(($deadline - time()) / (60 * 60 * 24));
-                ?>
-                    <div class="text-xs font-medium <?php echo $days_left > 3 ? 'text-green-600' : 'text-red-600'; ?> mb-3">
-                        <i class="fas fa-clock mr-1"></i>
-                        <?php 
-                        if ($days_left > 0) {
-                            echo 'Berakhir dalam ' . $days_left . ' hari';
-                        } else {
-                            echo 'Berakhir ' . abs($days_left) . ' hari yang lalu';
-                        }
-                        ?>
-                    </div>
-                <?php endif; ?>
-                
-                <a href="<?php echo esc_url($job_entity->getAttribute('permalink')); ?>" 
-                   class="block text-center text-sm bg-blue-600 hover:bg-blue-700 text-white rounded py-1.5 px-4 transition-colors">
-                    Lihat Detail
-                </a>
+                <!-- Job Title -->
+                <h3 class="text-xl font-semibold text-gray-900 mb-4">
+                    <a href="<?php echo esc_url($job_entity->getAttribute('permalink')); ?>" class="hover:text-blue-600 transition-colors">
+                        <?php echo esc_html($job_entity->getAttribute('title')); ?>
+                    </a>
+                </h3>
+
+                <div class="space-y-2">
+                    <p class="text-gray-600 font-bold"><?php echo esc_html($job_entity->getAttribute('company')); ?></p>
+                    <p class="flex items-center text-gray-500">
+                        <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>
+                        <?php echo esc_html($job_entity->getAttribute('location')); ?>
+                    </p>
+                </div>
+
+                <div class="mt-4 pt-4 border-t border-gray-100">
+                    <a href="<?php echo esc_url($job_entity->getAttribute('permalink')); ?>" 
+                       class="inline-flex items-center gap-2 text-blue-600 hover:text-blue-700">
+                        Lihat Detail
+                        <i class="fas fa-arrow-right"></i>
+                    </a>
+                </div>
             </div>
         </div>
         <?php
