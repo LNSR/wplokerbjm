@@ -4,6 +4,7 @@
  */
 
 use AstraChild\Controllers\HomePageController;
+use AstraChild\Views\Components\Pagination;
 
 // Initialize the controller
 $homeController = new HomePageController();
@@ -43,23 +44,15 @@ get_header(); ?>
                         ?>
                     </div>
 
-                    <?php if ($featured_jobs['max_pages'] > 1) : ?>
-                        <div class="mt-8 flex justify-center gap-2" id="featured-jobs-pagination">
-                            <?php 
-                            for ($i = 1; $i <= $featured_jobs['max_pages']; $i++) :
-                                $is_current = $i === $featured_jobs['current_page'];
-                            ?>
-                                <button type="button"
-                                        data-page="<?php echo $i; ?>"
-                                        class="page-number px-4 py-2 rounded-lg <?php echo $is_current ? 
-                                            'bg-blue-600 text-white' : 
-                                            'bg-white text-blue-600 hover:bg-blue-50'; ?> 
-                                            border border-blue-200 transition-colors">
-                                    <?php echo $i; ?>
-                                </button>
-                            <?php endfor; ?>
-                        </div>
-                    <?php endif; ?>
+                    <?php 
+                    // Use the Pagination component
+                    $pagination = new Pagination();
+                    $pagination->render(
+                        $featured_jobs, // Contains 'max_pages' and 'current_page' keys
+                        'featured-jobs', // Target element ID (without '-pagination')
+                        'loadFeaturedJobs' // JavaScript callback function name
+                    );
+                    ?>
 
                     <!-- Loading indicator -->
                     <div id="featured-jobs-loading" class="text-center py-8 hidden">
