@@ -41,7 +41,9 @@ class SearchForm
         $default_options = [
             'title' => 'Temukan Lowongan Kerja Terbaik',
             'subtitle' => 'Temukan ribuan lowongan kerja di Banjarmasin dan sekitarnya',
-            'show_title' => true
+            'show_title' => true,
+            'desktop_margin' => 'lg:mx-60',  // Default for homepage
+            'mobile_margin' => 'md:mx-auto'  // Default for mobile
         ];
         
         $options = array_merge($default_options, $options);
@@ -54,9 +56,8 @@ class SearchForm
             </div>
             <?php endif; ?>
 
-            <!-- Search Form -->
-            <div class="bg-white p-6 rounded-xl shadow-lg md:mx-auto lg:mx-75">
-            <!-- <div class="bg-white p-6 rounded-xl shadow-lg md:mx-auto lg:mx-30"> Replace above if using Sidebar -->
+            <!-- Search Form with configurable margins -->
+            <div class="bg-white p-6 rounded-xl shadow-lg <?php echo esc_attr($options['mobile_margin'] . ' ' . $options['desktop_margin']); ?>">
                 <form action="<?php echo esc_url(home_url('/search-jobs/')); ?>" method="GET" class="space-y-6">
                     <!-- Search Input -->
                     <?php $this->renderKeywordInput(); ?>
