@@ -32,6 +32,10 @@ get_header(); ?>
             ]); 
             ?>
         </div>
+        <!-- Sidebar
+        <div class="hidden lg:block w-full lg:w-1/4">
+        <?php // get_template_part('template-parts/jobs/sidebar'); ?>
+        </div> -->
     </div>
 </div>
 

@@ -93,8 +93,8 @@ class StatusCarousel
                     <?php endif; ?>
 
                     <!-- Carousel Content -->
-                    <div class="overflow-hidden lg:mx-20">
-                        <div id="status-carousel" class="flex gap-6 transition-transform duration-300 px-2" 
+                    <div class="overflow-hidden lg:mx-10 md:mx-5 px-0 md:px-2">
+                        <div id="status-carousel" class="flex gap-3 md:gap-6 transition-transform duration-300" 
                              data-auto-slide="<?php echo $options['auto_slide'] ? 'true' : 'false'; ?>"
                              data-items="<?php echo esc_attr($options['items_to_show']); ?>">
                             <?php $this->renderInitialItems(); ?>
@@ -146,11 +146,11 @@ class StatusCarousel
      */
     protected function renderCarouselItem($job_entity): void
     {
-        // structure same like JS version
-
+        // Get status attributes for consistent display
         $status = $job_entity->getAttribute('status');
         $status_attrs = JobHelpers::getJobStatusAttributes($status);
         
+        // Process deadline info similar to JS
         $deadline_html = '';
         if ($job_entity->hasAttribute('deadline')) {
             $deadline = strtotime($job_entity->getAttribute('deadline'));
@@ -181,7 +181,7 @@ class StatusCarousel
         }
         ?>
         <div class="status-carousel-item">
-            <div class="relative bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-4 md:p-5 h-full flex flex-col justify-between">
+            <div class="relative bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-3 md:p-5 h-full flex flex-col justify-between">
                 <!-- Badges Section -->
                 <div class="badges-container min-h-[40px] relative mb-2">
                     <!-- Deadline Badge -->

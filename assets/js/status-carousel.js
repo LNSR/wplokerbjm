@@ -18,7 +18,7 @@ class StatusCarousel {
         this.minSwipeDistance = 50; // Minimum distance for a swipe to register
         
         // Auto slide variables
-        this.autoSlideInterval = 15000; // 15 seconds
+        this.autoSlideInterval = 10000; // 10 seconds
         this.autoSlideTimer = null;
         this.isUserInteracting = false;
         
@@ -37,13 +37,27 @@ class StatusCarousel {
         // Get number of items to show from data attribute
         const itemsToShow = parseInt(this.carousel.dataset.items || 3);
         
-        // Calculate width percentage based on items to show
-        const itemWidth = `calc(${100 / itemsToShow}% - 1rem)`;
+        // Get window width for responsive adjustment
+        const windowWidth = window.innerWidth;
+        
+        // Choose number of items based on screen size
+        let effectiveItems = itemsToShow;
+        if (windowWidth < 640) {
+            effectiveItems = 1; // Show 1 item on small mobile
+        } else if (windowWidth < 768) {
+            effectiveItems = 1.2; // Show slightly more than 1 item on larger mobile
+        } else if (windowWidth < 1024) {
+            effectiveItems = 2; // Show 2 items on tablet
+        }
+        
+        // Calculate width percentage based on items to show with proper spacing
+        const gapCompensation = windowWidth < 640 ? '0.5rem' : '1rem';
+        const itemWidth = `calc(${100 / effectiveItems}% - ${gapCompensation})`;
         
         // Apply width to all carousel items
         const items = this.carousel.querySelectorAll('.status-carousel-item');
         items.forEach(item => {
-            item.style.flex = `0 0 ${100 / itemsToShow}%`;
+            item.style.flex = `0 0 ${100 / effectiveItems}%`;
             item.style.maxWidth = itemWidth;
         });
     }
@@ -213,7 +227,10 @@ class StatusCarousel {
             this.carousel.addEventListener('mouseleave', () => this.resumeAutoSlide());
         }
 
-        window.addEventListener('resize', () => this.updateCarousel());
+        window.addEventListener('resize', () => {
+            this.setItemWidths();
+            this.updateCarousel();
+        });
         
         // Handle page visibility changes to pause/resume auto slide
         document.addEventListener('visibilitychange', () => {

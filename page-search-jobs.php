@@ -36,10 +36,11 @@ get_header(); ?>
                         while ($jobs['query']->have_posts()) : $jobs['query']->the_post();
                             $job_card_view->render(null, [
                                 'show_statuses' => [
+                                    // True/False to show/hide each status
                                     '0' => true,   // Show normal jobs
                                     '2' => true,   // Show urgent jobs 
-                                    '3' => false,  // Hide pinned jobs
-                                    '4' => false   // Hide pinned & urgent jobs
+                                    '3' => true,  // Hide pinned jobs
+                                    '4' => true   // Hide pinned & urgent jobs
                                 ]
                             ]);
                         endwhile;
