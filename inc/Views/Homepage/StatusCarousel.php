@@ -207,7 +207,10 @@ class StatusCarousel
                 </h3>
 
                 <div class="space-y-2">
-                    <p class="text-gray-600 font-bold"><?php echo esc_html($job_entity->getAttribute('company')); ?></p>
+                    <p class="flex items-center text-gray-600">
+                        <i class="fas fa-building mr-2 text-blue-600"></i>
+                        <span class="font-bold"><?php echo esc_html($job_entity->getAttribute('company')); ?></span>
+                    </p>
                     <p class="flex items-center text-gray-500">
                         <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>
                         <?php echo esc_html($job_entity->getAttribute('location')); ?>

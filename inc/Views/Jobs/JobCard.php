@@ -125,7 +125,7 @@ class JobCard
             <!-- Company name stays full width -->
             <p class="text-gray-600 font-bold mb-2">
                 <i class="fas fa-building mr-2 text-blue-600"></i>
-                <?php echo esc_html($job->getAttribute('company')); ?>
+                <span class="font-bold"><?php echo esc_html($job->getAttribute('company')); ?></span>
             </p>
             <!-- Flex container for location, education and experience -->
             <div class="flex flex-wrap gap-x-4">

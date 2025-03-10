@@ -150,7 +150,7 @@ class StatusCarousel {
                         <!-- Visual Divider -->
                         <div class="border-b border-gray-100"></div>
                         
-                        <!-- Job Title (no need for extra top padding now) -->
+                        <!-- Job Title -->
                         <h3 class="text-xl font-semibold text-gray-900 mb-4">
                             <a href="${job.permalink}" class="hover:text-blue-600 transition-colors">
                                 ${job.title}
@@ -158,7 +158,10 @@ class StatusCarousel {
                         </h3>
         
                         <div class="space-y-2">
-                            <p class="text-gray-600 font-bold">${job.company}</p>
+                            <p class="flex items-center text-gray-600">
+                                <i class="fas fa-building mr-2 text-blue-600"></i>
+                                <span class="font-bold">${job.company}</span>
+                            </p>
                             <p class="flex items-center text-gray-500">
                                 <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>
                                 ${job.location}
