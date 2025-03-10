@@ -22,7 +22,7 @@ abstract class EntityModel
      * @param mixed $default Default value if key doesn't exist
      * @return mixed
      */
-    public function getAttribute($key, $default = null)
+    public function getAttribute(string $key, $default = null)
     {
         return isset($this->data[$key]) ? $this->data[$key] : $default;
     }
@@ -34,7 +34,7 @@ abstract class EntityModel
      * @param mixed $value The value to set
      * @return self
      */
-    public function setAttribute($key, $value)
+    public function setAttribute(string $key, $value): self
     {
         $this->data[$key] = $value;
         return $this;
@@ -46,7 +46,7 @@ abstract class EntityModel
      * @param string $key
      * @return boolean
      */
-    public function hasAttribute($key)
+    public function hasAttribute(string $key): bool
     {
         return isset($this->data[$key]);
     }
@@ -56,7 +56,7 @@ abstract class EntityModel
      *
      * @return array
      */
-    public function getAttributes()
+    public function getAttributes(): array
     {
         return $this->data;
     }
@@ -73,6 +73,28 @@ abstract class EntityModel
             $this->setAttribute($key, $value);
         }
         return $this;
+    }
+    
+    /**
+     * Get only the specified attributes
+     *
+     * @param array $keys Attribute keys to get
+     * @return array Filtered attributes
+     */
+    public function only(array $keys): array
+    {
+        return array_intersect_key($this->data, array_flip($keys));
+    }
+
+    /**
+     * Get all attributes except the specified ones
+     *
+     * @param array $keys Attribute keys to exclude
+     * @return array Filtered attributes
+     */
+    public function except(array $keys): array
+    {
+        return array_diff_key($this->data, array_flip($keys));
     }
     
     /**

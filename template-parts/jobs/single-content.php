@@ -6,6 +6,7 @@
  */
 
 use AstraChild\Helpers\JobHelpers;
+use AstraChild\Models\JobEntity;
 
 // Access job from query vars
 $job = get_query_var('job');

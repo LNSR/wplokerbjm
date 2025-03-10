@@ -40,20 +40,33 @@ class JobModel
      */
     public function getJobMetaData($post_id = null)
     {
+        // Get taxonomy terms
+        $location_terms = wp_get_post_terms($post_id, 'lokasi-pekerjaan');
+        $location = !empty($location_terms) ? $location_terms[0]->name : '';
+        
+        $job_type_terms = wp_get_post_terms($post_id, 'jenis-pekerjaan');
+        $job_type = !empty($job_type_terms) ? $job_type_terms[0]->name : '';
+        
+        $education_terms = wp_get_post_terms($post_id, 'pendidikan');
+        $education = !empty($education_terms) ? $education_terms[0]->name : '';
+        
+        $gender_terms = wp_get_post_terms($post_id, 'gender');
+        $gender = !empty($gender_terms) ? $gender_terms[0]->name : '';
+        
         return [
             'company' => rwmb_meta('nama_perusahaan', '', $post_id),
             'company_desc' => rwmb_meta('tentang_perusahaan', '', $post_id),
             'job_desc' => rwmb_meta('deskripsi_pekerjaan', '', $post_id),
-            'education' => rwmb_meta('pendidikan', '', $post_id),
-            'job_type' => rwmb_meta('jenis_pekerjaan', '', $post_id),
-            'gender' => rwmb_meta('gender', '', $post_id),
+            'education' => $education,  // from taxonomy
+            'job_type' => $job_type,   // from taxonomy
+            'gender' => $gender,       // from taxonomy
             'min_age' => rwmb_meta('umur_min', '', $post_id),
             'max_age' => rwmb_meta('umur_max', '', $post_id),
             'experience' => rwmb_meta('pengalaman', '', $post_id),
             'requirements' => rwmb_meta('persyaratan', '', $post_id),
             'min_salary' => rwmb_meta('gaji_minimal', '', $post_id),
             'max_salary' => rwmb_meta('gaji_maksimal', '', $post_id),
-            'location' => rwmb_meta('lokasi', '', $post_id),
+            'location' => $location,   // from taxonomy
             'deadline' => rwmb_meta('deadline', '', $post_id),
             'email' => rwmb_meta('email_kontak', '', $post_id),
             'phone' => rwmb_meta('nomor_kontak', '', $post_id),
@@ -341,21 +354,41 @@ class JobModel
             return false;
         }
 
-        // Save meta data
+        $taxonomy_fields = [
+            'education' => 'pendidikan',
+            'job_type' => 'jenis-pekerjaan',
+            'gender' => 'gender',
+            'location' => 'lokasi-pekerjaan'
+        ];
+        
+        // Set taxonomy terms
+        foreach ($taxonomy_fields as $entity_key => $taxonomy) {
+            if (isset($data[$entity_key])) {
+                // Check if term exists, create if not
+                $term = term_exists($data[$entity_key], $taxonomy);
+                if (!$term) {
+                    $term = wp_insert_term($data[$entity_key], $taxonomy);
+                }
+                
+                // Set the term for this post
+                if (!is_wp_error($term)) {
+                    $term_id = is_array($term) ? $term['term_id'] : $term;
+                    wp_set_post_terms($post_id, [$term_id], $taxonomy);
+                }
+            }
+        }
+        
+        // Update meta fields (excluding taxonomy fields)
         $meta_fields = [
             'nama_perusahaan' => 'company',
             'tentang_perusahaan' => 'company_desc',
             'deskripsi_pekerjaan' => 'job_desc',
-            'pendidikan' => 'education',
-            'jenis_pekerjaan' => 'job_type',
-            'gender' => 'gender',
             'umur_min' => 'min_age',
             'umur_max' => 'max_age',
             'pengalaman' => 'experience',
             'persyaratan' => 'requirements',
             'gaji_minimal' => 'min_salary',
             'gaji_maksimal' => 'max_salary',
-            'lokasi' => 'location',
             'deadline' => 'deadline',
             'email_kontak' => 'email',
             'nomor_kontak' => 'phone',
@@ -363,7 +396,7 @@ class JobModel
             'social_media' => 'socials',
             'status_pekerjaan' => 'status'
         ];
-
+        
         foreach ($meta_fields as $meta_key => $entity_key) {
             if (isset($data[$entity_key])) {
                 update_post_meta($post_id, $meta_key, $data[$entity_key]);
