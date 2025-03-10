@@ -36,11 +36,12 @@ class HomePageController
      * Get featured jobs for homepage
      * 
      * @param int $page Current page number
+     * @param array $filters Optional filter criteria
      * @return array Featured jobs data
      */
-    public function getFeaturedJobs($page = 1)
+    public function getFeaturedJobs($page = 1, $filters = [])
     {
-        return $this->jobModel->getFeaturedJobs($page);
+        return $this->jobModel->getFeaturedJobs($page, $filters);
     }
     
     

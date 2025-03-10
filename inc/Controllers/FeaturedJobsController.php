@@ -45,25 +45,36 @@ class FeaturedJobsController extends AjaxController
             wp_send_json_error('Invalid security token');
         }
         
-        $page = isset($_POST['page']) ? absint($_POST['page']) : 1;
-        $featured_jobs = $this->jobModel->getFeaturedJobs($page);
+        $page = isset($_POST['page']) ? intval($_POST['page']) : 1;
+        $filters = isset($_POST['filters']) ? json_decode(stripslashes($_POST['filters']), true) : [];
         
+        // Pass the filters to your job model
+        $featured_jobs = $this->jobModel->getFeaturedJobs($page, $filters);
+        
+        // Start output buffer to capture template content
         ob_start();
         
         if ($featured_jobs['query']->have_posts()) {
             while ($featured_jobs['query']->have_posts()) {
                 $featured_jobs['query']->the_post();
+                
+                // Set filter options for the template
+                set_query_var('job_card_options', $filters);
                 get_template_part('template-parts/homepage/content-job-card');
             }
+            wp_reset_postdata();
         } else {
             echo '<p class="text-gray-500 text-center">Tidak ada lowongan tersedia.</p>';
         }
-        wp_reset_postdata();
+        
+        $html = ob_get_clean();
         
         wp_send_json_success([
-            'html' => ob_get_clean(),
-            'found_posts' => $featured_jobs['found_posts'],
-            'max_pages' => $featured_jobs['max_pages']
+            'html' => $html,
+            'pagination' => [
+                'current_page' => $page,
+                'max_pages' => $featured_jobs['max_pages']
+            ]
         ]);
     }
 }

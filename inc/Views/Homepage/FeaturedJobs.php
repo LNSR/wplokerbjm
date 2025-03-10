@@ -81,7 +81,9 @@ class FeaturedJobs
                 <h2 class="text-3xl font-bold text-gray-900 mb-8"><?php echo esc_html($options['title']); ?></h2>
                 <?php endif; ?>
                 
-                <div id="featured-jobs-grid" class="grid <?php echo esc_attr($grid_columns . ' ' . $options['grid_gap']); ?>">
+                <div id="featured-jobs-grid" 
+                     class="grid <?php echo esc_attr($grid_columns . ' ' . $options['grid_gap']); ?>"
+                     data-filters="<?php echo esc_attr(json_encode($options['filter_jobs'])); ?>">
                     <?php
                     if ($query->have_posts()) :
                         while ($query->have_posts()) : $query->the_post();

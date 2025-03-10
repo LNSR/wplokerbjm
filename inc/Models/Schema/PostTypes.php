@@ -80,7 +80,7 @@ class PostTypes {
             'supports'            => ['title', 'editor', 'thumbnail'],
             'taxonomies'          => ['jenis-pekerjaan', 'lokasi-pekerjaan', 'kategori-lowongan', 'usia', 'gaji', 'pengalaman', 'pendidikan', 'gender'],
             'rewrite'             => [
-                'slug'       => 'archive-lowongan',
+                'slug'       => 'lowongan',
                 'with_front' => false,
             ],
         ];
