@@ -78,4 +78,64 @@ class JobHelpers
 
         return isset($attributes[$status]) ? $attributes[$status] : $attributes['0'];
     }
+
+    /**
+     * Get Indonesian month name
+     * 
+     * @param int|string $month Month number (1-12)
+     * @return string Indonesian month name
+     */
+    public static function getIndonesianMonth($month): string
+    {
+        $month = (int)$month;
+        $months = [
+            1 => 'Januari',
+            2 => 'Februari',
+            3 => 'Maret',
+            4 => 'April',
+            5 => 'Mei',
+            6 => 'Juni',
+            7 => 'Juli',
+            8 => 'Agustus',
+            9 => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Desember'
+        ];
+        
+        return $months[$month] ?? '';
+    }
+
+    /**
+     * Format date in Indonesian format
+     * 
+     * @param string $date_str Date string
+     * @param string $format Format (short, medium, long)
+     * @return string Formatted date in Indonesian
+     */
+    public static function formatIndonesianDate($date_str, $format = 'medium'): string
+    {
+        if (empty($date_str)) {
+            return '';
+        }
+        
+        $timestamp = strtotime($date_str);
+        if (!$timestamp) {
+            return '';
+        }
+        
+        $day = date('j', $timestamp);
+        $month = self::getIndonesianMonth(date('n', $timestamp));
+        $year = date('Y', $timestamp);
+        
+        switch ($format) {
+            case 'short':
+                return "$day $month $year";
+            case 'long':
+                return "$day $month $year " . date('H:i', $timestamp) . " WIB";
+            case 'medium':
+            default:
+                return "$day $month $year";
+        }
+    }
 }

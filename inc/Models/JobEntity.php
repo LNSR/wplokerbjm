@@ -2,6 +2,7 @@
 
 namespace AstraChild\Models;
 
+use AstraChild\Helpers\JobHelpers;
 /**
  * Job Entity
  * 
@@ -101,13 +102,22 @@ class JobEntity extends EntityModel
     }
 
     /**
-     * Get formatted deadline
-     *
+     * Get formatted deadline with Indonesian date
+     * 
      * @return string
      */
     public function getFormattedDeadline(): string
     {
-        return $this->formatDeadline($this->getAttribute('deadline'));
+        if (!$this->hasAttribute('deadline')) {
+            return '';
+        }
+        
+        $deadline = $this->getAttribute('deadline');
+        
+        // Get formatted date
+        $formatted_date = JobHelpers::formatIndonesianDate($deadline);
+        
+        return $formatted_date;
     }
 
     /**
