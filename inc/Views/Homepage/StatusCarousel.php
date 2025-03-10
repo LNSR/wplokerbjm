@@ -206,15 +206,37 @@ class StatusCarousel
                     </a>
                 </h3>
 
-                <div class="space-y-2">
-                    <p class="flex items-center text-gray-600">
+                <div class="mb-0">
+                    <!-- Company name stays full width -->
+                    <p class="flex items-center text-gray-600 mb-2">
                         <i class="fas fa-building mr-2 text-blue-600"></i>
                         <span class="font-bold"><?php echo esc_html($job_entity->getAttribute('company')); ?></span>
                     </p>
-                    <p class="flex items-center text-gray-500">
-                        <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>
-                        <?php echo esc_html($job_entity->getAttribute('location')); ?>
-                    </p>
+                    
+                    <!-- Flex container for location, education and experience -->
+                    <div class="flex flex-wrap gap-x-4 gap-y-2">
+                        <!-- Location -->
+                        <p class="flex items-center text-gray-500">
+                            <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>
+                            <?php echo esc_html($job_entity->getAttribute('location')); ?>
+                        </p>
+                        
+                        <!-- Education when available -->
+                        <?php if (!empty($job_entity->getAttribute('education'))): ?>
+                        <p class="flex items-center text-gray-500">
+                            <i class="fas fa-graduation-cap mr-2 text-blue-600"></i>
+                            <?php echo esc_html($job_entity->getAttribute('education')); ?>
+                        </p>
+                        <?php endif; ?>
+                        
+                        <!-- Experience when available -->
+                        <?php if (!empty($job_entity->getAttribute('experience'))): ?>
+                        <p class="flex items-center text-gray-500">
+                            <i class="fas fa-history mr-2 text-blue-600"></i>
+                            <?php echo esc_html($job_entity->getAttribute('experience')); ?>
+                        </p>
+                        <?php endif; ?>
+                    </div>
                 </div>
 
                 <div class="mt-4 pt-4 border-t border-gray-100">

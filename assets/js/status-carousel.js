@@ -141,7 +141,7 @@ class StatusCarousel {
                 <div class="status-carousel-item">
                     <div class="relative bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-4 md:p-5 h-full flex flex-col justify-between">
                         <!-- Badges Section -->
-                        <div class="badges-container min-h-[40px] relative mb-2">
+                        <div class="badges-container min-h-[35px] relative mb-2">
                             ${deadlineHTML}
                             
                             ${statusHTML}
@@ -157,15 +157,37 @@ class StatusCarousel {
                             </a>
                         </h3>
         
-                        <div class="space-y-2">
-                            <p class="flex items-center text-gray-600">
+                        <div class="mb-0">
+                            <!-- Company name stays full width -->
+                            <p class="flex items-center text-gray-600 mb-2">
                                 <i class="fas fa-building mr-2 text-blue-600"></i>
                                 <span class="font-bold">${job.company}</span>
                             </p>
-                            <p class="flex items-center text-gray-500">
-                                <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>
-                                ${job.location}
-                            </p>
+                            
+                            <!-- Flex container for location, education and experience -->
+                            <div class="flex flex-wrap gap-x-4 gap-y-2">
+                                <!-- Location -->
+                                <p class="flex items-center text-gray-500">
+                                    <i class="fas fa-map-marker-alt mr-2 text-blue-600"></i>
+                                    ${job.location}
+                                </p>
+                                
+                                <!-- Education when available -->
+                                ${job.education ? `
+                                <p class="flex items-center text-gray-500">
+                                    <i class="fas fa-graduation-cap mr-2 text-blue-600"></i>
+                                    ${job.education}
+                                </p>
+                                ` : ''}
+                                
+                                <!-- Experience when available -->
+                                ${job.experience ? `
+                                <p class="flex items-center text-gray-500">
+                                    <i class="fas fa-history mr-2 text-blue-600"></i>
+                                    ${job.experience} Tahun
+                                </p>
+                                ` : ''}
+                            </div>
                         </div>
         
                         <div class="mt-4 pt-4 border-t border-gray-100">

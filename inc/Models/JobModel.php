@@ -235,7 +235,9 @@ class JobModel
                             'label' => $status_attrs['label'],
                             'icon' => $status_attrs['icon'],
                             'class' => $status_attrs['class'] . $border_class
-                        ]
+                        ],
+                        'education' => $job_data['education'],
+                        'experience' => $job_data['experience']
                     ];
                 }
                 wp_reset_postdata();
