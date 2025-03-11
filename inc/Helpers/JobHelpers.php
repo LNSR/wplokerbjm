@@ -23,104 +23,6 @@ class JobHelpers
     }
     
     /**
-     * Format age range for display
-     * 
-     * @param mixed $min_age Minimum age
-     * @param mixed $max_age Maximum age
-     * @return string Formatted age range
-     */
-    public static function formatAgeRange($min_age, $max_age): string
-    {
-        if (!self::isReallyEmpty($min_age) && !self::isReallyEmpty($max_age)) {
-            return "{$min_age} - {$max_age} tahun";
-        }
-        return !self::isReallyEmpty($min_age) ? "Min {$min_age} tahun" : "Max {$max_age} tahun";
-    }
-    
-    /**
-     * Format salary range for display
-     * 
-     * @param mixed $min_salary Minimum salary
-     * @param mixed $max_salary Maximum salary
-     * @return string Formatted salary range
-     */
-    public static function formatSalaryRange($min_salary, $max_salary): string
-    {
-        if ($min_salary && $max_salary) {
-            return 'IDR ' . number_format($min_salary, 0, ',', '.') . ' - ' . number_format($max_salary, 0, ',', '.');
-        }
-        return $min_salary ?
-            'Minimal IDR ' . number_format($min_salary, 0, ',', '.') :
-            'Maksimal IDR ' . number_format($max_salary, 0, ',', '.');
-    }
-    
-    /**
-     * Format education for display
-     * 
-     * @param mixed $education Education data
-     * @return string Formatted education
-     */
-    public static function formatEducation($education): string
-    {
-        return is_array($education) ? implode(', ', $education) : $education;
-    }
-    
-    /**
-     * Format experience for display
-     * 
-     * @param mixed $years Years of experience
-     * @return string Formatted experience
-     */
-    public static function formatExperience($years): string
-    {
-        return $years . ' tahun';
-    }
-    
-    /**
-     * Format deadline for display
-     * 
-     * @param string $date Date string
-     * @return string Formatted deadline date
-     */
-    public static function formatDeadline(string $date): string
-    {
-        return date_i18n('d F Y', strtotime($date));
-    }
-    
-    /**
-     * Check if job has summary data
-     * 
-     * @param array $job_data Job metadata
-     * @return boolean True if has summary data, false otherwise
-     */
-    public static function hasJobSummary(array $job_data): bool
-    {
-        return !self::isReallyEmpty($job_data['job_type']) ||
-            !self::isReallyEmpty($job_data['education']) ||
-            !self::isReallyEmpty($job_data['experience']) ||
-            !self::isReallyEmpty($job_data['gender']) ||
-            !self::isReallyEmpty($job_data['min_age']) ||
-            !self::isReallyEmpty($job_data['max_age']) ||
-            !self::isReallyEmpty($job_data['min_salary']) ||
-            !self::isReallyEmpty($job_data['max_salary']) ||
-            !self::isReallyEmpty($job_data['location']) ||
-            !self::isReallyEmpty($job_data['deadline']);
-    }
-    
-    /**
-     * Check if job data has contact information
-     * 
-     * @param array $job_data Job metadata
-     * @return boolean True if has contact info, false otherwise
-     */
-    public static function hasContactInfo(array $job_data): bool
-    {
-        return !self::isReallyEmpty($job_data['email']) ||
-            !self::isReallyEmpty($job_data['phone']) ||
-            !self::isReallyEmpty($job_data['website']);
-    }
-    
-    /**
      * Translate time differences from English to Indonesian
      * 
      * @param string $time_diff Time difference string
@@ -175,5 +77,65 @@ class JobHelpers
         ];
 
         return isset($attributes[$status]) ? $attributes[$status] : $attributes['0'];
+    }
+
+    /**
+     * Get Indonesian month name
+     * 
+     * @param int|string $month Month number (1-12)
+     * @return string Indonesian month name
+     */
+    public static function getIndonesianMonth($month): string
+    {
+        $month = (int)$month;
+        $months = [
+            1 => 'Januari',
+            2 => 'Februari',
+            3 => 'Maret',
+            4 => 'April',
+            5 => 'Mei',
+            6 => 'Juni',
+            7 => 'Juli',
+            8 => 'Agustus',
+            9 => 'September',
+            10 => 'Oktober',
+            11 => 'November',
+            12 => 'Desember'
+        ];
+        
+        return $months[$month] ?? '';
+    }
+
+    /**
+     * Format date in Indonesian format
+     * 
+     * @param string $date_str Date string
+     * @param string $format Format (short, medium, long)
+     * @return string Formatted date in Indonesian
+     */
+    public static function formatIndonesianDate($date_str, $format = 'medium'): string
+    {
+        if (empty($date_str)) {
+            return '';
+        }
+        
+        $timestamp = strtotime($date_str);
+        if (!$timestamp) {
+            return '';
+        }
+        
+        $day = date('j', $timestamp);
+        $month = self::getIndonesianMonth(date('n', $timestamp));
+        $year = date('Y', $timestamp);
+        
+        switch ($format) {
+            case 'short':
+                return "$day $month $year";
+            case 'long':
+                return "$day $month $year " . date('H:i', $timestamp) . " WIB";
+            case 'medium':
+            default:
+                return "$day $month $year";
+        }
     }
 }

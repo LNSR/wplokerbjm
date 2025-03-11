@@ -4,6 +4,8 @@ namespace AstraChild\Views\Jobs;
 use AstraChild\Helpers\JobHelpers;
 use AstraChild\Models\JobEntity;
 use AstraChild\Controllers\JobController;
+use AstraChild\Views\Components\JobStatusBadge;
+use AstraChild\Views\Components\JobDeadlineBadge;
 
 /**
  * Job Card View
@@ -13,17 +15,54 @@ use AstraChild\Controllers\JobController;
 class JobCard
 {
     /**
+     * @var JobStatusBadge
+     */
+    protected $statusBadge;
+    
+    /**
+     * @var JobDeadlineBadge
+     */
+    protected $deadlineBadge;
+    
+    /**
+     * Initialize the job card
+     */
+    public function __construct()
+    {
+        $this->statusBadge = new JobStatusBadge();
+        $this->deadlineBadge = new JobDeadlineBadge();
+    }
+
+    /**
      * Render a job card
      * 
      * @param JobEntity|null $job_entity The job entity
+     * @param array $options Display options
      * @return void
      */
-    public function render(JobEntity $job_entity = null): void
+    public function render(JobEntity $job_entity = null, array $options = []): void
     {
+        $default_options = [
+            'show_statuses' => [
+                '0' => true,  // Normal (show by default)
+                '2' => true,  // Urgent (show by default)
+                '3' => true,  // Pinned (show by default)
+                '4' => true   // Pinned & Urgent (show by default)
+            ]
+        ];
+        
+        $options = array_merge($default_options, $options);
+        
         // Get job entity if not provided
         if ($job_entity === null) {
             $job_controller = new JobController();
             $job_entity = $job_controller->getJobEntity(get_the_ID());
+        }
+        
+        // Skip rendering if this job's status should not be shown
+        $status = $job_entity->getAttribute('status');
+        if (!empty($status) && isset($options['show_statuses'][$status]) && !$options['show_statuses'][$status]) {
+            return;
         }
         
         // Start output buffer
@@ -44,20 +83,17 @@ class JobCard
      */
     public function renderStatusBadge(JobEntity $job): void
     {
-        $status = $job->getAttribute('status');
-        
-        // Only show the status badge if it's urgent or pinned+urgent
-        if ($job->isUrgent()) {
-            $status_attrs = (new JobController())->getJobStatusAttributes($status);
-            ?>
-            <div class="absolute top-3 left-3">
-                <span class="inline-flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium <?php echo esc_attr($status_attrs['class']); ?>">
-                    <i class="<?php echo esc_attr($status_attrs['icon']); ?> mr-1"></i>
-                    <?php echo esc_html($status_attrs['label']); ?>
-                </span>
-            </div>
-            <?php
-        }
+        $this->statusBadge->render($job, [
+            'status_toggles' => [
+                '0' => false,  // Normal status
+                '2' => true,   // Urgent status
+                '3' => true,   // Featured status
+                '4' => true    // Featured + Urgent status
+            ],
+            'show' => true,
+            'position' => 'absolute-top-left',
+            'size' => 'md'
+        ]);
     }
     
     /**
@@ -68,33 +104,12 @@ class JobCard
      */
     public function renderDeadline(JobEntity $job): void
     {
-        $deadline = $job->getAttribute('deadline');
-        
-        if ($job->isUrgent() && !empty($deadline)) {
-            // Get the deadline timestamp
-            $deadline_timestamp = strtotime($deadline);
-            $current_timestamp = current_time('timestamp');
-            $time_diff = $deadline_timestamp - $current_timestamp;
-            ?>
-            <div class="absolute top-3 right-3">
-                <div class="flex items-center bg-white bg-opacity-90 rounded-lg px-2 py-1 text-xs border <?php echo $time_diff > 0 ? 'border-green-200' : 'border-red-200'; ?> shadow-sm">
-                    <i class="fas fa-clock <?php echo $time_diff > 0 ? 'text-green-600' : 'text-red-600'; ?> mr-1"></i>
-                    <span class="font-medium">
-                        <?php if ($time_diff > 0): ?>
-                            <!-- Future deadline - show remaining time -->
-                            <?php 
-                                $human_diff = JobHelpers::translateTimeDiff(human_time_diff($current_timestamp, $deadline_timestamp)); 
-                                echo "Deadline: $human_diff lagi";
-                            ?>
-                        <?php else: ?>
-                            <!-- Past deadline - show expired notice -->
-                            Berakhir: <?php echo date_i18n('d M Y', $deadline_timestamp); ?>
-                        <?php endif; ?>
-                    </span>
-                </div>
-            </div>
-            <?php
-        }
+        $this->deadlineBadge->render($job, [
+            'require_urgent' => true,  // Keep current behavior of only showing for urgent jobs
+            'position' => 'absolute-top-right',
+            'style' => 'badge',
+            'show_date_if_expired' => true
+        ]);
     }
     
     /**
@@ -110,7 +125,7 @@ class JobCard
             <!-- Company name stays full width -->
             <p class="text-gray-600 font-bold mb-2">
                 <i class="fas fa-building mr-2 text-blue-600"></i>
-                <?php echo esc_html($job->getAttribute('company')); ?>
+                <span class="font-bold"><?php echo esc_html($job->getAttribute('company')); ?></span>
             </p>
             <!-- Flex container for location, education and experience -->
             <div class="flex flex-wrap gap-x-4">

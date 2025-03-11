@@ -17,6 +17,7 @@ class Enqueue
         add_action('wp_enqueue_scripts', [$this, 'enqueueFeaturedJobsScripts']);
         add_action('wp_enqueue_scripts', [$this, 'enqueueShareScripts']);
         add_action('wp_enqueue_scripts', [$this, 'enqueueStatusCarouselScripts']);
+        add_action('wp_enqueue_scripts', [$this, 'enqueueCarouselStyles'], 20);
     }
 
     /**
@@ -90,9 +91,50 @@ class Enqueue
                 'statusCarouselData',
                 [
                     'ajaxurl' => admin_url('admin-ajax.php'),
+                    'action' => 'load_status_carousel', // Add this line
                     'nonce' => wp_create_nonce('status_carousel_nonce')
                 ]
             );
         }
+    }
+
+    /**
+     * Enqueue carousel styles
+     * 
+     * @return void
+     */
+    public function enqueueCarouselStyles(): void
+    {
+        wp_add_inline_style('theme-style', '
+            /* Base carousel styling */
+            .status-carousel-item {
+                transition: all 0.3s ease;
+                flex: 0 0 calc(100% / 3); /* Default for 3 items */
+                max-width: calc(100% / 3 - 1rem); /* Account for gap */
+                padding: 0 0.5rem;
+            }
+            
+            #status-carousel {
+                margin: 0 -0.5rem; /* Offset item padding */
+                display: flex;
+                flex-wrap: nowrap;
+                transition: transform 0.3s ease;
+            }
+            
+            /* Responsive behavior */
+            @media (max-width: 768px) {
+                .status-carousel-item {
+                    flex: 0 0 100%;
+                    max-width: calc(100% - 1rem);
+                }
+            }
+            
+            @media (min-width: 769px) and (max-width: 1024px) {
+                .status-carousel-item {
+                    flex: 0 0 50%;
+                    max-width: calc(50% - 1rem);
+                }
+            }
+        ');
     }
 }

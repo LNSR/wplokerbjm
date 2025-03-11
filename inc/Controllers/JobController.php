@@ -168,4 +168,34 @@ class JobController {
     public function getJobStatusAttributes($status) {
         return $this->model->getJobStatusAttributes($status);
     }
+
+    /**
+     * Get archive title based on current query
+     *
+     * @return string
+     */
+    public function getArchiveTitle(): string
+    {
+        if (is_tax()) {
+            $term = get_queried_object();
+            return $term->name;
+        }
+        
+        return 'Semua Lowongan';
+    }
+
+    /**
+     * Get archive description
+     *
+     * @return string
+     */
+    public function getArchiveDescription(): string
+    {
+        if (is_tax()) {
+            $term = get_queried_object();
+            return !empty($term->description) ? $term->description : 'Lowongan pekerjaan tersedia';
+        }
+        
+        return 'Temukan berbagai lowongan kerja yang tersedia';
+    }
 }

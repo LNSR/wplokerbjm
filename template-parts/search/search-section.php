@@ -9,11 +9,15 @@ use AstraChild\Views\Search\SearchForm;
 // Initialize the search form view
 $search_view = new SearchForm();
 
-// Render the search form
+// Check if we're on the search results page
+$is_search_page = strpos($_SERVER['REQUEST_URI'] ?? '', 'search-jobs') !== false;
+
+// Render with appropriate page-specific settings
 $search_view->render([
     'title' => 'Temukan Lowongan Kerja Terbaik',
     'subtitle' => 'Temukan ribuan lowongan kerja di Banjarmasin dan sekitarnya',
-    // Using a different title on search results page
-    'show_title' => !strpos($_SERVER['REQUEST_URI'], 'search-jobs')
+    'show_title' => !$is_search_page, 
+    // Different margins based on page type
+    'desktop_margin' => $is_search_page ? 'lg:mx-20' : 'lg:mx-80'
 ]);
 ?>

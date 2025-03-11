@@ -1,5 +1,4 @@
 <?php
-// filepath: /home/maulana/Project/Lowker-site/astra-child/template-parts/jobs/card-content.php
 /**
  * Template part for displaying job card content
  * 
@@ -23,17 +22,26 @@ if (!$job_entity) {
 ?>
 
 <div class="bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow duration-200 p-6 animate-fade-in relative">
-    <!-- Job Status Badge -->
-    <?php $this->renderStatusBadge($job_entity); ?>
+    <?php 
+    // Get status to check if badge will be shown
+    $status = $job_entity->getAttribute('status');
+    $has_status_badge = !empty($status);
     
-    <!-- Deadline information -->
+    $this->renderStatusBadge($job_entity); 
+    ?>
+    
     <?php $this->renderDeadline($job_entity); ?>
     
-    <!-- Add an invisible spacer when badge is present -->
-    <?php if ($job_entity->isUrgent()): ?>
-        <div class="h-6"></div>
+    <!-- Badge container with minimum height only if badges exist -->
+    <?php if ($has_status_badge): ?>
+    <div class="badges-container min-h-[25px] relative">
+        <!-- This empty div ensures space for absolute-positioned badges -->
+    </div>
+    
+    <!-- Visual Divider - Only shown when status badge exists -->
+    <div class="border-b border-gray-100"></div>
     <?php endif; ?>
-
+    
     <!-- Title and date section -->
     <div class="flex justify-between items-start gap-4 mb-4">
         <div class="flex items-center gap-3">

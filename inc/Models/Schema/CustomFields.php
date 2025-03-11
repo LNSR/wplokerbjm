@@ -1,4 +1,5 @@
 <?php
+
 namespace AstraChild\Models\Schema;
 
 /**
@@ -25,6 +26,7 @@ class CustomFields
      * @param array $meta_boxes Existing meta boxes
      * @return array Updated meta boxes
      */
+
     public function lowongan_meta_boxes($meta_boxes)
     {
         $prefix = '';
@@ -72,66 +74,6 @@ class CustomFields
                     'clone_empty_start' => false,
                     'hide_from_rest'    => false,
                     'limit_type'        => 'character',
-                ],
-                [
-                    'name'              => __('Pendidikan', 'astra-child'),
-                    'id'                => $prefix . 'pendidikan',
-                    'type'              => 'select',
-                    'options'           => [
-                        'SD'        => __('SD', 'astra-child'),
-                        'SMP'       => __('SMP', 'astra-child'),
-                        'SMA / SMK' => __('SMA / SMK', 'astra-child'),
-                        'D4'        => __('D4', 'astra-child'),
-                        'S1'        => __('S1', 'astra-child'),
-                        'S2'        => __('S2', 'astra-child'),
-                        'S3'        => __('S3', 'astra-child'),
-                    ],
-                    'multiple'          => true,
-                    'select_all_none'   => false,
-                    'required'          => false,
-                    'disabled'          => false,
-                    'readonly'          => false,
-                    'clone'             => false,
-                    'clone_empty_start' => false,
-                    'hide_from_rest'    => false,
-                ],
-                [
-                    'name'              => __('Jenis Pekerjaan', 'astra-child'),
-                    'id'                => $prefix . 'jenis_pekerjaan',
-                    'type'              => 'select',
-                    'options'           => [
-                        'Full Time'                 => __('Full Time', 'astra-child'),
-                        'Part Time'                 => __('Part Time', 'astra-child'),
-                        'Freelance'                 => __('Freelance', 'astra-child'),
-                        'Hidden / Tidak Diperlukan' => __('Hidden / Tidak Diperlukan', 'astra-child'),
-                    ],
-                    'std'               => __('Hidden / Tidak Diperlukan', 'astra-child'),
-                    'multiple'          => false,
-                    'select_all_none'   => false,
-                    'required'          => false,
-                    'disabled'          => false,
-                    'readonly'          => false,
-                    'clone'             => false,
-                    'clone_empty_start' => false,
-                    'hide_from_rest'    => false,
-                ],
-                [
-                    'name'              => __('Gender', 'astra-child'),
-                    'id'                => $prefix . 'gender',
-                    'type'              => 'select',
-                    'options'           => [
-                        'Pria'        => __('Pria', 'astra-child'),
-                        'Wanita'      => __('Wanita', 'astra-child'),
-                        'Pria/Wanita' => __('Pria/Wanita', 'astra-child'),
-                    ],
-                    'multiple'          => false,
-                    'select_all_none'   => false,
-                    'required'          => false,
-                    'disabled'          => false,
-                    'readonly'          => false,
-                    'clone'             => false,
-                    'clone_empty_start' => false,
-                    'hide_from_rest'    => false,
                 ],
                 [
                     'name'              => __('Umur Minimal', 'astra-child'),
@@ -206,19 +148,6 @@ class CustomFields
                     'clone'             => false,
                     'clone_empty_start' => false,
                     'hide_from_rest'    => false,
-                ],
-                [
-                    'name'              => __('Lokasi', 'astra-child'),
-                    'id'                => $prefix . 'lokasi',
-                    'type'              => 'text',
-                    'label_description' => __('Lokasi ditetapkan oleh HRD', 'astra-child'),
-                    'required'          => true,
-                    'disabled'          => false,
-                    'readonly'          => false,
-                    'clone'             => false,
-                    'clone_empty_start' => false,
-                    'hide_from_rest'    => false,
-                    'limit_type'        => 'character',
                 ],
                 [
                     'name'              => __('Deadline Pendaftaran', 'astra-child'),
@@ -298,12 +227,11 @@ class CustomFields
                     'type'              => 'select',
                     'label_description' => __('Prioritas pekerjaan yang akan ditampilkan di front page', 'astra-child'),
                     'options'           => [
-                        '0' => __('Normal', 'astra-child'),
-                        '2' => __('Urgent', 'astra-child'),
-                        '3' => __('Pinned', 'astra-child'),
-                        '4' => __('Pinned & Urgent', 'astra-child'),
+                        0 => __('Normal', 'astra-child'),
+                        2 => __('Urgent', 'astra-child'),
+                        3 => __('Pinned', 'astra-child'),
+                        4 => __('Pinned & Urgent', 'astra-child'),
                     ],
-                    'std'               => '0',
                     'multiple'          => false,
                     'select_all_none'   => false,
                     'required'          => true,

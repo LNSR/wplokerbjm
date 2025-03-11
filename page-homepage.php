@@ -3,10 +3,7 @@
  * Template Name: Homepage Lowongan
  */
 
-use AstraChild\Controllers\HomePageController;
-
-// Initialize the controller
-$homeController = new HomePageController();
+use AstraChild\Views\Homepage\FeaturedJobs;
 
 get_header(); ?>
 
@@ -22,56 +19,22 @@ get_header(); ?>
             <!-- Status Carousel Section -->
             <?php get_template_part('template-parts/homepage/status-carousel'); ?>
 
-            <!-- Featured Jobs Section -->
-            <section class="featured-jobs-section mb-12">
-                <div class="max-w-7xl mx-auto">
-                    <h2 class="text-3xl font-bold text-gray-900 mb-8">Lowongan Terbaru</h2>
-                    <div id="featured-jobs-grid" class="grid grid-cols-1 md:grid-cols-1 lg:grid-cols-1 gap-6">
-                        <?php
-                        $paged = get_query_var('paged') ? get_query_var('paged') : 1;
-                        $featured_jobs = $homeController->getFeaturedJobs($paged);
-                        $query = $featured_jobs['query'];
-
-                        if ($query->have_posts()) :
-                            while ($query->have_posts()) : $query->the_post();
-                                get_template_part('template-parts/homepage/content-job-card');
-                            endwhile;
-                            wp_reset_postdata();
-                        else :
-                            echo '<p class="text-gray-500 text-center">Tidak ada lowongan tersedia.</p>';
-                        endif;
-                        ?>
-                    </div>
-
-                    <?php if ($featured_jobs['max_pages'] > 1) : ?>
-                        <div class="mt-8 flex justify-center gap-2" id="featured-jobs-pagination">
-                            <?php 
-                            for ($i = 1; $i <= $featured_jobs['max_pages']; $i++) :
-                                $is_current = $i === $featured_jobs['current_page'];
-                            ?>
-                                <button type="button"
-                                        data-page="<?php echo $i; ?>"
-                                        class="page-number px-4 py-2 rounded-lg <?php echo $is_current ? 
-                                            'bg-blue-600 text-white' : 
-                                            'bg-white text-blue-600 hover:bg-blue-50'; ?> 
-                                            border border-blue-200 transition-colors">
-                                    <?php echo $i; ?>
-                                </button>
-                            <?php endfor; ?>
-                        </div>
-                    <?php endif; ?>
-
-                    <!-- Loading indicator -->
-                    <div id="featured-jobs-loading" class="text-center py-8 hidden">
-                        <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                    </div>
-                </div>
-            </section>
+            <!-- Featured Jobs Section - Now using View -->
+            <?php 
+            $featured_jobs_view = new FeaturedJobs();
+            $featured_jobs_view->render([
+                'title' => 'Lowongan Terbaru',
+                'columns' => [
+                    'mobile' => 1,
+                    'tablet' => 1,
+                    'desktop' => 1
+                ]
+            ]); 
+            ?>
         </div>
-
         <!-- Sidebar
         <div class="hidden lg:block w-full lg:w-1/4">
-            <?php // get_template_part('template-parts/jobs/sidebar'); ?>
+        <?php // get_template_part('template-parts/jobs/sidebar'); ?>
         </div> -->
     </div>
 </div>

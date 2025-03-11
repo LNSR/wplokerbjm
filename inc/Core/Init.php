@@ -21,10 +21,14 @@ class Init
             // Core services
             Enqueue::class,
             Setup::class,
+
+            // Windpress Integration
+            \AstraChild\Integrations\WindPress\WindPressService::class,
             
             // Schema components
             \AstraChild\Models\Schema\PostTypes::class,
             \AstraChild\Models\Schema\Taxonomies::class,
+            \AstraChild\Models\Schema\CustomFields::class,
             \AstraChild\Models\Schema\SchemaManager::class,
             
             // Controllers

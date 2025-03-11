@@ -7,11 +7,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     const loadJobs = (page = 1, append = false) => {
         loading.classList.remove('hidden');
+        
+        // Get filter options from data attribute
+        const filterOptions = JSON.parse(grid.dataset.filters || '{}');
 
         const formData = new FormData();
         formData.append('action', 'load_featured_jobs');
         formData.append('page', page);
         formData.append('_ajax_nonce', featuredJobsData.nonce);
+        formData.append('filters', JSON.stringify(filterOptions)); // Add filters to request
 
         fetch(featuredJobsData.ajaxurl, {
             method: 'POST',
