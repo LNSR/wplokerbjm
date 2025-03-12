@@ -18,6 +18,6 @@ $search_view->render([
     'subtitle' => 'Temukan ribuan lowongan kerja di Banjarmasin dan sekitarnya',
     'show_title' => !$is_search_page, 
     // Different margins based on page type
-    'desktop_margin' => $is_search_page ? 'lg:mx-20' : 'lg:mx-80'
+    'desktop_margin' => $is_search_page ? 'lg:mx-50' : 'lg:mx-80'
 ]);
 ?>
