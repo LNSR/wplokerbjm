@@ -45,6 +45,17 @@ get_header();
                         <a href="https://instagram.com/loker_banjarmasin" target="_blank" class="text-blue-600 font-medium hover:underline">@loker_banjarmasin</a>
                     </div>
                 </div>
+
+                <!-- WhatsApp Contact -->
+                <div class="flex items-center mb-4">
+                    <div class="w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-br from-green-400 to-green-600 mr-4">
+                        <i class="fab fa-whatsapp text-white text-xl"></i>
+                    </div>
+                    <div>
+                        <span class="font-medium block">WhatsApp:</span>
+                        <a href="https://wa.me/6283862447271" target="_blank" class="text-blue-600 font-medium hover:underline">+62 838-6244-7271</a>
+                    </div>
+                </div>
                 
                 <!-- Email Contact -->
                 <div class="flex items-center mb-4">
@@ -94,7 +105,7 @@ get_header();
     <section class="bg-white rounded-xl shadow-md p-6 mb-12">
         <h2 class="text-2xl font-bold text-gray-900 mb-8">Paket Pemasangan Iklan</h2>
         
-        <div class="bg-gradient-to-r from-blue-500 to-blue-700 text-white p-6 rounded-lg mb-6">
+        <div class="bg-gradient-to-r from-blue-500/80 to-blue-700/80 text-white p-6 rounded-lg mb-6 backdrop-blur-sm">
             <h3 class="text-xl font-bold mb-2">Paket Reguler</h3>
             <ul class="space-y-2 mb-4">
                 <li class="flex items-start">
@@ -113,7 +124,7 @@ get_header();
             <p class="mt-4 text-sm">* Silakan hubungi admin untuk informasi biaya pemasangan</p>
         </div>
         
-        <div class="bg-gradient-to-r from-purple-500 to-purple-700 text-white p-6 rounded-lg">
+        <div class="bg-gradient-to-r from-purple-500/80 to-purple-700/80 text-white p-6 rounded-lg backdrop-blur-sm">
             <h3 class="text-xl font-bold mb-2">Paket Premium</h3>
             <ul class="space-y-2 mb-4">
                 <li class="flex items-start">
