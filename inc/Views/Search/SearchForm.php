@@ -52,7 +52,7 @@ class SearchForm
             <?php if ($options['show_title']): ?>
             <div class="max-w-4xl mx-auto text-center">
                 <h1 class="text-4xl font-bold text-white mb-4"><?php echo esc_html($options['title']); ?></h1>
-                <p class="text-blue-100 mx-auto mb-8"><?php echo esc_html($options['subtitle']); ?></p>
+                <p class="text-blue-300 font-semibold mx-auto mb-8"><?php echo esc_html($options['subtitle']); ?></p>
             </div>
             <?php endif; ?>
 
