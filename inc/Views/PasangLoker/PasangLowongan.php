@@ -176,13 +176,14 @@ class PasangLowongan
             <h2 class="text-2xl font-bold text-gray-900 mb-8">Paket Pemasangan Iklan</h2>
             
             <!-- Grid container for pricing packages -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8 pt-4">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-5 md:gap-6 pt-2">
                 <?php 
                 // Regular package
                 $regularContent = $this->renderPricingPackageContent('Paket Reguler', [
-                    'Publikasi di website selama 30 hari',
-                    'Posting di Instagram @loker_banjarmasin',
-                    'Termasuk logo perusahaan'
+                    'Publikasi di website selama 1 bulan',
+                    'Posting di Instagram',
+                    'Posting di Facebook',
+                    'Posting di TikTok'
                 ]);
                 ?>
                 <div class="transform transition-all duration-300 hover:scale-[1.02] hover:-translate-y-1">
@@ -204,7 +205,7 @@ class PasangLowongan
             </div>
             
             <!-- Contact note -->
-            <div class="text-center mt-4">
+            <div class="text-center mt-4 pt-2">
                 <span class="text-gray-600 italic">
                     <i class="fas fa-info-circle text-blue-500 mr-2"></i>
                     Hubungi admin untuk informasi lebih lanjut mengenai biaya pemasangan
@@ -223,9 +224,9 @@ class PasangLowongan
     protected function renderFeatureItem(string $text): void
     {
         ?>
-        <li class="flex items-start">
-            <i class="fas fa-star text-yellow-300 mt-1 mr-2"></i>
-            <span><?php echo esc_html($text); ?></span>
+        <li class="flex items-start py-1"> <!-- Added vertical padding instead of margin -->
+            <i class="fas fa-star text-yellow-300 mt-0.5 mr-2 flex-shrink-0"></i>
+            <span class="text-sm sm:text-base"><?php echo esc_html($text); ?></span>
         </li>
         <?php
     }
@@ -241,12 +242,14 @@ class PasangLowongan
     {
         ob_start();
         ?>
-        <h3 class="text-xl font-bold mb-3"><?php echo esc_html($title); ?></h3>
-        <ul class="space-y-2 mb-4">
-            <?php foreach ($features as $feature): ?>
-                <?php $this->renderFeatureItem($feature); ?>
-            <?php endforeach; ?>
-        </ul>
+        <div>
+            <h3 class="text-xl font-bold mb-3"><?php echo esc_html($title); ?></h3>
+            <ul class="space-y-2">
+                <?php foreach ($features as $feature): ?>
+                    <?php $this->renderFeatureItem($feature); ?>
+                <?php endforeach; ?>
+            </ul>
+        </div>
         <?php
         return ob_get_clean();
     }
@@ -301,12 +304,8 @@ class PasangLowongan
     protected function renderGradientContainer(string $content, string $from = 'blue-500/80', string $to = 'blue-700/80'): void
     {
         ?>
-        <div class="bg-gradient-to-r from-<?php echo $from; ?> to-<?php echo $to; ?> text-white p-6 md:p-8 rounded-xl shadow-md h-full flex flex-col justify-between">
+        <div class="bg-gradient-to-r from-<?php echo $from; ?> to-<?php echo $to; ?> text-white p-5 sm:p-6 rounded-xl shadow-md h-full">
             <?php echo $content; ?>
-            
-            <!-- <p class="mt-4 text-sm text-white/80">
-                * Pilih paket yang sesuai dengan kebutuhan Anda
-            </p> -->
         </div>
         <?php
     }

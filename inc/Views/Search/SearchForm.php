@@ -148,7 +148,7 @@ class SearchForm
         ?>
         <div class="relative">
             <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <i class="fas fa-briefcase text-gray-400"></i>
+                <i class="fas fa-history text-gray-400"></i>
             </div>
             <select name="pengalaman" class="w-full pl-12 pr-4 py-4 rounded-lg border border-gray-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-200 text-gray-700 appearance-none bg-white text-center">
                 <option value="">Pengalaman</option>
