@@ -224,7 +224,7 @@ class PasangLowongan
     protected function renderFeatureItem(string $text): void
     {
         ?>
-        <li class="flex items-start py-1"> <!-- Added vertical padding instead of margin -->
+        <li class="flex items-start py-1">
             <i class="fas fa-star text-yellow-300 mt-0.5 mr-2 flex-shrink-0"></i>
             <span class="text-sm sm:text-base"><?php echo esc_html($text); ?></span>
         </li>
