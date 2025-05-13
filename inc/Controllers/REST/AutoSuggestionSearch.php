@@ -18,7 +18,7 @@ class AutoSuggestionSearch
                 foreach ($post_ids as $post_id) {
                     $title = get_the_title($post_id);
                     if (!empty($title)) {
-                        $results[] = $title;
+                        $results[] = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
                     }
                 }
             }

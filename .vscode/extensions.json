@@ -1,0 +1,8 @@
+{
+    "recommendations": [
+        "DEVSENSE.phptools-vscode",
+        "bradlc.vscode-tailwindcss",
+        "xdebug.php-debug",
+        "xdebug.php-pack"
+    ]
+}

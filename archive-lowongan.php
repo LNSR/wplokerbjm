@@ -1,4 +1,5 @@
 <?php
+
 /**
  * The template for displaying Lowongan archives and search/filter
  *
@@ -8,9 +9,11 @@
 
 namespace AstraChild;
 
+use AstraChild\Core\Container;
+use AstraChild\Views\Page\ArchiveView;
 
 get_header();
 
-$archiveView = \AstraChild\Core\Container::getContainer()->get(\AstraChild\Views\Page\ArchiveView::class)->render();
+$archiveView = Container::getContainer()->get(ArchiveView::class)->render();
 
 get_footer();

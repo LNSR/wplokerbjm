@@ -31,6 +31,7 @@ class SingleView
 				<?= $this->singleViewModel->viewRingkasanPekerja(); ?>
 				<?= $this->singleViewModel->viewDeskripsiPekerjaan(); ?>
 				<?= $this->singleViewModel->viewPersyaratan(); ?>
+				<?= $this->singleViewModel->viewCaraMelamar(); ?>
 				<?= $this->singleViewModel->viewBenefit(); ?>
 				<?= $this->singleViewModel->viewContact(); ?>
 				<?= $this->singleViewModel->viewSosmed(); ?>

@@ -27,8 +27,6 @@ class Enqueue
 			[],
 			ver: filemtime(get_stylesheet_directory() . '/assets/css/style.css')
 		);
-
-
 		wp_enqueue_script(
 			'astra-color-switch',
 			get_stylesheet_directory_uri() . '/assets/js/AstraColorSwitch.js',
@@ -38,6 +36,13 @@ class Enqueue
 		);
 		if (is_front_page() || is_post_type_archive('lowongan')) {
 
+			wp_enqueue_script(
+				'dynamic-search',
+				get_stylesheet_directory_uri() . '/assets/js/DynamicSearch.js',
+				['alpinejs'],
+				filemtime(get_stylesheet_directory() . '/assets/js/DynamicSearch.js'),
+				true
+			);
 
 			wp_enqueue_script(
 				'auto-suggestion-search',

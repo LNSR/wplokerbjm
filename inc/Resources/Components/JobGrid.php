@@ -9,13 +9,24 @@ class JobGrid
         $jobs_query = new \WP_Query($query_args);
         ob_start();
 ?>
-        <section class="mt-8">
+        <section class="mt-8" id="jobs-list">
             <h2 class="text-xl font-semibold !mb-6"><?= esc_html($title) ?></h2>
             <?php if ($total_jobs > 0): ?>
                 <div class="text-base font-medium mb-4"><?= esc_html($total_jobs) ?> lowongan ditemukan</div>
             <?php endif; ?>
-            <div x-data="loadMoreJobs('<?= esc_attr($context) ?>', <?= (int)($jobs_query->max_num_pages) ?>)">
-                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="jobs-list">
+            <div
+                x-data='loadMoreJobs(
+                    "<?= esc_attr($context) ?>",
+                    <?= (int)($jobs_query->max_num_pages) ?>,
+                    <?= json_encode([
+                        'cari' => $_GET['cari'] ?? '',
+                        'lokasi' => $_GET['lokasi'] ?? '',
+                        'gender' => $_GET['gender'] ?? '',
+                        'pendidikan' => $_GET['pendidikan'] ?? '',
+                        'sort' => $_GET['sort'] ?? 'desc',
+                    ]) ?>
+                )'>
+                <div id="job-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <?php
                     if ($jobs_query->have_posts()) :
                         while ($jobs_query->have_posts()) :

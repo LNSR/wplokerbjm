@@ -68,12 +68,15 @@ class Filters
         if (! empty($wp_query->query_vars['s'])) {
             $search = '';
             $q = $wp_query->query_vars['s'];
-            $q = esc_sql($wpdb->esc_like($q));
+            $q_esc = esc_sql($wpdb->esc_like($q));
+            $q_html = esc_sql($wpdb->esc_like(htmlentities($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+
             $search .= " AND (";
-            $search .= "{$wpdb->posts}.post_title LIKE '%{$q}%' OR ";
+            $search .= "{$wpdb->posts}.post_title LIKE '%{$q_esc}%' OR ";
+            $search .= "{$wpdb->posts}.post_title LIKE '%{$q_html}%' OR ";
             $search .= "{$wpdb->posts}.ID IN (
                 SELECT post_id FROM {$wpdb->postmeta}
-                WHERE meta_key = 'nama_perusahaan' AND meta_value LIKE '%{$q}%'
+                WHERE meta_key = 'nama_perusahaan' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
             )";
             $search .= ")";
         }

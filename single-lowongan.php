@@ -7,12 +7,12 @@
  */
 
 namespace AstraChild;
+
 use AstraChild\Core\Container;
 use AstraChild\Views\Page\SingleView;
 
 get_header();
 
-// Get the current lowongan post ID
 $post_id = get_the_ID();
 $singleView = Container::getContainer()->get(SingleView::class)->render($post_id);
 

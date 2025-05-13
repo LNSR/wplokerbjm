@@ -31,6 +31,7 @@ class CustomFieldRepository implements DataProviderInterface
             umur_max: rwmb_meta('umur_max', '', $post_id),
             pengalaman: rwmb_meta('pengalaman', '', $post_id),
             persyaratan: rwmb_meta('persyaratan', '', $post_id),
+            cara_melamar: rwmb_meta('cara_melamar', '', $post_id),
             benefit: rwmb_meta('benefit', '', $post_id),
             gaji_minimal: rwmb_meta('gaji_minimal', '', $post_id),
             gaji_maksimal: rwmb_meta('gaji_maksimal', '', $post_id),

@@ -153,10 +153,9 @@ class JobCard
 
 	private static function render_post_time(int $post_id): string
 	{
-		$post_time = get_post_time('U', true, $post_id);
-		$time_diff = human_time_diff($post_time, current_time('timestamp'));
+		$post_time = get_post_time('U', false, $post_id);
+		$time_diff = human_time_diff($post_time, current_time('timestamp', false));
 
-		// Translate English time units to Indonesian
 		$translations = [
 			'minute' => 'menit',
 			'minutes' => 'menit',

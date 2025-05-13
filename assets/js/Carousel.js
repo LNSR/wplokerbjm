@@ -58,7 +58,6 @@ document.addEventListener("DOMContentLoaded", function () {
       glider.scrollItem("next");
     }, 4000);
 
-    // Pause on mouse enter, resume on mouse leave
     gliderElem.addEventListener("mouseenter", () => clearInterval(autoScroll));
     gliderElem.addEventListener("mouseleave", () => {
       autoScroll = setInterval(() => {

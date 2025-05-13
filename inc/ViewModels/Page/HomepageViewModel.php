@@ -20,7 +20,7 @@ class HomepageViewModel
 	public function viewCarousel()
 	{
 		ob_start();
-		$query = new \WP_Query(JobQuery::getCarouselArgs(per_page: 6));
+		$query = new \WP_Query(JobQuery::getCarouselArgs(per_page: 9));
 ?>
 		<section class="px-4 py-8">
 			<h2 class="text-xl font-semibold !mb-6">Lowongan Unggulan</h2>

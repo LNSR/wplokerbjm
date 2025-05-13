@@ -15,6 +15,7 @@ class CustomFieldEntity
         public $umur_max = null,
         public $pengalaman = null,
         public $persyaratan = null,
+        public $cara_melamar = null,
         public $benefit = null,
         public $gaji_minimal = null,
         public $gaji_maksimal = null,

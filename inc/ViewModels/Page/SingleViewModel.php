@@ -13,6 +13,7 @@ use AstraChild\Services\Job\FormatterServices;
 use AstraChild\Resources\Components\FloatingActionButton;
 use AstraChild\Resources\Components\ColorSwitchButton;
 use AstraChild\Resources\Components\Partial\JobSummaryRows;
+use AstraChild\Resources\Components\Partial\JobsContactsRows;
 
 class SingleViewModel
 {
@@ -78,7 +79,6 @@ class SingleViewModel
 	{
 		$jobdata = $this->jobdata;
 
-		// Early return if all summary fields are empty
 		if (
 			empty($jobdata['jenis_pekerjaan_taxo']) &&
 			empty($jobdata['pendidikan_taxo']) &&
@@ -105,7 +105,8 @@ class SingleViewModel
 					<?php foreach ($rows as $row): ?>
 						<div class="flex items-center">
 							<i class="fas <?= $row['icon'] ?> text-blue-600 w-6 text-center"></i>
-							<span class="font-semibold ml-2"><?= $row['label'] ?>: <?= $row['value'] ?></span>
+							<span class="ml-2 !font-semibold"><?= $row['label'] ?>:</span>
+							<span class="ml-2 !font-semibold"><?= $row['value'] ?></span>
 						</div>
 					<?php endforeach; ?>
 				</div>
@@ -159,6 +160,29 @@ class SingleViewModel
 	<?php
 		return ob_get_clean();
 	}
+
+	public function viewCaraMelamar(): string
+	{
+		$jobdata = $this->jobdata;
+
+		if (empty($this->jobdata['cara_melamar'])) {
+			return '';
+		}
+
+		ob_start();
+	?>
+		<section>
+			<h2 class="text-xl flex items-center gap-2 !mb-4">
+				<i class="fas fa-file-signature text-blue-600"></i>
+				<span class="font-bold">Cara Melamar</span>
+			</h2>
+			<?= $jobdata['cara_melamar']; ?>
+			<div class="divider"></div>
+		</section>
+	<?php
+		return ob_get_clean();
+	}
+
 	public function viewBenefit(): string
 	{
 		$jobdata = $this->jobdata;
@@ -202,46 +226,18 @@ class SingleViewModel
 			</h2>
 			<div class="grid grid-cols-1 gap-4 mt-4">
 				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
-
-					<?php foreach (($jobdata['email_kontak'] ?? []) as $email) :
-						if (! empty($email)) : ?>
-							<div class="flex items-center">
-								<i class="fas fa-envelope text-blue-600 w-6 text-center text-xl"></i>
-								<div class="ml-2 font-semibold text-md">
-									<span class="block font-semibold ">Email:</span>
-									<a href="mailto:<?= $email; ?>" target="_blank" rel="noopener noreferrer"
-										class="block font-semibold break-words"><?= $email; ?></a>
-								</div>
+					<?php
+					$contacts = JobsContactsRows::getJobContactsRows($jobdata);
+					foreach ($contacts as $contact) : ?>
+						<div class="flex items-center">
+							<i class="<?= $contact['icon']; ?> text-blue-600 w-6 text-center text-xl"></i>
+							<div class="ml-2 font-semibold text-md">
+								<span class="block font-semibold "><?= $contact['label']; ?>:</span>
+								<a href="<?= $contact['href']; ?>" target="_blank" rel="noopener noreferrer"
+									class="block font-semibold break-words"><?= $contact['value']; ?></a>
 							</div>
-					<?php endif;
-					endforeach; ?>
-
-					<?php foreach (($jobdata['nomor_kontak'] ?? []) as $phone) :
-						if (! empty($phone)) : ?>
-							<div class="flex items-center">
-								<i class="fas fa-phone text-blue-600 w-6 text-center text-xl"></i>
-								<div class="ml-2 font-semibold text-md">
-									<span class="block ">Telepon:</span>
-									<a href="tel:<?= $phone; ?>" target="_blank" rel="noopener noreferrer"
-										class="block break-words"><?= FormatterServices::formatPhoneNumber($phone); ?></a>
-								</div>
-							</div>
-					<?php endif;
-					endforeach; ?>
-
-					<?php foreach (($jobdata['situs_kontak'] ?? []) as $site) :
-						if (! empty($site)) : ?>
-							<div class="flex items-center">
-								<i class="fas fa-globe text-blue-600 w-6 text-center text-xl"></i>
-								<div class="ml-2 font-semibold text-md">
-									<span class="block ">Website:</span>
-									<a href="<?= $site; ?>" target="_blank" rel="noopener noreferrer"
-										class="block break-words"><?= preg_replace('#^https?://#', '', $site); ?></a>
-								</div>
-							</div>
-					<?php endif;
-					endforeach; ?>
-
+						</div>
+					<?php endforeach; ?>
 				</div>
 			</div>
 		</section>

@@ -13,7 +13,7 @@ class CustomFieldsService
 	public function processCustomFields(mixed $customFields): mixed
 	{
 		// Process WYSIWYG fields
-		$wysiwyg_fields = ['tentang_perusahaan', 'deskripsi_pekerjaan', 'persyaratan', 'benefit'];
+		$wysiwyg_fields = ['tentang_perusahaan', 'deskripsi_pekerjaan', 'persyaratan', 'cara_melamar', 'benefit'];
 		foreach ($wysiwyg_fields as $field) {
 			if (!empty($customFields[$field]) && is_string($customFields[$field])) {
 				$customFields[$field] = do_shortcode(wpautop($customFields[$field]));

@@ -4,14 +4,28 @@ namespace AstraChild\Resources\Components;
 
 class SearchForm
 {
-	public static function render($lokasi_terms, $gender_terms, $pendidikan_terms, $current_search, $current_lokasi, $current_gender, $current_pendidikan, $current_sort)
+	public static function render(array $params)
 	{
+		$lokasi_terms      = $params['lokasi_terms'] ?? [];
+		$gender_terms      = $params['gender_terms'] ?? [];
+		$pendidikan_terms  = $params['pendidikan_terms'] ?? [];
+		$current_search    = $params['current_search'] ?? '';
+		$current_lokasi    = $params['current_lokasi'] ?? '';
+		$current_gender    = $params['current_gender'] ?? '';
+		$current_pendidikan = $params['current_pendidikan'] ?? '';
+		$current_sort      = $params['current_sort'] ?? 'desc';
+
 		ob_start();
 ?>
-		<form class="space-y-4" action="<?= esc_url(get_post_type_archive_link('lowongan')) ?>" method="get">
+		<form
+			class="space-y-4"
+			action="<?= esc_url(get_post_type_archive_link('lowongan')) ?>"
+			method="get"
+			x-data="dynamicSearch"
+			@submit.prevent="searchJobs">
 			<input type="hidden" name="post_type" value="lowongan" />
 
-			<div class="flex gap-2 relative" x-data="autoSuggestSearch()" @click.away="show = false">
+			<div class="flex gap-2 relative" x-data="autoSuggestSearch">
 				<input type="text" placeholder="Masukkan Pekerjaan atau Perusahaan" class="input input-bordered w-full rounded-r-none" name="cari"
 					x-model="query" @input.debounce.300ms="getSuggestions" @focus="show = suggestions.length > 0"
 					autocomplete="off" value="<?= esc_attr($current_search) ?>" />

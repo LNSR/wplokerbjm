@@ -87,7 +87,6 @@ class JobQuery
 
 		$tax_query = [];
 
-		// Other taxonomy filters
 		if (! empty($params['lokasi'])) {
 			$tax_query[] = [
 				'taxonomy' => 'lokasi-pekerjaan',
@@ -130,7 +129,6 @@ class JobQuery
 
 		return $args;
 	}
-
 
 	/**
 	 * * IMPORTANT Used for deleting old jobs according context (\AstraChild\Services\PostsManagement\PostsManagement)

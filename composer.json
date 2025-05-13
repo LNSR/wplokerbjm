@@ -2,6 +2,9 @@
   "require": {
     "php-di/php-di": "*"
   },
+  "require-dev": {
+    "php-stubs/wordpress-stubs": "*"
+  },
   "autoload": {
     "psr-4": {
       "AstraChild\\": "./inc"

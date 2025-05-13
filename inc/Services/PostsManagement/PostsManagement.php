@@ -24,7 +24,7 @@ class PostsManagement
         }
     }
 
-    private function deleteOldJobs(): void
+    public function deleteOldJobs(): void
     {
         $old_jobs = get_posts(JobQuery::oldJobsArgs());
         foreach ($old_jobs as $job_id) {
