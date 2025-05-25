@@ -22,12 +22,9 @@ class Container
                 mkdir($cacheDir, 0755, true);
             }
 
-            // Enable caching only in production
             $isProduction = defined('WP_ENV') && WP_ENV === 'production';
 
-            // In development, always clear the cache to avoid stale definitions
             if (!$isProduction && is_dir($cacheDir)) {
-                // Remove all files in the cache directory
                 array_map('unlink', glob("$cacheDir/*"));
             }
 

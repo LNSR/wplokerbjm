@@ -15,12 +15,9 @@ class AutoSuggestionSearch
             $post_ids = get_posts($args);
 
             if (!empty($post_ids) && !is_wp_error($post_ids)) {
-                foreach ($post_ids as $post_id) {
-                    $title = get_the_title($post_id);
-                    if (!empty($title)) {
-                        $results[] = html_entity_decode($title, ENT_QUOTES | ENT_HTML5, 'UTF-8');
-                    }
-                }
+                $results = array_map(function ($post_id) {
+                    return html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8');
+                }, $post_ids);
             }
         }
         return rest_ensure_response(array_values(array_unique($results)));

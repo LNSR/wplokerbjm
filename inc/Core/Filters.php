@@ -26,7 +26,7 @@ class Filters
         // List of script handles to defer
         $deferHandles = [
             'alpinejs',
-            'glider-js',
+            'swiper',
         ];
 
         // Check if the current handle is in the list
@@ -65,7 +65,7 @@ class Filters
     public function jobPostsSearchFilter($search, $wp_query)
     {
         global $wpdb;
-        if (! empty($wp_query->query_vars['s'])) {
+        if (!empty($wp_query->query_vars['s'])) {
             $search = '';
             $q = $wp_query->query_vars['s'];
             $q_esc = esc_sql($wpdb->esc_like($q));
@@ -96,7 +96,7 @@ class Filters
      */
     public function lscCssExcludes($excludes)
     {
-        $excludes[] = '/wp-content/themes/astra-child/assets/';
+        $excludes[] = '/wp-content/themes/astra-child/assets/css/';
         return $excludes;
     }
 }

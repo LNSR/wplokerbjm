@@ -64,18 +64,18 @@ class Enqueue
 		if (is_front_page()) {
 
 			wp_enqueue_script(
-				'glider-js',
-				get_stylesheet_directory_uri() . '/assets/js/dist/glider-js/glider.min.js',
+				'swiper',
+				get_stylesheet_directory_uri() . '/assets/js/dist/swiper/swiper-bundle.min.js',
 				[],
-				filemtime(get_stylesheet_directory() . '/assets/js/dist/glider-js/glider.min.js'),
+				filemtime(get_stylesheet_directory() . '/assets/js/dist/swiper/swiper-bundle.min.js'),
 				true
 			);
 
 			wp_enqueue_script(
-				'carousel',
-				get_stylesheet_directory_uri() . '/assets/js/Carousel.js',
-				['glider-js'],
-				filemtime(get_stylesheet_directory() . '/assets/js/Carousel.js'),
+				'carousel-swiper',
+				get_stylesheet_directory_uri() . '/assets/js/swiper.js',
+				['swiper'],
+				filemtime(get_stylesheet_directory() . '/assets/js/swiper.js'),
 				true
 			);
 		}

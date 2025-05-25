@@ -16,7 +16,7 @@ class DynamicSearch
             'pendidikan' => $request->get_param('pendidikan') ?? '',
             'sort' => $request->get_param('sort') ?? 'desc',
         ];
-        $args = JobQuery::searchJobsArgs($filters, 1, 9);
+        $args = JobQuery::searchJobsArgs($filters, 1, 36);
 
         $query = new \WP_Query($args);
 

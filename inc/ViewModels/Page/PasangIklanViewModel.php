@@ -109,10 +109,10 @@ class PasangIklanViewModel
 								<i class="fas fa-check-circle text-green-500 dark:text-green-400 mt-1 mr-2" aria-hidden="true"></i>
 								<span class="text-gray-800 dark:text-gray-100 break-words">Kontak untuk lamaran</span>
 							</li>
-							<li class="flex items-start">
+							<!-- <li class="flex items-start">
 								<i class="fas fa-check-circle text-green-500 dark:text-green-400 mt-1 mr-2" aria-hidden="true"></i>
 								<span class="text-gray-800 dark:text-gray-100 break-words">Logo perusahaan (opsional)</span>
-							</li>
+							</li> -->
 						</ul>
 					</aside>
 				</div>

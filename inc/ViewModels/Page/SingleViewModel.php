@@ -44,7 +44,7 @@ class SingleViewModel
 		<section>
 			<h2 class="text-2xl flex items-center gap-2 !mb-4">
 				<i class="fas fa-user-tie text-blue-500"></i>
-				<span class="font-bold"><?= $jobdata['nama_perusahaan']; ?></span>
+				<span class="!font-bold"><?= $jobdata['nama_perusahaan']; ?></span>
 			</h2>
 			<div class="divider"></div>
 		</section>

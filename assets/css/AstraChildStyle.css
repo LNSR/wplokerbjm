@@ -98,12 +98,11 @@
   display: none !important;
 }
 
-.carousel-hidden {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s;
-}
-.carousel-ready {
-  opacity: 1;
-  pointer-events: auto;
+figure.wp-caption.aligncenter img,
+img.aligncenter[class*="wp-image-"] {
+  max-width: 100%;
+  width: 450px;
+  height: auto;
+  display: block;
+  border-radius: 8px;
 }

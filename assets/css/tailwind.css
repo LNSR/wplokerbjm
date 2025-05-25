@@ -1,6 +1,6 @@
 @import "tailwindcss";
 @import "./AstraChildStyle.css";
-@import "glider-js/glider.min.css";
+@import "swiper/swiper-bundle.css";
 @import "@fortawesome/fontawesome-free/css/all.min.css";
 
 @plugin "daisyui";

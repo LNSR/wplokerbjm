@@ -15,11 +15,11 @@ class FloatingActionButton
 		ob_start();
 
 		$contactLinks = [
-			[
+			/* 			[
 				'icon' => 'fab fa-whatsapp text-green-500',
 				'label' => 'WhatsApp',
 				'url' => 'https://api.whatsapp.com/send?phone=6283862447271',
-			],
+			], */
 			[
 				'icon' => 'fab fa-instagram text-pink-500',
 				'label' => 'Instagram',

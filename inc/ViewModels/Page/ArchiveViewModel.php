@@ -22,7 +22,7 @@ class ArchiveViewModel
 			'sort'      => $_GET['sort'] ?? 'desc',
 		];
 		$paged = max(1, (int) ($_GET['paged'] ?? 1));
-		$query_args = \AstraChild\QueryBuilders\JobQuery::searchJobsArgs($params, $paged, 9);
+		$query_args = \AstraChild\QueryBuilders\JobQuery::searchJobsArgs($params, $paged, 72);
 		$jobs_query = new \WP_Query($query_args);
 		$total_jobs = $jobs_query->found_posts;
 		wp_reset_postdata();

@@ -1,6 +1,7 @@
 {
-    "editor.formatOnSave": true,
+    "editor.formatOnSave": false,
     "intelephense.environment.includePaths": [
         "vendor/php-stubs/wordpress-stubs"
-    ]
+    ],
+    "php.version": "8.4.7"
 }

@@ -26,8 +26,8 @@ class JobCard
 			case 'carousel':
 ?>
 				<a href="<?= $permalink; ?>"
-					class="block group rounded-xl transition-all duration-300 cursor-pointer carousel-card max-w-md border-2 border-blue-400 shadow-md hover:shadow-lg hover:border-blue-600 hover:border-solid mx-3">
-					<div class="card-body relative p-3 gap-0 flex flex-col h-full">
+					class="block group rounded-xl transition-all duration-300 cursor-pointer carousel-card max-w-full border-2 border-blue-400 shadow-md hover:shadow-lg hover:border-blue-600 hover:border-solid">
+					<div class="card-body relative p-3 gap-0 flex flex-col min-h-[300px] h-full">
 						<?= self::renderCardContent($post_id, $jobdata); ?>
 					</div>
 				</a>
@@ -125,13 +125,18 @@ class JobCard
 		if (empty($jobdata['deadline'])) {
 			return '';
 		}
-		$deadline_ts = strtotime($jobdata['deadline']);
-		$now = time();
-		$days_left = floor(($deadline_ts - $now) / 86400);
+
+		$deadline = new \DateTime($jobdata['deadline']);
+		$now = new \DateTime('now');
+		$deadline->setTime(0, 0, 0);
+		$now->setTime(0, 0, 0);
+
+		$interval = $now->diff($deadline);
+		$days_left = (int)$interval->format('%r%a'); // signed days
 
 		[$text, $icon_color] = match (true) {
 			$days_left > 1   => ["Tersisa {$days_left} hari", 'border border-blue-500 text-blue-500 bg-transparent'],
-			$days_left === 1 => ["Hari terakhir", 'border border-yellow-500 text-yellow-700 bg-transparent'],
+			$days_left === 1 => ["Tersisa 1 hari", 'border border-yellow-500 text-yellow-700 bg-transparent'],
 			$days_left === 0 => ["Hari terakhir", 'border border-red-500 text-red-500 bg-transparent'],
 			$days_left === -1 => ["Berakhir kemarin", 'border border-red-500 text-red-500 bg-transparent'],
 			$days_left < -1  => ["Berakhir " . abs($days_left) . " hari lalu", 'border border-red-500 text-red-500 bg-transparent'],

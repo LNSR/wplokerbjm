@@ -9,7 +9,7 @@ class HomepageViewModel
 
 	public function __construct()
 	{
-		// Constructor logic if needed
+
 	}
 
 	public function viewHero()
@@ -21,36 +21,42 @@ class HomepageViewModel
 	{
 		ob_start();
 		$query = new \WP_Query(JobQuery::getCarouselArgs(per_page: 9));
-?>
+		?>
 		<section class="px-4 py-8">
 			<h2 class="text-xl font-semibold !mb-6">Lowongan Unggulan</h2>
-			<?php if ($query->have_posts()) : ?>
-				<div class="glider-contain !relative carousel-hidden">
-					<div class="glider">
-						<?php while ($query->have_posts()) :
+			<?php if ($query->have_posts()): ?>
+				<div class="swiper mySwiper !relative invisible">
+					<div class="swiper-wrapper">
+						<?php while ($query->have_posts()):
 							$query->the_post(); ?>
-							<?= \AstraChild\Resources\Components\JobCard::render(get_the_ID(), 'carousel') ?>
+							<div class="swiper-slide">
+								<?= \AstraChild\Resources\Components\JobCard::render(get_the_ID(), 'carousel') ?>
+							</div>
 						<?php endwhile; ?>
 					</div>
-					<button aria-label="Previous"
-						class="glider-prev btn btn-circle absolute left-6 top-1/2 -translate-y-1/2 z-10 hidden sm:inline-flex"></button>
-					<button aria-label="Next"
-						class="glider-next btn btn-circle absolute right-6 top-1/2 -translate-y-1/2 z-10 hidden sm:inline-flex"></button>
+					<div
+						class="swiper-button-prev invisible md:visible opacity-20 hover:opacity-100 transition-opacity duration-400">
+					</div>
+					<div
+						class="swiper-button-next invisible md:visible opacity-20 hover:opacity-100 transition-opacity duration-400">
+					</div>
+					<div class="flex justify-center mt-8">
+						<div class="swiper-pagination"></div>
+					</div>
 				</div>
-				<div role="tablist" class="glider-dots mt-4 flex justify-center gap-2"></div>
-			<?php else : ?>
+			<?php else: ?>
 				<p class="text-center text-gray-500">Belum ada lowongan unggulan.</p>
 			<?php endif;
 			wp_reset_postdata(); ?>
 		</section>
-	<?php
+		<?php
 		return ob_get_clean();
 	}
 
 	public function viewCategoryGrid()
 	{
 		ob_start();
-	?>
+		?>
 		<section class="px-4 py-8">
 			<h2 class="text-2xl font-semibold !mb-6">Kategori Populer</h2>
 			<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4">
@@ -91,7 +97,7 @@ class HomepageViewModel
 				</a>
 			</div>
 		</section>
-<?php
+		<?php
 		return ob_get_clean();
 	}
 
