@@ -1,0 +1,171 @@
+services:
+  wordpress:
+    build: .
+    container_name: wordpress
+    ports:
+      - "80:80"
+    environment:
+      WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
+      WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
+      WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
+      WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
+      WORDPRESS_DEBUG: "true"
+      WP_ENV: "development"
+      WP_REPAIR: "false"
+      FORCE_SSL: "false"
+      WP_HOME: ${WORDPRESS_WP_HOME}
+      WORDPRESS_WP_SITEURL: ${WORDPRESS_WP_SITEURL}      
+      WORDPRESS_CONFIG_EXTRA: |
+        define('WP_REDIS_HOST', 'redis');
+        define('WP_REDIS_PASSWORD', '${REDIS_PASSWORD}');
+        define('WP_REDIS_DATABASE', ${REDIS_DATABASE});
+        define('WP_CACHE', true);
+        define('WP_CACHE_KEY_SALT', '${WORDPRESS_WP_SITEURL}');
+
+        if (!defined('WP_ENV')) {
+        define('WP_ENV', getenv('WP_ENV') ?: 'development'); // Default to 'development' if not set
+        }
+
+        // Define server hostname properly
+        if (isset($$_SERVER['HTTP_HOST'])) {
+          $$hostname = $$_SERVER['HTTP_HOST'];
+        } else {
+          $$hostname = 'localhost';
+        }
+
+        // Enable SSL detection with proxies like Ngrok
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && strpos($$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) {
+          $$_SERVER['HTTPS'] = 'on';  // Use 'on' to enable HTTPS
+          $$protocol = 'https://';
+        } else {
+          $$_SERVER['HTTPS'] = 'off';  // Explicitly set to 'off'
+          $$protocol = 'http://';
+        }
+
+        // If Ngrok is detected, use its URL for the site
+        if (isset($$_SERVER['HTTP_X_FORWARDED_HOST']) && strpos($$_SERVER['HTTP_X_FORWARDED_HOST'], 'ngrok') !== false) {
+          $$hostname = $$_SERVER['HTTP_X_FORWARDED_HOST'];
+        }
+
+        // Set home and site URL
+        define('WP_HOME', $$protocol . $$hostname);
+        define('WP_SITEURL', $$protocol . $$hostname);
+
+        // Development Environment Optimizations
+
+        // Enable full debugging
+        define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug/debug.log');
+        define('WP_DEBUG_DISPLAY', true);
+        define('SCRIPT_DEBUG', true);
+
+        // Performance optimizations for development
+        define('WP_POST_REVISIONS', 3);
+        define('AUTOSAVE_INTERVAL', 120);
+        define('EMPTY_TRASH_DAYS', 7);
+
+        // Disable WordPress cron and automatic updates for development
+        define('DISABLE_WP_CRON', false);
+        define('WP_AUTO_UPDATE_CORE', true);
+
+        // Memory limits
+        define('WP_MEMORY_LIMIT', '1024M');
+        define('WP_MAX_MEMORY_LIMIT', '8196M');
+
+        // Plugin/Theme Development
+        define('DISALLOW_FILE_EDIT', false);
+        define('DISALLOW_FILE_MODS', false);
+        define('WP_ENVIRONMENT_TYPE', 'development');
+        define('WP_DEVELOPMENT_MODE', 'all');
+
+        // Performance Testing
+        define('COMPRESS_CSS', false);
+        define('COMPRESS_SCRIPTS', false);
+        define('CONCATENATE_SCRIPTS', false);
+        define('ENFORCE_GZIP', false);
+
+        // Home and Site URL (only if not set by Ngrok detection)
+        if (!defined('WP_HOME')) {
+          define('WP_HOME', getenv('WORDPRESS_WP_HOME'));
+        }
+        if (!defined('WP_SITEURL')) {
+          define('WP_SITEURL', getenv('WORDPRESS_WP_SITEURL'));
+        }
+
+        // Additional settings
+        define('WP_ALLOW_REPAIR', filter_var(getenv('WP_REPAIR'), FILTER_VALIDATE_BOOLEAN) ? true : false);
+        define('FORCE_SSL_ADMIN', filter_var(getenv('FORCE_SSL'), FILTER_VALIDATE_BOOLEAN) ? true : false);
+    volumes:
+      - ./wordpress:/var/www/html/wp-content
+    depends_on:
+      - db
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/wp-admin/"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+  db:
+    image: mysql:8.0
+    container_name: wordpress_db
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+    volumes:
+      - db:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u$$MYSQL_USER",
+          "-p$$MYSQL_PASSWORD",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  phpmyadmin:
+    restart: always
+    image: phpmyadmin
+    container_name: phpmyadmin
+    environment:
+      PMA_HOST: ${PMA_HOST}
+      PMA_USER: ${PMA_USER}
+      PMA_PASSWORD: ${PMA_PASSWORD}
+      PMA_ARBITRARY: 1
+      APACHE_PORT: 81
+    ports:
+      - "81:81"
+    depends_on:
+      - db
+  redis:
+    image: redis:alpine
+    container_name: wordpress_redis
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory ${REDIS_MAXMEMORY} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY}
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+  # ngrok:
+  #   image: ngrok/ngrok:latest
+  #   container_name: ngrok
+  #   restart: unless-stopped
+  #   command: http wordpress:80
+  #   environment:
+  #     - NGROK_AUTHTOKEN=${NGROK_AUTH_TOKEN}
+  #   ports:
+  #     - "4040:4040"
+  #   depends_on:
+  #     - wordpress
+
+volumes:
+  wordpress:
+  db:
+  redis_data:

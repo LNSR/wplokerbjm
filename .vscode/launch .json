@@ -7,7 +7,7 @@
       "request": "launch",
       "port": 9004,
       "pathMappings": {
-        "/var/www/html/wp-content/themes/astra-child": "${workspaceFolder}"
+        "/var/www/html/wp-content/": "./wordpress/wp-content/"
       },
       "ignore": [
         "**/wp-admin/**",

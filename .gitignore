@@ -1,8 +1,8 @@
-tailwind.config.js
-ecs.php
-style.css.bak
-vendor
-cache/
-composer.lock
-package-lock.json
-node_modules
+wordpress/*
+!wordpress/themes
+wordpress/themes/*
+!wordpress/themes/astra-child
+.env
+php.md
+**/vendor
+**/node_modules
