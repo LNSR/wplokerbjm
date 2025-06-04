@@ -1,7 +1,7 @@
 document.addEventListener("DOMContentLoaded", function () {
   if (window.Swiper) {
     const swiper = new Swiper('.mySwiper', {
-      loop: false,
+      loop: true,
       slidesPerView: 1.3,
       spaceBetween: 16,
       autoplay: {

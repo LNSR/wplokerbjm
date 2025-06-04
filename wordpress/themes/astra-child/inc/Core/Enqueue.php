@@ -52,13 +52,19 @@ class Enqueue
 				true
 			);
 
-			// LoadMore Alpine component
 			wp_enqueue_script(
 				'loadmore-jobs',
 				get_stylesheet_directory_uri() . '/assets/js/LoadMore.js',
 				['alpinejs'],
 				filemtime(get_stylesheet_directory() . '/assets/js/LoadMore.js'),
 				false
+			);
+			wp_enqueue_script(
+				'time-post',
+				get_stylesheet_directory_uri() . '/assets/js/TimePost.js',
+				['alpinejs'],
+				filemtime(get_stylesheet_directory() . '/assets/js/TimePost.js'),
+				true
 			);
 		}
 		if (is_front_page()) {

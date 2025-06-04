@@ -1,0 +1,13 @@
+{
+	"folders": [
+		{
+			"path": "."
+		},
+		{
+			"path": "wordpress/themes/astra-child"
+		}
+	],
+	"settings": {
+		"php.version": "8.4.7"
+	}
+}

@@ -78,4 +78,27 @@ class FormatterServices
             return trim(chunk_split($number, 4, ' '));
         }
     }
+
+    public static function formatTimeAgo(int $timestamp): string
+    {
+        $time_diff = human_time_diff($timestamp, current_time('timestamp', false));
+        $translations = [
+            'minute' => 'menit',
+            'minutes' => 'menit',
+            'hour' => 'jam',
+            'hours' => 'jam',
+            'day' => 'hari',
+            'days' => 'hari',
+            'week' => 'minggu',
+            'weeks' => 'minggu',
+            'month' => 'bulan',
+            'months' => 'bulan',
+            'year' => 'tahun',
+            'years' => 'tahun',
+            'second' => 'detik',
+            'seconds' => 'detik',
+        ];
+        $time_diff = strtr($time_diff, $translations);
+        return sprintf('%s lalu', $time_diff);
+    }
 }
