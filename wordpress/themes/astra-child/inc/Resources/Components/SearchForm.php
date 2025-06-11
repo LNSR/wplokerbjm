@@ -64,8 +64,7 @@ class SearchForm
 				<div class="relative">
 					<i
 						class="fas fa-map-marker-alt absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none z-10"></i>
-					<select name="lokasi" class="select select-bordered w-full !pl-10 h-12 z-0">
-						<option value="" disabled selected>Lokasi</option>
+					<select name="lokasi" class="select select-bordered w-full !pl-10 h-12 z-0 select2" data-placeholder="Semua Lokasi">
 						<option value="">Semua Lokasi</option>
 						<?php echo self::render_hierarchical_options($lokasi_terms, $current_lokasi, 'lokasi-pekerjaan'); ?>
 					</select>
@@ -74,8 +73,7 @@ class SearchForm
 				<div class="relative">
 					<i
 						class="fas fa-venus-mars absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none z-10"></i>
-					<select name="gender" class="select select-bordered w-full !pl-10 h-12 z-0">
-						<option value="" disabled selected>Gender</option>
+					<select name="gender" class="select select-bordered w-full !pl-10 h-12 z-0 select2" data-placeholder="Semua Gender">
 						<option value="">Semua Gender</option>
 						<?php echo self::render_hierarchical_options($gender_terms, $current_gender, 'gender'); ?>
 					</select>
@@ -84,8 +82,7 @@ class SearchForm
 				<div class="relative">
 					<i
 						class="fas fa-graduation-cap absolute left-3 top-1/2 -translate-y-1/2 text-blue-500 pointer-events-none z-10"></i>
-					<select name="pendidikan" class="select select-bordered w-full !pl-10 h-12 z-0">
-						<option value="" disabled selected>Pendidikan</option>
+					<select name="pendidikan" class="select select-bordered w-full !pl-10 h-12 z-0 select2" data-placeholder="Semua Pendidikan">
 						<option value="">Semua Pendidikan</option>
 						<?php echo self::render_hierarchical_options($pendidikan_terms, $current_pendidikan, 'pendidikan'); ?>
 					</select>

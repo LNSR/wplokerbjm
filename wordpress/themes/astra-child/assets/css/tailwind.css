@@ -2,6 +2,8 @@
 @import "./AstraChildStyle.css";
 @import "swiper/swiper-bundle.css";
 @import "@fortawesome/fontawesome-free/css/all.min.css";
+@import "select2/dist/css/select2.min.css";
+@import "./select2-custom.css";
 
 @plugin "daisyui";
 

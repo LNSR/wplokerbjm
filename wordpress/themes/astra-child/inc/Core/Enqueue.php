@@ -43,7 +43,6 @@ class Enqueue
 				filemtime(get_stylesheet_directory() . '/assets/js/DynamicSearch.js'),
 				true
 			);
-
 			wp_enqueue_script(
 				'auto-suggestion-search',
 				get_stylesheet_directory_uri() . '/assets/js/AutoSuggestionSearch.js',
@@ -51,7 +50,6 @@ class Enqueue
 				filemtime(get_stylesheet_directory() . '/assets/js/AutoSuggestionSearch.js'),
 				true
 			);
-
 			wp_enqueue_script(
 				'loadmore-jobs',
 				get_stylesheet_directory_uri() . '/assets/js/LoadMore.js',
@@ -64,6 +62,20 @@ class Enqueue
 				get_stylesheet_directory_uri() . '/assets/js/TimePost.js',
 				['alpinejs'],
 				filemtime(get_stylesheet_directory() . '/assets/js/TimePost.js'),
+				true
+			);
+			wp_enqueue_script(
+				'select2',
+				get_stylesheet_directory_uri() . '/assets/js/dist/select2/select2.min.js',
+				['jquery'],
+				filemtime(get_stylesheet_directory() . '/assets/js/dist/select2/select2.min.js'),
+				true
+			);
+			wp_enqueue_script(
+				'select2-init',
+				get_stylesheet_directory_uri() . '/assets/js/select2-init.js',
+				['jquery', 'select2'],
+				filemtime(get_stylesheet_directory() . '/assets/js/select2-init.js'),
 				true
 			);
 		}

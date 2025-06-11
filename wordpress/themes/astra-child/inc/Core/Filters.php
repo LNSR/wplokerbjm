@@ -27,6 +27,8 @@ class Filters
         $deferHandles = [
             'alpinejs',
             'swiper',
+            'jquery',
+            'select2'
         ];
 
         // Handles for async
@@ -36,6 +38,7 @@ class Filters
             'loadmore-jobs',
             'time-post',
             'carousel-swiper',
+            'select2-init',
             'astra-color-switch'
         ];
 
