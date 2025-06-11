@@ -11,7 +11,7 @@ class JobQuery
 	 * @param int $per_page
 	 * @return array
 	 */
-	public static function latestJobsArgs(int $paged = 1, int $per_page = 9): array
+	public static function latestJobsArgs(int $paged, int $per_page): array
 	{
 		return [
 			'post_type' => 'lowongan',
@@ -72,7 +72,7 @@ class JobQuery
 	 * @param int $per_page
 	 * @return array
 	 */
-	public static function searchJobsArgs(array $params, int $paged = 1, int $per_page = 9): array
+	public static function searchJobsArgs(array $params, int $paged, int $per_page): array
 	{
 		$order = (isset($params['sort']) && strtolower($params['sort']) === 'asc') ? 'ASC' : 'DESC';
 
@@ -142,7 +142,7 @@ class JobQuery
 			'date_query'     => [
 				[
 					'column' => 'post_date',
-					'before' => '3 months ago',
+					'before' => '1 month ago',
 				],
 			],
 			'fields' => 'ids',

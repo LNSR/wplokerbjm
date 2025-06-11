@@ -19,7 +19,7 @@ class Enqueue
 			get_stylesheet_directory_uri() . '/assets/js/dist/alpinejs/cdn.min.js',
 			[],
 			filemtime(get_stylesheet_directory() . '/assets/js/dist/alpinejs/cdn.min.js'),
-			args: false
+			args: true
 		);
 		wp_enqueue_style(
 			'astra-child-tailwind',
@@ -57,7 +57,7 @@ class Enqueue
 				get_stylesheet_directory_uri() . '/assets/js/LoadMore.js',
 				['alpinejs'],
 				filemtime(get_stylesheet_directory() . '/assets/js/LoadMore.js'),
-				false
+				true
 			);
 			wp_enqueue_script(
 				'time-post',

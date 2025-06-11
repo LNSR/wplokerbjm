@@ -10,7 +10,7 @@ class Filters
      */
     public function register(): void
     {
-        add_filter('script_loader_tag', [$this, 'addDeferAttribute'], 10, 2);
+        add_filter('script_loader_tag', [$this, 'addScriptAttributes'], 10, 2);
         add_filter('posts_search', [$this, 'jobPostsSearchFilter'], 10, 2);
 
         add_filter('litespeed_optimize_js_excludes', [$this, 'lscJsExcludes']);
@@ -18,22 +18,33 @@ class Filters
     }
 
     /**
-     * Add defer attribute to specific scripts.
-     * for now mostly defer JS scripts.
+     * Add async or defer attribute to specific scripts.
+     * Use async for fast, non-blocking scripts and defer for dependencies.
      */
-    public function addDeferAttribute(string $tag, string $handle): string
+    public function addScriptAttributes(string $tag, string $handle): string
     {
-        // List of script handles to defer
+        // Handles for defer
         $deferHandles = [
             'alpinejs',
             'swiper',
         ];
 
-        // Check if the current handle is in the list
-        foreach ($deferHandles as $deferHandle) {
-            if ($handle === $deferHandle) {
-                return str_replace(' src', ' defer src', $tag);
-            }
+        // Handles for async
+        $asyncHandles = [
+            'dynamic-search',
+            'auto-suggestion-search',
+            'loadmore-jobs',
+            'time-post',
+            'carousel-swiper',
+            'astra-color-switch'
+        ];
+
+        if (in_array($handle, $deferHandles, true)) {
+            return str_replace(' src', ' defer src', $tag);
+        }
+
+        if (in_array($handle, $asyncHandles, true)) {
+            return str_replace(' src', ' async src', $tag);
         }
 
         return $tag;

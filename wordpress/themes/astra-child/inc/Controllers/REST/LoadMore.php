@@ -19,7 +19,7 @@ class LoadMore
                 'gender' => $request->get_param('gender') ?? '',
                 'pendidikan' => $request->get_param('pendidikan') ?? '',
                 'sort' => $request->get_param('sort') ?? 'desc',
-            ], $paged, per_page: 24)),
+            ], $paged,36)),
             default => new \WP_Query(JobQuery::latestJobsArgs($paged, 36)),
         };
 
