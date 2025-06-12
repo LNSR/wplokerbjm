@@ -8,7 +8,35 @@ class ColorSwitchButton
     {
         ob_start();
 ?>
-        <div id="astra-color-switch-wrapper" class="fixed z-50 right-3 top-2 lg:!top-8">
+        <div 
+            id="astra-color-switch-wrapper"
+            class="fixed z-50 right-3 top-2 lg:!top-8"
+            x-data="{
+                isDark: false,
+                show: false,
+                hideTimeout: null,
+                init() {
+                    this.isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+                    // Show button on mousemove/scroll
+                    window.addEventListener('mousemove', () => this.showButton(), { passive: true });
+                    window.addEventListener('scroll', () => this.showButton(), { passive: true });
+                },
+                toggleTheme() {
+                    const theme = this.isDark ? 'dark' : 'light';
+                    document.documentElement.setAttribute('data-theme', theme);
+                    localStorage.setItem('astra-theme', theme);
+                },
+                showButton() {
+                    this.show = true;
+                    clearTimeout(this.hideTimeout);
+                    this.hideTimeout = setTimeout(() => {
+                        this.show = false;
+                    }, 1500);
+                }
+            }"
+            x-init="init()"
+            :style="{ opacity: show ? 1 : 0 }"
+        >
             <div class="backdrop-blur-md bg-white/60 dark:bg-slate-800/60 rounded-full shadow-lg p-2">
                 <label class="flex cursor-pointer gap-2 items-center">
                     <!-- Sun icon -->
@@ -25,7 +53,15 @@ class ColorSwitchButton
                             <path d="m19.07 4.93-1.41 1.41"></path>
                         </g>
                     </svg>
-                    <input id="astra-color-switch" type="checkbox" value="dark" class="toggle theme-controller" aria-label="Theme Switch" />
+                    <input 
+                        id="astra-color-switch"
+                        type="checkbox"
+                        value="dark"
+                        class="toggle theme-controller"
+                        aria-label="Theme Switch"
+                        x-model="isDark"
+                        @change="toggleTheme"
+                    />
                     <!-- Moon icon -->
                     <svg class="swap-off fill-current w-6 h-6" style="color: var(--icon-color);" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
                         <g stroke-linejoin="round" stroke-linecap="round" stroke-width="2" fill="none" stroke="currentColor">

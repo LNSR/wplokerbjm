@@ -65,10 +65,11 @@ class JobCard
 				<h3 class="card-title text-lg md:text-xl !font-bold group-hover:text-blue-700 transition-colors">
 					<?= esc_html(get_the_title($post_id)); ?>
 				</h3>
-				<span class="text-lg text-center gap-2"
-					x-data="timePost('<?= esc_attr(get_post_time('c', false, $post_id)); ?>')" x-text="timeAgo">
-					<?= esc_html(FormatterServices::formatTimeAgo(get_post_time('U', false, $post_id))); ?>
-				</span>
+				<time class="text-lg text-center gap-2"
+					datetime="<?= esc_attr(date('c', get_post_time('U', true, $post_id))); ?>"
+					x-data="timePost('<?= esc_attr(get_post_time('U', true, $post_id)); ?>')" x-text="timeAgo">
+					<?= esc_html(FormatterServices::formatTimeAgo(get_post_time('U', true, $post_id))); ?>
+				</time>
 			</div>
 			<?php if (empty($jobdata['nama_perusahaan'])): ?>
 				<div class="divider -mt-2"></div>

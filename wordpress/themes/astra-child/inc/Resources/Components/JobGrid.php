@@ -26,7 +26,7 @@ class JobGrid
                         'sort' => $_GET['sort'] ?? 'desc',
                     ]) ?>
                 )'>
-                <div id="job-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <article id="job-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                     <?php
                     if ($jobs_query->have_posts()) :
                         while ($jobs_query->have_posts()) :
@@ -36,7 +36,7 @@ class JobGrid
                         wp_reset_postdata();
                     endif;
                     ?>
-                </div>
+                </article>
                 <?php if ($jobs_query->have_posts() && $jobs_query->max_num_pages > 1) : ?>
                     <div class="text-center mt-8">
                         <button class="btn btn-outline btn-wide" x-show="hasMore" x-bind:disabled="loading" x-on:click="loadMore">

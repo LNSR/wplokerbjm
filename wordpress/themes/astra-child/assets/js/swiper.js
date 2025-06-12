@@ -1,7 +1,12 @@
 document.addEventListener("DOMContentLoaded", function () {
   if (window.Swiper) {
+    const swiperElement = document.querySelector('.mySwiper');
+    const slideCount = swiperElement ? swiperElement.querySelectorAll('.swiper-slide').length : 0;
+    
+    const hasEnoughSlides = slideCount >= 8;
+    
     const swiper = new Swiper('.mySwiper', {
-      loop: true,
+      loop: hasEnoughSlides,
       slidesPerView: 1.3,
       spaceBetween: 16,
       autoplay: {
@@ -21,11 +26,11 @@ document.addEventListener("DOMContentLoaded", function () {
       },
       breakpoints: {
         640: {
-          slidesPerView: 2,
+          slidesPerView: Math.min(2, slideCount),
           spaceBetween: 24,
         },
         1024: {
-          slidesPerView: 4,
+          slidesPerView: Math.min(4, slideCount),
           spaceBetween: 32,
         },
       },

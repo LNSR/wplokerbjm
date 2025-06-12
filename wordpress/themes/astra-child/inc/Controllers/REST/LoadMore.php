@@ -20,7 +20,7 @@ class LoadMore
                 'pendidikan' => $request->get_param('pendidikan') ?? '',
                 'sort' => $request->get_param('sort') ?? 'desc',
             ], $paged,36)),
-            default => new \WP_Query(JobQuery::latestJobsArgs($paged, 36)),
+            default => new \WP_Query(JobQuery::latestJobsArgs($paged, 18)),
         };
 
         $html = '';

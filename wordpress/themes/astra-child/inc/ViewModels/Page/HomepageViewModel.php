@@ -20,7 +20,7 @@ class HomepageViewModel
 	public function viewCarousel()
 	{
 		ob_start();
-		$query = new \WP_Query(JobQuery::getCarouselArgs(per_page: 12));
+		$query = new \WP_Query(JobQuery::getCarouselArgs(per_page: 16));
 		?>
 		<section class="px-4 py-8">
 			<h2 class="text-xl font-semibold !mb-6">Lowongan Unggulan</h2>
@@ -104,7 +104,7 @@ class HomepageViewModel
 	public function viewFeaturedJobs()
 	{
 		return \AstraChild\Resources\Components\JobGrid::render(
-			JobQuery::latestJobsArgs(1, 36),
+			JobQuery::latestJobsArgs(1, 18),
 			'Lowongan Terbaru',
 			'latest'
 		);

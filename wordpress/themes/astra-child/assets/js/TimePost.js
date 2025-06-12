@@ -3,12 +3,27 @@ document.addEventListener('alpine:init', () => {
     function timePost(time) {
         return {
             time,
-            timeAgo: '',
+            timeAgo: 'Loading...',
             interval: null,
             update() {
-                const postDate = new Date(this.time);
+                // Handle both Unix timestamp and ISO string
+                let postDate;
+                if (typeof this.time === 'string' && this.time.match(/^\d+$/)) {
+                    postDate = new Date(parseInt(this.time) * 1000);
+                } else if (typeof this.time === 'number') {
+                    postDate = new Date(this.time * 1000);
+                } else {
+                    postDate = new Date(this.time);
+                }
+                
                 const now = new Date();
                 const diff = Math.floor((now - postDate) / 1000);
+
+                if (diff < 5) {
+                    this.timeAgo = 'Baru saja';
+                    this.setNextUpdate(5000);
+                    return;
+                }
 
                 const timeFormats = [
                     { limit: 60,        divisor: 1,        label: 'detik lalu',   next: 1000 },
@@ -25,7 +40,7 @@ document.addEventListener('alpine:init', () => {
                         const value = Math.floor(diff / format.divisor);
                         this.timeAgo = `${value} ${format.label}`;
                         const nextUpdate = typeof format.next === 'function' ? format.next(diff) : format.next;
-                        this.setNextUpdate(nextUpdate);
+                        this.setNextUpdate(Math.max(nextUpdate, 1000));
                         break;
                     }
                 }
@@ -38,7 +53,10 @@ document.addEventListener('alpine:init', () => {
                 this.update();
             },
             destroy() {
-                if (this.interval) clearTimeout(this.interval);
+                if (this.interval) {
+                    clearTimeout(this.interval);
+                    this.interval = null;
+                }
             }
         }
     }

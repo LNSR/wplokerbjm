@@ -25,6 +25,21 @@ class FloatingActionButton
 				'label' => 'Instagram',
 				'url' => 'https://www.instagram.com/loker_banjarmasin',
 			],
+			[
+				'icon' => 'fab fa-tiktok text-black',
+				'label' => 'TikTok',
+				'url' => 'https://www.tiktok.com/@loker_banjarmasin',
+			],
+			[
+				'icon' => 'fab fa-facebook text-blue-600',
+				'label' => 'Facebook',
+				'url' => 'https://www.facebook.com/loker.banjarmasin.2025',
+			],
+			[
+				'icon' => 'fab fa-threads text-black',
+				'label' => 'Threads',
+				'url' => 'https://www.threads.net/@loker_banjarmasin',
+			],
 		];
 
 ?>

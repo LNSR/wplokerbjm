@@ -29,5 +29,11 @@ class RESTServices
             'callback' => [\AstraChild\Controllers\REST\DynamicSearch::class, 'handle'],
             'permission_callback' => '__return_true',
         ]);
+
+        register_rest_route('astra-child/v1', '/dropdown-options/', [
+            'methods'  => 'GET',
+            'callback' => [\AstraChild\Controllers\REST\DropdownOptions::class, 'handle'],
+            'permission_callback' => '__return_true',
+        ]);
     }
 }

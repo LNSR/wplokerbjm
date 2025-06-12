@@ -23,7 +23,8 @@ class SingleViewModel
 		protected JobRepository $jobRepository,
 		protected SocialMediaService $socialMediaService,
 		protected JobDataFactory $jobDataFactory
-	) {}
+	) {
+	}
 
 	public function setJobDataInfo(int $post_id): void
 	{
@@ -40,7 +41,7 @@ class SingleViewModel
 		}
 
 		ob_start();
-?>
+		?>
 		<section>
 			<h2 class="text-2xl flex items-center gap-2 !mb-4">
 				<i class="fas fa-user-tie text-blue-500"></i>
@@ -48,7 +49,7 @@ class SingleViewModel
 			</h2>
 			<div class="divider"></div>
 		</section>
-	<?php
+		<?php
 		return ob_get_clean();
 	}
 
@@ -62,16 +63,16 @@ class SingleViewModel
 		}
 
 		ob_start();
-	?>
+		?>
 		<section>
 			<h2 class="text-xl flex items-center gap-2 !mb-4">
-				<i class="fas fa-map-marker-alt text-blue-600"></i>
+				<i class="fas fa-building text-blue-600"></i>
 				<span class="font-bold">Tentang Perusahaan</span>
 			</h2>
 			<?= $jobdata['tentang_perusahaan']; ?>
 			<div class="divider"></div>
 		</section>
-	<?php
+		<?php
 		return ob_get_clean();
 	}
 
@@ -94,26 +95,41 @@ class SingleViewModel
 		$rows = JobSummaryRows::getSummaryRows($jobdata);
 
 		ob_start();
-	?>
+		?>
 		<section>
 			<h2 class="flex items-center gap-2 !mb-4">
 				<i class="fas fa-clipboard-check text-blue-600"></i>
 				<span class="font-bold">Ringkasan Pekerjaan</span>
 			</h2>
-			<div class="grid grid-cols-1 gap-4 mt-4">
-				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-x-6 gap-y-4 text-lg">
+			<div class="gap-4 mt-4">
+				<div class="gap-x-6 gap-y-4 text-lg">
 					<?php foreach ($rows as $row): ?>
-						<div class="flex items-center">
-							<i class="fas <?= $row['icon'] ?> text-blue-600 w-6 text-center"></i>
-							<span class="ml-2 !font-semibold"><?= $row['label'] ?>:</span>
-							<span class="ml-2 !font-semibold"><?= $row['value'] ?></span>
+						<?php
+						$labelClass = '';
+						$labelClass = match ($row['label']) {
+							'Jenis Pekerjaan' => 'sm:ml-1 ml-3',
+							'Pendidikan' => 'ml-3',
+							'Pengalaman' => 'ml-3',
+							'Gender' => 'ml-3',
+							'Usia' => 'ml-3',
+							'Deadline' => 'ml-3',
+							'Gaji' => 'ml-3',
+							'Lokasi' => 'ml-3',
+							default => 'ml-2',
+						};
+						?>
+						<div class="flex items-start lg:space-x-2 space-x-1 mb-2">
+							<i class="fas <?= $row['icon'] ?> text-blue-600 w-3 text-justify pt-2"></i>
+							<span class="ml-3 !font-semibold whitespace-nowrap min-w-[120px]"><?= $row['label'] ?></span>
+							<span class="<?= $labelClass ?> !font-semibold">:</span>
+							<span class="!font-semibold"><?= $row['value'] ?></span>
 						</div>
 					<?php endforeach; ?>
 				</div>
 			</div>
 		</section>
 		<div class="divider"></div>
-	<?php
+		<?php
 		return ob_get_clean();
 	}
 
@@ -126,7 +142,7 @@ class SingleViewModel
 		}
 
 		ob_start();
-	?>
+		?>
 		<section>
 			<h2 class="text-xl flex items-center gap-2 !mb-4">
 				<i class="fas fa-info-circle text-blue-600"></i>
@@ -135,7 +151,7 @@ class SingleViewModel
 			<?= $jobdata['deskripsi_pekerjaan']; ?>
 			<div class="divider"></div>
 		</section>
-	<?php
+		<?php
 		return ob_get_clean();
 	}
 
@@ -148,7 +164,7 @@ class SingleViewModel
 		}
 
 		ob_start();
-	?>
+		?>
 		<section>
 			<h2 class="text-xl flex items-center gap-2 !mb-4">
 				<i class="fas fa-check-circle text-blue-600"></i>
@@ -157,7 +173,7 @@ class SingleViewModel
 			<?= $jobdata['persyaratan']; ?>
 			<div class="divider"></div>
 		</section>
-	<?php
+		<?php
 		return ob_get_clean();
 	}
 
@@ -170,7 +186,7 @@ class SingleViewModel
 		}
 
 		ob_start();
-	?>
+		?>
 		<section>
 			<h2 class="text-xl flex items-center gap-2 !mb-4">
 				<i class="fas fa-file-signature text-blue-600"></i>
@@ -179,7 +195,7 @@ class SingleViewModel
 			<?= $jobdata['cara_melamar']; ?>
 			<div class="divider"></div>
 		</section>
-	<?php
+		<?php
 		return ob_get_clean();
 	}
 
@@ -190,7 +206,7 @@ class SingleViewModel
 			return '';
 		}
 		ob_start();
-	?>
+		?>
 		<section>
 			<h2 class="text-xl flex items-center gap-2 !mb-4">
 				<i class="fas fa-hand-holding-heart text-blue-600"></i>
@@ -199,7 +215,7 @@ class SingleViewModel
 			<?= $jobdata['benefit']; ?>
 			<div class="divider"></div>
 		</section>
-	<?php
+		<?php
 		return ob_get_clean();
 	}
 
@@ -216,7 +232,7 @@ class SingleViewModel
 		}
 
 		ob_start();
-	?>
+		?>
 		<section>
 			<h2 class="text-xl flex items-center justify-between !mb-4">
 				<span class="flex items-center gap-2">
@@ -228,7 +244,7 @@ class SingleViewModel
 				<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
 					<?php
 					$contacts = JobsContactsRows::getJobContactsRows($jobdata);
-					foreach ($contacts as $contact) : ?>
+					foreach ($contacts as $contact): ?>
 						<div class="flex items-center">
 							<i class="<?= $contact['icon']; ?> text-blue-600 w-6 text-center text-xl"></i>
 							<div class="ml-2 font-semibold text-md">
@@ -242,7 +258,7 @@ class SingleViewModel
 			</div>
 		</section>
 		<div class="divider"></div>
-	<?php
+		<?php
 		return ob_get_clean();
 	}
 
@@ -255,7 +271,7 @@ class SingleViewModel
 		}
 
 		ob_start();
-	?>
+		?>
 		<section>
 			<h2 class="text-xl flex items-center gap-2 !mb-4">
 				<i class="fas fa-address-book text-blue-600"></i>
@@ -278,7 +294,7 @@ class SingleViewModel
 			</div>
 		</section>
 		<div class="divider"></div>
-<?php
+		<?php
 		return ob_get_clean();
 	}
 

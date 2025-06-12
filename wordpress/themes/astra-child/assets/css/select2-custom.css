@@ -29,7 +29,7 @@
     padding: 0.25rem !important;
     width: 1.5rem !important;
     height: 1.5rem !important;
-    text-align: center !important;
+    text-align: left !important;
     border-radius: 50% !important;
     cursor: pointer !important;
     z-index: 10 !important;
@@ -47,6 +47,7 @@
 .select2-results__option {
     padding: 0.5rem 1rem !important;
     text-align: left !important;
+    position: relative !important;
 }
 
 .select2-results__option--highlighted {
@@ -59,4 +60,173 @@
 
 .relative .select2-container .select2-selection {
     position: relative !important;
+}
+
+/* Loading states for lazy loading */
+.select2-results__option.loading-results {
+    text-align: center !important;
+    padding: 12px !important;
+    color: #6b7280 !important;
+    font-style: italic !important;
+}
+
+.select2-results__message {
+    text-align: center !important;
+    padding: 12px !important;
+    color: #6b7280 !important;
+    font-style: italic !important;
+}
+
+/* Enhanced hierarchy indicators - Highly visible */
+.expand-chevron-wrapper {
+    position: absolute !important;
+    right: 8px !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    cursor: pointer !important;
+    padding: 12px !important;
+    z-index: 1001 !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease !important;
+    background-color: rgba(59, 130, 246, 0.3) !important;
+    border: 2px solid #3b82f6 !important;
+    width: 80px !important;
+    height: 36px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1) !important;
+    gap: 6px !important;
+}
+
+.expand-chevron-wrapper:hover {
+    background-color: rgba(59, 130, 246, 0.5) !important;
+    border-color: #1d4ed8 !important;
+    transform: translateY(-50%) scale(1.05) !important;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.expand-chevron-wrapper .expand-chevron {
+    font-size: 14px !important;
+    color: #1d4ed8 !important;
+    pointer-events: none !important;
+    font-weight: bold !important;
+}
+
+.expand-chevron-wrapper:hover .expand-chevron {
+    color: #1e40af !important;
+}
+
+/* Add text for expand button */
+.expand-chevron-wrapper::before {
+    content: "Buka" !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    color: #1d4ed8 !important;
+    pointer-events: none !important;
+}
+
+.expand-chevron-wrapper:hover::before {
+    color: #1e40af !important;
+}
+
+/* Option content styling */
+.option-content {
+    position: relative !important;
+    padding-right: 95px !important; /* More space for larger button */
+    min-height: 44px !important; /* Taller to accommodate larger button */
+    display: flex !important;
+    align-items: center !important;
+    cursor: pointer !important;
+}
+
+/* Prevent text selection on interactive elements */
+.expand-chevron-wrapper,
+.expand-chevron,
+.back-button-item {
+    user-select: none !important;
+    -webkit-user-select: none !important;
+    -moz-user-select: none !important;
+    -ms-user-select: none !important;
+}
+
+/* Ensure chevron area doesn't get highlighted */
+.select2-results__option--highlighted .expand-chevron-wrapper {
+    border-color: #1d4ed8 !important;
+}
+
+/* Make sure chevron stays visible in all states */
+.select2-results__option .expand-chevron-wrapper {
+    background-color: rgba(59, 130, 246, 0.3) !important;
+    border: 2px solid #3b82f6 !important;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .select2-container {
+        font-size: 16px !important; /* Prevent zoom on iOS */
+    }
+    
+    .select2-dropdown {
+        width: 100% !important;
+    }
+    
+    .expand-chevron-wrapper {
+        width: 70px !important;
+        height: 32px !important;
+        right: 6px !important;
+        padding: 8px !important;
+        gap: 4px !important;
+    }
+    
+    .expand-chevron-wrapper::before {
+        font-size: 10px !important;
+    }
+    
+    .expand-chevron-wrapper .expand-chevron {
+        font-size: 12px !important;
+    }
+    
+    .option-content {
+        padding-right: 80px !important;
+        min-height: 40px !important;
+    }
+}
+
+/* Enhanced visual hierarchy */
+.select2-results__option[data-depth="0"] {
+    font-weight: 600 !important;
+}
+
+.select2-results__option[data-depth="1"] {
+    font-weight: 500 !important;
+}
+
+.select2-results__option[data-depth="2"] {
+    font-weight: 400 !important;
+}
+
+/* Loading spinner for AJAX calls */
+.select2-container--default .select2-selection--single .select2-selection__arrow b {
+    border-color: #888 transparent transparent transparent !important;
+}
+
+.select2-container--default.select2-container--open .select2-selection--single .select2-selection__arrow b {
+    border-color: transparent transparent #888 transparent !important;
+}
+
+/* Better focus states */
+.select2-container--default.select2-container--focus .select2-selection--single {
+    border-color: #3b82f6 !important;
+    box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2) !important;
+}
+
+/* Ensure proper stacking and visibility */
+.select2-results__option {
+    overflow: visible !important;
+}
+
+/* Remove background color from selected options */
+.select2-container--default .select2-results__option--selected {
+    background-color: #2271b1 !important;
 }

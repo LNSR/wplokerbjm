@@ -31,15 +31,13 @@ class Filters
             'select2'
         ];
 
-        // Handles for async
+        // Handles for async - Remove time-post since it depends on Alpine
         $asyncHandles = [
             'dynamic-search',
             'auto-suggestion-search',
             'loadmore-jobs',
-            'time-post',
             'carousel-swiper',
             'select2-init',
-            'astra-color-switch'
         ];
 
         if (in_array($handle, $deferHandles, true)) {

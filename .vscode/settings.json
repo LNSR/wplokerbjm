@@ -3,5 +3,5 @@
     "intelephense.environment.includePaths": [
         "wordpress/wp-content/themes/astra-child/vendor/php-stubs/wordpress-stubs"
     ],
-    "php.version": "8.4.7"
+    "php.version": "8.4.8"
 }
