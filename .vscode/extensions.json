@@ -2,5 +2,6 @@
     "recommendations": [
         "DEVSENSE.phptools-vscode",
         "bradlc.vscode-tailwindcss",
+        "Vue.volar"
     ]
 }

@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "type": "firefox",
+      "request": "launch",
+      "reAttach": true,
+      "name": "Zen Browser (Firefox)",
+      "url": "http://localhost",
+      "webRoot": "${workspaceFolder}/wordpress/wp-content/themes/astra-child/src/",
+      "reloadOnAttach": true,
+      "firefoxExecutable": "/usr/bin/zen-browser"
+    },
+    {
+      "name": "Listen for Xdebug (Child Theme)",
+      "type": "php",
+      "request": "launch",
+      "port": 9004,
+      "pathMappings": {
+        "/var/www/html/wp-content/": "./wordpress/wp-content/"
+      },
+      "ignore": [
+        "**/wp-admin/**",
+        "**/wp-includes/**",
+        "**/wp-content/plugins/**",
+        "**/wp-content/themes/!(astra-child|astra)/**",
+        "vendor/**"
+      ]
+    }
+  ]
+}

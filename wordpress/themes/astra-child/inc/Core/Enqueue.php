@@ -9,92 +9,98 @@ class Enqueue
      */
     public function register(): void
     {
-        add_action('wp_enqueue_scripts', [$this, 'enqueueJS']);
-        add_action('wp_enqueue_scripts', [$this, 'enqueueStyle']);
+        add_action('wp_enqueue_scripts', [$this, 'enqueueAssets']);
     }
 
-    public function enqueueStyle(): void
+    /**
+     * Determine the correct Vite entry for the current page.
+     */
+    private function getViteEntry(): ?string
     {
-        wp_enqueue_style(
-            'astra-child-tailwind',
-            get_stylesheet_directory_uri() . '/assets/css/style.css',
-            [],
-            filemtime(get_stylesheet_directory() . '/assets/css/style.css')
-        );
+        if (is_front_page() || is_post_type_archive('lowongan') || is_page('pasang-iklan-loker') ) {
+            return 'homepage.ts';
+        } elseif (is_singular('lowongan')) {
+            return 'single.ts';
+        }
+        return null;
     }
 
-    public function enqueueJS(): void
+    public function enqueueAssets(): void
     {
-        wp_enqueue_script(
-            'alpinejs',
-            get_stylesheet_directory_uri() . '/assets/js/dist/alpinejs/cdn.min.js',
+        $entry = $this->getViteEntry();
+        if (!$entry) {
+            return;
+        }
+
+        // Development mode: load from Vite dev server
+        if (defined('WP_ENV') && WP_ENV === 'development') {
+            $vite_base_url = preg_replace('#/$#', '', home_url()) . ':5173';
+            wp_enqueue_script_module(
+                'vite-' . md5($entry),
+                "{$vite_base_url}/src/{$entry}",
+                [],
+                null
+            );
+            wp_enqueue_script_module(
+                'vite-client',
+                "{$vite_base_url}/@vite/client",
+                [],
+                null
+            );
+            return;
+        }
+
+        // Production mode: load from built assets
+        $dist_dir = get_stylesheet_directory() . '/assets/vue/dist';
+        $dist_uri = get_stylesheet_directory_uri() . '/assets/vue/dist';
+        $manifest_path = $dist_dir . '/.vite/manifest.json';
+
+        if (!file_exists($manifest_path)) {
+            return;
+        }
+
+        $manifest = json_decode(file_get_contents($manifest_path), true);
+        $manifest_key = 'src/' . $entry;
+
+        if (empty($manifest[$manifest_key]['file'])) {
+            return;
+        }
+
+        $main_js = $manifest[$manifest_key]['file'];
+        $main_css = $manifest[$manifest_key]['css'] ?? [];
+
+        // Enqueue main JS
+        wp_enqueue_script_module(
+            'vue-' . md5($entry),
+            $dist_uri . '/' . $main_js,
             [],
-            filemtime(get_stylesheet_directory() . '/assets/js/dist/alpinejs/cdn.min.js'),
-            true
+            filemtime($dist_dir . '/' . $main_js)
         );
-        
-        if (is_front_page() || is_post_type_archive('lowongan')) 
-        {
-            wp_enqueue_script(
-                'dynamic-search',
-                get_stylesheet_directory_uri() . '/assets/js/DynamicSearch.js',
-                ['alpinejs'],
-                filemtime(get_stylesheet_directory() . '/assets/js/DynamicSearch.js'),
-                true
-            );
-            wp_enqueue_script(
-                'auto-suggestion-search',
-                get_stylesheet_directory_uri() . '/assets/js/AutoSuggestionSearch.js',
-                ['alpinejs'],
-                filemtime(get_stylesheet_directory() . '/assets/js/AutoSuggestionSearch.js'),
-                true
-            );
-            wp_enqueue_script(
-                'loadmore-jobs',
-                get_stylesheet_directory_uri() . '/assets/js/LoadMore.js',
-                ['alpinejs'],
-                filemtime(get_stylesheet_directory() . '/assets/js/LoadMore.js'),
-                true
-            );
-            wp_enqueue_script(
-                'time-post',
-                get_stylesheet_directory_uri() . '/assets/js/TimePost.js',
-                ['alpinejs'],
-                filemtime(get_stylesheet_directory() . '/assets/js/TimePost.js'),
-                true
-            );
-            wp_enqueue_script(
-                'select2',
-                get_stylesheet_directory_uri() . '/assets/js/dist/select2/select2.min.js',
-                ['jquery'],
-                filemtime(get_stylesheet_directory() . '/assets/js/dist/select2/select2.min.js'),
-                false
-            );
-            wp_enqueue_script(
-                'select2-init',
-                get_stylesheet_directory_uri() . '/assets/js/select2.js',
-                ['jquery', 'select2'],
-                filemtime(get_stylesheet_directory() . '/assets/js/select2.js'),
-                true
+
+        // Enqueue main CSS
+        foreach ($main_css as $css_file) {
+            wp_enqueue_style(
+                'vue-' . md5($entry) . '-' . md5($css_file),
+                $dist_uri . '/' . $css_file,
+                [],
+                filemtime($dist_dir . '/' . $css_file)
             );
         }
 
-        if (is_front_page()) 
-        {
-            wp_enqueue_script(
-                'swiper',
-                get_stylesheet_directory_uri() . '/assets/js/dist/swiper/swiper-bundle.min.js',
-                [],
-                filemtime(get_stylesheet_directory() . '/assets/js/dist/swiper/swiper-bundle.min.js'),
-                true
-            );
-            wp_enqueue_script(
-                'carousel-swiper',
-                get_stylesheet_directory_uri() . '/assets/js/swiper.js',
-                ['swiper'],
-                filemtime(get_stylesheet_directory() . '/assets/js/swiper.js'),
-                true
-            );
+        // Enqueue CSS from imported chunks (e.g., vendor, vendor-swiper, etc.)
+        if (!empty($manifest[$manifest_key]['imports'])) {
+            foreach ($manifest[$manifest_key]['imports'] as $importKey) {
+                if (!empty($manifest[$importKey]['css'])) {
+                    foreach ($manifest[$importKey]['css'] as $importCss) {
+                        wp_enqueue_style(
+                            'vue-' . $importKey,
+                            $dist_uri . '/' . $importCss,
+                            [],
+                            filemtime($dist_dir . '/' . $importCss)
+                        );
+                    }
+                }
+            }
         }
     }
 }

@@ -30,9 +30,28 @@ class RESTServices
             'permission_callback' => '__return_true',
         ]);
 
-        register_rest_route('astra-child/v1', '/dropdown-options/', [
+        register_rest_route('astra-child/v1', '/taxonomies/', [
             'methods'  => 'GET',
-            'callback' => [\AstraChild\Controllers\REST\DropdownOptions::class, 'handle'],
+            'callback' => [\AstraChild\Controllers\REST\TaxonomyDepth::class, 'handle'],
+            'permission_callback' => '__return_true',
+        ]);
+
+        $taxonomies = [
+            'lokasi',
+            'gender',
+            'pendidikan',
+        ];
+        foreach ($taxonomies as $taxonomy) {
+            register_rest_route('astra-child/v1', "/taxonomies/$taxonomy", [
+                'methods'  => 'GET',
+                'callback' => [\AstraChild\Controllers\REST\TaxonomyDepth::class, $taxonomy],
+                'permission_callback' => '__return_true',
+            ]);
+        }
+
+        register_rest_route('astra-child/v1', '/carousel/', [
+            'methods'  => 'GET',
+            'callback' => [\AstraChild\Controllers\REST\Carousel::class, 'handle'],
             'permission_callback' => '__return_true',
         ]);
     }

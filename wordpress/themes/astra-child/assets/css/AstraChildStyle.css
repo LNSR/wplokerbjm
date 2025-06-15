@@ -4,6 +4,15 @@
   display: none !important;
 }
 
+.hide-preload {
+  visibility: hidden !important;
+}
+
+/* Prevent transitions on root during theme switch to reduce INP/layout shift */
+html.theme-switching, body.theme-switching {
+  transition: none !important;
+}
+
 /* Light Mode */
 :root {
   --ast-global-color-0: #0067ff;
@@ -92,10 +101,6 @@
   --ast-customizer-color-13: #f3f4f6;
   --ast-customizer-color-14: #cc1818;
   --icon-color: #f1f5f9; /* Moon: */
-}
-
-[x-cloak] {
-  display: none !important;
 }
 
 figure.wp-caption.aligncenter img,

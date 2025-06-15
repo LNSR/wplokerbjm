@@ -44,12 +44,19 @@ class PostsManagement
         }
     }
 
+    /**
+     * Summary of updateJobStatusIfExpired
+     * @param int $post_id
+     * @param string $deadline
+     * @param int $current_status
+     * @return void
+     */
     public function updateJobStatusIfExpired(int $post_id, string $deadline, int $current_status): void
     {
-        $deadline_ts = strtotime($deadline);
+        $deadline_ts = strtotime($deadline . ' 23:59:59');
         $now = time();
-        // If more than 3 days(259200 seconds) have passed since deadline and status is not 0
-        if (($now - $deadline_ts) > 259200 && $current_status !== 0) {
+        // If the deadline has passed and status is not 0
+        if ($now > $deadline_ts && $current_status !== 0) {
             update_post_meta($post_id, 'status_pekerjaan', 0);
         }
     }

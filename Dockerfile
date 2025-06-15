@@ -1,4 +1,4 @@
-FROM wordpress:php8.4-apache
+FROM wordpress:php8.4-fpm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -80,21 +80,23 @@ RUN apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
 # Copy PHP configuration files
 COPY docker.conf.d/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
 COPY docker.conf.d/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
-COPY docker.conf.d/uploads.ini /usr/local/etc/php/conf.d/uploads.ini
+COPY docker.conf.d/php.ini /usr/local/etc/php/conf.d/php.ini
 
 # Add WordPress user with your host UID/GID
 RUN groupadd -r -g 1000 wordpress && \
-    useradd -r -u 1000 -g wordpress wordpress && \
-    chown -R wordpress:wordpress /var/www/html
+    useradd -r -u 1000 -g wordpress wordpress
 
 # Set permissions for WordPress directories
-RUN mkdir -p /var/www/html/wp-content/uploads /var/www/html/wp-content/debug && \
-    chown -R wordpress:wordpress /var/www/html
+RUN mkdir -p /var/www/html/wp-content/uploads /var/www/html/wp-content/debug
 
 # Ensure wp-cli is accessible for the wordpress user
 RUN chmod +x /usr/local/bin/wp && \
     ln -sf /usr/local/bin/wp /usr/bin/wp
 
-USER wordpress
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-CMD ["apache2-foreground"]
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
+CMD ["php-fpm"]
+
+USER wordpress

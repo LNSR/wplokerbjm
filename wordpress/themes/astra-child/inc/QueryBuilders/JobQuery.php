@@ -11,11 +11,10 @@ class JobQuery
 	 * @param int $per_page
 	 * @return array
 	 */
-	public static function latestJobsArgs(int $paged, int $per_page): array
-	{
+	public static function latestJobsArgs(int $paged = 1, $posts_per_page = 9): array{
 		return [
 			'post_type' => 'lowongan',
-			'posts_per_page' => $per_page,
+			'posts_per_page' => $posts_per_page,
 			'paged' => $paged,
 			'orderby' => 'date',
 			'order' => 'DESC',
@@ -47,20 +46,30 @@ class JobQuery
 	 */
 	public static function getCarouselArgs(int $per_page): array
 	{
+		$today = date('Y-m-d');
+		$seven_days = date('Y-m-d', strtotime('+7 days'));
+
 		return [
-			'post_type' => 'lowongan',
+			'post_type'      => 'lowongan',
 			'posts_per_page' => $per_page,
-			'meta_query' => [
+			'meta_query'     => [
 				[
-					'key' => 'status_pekerjaan',
-					'value' => [2, 3],
+					'key'     => 'status_pekerjaan',
+					'value'   => [2, 3],
 					'compare' => 'IN',
-					'type' => 'NUMERIC',
+					'type'    => 'NUMERIC',
+				],
+				[
+					'key'     => 'deadline',
+					'value'   => [$today, $seven_days],
+					'compare' => 'BETWEEN',
+					'type'    => 'DATE',
 				],
 			],
-			'post_status' => 'publish',
-			'orderby' => 'date',
-			'order' => 'DESC',
+			'post_status'    => 'publish',
+			'orderby'        => 'meta_value',
+			'meta_key'       => 'deadline',
+			'order'          => 'ASC',
 		];
 	}
 
@@ -87,29 +96,41 @@ class JobQuery
 
 		$tax_query = [];
 
-		if (! empty($params['lokasi'])) {
+		if (!empty($params['lokasi'])) {
+			$lokasi_terms = is_array($params['lokasi'])
+				? array_map('sanitize_text_field', $params['lokasi'])
+				: [sanitize_text_field($params['lokasi'])];
 			$tax_query[] = [
 				'taxonomy' => 'lokasi-pekerjaan',
 				'field' => 'slug',
-				'terms' => sanitize_text_field($params['lokasi']),
+				'terms' => $lokasi_terms,
+				'operator' => 'IN',
 			];
 		}
-		if (! empty($params['gender'])) {
+		if (!empty($params['gender'])) {
+			$gender_terms = is_array($params['gender'])
+				? array_map('sanitize_text_field', $params['gender'])
+				: [sanitize_text_field($params['gender'])];
 			$tax_query[] = [
 				'taxonomy' => 'gender',
 				'field' => 'slug',
-				'terms' => sanitize_text_field($params['gender']),
+				'terms' => $gender_terms,
+				'operator' => 'IN',
 			];
 		}
-		if (! empty($params['pendidikan'])) {
+		if (!empty($params['pendidikan'])) {
+			$pendidikan_terms = is_array($params['pendidikan'])
+				? array_map('sanitize_text_field', $params['pendidikan'])
+				: [sanitize_text_field($params['pendidikan'])];
 			$tax_query[] = [
 				'taxonomy' => 'pendidikan',
 				'field' => 'slug',
-				'terms' => sanitize_text_field($params['pendidikan']),
+				'terms' => $pendidikan_terms,
+				'operator' => 'IN',
 			];
 		}
 
-		if (! empty($params['cari'])) {
+		if (!empty($params['cari'])) {
 			$search_term = sanitize_text_field($params['cari']);
 			$tax_query[] = [
 				'taxonomy' => 'perusahaan',
@@ -122,7 +143,7 @@ class JobQuery
 
 		if ($tax_query) {
 			$args['tax_query'] = [
-				'relation' => !empty($params['cari']) ? 'OR' : 'AND',
+				'relation' => 'AND',
 				...$tax_query
 			];
 		}

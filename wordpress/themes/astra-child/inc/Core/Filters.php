@@ -10,45 +10,10 @@ class Filters
      */
     public function register(): void
     {
-        add_filter('script_loader_tag', [$this, 'addScriptAttributes'], 10, 2);
         add_filter('posts_search', [$this, 'jobPostsSearchFilter'], 10, 2);
 
         add_filter('litespeed_optimize_js_excludes', [$this, 'lscJsExcludes']);
         add_filter('litespeed_optimize_css_excludes', [$this, 'lscCssExcludes']);
-    }
-
-    /**
-     * Add async or defer attribute to specific scripts.
-     * Use async for fast, non-blocking scripts and defer for dependencies.
-     */
-    public function addScriptAttributes(string $tag, string $handle): string
-    {
-        // Handles for defer
-        $deferHandles = [
-            'alpinejs',
-            'swiper',
-            'jquery',
-            'select2'
-        ];
-
-        // Handles for async - Remove time-post since it depends on Alpine
-        $asyncHandles = [
-            'dynamic-search',
-            'auto-suggestion-search',
-            'loadmore-jobs',
-            'carousel-swiper',
-            'select2-init',
-        ];
-
-        if (in_array($handle, $deferHandles, true)) {
-            return str_replace(' src', ' defer src', $tag);
-        }
-
-        if (in_array($handle, $asyncHandles, true)) {
-            return str_replace(' src', ' async src', $tag);
-        }
-
-        return $tag;
     }
 
     /**
@@ -100,6 +65,7 @@ class Filters
      */
     public function lscJsExcludes($excludes)
     {
+        $excludes[] = '/wp-content/themes/astra-child/assets/vue/dist/js/';
         return $excludes;
     }
 
@@ -108,6 +74,7 @@ class Filters
      */
     public function lscCssExcludes($excludes)
     {
+        $excludes[] = '/wp-content/themes/astra-child/assets/vue/dist/css/';
         $excludes[] = '/wp-content/themes/astra-child/assets/css/';
         return $excludes;
     }

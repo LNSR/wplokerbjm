@@ -2,28 +2,26 @@
 
 namespace AstraChild\ViewModels\Page;
 
-class ArchiveViewModel
-{
+class ArchiveViewModel {
 
-	public function __construct() {}
+	public function __construct() {
+	}
 
-	public function viewHero()
-	{
+	public function viewHero() {
 		return \AstraChild\Resources\Components\Hero::render();
 	}
 
-	public function viewSearchResults()
-	{
-		$params = [
-			'cari'      => $_GET['cari'] ?? '',
-			'lokasi'    => $_GET['lokasi'] ?? '',
-			'gender'    => $_GET['gender'] ?? '',
+	public function viewSearchResults() {
+		$params = [ 
+			'cari' => $_GET['cari'] ?? '',
+			'lokasi' => $_GET['lokasi'] ?? '',
+			'gender' => $_GET['gender'] ?? '',
 			'pendidikan' => $_GET['pendidikan'] ?? '',
-			'sort'      => $_GET['sort'] ?? 'desc',
+			'sort' => $_GET['sort'] ?? 'desc',
 		];
-		$paged = max(1, (int) ($_GET['paged'] ?? 1));
-		$query_args = \AstraChild\QueryBuilders\JobQuery::searchJobsArgs($params, $paged, 72);
-		$jobs_query = new \WP_Query($query_args);
+		$paged = max( 1, (int) ( $_GET['paged'] ?? 1 ) );
+		$query_args = \AstraChild\QueryBuilders\JobQuery::searchJobsArgs( $params, $paged, 36);
+		$jobs_query = new \WP_Query( $query_args );
 		$total_jobs = $jobs_query->found_posts;
 		wp_reset_postdata();
 
@@ -35,13 +33,11 @@ class ArchiveViewModel
 		);
 	}
 
-	public function viewFloatingActionButton(): string
-	{
-		return \AstraChild\Resources\Components\FloatingActionButton::render();
+	public function viewFloatingActionButton(): string {
+		return '<div id="floating-action-button"></div>';
 	}
 
-	public function viewFloatingAstraColorSwitchButton(): string
-	{
-		return \AstraChild\Resources\Components\ColorSwitchButton::render();
+	public function viewFloatingAstraColorSwitchButton(): string {
+		return '<div id="color-switch-button"></div>';
 	}
 }

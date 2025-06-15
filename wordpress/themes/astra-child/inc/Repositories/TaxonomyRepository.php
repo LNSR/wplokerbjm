@@ -37,37 +37,30 @@ class TaxonomyRepository implements DataProviderInterface
 			'perusahaan_terms' => get_terms([
 				'taxonomy' => 'perusahaan',
 				'hide_empty' => true,
-				'parent' => 0
 			]),
 			'kategori_lowongan_terms' => get_terms([
 				'taxonomy' => 'kategori-lowongan',
 				'hide_empty' => true,
-				'parent' => 0
 			]),
 			'lokasi_terms' => get_terms([
 				'taxonomy' => 'lokasi-pekerjaan',
 				'hide_empty' => true,
-				'parent' => 0
 			]),
 			'jenis_pekerjaan_terms' => get_terms([
 				'taxonomy' => 'jenis-pekerjaan',
 				'hide_empty' => true,
-				'parent' => 0
 			]),
 			'gender_terms' => get_terms([
 				'taxonomy' => 'gender',
 				'hide_empty' => true,
-				'parent' => 0
 			]),
 			'pendidikan_terms' => get_terms([
 				'taxonomy' => 'pendidikan',
 				'hide_empty' => true,
-				'parent' => 0
 			]),
 			'pengalaman_terms' => get_terms([
 				'taxonomy' => 'pengalaman',
 				'hide_empty' => true,
-				'parent' => 0
 			])
 		];
 	}

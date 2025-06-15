@@ -1,1 +1,0 @@
-alias wpcli="docker exec -it wordpress wp"

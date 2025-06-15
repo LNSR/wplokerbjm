@@ -9,6 +9,27 @@ use AstraChild\Services\Job\FormatterServices;
 
 class JobCard
 {
+
+	public static function getCardData(int $post_id): array
+	{
+		/** @var JobRepository $repo */
+		$repo = Container::getContainer()->get(JobRepository::class);
+		$jobdata = $repo->getJobData($post_id);
+
+		return [
+			'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+			'nama_perusahaan' => !empty($jobdata['perusahaan_taxo'])
+				? html_entity_decode($jobdata['perusahaan_taxo'], ENT_QUOTES | ENT_HTML5, 'UTF-8')
+				: (isset($jobdata['nama_perusahaan']) ? html_entity_decode($jobdata['nama_perusahaan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),
+			'time_ago' => FormatterServices::formatTimeAgo(get_post_time('U', false, $post_id)),
+			'summary_rows' => JobSummaryRows::getSummaryRows($jobdata),
+			'statusjob' => self::render_statusjob($jobdata),
+			'deadline' => self::render_deadline($jobdata),
+			'permalink' => esc_url(get_permalink($post_id)),
+			'post_time' => get_post_time('c', false, $post_id),
+		];
+	}
+
 	/**
 	 * Render a job card.
 	 * @param int $post_id
@@ -26,22 +47,26 @@ class JobCard
 		switch ($variant) {
 			case 'carousel':
 				?>
-				<a href="<?= $permalink; ?>"
+				<article
 					class="block group rounded-xl transition-all duration-300 cursor-pointer carousel-card max-w-full border-2 border-blue-400 shadow-md hover:shadow-lg hover:border-blue-600 hover:border-solid">
-					<div class="card-body relative p-3 gap-0 flex flex-col min-h-[300px] h-full">
-						<?= self::renderCardContent($post_id, $jobdata); ?>
-					</div>
-				</a>
+					<a href="<?= $permalink; ?>" class="contents">
+						<div class="card-body relative p-3 gap-0 flex flex-col min-h-[300px] h-full">
+							<?= self::renderCardContent($post_id, $jobdata); ?>
+						</div>
+					</a>
+				</article>
 				<?php
 				break;
 			case 'featured':
 				?>
-				<a href="<?= $permalink; ?>"
+				<article
 					class="block group rounded-xl transition-all duration-300 cursor-pointer w-full max-w border-2 border-blue-400 shadow-lg hover:shadow-xl hover:border-blue-600 hover:scale-[1.02] hover:border-solid">
-					<div class="card-body relative p-4 gap-1 flex flex-col h-full">
-						<?= self::renderCardContent($post_id, $jobdata); ?>
-					</div>
-				</a>
+					<a href="<?= $permalink; ?>" class="contents">
+						<div class="card-body relative p-4 gap-1 flex flex-col h-full">
+							<?= self::renderCardContent($post_id, $jobdata); ?>
+						</div>
+					</a>
+				</article>
 				<?php
 				break;
 		}
@@ -51,7 +76,7 @@ class JobCard
 
 	private static function renderCardContent(int $post_id, array $jobdata)
 	{
-		$statusjob = self::render_statusjob($post_id, $jobdata);
+		$statusjob = self::render_statusjob($jobdata);
 		$deadline = self::render_deadline($jobdata);
 		$has_status = !empty(trim($statusjob));
 		$has_deadline = !empty(trim($deadline));
@@ -65,19 +90,24 @@ class JobCard
 				<h3 class="card-title text-lg md:text-xl !font-bold group-hover:text-blue-700 transition-colors">
 					<?= esc_html(get_the_title($post_id)); ?>
 				</h3>
-				<time class="text-lg text-center gap-2"
-					datetime="<?= esc_attr(date('c', get_post_time('U', true, $post_id))); ?>"
-					x-data="timePost('<?= esc_attr(get_post_time('U', true, $post_id)); ?>')" x-text="timeAgo">
-					<?= esc_html(FormatterServices::formatTimeAgo(get_post_time('U', true, $post_id))); ?>
+				<time class="text-lg text-center gap-2" datetime="<?= esc_attr(get_post_time('c', false, $post_id)); ?>">
+					<?= esc_html(FormatterServices::formatTimeAgo(get_post_time('U', false, $post_id))); ?>
 				</time>
 			</div>
-			<?php if (empty($jobdata['nama_perusahaan'])): ?>
+			<?php
+			// fallback to custom field if taxonomy is not set
+			// * IMPORTANT : custom field 'nama_perusahaan' is deprecated 
+			$namaPerusahaan = !empty($jobdata['perusahaan_taxo'])
+				? $jobdata['perusahaan_taxo']
+				: ($jobdata['nama_perusahaan'] ?? '');
+			?>
+			<?php if (empty($namaPerusahaan)): ?>
 				<div class="divider -mt-2"></div>
 			<?php endif; ?>
-			<?php if (!empty($jobdata['nama_perusahaan'])): ?>
+			<?php if (!empty($namaPerusahaan)): ?>
 				<h4 class="!font-bold flex items-center gap-2 !mb-6">
 					<i class="fas fa-user-tie text-blue-600"></i>
-					<?= $jobdata['nama_perusahaan']; ?>
+					<?= esc_html($namaPerusahaan); ?>
 				</h4>
 				<div class="divider !-mt-6"></div>
 			<?php endif; ?>
@@ -103,7 +133,7 @@ class JobCard
 		return ob_get_clean();
 	}
 
-	private static function render_statusjob(int $post_id, array $jobdata): string
+	private static function render_statusjob(array $jobdata): string
 	{
 		$status = (int) $jobdata['status_pekerjaan'];
 

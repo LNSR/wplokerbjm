@@ -166,8 +166,13 @@ class PasangIklanViewModel
 		return ob_get_clean();
 	}
 
+	public function viewFloatingActionButton(): string
+	{
+		return '<div id="floating-action-button"></div>';
+	}
+
 	public function viewFloatingAstraColorSwitchButton(): string
 	{
-		return \AstraChild\Resources\Components\ColorSwitchButton::render();
+		return '<div id="color-switch-button"></div>';
 	}
 }

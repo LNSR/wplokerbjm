@@ -10,19 +10,21 @@ use AstraChild\Repositories\JobRepository;
 use AstraChild\Factories\JobDataFactory;
 use AstraChild\Services\CustomField\SocialMediaService;
 use AstraChild\Services\Job\FormatterServices;
-use AstraChild\Resources\Components\FloatingActionButton;
-use AstraChild\Resources\Components\ColorSwitchButton;
+use AstraChild\Services\Job\JobServices;
 use AstraChild\Resources\Components\Partial\JobSummaryRows;
 use AstraChild\Resources\Components\Partial\JobsContactsRows;
 
 class SingleViewModel
 {
 	public array $jobdata = [];
+	public string $jobPostingJsonLd = '';
 
 	public function __construct(
 		protected JobRepository $jobRepository,
 		protected SocialMediaService $socialMediaService,
-		protected JobDataFactory $jobDataFactory
+		protected JobDataFactory $jobDataFactory,
+		protected FormatterServices $formatterServices,
+		protected JobServices $JobServices
 	) {
 	}
 
@@ -31,12 +33,22 @@ class SingleViewModel
 		$this->jobdata = $this->jobRepository->getJobData($post_id);
 	}
 
+	public function viewJobPostingJsonLd(int $post_id): string
+	{
+		return $this->jobPostingJsonLd = $this->JobServices->renderJobPostingJsonLd($post_id);
+	}
+
 	public function viewNamaPerusahaan(): string
 	{
-
 		$jobdata = $this->jobdata;
 
-		if (empty($this->jobdata['nama_perusahaan'])) {
+		// fallback to custom field if taxonomy is not set
+		// * IMPORTANT : custom field 'nama_perusahaan' is deprecated 
+		$namaPerusahaan = !empty($jobdata['perusahaan_taxo'])
+			? $jobdata['perusahaan_taxo']
+			: ($jobdata['nama_perusahaan'] ?? '');
+
+		if (empty($namaPerusahaan)) {
 			return '';
 		}
 
@@ -45,7 +57,7 @@ class SingleViewModel
 		<section>
 			<h2 class="text-2xl flex items-center gap-2 !mb-4">
 				<i class="fas fa-user-tie text-blue-500"></i>
-				<span class="!font-bold"><?= $jobdata['nama_perusahaan']; ?></span>
+				<span class="!font-bold"><?= esc_html($namaPerusahaan); ?></span>
 			</h2>
 			<div class="divider"></div>
 		</section>
@@ -66,7 +78,7 @@ class SingleViewModel
 		?>
 		<section>
 			<h2 class="text-xl flex items-center gap-2 !mb-4">
-				<i class="fas fa-building text-blue-600"></i>
+				<i class="fas fa-map-marker-alt text-blue-600"></i>
 				<span class="font-bold">Tentang Perusahaan</span>
 			</h2>
 			<?= $jobdata['tentang_perusahaan']; ?>
@@ -300,11 +312,11 @@ class SingleViewModel
 
 	public function viewFloatingActionButton(): string
 	{
-		return FloatingActionButton::render();
+		return '<div id="floating-action-button"></div>';
 	}
 
 	public function viewFloatingAstraColorSwitchButton(): string
 	{
-		return ColorSwitchButton::render();
+		return '<div id="color-switch-button"></div>';
 	}
 }

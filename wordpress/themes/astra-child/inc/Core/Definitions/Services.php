@@ -12,7 +12,12 @@ class Services
             \AstraChild\Services\Taxonomy\TaxonomyService::class => \DI\create(),
             \AstraChild\Services\CustomField\SocialMediaService::class => \DI\create(),
             \AstraChild\Services\REST\RESTServices::class => \DI\create(),
-            \AstraChild\Services\Job\JobServices::class => \DI\create(),
+            \AstraChild\Services\Job\JobServices::class => \DI\create()
+                ->constructor(
+                    \DI\get(\AstraChild\Repositories\JobRepository::class),
+                    \DI\get(\AstraChild\Factories\JobDataFactory::class),
+                    \DI\get(\AstraChild\Services\CustomField\SocialMediaService::class)
+                ),
             \AstraChild\Services\Job\ArchiveServices::class => \DI\create(),
             \AstraChild\Services\PostsManagement\PostsManagement::class => \DI\create(),
         ];

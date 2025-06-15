@@ -16,6 +16,7 @@ class SingleView
 
 ?>
 		<main class="container mx-auto space-y-8 mt-12">
+			<?= $this->singleViewModel->viewJobPostingJsonLd($post_id); ?>
 			<article>
 				<section class="top-0 backdrop-blur text-center">
 					<h1 class="text-3xl !font-bold"><?= the_title(); ?></h1>

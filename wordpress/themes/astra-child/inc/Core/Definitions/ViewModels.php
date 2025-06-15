@@ -11,7 +11,9 @@ class ViewModels
 				->constructor(
 					\DI\get(\AstraChild\Repositories\JobRepository::class),
 					\DI\get(\AstraChild\Services\CustomField\SocialMediaService::class),
-					\DI\get(\AstraChild\Factories\JobDataFactory::class)
+					\DI\get(\AstraChild\Factories\JobDataFactory::class),
+					\DI\get(\AstraChild\Services\Job\FormatterServices::class),
+					\DI\get(\AstraChild\Services\Job\JobServices::class)
 				),
 			\AstraChild\ViewModels\Page\HomepageViewModel::class => \DI\create()
 				->constructor(

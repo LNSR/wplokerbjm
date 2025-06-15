@@ -6,5 +6,12 @@ wordpress/themes/*
 php.md
 **/vendor
 **/node_modules
+**/bun.lock
 **/package-lock.json
 **/composer.lock
+**/stats.html
+convertToAvif.sh
+source.zsh
+mkcert
+localhost.pem
+localhost-key.pem

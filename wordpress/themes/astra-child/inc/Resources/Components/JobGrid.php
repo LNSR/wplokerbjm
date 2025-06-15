@@ -1,61 +1,87 @@
 <?php
 
 namespace AstraChild\Resources\Components;
+use AstraChild\Resources\Components\JobCard;
+use AstraChild\Services\Job\JobServices;
 
 class JobGrid
 {
-    public static function render(array $query_args, string $title = 'Lowongan Terbaru', string $context = 'latest', int $total_jobs = 0): string
+    public static function render(array $query_args, string $title, string $context = 'latest', int $total_jobs = 0): string
     {
         $jobs_query = new \WP_Query($query_args);
         ob_start();
-?>
-        <section class="mt-8" id="jobs-list">
-            <h2 class="text-xl font-semibold !mb-6"><?= esc_html($title) ?></h2>
-            <?php if ($total_jobs > 0): ?>
-                <div class="text-base font-medium mb-4"><?= esc_html($total_jobs) ?> lowongan ditemukan</div>
-            <?php endif; ?>
-            <div
-                x-data='loadMoreJobs(
-                    "<?= esc_attr($context) ?>",
-                    <?= (int)($jobs_query->max_num_pages) ?>,
-                    <?= json_encode([
-                        'cari' => $_GET['cari'] ?? '',
-                        'lokasi' => $_GET['lokasi'] ?? '',
-                        'gender' => $_GET['gender'] ?? '',
-                        'pendidikan' => $_GET['pendidikan'] ?? '',
-                        'sort' => $_GET['sort'] ?? 'desc',
-                    ]) ?>
-                )'>
-                <article id="job-cards" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    <?php
-                    if ($jobs_query->have_posts()) :
-                        while ($jobs_query->have_posts()) :
-                            $jobs_query->the_post();
-                            echo \AstraChild\Resources\Components\JobCard::render(get_the_ID(), 'featured');
-                        endwhile;
-                        wp_reset_postdata();
-                    endif;
-                    ?>
-                </article>
-                <?php if ($jobs_query->have_posts() && $jobs_query->max_num_pages > 1) : ?>
-                    <div class="text-center mt-8">
-                        <button class="btn btn-outline btn-wide" x-show="hasMore" x-bind:disabled="loading" x-on:click="loadMore">
-                            <span x-show="!loading">Muat Lowongan</span>
-                            <span x-show="loading">
-                                <span class="loading loading-spinner loading-sm"></span>
-                                Memuat Lowongan
-                            </span>
-                        </button>
-                    </div>
-                <?php elseif (!$jobs_query->have_posts()) : ?>
-                    <div class="text-center py-12">
-                        <h2 class="text-2xl font-semibold !mb-6">Tidak ada lowongan ditemukan.</h2>
-                        <p>Coba gunakan kata kunci atau filter lain.</p>
-                    </div>
+        $jobs = [];
+        $cards = [];
+
+        // Get JobServices instance
+        $jobServices = \AstraChild\Core\Container::getContainer()->get(JobServices::class);
+
+        if ($jobs_query->have_posts()) {
+            while ($jobs_query->have_posts()) {
+                $jobs_query->the_post();
+                $post_id = get_the_ID();
+                $jobs[] = JobCard::getCardData($post_id);
+                $cards[] = [
+                    'card' => JobCard::render($post_id, 'featured'),
+                    'schema' => $jobServices->renderJobPostingJsonLd($post_id),
+                ];
+            }
+            wp_reset_postdata();
+        }
+
+        if (!$title) {
+            $title = match ($context) {
+                'search' => 'Hasil Pencarian',
+                'archive' => 'Semua Lowongan',
+            };
+        }
+
+        $vueProps = self::getVueProps($jobs, $jobs_query, $context, $title, $total_jobs);
+
+        ?>
+        <section class="mt-8">
+                <?php
+                // Render all schemas before the Vue island
+                foreach ($cards as $item) {
+                    echo $item['schema'];
+                }
+                ?>
+            <div id="job-grid" data-props='<?= esc_attr(json_encode($vueProps)) ?>'>
+                <h2 class="text-xl font-semibold !mb-6"><?= esc_html($title) ?></h2>
+                <?php if ($total_jobs > 0): ?>
+                    <div class="text-base font-medium mb-4"><?= esc_html($total_jobs) ?> lowongan ditemukan</div>
                 <?php endif; ?>
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <?php
+                    foreach ($cards as $item) {
+                        echo $item['card'];
+                    }
+                    ?>
+                </div>
             </div>
         </section>
-<?php
+        <?php
         return ob_get_clean();
+    }
+
+    /**
+     * Build Vue props array for hydration.
+     */
+    protected static function getVueProps(array $jobs, \WP_Query $jobs_query, string $context, string $title, int $total_jobs): array
+    {
+        return [
+            'jobs' => $jobs,
+            'maxNumPages' => (int) ($jobs_query->max_num_pages),
+            'context' => $context,
+            'filters' => [
+                'cari' => $_GET['cari'] ?? '',
+                'lokasi' => $_GET['lokasi'] ?? '',
+                'gender' => $_GET['gender'] ?? '',
+                'pendidikan' => $_GET['pendidikan'] ?? '',
+                'sort' => $_GET['sort'] ?? 'desc',
+            ],
+            'title' => $title,
+            'totalJobs' => $total_jobs
+        ];
     }
 }

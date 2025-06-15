@@ -19,38 +19,7 @@ class HomepageViewModel
 
 	public function viewCarousel()
 	{
-		ob_start();
-		$query = new \WP_Query(JobQuery::getCarouselArgs(per_page: 16));
-		?>
-		<section class="px-4 py-8">
-			<h2 class="text-xl font-semibold !mb-6">Lowongan Unggulan</h2>
-			<?php if ($query->have_posts()): ?>
-				<div class="swiper mySwiper !relative invisible">
-					<div class="swiper-wrapper">
-						<?php while ($query->have_posts()):
-							$query->the_post(); ?>
-							<div class="swiper-slide">
-								<?= \AstraChild\Resources\Components\JobCard::render(get_the_ID(), 'carousel') ?>
-							</div>
-						<?php endwhile; ?>
-					</div>
-					<div
-						class="swiper-button-prev invisible md:visible opacity-20 hover:opacity-100 transition-opacity duration-400">
-					</div>
-					<div
-						class="swiper-button-next invisible md:visible opacity-20 hover:opacity-100 transition-opacity duration-400">
-					</div>
-					<div class="flex justify-center mt-8">
-						<div class="swiper-pagination"></div>
-					</div>
-				</div>
-			<?php else: ?>
-				<p class="text-center text-gray-500">Belum ada lowongan unggulan.</p>
-			<?php endif;
-			wp_reset_postdata(); ?>
-		</section>
-		<?php
-		return ob_get_clean();
+		return \AstraChild\Resources\Components\JobCarousel::render();
 	}
 
 	public function viewCategoryGrid()
@@ -104,7 +73,7 @@ class HomepageViewModel
 	public function viewFeaturedJobs()
 	{
 		return \AstraChild\Resources\Components\JobGrid::render(
-			JobQuery::latestJobsArgs(1, 18),
+			JobQuery::latestJobsArgs(1, 12),
 			'Lowongan Terbaru',
 			'latest'
 		);
@@ -112,11 +81,11 @@ class HomepageViewModel
 
 	public function viewFloatingActionButton(): string
 	{
-		return \AstraChild\Resources\Components\FloatingActionButton::render();
+		return '<div id="floating-action-button"></div>';
 	}
 
 	public function viewFloatingAstraColorSwitchButton(): string
 	{
-		return \AstraChild\Resources\Components\ColorSwitchButton::render();
+		return '<div id="color-switch-button"></div>';
 	}
 }
