@@ -1,4 +1,5 @@
 export interface Job {
+    id: number;
     jenis_pekerjaan_taxo?: string | string[];
     pendidikan_taxo?: string | string[];
     pengalaman?: number;

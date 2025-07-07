@@ -42,4 +42,15 @@ export class JobService {
       return { jobs: [] }
     }
   }
+
+  static async fetchSingleOverlay(id: number) {
+    try {
+      return await jobsApi.fetchSingleOverlay(id)
+    } catch (error) {
+      if (error instanceof ApiError) {
+        throw new Error(`Fetch single overlay failed: ${error.message}`)
+      }
+      throw new Error('Fetch single overlay failed: Unknown error')
+    }
+  }
 }

@@ -2,9 +2,28 @@
 
 namespace AstraChild\Services\REST;
 
+use AstraChild\Controllers\REST\AutoSuggestionSearch;
+use AstraChild\Controllers\REST\Carousel;
+use AstraChild\Controllers\REST\DynamicSearch;
+use AstraChild\Controllers\REST\LoadMore;
+use AstraChild\Controllers\REST\TaxonomyDepth;
+use AstraChild\Controllers\REST\SingleOverlay;
+
 
 class RESTServices
 {
+ 
+    public function __construct(
+        private TaxonomyDepth $taxonomyDepth,
+        private AutoSuggestionSearch $autoSuggestionSearch,
+        private LoadMore $loadMore,
+        private DynamicSearch $dynamicSearch,
+        private Carousel $carousel,
+        private SingleOverlay $singleOverlay
+    )
+    {
+    }
+
     public function register(): void
     {
         add_action('rest_api_init', [$this, 'registerRoutes']);
@@ -14,25 +33,25 @@ class RESTServices
     {
         register_rest_route('astra-child/v1', '/auto-suggest/', [
             'methods'  => 'GET',
-            'callback' => [\AstraChild\Controllers\REST\AutoSuggestionSearch::class, 'handle'],
+            'callback' => [$this->autoSuggestionSearch, 'handle'],
             'permission_callback' => '__return_true',
         ]);
 
         register_rest_route('astra-child/v1', '/load-more/', [
             'methods'  => 'GET',
-            'callback' => [\AstraChild\Controllers\REST\LoadMore::class, 'handle'],
+            'callback' => [$this->loadMore, 'handle'],
             'permission_callback' => '__return_true',
         ]);
 
         register_rest_route('astra-child/v1', '/search/', [
             'methods'  => 'GET',
-            'callback' => [\AstraChild\Controllers\REST\DynamicSearch::class, 'handle'],
+            'callback' => [$this->dynamicSearch, 'handle'],
             'permission_callback' => '__return_true',
         ]);
 
         register_rest_route('astra-child/v1', '/taxonomies/', [
             'methods'  => 'GET',
-            'callback' => [\AstraChild\Controllers\REST\TaxonomyDepth::class, 'handle'],
+            'callback' => [$this->taxonomyDepth, 'handle'],
             'permission_callback' => '__return_true',
         ]);
 
@@ -44,14 +63,20 @@ class RESTServices
         foreach ($taxonomies as $taxonomy) {
             register_rest_route('astra-child/v1', "/taxonomies/$taxonomy", [
                 'methods'  => 'GET',
-                'callback' => [\AstraChild\Controllers\REST\TaxonomyDepth::class, $taxonomy],
+                'callback' => [$this->taxonomyDepth, $taxonomy],
                 'permission_callback' => '__return_true',
             ]);
         }
 
         register_rest_route('astra-child/v1', '/carousel/', [
             'methods'  => 'GET',
-            'callback' => [\AstraChild\Controllers\REST\Carousel::class, 'handle'],
+            'callback' => [$this->carousel, 'handle'],
+            'permission_callback' => '__return_true',
+        ]);
+
+        register_rest_route('astra-child/v1', '/single-overlay/', [
+            'methods'  => 'GET',
+            'callback' => [$this->singleOverlay, 'handle'],
             'permission_callback' => '__return_true',
         ]);
     }

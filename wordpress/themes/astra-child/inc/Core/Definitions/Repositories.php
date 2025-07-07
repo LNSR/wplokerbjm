@@ -8,11 +8,10 @@ class Repositories
 	{
 		return [
 			// Bind repositories
-			\AstraChild\Repositories\JobRepository::class => \DI\create()
-				->constructor(
-					\DI\get(\AstraChild\Factories\JobDataFactory::class),
-
-				),
+			\AstraChild\Repositories\JobRepository::class => fn($c) =>
+				new \AstraChild\Repositories\JobRepository(
+					$c->get(\AstraChild\Factories\JobDataFactory::class)
+				)
 		];
 	}
 }

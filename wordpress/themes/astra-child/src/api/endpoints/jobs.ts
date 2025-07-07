@@ -5,7 +5,8 @@ import type {
   AutoSuggestResponse,
   LoadMoreFilters,
   LoadMoreResponse,
-  Job
+  Job,
+  SingleOverlayResponse
 } from '@/types'
 
 export interface JobsApiInterface {
@@ -13,6 +14,7 @@ export interface JobsApiInterface {
   searchJobs(filters: SearchFilters): Promise<SearchResponse>
   loadMore(filters: LoadMoreFilters): Promise<LoadMoreResponse>
   fetchCarousel(): Promise<{ jobs: Job[] }>
+  fetchSingleOverlay(id: number): Promise<SingleOverlayResponse>
 }
 
 export const jobsApi: JobsApiInterface = {
@@ -79,5 +81,12 @@ export const jobsApi: JobsApiInterface = {
    */
   async fetchCarousel(): Promise<{ jobs: Job[] }> {
     return await apiClient.get<{ jobs: Job[] }>('/carousel/')
+  },
+
+  /**
+   * Fetch single job overlay by ID
+   */
+  async fetchSingleOverlay(id: number): Promise<SingleOverlayResponse> {
+    return await apiClient.get<SingleOverlayResponse>('/single-overlay/', { id })
   }
 }

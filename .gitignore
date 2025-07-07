@@ -2,8 +2,10 @@ wordpress/*
 !wordpress/themes
 wordpress/themes/*
 !wordpress/themes/astra-child
+**/vue
 .env
 php.md
+**/cache
 **/vendor
 **/node_modules
 **/bun.lock

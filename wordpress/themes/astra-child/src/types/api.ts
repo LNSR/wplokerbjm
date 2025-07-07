@@ -55,3 +55,39 @@ export interface TaxonomyTermsResponse {
   genderTerms: TaxonomyTerm[]
   pendidikanTerms: TaxonomyTerm[]
 }
+
+export interface SummaryRow {
+  icon: string
+  label: string
+  value: string
+}
+
+export interface ContactRow {
+  type: string
+  icon: string
+  label: string
+  value: string
+  href: string
+}
+
+export interface SingleOverlayResponse {
+  id: number
+  permalink: string
+  title: string
+  jobdata: Record<string, any>
+  jobPostingJsonLd: any
+  namaPerusahaan: string
+  tentangPerusahaan: string
+  deskripsiPekerjaan: string
+  persyaratan: string
+  caraMelamar: string
+  benefit: string
+  contact: {
+    email: string[]
+    phone: string[]
+    website: string[]
+  }
+  social_media: any[]
+  summaryRows: SummaryRow[]
+  contactRows: ContactRow[]
+}

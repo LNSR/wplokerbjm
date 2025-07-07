@@ -10,26 +10,6 @@ use AstraChild\Services\Job\FormatterServices;
 class JobCard
 {
 
-	public static function getCardData(int $post_id): array
-	{
-		/** @var JobRepository $repo */
-		$repo = Container::getContainer()->get(JobRepository::class);
-		$jobdata = $repo->getJobData($post_id);
-
-		return [
-			'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-			'nama_perusahaan' => !empty($jobdata['perusahaan_taxo'])
-				? html_entity_decode($jobdata['perusahaan_taxo'], ENT_QUOTES | ENT_HTML5, 'UTF-8')
-				: (isset($jobdata['nama_perusahaan']) ? html_entity_decode($jobdata['nama_perusahaan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),
-			'time_ago' => FormatterServices::formatTimeAgo(get_post_time('U', false, $post_id)),
-			'summary_rows' => JobSummaryRows::getSummaryRows($jobdata),
-			'statusjob' => self::render_statusjob($jobdata),
-			'deadline' => self::render_deadline($jobdata),
-			'permalink' => esc_url(get_permalink($post_id)),
-			'post_time' => get_post_time('c', false, $post_id),
-		];
-	}
-
 	/**
 	 * Render a job card.
 	 * @param int $post_id
@@ -37,9 +17,9 @@ class JobCard
 	 */
 	public static function render(int $post_id, string $variant = ''): string
 	{
-		/** @var JobRepository $repo */
-		$repo = Container::getContainer()->get(JobRepository::class);
-		$jobdata = $repo->getJobData($post_id);
+		/** @var JobRepository */
+		$jobRepository = Container::getContainer()->get(JobRepository::class);
+		$jobdata = $jobRepository->getJobData($post_id);
 		$permalink = esc_url(get_permalink($post_id));
 
 		ob_start();
@@ -74,7 +54,7 @@ class JobCard
 		return ob_get_clean();
 	}
 
-	private static function renderCardContent(int $post_id, array $jobdata)
+	public static function renderCardContent(int $post_id, array $jobdata)
 	{
 		$statusjob = self::render_statusjob($jobdata);
 		$deadline = self::render_deadline($jobdata);
@@ -102,14 +82,14 @@ class JobCard
 				: ($jobdata['nama_perusahaan'] ?? '');
 			?>
 			<?php if (empty($namaPerusahaan)): ?>
-				<div class="divider -mt-2"></div>
+				<div class="divider mt-0"></div>
 			<?php endif; ?>
 			<?php if (!empty($namaPerusahaan)): ?>
 				<h4 class="!font-bold flex items-center gap-2 !mb-6">
 					<i class="fas fa-user-tie text-blue-600"></i>
 					<?= esc_html($namaPerusahaan); ?>
 				</h4>
-				<div class="divider !-mt-6"></div>
+				<div class="divider !-mt-4"></div>
 			<?php endif; ?>
 			<div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
 				<?php foreach ($rows as $row): ?>
@@ -133,7 +113,7 @@ class JobCard
 		return ob_get_clean();
 	}
 
-	private static function render_statusjob(array $jobdata): string
+	public static function render_statusjob(array $jobdata): string
 	{
 		$status = (int) $jobdata['status_pekerjaan'];
 
@@ -155,7 +135,7 @@ class JobCard
 		return ob_get_clean();
 	}
 
-	private static function render_deadline(array $jobdata): string
+	public static function render_deadline(array $jobdata): string
 	{
 		if (empty($jobdata['deadline'])) {
 			return '';

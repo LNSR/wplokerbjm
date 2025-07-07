@@ -20,11 +20,11 @@ class SingleViewModel
 	public string $jobPostingJsonLd = '';
 
 	public function __construct(
-		protected JobRepository $jobRepository,
-		protected SocialMediaService $socialMediaService,
-		protected JobDataFactory $jobDataFactory,
-		protected FormatterServices $formatterServices,
-		protected JobServices $JobServices
+		public JobRepository $jobRepository,
+		public SocialMediaService $socialMediaService,
+		public JobDataFactory $jobDataFactory,
+		public FormatterServices $formatterServices,
+		public JobServices $JobServices
 	) {
 	}
 

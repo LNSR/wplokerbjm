@@ -41,9 +41,26 @@ export class ApiClient {
     }
   }
 
-  async get<T = any>(endpoint: string, params?: Record<string, string | number>): Promise<T> {
+  private async handleResponse(response: Response) {
+    let data;
+    const contentType = response.headers.get('content-type');
+    if (contentType && contentType.includes('application/json')) {
+      data = await response.json();
+    } else {
+      data = await response.text();
+    }
+    if (!response.ok) {
+      throw new ApiError(
+        `HTTP ${response.status}: ${response.statusText}`,
+        response.status,
+        response
+      );
+    }
+    return data;
+  }
+
+  async get<T = any>(endpoint: string, params?: Record<string, string | number>, headers: Record<string, string> = {}): Promise<T> {
     const url = new URL(`${this.baseUrl}${endpoint}`)
-    
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
@@ -51,29 +68,18 @@ export class ApiClient {
         }
       })
     }
-
     try {
       const response = await this.fetchWithTimeout(url.toString(), {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
+          'X-Requested-With': 'XMLHttpRequest',
+          ...headers
         }
       })
-      
-      if (!response.ok) {
-        throw new ApiError(
-          `HTTP ${response.status}: ${response.statusText}`,
-          response.status,
-          response
-        )
-      }
-
-      return await response.json()
+      return await this.handleResponse(response);
     } catch (error) {
-      if (error instanceof ApiError) {
-        throw error
-      }
+      if (error instanceof ApiError) throw error;
       throw new ApiError(
         error instanceof Error ? error.message : 'Network error',
         0
@@ -81,32 +87,64 @@ export class ApiClient {
     }
   }
 
-  async post<T = any>(endpoint: string, data?: Record<string, any>): Promise<T> {
+  async post<T = any>(endpoint: string, data?: Record<string, any>, headers: Record<string, string> = {}): Promise<T> {
     const url = new URL(`${this.baseUrl}${endpoint}`)
-
     try {
       const response = await this.fetchWithTimeout(url.toString(), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'X-Requested-With': 'XMLHttpRequest'
+          'X-Requested-With': 'XMLHttpRequest',
+          ...headers
         },
         body: data ? JSON.stringify(data) : undefined
       })
-      
-      if (!response.ok) {
-        throw new ApiError(
-          `HTTP ${response.status}: ${response.statusText}`,
-          response.status,
-          response
-        )
-      }
-
-      return await response.json()
+      return await this.handleResponse(response);
     } catch (error) {
-      if (error instanceof ApiError) {
-        throw error
-      }
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(
+        error instanceof Error ? error.message : 'Network error',
+        0
+      )
+    }
+  }
+
+  async put<T = any>(endpoint: string, data?: Record<string, any>, headers: Record<string, string> = {}): Promise<T> {
+    const url = new URL(`${this.baseUrl}${endpoint}`)
+    try {
+      const response = await this.fetchWithTimeout(url.toString(), {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...headers
+        },
+        body: data ? JSON.stringify(data) : undefined
+      })
+      return await this.handleResponse(response);
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
+      throw new ApiError(
+        error instanceof Error ? error.message : 'Network error',
+        0
+      )
+    }
+  }
+
+  async delete<T = any>(endpoint: string, headers: Record<string, string> = {}): Promise<T> {
+    const url = new URL(`${this.baseUrl}${endpoint}`)
+    try {
+      const response = await this.fetchWithTimeout(url.toString(), {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Requested-With': 'XMLHttpRequest',
+          ...headers
+        }
+      })
+      return await this.handleResponse(response);
+    } catch (error) {
+      if (error instanceof ApiError) throw error;
       throw new ApiError(
         error instanceof Error ? error.message : 'Network error',
         0

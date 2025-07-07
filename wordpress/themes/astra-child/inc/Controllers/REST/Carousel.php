@@ -3,11 +3,17 @@
 namespace AstraChild\Controllers\REST;
 
 use AstraChild\QueryBuilders\JobQuery;
-use AstraChild\Resources\Components\JobCard;
+use AstraChild\Services\REST\RESTData;
 
 class Carousel
 {
-    public static function handle(\WP_REST_Request $request)
+
+    public function __construct(
+        private RESTData $restData
+    ) {
+    }
+
+    public function handle(\WP_REST_Request $request)
     {
         $args = JobQuery::getCarouselArgs(-1);
 
@@ -17,7 +23,7 @@ class Carousel
         if ($query->have_posts()) {
             while ($query->have_posts()) {
                 $query->the_post();
-                $jobs[] = JobCard::getCardData(get_the_ID());
+                $jobs[] = $this->restData->getCardData(get_the_ID());
             }
             wp_reset_postdata();
         }

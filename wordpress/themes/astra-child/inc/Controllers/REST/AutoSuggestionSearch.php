@@ -5,7 +5,7 @@ namespace AstraChild\Controllers\REST;
 
 class AutoSuggestionSearch
 {
-    public static function handle(\WP_REST_Request $request)
+    public function handle(\WP_REST_Request $request)
     {
         $query = sanitize_text_field($request->get_param('query'));
         $results = [];

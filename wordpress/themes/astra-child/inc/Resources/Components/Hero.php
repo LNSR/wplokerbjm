@@ -33,7 +33,7 @@ class Hero {
         <section class="mx-auto px-4 py-8 text-center">
             <h1 class="text-3xl md:text-5xl !font-bold !mb-2">Temukan Lowongan Kerja Terbaru di Banjarmasin</h1>
             <p class="mb-8 text-lg !text-semibold">Update setiap hari, mudah diakses, dan gratis!</p>
-            <div class="border-2 border-blue-500 rounded-xl p-4 md:p-6 hide-preload !min-h-[220px] lg:!min-h-[220px] sm:!min-h-[307px]" id="search-form-parent">
+            <div class="border-2 border-blue-500 rounded-xl p-4 md:p-6 hide-preload" id="search-form-parent">
                 <div id="search-form" data-props="<?= esc_attr(json_encode($vue_props)) ?>"></div>
             </div>
         </section>

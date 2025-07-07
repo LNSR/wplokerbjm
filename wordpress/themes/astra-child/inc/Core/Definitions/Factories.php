@@ -8,13 +8,14 @@ class Factories
     {
         return [
             // Bind JobDataFactory with specific providers
-            \AstraChild\Factories\JobDataFactory::class => \DI\create()->constructor(
-                \DI\get(entryName: 'customFieldsProvider'),
-                \DI\get(entryName: 'taxonomiesProvider'),
-                \DI\get(entryName: \AstraChild\Services\CustomField\CustomFieldsService::class),
-                \DI\get(entryName: \AstraChild\Services\Taxonomy\TaxonomyService::class),
-                \DI\get(entryName: \AstraChild\Services\CustomField\SocialMediaService::class)
-            )
+            \AstraChild\Factories\JobDataFactory::class => fn($c) =>
+                new \AstraChild\Factories\JobDataFactory(
+                    $c->get('customFieldsProvider'),
+                    $c->get('taxonomiesProvider'),
+                    $c->get(\AstraChild\Services\CustomField\CustomFieldsService::class),
+                    $c->get(\AstraChild\Services\Taxonomy\TaxonomyService::class),
+                    $c->get(\AstraChild\Services\CustomField\SocialMediaService::class)
+                )
         ];
     }
 }

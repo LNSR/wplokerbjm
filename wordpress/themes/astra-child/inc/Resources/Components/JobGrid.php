@@ -15,12 +15,13 @@ class JobGrid
 
         // Get JobServices instance
         $jobServices = \AstraChild\Core\Container::getContainer()->get(JobServices::class);
+        $jobCard = \AstraChild\Core\Container::getContainer()->get(\AstraChild\Services\REST\RESTData::class);
 
         if ($jobs_query->have_posts()) {
             while ($jobs_query->have_posts()) {
                 $jobs_query->the_post();
                 $post_id = get_the_ID();
-                $jobs[] = JobCard::getCardData($post_id);
+                $jobs[] = $jobCard->getCardData($post_id);
                 $cards[] = [
                     'card' => JobCard::render($post_id, 'featured'),
                     'schema' => $jobServices->renderJobPostingJsonLd($post_id),
