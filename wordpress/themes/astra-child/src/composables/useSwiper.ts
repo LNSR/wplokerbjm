@@ -1,15 +1,60 @@
 import Swiper from 'swiper'
-import { createApp, type App } from 'vue'
-import JobCard from '@/components/homepage/JobCard.vue'
+import { createApp, type App, onMounted, nextTick, defineAsyncComponent, type Ref } from 'vue'
 import type { Job } from '@/types/job'
 import { Navigation, Pagination, Autoplay, Virtual } from 'swiper/modules'
 import 'swiper/css'
 import 'swiper/css/navigation'
 import 'swiper/css/pagination'
 import 'swiper/css/virtual'
-import { onMounted, nextTick, type Ref } from 'vue'
 
 Swiper.use([Navigation, Pagination, Autoplay, Virtual])
+
+const JobCard = defineAsyncComponent(() => import('@/components/homepage/JobCard.vue'))
+
+// Swiper configuration generator
+function getSwiperConfig<T>(
+  slides: T[],
+  onVirtualUpdate?: () => void
+) {
+  return {
+    loop: false,
+    slidesPerView: 1.3,
+    spaceBetween: 16,
+    virtual: {
+      enabled: true,
+      slides,
+      renderSlide: (_slide: T, index: number) =>
+        `<div class="swiper-slide" data-swiper-slide-index="${index}">
+          <div class="virtual-slide-content" data-job-index="${index}"></div>
+        </div>`,
+    },
+    autoplay: {
+      delay: 5000,
+      disableOnInteraction: false,
+    },
+    pagination: {
+      el: '.swiper-pagination',
+      clickable: true,
+    },
+    navigation: {
+      nextEl: '.job-carousel-next',
+      prevEl: '.job-carousel-prev',
+    },
+    breakpoints: {
+      640: {
+        slidesPerView: 2,
+        spaceBetween: 24,
+      },
+      1024: {
+        slidesPerView: 4,
+        spaceBetween: 32,
+      },
+    },
+    on: {
+      slidesUpdated: () => onVirtualUpdate && onVirtualUpdate(),
+    },
+  }
+}
 
 export function useSwiper<T = unknown>(selector = '.job-carousel') {
   let swiperInstance: Swiper | null = null
@@ -19,54 +64,14 @@ export function useSwiper<T = unknown>(selector = '.job-carousel') {
     onVirtualUpdate?: () => void
   ): void {
     setTimeout(() => {
-      swiperInstance = new Swiper(selector, {
-        loop: false,
-        slidesPerView: 1.3,
-        spaceBetween: 16,
-        virtual: {
-          enabled: true,
-          slides: slides,
-          renderSlide: function (_slide: T, index: number) {
-            return `<div class="swiper-slide" data-swiper-slide-index="${index}">
-              <div class="virtual-slide-content" data-job-index="${index}"></div>
-            </div>`
-          },
-        },
-        autoplay: {
-          delay: 5000,
-          disableOnInteraction: false,
-        },
-        pagination: {
-          el: '.swiper-pagination',
-          clickable: true,
-        },
-        navigation: {
-          nextEl: '.job-carousel-next',
-          prevEl: '.job-carousel-prev',
-        },
-        breakpoints: {
-          640: {
-            slidesPerView: 2,
-            spaceBetween: 24,
-          },
-          1024: {
-            slidesPerView: 4,
-            spaceBetween: 32,
-          },
-        },
-        on: {
-          slidesUpdated: () => {
-            if (onVirtualUpdate) onVirtualUpdate()
-          }
-        }
-      })
+      swiperInstance = new Swiper(selector, getSwiperConfig(slides, onVirtualUpdate))
       document.querySelector(selector)?.classList.remove('invisible')
-      if (onVirtualUpdate) onVirtualUpdate()
+      onVirtualUpdate && onVirtualUpdate()
     }, 0)
   }
 
   function updateSlides(slides: T[]): void {
-    if (swiperInstance && swiperInstance.virtual) {
+    if (swiperInstance?.virtual) {
       swiperInstance.virtual.slides = slides
       swiperInstance.virtual.update(false)
     }
@@ -89,13 +94,12 @@ export function mountVirtualSlides(jobs: Job[]) {
     const batchSize = getBatchSize()
     let processed = 0
     while (i < slides.length && processed < batchSize && (!deadline || deadline.timeRemaining() > 0)) {
-      const slide = slides[i]
-      const slideWithApp = slide as HTMLElement & { __vue_app__?: App<Element> }
-      if (!slideWithApp.__vue_app__) {
+      const slide = slides[i] as HTMLElement & { __vue_app__?: App<Element> }
+      if (!slide.__vue_app__) {
         const indexAttr = slide.getAttribute('data-job-index')
         if (indexAttr !== null) {
           const index = Number(indexAttr)
-          const jobData: Job | undefined = jobs[index]
+          const jobData = jobs[index]
           if (jobData) {
             const app = createApp(JobCard, {
               jobdata: jobData,
@@ -103,7 +107,7 @@ export function mountVirtualSlides(jobs: Job[]) {
               variant: 'carousel'
             })
             app.mount(slide)
-            slideWithApp.__vue_app__ = app
+            slide.__vue_app__ = app
           }
         }
       }
@@ -138,7 +142,7 @@ export function useJobCarousel(options: {
 
       await nextTick()
       initSwiper(jobs.value, () => mountVirtualSlides(jobs.value))
-    } catch (e) {
+    } catch {
       jobs.value = []
     }
   }
@@ -155,4 +159,10 @@ export function useJobCarousel(options: {
     })
     observer.observe(el)
   })
+
+  return {
+    jobs,
+    loaded,
+    loadCarousel
+  }
 }

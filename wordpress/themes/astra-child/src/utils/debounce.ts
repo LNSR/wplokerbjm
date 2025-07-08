@@ -1,16 +1,13 @@
+import lodashDebounce from 'lodash/debounce'
+
+/**
+ * Custom debounce wrapper for lodash.debounce.
+ *
+ */
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
-  delay: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null
-
-  return (...args: Parameters<T>) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-    }
-
-    timeoutId = setTimeout(() => {
-      func(...args)
-    }, delay)
-  }
+  wait = 300,
+  options?: { leading?: boolean; trailing?: boolean }
+): (...args: Parameters<T>) => ReturnType<T> {
+  return lodashDebounce(func, wait, options)
 }

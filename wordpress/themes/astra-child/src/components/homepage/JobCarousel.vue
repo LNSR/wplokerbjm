@@ -8,7 +8,6 @@ const jobs = ref<Job[]>([])
 const loaded = ref(false)
 const { loading, fetchCarousel } = useApi()
 
-// Use the new composable logic for mounting and loading
 useJobCarousel({
   jobs,
   loaded,

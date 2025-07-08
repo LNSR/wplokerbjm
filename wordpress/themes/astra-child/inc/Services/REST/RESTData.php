@@ -67,7 +67,6 @@ class RESTData
         return [
             'id' => $post_id,
             'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-            'jobdata' => $jobdata,
             'namaPerusahaan' => isset($jobdata['perusahaan_taxo'])
                 ? html_entity_decode($jobdata['perusahaan_taxo'], ENT_QUOTES | ENT_HTML5, 'UTF-8')
                 : (isset($jobdata['nama_perusahaan']) ? html_entity_decode($jobdata['nama_perusahaan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),

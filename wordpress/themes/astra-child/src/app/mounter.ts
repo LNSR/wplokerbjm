@@ -1,4 +1,5 @@
 import { createVueApp, pinia, defineAsyncComponent } from '@/app/factory'
+import { router } from '@/app/router' 
 import type { ComponentConfig } from '@/types'
 
 export async function ComponentMounter(configs: ComponentConfig[] = []) {
@@ -16,7 +17,7 @@ export async function ComponentMounter(configs: ComponentConfig[] = []) {
               typeof config.component === 'function'
                 ? defineAsyncComponent(config.component)
                 : config.component
-            await createVueApp(component, props, pinia).mount(element)
+            await createVueApp(component, props, pinia, router).mount(element)
           }
         } catch (error) {
           console.error(`Failed to mount component at ${config.selector}:`, error)

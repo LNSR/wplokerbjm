@@ -5,16 +5,14 @@
       {{ totalJobs }} lowongan ditemukan
     </div>
     <div class="relative flex">
-      <div
-        :class="[
-          'transition-all duration-300 ',
-          drawerOpen ? 'w-full lg:w-[calc(100%-420px)]' : 'w-full'
-        ]"
-      >
-        <div
-          v-if="jobs.length"
-        >
-          <transition-group name="jobcard-fade" tag="div"
+      <div :class="[
+        'transition-all duration-300',
+        drawerOpen ? 'w-full lg:w-[calc(100%-420px)]' : 'w-full'
+      ]">
+        <div v-if="jobs.length">
+          <transition-group
+            name="jobcard-fade"
+            tag="div"
             :class="[
               'grid gap-6 job-grid-transition',
               drawerOpen
@@ -29,7 +27,7 @@
               variant="featured"
               :permalink="job.permalink ?? ''"
               :selected="selectedId === job.id"
-              @click="(id, _event, offsetTop) => openDrawer(id, offsetTop)"
+              @click="() => handleJobClick(job)"
               style="cursor:pointer"
             />
           </transition-group>
@@ -48,28 +46,21 @@
         </div>
         <div ref="sentinel" style="height: 1px"></div>
       </div>
-      <!-- Right: Overlay Drawer (desktop only) -->
-      <div
-        v-if="drawerOpen && selectedId !== null && selectedId !== undefined"
-        class="hidden md:block relative w-full"
-      >
-        <SingleOverlay
-          :id="selectedId"
-          :visible="drawerOpen"
-          :offset="overlayOffset"
-          @close="drawerOpen = false"
-        />
+      <div v-if="drawerOpen && selectedId !== null && selectedId !== undefined" class="hidden md:block relative w-full">
+        <SingleOverlay :id="selectedId" :visible="drawerOpen" :offset="overlayOffset" @close="handleOverlayClose" />
       </div>
     </div>
   </section>
 </template>
 
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref, defineAsyncComponent, watch, nextTick } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch, defineAsyncComponent, nextTick } from 'vue'
 import { useSearchStore } from '@/stores/search'
-import JobCard from '@/components/homepage/JobCard.vue'
-const SingleOverlay = defineAsyncComponent(() => import('@/components/homepage/JobGrid/SingleOverlay.vue'))
 import type { Job, SearchFilters } from '@/types'
+import { useRouter, useRoute } from 'vue-router'
+
+const JobCard = defineAsyncComponent(() => import('@/components/homepage/JobCard.vue'))
+const SingleOverlay = defineAsyncComponent(() => import('@/components/homepage/JobGrid/SingleOverlay.vue'))
 
 const props = defineProps<{
   jobs?: Job[]
@@ -86,8 +77,20 @@ const loading = computed(() => searchStore.loading)
 const hasMore = computed(() => searchStore.hasMore)
 const loadMore = searchStore.loadMore
 
+const router = useRouter()
+const route = useRoute()
 
 const hydrated = ref(false)
+const sentinel = ref<HTMLElement | null>(null)
+let observer: IntersectionObserver | null = null
+
+const drawerOpen = ref(false)
+const selectedId = ref<number | null>(null)
+const overlayOffset = ref(0)
+const scrollBehavior = ref<'auto' | 'smooth'>('auto')
+
+const totalJobs = computed(() => searchStore.totalJobs)
+const title = computed(() => searchStore.title)
 
 onMounted(() => {
   if (!hydrated.value && props.jobs && props.jobs.length) {
@@ -101,11 +104,9 @@ onMounted(() => {
   createObserver()
 })
 
-const totalJobs = computed(() => searchStore.totalJobs)
-const title = computed(() => searchStore.title)
-
-const sentinel = ref<HTMLElement | null>(null)
-let observer: IntersectionObserver | null = null
+onBeforeUnmount(() => {
+  if (observer) observer.disconnect()
+})
 
 function createObserver() {
   if (observer) observer.disconnect()
@@ -120,38 +121,83 @@ function createObserver() {
   if (sentinel.value) observer.observe(sentinel.value)
 }
 
-onBeforeUnmount(() => {
-  if (observer) observer.disconnect()
-})
+function updateOverlayOffset(id: number) {
+  const cardEl = document.querySelector(`[data-job-id="${id}"]`)
+  const gridContainer = cardEl?.closest('.relative.flex')
+  if (cardEl && gridContainer) {
+    const cardRect = cardEl.getBoundingClientRect()
+    const gridRect = gridContainer.getBoundingClientRect()
+    overlayOffset.value = cardRect.top - gridRect.top
+  }
+}
 
-// Drawer logic
-const drawerOpen = ref(false)
-const selectedId = ref<number | null>(null)
-const overlayOffset = ref(0)
 function openDrawer(id: number, offsetTop?: number) {
   selectedId.value = id
   drawerOpen.value = true
   overlayOffset.value = offsetTop ?? 0
+  scrollBehavior.value = 'smooth'
+
+  const job = jobs.value.find(j => j.id === id)
+  if (job && job.permalink && window.innerWidth >= 768) {
+    const url = new URL(job.permalink, window.location.origin)
+    router.replace(url.pathname + url.search + url.hash)
+  }
+
+  nextTick(() => {
+    setTimeout(() => {
+      updateOverlayOffset(id)
+      const cardEl = document.querySelector(`[data-job-id="${id}"]`)
+      cardEl?.scrollIntoView({
+        behavior: scrollBehavior.value,
+        block: 'start'
+      })
+      scrollBehavior.value = 'auto'
+    }, 400)
+  })
 }
 
-// Recalculate offset when transitioning to single grid (drawer opens)
+function handleOverlayClose() {
+  drawerOpen.value = false
+  selectedId.value = null
+  if (window.innerWidth >= 768) {
+    router.push('/')
+  }
+}
+
+function handleJobClick(job: Job) {
+  if (!job.permalink) return
+  if (window.innerWidth >= 768) {
+    openDrawer(job.id)
+  } else {
+    try {
+      const url = new URL(job.permalink, window.location.origin)
+      if (url.host === window.location.host) {
+        window.location.assign(url.pathname + url.search + url.hash)
+      } else {
+        window.location.href = job.permalink
+      }
+    } catch {
+      window.location.href = job.permalink
+    }
+  }
+}
+
 watch(drawerOpen, async (val) => {
   if (val && selectedId.value !== null) {
     await nextTick()
     setTimeout(() => {
-      const cardEl = document.querySelector(`[data-job-id="${selectedId.value}"]`)
-      const gridContainer = cardEl?.closest('.relative.flex')
-      if (cardEl && gridContainer) {
-        const cardRect = cardEl.getBoundingClientRect()
-        const gridRect = gridContainer.getBoundingClientRect()
-        overlayOffset.value = cardRect.top - gridRect.top
-        const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0
-        cardEl.scrollIntoView({
-          behavior: isTouchDevice ? 'auto' : 'smooth',
-          block: 'center'
-        })
-      }
-    }, 500)
+      updateOverlayOffset(selectedId.value!)
+    }, 400)
   }
 })
+
+watch(
+  () => route.fullPath,
+  (newPath) => {
+    if (!newPath.includes('/lowongan/')) {
+      drawerOpen.value = false
+      selectedId.value = null
+    }
+  }
+)
 </script>

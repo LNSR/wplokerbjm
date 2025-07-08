@@ -175,33 +175,46 @@
 </template>
 
 <script setup lang="ts">
-import { watch } from 'vue'
+import { watch, onMounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useSingleOverlay } from '@/composables/useSingleOverlay'
 import { formatPhone } from '@/services/Formatting'
 
 const props = defineProps<{
-  id: number
-  visible: boolean
+  id?: number
+  visible?: boolean
   offset?: number
 }>()
 const emit = defineEmits(['close'])
 
 const { data, loading, error, fetchSingleOverlay } = useSingleOverlay()
+const route = useRoute()
+
+// Fetch by id (overlay) or by slug (route)
+function fetchJob() {
+  if (props.visible && props.id) {
+    fetchSingleOverlay(props.id)
+  } else if (route.params.slug) {
+    const slugParam = Array.isArray(route.params.slug) ? route.params.slug[0] : route.params.slug
+    const id = Number(slugParam)
+    if (!isNaN(id)) {
+      fetchSingleOverlay(id)
+    }
+  }
+}
 
 watch(
   () => props.id,
-  (newId) => {
-    if (props.visible && newId) fetchSingleOverlay(newId)
-  },
+  fetchJob,
   { immediate: true }
 )
 
 watch(
   () => props.visible,
-  (show) => {
-    if (show && props.id) fetchSingleOverlay(props.id)
-  }
+  fetchJob
 )
+
+onMounted(fetchJob)
 
 const overlay = data
 

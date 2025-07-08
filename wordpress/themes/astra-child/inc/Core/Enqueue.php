@@ -12,25 +12,14 @@ class Enqueue
         add_action('wp_enqueue_scripts', [$this, 'enqueueAssets']);
     }
 
-    /**
-     * Determine the correct Vite entry for the current page.
-     */
-    private function getViteEntry(): ?string
+    private function getViteEntry(): string
     {
-        if (is_front_page() || is_post_type_archive('lowongan') || is_page('pasang-iklan-loker') ) {
-            return 'homepage.ts';
-        } elseif (is_singular('lowongan')) {
-            return 'single.ts';
-        }
-        return null;
+        return 'main.ts';
     }
 
     public function enqueueAssets(): void
     {
         $entry = $this->getViteEntry();
-        if (!$entry) {
-            return;
-        }
 
         // Development mode: load from Vite dev server
         if (defined('WP_ENV') && WP_ENV === 'development') {
@@ -68,6 +57,7 @@ class Enqueue
 
         $main_js = $manifest[$manifest_key]['file'];
         $main_css = $manifest[$manifest_key]['css'] ?? [];
+        $main_assets = $manifest[$manifest_key]['assets'] ?? [];
 
         // Enqueue main JS
         wp_enqueue_script_module(
@@ -87,20 +77,38 @@ class Enqueue
             );
         }
 
-        // Enqueue CSS from imported chunks (e.g., vendor, vendor-swiper, etc.)
-        if (!empty($manifest[$manifest_key]['imports'])) {
-            foreach ($manifest[$manifest_key]['imports'] as $importKey) {
-                if (!empty($manifest[$importKey]['css'])) {
-                    foreach ($manifest[$importKey]['css'] as $importCss) {
-                        wp_enqueue_style(
-                            'vue-' . $importKey,
-                            $dist_uri . '/' . $importCss,
-                            [],
-                            filemtime($dist_dir . '/' . $importCss)
-                        );
-                    }
-                }
-            }
-        }
+        $asset_version = filemtime($dist_dir . '/' . $main_js);
+        $this->injectAssetVersionScript($asset_version);
+    }
+
+    /**
+     * Injects a script to clear storage and reload if asset version changes.
+     */
+    private function injectAssetVersionScript($asset_version): void
+    {
+        add_action('wp_head', function () use ($asset_version) {
+            ?>
+            <script>
+                (function() {
+                    var ASSET_VERSION = '<?php echo $asset_version; ?>';
+                    var STORAGE_KEY = 'asset_version';
+                    try {
+                        var current = localStorage.getItem(STORAGE_KEY);
+                        if (current && current !== ASSET_VERSION) {
+                            localStorage.clear();
+                            sessionStorage.clear();
+                            if ('caches' in window) {
+                                caches.keys().then(function(names) {
+                                    for (let name of names) caches.delete(name);
+                                });
+                            }
+                            location.reload(true);
+                        }
+                        localStorage.setItem(STORAGE_KEY, ASSET_VERSION);
+                    } catch (e) {}
+                })();
+            </script>
+            <?php
+        });
     }
 }

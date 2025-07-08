@@ -176,7 +176,6 @@ services:
       timeout: 10s
       retries: 3
   phpmyadmin:
-    restart: always
     image: phpmyadmin
     container_name: phpmyadmin
     environment:

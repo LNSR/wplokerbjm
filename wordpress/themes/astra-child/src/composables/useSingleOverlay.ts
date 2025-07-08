@@ -1,5 +1,6 @@
 import { ref } from 'vue'
 import { JobService } from '@/services/JobService'
+import { debounce } from '@/utils'
 import type { SingleOverlayResponse } from '@/types'
 
 export function useSingleOverlay() {
@@ -20,10 +21,12 @@ export function useSingleOverlay() {
     }
   }
 
+  const debouncedFetchSingleOverlay = debounce(fetchSingleOverlay, 300)
+
   return {
     data,
     loading,
     error,
-    fetchSingleOverlay,
+    fetchSingleOverlay: debouncedFetchSingleOverlay,
   }
 }
