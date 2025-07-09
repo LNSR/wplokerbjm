@@ -1,16 +1,21 @@
 export const dom = {
-  updateSearchResults(html: string, containerId = '#search-results'): void {
-    const container = document.querySelector(containerId)
+  updateSearchResults(html: string, containerId = "#search-results"): void {
+    const container = document.querySelector(containerId);
     if (container) {
-      container.innerHTML = html
+      container.innerHTML = html;
     }
   },
 
   scrollToElement(selector: string, offset = 0): void {
-    const element = document.querySelector(selector)
+    const element = document.querySelector(selector);
     if (element) {
-      const top = element.getBoundingClientRect().top + window.pageYOffset - offset
-      window.scrollTo({ top, behavior: 'smooth' })
+      const top =
+        element.getBoundingClientRect().top + window.pageYOffset - offset;
+      window.scrollTo({ top, behavior: "smooth" });
     }
-  }
-}
+  },
+
+  isTouchDevice() {
+    return "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  },
+};

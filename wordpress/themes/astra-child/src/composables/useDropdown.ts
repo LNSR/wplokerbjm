@@ -7,9 +7,9 @@ export type Option = {
   value: string
   label: string
   children?: Option[]
-  isLoading?: boolean           // <-- Add this
-  hasMoreChildren?: boolean     // <-- Add this if you want to support "load more"
-  loadChildren?: () => Promise<Option[]> // <-- Add this for lazy loading
+  isLoading?: boolean           
+  hasMoreChildren?: boolean     
+  loadChildren?: () => Promise<Option[]>
   __breadcrumbs?: string[]
   __key?: string
 }

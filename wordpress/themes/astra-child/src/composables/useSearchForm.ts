@@ -2,7 +2,55 @@ import { computed, ref, watch, onMounted, inject } from 'vue'
 import { useSearchStore, useTaxonomyStore } from '@/stores'
 import { validation } from '@/utils'
 import type { SearchFormProps, SearchResponse, TaxonomyTerm } from '@/types'
-import { useSuggestions } from '@/composables/useSuggestions'
+
+export function useSuggestions(
+  searchStore: ReturnType<typeof useSearchStore>,
+  handleSubmit: () => void
+) {
+  const selectedSuggestionIndex = ref(-1)
+
+  function handleFocus() {
+    if (searchStore.hasSuggestions) {
+      searchStore.showSuggestions = true
+      selectedSuggestionIndex.value = -1
+    }
+  }
+
+  function navigateSuggestions(direction: number) {
+    if (!searchStore.showSuggestions || !searchStore.hasSuggestions) return
+
+    const maxIndex = searchStore.suggestions.length - 1
+
+    if (direction > 0) {
+      selectedSuggestionIndex.value = selectedSuggestionIndex.value < maxIndex
+        ? selectedSuggestionIndex.value + 1
+        : 0
+    } else {
+      selectedSuggestionIndex.value = selectedSuggestionIndex.value > 0
+        ? selectedSuggestionIndex.value - 1
+        : maxIndex
+    }
+  }
+
+  function selectSuggestion(suggestion: string) {
+    searchStore.selectSuggestion(suggestion)
+    selectedSuggestionIndex.value = -1
+    handleSubmit()
+  }
+
+  function hideSuggestionsImmediate() {
+    searchStore.showSuggestions = false
+    selectedSuggestionIndex.value = -1
+  }
+
+  return {
+    selectedSuggestionIndex,
+    handleFocus,
+    navigateSuggestions,
+    selectSuggestion,
+    hideSuggestionsImmediate
+  }
+}
 
 export function useSearchForm(props: SearchFormProps, emit: any) {
   const searchInput = ref<HTMLInputElement>()
@@ -28,6 +76,14 @@ export function useSearchForm(props: SearchFormProps, emit: any) {
       searchStore.getSuggestions(newQuery)
     }
   })
+
+  const {
+    selectedSuggestionIndex,
+    handleFocus,
+    navigateSuggestions,
+    selectSuggestion,
+    hideSuggestionsImmediate
+  } = useSuggestions(searchStore, handleSubmit)
 
   async function handleSubmit() {
     if (!validation.isValidFilters(searchStore.filters)) {
@@ -71,14 +127,6 @@ export function useSearchForm(props: SearchFormProps, emit: any) {
     }
   }
 
-  const {
-    selectedSuggestionIndex,
-    handleFocus,
-    navigateSuggestions,
-    selectSuggestion,
-    hideSuggestionsImmediate
-  } = useSuggestions(searchStore, handleSubmit)
-
   interface MappedTerm {
     value: string
     label: string
@@ -97,7 +145,6 @@ export function useSearchForm(props: SearchFormProps, emit: any) {
     return mapped
   }
 
-  
   const selectedFiltersWithNames = computed(() => {
     const SEMUA_VALUE = ''
     const filters: { key: 'lokasi' | 'gender' | 'pendidikan'; label: string; values: string[]; names: string[] }[] = []

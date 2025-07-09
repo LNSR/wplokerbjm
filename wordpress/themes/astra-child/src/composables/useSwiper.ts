@@ -6,6 +6,7 @@ import 'swiper/css'
 import 'swiper/css/navigation'
 import 'swiper/css/pagination'
 import 'swiper/css/virtual'
+import { useJobOverlayStore } from '@/stores/job-overlay'
 
 Swiper.use([Navigation, Pagination, Autoplay, Virtual])
 
@@ -87,8 +88,13 @@ export function getBatchSize(): number {
 }
 
 export function mountVirtualSlides(jobs: Job[]) {
+  const jobOverlay = useJobOverlayStore()
   const slides = Array.from(document.querySelectorAll<HTMLElement>('.virtual-slide-content'))
   let i = 0
+
+  function handleCarouselJobClick(jobId: number) {
+    jobOverlay.openOverlay(jobId, 0)
+  }
 
   function mountNextBatch(deadline?: IdleDeadline) {
     const batchSize = getBatchSize()
@@ -104,7 +110,8 @@ export function mountVirtualSlides(jobs: Job[]) {
             const app = createApp(JobCard, {
               jobdata: jobData,
               permalink: jobData.permalink ?? '',
-              variant: 'carousel'
+              variant: 'carousel',
+              onClick: () => handleCarouselJobClick(jobData.id)
             })
             app.mount(slide)
             slide.__vue_app__ = app

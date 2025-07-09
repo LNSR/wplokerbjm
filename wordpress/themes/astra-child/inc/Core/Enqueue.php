@@ -92,11 +92,21 @@ class Enqueue
                 (function() {
                     var ASSET_VERSION = '<?php echo $asset_version; ?>';
                     var STORAGE_KEY = 'asset_version';
+                    function clearAllCookies() {
+                        var cookies = document.cookie.split("; ");
+                        for (var i = 0; i < cookies.length; i++) {
+                            var cookie = cookies[i];
+                            var eqPos = cookie.indexOf("=");
+                            var name = eqPos > -1 ? cookie.substr(0, eqPos) : cookie;
+                            document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/";
+                        }
+                    }
                     try {
                         var current = localStorage.getItem(STORAGE_KEY);
                         if (current && current !== ASSET_VERSION) {
                             localStorage.clear();
                             sessionStorage.clear();
+                            clearAllCookies();
                             if ('caches' in window) {
                                 caches.keys().then(function(names) {
                                     for (let name of names) caches.delete(name);
