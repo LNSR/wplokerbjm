@@ -129,7 +129,11 @@ class JobQuery
 				'operator' => 'IN',
 			];
 		}
-
+		
+		/**
+		 * ! NOTE: The 's' parameter search is overridden by the custom SQL in Filters::jobPostsSearchFilter().
+		 * The tax_query for 'perusahaan' is still useful for REST or custom queries that do not use 's'.
+		 */
 		if (!empty($params['cari'])) {
 			$search_term = sanitize_text_field($params['cari']);
 			$tax_query[] = [

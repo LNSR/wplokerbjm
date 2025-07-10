@@ -61,14 +61,22 @@ const isDark = ref(false)
 const visible = ref(false)
 let hideTimeout: ReturnType<typeof setTimeout> | null = null
 let mediaQuery: MediaQueryList
+let currentTheme = ''
 
 function setTheme(dark: boolean) {
+  const newTheme = dark ? 'dark' : 'light'
+  if (currentTheme === newTheme) return // Avoid redundant updates
+  currentTheme = newTheme
   document.documentElement.classList.add('theme-switching')
-  document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light')
-  localStorage.setItem('astra-theme', dark ? 'dark' : 'light')
+  document.documentElement.setAttribute('data-theme', newTheme)
+  try {
+    localStorage.setItem('astra-theme', newTheme)
+  } catch (e) {
+    // Ignore quota errors
+  }
   setTimeout(() => {
     document.documentElement.classList.remove('theme-switching')
-  }, 120)
+  }, 30)
 }
 
 // Use requestAnimationFrame to batch DOM update
@@ -80,7 +88,7 @@ function showButtonRaf() {
 }
 
 // Debounce the showButton handler
-const debouncedShowButton = debounce(showButtonRaf, 120)
+const debouncedShowButton = debounce(showButtonRaf, 60)
 
 // Expose showButton for template events
 function showButton() {
@@ -102,7 +110,11 @@ function handleSystemThemeChange(e: MediaQueryListEvent) {
 }
 
 onMounted(() => {
-  const saved = localStorage.getItem('astra-theme')
+  let saved = ''
+  try {
+    saved = localStorage.getItem('astra-theme') || ''
+  } catch (e) {}
+
   if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true
     setTheme(true)

@@ -52,9 +52,16 @@ class Filters
             $search .= "{$wpdb->posts}.post_title LIKE '%{$q_esc}%' OR ";
             $search .= "{$wpdb->posts}.post_title LIKE '%{$q_html}%' OR ";
             $search .= "{$wpdb->posts}.ID IN (
-                SELECT post_id FROM {$wpdb->postmeta}
-                WHERE meta_key = 'nama_perusahaan' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
-            )";
+            SELECT post_id FROM {$wpdb->postmeta}
+            WHERE meta_key = 'nama_perusahaan' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
+        ) OR ";
+            $search .= "{$wpdb->posts}.ID IN (
+            SELECT object_id FROM {$wpdb->term_relationships}
+            INNER JOIN {$wpdb->term_taxonomy} ON {$wpdb->term_taxonomy}.term_taxonomy_id = {$wpdb->term_relationships}.term_taxonomy_id
+            INNER JOIN {$wpdb->terms} ON {$wpdb->terms}.term_id = {$wpdb->term_taxonomy}.term_id
+            WHERE {$wpdb->term_taxonomy}.taxonomy = 'perusahaan'
+            AND {$wpdb->terms}.name LIKE '%{$q_esc}%'
+        )";
             $search .= ")";
         }
         return $search;

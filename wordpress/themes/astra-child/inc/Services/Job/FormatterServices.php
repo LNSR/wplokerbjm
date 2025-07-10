@@ -46,11 +46,11 @@ class FormatterServices
         }
 
         if ($has_umur_min && $has_umur_max) {
-            return $umur_min . ' - ' . $umur_max . ' tahun';
+            return $umur_min . ' - ' . $umur_max . ' Tahun';
         } elseif ($has_umur_min) {
-            return 'Minimal ' . $umur_min . ' tahun';
+            return 'Minimal ' . $umur_min . ' Tahun';
         } else {
-            return 'Maksimal ' . $umur_max . ' tahun';
+            return 'Maksimal ' . $umur_max . ' Tahun';
         }
     }
 

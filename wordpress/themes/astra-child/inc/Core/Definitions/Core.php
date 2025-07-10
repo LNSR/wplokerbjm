@@ -22,7 +22,7 @@ class Core
 						$c->get(\AstraChild\Models\Schema\CustomFields::class),
 						$c->get(\AstraChild\Models\Schema\Taxonomies::class),
 						$c->get(\AstraChild\Models\Schema\PostTypes::class),
-						$c->get(\AstraChild\Services\REST\RESTServices::class),
+						$c->get(\AstraChild\Services\REST\RESTRoute::class),
 						$c->get(\AstraChild\Services\Job\ArchiveServices::class),
 						$c->get(\AstraChild\Services\PostsManagement\PostsManagement::class)
 					],

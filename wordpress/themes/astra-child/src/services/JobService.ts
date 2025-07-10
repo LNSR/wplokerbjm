@@ -7,8 +7,10 @@ export class JobService {
     try {
       return await jobsApi.getAutoSuggestions(query)
     } catch (error) {
-      console.error('Auto suggestions failed:', error)
-      return []
+      if (error instanceof ApiError) {
+        throw new Error(`Auto suggestions failed: ${error.message}`)
+      }
+      throw new Error('Auto suggestions failed: Unknown error')
     }
   }
 
@@ -38,8 +40,10 @@ export class JobService {
     try {
       return await jobsApi.fetchCarousel()
     } catch (error) {
-      console.error('Fetch carousel failed:', error)
-      return { jobs: [] }
+      if (error instanceof ApiError) {
+        throw new Error(`Fetch carousel failed: ${error.message}`)
+      }
+      throw new Error('Fetch carousel failed: Unknown error')
     }
   }
 

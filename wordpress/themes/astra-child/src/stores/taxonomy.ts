@@ -2,7 +2,6 @@ import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { TaxonomyService } from '@/services/TaxonomyService'
 import type { TaxonomyTerm } from '@/types/api'
-import { useAsyncState } from '@/composables/useAsyncState'
 
 export const useTaxonomyStore = defineStore('taxonomy', () => {
   // State
@@ -14,14 +13,17 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
   const genderLoaded = ref(false)
   const pendidikanLoaded = ref(false)
 
-  // Use composable for loading/error
-  const lokasiAsync = useAsyncState()
-  const genderAsync = useAsyncState()
-  const pendidikanAsync = useAsyncState()
+  // Loading/Error state (no useAsyncState)
+  const lokasiLoading = ref(false)
+  const genderLoading = ref(false)
+  const pendidikanLoading = ref(false)
+  const lokasiError = ref<string | null>(null)
+  const genderError = ref<string | null>(null)
+  const pendidikanError = ref<string | null>(null)
 
   // Computed
   const loading = computed(() =>
-    lokasiAsync.loading.value || genderAsync.loading.value || pendidikanAsync.loading.value
+    lokasiLoading.value || genderLoading.value || pendidikanLoading.value
   )
   const isLoaded = computed(() =>
     lokasiLoaded.value && genderLoaded.value && pendidikanLoaded.value
@@ -34,50 +36,50 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
 
   // Actions
   async function fetchLokasiTerms() {
-    if (lokasiLoaded.value && !lokasiAsync.error.value) return
-    lokasiAsync.setLoading(true)
-    lokasiAsync.setError(null)
+    if (lokasiLoaded.value && !lokasiError.value) return
+    lokasiLoading.value = true
+    lokasiError.value = null
     try {
       const data = await TaxonomyService.fetchLokasiTerms()
       lokasiTerms.value = data
       lokasiLoaded.value = true
     } catch (err) {
-      lokasiAsync.setError(err instanceof Error ? err.message : 'Failed to fetch lokasi terms')
+      lokasiError.value = err instanceof Error ? err.message : 'Failed to fetch lokasi terms'
       lokasiLoaded.value = false
     } finally {
-      lokasiAsync.setLoading(false)
+      lokasiLoading.value = false
     }
   }
 
   async function fetchGenderTerms() {
-    if (genderLoaded.value && !genderAsync.error.value) return
-    genderAsync.setLoading(true)
-    genderAsync.setError(null)
+    if (genderLoaded.value && !genderError.value) return
+    genderLoading.value = true
+    genderError.value = null
     try {
       const data = await TaxonomyService.fetchGenderTerms()
       genderTerms.value = data
       genderLoaded.value = true
     } catch (err) {
-      genderAsync.setError(err instanceof Error ? err.message : 'Failed to fetch gender terms')
+      genderError.value = err instanceof Error ? err.message : 'Failed to fetch gender terms'
       genderLoaded.value = false
     } finally {
-      genderAsync.setLoading(false)
+      genderLoading.value = false
     }
   }
 
   async function fetchPendidikanTerms() {
-    if (pendidikanLoaded.value && !pendidikanAsync.error.value) return
-    pendidikanAsync.setLoading(true)
-    pendidikanAsync.setError(null)
+    if (pendidikanLoaded.value && !pendidikanError.value) return
+    pendidikanLoading.value = true
+    pendidikanError.value = null
     try {
       const data = await TaxonomyService.fetchPendidikanTerms()
       pendidikanTerms.value = data
       pendidikanLoaded.value = true
     } catch (err) {
-      pendidikanAsync.setError(err instanceof Error ? err.message : 'Failed to fetch pendidikan terms')
+      pendidikanError.value = err instanceof Error ? err.message : 'Failed to fetch pendidikan terms'
       pendidikanLoaded.value = false
     } finally {
-      pendidikanAsync.setLoading(false)
+      pendidikanLoading.value = false
     }
   }
 
@@ -88,9 +90,19 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
     lokasiLoaded.value = false
     genderLoaded.value = false
     pendidikanLoaded.value = false
-    lokasiAsync.setError(null)
-    genderAsync.setError(null)
-    pendidikanAsync.setError(null)
+    lokasiError.value = null
+    genderError.value = null
+    pendidikanError.value = null
+  }
+
+  function resetLokasiError() {
+    lokasiError.value = null
+  }
+  function resetGenderError() {
+    genderError.value = null
+  }
+  function resetPendidikanError() {
+    pendidikanError.value = null
   }
 
   function getTermNameBySlug(type: 'lokasi' | 'gender' | 'pendidikan', slug: string): string {
@@ -122,12 +134,12 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
     genderLoaded,
     pendidikanLoaded,
     // Loading/Error
-    lokasiLoading: lokasiAsync.loading,
-    genderLoading: genderAsync.loading,
-    pendidikanLoading: pendidikanAsync.loading,
-    lokasiError: lokasiAsync.error,
-    genderError: genderAsync.error,
-    pendidikanError: pendidikanAsync.error,
+    lokasiLoading,
+    genderLoading,
+    pendidikanLoading,
+    lokasiError,
+    genderError,
+    pendidikanError,
 
     // Computed
     loading,
@@ -139,9 +151,9 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
     fetchGenderTerms,
     fetchPendidikanTerms,
     clearTerms,
-    resetLokasiError: lokasiAsync.resetError,
-    resetGenderError: genderAsync.resetError,
-    resetPendidikanError: pendidikanAsync.resetError,
+    resetLokasiError,
+    resetGenderError,
+    resetPendidikanError,
 
     // Getters
     getTermNameBySlug,

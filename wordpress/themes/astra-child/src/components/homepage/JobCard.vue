@@ -1,5 +1,5 @@
 <template>
-  <article :class="cardClass" @click="handleClick" style="cursor:pointer" :data-job-id="jobdata.id">
+  <article :class="cardClass" @click="handleClick" style="cursor:pointer">
     <a :href="permalink" class="contents">
       <div :class="bodyClass">
         <div class="flex-1 flex flex-col justify-start">
@@ -7,29 +7,29 @@
             <h3 class="card-title text-lg md:text-xl !font-bold group-hover:text-blue-700 transition-colors">
               {{ jobdata.title }}
             </h3>
-            <time class="text-lg text-center gap-2" :datetime="jobdata.post_time">
+            <time class="text-lg !font-semibold text-center gap-2" :datetime="jobdata.post_time">
               {{ timeAgo }}
             </time>
           </div>
           <div v-if="!jobdata.nama_perusahaan" class="divider mt-0"></div>
           <template v-else>
             <h4 class="!font-bold flex items-center gap-2 !mb-6">
-              <i class="fas fa-user-tie text-blue-600"></i>
+              <i class="fas fa-user-tie !text-[var(--ast-global-color-1)]"></i>
               {{ jobdata.nama_perusahaan }}
             </h4>
             <div class="divider !-mt-4"></div>
           </template>
           <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
             <template v-for="row in summaryRows" :key="row.label">
-              <span v-if="row.label !== 'Deadline'" class="flex items-center text-base md:text-base gap-2 py-1">
-                <i :class="['fas', row.icon, 'text-blue-600']"></i>
+              <span v-if="row.label !== 'Deadline'" class="flex items-center text-base md:text-base font-semibold gap-2 py-1">
+                <i :class="['fas', row.icon, 'text-[var(--ast-global-color-1)]']"></i>
                 <span v-html="row.value"></span>
               </span>
             </template>
           </div>
         </div>
         <div v-if="hasStatusOrDeadline" class="divider my-2"></div>
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between font-semibold">
           <span v-if="jobdata.statusjob" v-html="jobdata.statusjob"></span>
           <span v-if="jobdata.deadline" v-html="jobdata.deadline"></span>
         </div>
@@ -70,17 +70,7 @@ function handleClick(event: MouseEvent) {
   }
 
   if (props.variant === 'featured') {
-    const cardEl = (event.currentTarget as HTMLElement)
-    const cardRect = cardEl.getBoundingClientRect()
-    const gridContainer = cardEl.closest('.relative.flex') as HTMLElement
-    let offsetTop = 0
-    if (gridContainer) {
-      const gridRect = gridContainer.getBoundingClientRect()
-      offsetTop = cardRect.top - gridRect.top
-    } else {
-      offsetTop = cardRect.top
-    }
-    emit('click', props.jobdata.id, event, offsetTop)
+    emit('click', event)
   }
 }
 

@@ -31,7 +31,7 @@ class JobSummaryRows
             $rows[] = [
                 'icon' => 'fa-briefcase',
                 'label' => 'Pengalaman',
-                'value' => $jobdata['pengalaman'] . ' Tahun',
+                'value' => $jobdata['pengalaman'] . ' Tahun Pengalaman',
             ];
         }
         if (!empty($jobdata['gender_taxo'])) {

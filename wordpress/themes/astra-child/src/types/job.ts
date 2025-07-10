@@ -10,5 +10,7 @@ export interface Job {
     umur_max?: number;
     lokasi_taxo?: string | string[];
     permalink?: string;
+    slug?: string;
+    
 }
 

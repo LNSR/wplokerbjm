@@ -59,7 +59,6 @@ class Enqueue
         $main_css = $manifest[$manifest_key]['css'] ?? [];
         $main_assets = $manifest[$manifest_key]['assets'] ?? [];
 
-        // Enqueue main JS
         wp_enqueue_script_module(
             'vue-' . md5($entry),
             $dist_uri . '/' . $main_js,
@@ -67,7 +66,6 @@ class Enqueue
             filemtime($dist_dir . '/' . $main_js)
         );
 
-        // Enqueue main CSS
         foreach ($main_css as $css_file) {
             wp_enqueue_style(
                 'vue-' . md5($entry) . '-' . md5($css_file),

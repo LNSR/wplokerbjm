@@ -3,7 +3,6 @@ import { ref, computed } from 'vue'
 import { debounce, validation } from '@/utils'
 import type { SearchFilters, LoadMoreFilters } from '@/types'
 import type { Job, LoadMoreResponse } from '@/types'
-import { useAsyncState } from '@/composables/useAsyncState'
 import { useApi } from '@/composables/useApi'
 
 export const useSearchStore = defineStore('search', () => {
@@ -26,8 +25,8 @@ export const useSearchStore = defineStore('search', () => {
   const maxNumPages = ref<number>(1)
   const page = ref(1)
 
-  // Use composable for loading/error
-  const asyncState = useAsyncState()
+  const loading = ref(false)
+  const error = ref<string | null>(null)
   const suggestionsLoading = ref(false)
   const { fetchAutoSuggestions, searchJobs: apiSearchJobs, loadMore: apiLoadMore } = useApi()
 
@@ -126,8 +125,8 @@ export const useSearchStore = defineStore('search', () => {
   
   // Search functionality
   async function searchJobs() {
-    asyncState.setLoading(true)
-    asyncState.setError(null)
+    loading.value = true
+    error.value = null
     try {
       const response = await apiSearchJobs(filters.value)
       jobs.value = [...response.jobs]
@@ -141,19 +140,19 @@ export const useSearchStore = defineStore('search', () => {
       }
       return response
     } catch (err) {
-      asyncState.setError(err instanceof Error ? err.message : 'Search failed')
+      error.value = err instanceof Error ? err.message : 'Search failed'
       throw err
     } finally {
-      asyncState.setLoading(false)
+      loading.value = false
     }
   }
 
   const hasMore = computed(() => page.value < maxNumPages.value)
   
   async function loadMore() {
-    if (asyncState.loading.value || page.value >= maxNumPages.value) return
-    asyncState.setLoading(true)
-    asyncState.setError(null)
+    if (loading.value || page.value >= maxNumPages.value) return
+    loading.value = true
+    error.value = null
     try {
       const loadMoreFilters: LoadMoreFilters = {
         page: page.value + 1,
@@ -169,10 +168,10 @@ export const useSearchStore = defineStore('search', () => {
       }
       return response
     } catch (err) {
-      asyncState.setError(err instanceof Error ? err.message : 'Load more failed')
+      error.value = err instanceof Error ? err.message : 'Load more failed'
       throw err
     } finally {
-      asyncState.setLoading(false)
+      loading.value = false
     }
   }
 
@@ -182,9 +181,9 @@ export const useSearchStore = defineStore('search', () => {
     searchHistory,
     suggestions,
     showSuggestions,
-    loading: asyncState.loading,
+    loading,
     suggestionsLoading,
-    error: asyncState.error,
+    error,
     jobs,
     context,
     title,
@@ -208,7 +207,5 @@ export const useSearchStore = defineStore('search', () => {
     hideSuggestions,
     searchJobs,
     loadMore,
-    setError: asyncState.setError,
-    resetError: asyncState.resetError,
   }
 })

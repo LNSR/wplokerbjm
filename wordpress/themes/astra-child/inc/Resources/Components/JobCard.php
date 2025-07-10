@@ -70,7 +70,7 @@ class JobCard
 				<h3 class="card-title text-lg md:text-xl !font-bold group-hover:text-blue-700 transition-colors">
 					<?= esc_html(get_the_title($post_id)); ?>
 				</h3>
-				<time class="text-lg text-center gap-2" datetime="<?= esc_attr(get_post_time('c', false, $post_id)); ?>">
+				<time class="text-lg font-semibold text-center gap-2" datetime="<?= esc_attr(get_post_time('c', false, $post_id)); ?>">
 					<?= esc_html(FormatterServices::formatTimeAgo(get_post_time('U', false, $post_id))); ?>
 				</time>
 			</div>
@@ -86,7 +86,7 @@ class JobCard
 			<?php endif; ?>
 			<?php if (!empty($namaPerusahaan)): ?>
 				<h4 class="!font-bold flex items-center gap-2 !mb-6">
-					<i class="fas fa-user-tie text-blue-600"></i>
+					<i class="fas fa-user-tie text-[var(--ast-global-color-1)]"></i>
 					<?= esc_html($namaPerusahaan); ?>
 				</h4>
 				<div class="divider !-mt-4"></div>
@@ -95,8 +95,8 @@ class JobCard
 				<?php foreach ($rows as $row): ?>
 					<?php if ($row['label'] === 'Deadline')
 						continue; ?>
-					<span class="flex items-center text-base md:text-base gap-2 py-1">
-						<i class="fas <?= $row['icon'] ?> text-blue-600"></i>
+					<span class="flex items-center text-base md:text-base font-semibold gap-2 py-1">
+						<i class="fas <?= $row['icon'] ?> text-[var(--ast-global-color-1)]"></i>
 						<?= $row['value']; ?>
 					</span>
 				<?php endforeach; ?>
@@ -105,7 +105,7 @@ class JobCard
 		<?php if ($has_status || $has_deadline): ?>
 			<div class="divider my-2"></div>
 		<?php endif; ?>
-		<div class="flex items-center justify-between">
+		<div class="flex items-center justify-between font-semibold">
 			<?= $statusjob; ?>
 			<?= $deadline; ?>
 		</div>
@@ -128,7 +128,7 @@ class JobCard
 
 		ob_start();
 		?>
-		<span class="inline-block px-3 py-1 rounded-full text-xs font-semibold <?= esc_attr($color); ?>">
+		<span class="inline-block px-3 py-1 text-xs <?= esc_attr($color); ?>">
 			<?= esc_html($label); ?>
 		</span>
 		<?php
@@ -163,7 +163,7 @@ class JobCard
 
 		ob_start();
 		?>
-		<div class="flex items-center <?= $icon_color; ?> rounded-md p-2">
+		<div class="flex items-center <?= $icon_color; ?> p-2">
 			<i class="fas fa-calendar-alt mr-2"></i>
 			<span class="text-sm"><?= $text; ?></span>
 		</div>

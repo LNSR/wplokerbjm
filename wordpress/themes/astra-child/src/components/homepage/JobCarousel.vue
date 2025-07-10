@@ -2,17 +2,12 @@
 import { ref } from 'vue'
 import type { Job } from '@/types/job'
 import { useJobCarousel } from '@/composables/useSwiper'
-import { useApi } from '@/composables/useApi'
 
 const jobs = ref<Job[]>([])
 const loaded = ref(false)
-const { loading, fetchCarousel } = useApi()
-
-useJobCarousel({
+const { loading } = useJobCarousel({
   jobs,
   loaded,
-  fetchCarousel,
-  loading,
 })
 </script>
 <template>

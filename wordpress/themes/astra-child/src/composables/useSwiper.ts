@@ -7,6 +7,10 @@ import 'swiper/css/navigation'
 import 'swiper/css/pagination'
 import 'swiper/css/virtual'
 import { useJobOverlayStore } from '@/stores/job-overlay'
+import { useApi } from '@/composables/useApi'
+import { router } from '@/app/router'
+import { getJobSlugFromId } from '@/services/RouterService'
+import { useRouterWatcher } from '@/composables/useRouterWatcher'
 
 Swiper.use([Navigation, Pagination, Autoplay, Virtual])
 
@@ -93,7 +97,14 @@ export function mountVirtualSlides(jobs: Job[]) {
   let i = 0
 
   function handleCarouselJobClick(jobId: number) {
-    jobOverlay.openOverlay(jobId, 0)
+    jobOverlay.openOverlay(jobId)
+    const jobsForSlug = jobs
+      .filter((j): j is { id: number; permalink: string } => typeof j.permalink === 'string')
+      .map(j => ({ id: j.id, permalink: j.permalink! }))
+    const slug = getJobSlugFromId(jobsForSlug, jobId)
+    if (slug) {
+      router.push({ name: 'JobDetail', params: { slug } })
+    }
   }
 
   function mountNextBatch(deadline?: IdleDeadline) {
@@ -134,11 +145,10 @@ export function mountVirtualSlides(jobs: Job[]) {
 
 export function useJobCarousel(options: {
   jobs: Ref<Job[]>,
-  loaded: Ref<boolean>,
-  fetchCarousel: () => Promise<any>,
-  loading: Ref<boolean>
+  loaded: Ref<boolean>
 }) {
-  const { jobs, loaded, fetchCarousel } = options
+  const { jobs, loaded } = options
+  const { loading, fetchCarousel } = useApi()
   const { initSwiper } = useSwiper('.job-carousel')
 
   async function loadCarousel() {
@@ -167,9 +177,12 @@ export function useJobCarousel(options: {
     observer.observe(el)
   })
 
+  useRouterWatcher(jobs);
+
   return {
     jobs,
     loaded,
+    loading,
     loadCarousel
   }
 }

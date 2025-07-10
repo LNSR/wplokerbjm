@@ -4,24 +4,24 @@ import { ref } from 'vue'
 export const useJobOverlayStore = defineStore('jobOverlay', () => {
   const overlayOpen = ref(false)
   const selectedId = ref<number | null>(null)
-  const overlayOffset = ref(0)
+  const selectedSlug = ref<string | null>(null)
 
-  function openOverlay(id: number, offsetTop?: number) {
+  function openOverlay(id: number, slug?: string) {
     selectedId.value = id
+    selectedSlug.value = slug ?? null
     overlayOpen.value = true
-    overlayOffset.value = offsetTop ?? 0
   }
 
   function closeOverlay() {
     overlayOpen.value = false
     selectedId.value = null
-    overlayOffset.value = 0
+    selectedSlug.value = null
   }
 
   return {
     overlayOpen,
     selectedId,
-    overlayOffset,
+    selectedSlug,
     openOverlay,
     closeOverlay,
   }

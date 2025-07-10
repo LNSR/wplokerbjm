@@ -10,7 +10,7 @@ use AstraChild\Controllers\REST\TaxonomyDepth;
 use AstraChild\Controllers\REST\SingleOverlay;
 
 
-class RESTServices
+class RESTRoute
 {
  
     public function __construct(

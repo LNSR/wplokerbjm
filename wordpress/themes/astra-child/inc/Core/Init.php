@@ -2,7 +2,14 @@
 
 namespace AstraChild\Core;
 
-
+/**
+ * 
+ *
+ * Handles the initialization of core services for the Astra Child theme.
+ * Iterates through the provided services and calls their 'register' method if available.
+ *
+ * 
+ */
 class Init {
     public function __construct(private readonly array $services = []) {}
 

@@ -14,8 +14,8 @@ class Services
                 new \AstraChild\Services\Taxonomy\TaxonomyService(),
             \AstraChild\Services\CustomField\SocialMediaService::class => fn($c) =>
                 new \AstraChild\Services\CustomField\SocialMediaService(),
-            \AstraChild\Services\REST\RESTServices::class => fn($c) =>
-                new \AstraChild\Services\REST\RESTServices(
+            \AstraChild\Services\REST\RestRoute::class => fn($c) =>
+                new \AstraChild\Services\REST\RestRoute(
                     $c->get(\AstraChild\Controllers\REST\TaxonomyDepth::class),
                     $c->get(\AstraChild\Controllers\REST\AutoSuggestionSearch::class),
                     $c->get(\AstraChild\Controllers\REST\LoadMore::class),

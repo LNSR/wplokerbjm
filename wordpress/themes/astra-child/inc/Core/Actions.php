@@ -2,11 +2,14 @@
 
 namespace AstraChild\Core;
 
-class Actions {
-	public function register(): void {
-		add_action( 'wp_enqueue_scripts', [ $this, 'disableJquery' ], 1 );
-		add_action( 'wp_head', [ $this, 'injectThemeScript' ], 0 );
-		add_action( 'wp_head', [ $this, 'suppressJqueryErrors' ], 1 );
+class Actions
+{
+	public function register(): void
+	{
+		add_action('wp_enqueue_scripts', [$this, 'disableJquery'], 1);
+		add_action('wp_head', [$this, 'injectThemeScript'], 0);
+		add_action('wp_head', [$this, 'suppressJqueryErrors'], 1);
+		add_action('wp_head', [$this, 'injectNoScriptWarning']);
 
 		// if (!is_admin() && !is_user_logged_in()) {
 		//     add_action('wp_head', [$this, 'injectAdsenseScript'], 10);
@@ -15,25 +18,28 @@ class Actions {
 		// }
 	}
 
-	public function disableJquery(): void {
+	public function disableJquery(): void
+	{
 		// Only disable jQuery for non-logged-in users on the frontend
-		if ( ! is_admin() && ! is_user_logged_in() ) {
+		if (!is_admin() && !is_user_logged_in()) {
 			global $wp_scripts;
-			if ( $wp_scripts instanceof \WP_Scripts ) {
-				foreach ( $wp_scripts->registered as $handle => $script ) {
-					if ( strpos( $handle, 'jquery' ) === 0 ) {
-						wp_dequeue_script( $handle );
-						wp_deregister_script( $handle );
+			if ($wp_scripts instanceof \WP_Scripts) {
+				foreach ($wp_scripts->registered as $handle => $script) {
+					if (strpos($handle, 'jquery') === 0) {
+						wp_dequeue_script($handle);
+						wp_deregister_script($handle);
 					}
 				}
 			}
 		}
 	}
 
-	public function suppressJqueryErrors(): void {
+	public function suppressJqueryErrors(): void
+	{
 		?>
 		<script>
 			if (!window.jQuery) {
+				console.warn('jQuery is not loaded. A minimal stub is provided to suppress errors.');
 				window.jQuery = window.$ = function () {
 					return {
 						ready: function (fn) { if (typeof fn === 'function') fn(); return this; },
@@ -55,9 +61,15 @@ class Actions {
 						prepend: function () { return this; },
 						remove: function () { return this; },
 						hide: function () { return this; },
-						show: function () { return this; }
+						show: function () { return this; },
+						val: function () { return ''; }, // common in forms
+						html: function () { return this; },
+						text: function () { return this; },
+						fadeIn: function () { return this; },
+						fadeOut: function () { return this; }
 					};
 				};
+				window.jQuery.fn = window.jQuery.prototype = {};
 			}
 		</script>
 		<?php
@@ -66,7 +78,8 @@ class Actions {
 	/**
 	 * Injects a script to set the theme before CSS loads, preventing FOUC.
 	 */
-	public function injectThemeScript(): void {
+	public function injectThemeScript(): void
+	{
 		?>
 		<script>
 			(function () {
@@ -81,7 +94,8 @@ class Actions {
 		<?php
 	}
 
-	public function injectAdsenseScript(): void {
+	public function injectAdsenseScript(): void
+	{
 		?>
 		<script>
 			window.addEventListener('DOMContentLoaded', function () {
@@ -95,7 +109,8 @@ class Actions {
 		<?php
 	}
 
-	public function injectGTMHead(): void {
+	public function injectGTMHead(): void
+	{
 		?>
 		<!-- Google Tag Manager (deferred) -->
 		<script>
@@ -118,12 +133,27 @@ class Actions {
 		<?php
 	}
 
-	public function injectGTMBody(): void {
+	public function injectGTMBody(): void
+	{
 		?>
 		<!-- Google Tag Manager (noscript) -->
 		<noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-PHZNSBWX" height="0" width="0"
 				style="display:none;visibility:hidden"></iframe></noscript>
 		<!-- End Google Tag Manager (noscript) -->
+		<?php
+	}
+
+	/**
+	 * Injects a warning for users with JavaScript disabled.
+	 */
+	public function injectNoScriptWarning(): void
+	{
+		?>
+		<noscript>
+			<div class="fixed top-0 left-0 w-full z-[9999] bg-yellow-300 text-black text-center font-bold py-4 px-2 mt-12">
+				Tolong aktifkan JavaScript di browser Anda.
+			</div>
+		</noscript>
 		<?php
 	}
 }

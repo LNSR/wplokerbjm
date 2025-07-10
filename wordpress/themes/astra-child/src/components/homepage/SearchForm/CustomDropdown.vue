@@ -2,7 +2,7 @@
   <div class="relative" tabindex="0" @blur="close" ref="dropdownRef">
     <button
       type="button"
-      class="w-full text-left !px-4 !py-3 border rounded h-12 !bg-[var(--ast-global-color-5)] hover:!bg-[var(--ast-global-color-1) !text-[var(--ast-global-color-1)]"
+      class="w-full text-left !px-4 !py-3 border rounded h-12 !bg-[var(--ast-global-color-5)] hover:!ring-2 hover:!ring-color[var(--ast-global-color-1) !text-[var(--ast-global-color-1)]"
       @click="toggle"
     >
       <span class="!pl-6">

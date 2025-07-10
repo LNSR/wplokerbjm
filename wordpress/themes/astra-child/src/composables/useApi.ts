@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import { JobService } from '@/services/JobService'
 import type { SearchFilters, LoadMoreFilters, SearchResponse, AutoSuggestResponse, LoadMoreResponse } from '@/types'
+import type { SingleOverlayResponse } from '@/types'
 
 export function useApi() {
   const loading = ref(false)
@@ -62,12 +63,24 @@ export function useApi() {
     }
   }
 
+  async function fetchSingleOverlay(id: number): Promise<SingleOverlayResponse | null> {
+    try {
+      return await JobService.fetchSingleOverlay(id)
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Failed to fetch job overlay'
+      throw err
+    } finally {
+      loading.value = false
+    }
+  }
+
   return {
     loading,
     error,
     fetchAutoSuggestions,
     searchJobs,
     loadMore,
-    fetchCarousel
+    fetchCarousel,
+    fetchSingleOverlay
   }
 }

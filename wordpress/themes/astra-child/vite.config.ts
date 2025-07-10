@@ -55,6 +55,7 @@ export default defineConfig(({ command }) => ({
     emptyOutDir: true,
     sourcemap: false,
     manifest: true,
+    target: "esnext",
     rollupOptions: {
       input: {
         main: "./src/main.ts",

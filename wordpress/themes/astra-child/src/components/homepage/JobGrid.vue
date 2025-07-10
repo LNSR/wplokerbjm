@@ -35,8 +35,13 @@
         </div>
         <div ref="sentinel" style="height: 1px"></div>
       </div>
-      <div v-if="overlayOpen && selectedId !== null && selectedId !== undefined" class="hidden md:block relative w-full">
-        <SingleOverlay :id="selectedId" :visible="overlayOpen" :offset="overlayOffset" @close="handleOverlayClose" />
+      <div v-if="overlayOpen && selectedId !== null && selectedId !== undefined" class="hidden md:block w-full"
+        :class="[
+          overlayOpen ? 'sticky top-0 self-start' : 'relative'
+        ]"
+        :style="{ top: wpAdminBarOffset }"
+      >
+        <SingleOverlay :id="selectedId" :visible="overlayOpen" @close="handleOverlayClose" />
       </div>
     </div>
   </section>
@@ -64,12 +69,12 @@ const {
   sentinel,
   overlayOpen,
   selectedId,
-  overlayOffset,
   totalJobs,
   title,
   handleOverlayClose,
   handleJobClick,
   searchStore,
+  wpAdminBarOffset
 } = useJobGrid(props)
 
 </script>
