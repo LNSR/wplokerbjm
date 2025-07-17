@@ -9,16 +9,13 @@ class Core
 		return [
 			\AstraChild\Core\Enqueue::class => fn($c) =>
 				new \AstraChild\Core\Enqueue(),
-			\AstraChild\Core\Actions::class => fn($c) =>
-				new \AstraChild\Core\Actions(),
-			\AstraChild\Core\Filters::class => fn($c) =>
-				new \AstraChild\Core\Filters(),
+			\AstraChild\Core\Hooks::class => fn($c) =>
+				new \AstraChild\Core\Hooks(),
 			\AstraChild\Core\Init::class => fn($c) =>
 				new \AstraChild\Core\Init(
 					[
 						$c->get(\AstraChild\Core\Enqueue::class),
-						$c->get(\AstraChild\Core\Actions::class),
-						$c->get(\AstraChild\Core\Filters::class),
+						$c->get(\AstraChild\Core\Hooks::class),
 						$c->get(\AstraChild\Models\Schema\CustomFields::class),
 						$c->get(\AstraChild\Models\Schema\Taxonomies::class),
 						$c->get(\AstraChild\Models\Schema\PostTypes::class),

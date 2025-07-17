@@ -2,15 +2,16 @@
 
 namespace AstraChild\Services\PostsManagement;
 
+use AstraChild\Contracts\HooksInterface;
 use AstraChild\QueryBuilders\JobQuery;
 
 /**
  * ? Subject to change: dedicated CronJob for better seperation of concerns.
  * 
  */
-class PostsManagement
+class PostsManagement implements HooksInterface
 {
-    public function register(): void
+    public function registerActions(): void
     {
         add_action('astra_child_delete_old_jobs', [$this, 'deleteOldJobs']);
         add_action('astra_child_update_job_statuses', [$this, 'updateAllJobStatuses']);
@@ -22,6 +23,10 @@ class PostsManagement
         if (! wp_next_scheduled('astra_child_update_job_statuses')) {
             wp_schedule_event(time(), 'daily', 'astra_child_update_job_statuses');
         }
+    }
+    public function registerFilters(): void
+    {
+        // No filters to register in this class
     }
 
     public function deleteOldJobs(): void

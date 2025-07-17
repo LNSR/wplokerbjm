@@ -30,6 +30,9 @@ class Container
 
             if ($isProduction) {
                 $builder->enableCompilation($cacheDir);
+                if (function_exists('apcu_enabled') && apcu_enabled()) {
+                    $builder->enableDefinitionCache();
+                }
             }
 
             $builder->addDefinitions(array_merge(

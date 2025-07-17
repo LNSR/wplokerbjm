@@ -43,7 +43,7 @@ class SingleViewModel
 		$jobdata = $this->jobdata;
 
 		// fallback to custom field if taxonomy is not set
-		// * IMPORTANT : custom field 'nama_perusahaan' is deprecated 
+		// * IMPORTANT : custom field 'nama_perusahaan' is used for non-company
 		$namaPerusahaan = !empty($jobdata['perusahaan_taxo'])
 			? $jobdata['perusahaan_taxo']
 			: ($jobdata['nama_perusahaan'] ?? '');
@@ -119,15 +119,15 @@ class SingleViewModel
 						<?php
 						$labelClass = '';
 						$labelClass = match ($row['label']) {
-							'Jenis Pekerjaan' => 'sm:ml-1 ml-3',
-							'Pendidikan' => 'ml-3',
-							'Pengalaman' => 'ml-3',
-							'Gender' => 'ml-3',
-							'Usia' => 'ml-3',
-							'Deadline' => 'ml-3',
-							'Gaji' => 'ml-3',
-							'Lokasi' => 'ml-3',
-							default => 'ml-2',
+							'Jenis Pekerjaan' => 'lg:ml-3 ml-5',
+							'Pendidikan' => 'ml-5',
+							'Pengalaman' => 'ml-5',
+							'Gender' => 'ml-5',
+							'Usia' => 'ml-5',
+							'Deadline' => 'ml-5',
+							'Gaji' => 'ml-5',
+							'Lokasi' => 'ml-5',
+							default => 'ml-4',
 						};
 						?>
 						<div class="flex items-start lg:space-x-2 space-x-1 mb-2">

@@ -1,12 +1,19 @@
 <?php
 namespace AstraChild\Services\Job;
+use AstraChild\Contracts\HooksInterface;
 
-class ArchiveServices {
-    public function register(): void
+class ArchiveServices implements HooksInterface
+{
+    public function registerActions(): void
     {
         add_action('pre_get_posts', [$this, 'forceLowonganArchiveTemplate']);
     }
 
+    public function registerFilters(): void
+    {
+        // No filters to register in this class
+    }
+    
     /**
      * Force the lowongan archive template when searching.
      *

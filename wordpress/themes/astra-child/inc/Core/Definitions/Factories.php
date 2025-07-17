@@ -15,7 +15,9 @@ class Factories
                     $c->get(\AstraChild\Services\CustomField\CustomFieldsService::class),
                     $c->get(\AstraChild\Services\Taxonomy\TaxonomyService::class),
                     $c->get(\AstraChild\Services\CustomField\SocialMediaService::class)
-                )
+                ),
+            'customFieldsProvider' => fn($c) => $c->get(\AstraChild\Repositories\CustomFieldRepository::class),
+            'taxonomiesProvider'   => fn($c) => $c->get(\AstraChild\Repositories\TaxonomyRepository::class),
         ];
     }
 }
