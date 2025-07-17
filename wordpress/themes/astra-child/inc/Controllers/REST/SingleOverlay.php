@@ -8,11 +8,8 @@ use AstraChild\Services\REST\RESTData;
 
 class SingleOverlay
 {
-    protected RESTData $restData;
-
-    public function __construct(RESTData $restData)
+    public function __construct(private RESTData $restData)
     {
-        $this->restData = $restData;
     }
 
     public function handle(WP_REST_Request $request): WP_REST_Response

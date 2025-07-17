@@ -2,6 +2,7 @@
 
 namespace AstraChild\Services\REST;
 
+use AstraChild\Contracts\HooksInterface;
 use AstraChild\Controllers\REST\AutoSuggestionSearch;
 use AstraChild\Controllers\REST\Carousel;
 use AstraChild\Controllers\REST\DynamicSearch;
@@ -10,7 +11,7 @@ use AstraChild\Controllers\REST\TaxonomyDepth;
 use AstraChild\Controllers\REST\SingleOverlay;
 
 
-class RESTRoute
+class RESTRoute implements HooksInterface
 {
  
     public function __construct(
@@ -24,9 +25,13 @@ class RESTRoute
     {
     }
 
-    public function register(): void
+    public function registerActions(): void
     {
         add_action('rest_api_init', [$this, 'registerRoutes']);
+    }
+    public function registerFilters(): void
+    {
+        // No filters to register in this class
     }
 
     public function registerRoutes(): void

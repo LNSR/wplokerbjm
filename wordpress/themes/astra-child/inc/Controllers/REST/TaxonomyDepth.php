@@ -5,12 +5,7 @@ use AstraChild\Services\Taxonomy\TaxonomyService;
 use AstraChild\Repositories\TaxonomyRepository;
 
 class TaxonomyDepth {
-    protected TaxonomyService $service;
-    protected TaxonomyRepository $repository;
-
-    public function __construct(TaxonomyService $service, TaxonomyRepository $repository) {
-        $this->service = $service;
-        $this->repository = $repository;
+    public function __construct(private TaxonomyService $service, private TaxonomyRepository $repository) {
     }
 
     public function handle(\WP_REST_Request $request) {

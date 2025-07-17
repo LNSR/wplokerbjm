@@ -1,15 +1,21 @@
 <?php
 
 namespace AstraChild\Core;
+use AstraChild\Contracts\HooksInterface;
 
-class Enqueue
+class Enqueue implements HooksInterface
 {
     /**
      * Register scripts and styles.
      */
-    public function register(): void
+    public function registerActions(): void
     {
         add_action('wp_enqueue_scripts', [$this, 'enqueueAssets']);
+    }
+
+    public function registerFilters(): void
+    {
+        // No filters to register in this class
     }
 
     private function getViteEntry(): string

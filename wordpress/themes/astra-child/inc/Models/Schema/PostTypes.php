@@ -1,21 +1,27 @@
 <?php
 namespace AstraChild\Models\Schema;
 
+use AstraChild\Contracts\HooksInterface;
+
 /**
  * Post Types Schema
  * 
  * Defines custom post types for the application
  */
-class PostTypes {
+class PostTypes implements HooksInterface {
     /**
      * Register all custom post types
      * 
      * @return void
      */
-    public function register(): void {
+    public function registerActions(): void {
         add_action('init', [$this, 'registerLowonganPostType']);
     }
-    
+
+    public function registerFilters(): void {
+        // No filters to register in this class
+    }
+
     /**
      * Register the Lowongan post type
      * 

@@ -13,6 +13,30 @@ RUN mkdir -p /etc/apt/apt.conf.d/ && \
     libicu-dev \
     git \
     curl \
+    pkg-config \
+    libmemcached-dev \
+    zlib1g-dev \
+    libzstd-dev \
+    libyaml-dev \
+    libsasl2-dev \
+    libssl-dev \
+    libpng-dev \
+    libjpeg-dev \
+    libfreetype6-dev \
+    libxml2-dev \
+    libgmp-dev \
+    libsodium-dev \
+    libonig-dev \
+    libcurl4-openssl-dev \
+    libxslt1-dev \
+    libwebp-dev \
+    libxpm-dev \
+    libavif-dev \
+    libreadline-dev \
+    libedit-dev \
+    libpq-dev \
+    libmcrypt-dev \
+    libbrotli-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install wp-cli - using the stable download URL
@@ -20,21 +44,17 @@ RUN curl -o wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages
     && chmod +x wp-cli.phar \
     && mv wp-cli.phar /usr/local/bin/wp
 
-# Install Redis extension
-RUN pecl install redis && docker-php-ext-enable redis
-
-# Install Xdebug extension
-RUN pecl install xdebug && docker-php-ext-enable xdebug
-
-# Install Imagick extension
-RUN cd /tmp \
-    && git clone https://github.com/Imagick/imagick.git \
-    && cd imagick \
-    && phpize \
-    && ./configure \
-    && make \
-    && make install \
-    && docker-php-ext-enable imagick
+# Install PECL extensions and enable them
+RUN pecl install redis \
+    xdebug \
+    imagick \
+    apcu \
+    memcached \
+    igbinary \
+    msgpack \
+    yaml \
+    brotli \
+    && docker-php-ext-enable redis xdebug imagick apcu memcached igbinary msgpack yaml brotli
 
 # Install most commonly used PHP extensions for WordPress plugins
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -60,18 +80,35 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev \
     libmemcached-dev \
     libzstd-dev \
+    libyaml-dev \
+    libmcrypt-dev \
     git \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm --with-avif \
     && docker-php-ext-install -j$(nproc) \
+        bcmath \
+        calendar \
         curl \
+        exif \
         gd \
+        gettext \
+        gmp \
+        intl \
         mbstring \
         mysqli \
-        xml \
-        soap \
-        gmp \
+        opcache \
         pcntl \
+        pdo \
+        pdo_mysql \
+        pdo_pgsql \
+        pgsql \
+        soap \
+        sockets \
         sodium \
+        sysvmsg \
+        sysvsem \
+        sysvshm \
+        xml \
+        zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Clean up unnecessary files

@@ -1,22 +1,28 @@
 <?php
 
 namespace AstraChild\Models\Schema;
+use AstraChild\Contracts\HooksInterface;
 
 /**
  * Custom Fields Schema
  * 
  * Provides schema for custom fields
  */
-class CustomFields
+class CustomFields implements HooksInterface
 {
     /**
      * Register custom fields
      * 
      * @return void
      */
-    public function register(): void
+    public function registerActions(): void
     {
         add_filter('rwmb_meta_boxes', [$this, 'lowongan_meta_boxes']);
+    }
+
+    public function registerFilters(): void
+    {
+        // No filters to register in this class
     }
 
     /**

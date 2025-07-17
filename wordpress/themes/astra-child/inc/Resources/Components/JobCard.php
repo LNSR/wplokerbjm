@@ -76,7 +76,7 @@ class JobCard
 			</div>
 			<?php
 			// fallback to custom field if taxonomy is not set
-			// * IMPORTANT : custom field 'nama_perusahaan' is deprecated 
+			// * IMPORTANT : custom field 'nama_perusahaan' is used for non-company
 			$namaPerusahaan = !empty($jobdata['perusahaan_taxo'])
 				? $jobdata['perusahaan_taxo']
 				: ($jobdata['nama_perusahaan'] ?? '');

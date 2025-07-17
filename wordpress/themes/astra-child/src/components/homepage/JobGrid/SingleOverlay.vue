@@ -58,11 +58,11 @@
           </h2>
           <div class="gap-4 mt-4">
             <div class="gap-x-6 gap-y-4 text-lg">
-              <div v-for="row in overlay.summaryRows" :key="row.label"
-                class="flex items-start lg:space-x-2 space-x-1 mb-2">
+              <!-- Ringkasan Pekerjaan (Vue logic version) -->
+              <div v-for="row in overlay.summaryRows" :key="row.label" class="flex items-start lg:space-x-2 space-x-1 mb-2">
                 <i :class="['fas', row.icon, 'text-blue-600', 'w-3', 'text-justify', 'pt-2']"></i>
                 <span class="ml-3 !font-semibold whitespace-nowrap min-w-[120px]">{{ row.label }}</span>
-                <span class="ml-2 !font-semibold">:</span>
+                <span :class="[getLabelClass(row.label), '!font-semibold']">:</span>
                 <span class="!font-semibold" v-html="row.value"></span>
               </div>
             </div>
@@ -214,5 +214,22 @@ const drawerOpenClass = 'transform translate-x-0'
 function onWysiwygImgClick(e: MouseEvent) {
   const target = e.target as HTMLElement
   if (target.tagName === 'IMG' && target.parentElement?.tagName === 'A') { e.preventDefault() }
+}
+
+function getLabelClass(label: string) {
+  switch (label) {
+    case 'Jenis Pekerjaan':
+      return 'lg:ml-3 ml-5'
+    case 'Pendidikan':
+    case 'Pengalaman':
+    case 'Gender':
+    case 'Usia':
+    case 'Deadline':
+    case 'Gaji':
+    case 'Lokasi':
+      return 'ml-5'
+    default:
+      return 'ml-4'
+  }
 }
 </script>

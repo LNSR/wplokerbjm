@@ -1,20 +1,21 @@
 <?php
 
 namespace AstraChild\Models\Schema;
+use AstraChild\Contracts\HooksInterface;
 
 /**
  * Taxonomies Schema
  * 
  * Defines custom taxonomies for job listings
  */
-class Taxonomies
+class Taxonomies implements HooksInterface
 {
     /**
      * Register all taxonomies
      * 
      * @return void
      */
-    public function register(): void
+    public function registerActions(): void
     {
         add_action('init', [$this, 'registerPerusahaanTaxonomy']);
         add_action('init', [$this, 'registerKategoriTaxonomy']);
@@ -22,6 +23,10 @@ class Taxonomies
         add_action('init', [$this, 'registerJenisPekerjaanTaxonomy']);
         add_action('init', [$this, 'registerGenderTaxonomy']);
         add_action('init', [$this, 'registerPendidikanTaxonomy']);
+    }
+    public function registerFilters(): void
+    {
+        // No filters to register in this class
     }
 
     /**
