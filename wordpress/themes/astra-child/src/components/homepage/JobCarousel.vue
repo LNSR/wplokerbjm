@@ -29,7 +29,7 @@ const { loading } = useJobCarousel({
     </div>
   </div>
   <div v-if="loading" class="text-center py-8">Memuat...</div>
-  <div v-else-if="jobs.length" class="swiper job-carousel invisible" id="job-carousel">
+  <div v-else-if="jobs.length" class="swiper job-carousel invisible">
     <div class="swiper-wrapper">
       <!-- Virtual slides will be dynamically created by Swiper -->
     </div>

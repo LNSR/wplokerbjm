@@ -1,6 +1,6 @@
 <?php
 
-namespace AstraChild\Resources\Components;
+namespace AstraChild\Components;
 
 class JobCarousel
 {
@@ -8,7 +8,7 @@ class JobCarousel
      * Render only the root element for Vue to hydrate as a client-side component.
      * No server-side job data or markup is rendered.
      */
-    public static function render(): string
+    public function render(): string
     {
         ob_start();
         ?>

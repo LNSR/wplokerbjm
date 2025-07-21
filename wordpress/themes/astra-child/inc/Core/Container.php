@@ -40,6 +40,7 @@ class Container
                 \AstraChild\Core\Definitions\Models::getDefinitions(),
                 \AstraChild\Core\Definitions\Repositories::getDefinitions(),
                 \AstraChild\Core\Definitions\Factories::getDefinitions(),
+                \AstraChild\Core\Definitions\Components::getDefinitions(),
                 \AstraChild\Core\Definitions\ViewModels::getDefinitions(),
                 \AstraChild\Core\Definitions\Services::getDefinitions(),
                 \AstraChild\Core\Definitions\Controllers::getDefinitions(),

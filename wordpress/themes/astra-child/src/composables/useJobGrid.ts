@@ -1,7 +1,7 @@
 import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { useSearchStore } from "@/stores/search";
 import { useJobOverlayStore } from "@/stores/job-overlay";
-import { getJobSlugFromId } from "@/services/RouterService";
+import { RouterService } from "@/services/RouterService";
 import { useRouter } from "vue-router";
 import { useRouterWatcher } from "@/composables/useRouterWatcher";
 import type { Job, SearchFilters } from "@/types";
@@ -55,7 +55,7 @@ export function useJobGrid(props: {
       (j): j is { id: number; permalink: string } =>
         typeof j.permalink === "string"
     );
-    const slug = getJobSlugFromId(jobsWithPermalink, id);
+    const slug = RouterService.getJobSlugFromId(jobsWithPermalink, id);
     jobOverlay.openOverlay(id, slug ?? undefined);
     scrollBehavior.value = "smooth";
 

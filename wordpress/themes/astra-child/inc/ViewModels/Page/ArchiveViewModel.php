@@ -1,14 +1,19 @@
 <?php
 
 namespace AstraChild\ViewModels\Page;
+use AstraChild\Components\Hero;
+use AstraChild\Components\JobGrid;
 
 class ArchiveViewModel {
 
-	public function __construct() {
+	public function __construct(
+		private Hero $hero,
+		private JobGrid $jobGrid
+	) {
 	}
 
 	public function viewHero() {
-		return \AstraChild\Resources\Components\Hero::render();
+		return $this->hero->render();
 	}
 
 	public function viewSearchResults() {
@@ -25,7 +30,7 @@ class ArchiveViewModel {
 		$total_jobs = $jobs_query->found_posts;
 		wp_reset_postdata();
 
-		return \AstraChild\Resources\Components\JobGrid::render(
+		return $this->jobGrid->render(
 			$query_args,
 			'Hasil Pencarian',
 			'search',

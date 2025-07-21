@@ -1,15 +1,19 @@
 <?php
 
-namespace AstraChild\Resources\Components;
+namespace AstraChild\Components;
 
 use AstraChild\Core\Container;
 use AstraChild\Repositories\TaxonomyRepository;
 
 class Hero {
-    public static function render() {
-        /** @var TaxonomyRepository $repo */
-        $repo = Container::getContainer()->get( TaxonomyRepository::class);
-        $terms = $repo->getTaxonomyTerms();
+
+    public function __construct(
+        private TaxonomyRepository $taxonomyRepository
+    ) {
+    }
+
+    public function render() {
+        $terms = $this->taxonomyRepository->getTaxonomyTerms();
 
         $current_search = isset($_GET['cari']) ? sanitize_text_field($_GET['cari']) : '';
         $current_lokasi = isset($_GET['lokasi']) ? sanitize_text_field($_GET['lokasi']) : '';

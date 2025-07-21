@@ -1,6 +1,6 @@
 <?php
 
-namespace AstraChild\Resources\Components\Partial;
+namespace AstraChild\Components\Partial;
 
 use AstraChild\Services\Job\FormatterServices;
 

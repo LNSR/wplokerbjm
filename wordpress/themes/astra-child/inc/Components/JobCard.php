@@ -1,25 +1,28 @@
 <?php
 
-namespace AstraChild\Resources\Components;
+namespace AstraChild\Components;
 
 use AstraChild\Core\Container;
 use AstraChild\Repositories\JobRepository;
-use AstraChild\Resources\Components\Partial\JobSummaryRows;
+use AstraChild\Components\Partial\JobSummaryRows;
 use AstraChild\Services\Job\FormatterServices;
 
 class JobCard
 {
+
+	public function __construct(
+		private JobRepository $jobRepository,
+	) {
+	}
 
 	/**
 	 * Render a job card.
 	 * @param int $post_id
 	 * @param string $variant
 	 */
-	public static function render(int $post_id, string $variant = ''): string
+	public function render(int $post_id, string $variant = ''): string
 	{
-		/** @var JobRepository */
-		$jobRepository = Container::getContainer()->get(JobRepository::class);
-		$jobdata = $jobRepository->getJobData($post_id);
+		$jobdata = $this->jobRepository->getJobData($post_id);
 		$permalink = esc_url(get_permalink($post_id));
 
 		ob_start();

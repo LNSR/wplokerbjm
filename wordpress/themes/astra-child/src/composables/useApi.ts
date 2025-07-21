@@ -1,5 +1,5 @@
 import { ref } from 'vue'
-import { JobService } from '@/services/JobService'
+import { JobService } from '@/services/ApiService'
 import type { SearchFilters, LoadMoreFilters, SearchResponse, AutoSuggestResponse, LoadMoreResponse } from '@/types'
 import type { SingleOverlayResponse } from '@/types'
 

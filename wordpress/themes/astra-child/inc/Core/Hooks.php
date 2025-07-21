@@ -101,6 +101,11 @@ class Hooks implements HooksInterface
                     let theme = localStorage.getItem('astra-theme');
                     if (theme === 'dark' || theme === 'light') {
                         document.documentElement.setAttribute('data-theme', theme);
+                        if (theme === 'dark') {
+                            document.documentElement.classList.add('astra-dark-mode-enable');
+                        } else {
+                            document.documentElement.classList.remove('astra-dark-mode-enable');
+                        }
                     }
                 } catch (e) { }
             })();

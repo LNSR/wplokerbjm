@@ -1,7 +1,7 @@
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useJobOverlayStore } from '@/stores/job-overlay'
-import { getJobSlugFromRoute } from '@/services/RouterService'
+import { RouterService } from '@/services/RouterService'
 import type { Job } from '@/types'
 
 /**
@@ -16,7 +16,7 @@ export function useRouterWatcher(jobsRef: { value: Job[] }) {
     () => router.currentRoute.value.fullPath,
     (newPath) => {
       if (newPath.startsWith('/lowongan/')) {
-        const slug = getJobSlugFromRoute(newPath)
+        const slug = RouterService.getJobSlugFromRoute(newPath)
         if (slug) {
           const job = jobsRef.value.find(
             (j) => j.permalink && j.permalink.includes(`/lowongan/${slug}`)

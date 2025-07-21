@@ -65,14 +65,18 @@ let currentTheme = ''
 
 function setTheme(dark: boolean) {
   const newTheme = dark ? 'dark' : 'light'
-  if (currentTheme === newTheme) return // Avoid redundant updates
+  if (currentTheme === newTheme) return
   currentTheme = newTheme
   document.documentElement.classList.add('theme-switching')
   document.documentElement.setAttribute('data-theme', newTheme)
+  if (dark) {
+    document.documentElement.classList.add('astra-dark-mode-enable')
+  } else {
+    document.documentElement.classList.remove('astra-dark-mode-enable')
+  }
   try {
     localStorage.setItem('astra-theme', newTheme)
   } catch (e) {
-    // Ignore quota errors
   }
   setTimeout(() => {
     document.documentElement.classList.remove('theme-switching')

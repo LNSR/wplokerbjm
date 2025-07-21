@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
-import { TaxonomyService } from '@/services/TaxonomyService'
+import { TaxonomyService } from '@/services/ApiService'
 import type { TaxonomyTerm } from '@/types/api'
 
 export const useTaxonomyStore = defineStore('taxonomy', () => {

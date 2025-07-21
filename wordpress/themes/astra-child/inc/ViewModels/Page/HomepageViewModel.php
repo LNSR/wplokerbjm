@@ -1,25 +1,34 @@
 <?php
 
 namespace AstraChild\ViewModels\Page;
+use AstraChild\Components\Hero;
+use AstraChild\Components\JobGrid;
+use AstraChild\Components\JobCarousel;
+use AstraChild\Services\Job\JobServices;
 
 use AstraChild\QueryBuilders\JobQuery;
 
 class HomepageViewModel
 {
 
-	public function __construct()
+	public function __construct(
+		private Hero $hero,
+		private JobGrid $jobGrid,
+		private JobCarousel $jobCarousel,
+		private JobServices $jobServices,
+	)
 	{
 
 	}
 
 	public function viewHero()
 	{
-		return \AstraChild\Resources\Components\Hero::render();
+		return $this->hero->render();
 	}
 
 	public function viewCarousel()
 	{
-		return \AstraChild\Resources\Components\JobCarousel::render();
+		return $this->jobCarousel->render();
 	}
 
 	public function viewCategoryGrid()
@@ -72,7 +81,7 @@ class HomepageViewModel
 
 	public function viewFeaturedJobs()
 	{
-		return \AstraChild\Resources\Components\JobGrid::render(
+		return $this->jobGrid->render(
 			JobQuery::latestJobsArgs(1, 12),
 			'Lowongan Terbaru',
 			'latest'

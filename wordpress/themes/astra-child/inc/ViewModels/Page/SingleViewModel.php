@@ -11,8 +11,8 @@ use AstraChild\Factories\JobDataFactory;
 use AstraChild\Services\CustomField\SocialMediaService;
 use AstraChild\Services\Job\FormatterServices;
 use AstraChild\Services\Job\JobServices;
-use AstraChild\Resources\Components\Partial\JobSummaryRows;
-use AstraChild\Resources\Components\Partial\JobsContactsRows;
+use AstraChild\Components\Partial\JobSummaryRows;
+use AstraChild\Components\Partial\JobsContactsRows;
 
 class SingleViewModel
 {

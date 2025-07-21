@@ -8,7 +8,19 @@
 		}
 	],
 	"settings": {
-		"php.version": "8.4.8",
-		"typescript.tsdk": "astra-child/node_modules/typescript/lib"
+		"php.version": "8.4",
+		"typescript.tsdk": "astra-child/node_modules/typescript/lib",
+		"php.stubs": [
+			"apcu",
+			"composer",
+			"gnupg",
+			"imagick",
+			"opcache",
+			"pcntl",
+			"redis",
+			"wordpress",
+			"xdebug",
+			"*"
+		]
 	}
 }

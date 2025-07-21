@@ -3,7 +3,6 @@
 namespace AstraChild\Controllers\REST;
 
 use AstraChild\QueryBuilders\JobQuery;
-use AstraChild\Resources\Components\JobCard;
 use AstraChild\Services\Utilities\Utilities;
 use AstraChild\Services\REST\RESTData;
 

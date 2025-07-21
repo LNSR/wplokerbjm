@@ -3,8 +3,8 @@
 namespace AstraChild\Services\REST;
 use AstraChild\Repositories\JobRepository;
 use AstraChild\Services\Job\FormatterServices;
-use AstraChild\Resources\Components\Partial\JobSummaryRows;
-use AstraChild\Resources\Components\Partial\JobsContactsRows;
+use AstraChild\Components\Partial\JobSummaryRows;
+use AstraChild\Components\Partial\JobsContactsRows;
 use AstraChild\Factories\JobDataFactory;
 
 class RESTData
@@ -26,8 +26,8 @@ class RESTData
                 : (isset($jobdata['nama_perusahaan']) ? html_entity_decode($jobdata['nama_perusahaan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),
             'time_ago' => FormatterServices::formatTimeAgo(get_post_time('U', false, $post_id)),
             'summary_rows' => JobSummaryRows::getSummaryRows($jobdata),
-            'statusjob' => \AstraChild\Resources\Components\JobCard::render_statusjob($jobdata),
-            'deadline' => \AstraChild\Resources\Components\JobCard::render_deadline($jobdata),
+            'statusjob' => \AstraChild\Components\JobCard::render_statusjob($jobdata),
+            'deadline' => \AstraChild\Components\JobCard::render_deadline($jobdata),
             'permalink' => esc_url(get_permalink($post_id)),
             'post_time' => get_post_time('c', false, $post_id),
         ];

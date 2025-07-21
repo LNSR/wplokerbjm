@@ -1,30 +1,36 @@
 <?php
 
-namespace AstraChild\Resources\Components;
-use AstraChild\Resources\Components\JobCard;
+namespace AstraChild\Components;
+use AstraChild\Components\JobCard;
 use AstraChild\Services\Job\JobServices;
+use AstraChild\Services\REST\RESTData;
 
 class JobGrid
 {
-    public static function render(array $query_args, string $title, string $context = 'latest', int $total_jobs = 0): string
+
+    public function __construct(
+        private JobCard $jobCard,
+        private JobServices $jobServices,
+        private RESTData $restData,
+    ) {
+    }
+
+    public function render(array $query_args, string $title, string $context = 'latest', int $total_jobs = 0): string
     {
         $jobs_query = new \WP_Query($query_args);
         ob_start();
         $jobs = [];
         $cards = [];
 
-        // Get JobServices instance
-        $jobServices = \AstraChild\Core\Container::getContainer()->get(JobServices::class);
-        $jobCard = \AstraChild\Core\Container::getContainer()->get(\AstraChild\Services\REST\RESTData::class);
 
         if ($jobs_query->have_posts()) {
             while ($jobs_query->have_posts()) {
                 $jobs_query->the_post();
                 $post_id = get_the_ID();
-                $jobs[] = $jobCard->getCardData($post_id);
+                $jobs[] = $this->restData->getCardData($post_id);
                 $cards[] = [
-                    'card' => JobCard::render($post_id, 'featured'),
-                    'schema' => $jobServices->renderJobPostingJsonLd($post_id),
+                    'card' => $this->jobCard->render($post_id, 'featured'),
+                    'schema' => $this->jobServices->renderJobPostingJsonLd($post_id),
                 ];
             }
             wp_reset_postdata();
@@ -42,7 +48,6 @@ class JobGrid
         ?>
         <section class="mt-8">
                 <?php
-                // Render all schemas before the Vue island
                 foreach ($cards as $item) {
                     echo $item['schema'];
                 }
@@ -72,7 +77,7 @@ class JobGrid
     {
         return [
             'jobs' => $jobs,
-            'maxNumPages' => (int) ($jobs_query->max_num_pages),
+            'maxNumPages' => (int) $jobs_query->max_num_pages,
             'context' => $context,
             'filters' => [
                 'cari' => $_GET['cari'] ?? '',

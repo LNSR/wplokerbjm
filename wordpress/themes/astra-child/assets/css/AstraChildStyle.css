@@ -26,7 +26,7 @@ html.theme-switching, body.theme-switching {
   --ast-global-color-8: #222222;
 
   /* Astra Customizer Colors */
-  --ast-customizer-color-1: #0284c7;
+  /* --ast-customizer-color-1: #0284c7;
   --ast-customizer-color-2: #0ea5e9;
   --ast-customizer-color-3: #2271b1;
   --ast-customizer-color-4: #1e293b;
@@ -39,8 +39,8 @@ html.theme-switching, body.theme-switching {
   --ast-customizer-color-11: #f5f5f5;
   --ast-customizer-color-12: #1e293b;
   --ast-customizer-color-13: #f3f4f6;
-  --ast-customizer-color-14: #cc1818;
-  --icon-color: #000000; /* Sun: */
+  --ast-customizer-color-14: #cc1818; */
+  --icon-color: var(--ast-global-color-0); /* Sun: */
 }
 
 [data-theme="light"] {
@@ -56,7 +56,7 @@ html.theme-switching, body.theme-switching {
   --ast-global-color-8: #222222;
 
   /* Astra Customizer Colors (Light) */
-  --ast-customizer-color-1: #0284c7;
+  /* --ast-customizer-color-1: #0284c7;
   --ast-customizer-color-2: #0ea5e9;
   --ast-customizer-color-3: #2271b1;
   --ast-customizer-color-4: #1e293b;
@@ -69,8 +69,8 @@ html.theme-switching, body.theme-switching {
   --ast-customizer-color-11: #f5f5f5;
   --ast-customizer-color-12: #1e293b;
   --ast-customizer-color-13: #f3f4f6;
-  --ast-customizer-color-14: #cc1818;
-  --icon-color: #000000; /* Sun: */
+  --ast-customizer-color-14: #cc1818; */
+  --icon-color: var(--ast-global-color-0); /* Sun: */
 }
 
 [data-theme="dark"] {
@@ -86,7 +86,7 @@ html.theme-switching, body.theme-switching {
   --ast-global-color-8: #222222;
 
   /* Astra Customizer Colors (Dark) */
-  --ast-customizer-color-1: #0284c7;
+  /* --ast-customizer-color-1: #0284c7;
   --ast-customizer-color-2: #0ea5e9;
   --ast-customizer-color-3: #2271b1;
   --ast-customizer-color-4: #1e293b;
@@ -99,7 +99,7 @@ html.theme-switching, body.theme-switching {
   --ast-customizer-color-11: #f5f5f5;
   --ast-customizer-color-12: #1e293b;
   --ast-customizer-color-13: #f3f4f6;
-  --ast-customizer-color-14: #cc1818;
+  --ast-customizer-color-14: #cc1818; */
   --icon-color: #f1f5f9; /* Moon: */
 }
 
