@@ -2,7 +2,6 @@
 
 namespace AstraChild\Repositories;
 
-use AstraChild\Factories\JobDataFactory;
 
 /**
  * Job Repository
@@ -12,7 +11,7 @@ use AstraChild\Factories\JobDataFactory;
 class JobRepository
 {
     public function __construct(
-        private JobDataFactory $jobDataFactory,
+        private \AstraChild\Factories\JobDataFactory $jobDataFactory,
     ) {}
 
     /**

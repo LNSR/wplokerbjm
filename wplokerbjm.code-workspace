@@ -4,6 +4,9 @@
 			"path": "."
 		},
 		{
+			"path": "wordpress/themes/astra"
+		},
+		{
 			"path": "wordpress/themes/astra-child"
 		}
 	],

@@ -1,2 +1,2 @@
-export { useSearchStore } from './search'
-export { useTaxonomyStore } from './taxonomy'
+export { useSearchStore } from './Search'
+export { useTaxonomyStore } from './Taxonomy'

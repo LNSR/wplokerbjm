@@ -12,7 +12,7 @@ class ArchiveView
 	public function render(): void
 	{
 ?>
-		<main class="container mx-auto">
+		<main class="container mx-auto max-w-[95vmax] lg:max-w-[90vmax] px-4 py-8">
 			<?= $this->archiveViewModel->viewHero(); ?>
 			<?= $this->archiveViewModel->viewSearchResults(); ?>
 

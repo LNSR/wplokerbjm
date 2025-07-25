@@ -1,17 +1,15 @@
 <template>
-  <div
-    class="fixed z-50 right-3 top-2 lg:!top-8 transition-opacity duration-500"
-    :style="{ opacity: visible ? '1' : '0' }"
-    @mouseenter="showButton"
-    @focusin="showButton"
-    @mouseleave="hideSoon"
-    @focusout="hideSoon"
-  >
-    <div class="backdrop-blur-md bg-white/60 dark:bg-slate-800/60 rounded-full shadow-lg p-2">
-      <label class="flex cursor-pointer gap-2 items-center" title="Ganti tema">
-        <!-- Sun icon (always visible, dim if dark) -->
+  <div class="!backdrop-blur-lg rounded-full shadow-lg p-2">
+    <label class="flex cursor-pointer gap-2 items-center">
+      <span class="relative w-12 h-6 flex items-center">
+        <span class="absolute inset-0 rounded-full bg-gray-200 dark:bg-slate-700 transition"></span>
+        <span
+          class="absolute top-0 left-0 w-6 h-6 rounded-full bg-white dark:bg-slate-800 shadow transition-transform"
+          :style="{ transform: isDark ? 'translateX(100%)' : 'translateX(0)' }"
+        ></span>
+        <!-- Sun icon -->
         <svg
-          class="w-6 h-6 transition-all"
+          class="absolute left-1 top-1 w-4 h-4 transition-all z-10"
           :class="isDark ? 'opacity-40 grayscale' : 'opacity-100'"
           style="color: var(--icon-color);"
           xmlns="http://www.w3.org/2000/svg"
@@ -29,16 +27,9 @@
             <path d="m19.07 4.93-1.41 1.41"></path>
           </g>
         </svg>
-        <input
-          type="checkbox"
-          value="dark"
-          class="toggle theme-controller focus:ring-2 focus:ring-blue-400"
-          aria-label="Theme Switch"
-          v-model="isDark"
-        />
-        <!-- Moon icon (always visible, dim if light) -->
+        <!-- Moon icon -->
         <svg
-          class="w-6 h-6 transition-all"
+          class="absolute right-1 top-1 w-4 h-4 transition-all z-10"
           :class="!isDark ? 'opacity-40 grayscale' : 'opacity-100'"
           style="color: var(--icon-color);"
           xmlns="http://www.w3.org/2000/svg"
@@ -48,18 +39,23 @@
             <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
           </g>
         </svg>
-      </label>
-    </div>
+        <input
+          type="checkbox"
+          value="dark"
+          class="toggle theme-controller focus:ring-2 focus:ring-blue-400 absolute w-12 h-6 opacity-0 cursor-pointer"
+          aria-label="Theme Switch"
+          v-model="isDark"
+        />
+      </span>
+    </label>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted, onBeforeUnmount } from 'vue'
+import { ref, watch, onMounted } from 'vue'
 import { debounce } from '@/utils/debounce'
 
 const isDark = ref(false)
-const visible = ref(false)
-let hideTimeout: ReturnType<typeof setTimeout> | null = null
 let mediaQuery: MediaQueryList
 let currentTheme = ''
 
@@ -67,43 +63,24 @@ function setTheme(dark: boolean) {
   const newTheme = dark ? 'dark' : 'light'
   if (currentTheme === newTheme) return
   currentTheme = newTheme
-  document.documentElement.classList.add('theme-switching')
-  document.documentElement.setAttribute('data-theme', newTheme)
-  if (dark) {
-    document.documentElement.classList.add('astra-dark-mode-enable')
-  } else {
-    document.documentElement.classList.remove('astra-dark-mode-enable')
-  }
-  try {
-    localStorage.setItem('astra-theme', newTheme)
-  } catch (e) {
-  }
-  setTimeout(() => {
-    document.documentElement.classList.remove('theme-switching')
-  }, 30)
-}
 
-// Use requestAnimationFrame to batch DOM update
-function showButtonRaf() {
   window.requestAnimationFrame(() => {
-    visible.value = true
-    if (hideTimeout) clearTimeout(hideTimeout)
+    document.documentElement.classList.add('theme-switching')
+    document.documentElement.setAttribute('data-theme', newTheme)
+    if (dark) {
+      document.documentElement.classList.add('astra-dark-mode-enable')
+    } else {
+      document.documentElement.classList.remove('astra-dark-mode-enable')
+    }
+    try {
+      localStorage.setItem('astra-theme', newTheme)
+    } catch (e) {
+      console.error('Error saving theme to localStorage:', e)
+    }
+    setTimeout(() => {
+      document.documentElement.classList.remove('theme-switching')
+    }, 30)
   })
-}
-
-// Debounce the showButton handler
-const debouncedShowButton = debounce(showButtonRaf, 60)
-
-// Expose showButton for template events
-function showButton() {
-  debouncedShowButton()
-}
-
-function hideSoon() {
-  if (hideTimeout) clearTimeout(hideTimeout)
-  hideTimeout = setTimeout(() => {
-    visible.value = false
-  }, 2000)
 }
 
 function handleSystemThemeChange(e: MediaQueryListEvent) {
@@ -117,7 +94,9 @@ onMounted(() => {
   let saved = ''
   try {
     saved = localStorage.getItem('astra-theme') || ''
-  } catch (e) {}
+  } catch (e) {
+    console.error('Error reading localStorage:', e)
+  }
 
   if (saved === 'dark' || (!saved && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
     isDark.value = true
@@ -127,26 +106,13 @@ onMounted(() => {
     setTheme(false)
   }
 
-  // Use debounced handler for input events
-  window.addEventListener('mousemove', debouncedShowButton, { passive: true })
-  window.addEventListener('scroll', debouncedShowButton, { passive: true })
-  showButtonRaf()
-  hideSoon()
-
   mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-  mediaQuery.addEventListener('change', handleSystemThemeChange)
+  mediaQuery.addEventListener('change', handleSystemThemeChange, { passive: true })
 })
 
-onBeforeUnmount(() => {
-  window.removeEventListener('mousemove', debouncedShowButton)
-  window.removeEventListener('scroll', debouncedShowButton)
-  if (hideTimeout) clearTimeout(hideTimeout)
-  if (mediaQuery) {
-    mediaQuery.removeEventListener('change', handleSystemThemeChange)
-  }
-})
+const debouncedSetTheme = debounce(setTheme, 10)
 
 watch(isDark, (val) => {
-  setTheme(val)
+  debouncedSetTheme(val)
 })
 </script>

@@ -2,42 +2,39 @@
 
 namespace AstraChild\Views\Page;
 
-use AstraChild\ViewModels\Page\SingleViewModel;
-
 class SingleView
 {
 	public function __construct(
-		private SingleViewModel $singleViewModel
-	) {}
+		private \AstraChild\Repositories\JobRepository $jobRepository,
+		private \AstraChild\Factories\JobDataFactory $jobDataFactory,
+		private \AstraChild\Services\Job\JobServices $jobServices
+	) {
+	}
 
 	public function render(int $post_id): void
 	{
-		$this->singleViewModel->setJobDataInfo($post_id);
+		$jobdata = $this->jobRepository->getJobData($post_id);
 
-?>
-		<main class="container mx-auto space-y-8 mt-12">
-			<?= $this->singleViewModel->viewJobPostingJsonLd($post_id); ?>
-			<article>
-				<section class="top-0 backdrop-blur text-center">
-					<h1 class="text-3xl !font-bold"><?= the_title(); ?></h1>
-				</section>
-
-				<div class="divider"></div>
-
-				<?= $this->singleViewModel->viewFloatingAstraColorSwitchButton(); ?>
-				<?= $this->singleViewModel->viewFloatingActionButton(); ?>
-
-				<?= $this->singleViewModel->viewNamaPerusahaan(); ?>
-				<?= $this->singleViewModel->viewTentangPerusahaan(); ?>
-				<?= $this->singleViewModel->viewRingkasanPekerja(); ?>
-				<?= $this->singleViewModel->viewDeskripsiPekerjaan(); ?>
-				<?= $this->singleViewModel->viewPersyaratan(); ?>
-				<?= $this->singleViewModel->viewCaraMelamar(); ?>
-				<?= $this->singleViewModel->viewBenefit(); ?>
-				<?= $this->singleViewModel->viewContact(); ?>
-				<?= $this->singleViewModel->viewSosmed(); ?>
-			</article>
-		</main>
-<?php
+		$props = [
+			'job' => [
+				'title' => get_the_title($post_id),
+				'namaPerusahaan' => !empty($jobdata['perusahaan_taxo']) ? $jobdata['perusahaan_taxo'] : ($jobdata['nama_perusahaan']),
+				'tentangPerusahaan' => $jobdata['tentang_perusahaan'] ?? '',
+				'ringkasanPekerjaan' => \AstraChild\Components\Partial\JobSummaryRows::getSummaryRows($jobdata) ,
+				'deskripsiPekerjaan' => $jobdata['deskripsi_pekerjaan'] ?? '',
+				'persyaratan' => $jobdata['persyaratan'] ?? '',
+				'caraMelamar' => $jobdata['cara_melamar'] ?? '',
+				'benefit' => $jobdata['benefit'] ?? '',
+				'contacts' => \AstraChild\Components\Partial\JobsContactsRows::getJobContactsRows($jobdata),
+				'social_media' => $this->jobDataFactory->createSocialMediaItems($jobdata['social_media'] ?? []),
+				'post_time' => get_post_time('c', false, $post_id),
+			]
+		];
+		?>
+		<?= $this->jobServices->renderJobPostingJsonLd($post_id); ?>
+		<div id="single-lowongan"
+			data-props='<?= esc_attr(json_encode($props, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)) ?>'>
+		</div>
+		<?php
 	}
 }

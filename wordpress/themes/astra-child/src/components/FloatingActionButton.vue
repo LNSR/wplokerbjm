@@ -139,8 +139,8 @@ const socialLinks = [
 
 function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
+  show.value = false // hide button instantly after scroll
 }
-
 
 function toggleDropdown() {
   dropdownOpen.value = !dropdownOpen.value
@@ -175,13 +175,20 @@ function observeJobGrid() {
   jobGridObserver.observe(jobGrid)
 }
 
+function handleScroll() {
+  show.value = window.scrollY > 0
+}
+
 onMounted(() => {
   document.addEventListener('mousedown', handleClickOutside)
   observeJobGrid()
+  window.addEventListener('scroll', handleScroll)
+  handleScroll() // initialize state
 })
 
 onBeforeUnmount(() => {
   document.removeEventListener('mousedown', handleClickOutside)
   if (jobGridObserver) jobGridObserver.disconnect()
+  window.removeEventListener('scroll', handleScroll)
 })
 </script>

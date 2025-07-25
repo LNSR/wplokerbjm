@@ -1,6 +1,6 @@
 import { watch } from 'vue'
 import { useRouter } from 'vue-router'
-import { useJobOverlayStore } from '@/stores/job-overlay'
+import { useJobOverlayStore } from '@/stores/JobOverlay'
 import { RouterService } from '@/services/RouterService'
 import type { Job } from '@/types'
 

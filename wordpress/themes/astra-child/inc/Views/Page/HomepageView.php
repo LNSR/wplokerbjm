@@ -2,7 +2,7 @@
 
 namespace AstraChild\Views\Page;
 
-use AstraChild\ViewModels\page\HomepageViewModel;
+use AstraChild\ViewModels\Page\HomepageViewModel;
 
 class HomepageView
 {
@@ -14,13 +14,12 @@ class HomepageView
     {
 
 ?>
-        <main class="container mx-auto px-4 py-8">
+        <main class="container mx-auto max-w-[95vmax] lg:max-w-[90vmax] px-4 py-8">
             <?= $this->homepageViewModel->viewHero(); ?>
             <?= $this->homepageViewModel->viewCarousel(); ?>
             <?= $this->homepageViewModel->viewFeaturedJobs(); ?>
 
             <?= $this->homepageViewModel->viewFloatingActionButton(); ?>
-            <?= $this->homepageViewModel->viewFloatingAstraColorSwitchButton(); ?>
         </main>
 <?php
     }

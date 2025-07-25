@@ -3,24 +3,18 @@
 namespace AstraChild\Services\REST;
 
 use AstraChild\Contracts\HooksInterface;
-use AstraChild\Controllers\REST\AutoSuggestionSearch;
-use AstraChild\Controllers\REST\Carousel;
-use AstraChild\Controllers\REST\DynamicSearch;
-use AstraChild\Controllers\REST\LoadMore;
-use AstraChild\Controllers\REST\TaxonomyDepth;
-use AstraChild\Controllers\REST\SingleOverlay;
 
 
 class RESTRoute implements HooksInterface
 {
  
     public function __construct(
-        private TaxonomyDepth $taxonomyDepth,
-        private AutoSuggestionSearch $autoSuggestionSearch,
-        private LoadMore $loadMore,
-        private DynamicSearch $dynamicSearch,
-        private Carousel $carousel,
-        private SingleOverlay $singleOverlay
+        private \AstraChild\Controllers\REST\TaxonomyDepth $taxonomyDepth,
+        private \AstraChild\Controllers\REST\AutoSuggestionSearch $autoSuggestionSearch,
+        private \AstraChild\Controllers\REST\LoadMore $loadMore,
+        private \AstraChild\Controllers\REST\DynamicSearch $dynamicSearch,
+        private \AstraChild\Controllers\REST\Carousel $carousel,
+        private \AstraChild\Controllers\REST\SingleOverlay $singleOverlay
     )
     {
     }

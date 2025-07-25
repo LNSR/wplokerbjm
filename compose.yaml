@@ -196,17 +196,17 @@ services:
       - "6379:6379"
     volumes:
       - redis_data:/data
-  # ngrok:
-  #   image: ngrok/ngrok:latest
-  #   container_name: ngrok
-  #   restart: unless-stopped
-  #   command: http wordpress:80
-  #   environment:
-  #     - NGROK_AUTHTOKEN=${NGROK_AUTH_TOKEN}
-  #   ports:
-  #     - "4040:4040"
-  #   depends_on:
-  #     - wordpress
+# ngrok:
+#   image: ngrok/ngrok:latest
+#   container_name: ngrok
+#   restart: unless-stopped
+#   command: http wordpress:80
+#   environment:
+#     - NGROK_AUTHTOKEN=${NGROK_AUTH_TOKEN}
+#   ports:
+#     - "4040:4040"
+#   depends_on:
+#     - wordpress
 
 volumes:
   wordpress:

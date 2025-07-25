@@ -92,9 +92,4 @@ class HomepageViewModel
 	{
 		return '<div id="floating-action-button"></div>';
 	}
-
-	public function viewFloatingAstraColorSwitchButton(): string
-	{
-		return '<div id="color-switch-button"></div>';
-	}
 }

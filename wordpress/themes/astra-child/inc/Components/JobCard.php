@@ -73,7 +73,7 @@ class JobCard
 				<h3 class="card-title text-lg md:text-xl !font-bold group-hover:text-blue-700 transition-colors">
 					<?= esc_html(get_the_title($post_id)); ?>
 				</h3>
-				<time class="text-lg font-semibold text-center gap-2" datetime="<?= esc_attr(get_post_time('c', false, $post_id)); ?>">
+				<time class="text-lg !font-semibold text-center gap-2" datetime="<?= esc_attr(get_post_time('c', false, $post_id)); ?>">
 					<?= esc_html(FormatterServices::formatTimeAgo(get_post_time('U', false, $post_id))); ?>
 				</time>
 			</div>
@@ -89,7 +89,7 @@ class JobCard
 			<?php endif; ?>
 			<?php if (!empty($namaPerusahaan)): ?>
 				<h4 class="!font-bold flex items-center gap-2 !mb-6">
-					<i class="fas fa-user-tie text-[var(--ast-global-color-1)]"></i>
+					<i class="fas fa-user-tie !text-[var(--ast-global-color-1)]"></i>
 					<?= esc_html($namaPerusahaan); ?>
 				</h4>
 				<div class="divider !-mt-4"></div>

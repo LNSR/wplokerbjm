@@ -1,4 +1,5 @@
 @import "tailwindcss";
+@import "../../style.css";
 @import "./AstraChildStyle.css";
 @import "@fortawesome/fontawesome-free/css/fontawesome.css";
 @import "@fortawesome/fontawesome-free/css/solid.css";
@@ -6,7 +7,7 @@
 /* Add only the icon sets you actually want to use:
 @import "@fortawesome/fontawesome-free/css/regular.css";
 */
-@source "../../inc/**/*.php";
+@source "../../**/*.php";
 @source not "../../vendor/**";
 
 @plugin "daisyui";

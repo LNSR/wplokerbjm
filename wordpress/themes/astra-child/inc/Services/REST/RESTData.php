@@ -1,17 +1,16 @@
 <?php
 
 namespace AstraChild\Services\REST;
-use AstraChild\Repositories\JobRepository;
 use AstraChild\Services\Job\FormatterServices;
 use AstraChild\Components\Partial\JobSummaryRows;
 use AstraChild\Components\Partial\JobsContactsRows;
-use AstraChild\Factories\JobDataFactory;
+use AstraChild\Components\JobCard;
 
 class RESTData
 {
     public function __construct(
-        public JobRepository $jobRepository,
-        public JobDataFactory $jobDataFactory
+        public \AstraChild\Repositories\JobRepository $jobRepository,
+        public \AstraChild\Factories\JobDataFactory $jobDataFactory
     ) {}
 
     public function getCardData(int $post_id): array
@@ -26,8 +25,8 @@ class RESTData
                 : (isset($jobdata['nama_perusahaan']) ? html_entity_decode($jobdata['nama_perusahaan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),
             'time_ago' => FormatterServices::formatTimeAgo(get_post_time('U', false, $post_id)),
             'summary_rows' => JobSummaryRows::getSummaryRows($jobdata),
-            'statusjob' => \AstraChild\Components\JobCard::render_statusjob($jobdata),
-            'deadline' => \AstraChild\Components\JobCard::render_deadline($jobdata),
+            'statusjob' => JobCard::render_statusjob($jobdata),
+            'deadline' => JobCard::render_deadline($jobdata),
             'permalink' => esc_url(get_permalink($post_id)),
             'post_time' => get_post_time('c', false, $post_id),
         ];
@@ -75,21 +74,13 @@ class RESTData
             'persyaratan' => isset($jobdata['persyaratan']) ? html_entity_decode($jobdata['persyaratan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '',
             'caraMelamar' => isset($jobdata['cara_melamar']) ? html_entity_decode($jobdata['cara_melamar'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '',
             'benefit' => isset($jobdata['benefit']) ? html_entity_decode($jobdata['benefit'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '',
-            'contact' => [
-                'email' => $jobdata['email_kontak'] ?? [],
-                'phone' => array_map(
-                    fn($n) => FormatterServices::formatPhoneNumber($n),
-                    $jobdata['nomor_kontak'] ?? []
-                ),
-                'website' => $jobdata['situs_kontak'] ?? [],
-            ],
             'salaryFormatted' => $formattedSalary,
             'ageFormatted' => $formattedAge,
             'social_media' => $formattedSosmed,
-            'summaryRows' => $summaryRows,
-            'contactRows' => $contactRows,
-            'sosmedRows' => $sosmedRows,
+            'ringkasanPekerjaan' => $summaryRows,
+            'contacts' => $contactRows,
             'permalink' => esc_url(get_permalink($post_id)),
+            'post_time' => get_post_time('c', false, $post_id),
         ];
     }
 }

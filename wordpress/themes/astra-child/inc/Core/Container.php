@@ -34,17 +34,11 @@ class Container
                     $builder->enableDefinitionCache();
                 }
             }
+            $builder->useAutowiring(true);
 
             $builder->addDefinitions(array_merge(
                 \AstraChild\Core\Definitions\Core::getDefinitions(),
-                \AstraChild\Core\Definitions\Models::getDefinitions(),
-                \AstraChild\Core\Definitions\Repositories::getDefinitions(),
                 \AstraChild\Core\Definitions\Factories::getDefinitions(),
-                \AstraChild\Core\Definitions\Components::getDefinitions(),
-                \AstraChild\Core\Definitions\ViewModels::getDefinitions(),
-                \AstraChild\Core\Definitions\Services::getDefinitions(),
-                \AstraChild\Core\Definitions\Controllers::getDefinitions(),
-                \AstraChild\Core\Definitions\Views::getDefinitions(),
             ));
 
             self::$container = $builder->build();

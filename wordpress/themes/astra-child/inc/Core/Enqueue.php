@@ -69,7 +69,7 @@ class Enqueue implements HooksInterface
             'vue-' . md5($entry),
             $dist_uri . '/' . $main_js,
             [],
-            filemtime($dist_dir . '/' . $main_js)
+            filemtime($dist_dir . '/' . $main_js),
         );
 
         foreach ($main_css as $css_file) {

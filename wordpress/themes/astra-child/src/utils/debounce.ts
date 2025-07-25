@@ -1,4 +1,4 @@
-import lodashDebounce from 'lodash/debounce'
+import lodashDebounce from 'lodash-es/debounce'
 
 /**
  * Custom debounce wrapper for lodash.debounce.

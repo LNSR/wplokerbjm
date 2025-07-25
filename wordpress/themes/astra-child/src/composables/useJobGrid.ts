@@ -1,15 +1,15 @@
 import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
-import { useSearchStore } from "@/stores/search";
-import { useJobOverlayStore } from "@/stores/job-overlay";
+import { useSearchStore } from "@/stores/Search";
+import { useJobOverlayStore } from "@/stores/JobOverlay";
 import { RouterService } from "@/services/RouterService";
 import { useRouter } from "vue-router";
 import { useRouterWatcher } from "@/composables/useRouterWatcher";
-import type { Job, SearchFilters } from "@/types";
+import type { Job, SearchFilters, SearchContext } from "@/types";
 
 export function useJobGrid(props: {
   jobs?: Job[];
   maxNumPages?: number;
-  context?: "search" | "archive";
+  context?: SearchContext;
   filters?: Partial<SearchFilters>;
   title?: string;
   totalJobs?: number;
@@ -37,6 +37,7 @@ export function useJobGrid(props: {
 
   useRouterWatcher(jobs);
 
+  // Initialize the IntersectionObserver to load more jobs when the sentinel is in view
   function createObserver() {
     if (observer) observer.disconnect();
     observer = new window.IntersectionObserver(
@@ -100,15 +101,22 @@ export function useJobGrid(props: {
       wpAdminBarOffset.value = "0px";
     }
   });
-  
-  // Hydrate the search store with initial jobs and other props
+
+  /**
+   * Hydrate the searchStore with initial jobs and other props from PHP.
+   *
+   * This block initializes the frontend store with data passed from the backend
+   * * see [JobGrid.php], ensuring SSR/SPA consistency. It sets jobs, pagination,
+   * context, title, and totalJobs from the hydrated props, only once per mount.
+   * After hydration, it also sets up the IntersectionObserver for infinite scroll.
+   */
   onMounted(() => {
     if (!hydrated.value && props.jobs && props.jobs.length) {
       searchStore.jobs = [...props.jobs];
       hydrated.value = true;
       if (props.maxNumPages) searchStore.maxNumPages = props.maxNumPages;
-      if (props.context) searchStore.context = props.context;
-      if (props.title) searchStore.title = props.title;
+      if (props.context) searchStore.context = props.context; // 'Latest'
+      if (props.title) searchStore.title = props.title; // Lowongan Terbaru
       if (props.totalJobs !== undefined)
         searchStore.totalJobs = props.totalJobs;
     }
@@ -132,19 +140,14 @@ export function useJobGrid(props: {
   return {
     jobs,
     loading,
-    hasMore,
-    loadMore,
     searchStore,
-    hydrated,
     sentinel,
     overlayOpen,
     selectedId,
-    scrollBehavior,
     totalJobs,
     title,
     handleOverlayClose,
     handleJobClick,
     wpAdminBarOffset,
-    createObserver,
   };
 }

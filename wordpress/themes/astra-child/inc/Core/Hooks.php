@@ -13,9 +13,9 @@ class Hooks implements HooksInterface
 
     public function registerActions(): void
     {
-        add_action('wp_enqueue_scripts', [$this, 'disableJquery'], 1);
-        add_action('wp_head', [$this, 'injectThemeScript'], 0);
-        add_action('wp_head', [$this, 'suppressJqueryErrors'], 1);
+        add_action('wp_enqueue_scripts', [$this, 'disableJquery']);
+        add_action('wp_head', [$this, 'injectThemeScript']);
+        add_action('wp_head', [$this, 'suppressJqueryErrors']);
         add_action('wp_head', [$this, 'injectNoScriptWarning']);
 
         // if (!is_admin() && !is_user_logged_in()) {
@@ -213,7 +213,7 @@ class Hooks implements HooksInterface
      */
     public function lscJsExcludes($excludes)
     {
-        $excludes[] = '/wp-content/themes/astra-child/assets/vue/dist/js/';
+        $excludes[] = '/wp-content/themes/astra-child/assets/';
         return $excludes;
     }
 
@@ -222,8 +222,7 @@ class Hooks implements HooksInterface
      */
     public function lscCssExcludes($excludes)
     {
-        $excludes[] = '/wp-content/themes/astra-child/assets/vue/dist/css/';
-        $excludes[] = '/wp-content/themes/astra-child/assets/css/';
+        $excludes[] = '/wp-content/themes/astra-child/assets/';
         return $excludes;
     }
 }

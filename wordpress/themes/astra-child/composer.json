@@ -9,5 +9,8 @@
     "psr-4": {
       "AstraChild\\": "./inc"
     }
+  },
+  "scripts": {
+    "test": "phpunit"
   }
 }

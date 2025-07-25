@@ -1,4 +1,4 @@
-import type { Job } from "@/types/job";
+import type { Job } from "@/types/Job";
 
 export class RouterService {
   static getJobSlugFromRoute(routePath: string): string | null {

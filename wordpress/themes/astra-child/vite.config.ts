@@ -4,9 +4,9 @@ import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "path";
 import liveReload from "vite-plugin-live-reload";
 import Inspector from "vite-plugin-vue-inspector";
-import { compression, defineAlgorithm } from "vite-plugin-compression2";
+// import { compression, defineAlgorithm } from "vite-plugin-compression2";
 import { visualizer } from "rollup-plugin-visualizer";
-import { constants as zlibConstants } from "zlib";
+// import { constants as zlibConstants } from "zlib";
 import fs from "fs";
 import path from "path";
 
@@ -16,24 +16,25 @@ export default defineConfig(({ command }) => ({
     tailwindcss(),
     liveReload(["./**/*.php"]),
     Inspector(),
-    compression({
-      algorithms: [
-        defineAlgorithm("zstd", {
-          params: {
-            [zlibConstants.ZSTD_c_compressionLevel]: 19,
-            [zlibConstants.ZSTD_c_nbWorkers]: 4,
-            [zlibConstants.ZSTD_c_contentSizeFlag]: true,
-            [zlibConstants.ZSTD_c_checksumFlag]: true,
-          },
-        }),
-      ],
-    }),
+    // compression({
+    //   algorithms: [
+    //     defineAlgorithm("zstd", {
+    //       params: {
+    //         [zlibConstants.ZSTD_c_compressionLevel]: 19,
+    //         [zlibConstants.ZSTD_c_nbWorkers]: 4,
+    //         [zlibConstants.ZSTD_c_contentSizeFlag]: true,
+    //         [zlibConstants.ZSTD_c_checksumFlag]: true,
+    //       },
+    //     }),
+    //   ],
+    // }),
     visualizer({ open: true }),
   ],
   resolve: {
     alias: {
       "@": resolve(__dirname, "./src"),
       "@assets": resolve(__dirname, "./assets"),
+      "@inversify": resolve(__dirname, "./src/container"),
     },
   },
   server: {
@@ -78,20 +79,6 @@ export default defineConfig(({ command }) => ({
           // images or other assets
           return "assets/[name]-[hash][extname]";
         },
-        manualChunks(id) {
-          if (id.includes("node_modules/swiper")) {
-            return "carousel";
-          }
-          if (
-            id.includes("ColorSwitchButton") ||
-            id.includes("FloatingActionButton")
-          ) {
-            return "navigation-buttons";
-          }
-          if (id.includes("node_modules")) {
-            return "vendor";
-          }
-        },
       },
     },
     minify: "terser",
@@ -104,8 +91,9 @@ export default defineConfig(({ command }) => ({
       },
       format: {
         comments: false,
+        shebang: false,
       },
-      mangle: true, // Shorten variable and function names
+      mangle: true,
     },
   },
 }));

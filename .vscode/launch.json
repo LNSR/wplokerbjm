@@ -18,14 +18,7 @@
       "port": 9004,
       "pathMappings": {
         "/var/www/html/wp-content/": "./wordpress/wp-content/"
-      },
-      "ignore": [
-        "**/wp-admin/**",
-        "**/wp-includes/**",
-        "**/wp-content/plugins/**",
-        "**/wp-content/themes/!(astra-child|astra)/**",
-        "vendor/**"
-      ]
+      }
     }
   ]
 }

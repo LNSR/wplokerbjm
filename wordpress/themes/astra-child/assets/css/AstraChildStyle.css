@@ -4,10 +4,6 @@
   display: none !important;
 }
 
-.hide-preload {
-  visibility: hidden !important;
-}
-
 /* Prevent transitions on root during theme switch to reduce INP/layout shift */
 html.theme-switching, body.theme-switching {
   transition: none !important;
