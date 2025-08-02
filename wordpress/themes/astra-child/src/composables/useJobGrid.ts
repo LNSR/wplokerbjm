@@ -1,7 +1,6 @@
 import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
 import { useSearchStore } from "@/stores/Search";
 import { useJobOverlayStore } from "@/stores/JobOverlay";
-import { RouterService } from "@/services/RouterService";
 import { useRouter } from "vue-router";
 import { useRouterWatcher } from "@/composables/useRouterWatcher";
 import type { Job, SearchFilters, SearchContext } from "@/types";
@@ -28,7 +27,7 @@ export function useJobGrid(props: {
 
   const jobOverlay = useJobOverlayStore();
   const overlayOpen = computed(() => jobOverlay.overlayOpen);
-  const selectedId = computed(() => jobOverlay.selectedId);
+  const selectedSlug = computed(() => jobOverlay.selectedSlug);
 
   const scrollBehavior = ref<"auto" | "smooth">("auto");
 
@@ -51,16 +50,11 @@ export function useJobGrid(props: {
     if (sentinel.value) observer.observe(sentinel.value);
   }
 
-  function openOverlay(id: number) {
-    const jobsWithPermalink = jobs.value.filter(
-      (j): j is { id: number; permalink: string } =>
-        typeof j.permalink === "string"
-    );
-    const slug = RouterService.getJobSlugFromId(jobsWithPermalink, id);
-    jobOverlay.openOverlay(id, slug ?? undefined);
+  function openOverlay(slug: string) {
+    jobOverlay.openOverlay(slug);
     scrollBehavior.value = "smooth";
 
-    const job = jobs.value.find((j) => j.id === id);
+    const job = jobs.value.find((j) => j.slug === slug);
     if (job && job.permalink && window.innerWidth >= 768) {
       const url = new URL(job.permalink, window.location.origin);
       router.push(url.pathname + url.search + url.hash);
@@ -77,7 +71,7 @@ export function useJobGrid(props: {
   function handleJobClick(job: Job) {
     if (!job.permalink) return;
     if (window.innerWidth >= 768) {
-      openOverlay(job.id);
+      openOverlay(job.slug ?? "");
     } else {
       try {
         const url = new URL(job.permalink, window.location.origin);
@@ -143,7 +137,7 @@ export function useJobGrid(props: {
     searchStore,
     sentinel,
     overlayOpen,
-    selectedId,
+    selectedSlug,
     totalJobs,
     title,
     handleOverlayClose,

@@ -10,11 +10,11 @@ use AstraChild\Services\CustomField\SocialMediaService;
 class JobDataFactory
 {
     public function __construct(
-        protected ?DataProviderInterface $customFieldsProvider,
-        protected ?DataProviderInterface $taxonomiesProvider,
-        protected ?CustomFieldsService $customFieldsService,
-        protected ?TaxonomyService $taxonomyService,
-        protected ?SocialMediaService $socialMediaService
+        private DataProviderInterface $customFieldsProvider,
+        private DataProviderInterface $taxonomiesProvider,
+        private CustomFieldsService $customFieldsService,
+        private TaxonomyService $taxonomyService,
+        private SocialMediaService $socialMediaService
     ) {}
 
     /**
@@ -40,7 +40,7 @@ class JobDataFactory
         // Process taxonomies
         $processedTaxonomies = [];
         if (is_object($this->taxonomyService)) {
-            foreach ((array) $taxonomies as $key => $terms) {
+            foreach ( $taxonomies as $key => $terms) {
                 $processedTerms = $this->taxonomyService->processTaxonomyTerms($terms);
                 $processedTaxonomies[$key] = is_array($processedTerms) ? implode(', ', $processedTerms) : 'N/A';
             }

@@ -8,13 +8,12 @@ import "swiper/css/pagination";
 import "swiper/css/virtual";
 import { useJobOverlayStore } from "@/stores/JobOverlay";
 import { AppRouter } from "@/app/Router";
-import { RouterService } from "@/services/RouterService";
 import JobCard from "@/components/Homepage/JobCard.vue";
 import { container } from "@inversify/inversify/inversify.config";
 
 Swiper.use([Navigation, Pagination, Autoplay, Virtual]);
 
-class JobCarousel<T = unknown> {
+export class JobCarousel<T = unknown> {
   private swiperInstance: Swiper | null = null;
   private selector: string;
 
@@ -72,7 +71,9 @@ class JobCarousel<T = unknown> {
     );
     onVirtualUpdate && onVirtualUpdate();
   }
-
+  
+  // Use this method to update the slides in the swiper instance
+  // This is useful when you want to change the slides dynamically
   updateSlides(slides: T[]): void {
     if (this.swiperInstance?.virtual) {
       this.swiperInstance.virtual.slides = slides;
@@ -86,25 +87,17 @@ class JobCarousel<T = unknown> {
     return 2;
   }
 
-  static mountVirtualSlides(jobs: Job[]) {
+  mountVirtualSlides(jobs: Job[]) {
     const jobOverlay = useJobOverlayStore();
     const slides = Array.from(
       document.querySelectorAll<HTMLElement>(".virtual-slide-content")
     );
     let i = 0;
 
-    function handleCarouselJobClick(jobId: number) {
-      jobOverlay.openOverlay(jobId);
-      const jobsForSlug = jobs
-        .filter(
-          (j): j is { id: number; permalink: string } =>
-            typeof j.permalink === "string"
-        )
-        .map((j) => ({ id: j.id, permalink: j.permalink! }));
-      const slug = RouterService.getJobSlugFromId(jobsForSlug, jobId);
-
+    function handleCarouselJobClick(slug: string) {
+      jobOverlay.openOverlay(slug);
       const appRouter = container.get(AppRouter);
-      if (appRouter.router.currentRoute.value.path !== "/") {
+      if (appRouter.router.currentRoute.value.path === "/") {
         if (slug) {
           appRouter.router.push({ name: "JobDetail", params: { slug } });
         }
@@ -130,7 +123,7 @@ class JobCarousel<T = unknown> {
                 jobdata: jobData,
                 permalink: jobData.permalink ?? "",
                 variant: "carousel",
-                onClick: () => handleCarouselJobClick(jobData.id),
+                onClick: () => handleCarouselJobClick(jobData.slug ?? ''),
                 totalJobs: jobs.length,
               });
               app.mount(slide);
@@ -158,16 +151,4 @@ class JobCarousel<T = unknown> {
       }
     }
   }
-}
-
-export function useSwiper<T = unknown>(selector = ".job-carousel") {
-  const carousel = new JobCarousel<T>(selector);
-  return {
-    initSwiper: carousel.initSwiper.bind(carousel),
-    updateSlides: carousel.updateSlides.bind(carousel),
-  };
-}
-
-export function mountVirtualSlides(jobs: Job[]) {
-  JobCarousel.mountVirtualSlides(jobs);
 }

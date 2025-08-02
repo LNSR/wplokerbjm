@@ -17,7 +17,7 @@
       "request": "launch",
       "port": 9004,
       "pathMappings": {
-        "/var/www/html/wp-content/": "./wordpress/wp-content/"
+        "/var/www/html/wp-content/": "./wordpress/"
       }
     }
   ]

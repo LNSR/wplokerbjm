@@ -1,0 +1,56 @@
+<?php
+
+namespace AstraChild\Core\Definitions;
+
+use AstraChild\Core\AutowireScanner;
+
+/**
+ * Auto-scanned definitions for autowiring.
+ * 
+ * This class automatically scans the inc/ directory recursively and registers
+ * all suitable classes for autowiring, excluding interfaces, abstract classes,
+ * and static-only classes.
+ * 
+ * Note: This only adds definitions for classes that don't already have manual
+ * definitions in other definition files.
+ */
+class AutoScanned
+{
+    public static function getDefinitions(): array
+    {
+        // Create scanner instance directly (not from container)
+        $scanner = new AutowireScanner(
+            dirname(__DIR__, 2), // Points to the inc/ directory
+            'AstraChild'
+        );
+
+        $autoDefinitions = $scanner->scanForAutowirableClasses();
+
+        // Dynamically scan all definition files except this one
+        $definitionsDir = __DIR__;
+        $existingDefinitions = [];
+        foreach (glob($definitionsDir . '/*.php') as $file) {
+            if (basename($file) === 'AutoScanned.php') {
+                continue;
+            }
+            // Get class name from file
+            $className = __NAMESPACE__ . '\\' . basename($file, '.php');
+            if (class_exists($className) && method_exists($className, 'getDefinitions')) {
+                $defs = $className::getDefinitions();
+                if (is_array($defs)) {
+                    $existingDefinitions = array_merge($existingDefinitions, $defs);
+                }
+            }
+        }
+
+        // Only return auto-definitions for classes that don't have manual definitions
+        $filteredDefinitions = [];
+        foreach ($autoDefinitions as $className => $definition) {
+            if (!array_key_exists($className, $existingDefinitions)) {
+                $filteredDefinitions[$className] = $definition;
+            }
+        }
+
+        return $filteredDefinitions;
+    }
+}

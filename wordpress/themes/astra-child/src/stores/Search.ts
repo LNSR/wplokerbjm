@@ -3,7 +3,7 @@ import { ref, computed } from "vue";
 import { debounce, validation } from "@/utils";
 import type { SearchFilters, LoadMoreFilters, SearchContext } from "@/types";
 import type { Job, LoadMoreResponse, SearchResponse } from "@/types";
-import { useApi } from "@/composables/useApi";
+import { useApi } from "@/composables/useAPI";
 
 export const useSearchStore = defineStore("search", () => {
   // State
@@ -179,9 +179,11 @@ export const useSearchStore = defineStore("search", () => {
       const response: LoadMoreResponse = await apiLoadMore(loadMoreFilters);
       if (Array.isArray(response.jobs) && response.jobs.length) {
         jobs.value.push(...response.jobs);
-        page.value++;
+        page.value = response.pagination.current;
+        maxNumPages.value = response.pagination.max;
       } else {
-        page.value = maxNumPages.value; // No more 
+        // dont increment page
+        page.value = maxNumPages.value;
       }
       return response;
     } catch (err) {

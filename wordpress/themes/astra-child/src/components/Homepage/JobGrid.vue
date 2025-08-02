@@ -17,7 +17,7 @@
               : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
           ]">
             <JobCard v-for="job in jobs" :key="job.permalink" :jobdata="job" variant="featured"
-              :permalink="job.permalink ?? ''" :selected="selectedId === job.id" @click="() => handleJobClick(job)"
+              :permalink="job.permalink ?? ''" :selected="selectedSlug === job.slug" @click="() => handleJobClick(job)"
               style="cursor:pointer" />
           </transition-group>
         </div>
@@ -35,13 +35,13 @@
         </div>
         <div ref="sentinel" style="height: 1px"></div>
       </div>
-      <div v-if="overlayOpen && selectedId !== null && selectedId !== undefined" class="hidden md:block w-full"
+      <div v-if="overlayOpen && selectedSlug" class="hidden md:block w-full"
         :class="[
           overlayOpen ? 'sticky top-0 self-start' : 'relative'
         ]"
         :style="{ top: wpAdminBarOffset }"
       >
-        <SingleOverlay :id="selectedId" :visible="overlayOpen" @close="handleOverlayClose" />
+        <SingleOverlay :slug="selectedSlug" :visible="overlayOpen" :permalink="jobs.find(job => job.slug === selectedSlug)?.permalink" @close="handleOverlayClose" />
       </div>
     </div>
   </section>
@@ -65,7 +65,7 @@ const {
   loading,
   sentinel,
   overlayOpen,
-  selectedId,
+  selectedSlug,
   totalJobs,
   title,
   handleOverlayClose,

@@ -9,7 +9,7 @@
       <button class="absolute top-5 right-4" @click="close" aria-label="Close">
         Tutup
       </button>
-      <a v-if="!loading && overlay && overlay.permalink" :href="overlay.permalink" target="_blank" rel="noopener"
+      <a v-if="!loading && overlay && props.permalink" :href="props.permalink" target="_blank" rel="noopener"
         class="absolute top-5 left-4 btn btn-sm btn-outline btn-primary flex items-center gap-1">
         <i class="fas fa-external-link-alt"></i>
         Buka di Tab Baru
@@ -38,8 +38,9 @@ import { useSingleOverlay } from '@/composables/useJobGrid/useSingleOverlay'
 import JobDetail from '@/components/JobDetail.vue'
 
 const props = defineProps<{
-  id?: number
+  slug?: string
   visible?: boolean
+  permalink?: string
 }>()
 const emit = defineEmits(['close'])
 
@@ -47,19 +48,18 @@ const { data, loading, error, useSingleOverlayAPI } = useSingleOverlay()
 const route = useRoute()
 
 function fetchJob() {
-  if (props.visible && props.id) {
-    useSingleOverlayAPI(props.id)
+  if (props.visible && props.slug) {
+    useSingleOverlayAPI(props.slug)
   } else if (route.params['slug']) {
     const slugParam = Array.isArray(route.params['slug']) ? route.params['slug'][0] : route.params['slug']
-    const id = Number(slugParam)
-    if (!isNaN(id)) {
-      useSingleOverlayAPI(id)
+    if (slugParam) {
+      useSingleOverlayAPI(slugParam)
     }
   }
 }
 
 watch(
-  () => props.id,
+  () => props.slug,
   fetchJob,
   { immediate: true }
 )

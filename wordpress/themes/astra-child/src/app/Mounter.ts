@@ -14,33 +14,35 @@ export class ComponentMounter {
 
   async mount(configs: ComponentConfig[] = [], options: MounterOptions = {}) {
     const propAttr = options.propAttribute || "data-props";
-    await Promise.all(
-      configs.map(async (config) => {
-        const elements = document.querySelectorAll(config.selector);
-        await Promise.all(
-          Array.from(elements).map(async (element) => {
-            try {
-              const props: any = JSON.parse(
-                element.getAttribute(propAttr) || "{}"
-              );
-              const component =
-                typeof config.component === "function"
-                  ? defineAsyncComponent(config.component)
-                  : config.component;
-              this.appFactory.create(component, props).mount(element);
-            } catch (error) {
-              if (options.onError) {
-                options.onError(error, element, config);
-              } else {
-                console.error(
-                  `Failed to mount component at ${config.selector}:`,
-                  error
-                );
-              }
-            }
-          })
-        );
-      })
-    );
+
+    for (const config of configs) {
+      const elements = document.querySelectorAll(config.selector);
+
+      for (const element of Array.from(elements)) {
+        try {
+          const props: any = JSON.parse(element.getAttribute(propAttr) || "{}");
+          const component =
+            typeof config.component === "function"
+              ? defineAsyncComponent(config.component)
+              : config.component;
+
+          this.appFactory.create(component, props).mount(element);
+
+          if (element.hasAttribute(propAttr)) {
+            element.removeAttribute(propAttr);
+          }
+          
+        } catch (error) {
+          if (options.onError) {
+            options.onError(error, element, config);
+          } else {
+            console.error(
+              `Failed to mount component at ${config.selector}:`,
+              error
+            );
+          }
+        }
+      }
+    }
   }
 }

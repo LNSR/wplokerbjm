@@ -24,12 +24,6 @@ async function mountHomepageComponents() {
   ];
   container.get(ComponentMounter).mount(homepageConfigs);
 }
-
 document.addEventListener("DOMContentLoaded", async () => {
   await mountHomepageComponents();
-  requestAnimationFrame(() => {
-    document.querySelectorAll("[data-props]").forEach((el) => {
-      el.removeAttribute("data-props");
-    });
-  });
 });

@@ -35,9 +35,15 @@ class Container
                 }
             }
             $builder->useAutowiring(true);
+            $builder->useAttributes(true);
 
             $builder->addDefinitions(array_merge(
+                // Auto-scanned definitions
+                \AstraChild\Core\Definitions\AutoScanned::getDefinitions(),
+
+                // Manually defined dependencies
                 \AstraChild\Core\Definitions\Core::getDefinitions(),
+                \AstraChild\Core\Definitions\Repositories::getDefinitions(),
                 \AstraChild\Core\Definitions\Factories::getDefinitions(),
             ));
 

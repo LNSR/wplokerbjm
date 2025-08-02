@@ -40,11 +40,13 @@
 
 <script lang="ts" setup>
 import { computed } from 'vue'
+import type { PropType } from 'vue'
 import { useTimeAgo } from '@/composables/useTime'
+import { useJobCard } from '@/composables/useJobCard'
 
 const props = defineProps({
   jobdata: { type: Object, required: true },
-  variant: { type: String, default: '' },
+  variant: { type: String as PropType<'featured' | 'carousel'>, required: true },
   permalink: { type: String, required: true },
   selected: { type: Boolean, default: false },
   onClick: { type: Function }
@@ -61,7 +63,7 @@ function handleClick(event: MouseEvent) {
   event.preventDefault()
 
   if (props.variant === 'carousel' && props.onClick) {
-    props.onClick(props.jobdata['id'], event, 0)
+    props.onClick(props.jobdata['slug'], event, 0)
     const grid = document.getElementById('job-grid')
     if (grid) {
       grid.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -74,23 +76,7 @@ function handleClick(event: MouseEvent) {
   }
 }
 
-const cardClass = computed(() => {
-  let base = ''
-  if (props.variant === 'carousel') {
-    base = 'block group rounded-xl transition-all duration-300 cursor-pointer carousel-card max-w-full border-2 border-blue-400 shadow-md hover:shadow-lg hover:border-blue-600 hover:border-solid'
-  } else if (props.variant === 'featured') {
-    base = 'block group rounded-xl transition-all duration-300 cursor-pointer w-full max-w border-2 border-blue-400 shadow-lg hover:shadow-xl hover:border-blue-600 hover:scale-[1.02] hover:border-solid'
-  }
-  if (props.selected) {
-    base += ' ring-4 ring-blue-500 border-blue-700'
-  }
-  return base
-})
-const bodyClass = computed(() => {
-  if (props.variant === 'carousel') return 'card-body relative p-3 gap-0 flex flex-col min-h-[300px] h-full'
-  if (props.variant === 'featured') return 'card-body relative p-4 gap-1 flex flex-col h-full'
-  return ''
-})
+const { cardClass, bodyClass } = useJobCard(props.variant, props.selected)
 
 const summaryRows = computed(() => props.jobdata['summary_rows'] || [])
 const hasStatusOrDeadline = computed(() => !!props.jobdata['statusjob'] || !!props.jobdata['deadline'])

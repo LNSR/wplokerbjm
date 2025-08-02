@@ -13,7 +13,7 @@ export interface JobsApiInterface {
   getAutoSuggestions(query: string): Promise<AutoSuggestResponse>
   searchJobs(filters: SearchFilters): Promise<SearchResponse>
   loadMore(filters: LoadMoreFilters): Promise<LoadMoreResponse>
-  fetchSingleOverlay(id: number): Promise<SingleOverlayResponse>
+  fetchSingleOverlay(slug: string): Promise<SingleOverlayResponse>
 }
 
 export const jobsApi: JobsApiInterface = {
@@ -80,9 +80,9 @@ export const jobsApi: JobsApiInterface = {
   },
 
   /**
-   * Fetch single job overlay by ID
+   * Fetch single job overlay by slug
    */
-  async fetchSingleOverlay(id: number): Promise<SingleOverlayResponse> {
-    return await container.get(ApiClient).get<SingleOverlayResponse>('/single-overlay/', { id })
+  async fetchSingleOverlay(slug: string): Promise<SingleOverlayResponse> {
+    return await container.get(ApiClient).get<SingleOverlayResponse>('/single-overlay/', { slug })
   }
 }

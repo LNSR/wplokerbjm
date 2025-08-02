@@ -1,14 +1,16 @@
 import { onMounted, nextTick, type Ref } from "vue";
-import { useSwiper, mountVirtualSlides } from "@/composables/useCarousel/useSwiper";
+import { JobCarousel } from "@/composables/useCarousel/useSwiper";
 import { useRouterWatcher } from "@/composables/useRouterWatcher";
-
+import { container } from "@/container/inversify/inversify.config";
 export function useJobCarousel(options: {
   jobs: Ref<any[]>;
   loaded: Ref<boolean>;
   propAttribute?: string;
 }) {
+  const carousel = container.get(JobCarousel);
   const { jobs, loaded, propAttribute = "data-props" } = options;
-  const { initSwiper } = useSwiper(".job-carousel");
+  const initSwiper = carousel.initSwiper.bind(carousel);
+  // const updateSlides = carousel.updateSlides.bind(carousel);
 
   onMounted(async () => {
     const el = document.getElementById("job-carousel");
@@ -19,7 +21,7 @@ export function useJobCarousel(options: {
         jobs.value = props.jobs || [];
         loaded.value = true;
         await nextTick();
-        initSwiper(jobs.value, () => mountVirtualSlides(jobs.value));
+        initSwiper(jobs.value, () => carousel.mountVirtualSlides(jobs.value));
       } catch (e) {
         jobs.value = [];
         loaded.value = true;

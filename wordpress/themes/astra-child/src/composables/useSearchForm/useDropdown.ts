@@ -1,12 +1,41 @@
-import { ref, computed, watch, type Ref } from "vue";
+import { ref, computed, watch, type Ref, type ComputedRef } from "vue";
 import type { SearchFilters } from "@/types";
 import { useTaxonomyStore } from "@/stores/Taxonomy";
-import type {
-  SelectedItem,
-  Option,
-  UseDropdownReturn,
-} from "@/types/Component";
 import { useBreadcrumb } from "./useDropdownBreadcrumb";
+// Dropdown composable types
+export type SelectedItem = { value: string; label: string }
+
+export type Option = {
+  value: string
+  label: string
+  children?: Option[]
+  isLoading?: boolean
+  hasMoreChildren?: boolean
+  loadChildren?: () => Promise<Option[]>
+  __breadcrumbs?: string[]
+  __key?: string
+}
+
+export interface UseDropdownReturn {
+  open: Ref<boolean>;
+  activeIndex: Ref<number>;
+  search: Ref<string>;
+  breadcrumb: ComputedRef<string[]>;
+  selectedValues: ComputedRef<SelectedItem[]>;
+  multiSelectLabel: ComputedRef<string>;
+  isSelected: (value: string) => boolean;
+  toggleValue: (value: string) => void;
+  isMultiple: ComputedRef<boolean>;
+  SEMUA_VALUE: string;
+  toggle: () => void;
+  close: () => void;
+  select: (option: Option) => void;
+  goBack: () => void;
+  navigateChildren: (children: Option[], label: string, parentOption?: Option) => void;
+  goToBreadcrumb: (idx: number) => void;
+  filteredOptions: ComputedRef<Option[]>;
+  highlightMatch: (label: string, query: string) => string;
+}
 
 export function useDropdown(props: {
   modelValue: Ref<SearchFilters>;
@@ -34,7 +63,6 @@ export function useDropdown(props: {
     resetBreadcrumb,
   } = useBreadcrumb();
 
-  // Proxy activeIndex to local ref for keyboard navigation
   watch(activeIndex, (val) => {
     breadcrumbActiveIndex.value = val;
   });

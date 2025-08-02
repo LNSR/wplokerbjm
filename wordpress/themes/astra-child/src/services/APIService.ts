@@ -16,8 +16,8 @@ export class JobService {
     return await jobsApi.loadMore(filters)
   }
 
-  static async fetchSingleOverlay(id: number) {
-    return await jobsApi.fetchSingleOverlay(id)
+  static async fetchSingleOverlay(slug: string) {
+    return await jobsApi.fetchSingleOverlay(slug)
   }
 }
 

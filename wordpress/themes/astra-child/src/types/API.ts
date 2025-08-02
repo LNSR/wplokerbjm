@@ -28,7 +28,15 @@ export interface SearchResponse extends BaseJobResponse {
 }
 
 // Response for pagination operations (keeps it simple)
-export interface LoadMoreResponse extends BaseJobResponse {}
+export interface LoadMoreResponse {
+  jobs: Job[]
+  pagination: {
+    current: number
+    max: number
+  }
+  context?: SearchContext
+  filters?: Partial<SearchFilters>
+}
 
 // Simplified load more filters - flattened structure
 export interface LoadMoreFilters extends Partial<SearchFilters> {
@@ -76,8 +84,6 @@ export interface SocialMediaItem {
 }
 
 export interface SingleOverlayResponse {
-  id: number;
-  permalink: string;
   title: string;
   namaPerusahaan: string;
   tentangPerusahaan: string;

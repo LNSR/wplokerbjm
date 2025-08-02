@@ -22,7 +22,7 @@ export function useRouterWatcher(jobsRef: { value: Job[] }) {
             (j) => j.permalink && j.permalink.includes(`/lowongan/${slug}`)
           )
           if (job) {
-            jobOverlay.openOverlay(job.id, slug)
+            jobOverlay.openOverlay(slug)
           }
         }
       } else {

@@ -16,7 +16,7 @@ class CustomFieldsService
 		$wysiwyg_fields = ['tentang_perusahaan', 'deskripsi_pekerjaan', 'persyaratan', 'cara_melamar', 'benefit'];
 		foreach ($wysiwyg_fields as $field) {
 			if (!empty($customFields[$field]) && is_string($customFields[$field])) {
-				$customFields[$field] = do_shortcode(wpautop($customFields[$field]));
+				$customFields[$field] = do_shortcode(wpautop(wp_kses_post($customFields[$field])));
 			}
 		}
 

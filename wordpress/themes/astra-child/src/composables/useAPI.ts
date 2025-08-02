@@ -42,11 +42,11 @@ export function useApi() {
   }
 
   async function fetchSingleOverlay(
-    id: number
+    slug: string
   ): Promise<SingleOverlayResponse | null> {
     loading.value = true;
     try {
-      return await JobService.fetchSingleOverlay(id);
+      return await JobService.fetchSingleOverlay(slug);
     } finally {
       loading.value = false;
     }

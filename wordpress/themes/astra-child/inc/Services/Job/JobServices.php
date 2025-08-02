@@ -8,9 +8,9 @@ use AstraChild\Services\CustomField\SocialMediaService;
 class JobServices {
 
     public function __construct(
-        protected JobRepository $jobRepository,
-        protected ?JobDataFactory $jobDataFactory,
-        protected ?SocialMediaService $socialMediaService
+        private JobRepository $jobRepository,
+        private JobDataFactory $jobDataFactory,
+        private SocialMediaService $socialMediaService
     ) {}
 
 

@@ -1,7 +1,7 @@
 import { ref } from 'vue'
 import { debounce } from '@/utils'
 import type { SingleOverlayResponse } from '@/types'
-import { useApi } from '../useApi'
+import { useApi } from '../useAPI'
 
 export function useSingleOverlay() {
   const data = ref<SingleOverlayResponse | null>(null)
@@ -11,11 +11,11 @@ export function useSingleOverlay() {
   const { fetchSingleOverlay } = useApi()
 
 
-  async function useSingleOverlayAPI(id: number) {
+  async function useSingleOverlayAPI(slug: string) {
     loading.value = true
     error.value = null
     try {
-      data.value = await fetchSingleOverlay(id)
+      data.value = await fetchSingleOverlay(slug)
     } finally {
       loading.value = false
     }

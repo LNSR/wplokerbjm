@@ -88,8 +88,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onBeforeUnmount, toRef } from 'vue'
-import { useDropdown } from '@/composables/useSearchForm/useDropdown'
-import type { Option } from '@/types'
+import { useDropdown, type Option } from '@/composables/useSearchForm/useDropdown'
 import type { SortOption } from '@/types'
 
 const props = defineProps<{ modelValue: string[] | string | SortOption; options: Option[]; placeholder?: string; multiple?: boolean; disabled?: boolean }>()

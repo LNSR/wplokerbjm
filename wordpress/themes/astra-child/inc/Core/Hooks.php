@@ -14,6 +14,7 @@ class Hooks implements HooksInterface
     public function registerActions(): void
     {
         add_action('wp_enqueue_scripts', [$this, 'disableJquery']);
+        add_action('litespeed_purged_all', [$this, 'deleteCompiledContainer']);
         add_action('wp_head', [$this, 'injectThemeScript']);
         add_action('wp_head', [$this, 'suppressJqueryErrors']);
         add_action('wp_head', [$this, 'injectNoScriptWarning']);
@@ -171,6 +172,14 @@ class Hooks implements HooksInterface
             </div>
         </noscript>
         <?php
+    }
+
+    public function deleteCompiledContainer(): void
+    {
+        $file = get_stylesheet_directory() . '/cache/CompiledContainer.php';
+        if (file_exists($file)) {
+            unlink($file);
+        }
     }
 
     /*======================================================================
