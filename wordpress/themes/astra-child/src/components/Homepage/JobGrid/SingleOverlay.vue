@@ -14,6 +14,16 @@
         <i class="fas fa-external-link-alt"></i>
         Buka di Tab Baru
       </a>
+      <a
+        v-if="!loading && overlay && isLoggedIn && editPostId"
+        :href="`/wp-admin/post.php?post=${editPostId}&action=edit`"
+        target="_blank"
+        rel="noopener"
+        class="absolute top-5 left-44 btn btn-sm btn-outline btn-warning flex items-center gap-1"
+      >
+        <i class="fas fa-edit"></i>
+        Edit
+      </a>
       <div v-if="loading" class="p-4 text-center pt-16 flex-1 flex flex-col items-center justify-center">
         <span class="sr-only">Memuat...</span>
         <svg class="animate-spin h-8 w-8 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -32,8 +42,6 @@
 </template>
 
 <script setup lang="ts">
-import { watch, onMounted } from 'vue'
-import { useRoute } from 'vue-router'
 import { useSingleOverlay } from '@/composables/useJobGrid/useSingleOverlay'
 import JobDetail from '@/components/JobDetail.vue'
 
@@ -44,32 +52,13 @@ const props = defineProps<{
 }>()
 const emit = defineEmits(['close'])
 
-const { data, loading, error, useSingleOverlayAPI } = useSingleOverlay()
-const route = useRoute()
-
-function fetchJob() {
-  if (props.visible && props.slug) {
-    useSingleOverlayAPI(props.slug)
-  } else if (route.params['slug']) {
-    const slugParam = Array.isArray(route.params['slug']) ? route.params['slug'][0] : route.params['slug']
-    if (slugParam) {
-      useSingleOverlayAPI(slugParam)
-    }
-  }
-}
-
-watch(
-  () => props.slug,
-  fetchJob,
-  { immediate: true }
-)
-
-watch(
-  () => props.visible,
-  fetchJob
-)
-
-onMounted(fetchJob)
+const {
+  data,
+  loading,
+  error,
+  isLoggedIn,
+  editPostId,
+} = useSingleOverlay(props)
 
 const overlay = data
 

@@ -4,9 +4,9 @@ namespace AstraChild\Core;
 
 use AstraChild\Contracts\HooksInterface;
 
+
 class Hooks implements HooksInterface
 {
-
     /*======================================================================
      | REGISTER HOOKS
      ======================================================================*/
@@ -18,6 +18,8 @@ class Hooks implements HooksInterface
         add_action('wp_head', [$this, 'injectThemeScript']);
         add_action('wp_head', [$this, 'suppressJqueryErrors']);
         add_action('wp_head', [$this, 'injectNoScriptWarning']);
+        add_action('wp_head', [$this, 'injectWpUserLoggedInFlag']); // login status
+
 
         // if (!is_admin() && !is_user_logged_in()) {
         //     add_action('wp_head', [$this, 'injectAdsenseScript'], 10);
@@ -26,6 +28,10 @@ class Hooks implements HooksInterface
         // }
     }
 
+    /*======================================================================
+     | REGISTER FILTERS
+     ======================================================================*/
+
     public function registerFilters(): void
     {
         add_filter('posts_search', [$this, 'jobPostsSearchFilter'], 10, 2);
@@ -33,9 +39,21 @@ class Hooks implements HooksInterface
         add_filter('litespeed_optimize_css_excludes', [$this, 'lscCssExcludes']);
     }
 
+
     /*======================================================================
      | ACTIONS
      ======================================================================*/
+
+
+    /**
+     * Injects a JS variable indicating if the user is logged in to WordPress.
+     */
+    public function injectWpUserLoggedInFlag(): void
+    {
+        ?>
+        <script>window.wpUserLoggedIn = <?php echo is_user_logged_in() ? 'true' : 'false'; ?>;</script>
+        <?php
+    }
 
     public function disableJquery(): void
     {
@@ -51,6 +69,7 @@ class Hooks implements HooksInterface
             }
         }
     }
+
 
     public function suppressJqueryErrors(): void
     {
@@ -93,6 +112,7 @@ class Hooks implements HooksInterface
         <?php
     }
 
+
     public function injectThemeScript(): void
     {
         ?>
@@ -114,6 +134,7 @@ class Hooks implements HooksInterface
         <?php
     }
 
+
     public function injectAdsenseScript(): void
     {
         ?>
@@ -128,6 +149,7 @@ class Hooks implements HooksInterface
         </script>
         <?php
     }
+
 
     public function injectGTMHead(): void
     {
@@ -153,6 +175,7 @@ class Hooks implements HooksInterface
         <?php
     }
 
+
     public function injectGTMBody(): void
     {
         ?>
@@ -162,6 +185,7 @@ class Hooks implements HooksInterface
         <!-- End Google Tag Manager (noscript) -->
         <?php
     }
+
 
     public function injectNoScriptWarning(): void
     {
@@ -174,6 +198,7 @@ class Hooks implements HooksInterface
         <?php
     }
 
+
     public function deleteCompiledContainer(): void
     {
         $file = get_stylesheet_directory() . '/cache/CompiledContainer.php';
@@ -181,6 +206,7 @@ class Hooks implements HooksInterface
             unlink($file);
         }
     }
+
 
     /*======================================================================
      | FILTERS

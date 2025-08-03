@@ -34,6 +34,7 @@ class Core
                         $c->get(\AstraChild\Models\Schema\PostTypes::class),
                         $c->get(\AstraChild\Services\REST\RESTRoute::class),
                         $c->get(\AstraChild\Services\Job\ArchiveServices::class),
+                        $c->get(\AstraChild\Services\Taxonomy\TaxonomyManagement::class),
                         $c->get(\AstraChild\Services\PostsManagement\PostsManagement::class)
                     ],
                 ),

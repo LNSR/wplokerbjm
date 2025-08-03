@@ -1,0 +1,1 @@
+alias wpcli='docker exec wordpress wp --path=/var/www/html'

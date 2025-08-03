@@ -24,6 +24,4 @@ async function mountHomepageComponents() {
   ];
   container.get(ComponentMounter).mount(homepageConfigs);
 }
-document.addEventListener("DOMContentLoaded", async () => {
-  await mountHomepageComponents();
-});
+await mountHomepageComponents();

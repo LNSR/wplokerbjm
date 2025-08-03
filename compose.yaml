@@ -116,8 +116,6 @@ services:
     volumes:
       - wordpress:/var/www/html
       - ./wordpress:/var/www/html/wp-content
-      - ./wordpress/themes/astra-child/node_modules:/var/www/html/node_modules
-      - ./.htaccess:/var/www/html/.htaccess
     depends_on:
       - db
     healthcheck:
@@ -140,7 +138,6 @@ services:
     volumes:
       - wordpress:/var/www/html:ro
       - ./wordpress:/var/www/html/wp-content:ro
-      - ./wordpress/themes/astra-child/node_modules:/var/www/html/node_modules:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # generate your own SSL
       - ./localhost.pem:/var/www/certs/localhost.crt:ro
@@ -150,7 +147,7 @@ services:
       - caddy_config:/config
 
   db:
-    image: mysql:8.0
+    image: mysql:9
     container_name: wordpress_db
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}

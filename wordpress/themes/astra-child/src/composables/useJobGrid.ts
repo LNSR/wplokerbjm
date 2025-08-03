@@ -34,6 +34,11 @@ export function useJobGrid(props: {
   const totalJobs = computed(() => searchStore.totalJobs);
   const title = computed(() => searchStore.title);
 
+  const selectedPermalink = computed(() => {
+    return jobOverlay.selectedJob?.permalink ??
+      jobs.value.find((job) => job.slug === selectedSlug.value)?.permalink ?? '';
+  });
+
   useRouterWatcher(jobs);
 
   // Initialize the IntersectionObserver to load more jobs when the sentinel is in view
@@ -51,10 +56,9 @@ export function useJobGrid(props: {
   }
 
   function openOverlay(slug: string) {
-    jobOverlay.openOverlay(slug);
-    scrollBehavior.value = "smooth";
-
     const job = jobs.value.find((j) => j.slug === slug);
+    jobOverlay.openOverlay(slug, job);
+    scrollBehavior.value = "smooth";
     if (job && job.permalink && window.innerWidth >= 768) {
       const url = new URL(job.permalink, window.location.origin);
       router.push(url.pathname + url.search + url.hash);
@@ -143,5 +147,7 @@ export function useJobGrid(props: {
     handleOverlayClose,
     handleJobClick,
     wpAdminBarOffset,
+    jobOverlay,
+    selectedPermalink
   };
 }

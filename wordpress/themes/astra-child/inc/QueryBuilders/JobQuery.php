@@ -183,4 +183,12 @@ class JobQuery
 			'fields'         => 'ids',
 		];
 	}
+	public static function unusedTaxonomiesTermsArgs($taxonomy): array
+	{
+		return get_terms([
+			'taxonomy'   => $taxonomy,
+			'hide_empty' => false,
+			'fields'     => 'ids',
+		]);
+	}
 }

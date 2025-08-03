@@ -85,30 +85,30 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     && docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm --with-avif \
     && docker-php-ext-install -j$(nproc) \
-        bcmath \
-        calendar \
-        curl \
-        exif \
-        gd \
-        gettext \
-        gmp \
-        intl \
-        mbstring \
-        mysqli \
-        opcache \
-        pcntl \
-        pdo \
-        pdo_mysql \
-        pdo_pgsql \
-        pgsql \
-        soap \
-        sockets \
-        sodium \
-        sysvmsg \
-        sysvsem \
-        sysvshm \
-        xml \
-        zip \
+    bcmath \
+    calendar \
+    curl \
+    exif \
+    gd \
+    gettext \
+    gmp \
+    intl \
+    mbstring \
+    mysqli \
+    opcache \
+    pcntl \
+    pdo \
+    pdo_mysql \
+    pdo_pgsql \
+    pgsql \
+    soap \
+    sockets \
+    sodium \
+    sysvmsg \
+    sysvsem \
+    sysvshm \
+    xml \
+    zip \
     && rm -rf /var/lib/apt/lists/*
 
 # Clean up unnecessary files
@@ -123,17 +123,10 @@ COPY docker.conf.d/php.ini /usr/local/etc/php/conf.d/php.ini
 RUN groupadd -r -g 1000 wordpress && \
     useradd -r -u 1000 -g wordpress wordpress
 
-# Set permissions for WordPress directories
-RUN mkdir -p /var/www/html/wp-content/uploads /var/www/html/wp-content/debug
-
 # Ensure wp-cli is accessible for the wordpress user
 RUN chmod +x /usr/local/bin/wp && \
     ln -sf /usr/local/bin/wp /usr/bin/wp
 
-COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
-RUN chmod +x /usr/local/bin/docker-entrypoint.sh
-
-ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["php-fpm"]
 
 USER wordpress

@@ -2,14 +2,16 @@
 
 namespace AstraChild\Services\Taxonomy;
 
-class TaxonomyService {
+class TaxonomyService
+{
     /**
      * Process taxonomy terms.
      *
      * @param array|false|\WP_Error|null|string $terms Raw taxonomy terms.
      * @return array Processed taxonomy term names.
      */
-    public function processTaxonomyTerms($terms): array {
+    public function processTaxonomyTerms($terms): array
+    {
         // Handle different input types
         if (is_wp_error($terms) || empty($terms)) {
             return [];
@@ -26,7 +28,7 @@ class TaxonomyService {
         }
 
         // Process array of term objects
-        return array_map(function($term) {
+        return array_map(function ($term) {
             // Handle term objects
             if (is_object($term) && isset($term->name)) {
                 return sanitize_text_field($term->name);

@@ -35,13 +35,11 @@
         </div>
         <div ref="sentinel" style="height: 1px"></div>
       </div>
-      <div v-if="overlayOpen && selectedSlug" class="hidden md:block w-full"
-        :class="[
-          overlayOpen ? 'sticky top-0 self-start' : 'relative'
-        ]"
-        :style="{ top: wpAdminBarOffset }"
-      >
-        <SingleOverlay :slug="selectedSlug" :visible="overlayOpen" :permalink="jobs.find(job => job.slug === selectedSlug)?.permalink" @close="handleOverlayClose" />
+      <div v-if="overlayOpen && selectedSlug" class="hidden md:block w-full" :class="[
+        overlayOpen ? 'sticky top-0 self-start' : 'relative'
+      ]" :style="{ top: wpAdminBarOffset }">
+        <SingleOverlay :slug="selectedSlug" :visible="overlayOpen" :permalink="selectedPermalink"
+          @close="handleOverlayClose" />
       </div>
     </div>
   </section>
@@ -71,7 +69,7 @@ const {
   handleOverlayClose,
   handleJobClick,
   searchStore,
-  wpAdminBarOffset
+  wpAdminBarOffset,
+  selectedPermalink
 } = useJobGrid(props)
-
 </script>

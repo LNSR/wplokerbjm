@@ -95,7 +95,8 @@ export class JobCarousel<T = unknown> {
     let i = 0;
 
     function handleCarouselJobClick(slug: string) {
-      jobOverlay.openOverlay(slug);
+      const job = jobs.find(j => j.slug === slug);
+      jobOverlay.openOverlay(slug, job);
       const appRouter = container.get(AppRouter);
       if (appRouter.router.currentRoute.value.path === "/") {
         if (slug) {
