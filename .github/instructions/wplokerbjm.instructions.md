@@ -7,6 +7,12 @@ applyTo: "**/*.{js,ts,php,css,html,json}"
 ## Cache
 
 - Cache plugin used: **LiteSpeed Cache** with object caching redis.
+- Dynamic data framework: **Metabox Lite**
+
+## SEO
+
+- SEO plugin used: **Rank Math Free**
+- Adsense, Analytics, Google Tag Manager integrated via: **Site Kit**
 
 # Development Instructions for WPLokerBJM
 

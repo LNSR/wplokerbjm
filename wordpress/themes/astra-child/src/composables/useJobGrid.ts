@@ -41,7 +41,6 @@ export function useJobGrid(props: {
 
   useRouterWatcher(jobs);
 
-  // Initialize the IntersectionObserver to load more jobs when the sentinel is in view
   function createObserver() {
     if (observer) observer.disconnect();
     observer = new window.IntersectionObserver(

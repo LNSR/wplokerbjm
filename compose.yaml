@@ -13,7 +13,7 @@ services:
       WP_REPAIR: "false"
       FORCE_SSL_ADMIN: "true"
       WP_HOME: ${WORDPRESS_WP_HOME}
-      WORDPRESS_WP_SITEURL: ${WORDPRESS_WP_SITEURL}      
+      WORDPRESS_WP_SITEURL: ${WORDPRESS_WP_SITEURL}
       WORDPRESS_CONFIG_EXTRA: |
         if (!defined('WP_CACHE')) define('WP_CACHE', true);
         define('WP_CACHE_KEY_SALT', '${WORDPRESS_WP_SITEURL}');
@@ -142,9 +142,10 @@ services:
       # generate your own SSL
       - ./localhost.pem:/var/www/certs/localhost.crt:ro
       - ./localhost-key.pem:/var/www/certs/localhost.key:ro
-      # Optional: persist Caddy data
-      - caddy_data:/data
-      - caddy_config:/config
+      - type: tmpfs
+        target: /data
+      - type: tmpfs
+        target: /config
 
   db:
     image: mysql:9
@@ -192,7 +193,8 @@ services:
     ports:
       - "6379:6379"
     volumes:
-      - redis_data:/data
+      - type: tmpfs
+        target: /data
 # ngrok:
 #   image: ngrok/ngrok:latest
 #   container_name: ngrok
@@ -208,6 +210,3 @@ services:
 volumes:
   wordpress:
   db:
-  redis_data:
-  caddy_data:
-  caddy_config:

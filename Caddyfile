@@ -1,5 +1,5 @@
 :443 {
-  tls /var/www/certs/localhost.crt /var/www/certs/localhost.key
+  tls /var/www/certs/localhost.crt /var/www/certs/localhost.key # Use your own certificate
   root * /var/www/html
   php_fastcgi wordpress:9000
 
@@ -22,6 +22,12 @@
     Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
     Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    Referrer-Policy "strict-origin-when-cross-origin"
+    X-Content-Type-Options "nosniff"
+    X-Frame-Options "SAMEORIGIN"
+    X-XSS-Protection "1; mode=block"
+    Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    Cache-Control "public, max-age=31536000, immutable"
   }
 
   log {

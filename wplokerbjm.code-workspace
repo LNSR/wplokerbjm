@@ -8,6 +8,9 @@
 		},
 		{
 			"path": "wordpress/themes/astra-child"
+		},
+		{
+			"path": "/tmp/Downloads"
 		}
 	],
 	"settings": {

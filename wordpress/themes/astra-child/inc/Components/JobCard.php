@@ -121,8 +121,8 @@ class JobCard
 		$status = (int) $jobdata['status_pekerjaan'];
 
 		[$label, $color] = match ($status) {
-			2 => ['Urgent', 'border border-red-500 text-red-500 bg-transparent text-md'],
-			3 => ['Pinned', 'border border-yellow-500 text-yellow-700 bg-transparent text-md'],
+			2 => ['Urgent', 'bg-red-600 text-white border border-red-700 shadow-sm text-md'],
+			3 => ['Pinned', 'bg-yellow-400 text-black border border-yellow-600 shadow-sm text-md'],
 			default => ['', ''],
 		};
 
@@ -131,7 +131,7 @@ class JobCard
 
 		ob_start();
 		?>
-		<span class="inline-block px-3 py-1 text-xs <?= esc_attr($color); ?>">
+		<span class="inline-block px-3 py-1 text-sm font-bold rounded <?= esc_attr($color); ?>">
 			<?= esc_html($label); ?>
 		</span>
 		<?php
@@ -152,13 +152,13 @@ class JobCard
 		$interval = $now->diff($deadline);
 		$days_left = (int) $interval->format('%r%a');
 
-		[$text, $icon_color] = match (true) {
-			$days_left > 1 => ["Tersisa {$days_left} hari", 'border border-blue-500 text-blue-500 bg-transparent'],
-			$days_left === 1 => ["Tersisa 1 hari", 'border border-yellow-500 text-yellow-700 bg-transparent'],
-			$days_left === 0 => ["Hari terakhir", 'border border-red-500 text-red-500 bg-transparent'],
-			$days_left === -1 => ["Berakhir kemarin", 'border border-red-500 text-red-500 bg-transparent'],
-			$days_left < -1 => ["Berakhir " . abs($days_left) . " hari lalu", 'border border-red-500 text-red-500 bg-transparent'],
-			default => ["Berakhir hari ini", 'border border-red-500 text-red-500 bg-transparent'],
+		[$text, $style] = match (true) {
+			$days_left > 1 => ["Tersisa {$days_left} hari", 'bg-blue-600 text-white border border-blue-800'],
+			$days_left === 1 => ["Tersisa 1 hari", 'bg-yellow-400 text-black border border-yellow-600'],
+			$days_left === 0 => ["Hari terakhir", 'bg-red-600 text-white border border-red-800'],
+			$days_left === -1 => ["Berakhir kemarin", 'bg-gray-500 text-white border border-gray-700'],
+			$days_left < -1 => ["Berakhir " . abs($days_left) . " hari lalu", 'bg-gray-400 text-black border border-gray-700'],
+			default => ["Berakhir hari ini", 'bg-red-600 text-white border border-red-800'],
 		};
 
 		if (!$text)
@@ -166,9 +166,9 @@ class JobCard
 
 		ob_start();
 		?>
-		<div class="flex items-center <?= $icon_color; ?> p-2">
-			<i class="fas fa-calendar-alt mr-2"></i>
-			<span class="text-sm"><?= $text; ?></span>
+		<div class="flex items-center gap-2 px-3 py-1 rounded font-semibold text-sm <?= esc_attr($style); ?>">
+			<i class="fas fa-calendar-alt"></i>
+			<span><?= $text; ?></span>
 		</div>
 		<?php
 		return ob_get_clean();
