@@ -1,0 +1,152 @@
+.ast-site-title-wrap,
+.ast-site-title,
+.site-title {
+  display: none !important;
+}
+
+/* Prevent transitions on root during theme switch to reduce INP/layout shift */
+html.theme-switching,
+body.theme-switching {
+  transition: none !important;
+}
+
+.component-placeholder {
+  position: fixed; 
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100vw;
+  height: 100vh;
+  padding: 0 !important; 
+  background: var(--ast-global-color-4);
+  z-index: 9999;
+  /* Smooth fade when removing the placeholder */
+  transition: opacity .28s ease, visibility .28s ease;
+  opacity: 1;
+  visibility: visible;
+}
+
+.component-placeholder svg.animate-spin {
+	width: 5rem;
+	height: 5rem;
+}
+
+/* Fade-out helper: add this class to trigger smooth removal */
+.component-placeholder--fadeout {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Light Mode */
+:root {
+  --ast-global-color-0: #0067ff;
+  --ast-global-color-1: #005ee9;
+  --ast-global-color-2: #0f172a;
+  --ast-global-color-3: #364151;
+  --ast-global-color-4: #ffffff;
+  --ast-global-color-5: #e7f6ff;
+  --ast-global-color-6: #070614;
+  --ast-global-color-7: #d1dae5;
+  --ast-global-color-8: #222222;
+
+  /* Astra Customizer Colors */
+  /* --ast-customizer-color-1: #0284c7;
+  --ast-customizer-color-2: #0ea5e9;
+  --ast-customizer-color-3: #2271b1;
+  --ast-customizer-color-4: #1e293b;
+  --ast-customizer-color-5: #334155;
+  --ast-customizer-color-6: #9ca3af;
+  --ast-customizer-color-7: #d1d5db;
+  --ast-customizer-color-8: #4b5563;
+  --ast-customizer-color-9: #fff;
+  --ast-customizer-color-10: #fff;
+  --ast-customizer-color-11: #f5f5f5;
+  --ast-customizer-color-12: #1e293b;
+  --ast-customizer-color-13: #f3f4f6;
+  --ast-customizer-color-14: #cc1818; */
+  --icon-color: var(--ast-global-color-0); /* Sun: */
+}
+
+[data-theme="light"] {
+  /* Astra Global Colors (Light) */
+  --ast-global-color-0: #0067ff;
+  --ast-global-color-1: #005ee9;
+  --ast-global-color-2: #0f172a;
+  --ast-global-color-3: #364151;
+  --ast-global-color-4: #ffffff;
+  --ast-global-color-5: #e7f6ff;
+  --ast-global-color-6: #070614;
+  --ast-global-color-7: #d1dae5;
+  --ast-global-color-8: #222222;
+
+  /* Astra Customizer Colors (Light) */
+  /* --ast-customizer-color-1: #0284c7;
+  --ast-customizer-color-2: #0ea5e9;
+  --ast-customizer-color-3: #2271b1;
+  --ast-customizer-color-4: #1e293b;
+  --ast-customizer-color-5: #334155;
+  --ast-customizer-color-6: #9ca3af;
+  --ast-customizer-color-7: #d1d5db;
+  --ast-customizer-color-8: #4b5563;
+  --ast-customizer-color-9: #fff;
+  --ast-customizer-color-10: #fff;
+  --ast-customizer-color-11: #f5f5f5;
+  --ast-customizer-color-12: #1e293b;
+  --ast-customizer-color-13: #f3f4f6;
+  --ast-customizer-color-14: #cc1818; */
+  --icon-color: var(--ast-global-color-0); /* Sun: */
+}
+
+[data-theme="dark"] {
+  /* Astra Global Colors (Dark) */
+  --ast-global-color-0: #0085ff;
+  --ast-global-color-1: #0177e3;
+  --ast-global-color-2: #ffffff;
+  --ast-global-color-3: #e7f6ff;
+  --ast-global-color-4: #212a37;
+  --ast-global-color-5: #0f172a;
+  --ast-global-color-6: #4f5b62;
+  --ast-global-color-7: #070614;
+  --ast-global-color-8: #222222;
+
+  /* Astra Customizer Colors (Dark) */
+  /* --ast-customizer-color-1: #0284c7;
+  --ast-customizer-color-2: #0ea5e9;
+  --ast-customizer-color-3: #2271b1;
+  --ast-customizer-color-4: #1e293b;
+  --ast-customizer-color-5: #334155;
+  --ast-customizer-color-6: #9ca3af;
+  --ast-customizer-color-7: #d1d5db;
+  --ast-customizer-color-8: #4b5563;
+  --ast-customizer-color-9: #fff;
+  --ast-customizer-color-10: #fff;
+  --ast-customizer-color-11: #f5f5f5;
+  --ast-customizer-color-12: #1e293b;
+  --ast-customizer-color-13: #f3f4f6;
+  --ast-customizer-color-14: #cc1818; */
+  --icon-color: #f1f5f9; /* Moon: */
+}
+
+[data-theme="lavender"] {
+  --ast-global-color-0: #6528f7;
+  --ast-global-color-1: #5511f8;
+  --ast-global-color-2: #0f172a;
+  --ast-global-color-3: #454f5e;
+  --ast-global-color-4: #ffffff;
+  --ast-global-color-5: #f2f0fe;
+  --ast-global-color-6: #0d0614;
+  --ast-global-color-7: #d8d8f5;
+  --ast-global-color-8: #222222;
+  --icon-color: var(--ast-global-color-0); /* Sun: */
+}
+
+figure.wp-caption.aligncenter img,
+img.aligncenter[class*="wp-image-"] {
+  max-width: 100%;
+  width: 500px;
+  height: auto;
+  display: block;
+  border-radius: 8px;
+}

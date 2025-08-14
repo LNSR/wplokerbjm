@@ -4,10 +4,10 @@
 			"path": "."
 		},
 		{
-			"path": "wordpress/themes/astra"
+			"path": "wordpress/wp-content/themes/astra"
 		},
 		{
-			"path": "wordpress/themes/astra-child"
+			"path": "wordpress/wp-content/themes/astra-child"
 		},
 		{
 			"path": "/tmp/Downloads"

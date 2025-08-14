@@ -4,13 +4,13 @@ This repository contains the source code and configuration for WPLokerBJM, which
 
 ## Project Structure
 
-- `wordpress/themes/astra-child`:  
+- `wordpress/wp-content/themes/astra-child`:  
   The main directory for theme customizations. Extends the Astra parent theme with custom features, styles, and templates for the Lowker-site project.
 
-- `wordpress/themes/astra-child/inc`:  
+- `wordpress/wp-content/themes/astra-child/inc`:  
   Contains backend PHP code, including custom functions, REST APIs, hooks, and filters. This may include custom post types, meta fields, and integration logic.
 
-- `wordpress/themes/astra-child/src`:  
+- `wordpress/wp-content/themes/astra-child/src`:  
   Contains Vue components and all client-side code that enhances the user interface.
 
 ---
@@ -20,7 +20,7 @@ This repository contains the source code and configuration for WPLokerBJM, which
 ### Core Plugins
 
 1. **MetaBox**  
-   See `wordpress/themes/astra-child/inc/Models/Schema` for the dynamic data framework.
+   See `wordpress/wp-content/themes/astra-child/inc/Models/Schema` for the dynamic data framework.
 
 2. **Rank Math SEO**  
    Uses a custom Job Posting schema. See the `JobService::class` in PHP.
@@ -44,6 +44,7 @@ inc/
 │   ├── Container.php          # Dependency Injection container (PHP-DI)
 │   ├── Definitions/           # Container definitions
 │   ├── Enqueue.php            # Registers/enqueues scripts and styles
+│   ├── Hooks/                  # Sub-Hooks
 │   ├── Hooks.php              # Registers custom WP actions and filters
 │   ├── Init.php               # Initializes services and hooks
 ├── Factories/                 # Factory classes

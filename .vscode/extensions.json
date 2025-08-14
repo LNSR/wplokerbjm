@@ -2,6 +2,8 @@
     "recommendations": [
         "DEVSENSE.phptools-vscode",
         "bradlc.vscode-tailwindcss",
-        "Vue.volar"
+        "Vue.volar",
+        "matthewpi.caddyfile-support",
+        "aaron-bond.better-comments"
     ]
 }

@@ -1,6 +1,9 @@
 :443 {
   tls /var/www/certs/localhost.crt /var/www/certs/localhost.key # Use your own certificate
   root * /var/www/html
+  # WordPress: try existing file, then directory, otherwise fall back to index.php
+  # This enables pretty permalinks to be handled by WordPress.
+  try_files {path} {path}/ /index.php?{query}
   php_fastcgi wordpress:9000
 
   # Rewrite /node_modules/* to the {your-theme} node_modules directory
@@ -17,6 +20,7 @@
     zstd best
   }
 
+  # Default security headers
   header {
     Access-Control-Allow-Origin *
     Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
@@ -27,7 +31,26 @@
     X-Frame-Options "SAMEORIGIN"
     X-XSS-Protection "1; mode=block"
     Permissions-Policy "geolocation=(), microphone=(), camera=()"
+  }
+
+  # Aggressive cache for static assets
+  @static_assets {
+    path_regexp static_assets ".*\.(?:js|css|png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf|eot|otf|mp4|webm|ogg|mp3|json|xml|map)$"
+  }
+  header @static_assets {
     Cache-Control "public, max-age=31536000, immutable"
+    Expires "Thu, 31 Dec 2037 23:55:55 GMT"
+    Pragma "cache"
+  }
+
+  # No cache for HTML/PHP (dynamic content)
+  @dynamic_content {
+    path_regexp dynamic_content ".*\.(?:php|html?)$"
+  }
+  header @dynamic_content {
+    Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
+    Pragma "no-cache"
+    Expires "0"
   }
 
   log {

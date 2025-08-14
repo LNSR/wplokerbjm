@@ -9,7 +9,8 @@ services:
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      WP_ENV: "development"
+      WORDPRESS_DEBUG: "true"
+      WP_ENV: ${WP_ENV} # "development" | "production"
       WP_REPAIR: "false"
       FORCE_SSL_ADMIN: "true"
       WP_HOME: ${WORDPRESS_WP_HOME}
@@ -115,7 +116,7 @@ services:
         define('WP_ALLOW_REPAIR', filter_var(getenv('WP_REPAIR'), FILTER_VALIDATE_BOOLEAN) ? true : false);
     volumes:
       - wordpress:/var/www/html
-      - ./wordpress:/var/www/html/wp-content
+      - ./wordpress/wp-content:/var/www/html/wp-content
     depends_on:
       - db
     healthcheck:
@@ -129,15 +130,16 @@ services:
   caddy:
     image: caddy:latest
     container_name: caddy
+    environment:
+      - WP_ENV=${WP_ENV}
     depends_on:
       - wordpress
     ports:
-      - "443:443/udp"
-      - "443:443/tcp"
+      - "443:443"
       - "80:80"
     volumes:
       - wordpress:/var/www/html:ro
-      - ./wordpress:/var/www/html/wp-content:ro
+      - ./wordpress/wp-content:/var/www/html/wp-content:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # generate your own SSL
       - ./localhost.pem:/var/www/certs/localhost.crt:ro
@@ -160,16 +162,7 @@ services:
     ports:
       - "3306:3306"
     healthcheck:
-      test:
-        [
-          "CMD",
-          "mysqladmin",
-          "ping",
-          "-h",
-          "localhost",
-          "-u$$MYSQL_USER",
-          "-p$$MYSQL_PASSWORD",
-        ]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3

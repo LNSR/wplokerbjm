@@ -3,8 +3,5 @@
   "intelephense.environment.includePaths": [
     "wordpress/wp-content/themes/astra-child/vendor/php-stubs/wordpress-stubs"
   ],
-  "php.version": "8.4.8",
-  "typescript.tsdk": "node_modules/typescript/lib",
-  "volar.takeOverMode.enabled": true,
   "editor.codeLens": true
 }
