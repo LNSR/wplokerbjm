@@ -31,7 +31,7 @@
     "@volar/vue-language-server": "^1.6.5",
     "@vue/tsconfig": "^0.7.0",
     "daisyui": "^5.0.50",
-    "eslint": "^9.33.0",
+    "eslint": "^9.34.0",
     "eslint-plugin-vue": "^10.4.0",
     "rollup-plugin-visualizer": "^6.0.3",
     "tailwindcss": "^4.1.12",

@@ -37,17 +37,20 @@ export default defineConfig(({ command }) => ({
       "@assets": resolve(__dirname, "./assets"),
     },
   },
-  server: {
-    host: "0.0.0.0",
-    port: 5173,
-    cors: true,
-    https: {
-      key: fs.readFileSync(
+  server: (() => {
+    const base = { host: "0.0.0.0", port: 5173, cors: true };
+    if (command !== "serve") return base;
+    try {
+      const key = fs.readFileSync(
         path.resolve(__dirname, "../../../../localhost-key.pem")
-      ),
-      cert: fs.readFileSync(path.resolve(__dirname, "../../../../localhost.pem")),
-    },
-  },
+      );
+      const cert = fs.readFileSync(path.resolve(__dirname, "../../../../localhost.pem"));
+      return { ...base, https: { key, cert } };
+    } catch (err) {
+      console.warn("Local HTTPS certs not available; running dev server without HTTPS:", String(err));
+      return base;
+    }
+  })(),
   ...(command === "build"
     ? { base: "/wp-content/themes/astra-child/assets/dist/" }
     : {}),
@@ -77,7 +80,6 @@ export default defineConfig(({ command }) => ({
           if (assetName && /\.(woff2?|ttf|otf|eot)$/.test(assetName)) {
             return "webfonts/[name]-[hash][extname]";
           }
-          // images or other assets
           return "assets/[name]-[hash][extname]";
         },
         // ! Must split inversify.config.ts because MOUNT runtime in production causing timing issues
@@ -114,6 +116,6 @@ export default defineConfig(({ command }) => ({
       },
       keep_classnames: false, // Set to true if you need class names for DI
       keep_fnames: false, // Set to true if you need function names for debugging
-    },
-  },
+    }
+  }
 }));

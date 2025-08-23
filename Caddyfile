@@ -1,14 +1,14 @@
 :443 {
-  tls /var/www/certs/localhost.crt /var/www/certs/localhost.key # Use your own certificate
+  tls /var/www/certs/localhost.crt /var/www/certs/localhost.key # ! Use your own certificate
   root * /var/www/html
   # WordPress: try existing file, then directory, otherwise fall back to index.php
   # This enables pretty permalinks to be handled by WordPress.
   try_files {path} {path}/ /index.php?{query}
   php_fastcgi wordpress:9000
 
-  # Rewrite /node_modules/* to the {your-theme} node_modules directory
-  # Use this to serve local node_modules for development purposes
-  # This assumes the node_modules directory is located at /var/www/html/wp-content/themes/{your-theme}/node_modules
+  # * Rewrite /node_modules/* to the {your-theme} node_modules directory
+  # * Use this to serve local node_modules for development purposes
+  # * This assumes the node_modules directory is located at /var/www/html/wp-content/themes/{your-theme}/node_modules
   @node_modules_path path_regexp node_modules ^/node_modules/(.*)$
   rewrite @node_modules_path /wp-content/themes/astra-child/node_modules/{re.node_modules.1}
 

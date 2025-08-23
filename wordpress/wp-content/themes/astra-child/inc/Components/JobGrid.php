@@ -3,14 +3,12 @@
 namespace AstraChild\Components;
 use AstraChild\Repositories\JobRepository;
 use AstraChild\Services\Job\JobServices;
-use AstraChild\Services\REST\RESTData;
 
 class JobGrid
 {
 
     public function __construct(
         private JobServices $jobServices,
-        private RESTData $restData,
         private JobRepository $jobRepository
     ) {
     }

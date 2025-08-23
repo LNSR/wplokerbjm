@@ -29,7 +29,6 @@ export class MounterService {
         comp = maybe;
       }
     } else if (comp && typeof (comp as any).then === "function") {
-      // it's a Promise (import(...))
       const mod = await (comp as any);
       comp = mod && (mod as any).default ? (mod as any).default : mod;
     }
@@ -53,7 +52,6 @@ export class MounterService {
           try {
             return await resolver(component);
           } catch (err) {
-            // remove from cache so future attempts can retry
             cache.delete(component);
             throw err;
           }
@@ -65,9 +63,8 @@ export class MounterService {
 
     return { getResolvePromise } as const;
   }
-  
-  placeHolderRemoval(element: Element) {
-    // Save user state so we can restore after placeholder removed
+
+  placeholderRemoval(element: Element) {
     const previousActive = (typeof document !== 'undefined' && document.activeElement) ? document.activeElement as HTMLElement | null : null;
     const previousScroll = (typeof window !== 'undefined') ? { x: window.scrollX || 0, y: window.scrollY || 0 } : { x: 0, y: 0 };
 
@@ -102,7 +99,6 @@ export class MounterService {
           placeholder.remove();
         }
 
-        // restore focus/scroll after removal to avoid trapping keyboard users
         restoreUserState();
       } catch (err) {
         console.error('Failed to remove placeholder (immediate)', err);
@@ -114,7 +110,6 @@ export class MounterService {
         const placeholder = element.querySelector('.component-placeholder') as HTMLElement | null;
         if (!placeholder || placeholder.parentElement !== element) return;
 
-        // mark aria busy -> false so screen readers are informed before removal
         try { placeholder.setAttribute('aria-busy', 'false'); } catch { /* ignore */ }
 
         // trigger CSS fade
@@ -144,7 +139,6 @@ export class MounterService {
         // restore focus/scroll after fade removal
         restoreUserState();
       } catch {
-        // best-effort: attempt immediate removal; ignore nested errors
         try { removePlaceholderImmediate(); } catch { /* ignore */ }
       }
     };
@@ -152,6 +146,29 @@ export class MounterService {
     return { removePlaceholderImmediate, removePlaceholderWithFade, restoreUserState } as const;
   }
 
+  parseProps(element: Element, propAttr: string): Record<string, unknown> {
+    const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`) as HTMLScriptElement | null;
+    let props: any = {};
+
+    if (scriptElement) {
+      const raw = scriptElement.textContent || scriptElement.innerHTML || "";
+      try {
+        props = raw ? JSON.parse(raw) : {};
+      } catch (err) {
+        console.error('Failed to parse props from <script> content:', err);
+        props = {};
+      }
+    }
+
+    const isDev = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env && (import.meta as any).env.DEV);
+      if (!isDev) {
+        if (scriptElement && scriptElement.parentElement) {
+          try { scriptElement.remove(); } catch { /* ignore */ }
+        }
+      }
+
+    return props;
+  }
 
   /**
    * Mount a resolved component VNode into an element using the provided app context.
@@ -168,10 +185,9 @@ export class MounterService {
     const FALLBACK_REMOVE_MS = 7000; // ms before we forcibly remove placeholder
     let fallbackTimer: number | undefined;
 
-  const { removePlaceholderImmediate, removePlaceholderWithFade } = this.placeHolderRemoval(element);
+    const { removePlaceholderImmediate, removePlaceholderWithFade } = this.placeholderRemoval(element);
 
     try {
-      // start fallback timer (in case mount never completes)
       fallbackTimer = window.setTimeout(() => {
         console.warn(`Mount timeout (${FALLBACK_REMOVE_MS}ms) for ${config.selector} — removing placeholder.`);
         removePlaceholderImmediate();
@@ -180,9 +196,7 @@ export class MounterService {
       const resolved = await resolvedPromise;
       if (!resolved) throw new Error("Component resolved to falsy value");
 
-      const props: any = element.hasAttribute(propAttr)
-        ? JSON.parse(element.getAttribute(propAttr) || "{}")
-        : {};
+      const props = this.parseProps(element, propAttr);
 
       const vnode: VNode = createVNode(resolved, props as Record<string, unknown>);
       (vnode as any).appContext = (rootApp as any)._context;
@@ -191,10 +205,6 @@ export class MounterService {
       element.setAttribute("component-mounted", "1");
 
       await nextTick();
-
-      if (element.hasAttribute(propAttr)) {
-        element.removeAttribute(propAttr);
-      }
 
       // remove placeholder with fade-out for smooth UX
       await removePlaceholderWithFade();

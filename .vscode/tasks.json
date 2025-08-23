@@ -1,0 +1,45 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "dev",
+      "type": "shell",
+      "command": "bunx vite",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/wordpress/wp-content/themes/astra-child"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "build",
+      "type": "shell",
+      "command": "bunx vue-tsc -b && bunx eslint --ext .ts,.vue src && bunx vite build",
+      "group": "build",
+      "options": {
+        "cwd": "${workspaceFolder}/wordpress/wp-content/themes/astra-child"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "preview",
+      "type": "shell",
+      "command": "bunx vite preview",
+      "group": "test",
+      "options": {
+        "cwd": "${workspaceFolder}/wordpress/wp-content/themes/astra-child"
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "lint",
+      "type": "shell",
+      "command": "bunx eslint --ext .ts,.vue src && bunx vue-tsc --noEmit",
+      "group": "test",
+      "options": {
+        "cwd": "${workspaceFolder}/wordpress/wp-content/themes/astra-child"
+      },
+      "problemMatcher": ["$eslint-stylish"]
+    }
+  ]
+}

@@ -4,18 +4,16 @@
 			"path": "."
 		},
 		{
+			// Parent theme reference
 			"path": "wordpress/wp-content/themes/astra"
 		},
 		{
 			"path": "wordpress/wp-content/themes/astra-child"
 		},
-		{
-			"path": "/tmp/Downloads"
-		}
 	],
 	"settings": {
 		"php.version": "8.4",
-		"typescript.tsdk": "astra-child/node_modules/typescript/lib",
+		"typescript.tsdk": "wordpress/wp-content/themes/astra-child/node_modules/typescript/lib",
 		"php.stubs": [
 			"apcu",
 			"composer",

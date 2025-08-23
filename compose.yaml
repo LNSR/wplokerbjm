@@ -86,8 +86,8 @@ services:
             if (!defined('WP_DEBUG')) define('WP_DEBUG', false);
             if (!defined('WP_DEBUG_DISPLAY')) define('WP_DEBUG_DISPLAY', false);
             if (!defined('SCRIPT_DEBUG')) define('SCRIPT_DEBUG', false);
-            define('DISALLOW_FILE_EDIT', true);
-            define('DISALLOW_FILE_MODS', true);
+            define('DISALLOW_FILE_EDIT', false);
+            define('DISALLOW_FILE_MODS', false);
             define('WP_ENVIRONMENT_TYPE', 'production');
             define('FORCE_SSL_ADMIN', true); // Force SSL for admin
             define('AUTOSAVE_INTERVAL', 300); // Autosave every 5 minutes
@@ -96,8 +96,11 @@ services:
             define('WP_MEMORY_LIMIT', '2048M'); // Set memory limit
             define('WP_MAX_MEMORY_LIMIT', '8196M'); // Set max memory limit
             define('WP_CRON_LOCK_TIMEOUT', 60); // Cron lock timeout
-            define('WP_AUTO_UPDATE_CORE', false); // Disable core auto-updates
-            define('DISABLE_WP_CRON', true); // Use system cron instead
+            
+            define('WP_AUTO_UPDATE_CORE', true);
+            define('DISABLE_WP_CRON', false);
+
+            // Asset concatenation/compression
             define('CONCATENATE_SCRIPTS', true); // Combine JS files
             define('COMPRESS_SCRIPTS', true); // Compress JS
             define('COMPRESS_CSS', true); // Compress CSS
@@ -130,8 +133,6 @@ services:
   caddy:
     image: caddy:latest
     container_name: caddy
-    environment:
-      - WP_ENV=${WP_ENV}
     depends_on:
       - wordpress
     ports:
@@ -141,7 +142,7 @@ services:
       - wordpress:/var/www/html:ro
       - ./wordpress/wp-content:/var/www/html/wp-content:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      # generate your own SSL
+      # generate your own SSL via "mkcert"
       - ./localhost.pem:/var/www/certs/localhost.crt:ro
       - ./localhost-key.pem:/var/www/certs/localhost.key:ro
       - type: tmpfs

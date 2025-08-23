@@ -8,8 +8,6 @@ export interface LayoutProps {
 export interface ComponentConfig {
   selector: string
   component: any
-  /** If true, ensure the app router is installed on the shared root app before mounting */
-  useRouter?: boolean
 }
 
 // Props for the JobCard component (shared type)

@@ -5,7 +5,7 @@ This repository contains the source code and configuration for WPLokerBJM, which
 ## Project Structure
 
 - `wordpress/wp-content/themes/astra-child`:  
-  The main directory for theme customizations. Extends the Astra parent theme with custom features, styles, and templates for the Lowker-site project.
+  The main directory for theme customizations. Extends the Astra parent theme with custom features, styles, and templates for the WPLokerBJM.
 
 - `wordpress/wp-content/themes/astra-child/inc`:  
   Contains backend PHP code, including custom functions, REST APIs, hooks, and filters. This may include custom post types, meta fields, and integration logic.
@@ -15,41 +15,60 @@ This repository contains the source code and configuration for WPLokerBJM, which
 
 ---
 
-## Backend Structure
+## Setup Configuration
+```
+├── Caddyfile                          # Reverse Proxy. See https://caddyserver.com/docs/
+├── compose.yaml
+├── docker.conf.d                      # Images Docker configurations
+├── Dockerfile
+├── localhost-key.pem                  # Generated via mkcert, used for HTTPS local dev
+├── localhost.pem                      # Same(but for public cert)
+├── readme.md
+├── wordpress                          # Wordpress installation
+├── wpcli.sh                           # Provide alias for "wpcli"(change to your own container)
+└── wplokerbjm.code-workspace
+```
 
-### Core Plugins
+## Wordpress Core Plugins
 
 1. **MetaBox**  
+
    See `wordpress/wp-content/themes/astra-child/inc/Models/Schema` for the dynamic data framework.
 
 2. **Rank Math SEO**  
-   Uses a custom Job Posting schema. See the `JobService::class` in PHP.
 
-3. **Updraft Plus**  
+   Uses a custom Job Posting schema. See the `JobService::class` in PHP. # Optional
+
+3. **Updraft Plus**
+
    Provides backup and restore functionality.
 
-### Backend Architecture
+4. **Litespeed Cache**
+
+   Caching solution # choose another if not using Litespeed Server
+
+### Backend Structure
 
 The backend code is organized as follows:
 
 ```
 inc/
-├── Components/                # PHP UI components
+├── Components/                # PHP UI components (migrated to CSR frontend, provide only initial data)
 ├── Contracts/                 # Interfaces for data providers and hooks
 │   └── HooksInterface.php     # Interface for WP Hooks
 ├── Controllers/               # Controllers
 │   └── REST/                  # REST API controllers
 ├── Core/                      # Core framework and dependency injection
-│   ├── AutowireScanner.php    # Scans for PHP files for autowiring
+│   ├── AutowireScanner.php    # Scans for PHP files for autowiring #
 │   ├── Container.php          # Dependency Injection container (PHP-DI)
 │   ├── Definitions/           # Container definitions
 │   ├── Enqueue.php            # Registers/enqueues scripts and styles
-│   ├── Hooks/                  # Sub-Hooks
+│   ├── Hooks/                 # Sub-Hooks
 │   ├── Hooks.php              # Registers custom WP actions and filters
 │   ├── Init.php               # Initializes services and hooks
 ├── Factories/                 # Factory classes
 ├── Layouts/                   # Reusable page/section layouts
-│   └── Layouts.php
+│   └── Layouts.php            # (migrated to CSR frontend, provide only initial data)
 ├── Models/                    # Data models and schema definitions
 │   ├── CustomFieldEntity.php
 │   ├── Schema/                # MetaBox fields, post types, taxonomies (reference only)
@@ -61,8 +80,8 @@ inc/
 │   └── JobQuery.php
 ├── Repositories/              # Data repositories
 ├── Services/                  # Business logic/services
-├── ViewModels/                # Page view models
-└── Views/                     # PHP view templates
+├── ViewModels/                # Page view models (migrated to CSR frontend, provide only initial data)
+└── Views/                     # PHP view templates (migrated to CSR frontend, provide only initial data)
 ```
 
 ---
@@ -79,16 +98,15 @@ src/
 │   ├── Error.ts               # API error handling
 │   └── index.ts               # API module entry
 ├── app                        # App bootstrap, mounting, routing
-│   ├── Factory.ts
+│   ├── entry/                 # entry components setup             
+│   ├── Factory.ts             
 │   ├── index.ts
 │   ├── Mounter.ts
 │   └── Router.ts
 ├── components                 # Vue UI components
 │   ├── Homepage               # Homepage-specific components
+│   ├── Shared                 # Shared inter-components
 ├── composables                # Vue composables (reusable logic)
-├── container                  # Dependency injection setup
-│   └── inversify
-│       └── inversify.config.ts
 ├── layouts                    # App layout components
 ├── pages                      # Page-level Vue components
 ├── services                   # Service classes (API, Auth, etc.)
@@ -97,13 +115,14 @@ src/
 ├── utils                      # Utility functions
 ├── global.d.ts                # Global TypeScript declarations
 ├── main.ts                    # Vue app entry point
+├── inversify.config.ts        # Inversify Container
 ├── shims-vue.d.ts             # Vue shims for TypeScript
 └── vite-env.d.ts              # Vite env type declarations
 ```
 
 ---
 
-## Setup Instructions
+## Setup Dev instruction
 
 1. **Clone the repository**
 
@@ -114,14 +133,14 @@ src/
 
 3. **Generate SSL certificates** (for HTTPS)
 
-   Using **Caddy** or **mkcert**:
-
+   Using **Caddy** or **mkcert** (your choice)
    ```sh
+   # mkcert only
    mkcert -install
    mkcert localhost 127.0.0.1 ::1  # Use your own IP or domain if needed
    ```
 
-4. **Start Docker containers**
+4. **Spin Docker containers**
 
    - **Set correct permissions (before containers are running)**  
      The container needs UID/GID `1000` for read/write access, instead of the container's `www-data` user (`33`):
@@ -137,3 +156,7 @@ src/
       docker exec -it -u root <your_wordpress_container> bash
       chown -R wordpress:wordpress /var/www/html/*
      ```
+
+5. **Run `bun vite dev` or `VSCode's terminal > Run Task > dev`**
+
+## See [Project Notes](wordpress/wp-content/themes/astra-child/README.md)

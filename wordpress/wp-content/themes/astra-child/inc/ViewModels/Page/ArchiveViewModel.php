@@ -35,7 +35,6 @@ class ArchiveViewModel
 
 		$query_args = JobQuery::searchJobsArgs($params, $paged, 36);
 
-		// get total jobs for pagination info
 		$jobs_query = new \WP_Query($query_args);
 		$total_jobs = $jobs_query->found_posts;
 		wp_reset_postdata();

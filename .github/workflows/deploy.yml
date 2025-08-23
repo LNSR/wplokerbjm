@@ -1,0 +1,191 @@
+name: Build & Deploy Theme via Rclone
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Perform a dry-run rsync instead of a real deploy'
+        required: false
+        default: 'true'
+
+env:
+  THEME_DIR: wordpress/wp-content/themes/astra-child
+
+jobs:
+  build-and-deploy:
+    name: Build and deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Verify Bun
+        run: |
+          echo "Bun: $(bun --version || echo 'bun not found')"
+
+      - name: Install dependencies (theme)
+        working-directory: ${{ env.THEME_DIR }}
+        run: |
+          # ensure bun is available
+          echo "Bun: $(bun --version || echo 'bun not found')"
+          bun install
+
+      - name: Build (theme)
+        working-directory: ${{ env.THEME_DIR }}
+        run: bun run build
+
+      - name: Setup PHP & Composer
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          tools: composer:v2
+
+      - name: Composer install (no-dev)
+        working-directory: ${{ env.THEME_DIR }}
+        run: |
+          composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
+
+      - name: Prepare SSH key
+        # Writes SSH key to temporary file, optionally strips passphrase, and adds to agent
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KEY_PASSPHRASE: ${{ secrets.SSH_KEY_PASSPHRASE }}
+          HOST: ${{ secrets.HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set -e
+          mkdir -p ~/.ssh
+          echo "Writing deploy key"
+          echo "$SSH_PRIVATE_KEY" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          # If a passphrase is provided, remove it so ssh-add can use the key non-interactively
+          if [ -n "$SSH_KEY_PASSPHRASE" ]; then
+            echo "Removing passphrase from key"
+            ssh-keygen -p -P "$SSH_KEY_PASSPHRASE" -N "" -f /tmp/deploy_key || true
+          fi
+          eval "$(ssh-agent -s)"
+          ssh-add /tmp/deploy_key
+          # Ensure known_hosts contains the host fingerprint (use provided port or default 22)
+          # Default to port 22; set a non-standard port via the `SSH_PORT` repository secret
+          PORT=${SSH_PORT:-22}
+          ssh-keyscan -p $PORT $HOST >> ~/.ssh/known_hosts || true
+
+      - name: Verify deploy key is usable (non-interactive)
+        env:
+          SSH_KEY_PASSPHRASE: ${{ secrets.SSH_KEY_PASSPHRASE }}
+        run: |
+          set -e
+          # Quick check: ssh-keygen -y fails if the key is passphrase-protected or invalid
+          if ssh-keygen -y -f /tmp/deploy_key >/dev/null 2>&1; then
+            echo "Deploy key is not passphrase-protected or is already unlocked"
+            exit 0
+          fi
+
+          if [ -n "${SSH_KEY_PASSPHRASE:-}" ]; then
+            echo "Deploy key appears encrypted; attempting to strip passphrase using SSH_KEY_PASSPHRASE"
+            ssh-keygen -p -P "$SSH_KEY_PASSPHRASE" -N "" -f /tmp/deploy_key || true
+            if ssh-keygen -y -f /tmp/deploy_key >/dev/null 2>&1; then
+              echo "Passphrase removed from deploy key"
+              exit 0
+            fi
+          fi
+
+          echo "ERROR: /tmp/deploy_key is passphrase-protected or invalid and could not be unlocked non-interactively."
+          echo "Options: (1) set the SSH_KEY_PASSPHRASE secret to the key's passphrase so the workflow can strip it;"
+          echo "         (2) use an unencrypted private key in SSH_PRIVATE_KEY;"
+          exit 1
+
+      - name: SSH auth check (using deploy key)
+        # Diagnostic: try authenticating with the exact deploy key that will be used by rsync.
+        # Don't fail the job on this step; we upload the log for inspection.
+        continue-on-error: true
+        env:
+          SSH_USER: ${{ secrets.SSH_USER }}
+          HOST: ${{ secrets.HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+        run: |
+          set +e
+          PORT=${SSH_PORT:-22}
+          AUTH_LOG="$GITHUB_WORKSPACE/ssh-auth.log"
+          echo "Testing SSH auth to ${SSH_USER}@${HOST} port $PORT using /tmp/deploy_key" > "$AUTH_LOG"
+          # Use IdentitiesOnly to ensure ssh uses only the provided key
+          ssh -i /tmp/deploy_key -o IdentitiesOnly=yes -o BatchMode=yes -o ConnectTimeout=10 -vvv -p $PORT ${SSH_USER}@${HOST} 'echo SSH_AUTH_OK' 2>&1 | tee -a "$AUTH_LOG" || true
+      - name: Setup rclone
+        uses: AnimMouse/setup-rclone@v1
+
+      - name: Install rclone and sync via SFTP
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          HOST: ${{ secrets.HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          REMOTE_PATH: ${{ secrets.REMOTE_PATH }}
+          SRC_DIR: ${{ env.THEME_DIR }}
+          DRY_RUN: ${{ github.event.inputs.dry_run }}
+        run: |
+          set -euo pipefail
+
+          RSYNC_LOG="$GITHUB_WORKSPACE/rsync.log"
+          mkdir -p "$(dirname "$RSYNC_LOG")"
+          echo "Logging deploy output to $RSYNC_LOG"
+
+          eval "$(ssh-agent -s)"
+          chmod 600 /tmp/deploy_key || true
+          if [ -n "${SSH_KEY_PASSPHRASE:-}" ]; then
+            ssh-keygen -p -P "$SSH_KEY_PASSPHRASE" -N "" -f /tmp/deploy_key || true
+          fi
+          ssh-add /tmp/deploy_key
+          ssh-add -l || (echo 'ssh-agent has no keys; failing' && exit 1)
+          PORT=${SSH_PORT:-22}
+          mkdir -p ~/.ssh
+          ssh-keyscan -p $PORT $HOST >> ~/.ssh/known_hosts || true
+
+          rclone config create sftpdeploy sftp host ${HOST} user ${SSH_USER} port ${SSH_PORT:-22} use-agent true
+
+          cd "$SRC_DIR"
+
+          SELECTED=(
+            "cache"
+            "inc"
+            "footer.php"
+            "functions.php"
+            "page-homepage.php"
+            "page-pasang-lowongan.php"
+            "single-lowongan.php"
+            "archive-lowongan.php"
+            "assets"
+            "vendor"
+          )
+
+          RCLONE_BASE_OPTS="--progress --transfers 4 --checkers 8 --sftp-disable-hashcheck --retries 3 --low-level-retries 10 --timeout 1m --contimeout 1m"
+
+          if [ -z "$DRY_RUN" ] || [ "$DRY_RUN" = "true" ]; then
+            DRY_FLAG="--dry-run"
+          else
+            DRY_FLAG=""
+          fi
+
+          for p in "${SELECTED[@]}"; do
+            if [ ! -e "$p" ]; then
+              echo "Skipping $p; not present" | tee -a "$RSYNC_LOG"
+              continue
+            fi
+
+            if [ -f "$p" ]; then
+              REMOTE_DIR="${REMOTE_PATH%/}"
+              echo "rclone copy $p -> sftpdeploy:${REMOTE_DIR}/ $DRY_FLAG" | tee -a "$RSYNC_LOG"
+              rclone copy $DRY_FLAG $RCLONE_BASE_OPTS "$p" "sftpdeploy:${REMOTE_DIR}/" 2>&1 | tee -a "$RSYNC_LOG"
+            else
+              REMOTE_TARGET="${REMOTE_PATH%/}/$p"
+              echo "rclone sync $p -> sftpdeploy:$REMOTE_TARGET $DRY_FLAG" | tee -a "$RSYNC_LOG"
+              rclone sync $DRY_FLAG $RCLONE_BASE_OPTS "$p" "sftpdeploy:$REMOTE_TARGET" 2>&1 | tee -a "$RSYNC_LOG"
+            fi
+          done
+          ssh-agent -k || true
+

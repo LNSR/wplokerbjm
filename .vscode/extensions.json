@@ -4,6 +4,11 @@
         "bradlc.vscode-tailwindcss",
         "Vue.volar",
         "matthewpi.caddyfile-support",
-        "aaron-bond.better-comments"
+        "aaron-bond.better-comments",
+        "dbaeumer.vscode-eslint",
+        "devsense.composer-php-vscode",
+        "docker.docker",
+        "ms-azuretools.vscode-docker",
+        "esbenp.prettier-vscode"
     ]
 }
