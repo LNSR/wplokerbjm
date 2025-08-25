@@ -29,17 +29,7 @@ class SingleView
 			<script type="application/json" data-props>
 				<?= wp_json_encode($this->getProps($post_id), JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
 			</script>
-
-			<?php
-			$theme_dir = get_theme_file_path('');
-			$skeleton = $theme_dir . '/assets/dist/skeletons/single-lowongan.html';
-
-			if (file_exists($skeleton)) {
-				echo file_get_contents($skeleton);
-			} else {
-				echo Placeholder::render();
-			}
-			?>
+			<?= Placeholder::render(); ?>
 		</div>
 		<?php
 	}
