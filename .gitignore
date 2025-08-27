@@ -7,6 +7,7 @@ wordpress/wp-content/themes/*
 **/dist
 .env
 **/cache
+!wordpress/wp-content/themes/astra-child/cache
 **/vendor
 **/node_modules
 **/bun.lock
