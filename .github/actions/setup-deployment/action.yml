@@ -1,0 +1,56 @@
+name: "Setup Deployment"
+description: "Setup SSH keys and deployment tools"
+
+inputs:
+  skip-ssh-setup:
+    description: "Skip SSH setup steps"
+    required: false
+    default: "false"
+  ssh-private-key:
+    description: "SSH private key"
+    required: false
+  ssh-key-passphrase:
+    description: "SSH key passphrase"
+    required: false
+  host:
+    description: "Remote host"
+    required: false
+  ssh-port:
+    description: "SSH port"
+    required: false
+  ssh-user:
+    description: "SSH username"
+    required: false
+
+runs:
+  using: "composite"
+  steps:
+    - name: Prepare SSH key
+      if: ${{ inputs.skip-ssh-setup != 'true' }}
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.ssh-private-key }}
+        SSH_KEY_PASSPHRASE: ${{ inputs.ssh-key-passphrase }}
+        HOST: ${{ inputs.host }}
+        SSH_PORT: ${{ inputs.ssh-port }}
+      run: bash .github/scripts/prepare-ssh-key.sh
+      shell: bash
+
+    - name: Verify deploy key is usable (non-interactive)
+      if: ${{ inputs.skip-ssh-setup != 'true' }}
+      env:
+        SSH_KEY_PASSPHRASE: ${{ inputs.ssh-key-passphrase }}
+      run: bash .github/scripts/verify-deploy-key.sh
+      shell: bash
+
+    - name: SSH auth check (using deploy key)
+      if: ${{ inputs.skip-ssh-setup != 'true' }}
+      continue-on-error: true
+      env:
+        SSH_USER: ${{ inputs.ssh-user }}
+        HOST: ${{ inputs.host }}
+        SSH_PORT: ${{ inputs.ssh-port }}
+      run: bash .github/scripts/ssh-auth-check.sh
+      shell: bash
+
+    - name: Setup rclone
+      uses: AnimMouse/setup-rclone@v1

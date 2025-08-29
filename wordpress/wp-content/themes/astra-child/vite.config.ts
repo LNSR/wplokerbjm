@@ -4,7 +4,6 @@ import vue from "@vitejs/plugin-vue";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "path";
 import liveReload from "vite-plugin-live-reload";
-import Inspector from "vite-plugin-vue-inspector";
 // import { compression, defineAlgorithm } from "vite-plugin-compression2";
 import { visualizer } from "rollup-plugin-visualizer";
 // import { constants as zlibConstants } from "zlib";
@@ -16,7 +15,6 @@ export default defineConfig(({ command }) => ({
     vue(),
     tailwindcss(),
     liveReload(["./**/*.php"]),
-    Inspector(),
     // compression({
     //   algorithms: [
     //     defineAlgorithm("zstd", {
@@ -97,7 +95,18 @@ export default defineConfig(({ command }) => ({
         drop_debugger: true,
         passes: 3,
         ecma: 2020,
-        pure_funcs: ["console.info"],
+        pure_funcs: [
+          "console.info",
+          "console.debug",
+          "console.warn",
+          "console.error",
+          "console.log",
+          "console.table",
+          "console.group",
+          "console.groupEnd",
+          "console.time",
+          "console.timeEnd"
+        ],
         module: true,
         toplevel: true,
         unsafe: true,

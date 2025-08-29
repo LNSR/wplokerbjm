@@ -62,8 +62,10 @@ export function useSearchForm(props: SearchFormProps, emit: any) {
     }
     if (selectedSuggestionIndex.value >= 0 && searchStore.hasSuggestions) {
       const suggestion = searchStore.suggestions[selectedSuggestionIndex.value];
-      selectSuggestion(suggestion);
-      return;
+      if (suggestion) {
+        selectSuggestion(suggestion);
+        return;
+      }
     }
     try {
       const response = await searchStore.searchJobs();

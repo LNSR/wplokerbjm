@@ -28,19 +28,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-
-      - name: Verify Bun
-        run: |
-          echo "Bun: $(bun --version || echo 'bun not found')"
-
-      - name: Install dependencies (theme)
-        working-directory: ${{ env.THEME_DIR }}
-        run: |
-          # ensure bun is available
-          echo "Bun: $(bun --version || echo 'bun not found')"
-          bun install
+      - name: Setup dependencies
+        uses: ./.github/actions/setup-dependencies
+        with:
+          theme-dir: ${{ env.THEME_DIR }}
+          install-jq: false
+          install-playwright: false
 
       - name: Build (theme)
         working-directory: ${{ env.THEME_DIR }}
@@ -57,33 +50,19 @@ jobs:
         run: |
           composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader
 
-      - name: Prepare SSH key
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_KEY_PASSPHRASE: ${{ secrets.SSH_KEY_PASSPHRASE }}
-          HOST: ${{ secrets.HOST }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-        run: bash .github/scripts/prepare-ssh-key.sh
-
-      - name: Verify deploy key is usable (non-interactive)
-        env:
-          SSH_KEY_PASSPHRASE: ${{ secrets.SSH_KEY_PASSPHRASE }}
-        run: bash .github/scripts/verify-deploy-key.sh
-
-      - name: SSH auth check (using deploy key)
-        # Diagnostic: try authenticating with the exact deploy key that will be used by Rclone.
-        continue-on-error: true
-        env:
-          SSH_USER: ${{ secrets.SSH_USER }}
-          HOST: ${{ secrets.HOST }}
-          SSH_PORT: ${{ secrets.SSH_PORT }}
-        run: bash .github/scripts/ssh-auth-check.sh
-      - name: Setup rclone
-        uses: AnimMouse/setup-rclone@v1
+      - name: Setup deployment
+        uses: ./.github/actions/setup-deployment
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-key-passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }}
+          host: ${{ secrets.HOST }}
+          ssh-port: ${{ secrets.SSH_PORT }}
+          ssh-user: ${{ secrets.SSH_USER }}
 
       - name: Install rclone and sync via SFTP
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          SSH_KEY_PASSPHRASE: ${{ secrets.SSH_KEY_PASSPHRASE }}
           SSH_USER: ${{ secrets.SSH_USER }}
           HOST: ${{ secrets.HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
@@ -95,4 +74,4 @@ jobs:
           RCLONE_RETRIES: ${{ env.RCLONE_RETRIES }}
           RCLONE_LOW_RETRIES: ${{ env.RCLONE_LOW_RETRIES }}
           RCLONE_LOG_LEVEL: ${{ env.RCLONE_LOG_LEVEL }}
-        run: bash .github/scripts/rclone-sync.sh
+        run: bash .github/scripts/deploy/rclone-sync.sh

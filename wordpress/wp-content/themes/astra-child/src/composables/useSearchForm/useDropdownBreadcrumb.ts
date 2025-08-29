@@ -1,8 +1,9 @@
 import { ref, computed } from 'vue'
+import type { Option } from './useDropdown'
 
 export function useBreadcrumb() {
   const breadcrumbLabels = ref<string[]>([])
-  const stack = ref<any[][]>([])
+  const stack = ref<Option[][]>([])
   const activeIndex = ref(0)
 
   const breadcrumb = computed(() => breadcrumbLabels.value)
@@ -21,7 +22,7 @@ export function useBreadcrumb() {
     activeIndex.value = 0
   }
 
-  function pushBreadcrumb(label: string, children: any[]) {
+  function pushBreadcrumb(label: string, children: Option[]) {
     stack.value.push(children)
     breadcrumbLabels.value.push(label)
     activeIndex.value = 0

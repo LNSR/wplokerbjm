@@ -189,6 +189,7 @@ services:
     volumes:
       - type: tmpfs
         target: /data
+
 # ngrok:
 #   image: ngrok/ngrok:latest
 #   container_name: ngrok

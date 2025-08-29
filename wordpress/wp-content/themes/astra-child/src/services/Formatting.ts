@@ -50,7 +50,7 @@ export function formatPhone(number: string): string {
   const match = number.match(/^\+(\d{1,5})(\d{0,})$/);
   if (match) {
     const countryCode = '+' + match[1];
-    const rest = match[2];
+    const rest = match[2] || '';
     const formattedRest = rest.replace(/(.{4})/g, '$1 ').trim();
     return (countryCode + ' ' + formattedRest).trim();
   } else {

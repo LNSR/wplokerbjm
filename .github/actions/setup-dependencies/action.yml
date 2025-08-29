@@ -1,0 +1,93 @@
+name: "Setup Dependencies"
+description: "Setup common dependencies with caching for Node.js modules and Playwright browsers"
+
+inputs:
+  theme-dir:
+    description: "Theme directory path"
+    required: true
+    default: "wordpress/wp-content/themes/astra-child"
+  install-jq:
+    description: "Whether to install jq"
+    required: false
+    default: "false"
+  install-playwright:
+    description: "Whether to install Playwright"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Setup jq for JSON parsing
+      if: ${{ inputs.install-jq == 'true' }}
+      run: |
+        if ! command -v jq &> /dev/null; then
+          echo "Installing jq..."
+          sudo apt-get update && sudo apt-get install -y jq
+        else
+          echo "✅ jq already installed: $(jq --version)"
+        fi
+      shell: bash
+
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v1
+
+    - name: Verify Bun
+      run: |
+        echo "Bun: $(bun --version || echo 'bun not found')"
+      shell: bash
+
+    - name: Cache node_modules
+      uses: actions/cache@v4
+      id: bun-cache
+      with:
+        path: ${{ inputs.theme-dir }}/node_modules
+        key: ${{ runner.os }}-bun-v2-${{ hashFiles('**/bun.lock', '**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-bun-v2-
+          ${{ runner.os }}-bun-
+
+    - name: Check Bun cache status
+      run: |
+        if [ "${{ steps.bun-cache.outputs.cache-hit }}" == "true" ]; then
+          echo "✅ Bun cache hit - node_modules restored from cache"
+        else
+          echo "❌ Bun cache miss - will install fresh dependencies"
+        fi
+      shell: bash
+
+    - name: Install dependencies (theme)
+      working-directory: ${{ inputs.theme-dir }}
+      run: |
+        # ensure bun is available
+        echo "Bun: $(bun --version || echo 'bun not found')"
+        bun install
+      shell: bash
+
+    - name: Cache Playwright browsers
+      if: ${{ inputs.install-playwright == 'true' }}
+      uses: actions/cache@v4
+      id: playwright-cache
+      with:
+        path: |
+          /home/runner/.cache/ms-playwright
+          ~/.cache/ms-playwright
+        key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/bun.lock', '**/package.json') }}
+        restore-keys: |
+          ${{ runner.os }}-playwright-v2-
+          ${{ runner.os }}-playwright-chromium-
+
+    - name: Setup Playwright
+      if: ${{ inputs.install-playwright == 'true' }}
+      working-directory: ${{ inputs.theme-dir }}
+      run: |
+        # Only install Chromium (Chrome) browser for faster setup
+        if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
+          echo "❌ Playwright cache miss - installing Chromium with dependencies..."
+          bunx playwright install --with-deps chromium
+        else
+          echo "✅ Playwright cache hit - using cached browsers"
+          # Still need to install system dependencies even when browsers are cached
+          bunx playwright install-deps chromium
+        fi
+      shell: bash

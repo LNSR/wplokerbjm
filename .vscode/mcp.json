@@ -1,0 +1,53 @@
+{
+  "servers": {
+    "playwright": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "${workspaceFolder}/mcp/playwright:${workspaceFolder}",
+        "mcp/playwright"
+      ],
+      "type": "stdio"
+    },
+    "github": {
+      "type": "stdio",
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--env-file",
+        "${workspaceFolder}/.env",
+        "-v",
+        "${workspaceFolder}/mcp/github:${workspaceFolder}",
+        "ghcr.io/github/github-mcp-server"
+      ]
+    },
+    "sequentialthinking": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "${workspaceFolder}/mcp/sequentialthinking:${workspaceFolder}",
+        "mcp/sequentialthinking"
+      ],
+      "type": "stdio"
+    },
+    "memory": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "-v",
+        "${workspaceFolder}/mcp/memory:${workspaceFolder}",
+        "mcp/memory"
+      ]
+    }
+  }
+}

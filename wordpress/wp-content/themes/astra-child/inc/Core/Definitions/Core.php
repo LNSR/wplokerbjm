@@ -34,8 +34,9 @@ class Core
                         $c->get(\AstraChild\Models\Schema\PostTypes::class),
                         $c->get(\AstraChild\Services\REST\RESTRoute::class),
                         $c->get(\AstraChild\Services\Job\ArchiveServices::class),
-                        $c->get(\AstraChild\Services\Taxonomy\TaxonomyManagement::class),
-                        $c->get(\AstraChild\Services\PostsManagement\PostsManagement::class)
+                        $c->get(\AstraChild\Services\PostsManagement\SSG\PostsCRUDListener::class),
+                        $c->get(\AstraChild\Services\PostsManagement\SSG\RedirectToSSG::class),
+                        $c->get(\AstraChild\Services\Cron\CronService::class)
                     ],
                 ),
         ];

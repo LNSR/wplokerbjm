@@ -1,1 +1,1 @@
-alias wpcli='docker exec wordpress wp --path=/var/www/html'
+alias wpcli='docker exec wordpress gosu wordpress wp --path=/var/www/html'

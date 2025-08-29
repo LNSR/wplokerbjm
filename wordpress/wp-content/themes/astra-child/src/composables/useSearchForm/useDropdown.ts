@@ -81,7 +81,8 @@ export function useDropdown(props: {
 
   const multiSelectLabel = computed(() => {
     if (!isMultiple.value) {
-      return selectedValues.value.length ? selectedValues.value[0].label : "";
+      const firstItem = selectedValues.value.length > 0 ? selectedValues.value[0] : null;
+      return firstItem ? firstItem.label : "";
     }
     const filtered = selectedValues.value.filter(
       (v) => v.value !== SEMUA_VALUE && v.value !== ""
@@ -89,6 +90,7 @@ export function useDropdown(props: {
     if (filtered.length === 0) return props.placeholder || "Pilih";
     if (filtered.length === 1) {
       const item = filtered[0];
+      if (!item) return props.placeholder || "Pilih";
       let name = item.label;
       if (props.options.value.length && taxonomyStore) {
         if (props.options.value.some((opt) => opt.value === item.value)) {
@@ -125,9 +127,11 @@ export function useDropdown(props: {
   }
 
   const currentOptions = computed<Option[]>(() => {
-    return stack.value.length
-      ? stack.value[stack.value.length - 1]
-      : props.options.value;
+    if (stack.value.length > 0) {
+      const lastStack = stack.value[stack.value.length - 1];
+      return lastStack || [];
+    }
+    return props.options.value ?? [];
   });
 
   function getLabel() {
@@ -179,12 +183,16 @@ export function useDropdown(props: {
     const result: Option[] = [];
     for (let i = 0; i < options.length; i++) {
       const opt = options[i];
+      if (!opt) continue;
       const key = [opt.value, ...breadcrumbs].join(">");
       result.push({ ...opt, __breadcrumbs: breadcrumbs, __key: key, children: undefined });
       if (opt.children && opt.children.length) {
         const nested = flattenOptions(opt.children, [...breadcrumbs, opt.label]);
         for (let j = 0; j < nested.length; j++) {
-          result.push(nested[j]);
+          const nestedOpt = nested[j];
+          if (nestedOpt) {
+            result.push(nestedOpt);
+          }
         }
       }
     }

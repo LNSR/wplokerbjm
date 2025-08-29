@@ -17,9 +17,11 @@ class Container
         if (self::$container === null) {
             $builder = new ContainerBuilder();
 
-            $cacheDir = __DIR__ . '/../../cache';
+            $cacheDir = get_stylesheet_directory() . '/cache';
             if (!is_dir($cacheDir)) {
-                mkdir($cacheDir, 0755, true);
+                if (!mkdir($cacheDir, 0755, true)) {
+                    error_log("Failed to create cache directory: $cacheDir");
+                }
             }
 
             $isProduction = defined('WP_ENV') && WP_ENV === 'production';
@@ -28,7 +30,7 @@ class Container
                 array_map('unlink', glob("$cacheDir/*"));
             }
 
-            if ($isProduction) {
+            if ($isProduction && $cacheDir && is_dir($cacheDir)) {
                 $builder->enableCompilation($cacheDir);
                 if (function_exists('apcu_enabled') && apcu_enabled()) {
                     $builder->enableDefinitionCache();

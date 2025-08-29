@@ -2,14 +2,12 @@
 
 namespace AstraChild\Controllers\REST;
 
-use AstraChild\QueryBuilders\JobQuery;
 use AstraChild\Services\Utilities\Utilities;
-use AstraChild\Repositories\JobRepository;
 
 class DynamicSearch
 {
     public function __construct(
-        private JobRepository $jobRepository
+        private \AstraChild\Repositories\JobRepository $jobRepository
     ) {
     }
 
@@ -22,7 +20,7 @@ class DynamicSearch
             'pendidikan' => Utilities::parseMulti($request->get_param('pendidikan')),
             'sort' => $request->get_param('sort') ?? 'desc',
         ];
-        $args = JobQuery::searchJobsArgs($filters, 1, 36);
+        $args = \AstraChild\QueryBuilders\JobQuery::searchJobsArgs($filters, 1, 36);
 
         $result = $this->jobRepository->queryCard($args);
 

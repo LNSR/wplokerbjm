@@ -4,12 +4,11 @@ namespace AstraChild\Controllers\REST;
 
 use AstraChild\QueryBuilders\JobQuery;
 use AstraChild\Services\Utilities\Utilities;
-use AstraChild\Repositories\JobRepository;
 
 class LoadMore
 {
     public function __construct(
-    private JobRepository $jobRepository
+    private \AstraChild\Repositories\JobRepository $jobRepository
     ) {
     }
 

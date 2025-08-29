@@ -4,11 +4,10 @@ namespace AstraChild\Controllers\REST;
 
 use WP_REST_Request;
 use WP_REST_Response;
-use AstraChild\Services\REST\RESTData;
 
 class SingleOverlay
 {
-    public function __construct(private RESTData $restData)
+    public function __construct(private \AstraChild\Services\REST\RESTData $restData)
     {
     }
 

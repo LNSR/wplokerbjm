@@ -25,6 +25,7 @@
     "incremental": true,
     "skipLibCheck": true,
     "useDefineForClassFields": true,
+    "types": ["node"],
 
     /* Strictness and Linting */
     "strict": true,
@@ -35,5 +36,5 @@
     "noUncheckedSideEffectImports": true,
     "noPropertyAccessFromIndexSignature": true
   },
-  "include": ["vite.config.ts"]
+  "include": ["vite.config.ts", "tools/**/*.ts"]
 }

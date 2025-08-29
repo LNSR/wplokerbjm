@@ -32,6 +32,30 @@ export default [
     },
   },
   {
+    files: ['tools/**/*.ts'],
+    languageOptions: {
+      parser: typescriptParser,
+      parserOptions: {
+        ecmaVersion: 'latest',
+        sourceType: 'module',
+        project: './tsconfig.node.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+      globals: {
+        ...globals.node,
+        ...globals.browser,
+        es2024: true,
+      },
+    },
+    plugins: {
+      '@typescript-eslint': typescript,
+    },
+    rules: {
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': ['warn'],
+    },
+  },
+  {
     files: ['**/*.vue'],
     languageOptions: {
       parser: vueParser,

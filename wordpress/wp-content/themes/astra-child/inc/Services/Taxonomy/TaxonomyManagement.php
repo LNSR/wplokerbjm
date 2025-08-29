@@ -1,25 +1,10 @@
 <?php
 namespace AstraChild\Services\Taxonomy;
 
-use AstraChild\Contracts\HooksInterface;
 use AstraChild\QueryBuilders\JobQuery;
 
-class TaxonomyManagement implements HooksInterface
+class TaxonomyManagement
 {
-    public function registerActions(): void
-    {
-        add_action('astra_child_cleanup_taxonomy', [$this, 'deleteUnusedTermsCron']);
-
-        if (!wp_next_scheduled('astra_child_cleanup_taxonomy')) {
-            wp_schedule_event(time(), 'weekly', 'astra_child_cleanup_taxonomy');
-        }
-    }
-
-    public function registerFilters(): void
-    {
-        // No filters needed for cleanup
-    }
-
     public function deleteUnusedTermsCron()
     {
         $taxonomies = get_taxonomies([], 'names');

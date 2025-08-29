@@ -1,7 +1,23 @@
 {
   "editor.formatOnSave": true,
-  "intelephense.environment.includePaths": [
-    "wordpress/wp-content/themes/astra-child/vendor/php-stubs/wordpress-stubs"
-  ],
-  "editor.codeLens": true
+  "intelephense.environment.includePaths": "${workspaceFolder:astra-child}/vendor/php-stubs",
+  "editor.codeLens": true,
+  "files.watcherExclude": {
+    "**/node_modules": true,
+    "**/vendor": true,
+    "**/.git": true,
+    "**/dist": true,
+    "**/build": true,
+    "**/uploads": true,
+    "**/cache": true
+  },
+  "chat.mcp.serverSampling": {
+    "wplokerbjm/.vscode/mcp.json: context7": {
+      "allowedModels": [
+        "copilot/gpt-4.1",
+        "copilot/gpt-5-mini",
+        "copilot/grok-code-fast-1"
+      ]
+    }
+  }
 }

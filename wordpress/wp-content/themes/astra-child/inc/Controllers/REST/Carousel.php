@@ -3,13 +3,12 @@
 namespace AstraChild\Controllers\REST;
 
 use AstraChild\QueryBuilders\JobQuery;
-use AstraChild\Repositories\JobRepository;
 
 class Carousel
 {
 
     public function __construct(
-        private JobRepository $jobRepository
+        private \AstraChild\Repositories\JobRepository $jobRepository
     ) {
     }
 
