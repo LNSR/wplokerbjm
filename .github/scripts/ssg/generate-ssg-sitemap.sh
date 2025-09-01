@@ -7,6 +7,24 @@ set -euo pipefail
 
 echo "SSG sitemap deploy wrapper starting"
 
+# Check system resources before starting (lightweight check for sync operations)
+echo "Checking system resources..."
+MEMORY_USAGE=$(free | grep Mem | awk '{printf "%.0f", $3/$2 * 100.0}' 2>/dev/null || echo "N/A")
+CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{print 100 - $1}' 2>/dev/null || echo "N/A")
+
+if [ "$MEMORY_USAGE" != "N/A" ] && [ "$CPU_USAGE" != "N/A" ]; then
+    echo "Memory usage: ${MEMORY_USAGE}%"
+    echo "CPU usage: ${CPU_USAGE}%"
+    
+    # Only warn if extremely high usage (more lenient than generation script)
+    if [ "$MEMORY_USAGE" -gt 90 ] || [ "$CPU_USAGE" -gt 90 ]; then
+        echo "⚠️  Warning: System is heavily loaded (${MEMORY_USAGE}% memory, ${CPU_USAGE}% CPU)"
+        echo "SSG sync may be slower than usual"
+    fi
+else
+    echo "Resource monitoring not available (non-Linux system)"
+fi
+
 # Expected environment variables (inherited from workflow):
 # SSH_PRIVATE_KEY, SSH_USER, HOST, SSH_PORT, REMOTE_PATH, DRY_RUN,
 # RCLONE_TRANSFERS, RCLONE_CHECKERS, RCLONE_RETRIES, RCLONE_LOW_RETRIES, RCLONE_LOG_LEVEL
@@ -46,7 +64,10 @@ mkdir -p ~/.ssh
 ssh-keyscan -p "$PORT" "$HOST" >> ~/.ssh/known_hosts || true
 
 echo "Configuring rclone remote 'sftpdeploy'"
-rclone config create sftpdeploy sftp host "${HOST}" user "${SSH_USER}" port "${SSH_PORT:-22}" use-agent true || true
+rclone config create sftpdeploy sftp host "${HOST}" user "${SSH_USER}" port "${SSH_PORT:-22}" use-agent true disable_hashcheck true || {
+    echo "❌ Failed to create rclone config"
+    exit 1
+}
 
 cd "$SSG_SRC_DIR"
 
@@ -57,9 +78,13 @@ RCLONE_BASE_OPTS=(
   --sftp-disable-hashcheck
   --retries "${RCLONE_RETRIES}"
   --low-level-retries "${RCLONE_LOW_RETRIES}"
-  --timeout 1m
-  --contimeout 1m
+  --timeout 5m
+  --contimeout 30s
   --log-level "${RCLONE_LOG_LEVEL}"
+  --bwlimit 5M
+  --tpslimit 2
+  --tpslimit-burst 4
+  --delete-after
 )
 
 echo "Ensuring remote SSG directory exists: $REMOTE_SSG_DIR"

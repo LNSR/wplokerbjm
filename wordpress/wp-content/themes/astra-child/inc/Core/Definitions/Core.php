@@ -36,7 +36,9 @@ class Core
                         $c->get(\AstraChild\Services\Job\ArchiveServices::class),
                         $c->get(\AstraChild\Services\PostsManagement\SSG\PostsCRUDListener::class),
                         $c->get(\AstraChild\Services\PostsManagement\SSG\RedirectToSSG::class),
-                        $c->get(\AstraChild\Services\Cron\CronService::class)
+                        $c->get(\AstraChild\Services\Cron\CronService::class),
+                        $c->get(\AstraChild\Services\PostsManagement\PostsListener::class),
+                        $c->get(\AstraChild\Services\Taxonomy\TaxonomyListener::class)
                     ],
                 ),
         ];

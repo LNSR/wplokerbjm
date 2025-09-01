@@ -24,10 +24,10 @@ jobs:
     name: Build and deploy SSG
     runs-on: ubuntu-latest
     env:
-      RCLONE_TRANSFERS: "4"
-      RCLONE_CHECKERS: "8"
+      RCLONE_TRANSFERS: "3"
+      RCLONE_CHECKERS: "6"
       RCLONE_RETRIES: "3"
-      RCLONE_LOW_RETRIES: "10"
+      RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"
 
     steps:
@@ -54,6 +54,18 @@ jobs:
         working-directory: ${{ env.THEME_DIR }}
         env:
           SSG_MINIFY_HTML: "true"
+          SSG_CONCURRENCY: "2"
+          SSG_PAGE_TIMEOUT: "30000"
+          SSG_CONTINUE_ON_ERROR: "false"
+          SSG_MAX_RETRIES: "3"
+          # AdBlock settings for policy compliance
+          SSG_BLOCK_ADS: "true"
+          SSG_BLOCK_TRACKING: "true"
+          SSG_BLOCK_ANALYTICS: "true"
+          SSG_LOG_BLOCKED: "true"
+          # DNS over HTTPS for enhanced ad blocking
+          SSG_DOH_SERVER: "https://dns.adguard.com/dns-query"
+
           GITHUB_PATHS: ${{ github.event.inputs.paths }}
           GITHUB_REASON: ${{ github.event.inputs.reason }}
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}

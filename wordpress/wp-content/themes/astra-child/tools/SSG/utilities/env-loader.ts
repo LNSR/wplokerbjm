@@ -11,6 +11,11 @@ export interface SSGConfig {
   pageTimeout: number;
   continueOnError: boolean;
   minifyHtml: boolean;
+  blockAds: boolean;
+  blockTracking: boolean;
+  blockAnalytics: boolean;
+  logBlocked: boolean;
+  dohServer: string;
 }
 
 export class EnvLoader {
@@ -45,10 +50,15 @@ export class EnvLoader {
       maxRetries: parseInt(process.env['SSG_MAX_RETRIES'] || '3'),
       pageTimeout: parseInt(process.env['SSG_PAGE_TIMEOUT'] || '30000'),
       continueOnError: process.env['SSG_CONTINUE_ON_ERROR'] === 'true',
-      minifyHtml: process.env['SSG_MINIFY_HTML'] === 'true'
+      minifyHtml: process.env['SSG_MINIFY_HTML'] === 'true',
+      blockAds: process.env['SSG_BLOCK_ADS'] !== 'false',
+      blockTracking: process.env['SSG_BLOCK_TRACKING'] !== 'false',
+      blockAnalytics: process.env['SSG_BLOCK_ANALYTICS'] === 'true',
+      logBlocked: process.env['SSG_LOG_BLOCKED'] !== 'false',
+      dohServer: process.env['SSG_DOH_SERVER'] || 'https://dns.adguard.com/dns-query'
     };
 
-    return this.config;
+    return this.config!;
   }
 
   /**

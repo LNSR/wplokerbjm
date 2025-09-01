@@ -129,7 +129,15 @@ async function main(): Promise<void> {
     console.log('  SSG_PAGE_TIMEOUT: Timeout for individual page generation in ms (default: 30000)');
     console.log('  SSG_CONTINUE_ON_ERROR: Continue processing even if some pages fail (default: false)');
     console.log('  SSG_MINIFY_HTML: Minify HTML output to reduce file size (default: false)');
+    console.log('  SSG_BLOCK_ADS: Block ads during generation (default: true)');
+    console.log('  SSG_BLOCK_TRACKING: Block tracking scripts (default: true)');
+    console.log('  SSG_BLOCK_ANALYTICS: Block analytics scripts (default: false)');
+    console.log('  SSG_LOG_BLOCKED: Log blocked requests (default: true)');
     console.log('');
+    console.log('AdBlock Protection:');
+    console.log('  🛡️ Automatically blocks AdSense, tracking, and analytics');
+    console.log('  🚫 Prevents AdSense policy violations during generation');
+    console.log('  📊 Configurable blocking for different service types');
     console.log('Examples:');
     console.log('  bun tools/SSG/ssg-sitemap.ts ./sitemap.xml ./output');
     console.log('  bun tools/SSG/ssg-sitemap.ts https://example.com/sitemap.xml');

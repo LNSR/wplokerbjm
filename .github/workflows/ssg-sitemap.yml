@@ -1,6 +1,9 @@
 name: SSG Build & Deploy (Sitemap)
 
 on:
+  schedule:
+    # Run every day at 0 AM
+    - cron: "0 0 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -16,11 +19,14 @@ jobs:
   build-and-deploy:
     name: Build and deploy SSG (Sitemap)
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
     env:
-      RCLONE_TRANSFERS: "4"
-      RCLONE_CHECKERS: "8"
+      RCLONE_TRANSFERS: "3"
+      RCLONE_CHECKERS: "6"
       RCLONE_RETRIES: "3"
-      RCLONE_LOW_RETRIES: "10"
+      RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"
 
     steps:
@@ -33,23 +39,6 @@ jobs:
           theme-dir: ${{ env.THEME_DIR }}
           install-jq: true
           install-playwright: true
-
-      - name: Generate SSG Content (Sitemap)
-        working-directory: ${{ env.THEME_DIR }}
-        env:
-          SSG_MINIFY_HTML: "true"
-          # Reduce concurrency to avoid exhausting runner resources and crashing Chromium
-          SSG_CONCURRENCY: "2"
-          # Increase per-page timeout to tolerate slow pages (ms)
-          SSG_PAGE_TIMEOUT: "60000"
-          # Allow continuing when some pages fail; useful for sitemap runs
-          SSG_CONTINUE_ON_ERROR: "false"
-          # Number of retries for failed pages
-          SSG_MAX_RETRIES: "4"
-        run: |
-          echo "Using sitemap: ${{ env.SITE_URL }}/sitemap_index.xml"
-          bun run ssg:sitemap "${{ env.SITE_URL }}/sitemap_index.xml"
-
       - name: Setup deployment
         uses: ./.github/actions/setup-deployment
         with:
@@ -58,6 +47,40 @@ jobs:
           host: ${{ secrets.HOST }}
           ssh-port: ${{ secrets.SSH_PORT }}
           ssh-user: ${{ secrets.SSH_USER }}
+
+      - name: Setup GitHub CLI
+        uses: sersoft-gmbh/setup-gh-cli-action@v2
+        with:
+          version: stable
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Disable selective url SSG workflow to prevent duplicate runs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow disable 185023324
+
+      - name: Generate SSG Content (Sitemap)
+        working-directory: ${{ env.THEME_DIR }}
+        env:
+          SSG_MINIFY_HTML: "true"
+          # Reduce concurrency to avoid exhausting runner resources and crashing Chromium
+          SSG_CONCURRENCY: "4"
+          # Increase per-page timeout to tolerate slow pages (ms)
+          SSG_PAGE_TIMEOUT: "60000"
+          # Allow continuing when some pages fail; useful for sitemap runs
+          SSG_CONTINUE_ON_ERROR: "false"
+          # Number of retries for failed pages
+          SSG_MAX_RETRIES: "4"
+          # AdBlock settings for policy compliance
+          SSG_BLOCK_ADS: "true"
+          SSG_BLOCK_TRACKING: "true"
+          SSG_BLOCK_ANALYTICS: "true"
+          SSG_LOG_BLOCKED: "false"
+          # DNS over HTTPS for enhanced ad blocking
+          SSG_DOH_SERVER: "https://dns.adguard.com/dns-query"
+        run: |
+          echo "Using sitemap: ${{ env.SITE_URL }}/sitemap_index.xml"
+          bun run ssg:sitemap "${{ env.SITE_URL }}/sitemap_index.xml"
 
       - name: Install rclone and sync via SFTP (sitemap mode)
         working-directory: ${{ env.THEME_DIR }}
@@ -76,3 +99,8 @@ jobs:
           RCLONE_LOW_RETRIES: ${{ env.RCLONE_LOW_RETRIES }}
           RCLONE_LOG_LEVEL: ${{ env.RCLONE_LOG_LEVEL }}
         run: bash ../../../../.github/scripts/ssg/generate-ssg-sitemap.sh
+
+      - name: Enable selective url SSG workflow
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh workflow enable 185023324

@@ -2,7 +2,24 @@
 
 /**
  * Astra Child Theme Functions
+ * This file reserved for plugins outside author who add custom functions to the child theme 
  * 
+ * This file contains minimal theme functions and enqueues.
+ * Most of the theme's functionality is handled by the dependency injection container
+ * and services that are bootstrapped by the MU plugin.
+ *
+ * ⚠️  WARNING: Do not modify this file directly!
+ * ⚠️  All custom functionality should be added through the DI container system.
+ *
+ * Bootstrap Process:
+ * 1. WordPress loads MU plugins in alphabetical order
+ * 2. astra-child-bootstrap.php loads first and initializes the DI container
+ * 3. Container registers all services, hooks, and dependencies
+ * 4. Theme functions.php loads last with minimal setup
+ *
+ * @see /wp-content/mu-plugins/astra-child-bootstrap.php - Main bootstrap file that initializes the DI container
+ * @see /wp-content/themes/astra-child/inc/Core/Container.php - Dependency injection container
+ * @see /wp-content/themes/astra-child/inc/Core/Init.php - Service initialization
  * @package Astra-Child
  * @since 1.0.0
  */
@@ -11,21 +28,6 @@
 if (!defined('ABSPATH')) {
     exit;
 }
-
-// Register Composer autoloader
-require_once get_stylesheet_directory() . '/vendor/autoload.php';
-
-use AstraChild\Core\Container;
-
-// Initialize the DI container
-$container = Container::getContainer();
-
-// Bootstrap the theme
-$init = $container->get(AstraChild\Core\Init::class);
-$init->initialize();
-
-// BEGIN ENQUEUE PARENT ACTION
-// AUTO GENERATED - Do not modify or remove comment markers above or below:
 
 if (!function_exists('chld_thm_cfg_locale_css')):
     function chld_thm_cfg_locale_css($uri)
@@ -44,5 +46,3 @@ if (!function_exists('child_theme_configurator_css')):
     }
 endif;
 add_action('wp_enqueue_scripts', 'child_theme_configurator_css', 10);
-
-// END ENQUEUE PARENT ACTION

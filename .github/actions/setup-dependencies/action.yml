@@ -18,12 +18,50 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Cache APT archives and lists
+      uses: actions/cache@v4
+      id: apt-cache
+      with:
+        path: |
+          ~/.apt-cache/archives
+          ~/.apt-cache/lists
+        key: ${{ runner.os }}-apt-${{ hashFiles('.github/actions/setup-dependencies/action.yml') }}
+        restore-keys: |
+          ${{ runner.os }}-apt-
+
     - name: Setup jq for JSON parsing
       if: ${{ inputs.install-jq == 'true' }}
       run: |
+        # Restore APT cache if available
+        if [ "${{ steps.apt-cache.outputs.cache-hit }}" == "true" ]; then
+          echo "✅ APT cache restored - copying to system locations"
+          # Create user cache directories if they don't exist
+          mkdir -p ~/.apt-cache/lists ~/.apt-cache/archives
+          # Copy cached lists to system location
+          sudo mkdir -p /var/lib/apt/lists
+          sudo cp -a ~/.apt-cache/lists/* /var/lib/apt/lists/ 2>/dev/null || true
+          # Copy cached archives to system location
+          sudo mkdir -p /var/cache/apt/archives
+          sudo cp -a ~/.apt-cache/archives/* /var/cache/apt/archives/ 2>/dev/null || true
+          echo "✅ Using cached APT data - skipping apt-get update"
+        fi
+
         if ! command -v jq &> /dev/null; then
           echo "Installing jq..."
-          sudo apt-get update && sudo apt-get install -y jq
+          
+          # Create user cache directories if they don't exist
+          mkdir -p ~/.apt-cache/lists ~/.apt-cache/archives
+          
+          # If cache wasn't restored, we need to refresh package lists
+          if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
+            echo "❌ APT cache miss - running apt-get update"
+            sudo apt-get update
+            # Copy updated lists to user cache for future runs
+            cp -a /var/lib/apt/lists/* ~/.apt-cache/lists/ 2>/dev/null || true
+          fi
+          
+          # Use noninteractive and no-install-recommends to speed and reduce size
+          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq
         else
           echo "✅ jq already installed: $(jq --version)"
         fi
@@ -90,4 +128,26 @@ runs:
           # Still need to install system dependencies even when browsers are cached
           bunx playwright install-deps chromium
         fi
+      shell: bash
+
+    - name: Sync system APT data back to user cache for upload
+      run: |
+        # Ensure any lists/archives downloaded by apt during this job are copied into
+        # the user cache directory so the actions/cache step can upload them at job end.
+        mkdir -p ~/.apt-cache/lists ~/.apt-cache/archives
+
+        # Copy package lists
+        if [ -d /var/lib/apt/lists ]; then
+          cp -a /var/lib/apt/lists/* ~/.apt-cache/lists/ 2>/dev/null || true
+        fi
+
+        # Copy package archives
+        if [ -d /var/cache/apt/archives ]; then
+          cp -a /var/cache/apt/archives/* ~/.apt-cache/archives/ 2>/dev/null || true
+        fi
+
+        # Set proper ownership
+        chown -R $USER:$(id -gn) ~/.apt-cache 2>/dev/null || true
+
+        echo "✅ APT cache synced back to user directory"
       shell: bash

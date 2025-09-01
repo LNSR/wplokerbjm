@@ -1,6 +1,10 @@
+**/__pycache__
 wordpress/*
 !wordpress/wp-content
 wordpress/wp-content/*
+!wordpress/wp-content/mu-plugins/
+wordpress/wp-content/mu-plugins/*
+!wordpress/wp-content/mu-plugins/astra-child-bootstrap.php
 !wordpress/wp-content/themes
 wordpress/wp-content/themes/*
 !wordpress/wp-content/themes/astra-child

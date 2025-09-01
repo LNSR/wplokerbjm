@@ -2,6 +2,7 @@
 
 namespace AstraChild\Repositories;
 
+use AstraChild\Core\Cache;
 
 /**
  * Job Repository
@@ -11,21 +12,11 @@ namespace AstraChild\Repositories;
 class JobRepository
 {
     public function __construct(
-        private \AstraChild\Factories\JobDataFactory $jobDataFactory,
         private \AstraChild\Services\REST\RESTData $restData,
         private \AstraChild\Services\Job\JobServices $jobServices
-    ) {}
-
-    /**
-     * Combined Taxonomies and Meta data for a job data
-     *
-     * @param int $post_id Post ID
-     * @return array Combined job data
-     */
-    public function getJobData(int $post_id): array
-    {
-        return $this->jobDataFactory->buatDataPekerjaan($post_id);
+    ) {
     }
+
 
     /**
      * Run a WP_Query and return normalized card data and schema.
@@ -35,6 +26,13 @@ class JobRepository
      */
     public function queryCard(array $query_args): array
     {
+        $cacheKey = 'query_card_' . md5(serialize($query_args));
+
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         $jobs_query = new \WP_Query($query_args);
 
         $jobs = [];
@@ -50,10 +48,14 @@ class JobRepository
             wp_reset_postdata();
         }
 
-        return [
+        $result = [
             'jobs' => $jobs,
             'query' => $jobs_query,
             'schema' => $schema,
         ];
+
+        Cache::set($cacheKey, $result, 86400); // Cache for 1 day
+
+        return $result;
     }
 }

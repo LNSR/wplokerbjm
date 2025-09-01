@@ -4,6 +4,7 @@ namespace AstraChild\Repositories;
 
 use AstraChild\Contracts\DataProviderInterface;
 use AstraChild\Models\TaxonomyEntity;
+use AstraChild\Core\Cache;
 
 class TaxonomyRepository implements DataProviderInterface
 {
@@ -21,7 +22,12 @@ class TaxonomyRepository implements DataProviderInterface
 	 */
 	public function getMetaBoxData(int $post_id): TaxonomyEntity
 	{
-		return new TaxonomyEntity(
+		$cacheKey = 'taxonomies_job_data_' . $post_id;
+		$cached = Cache::get($cacheKey);
+		if ($cached !== false) {
+			return $cached;
+		}
+		$entity = new TaxonomyEntity(
 			perusahaan_taxo: get_the_terms($post_id, 'perusahaan'),
 			kategori_lowongan_taxo: get_the_terms($post_id, 'kategori-lowongan'),
 			lokasi_taxo: get_the_terms($post_id, 'lokasi-pekerjaan'),
@@ -29,11 +35,18 @@ class TaxonomyRepository implements DataProviderInterface
 			gender_taxo: get_the_terms($post_id, 'gender'),
 			pendidikan_taxo: get_the_terms($post_id, 'pendidikan')
 		);
+		Cache::set($cacheKey, $entity, 86400); // Cache for 24 hours
+		return $entity;
 	}
 
 	public function getTaxonomyTerms(): array
 	{
-		return [
+		$cached_terms = Cache::get('taxonomy_terms_all');
+		if ($cached_terms !== false) {
+			return $cached_terms;
+		}
+
+		$terms = [
 			'perusahaan_terms' => get_terms([
 				'taxonomy' => 'perusahaan',
 				'hide_empty' => true,
@@ -63,5 +76,7 @@ class TaxonomyRepository implements DataProviderInterface
 				'hide_empty' => true,
 			])
 		];
+		Cache::set('taxonomy_terms_all', $terms, 86400); // Cache for 24 hours
+		return $terms;
 	}
 }

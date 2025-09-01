@@ -2,12 +2,20 @@
 
 namespace AstraChild\Controllers\REST;
 
+use AstraChild\Core\Cache;
 
 class AutoSuggestionSearch
 {
     public function handle(\WP_REST_Request $request)
     {
         $query = sanitize_text_field($request->get_param('query'));
+        $cacheKey = 'auto_suggestion_' . sanitize_key($query);
+
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return rest_ensure_response($cached);
+        }
+
         $results = [];
 
         if ($query && strlen($query) >= 2) {
@@ -20,6 +28,11 @@ class AutoSuggestionSearch
                 }, $post_ids);
             }
         }
-        return rest_ensure_response(array_values(array_unique($results)));
+
+        $uniqueResults = array_values(array_unique($results));
+
+        Cache::set($cacheKey, $uniqueResults, 86400); // Cache for 24 hours
+
+        return rest_ensure_response($uniqueResults);
     }
 }

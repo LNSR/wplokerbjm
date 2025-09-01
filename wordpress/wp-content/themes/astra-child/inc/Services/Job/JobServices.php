@@ -2,6 +2,7 @@
 
 namespace AstraChild\Services\Job;
 use AstraChild\Factories\JobDataFactory;
+use AstraChild\Core\Cache;
 
 class JobServices
 {
@@ -14,7 +15,14 @@ class JobServices
 
     public function renderJobPostingJsonLd(int $post_id): string
     {
-    $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
+        $cacheKey = 'job_schema_' . $post_id;
+
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
 
         $lokasi = $jobdata['lokasi_taxo'] ?? '';
         if (is_array($lokasi)) {
@@ -142,7 +150,12 @@ class JobServices
         $schema['hiringOrganization'] = array_filter($schema['hiringOrganization'], fn($v) => !is_null($v));
         $schema = array_filter($schema, fn($v) => !is_null($v));
 
-        return '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . '</script>';
+        $jsonLd = '<script type="application/ld+json">' . json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . '</script>';
+
+        // Cache for 24 hours
+        Cache::set($cacheKey, $jsonLd, 86400);
+
+        return $jsonLd;
     }
 
 }

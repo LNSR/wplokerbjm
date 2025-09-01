@@ -18,10 +18,10 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     env:
-      RCLONE_TRANSFERS: "4"
-      RCLONE_CHECKERS: "8"
+      RCLONE_TRANSFERS: "3"
+      RCLONE_CHECKERS: "6"
       RCLONE_RETRIES: "3"
-      RCLONE_LOW_RETRIES: "10"
+      RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"
 
     steps:
@@ -74,4 +74,5 @@ jobs:
           RCLONE_RETRIES: ${{ env.RCLONE_RETRIES }}
           RCLONE_LOW_RETRIES: ${{ env.RCLONE_LOW_RETRIES }}
           RCLONE_LOG_LEVEL: ${{ env.RCLONE_LOG_LEVEL }}
+          MU_PLUGIN_REMOTE_PATH: ${{ secrets.MU_PLUGIN_REMOTE_PATH }}
         run: bash .github/scripts/deploy/rclone-sync.sh

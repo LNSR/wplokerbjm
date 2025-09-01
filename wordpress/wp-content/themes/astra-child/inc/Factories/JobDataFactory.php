@@ -5,6 +5,7 @@ namespace AstraChild\Factories;
 use AstraChild\Contracts\DataProviderInterface;
 use AstraChild\Services\CustomField\CustomFieldsService;
 use AstraChild\Services\Taxonomy\TaxonomyService;
+use AstraChild\Core\Cache;
 
 class JobDataFactory
 {
@@ -27,6 +28,11 @@ class JobDataFactory
      */
     public function buatDataPekerjaan(int $post_id): array
     {
+        $combinedData = Cache::get('job_data_factory_' . $post_id);
+        if ($combinedData !== false) {
+            return $combinedData;
+        }
+
         $customFields = $this->customFieldsProvider?->getMetaBoxData($post_id) ?? [];
         $taxonomies = $this->taxonomiesProvider?->getMetaBoxData($post_id) ?? [];
 
@@ -38,7 +44,7 @@ class JobDataFactory
         // Process taxonomies
         $processedTaxonomies = [];
         if (is_object($this->taxonomyService)) {
-            foreach ( $taxonomies as $key => $terms) {
+            foreach ($taxonomies as $key => $terms) {
                 $processedTerms = $this->taxonomyService->processTaxonomyTerms($terms);
                 $processedTaxonomies[$key] = is_array($processedTerms) ? implode(', ', $processedTerms) : 'N/A';
             }
@@ -46,6 +52,9 @@ class JobDataFactory
 
         // Combine meta and taxonomy data
         $combinedData = array_merge($processedCustomFields, $processedTaxonomies);
+
+        // Cache for 1 day
+        Cache::set('job_data_' . $post_id, $combinedData, 86400);
 
         return $combinedData;
     }

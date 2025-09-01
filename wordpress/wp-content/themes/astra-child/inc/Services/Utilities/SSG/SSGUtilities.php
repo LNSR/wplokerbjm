@@ -10,7 +10,7 @@ namespace AstraChild\Services\Utilities\SSG;
 class SSGUtilities
 {
     /**
-     * Get the file path for the SSG version (matches RedirectToSSG.php logic)
+     * Get the file path for the SSG version
      */
     public function getSSGFilePath(\WP_Post $post): string
     {
@@ -57,6 +57,14 @@ class SSGUtilities
         if (file_exists($ssgFilePath)) {
             if (unlink($ssgFilePath)) {
                 error_log("SSG Delete: Successfully deleted SSG file: $ssgFilePath (Reason: $reason)");
+
+                // Purge LiteSpeed cache for this post and SSG tag
+                if (function_exists('litespeed_purge_post')) {
+                    litespeed_purge_post($post_id);
+                }
+                if (function_exists('do_action')) {
+                    do_action('litespeed_purge_tag', 'ssg');
+                }
             } else {
                 error_log("SSG Delete: Failed to delete SSG file: $ssgFilePath (Reason: $reason)");
             }

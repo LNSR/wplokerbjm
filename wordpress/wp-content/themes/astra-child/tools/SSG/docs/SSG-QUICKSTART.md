@@ -57,6 +57,12 @@ SSG_CONCURRENCY=5
 SSG_MINIFY_HTML=true
 SSG_PAGE_TIMEOUT=30000
 
+# Privacy and security settings
+SSG_DOH_SERVER=https://dns.adguard.com/dns-query
+SSG_BLOCK_ADS=true
+SSG_BLOCK_TRACKING=true
+SSG_BLOCK_ANALYTICS=false
+
 # Output settings
 SSG_OUTPUT_DIR=./assets/ssg
 SSG_CONTINUE_ON_ERROR=true
@@ -90,7 +96,9 @@ Your static site has been generated! You should see:
 
 - 📁 **`assets/ssg/`** - Directory with all static HTML files
 - ⚡ **Minified HTML** (if enabled) - Optimized for performance
-- 🔗 **Preserved URLs** - Matching your WordPress structure
+- � **DNS over HTTPS** (if configured) - Enhanced privacy protection
+- 🛡️ **AdBlock Protection** (if enabled) - Clean HTML without ads/trackers
+- �🔗 **Preserved URLs** - Matching your WordPress structure
 
 ## 🔧 Advanced Usage
 

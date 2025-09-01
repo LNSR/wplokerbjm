@@ -6,6 +6,20 @@ set -euo pipefail
 
 echo "Starting SSG generation and deployment..."
 
+# Check system resources before starting
+echo "Checking system resources..."
+MEMORY_USAGE=$(free | grep Mem | awk '{printf "%d", $3/$2 * 100}')
+CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{printf "%d", 100 - $1}')
+
+echo "Memory usage: ${MEMORY_USAGE}%"
+echo "CPU usage: ${CPU_USAGE}%"
+
+# Warn if system is already heavily loaded
+if [ "$MEMORY_USAGE" -gt 80 ] || [ "$CPU_USAGE" -gt 80 ]; then
+  echo "⚠️  Warning: System is heavily loaded (${MEMORY_USAGE}% memory, ${CPU_USAGE}% CPU)"
+  echo "Consider reducing parallel processes or SSG_MAX_PARALLEL"
+fi
+
 # Expected environment variables:
 # GITHUB_PATHS, GITHUB_REASON, SSH_PRIVATE_KEY, SSH_USER, HOST, SSH_PORT,
 # REMOTE_PATH, SRC_DIR, DRY_RUN, RCLONE_TRANSFERS, RCLONE_CHECKERS,
@@ -32,11 +46,14 @@ if [[ -n "${GITHUB_PATHS:-}" ]]; then
     GENERATED_COUNT=0
     FAILED_PATHS=()
     
-    # Check if we should run in parallel (more than 3 paths and not in dry run)
-    if [ "$PATH_COUNT" -gt 3 ] && [ "${DRY_RUN:-false}" != "true" ]; then
+    # Check if we should run in parallel (more than 5 paths and not in dry run)
+    if [ "$PATH_COUNT" -gt 5 ] && [ "${DRY_RUN:-false}" != "true" ]; then
         echo "🔄 Running in parallel mode for $PATH_COUNT paths"
         MAX_PARALLEL=${SSG_MAX_PARALLEL:-2}  # Limit parallel processes to prevent resource exhaustion
         echo "Using max $MAX_PARALLEL parallel processes"
+        
+        # Create a timestamp file to track what we generate
+        touch /tmp/ssg_start_time
         
         # Generate pages in parallel using GNU parallel
         printf '%s\n' "${PATHS[@]}" | parallel --no-notice -j "$MAX_PARALLEL" '
@@ -66,15 +83,15 @@ if [[ -n "${GITHUB_PATHS:-}" ]]; then
             output_file="./assets/ssg/${filename}"
             
             echo "Generating: $url_path -> $output_file"
+            echo "Running: bun run ssg \"$path\" \"$output_file\""
 
-      echo "Running: bun run ssg \"$path\" \"$output_file\""
-
-      # Add timeout to prevent hanging
-      if timeout 300 bun run ssg "$path" "$output_file"; then
-        echo "✅ Completed: $path"
-      else
-        echo "❌ Timeout or error occurred for $path"
-      fi
+            # Add timeout and memory limits to prevent resource exhaustion
+            if timeout 180 bun run ssg "$path" "$output_file"; then
+                echo "✅ Completed: $path"
+            else
+                echo "❌ Timeout or error occurred for $path"
+                exit 1
+            fi
         '
         
         # Count generated files (approximate)
@@ -111,8 +128,8 @@ if [[ -n "${GITHUB_PATHS:-}" ]]; then
 
       echo "Running: bun run ssg \"$path\" \"$output_file\""
 
-      # Add timeout to prevent hanging
-      timeout 300 bun run ssg "$path" "$output_file" || {
+      # Add timeout and memory limits to prevent resource exhaustion
+      timeout 180 bun run ssg "$path" "$output_file" || {
         echo "❌ Timeout or error occurred for $path"
         FAILED_PATHS+=("$path")
         continue
@@ -136,14 +153,18 @@ if [[ -n "${GITHUB_PATHS:-}" ]]; then
     # Force cleanup of any remaining processes
     echo "Cleaning up processes..."
     # More targeted cleanup - only kill our specific processes
-  pkill -f "bun.*ssg" || true
+    pkill -f "bun.*ssg" || true
     pkill -f "playwright.*chromium.*--remote-debugging-port" || true
     # Give processes time to cleanup gracefully
-    sleep 2
+    sleep 3
     # Force kill any remaining hung processes
     pkill -9 -f "bun.*ssg" || true
     pkill -9 -f "playwright" || true
     pkill -9 -f "chromium.*--headless" || true
+    
+    # Additional cleanup for any parallel processes
+    pkill -f "parallel" || true
+    sleep 1
 
 else
     echo "No specific paths provided - skipping selective generation"
@@ -161,6 +182,10 @@ else
 fi
 
 echo "SSG generation completed successfully!"
+
+# Brief pause before deployment to prevent server overload
+echo "Pausing 5 seconds before deployment..."
+sleep 5
 
 echo "Starting SSG deploy (no persistent logs will be written)"
 
@@ -215,7 +240,7 @@ cd "$SSG_SRC_DIR"
 echo "Copying SSG assets from: $SSG_SRC_DIR"
 echo "Remote destination: ${REMOTE_PATH}/assets/ssg"
 
-RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --sftp-disable-hashcheck --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 1m --contimeout 1m --log-level ${RCLONE_LOG_LEVEL}"
+RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --sftp-disable-hashcheck --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 5m --contimeout 30s --log-level ${RCLONE_LOG_LEVEL} --bwlimit 5M --tpslimit 2 --tpslimit-burst 4"
 
 # Test rclone remote connectivity before heavy operations
 if ! rclone lsd sftpdeploy: >/dev/null 2>&1; then

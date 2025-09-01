@@ -2,6 +2,8 @@
 
 namespace AstraChild\QueryBuilders;
 
+use AstraChild\QueryBuilders\TaxonomyQuery;
+
 class JobQuery
 {
 	/**
@@ -11,7 +13,8 @@ class JobQuery
 	 * @param int $per_page
 	 * @return array
 	 */
-	public static function latestJobsArgs(int $paged = 1, $posts_per_page = 9): array{
+	public static function latestJobsArgs(int $paged = 1, $posts_per_page = 9): array
+	{
 		return [
 			'post_type' => 'lowongan',
 			'posts_per_page' => $posts_per_page,
@@ -50,26 +53,26 @@ class JobQuery
 		$seven_days = date('Y-m-d', strtotime('+7 days'));
 
 		return [
-			'post_type'      => 'lowongan',
+			'post_type' => 'lowongan',
 			'posts_per_page' => $per_page,
-			'meta_query'     => [
+			'meta_query' => [
 				[
-					'key'     => 'status_pekerjaan',
-					'value'   => [2, 3],
+					'key' => 'status_pekerjaan',
+					'value' => [2, 3],
 					'compare' => 'IN',
-					'type'    => 'NUMERIC',
+					'type' => 'NUMERIC',
 				],
 				[
-					'key'     => 'deadline',
-					'value'   => [$today, $seven_days],
+					'key' => 'deadline',
+					'value' => [$today, $seven_days],
 					'compare' => 'BETWEEN',
-					'type'    => 'DATE',
+					'type' => 'DATE',
 				],
 			],
-			'post_status'    => 'publish',
-			'orderby'        => 'meta_value',
-			'meta_key'       => 'deadline',
-			'order'          => 'ASC',
+			'post_status' => 'publish',
+			'orderby' => 'meta_value',
+			'meta_key' => 'deadline',
+			'order' => 'ASC',
 		];
 	}
 
@@ -94,61 +97,17 @@ class JobQuery
 			'post_status' => 'publish',
 		];
 
-		$tax_query = [];
-
-		if (!empty($params['lokasi'])) {
-			$lokasi_terms = is_array($params['lokasi'])
-				? array_map('sanitize_text_field', $params['lokasi'])
-				: [sanitize_text_field($params['lokasi'])];
-			$tax_query[] = [
-				'taxonomy' => 'lokasi-pekerjaan',
-				'field' => 'slug',
-				'terms' => $lokasi_terms,
-				'operator' => 'IN',
-			];
-		}
-		if (!empty($params['gender'])) {
-			$gender_terms = is_array($params['gender'])
-				? array_map('sanitize_text_field', $params['gender'])
-				: [sanitize_text_field($params['gender'])];
-			$tax_query[] = [
-				'taxonomy' => 'gender',
-				'field' => 'slug',
-				'terms' => $gender_terms,
-				'operator' => 'IN',
-			];
-		}
-		if (!empty($params['pendidikan'])) {
-			$pendidikan_terms = is_array($params['pendidikan'])
-				? array_map('sanitize_text_field', $params['pendidikan'])
-				: [sanitize_text_field($params['pendidikan'])];
-			$tax_query[] = [
-				'taxonomy' => 'pendidikan',
-				'field' => 'slug',
-				'terms' => $pendidikan_terms,
-				'operator' => 'IN',
-			];
-		}
-		
-		/**
-		 * ! NOTE: The 's' parameter search is overridden by the custom SQL in Filters::jobPostsSearchFilter().
-		 * The tax_query for 'perusahaan' is still useful for REST or custom queries that do not use 's'.
-		 */
+		// Delegate taxonomy parts construction to TaxonomyQuery for separation of concerns.
+		$tax_query_parts = TaxonomyQuery::jobTaxQueryParts($params);
 		if (!empty($params['cari'])) {
-			$search_term = sanitize_text_field($params['cari']);
-			$tax_query[] = [
-				'taxonomy' => 'perusahaan',
-				'field'    => 'name',
-				'terms'    => $search_term,
-				'operator' => 'LIKE',
-			];
-			$args['s'] = $search_term;
+			// preserve previous behavior where 'cari' also sets 's'
+			$args['s'] = sanitize_text_field($params['cari']);
 		}
 
-		if ($tax_query) {
+		if ($tax_query_parts) {
 			$args['tax_query'] = [
 				'relation' => 'AND',
-				...$tax_query
+				...$tax_query_parts,
 			];
 		}
 
@@ -161,10 +120,10 @@ class JobQuery
 	public static function oldJobsArgs(): array
 	{
 		return [
-			'post_type'      => 'lowongan',
-			'post_status'    => 'publish',
+			'post_type' => 'lowongan',
+			'post_status' => 'publish',
 			'posts_per_page' => -1,
-			'date_query'     => [
+			'date_query' => [
 				[
 					'column' => 'post_date',
 					'before' => '1 month ago',
@@ -177,18 +136,55 @@ class JobQuery
 	public static function allJobsIdsArgs(): array
 	{
 		return [
-			'post_type'      => 'lowongan',
-			'post_status'    => 'publish',
+			'post_type' => 'lowongan',
+			'post_status' => 'publish',
 			'posts_per_page' => -1,
-			'fields'         => 'ids',
+			'fields' => 'ids',
 		];
 	}
-	public static function unusedTaxonomiesTermsArgs($taxonomy): array
+
+	/**
+	 * Build a SQL fragment for the `posts_search` filter used for job post searches.
+	 *
+	 * This returns an escaped SQL string (starting with a leading " AND (...)")
+	 * suitable for appending to the `$search` value in the `posts_search` filter.
+	 *
+	 * @param \wpdb $wpdb
+	 * @param string $q raw search string
+	 * @return string SQL fragment (empty string when $q is empty)
+	 */
+	public static function buildPostsSearchSql(\wpdb $wpdb, string $q): string
 	{
-		return get_terms([
-			'taxonomy'   => $taxonomy,
-			'hide_empty' => false,
-			'fields'     => 'ids',
-		]);
+		if ($q === '') {
+			return '';
+		}
+
+		// Safely escape the search term for LIKE queries
+		$q_esc = esc_sql($wpdb->esc_like($q));
+		$q_html = esc_sql($wpdb->esc_like(htmlentities($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+
+		$posts = $wpdb->posts;
+		$postmeta = $wpdb->postmeta;
+		$terms = $wpdb->terms;
+		$term_taxonomy = $wpdb->term_taxonomy;
+		$term_relationships = $wpdb->term_relationships;
+
+		$sql = " AND (";
+		$sql .= "{$posts}.post_title LIKE '%{$q_esc}%' OR ";
+		$sql .= "{$posts}.post_title LIKE '%{$q_html}%' OR ";
+		$sql .= "{$posts}.ID IN (
+			SELECT post_id FROM {$postmeta}
+			WHERE meta_key = 'nama_perusahaan' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
+		) OR ";
+		$sql .= "{$posts}.ID IN (
+			SELECT object_id FROM {$term_relationships}
+			INNER JOIN {$term_taxonomy} ON {$term_taxonomy}.term_taxonomy_id = {$term_relationships}.term_taxonomy_id
+			INNER JOIN {$terms} ON {$terms}.term_id = {$term_taxonomy}.term_id
+			WHERE {$term_taxonomy}.taxonomy = 'perusahaan'
+			AND {$terms}.name LIKE '%{$q_esc}%'
+		)";
+		$sql .= ")";
+
+		return $sql;
 	}
 }

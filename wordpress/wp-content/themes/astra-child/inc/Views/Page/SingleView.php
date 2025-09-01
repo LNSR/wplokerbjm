@@ -2,6 +2,7 @@
 
 namespace AstraChild\Views\Page;
 use AstraChild\Components\Placeholder;
+use AstraChild\Core\Cache;
 
 class SingleView
 {
@@ -14,10 +15,21 @@ class SingleView
 
 	public function getProps($post_id): array
 	{
-		return [
+		$cacheKey = 'single_view_props_' . $post_id;
+
+		$cached = Cache::get($cacheKey);
+		if ($cached !== false) {
+			return $cached;
+		}
+
+		$data = [
 			'layouts' => $this->layouts->getProps(),
 			'job' => $this->restData->getSingleOverlayData($post_id)
 		];
+
+		Cache::set($cacheKey, $data, 86400); // Cache for 24 hours
+
+		return $data;
 	}
 
 

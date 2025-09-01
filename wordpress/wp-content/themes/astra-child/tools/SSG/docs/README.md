@@ -16,28 +16,35 @@ A comprehensive suite of static site generation tools designed for WordPress the
 - 🔄 **Automated Builds** - Triggers on WordPress content changes
 - ⚡ **High Performance** - Concurrent page generation with rate limiting
 - 🗜️ **HTML Minification** - Optimized output for better performance
-- 🔗 **WordPress Integration** - Seamless integration with WordPress hooks
+- 🛡️ **AdBlock Protection** - Blocks ads, tracking, and analytics during generation
+  - 🔒 **DNS over HTTPS (DoH)** - Enhanced privacy with AdGuard DNS blocking
 - 📊 **Performance Optimization** - Configurable settings to optimize generation speed
 - 🛡️ **Error Handling** - Robust error handling and recovery mechanisms
 
 ## 📁 Project Structure
 
 ```text
-tools/
-├── README.md                    # This comprehensive documentation
-├── SSG-QUICKSTART.md           # Quick start guide (5 minutes)
+tools/SSG/
 ├── .ssg.env.example           # Environment variables template
-├── SSG/                        # Main SSG tools
-│   ├── ssg.ts                  # Single page generator
-│   ├── ssg-sitemap.ts          # Sitemap-based generator
-│   └── utilities/              # Shared utility modules
-│       ├── browser-utils.ts    # Browser automation utilities
-│       ├── concurrency-utils.ts # Concurrency control
-│       ├── env-loader.ts       # Environment variable loading
-│       ├── file-utils.ts       # File operations
-│       └── xml-utils.ts        # XML parsing utilities
-|
-../inc/                         # WordPress Backend Integration
+├── ssg.ts                     # Single page generator
+├── ssg-sitemap.ts             # Sitemap-based generator
+├── test-adblock.sh            # AdBlock testing script
+├── docs/                      # Documentation files
+│   ├── README.md              # This comprehensive documentation
+│   ├── SSG-QUICKSTART.md      # Quick start guide (5 minutes)
+│   ├── SSG-WP-INTEGRATION.md  # WordPress integration guide
+│   ├── ADBLOCK-PROTECTION.md  # AdBlock protection guide
+│   ├── IMPLEMENTATION-SUMMARY.md # Implementation summary
+│   └── Personal-Note.md       # Personal notes
+└── utilities/                 # Shared utility modules
+    ├── adblock-utils.ts       # AdBlock & tracking protection
+    ├── browser-utils.ts       # Browser automation utilities
+    ├── concurrency-utils.ts   # Concurrency control
+    ├── env-loader.ts          # Environment variable loading
+    ├── file-utils.ts          # File operations
+    └── xml-utils.ts           # XML parsing utilities
+
+../inc/                        # WordPress Backend Integration
 ├── Controllers/REST/
 │   └── DispatchSSGBuild.php   # REST API for manual triggers
 ├── Services/PostsManagement/SSG/
@@ -54,6 +61,7 @@ tools/
 
 - **[SSG-QUICKSTART.md](./SSG-QUICKSTART.md)** - Get started in 5 minutes
 - **[WordPress Integration](./SSG-WP-INTEGRATION.md)** - WordPress automation architecture
+- **[AdBlock Protection](./ADBLOCK-PROTECTION.md)** - Comprehensive guide to ad blocking features
 - **[README.md](./README.md)** - This comprehensive documentation
 
 ### Quick Navigation
@@ -114,6 +122,10 @@ Arguments:
 Environment Variables (loaded from .env files):
   SSG_MINIFY_HTML    Minify HTML output (default: false)
   SSG_PAGE_TIMEOUT   Page generation timeout in ms (default: 30000)
+  SSG_BLOCK_ADS      Block ads during generation (default: true)
+  SSG_BLOCK_TRACKING Block tracking scripts (default: true)
+  SSG_BLOCK_ANALYTICS Block analytics scripts (default: false)
+  SSG_LOG_BLOCKED    Log blocked requests (default: true)
 ```
 
 ### 2. Sitemap-based Generator (`ssg-sitemap.ts`)
@@ -155,6 +167,10 @@ Environment Variables (loaded from .env files):
   SSG_PAGE_TIMEOUT        Timeout for individual page generation in ms (default: 30000)
   SSG_CONTINUE_ON_ERROR   Continue processing even if some pages fail (default: false)
   SSG_MINIFY_HTML         Minify HTML output to reduce file size (default: false)
+  SSG_BLOCK_ADS           Block ads during generation (default: true)
+  SSG_BLOCK_TRACKING      Block tracking scripts (default: true)
+  SSG_BLOCK_ANALYTICS     Block analytics scripts (default: false)
+  SSG_LOG_BLOCKED         Log blocked requests (default: true)
 ```
 
 ### 3. Environment Configuration
@@ -428,6 +444,11 @@ curl https://yoursite.com/wp-json/astra-child/v1/
 | `SSG_PAGE_TIMEOUT`      | `30000` | Page generation timeout in ms               | All tools   |
 | `SSG_CONTINUE_ON_ERROR` | `false` | Continue processing even if some pages fail | ssg-sitemap |
 | `SSG_MINIFY_HTML`       | `false` | Minify HTML output to reduce file size      | All tools   |
+| `SSG_BLOCK_ADS`         | `true`  | Block ads during generation (AdSense safe)  | All tools   |
+| `SSG_BLOCK_TRACKING`    | `true`  | Block tracking scripts during generation    | All tools   |
+| `SSG_BLOCK_ANALYTICS`   | `false` | Block analytics during generation           | All tools   |
+| `SSG_LOG_BLOCKED`       | `true`  | Log blocked requests for debugging          | All tools   |
+| `SSG_DOH_SERVER`        | `https://dns.adguard.com/dns-query` | DNS over HTTPS server for enhanced privacy | All tools   |
 
 ### Vite Environment Loading
 
@@ -476,7 +497,188 @@ bun run ssg:sitemap https://example.com/sitemap.xml
 
 This approach eliminates the need to manually set environment variables each time and provides a clean, version-controlled configuration system.
 
-## 📊 Performance Optimization
+## 🛡️ AdBlock Protection
+
+### Why AdBlock is Important for SSG
+
+When generating static sites from live WordPress pages that include AdSense, Google Analytics, or other tracking scripts, you risk violating platform Terms of Service and creating invalid traffic patterns. The SSG tools include comprehensive adblock protection to ensure clean, policy-compliant static pages.
+
+### AdSense Policy Compliance
+
+**The Problem**: Static site generation can trigger AdSense policy violations because:
+
+- Automated page access may be flagged as invalid traffic
+- Cached ad content violates AdSense caching policies
+- Pre-rendered ads don't refresh properly, causing impression discrepancies
+
+**The Solution**: SSG AdBlock automatically blocks:
+
+- **Google AdSense**: All googlesyndication.com, doubleclick.net, googleadservices.com
+- **Ad Networks**: Amazon Ads, Media.net, Criteo, Outbrain, Taboola
+- **Social Media Ads**: Facebook Ads, Twitter Ads, LinkedIn Ads, Pinterest Ads
+
+### Tracking Protection
+
+**Blocked Tracking Services**:
+
+- **Facebook Pixel**: connect.facebook.net, facebook.com/tr
+- **User Analytics**: Hotjar, FullStory, Mouseflow, CrazyEgg
+- **Error Tracking**: Bugsnag, Sentry, Rollbar, TrackJS
+- **Session Recording**: Clarity, SmartLook, LogRocket
+
+### Analytics Handling
+
+**Google Analytics & GTM**: Blocked optionally (default: `false`)
+
+- Keep analytics enabled to preserve site functionality
+- Analytics don't violate policies like ads do
+- Helps maintain proper site understanding during generation
+
+### Configuration Options
+
+```bash
+# AdBlock Environment Variables
+SSG_BLOCK_ADS=true           # Block all ad networks (recommended: true)
+SSG_BLOCK_TRACKING=true      # Block user tracking (recommended: true)
+SSG_BLOCK_ANALYTICS=false    # Block analytics (recommended: false)
+SSG_LOG_BLOCKED=true         # Show blocking activity (recommended: true)
+
+# Advanced Configuration
+SSG_ALLOWED_DOMAINS=your-cdn.com,trusted-service.com
+SSG_CUSTOM_BLOCKLIST=unwanted-tracker.com,popup-service.js
+```
+
+### AdBlock in Action
+
+```bash
+# Example output with AdBlock enabled (production settings for bot-only serving)
+🛡️ AdBlock enabled - blocking ads, tracking, analytics
+🚫 Blocked script: googlesyndication.com/pagead/js/adsbygoogle.js (ad_blocking)
+🚫 Blocked xhr: facebook.com/tr (tracking_blocking)
+🚫 Blocked fetch: google-analytics.com/g/collect (analytics_blocking)
+🚫 Blocked 15 requests:
+   - ad_blocking: 8
+   - tracking_blocking: 5
+   - analytics_blocking: 2
+✅ Static page generated: ./output/page.html
+```
+
+**Dynamic Messages Based on Configuration:**
+
+```bash
+# Production settings (bot-only serving)
+🛡️ AdBlock enabled - blocking ads, tracking, analytics
+
+# Development settings (analytics allowed)
+🛡️ AdBlock enabled - blocking ads, tracking
+
+# Minimal blocking (SSG_BLOCK_TRACKING=false)
+🛡️ AdBlock enabled - blocking ads
+
+# Ads only (SSG_BLOCK_TRACKING=false SSG_BLOCK_ANALYTICS=false)
+🛡️ AdBlock enabled - blocking ads
+```
+
+### Using AdBlock Programmatically
+
+```typescript
+import { generateStaticPage } from "./utilities/browser-utils.js";
+
+// Generate with custom AdBlock configuration
+await generateStaticPage("https://example.com", "./output/page.html", {
+  minifyHtml: true,
+  adBlock: {
+    blockAds: true,
+    blockTracking: true,
+    blockAnalytics: false,
+    logBlocked: true,
+    allowedDomains: ["your-trusted-cdn.com"],
+    customBlockList: ["unwanted-service.com"],
+  },
+});
+```
+
+### Security Benefits
+
+- **Policy Compliance**: Prevents AdSense account suspension
+- **Clean HTML**: Removes tracking pixels and ad placeholders
+- **Performance**: Faster generation without external ad requests
+- **Privacy**: No user data collection during generation
+- **Reliability**: Eliminates external service dependencies
+
+## � DNS over HTTPS (DoH) Protection
+
+### What is DoH?
+
+**DNS over HTTPS (DoH)** encrypts DNS queries and routes them through a privacy-focused DNS server. The SSG tools integrate DoH with AdGuard's DNS service to provide an additional layer of ad and tracker blocking at the DNS level.
+
+### DoH Benefits
+
+- **Enhanced Privacy**: DNS queries are encrypted and protected from eavesdropping
+- **Additional Blocking**: Blocks ad/tracker domains before requests are made
+- **Complementary Protection**: Works alongside request-level AdBlock for comprehensive protection
+- **Performance**: Minimal latency impact with fallback to regular DNS if DoH fails
+
+### DoH Configuration
+
+```bash
+# DoH Environment Variables
+SSG_DOH_SERVER=https://dns.adguard.com/dns-query    # AdGuard (blocks ads/malware/tracking)
+# Alternative: https://p2.freedns.controld.com/freedns-query (family protection)
+```
+
+### DoH in Action
+
+```bash
+# Example output with DoH enabled
+🔒 DNS over HTTPS enabled: https://dns.adguard.com/dns-query
+🛡️ AdBlock enabled - blocking ads, tracking
+🚫 Blocked script: googlesyndication.com/pagead/js/adsbygoogle.js (ad_blocking)
+🚫 Blocked xhr: facebook.com/tr (tracking_blocking)
+✅ Static page generated: ./output/page.html
+```
+
+### DoH vs AdBlock
+
+| Feature | AdBlock (Request Level) | DoH (DNS Level) |
+| ------- | ----------------------- | --------------- |
+| **Scope** | Blocks HTTP requests | Blocks DNS resolution |
+| **Timing** | After DNS lookup | Before request |
+| **Coverage** | Request URLs | Domain names |
+| **Fallback** | N/A | Regular DNS |
+| **Performance** | Minimal impact | Small latency increase |
+
+### Recommended DoH Settings
+
+#### Production (Maximum Privacy)
+
+```bash
+SSG_DOH_SERVER=https://dns.adguard.com/dns-query
+SSG_BLOCK_ADS=true
+SSG_BLOCK_TRACKING=true
+SSG_BLOCK_ANALYTICS=true
+```
+
+#### Development (Balanced)
+
+```bash
+SSG_DOH_SERVER=https://dns.adguard.com/dns-query
+SSG_BLOCK_ADS=true
+SSG_BLOCK_TRACKING=true
+SSG_BLOCK_ANALYTICS=false
+```
+
+#### CI/CD (Automated)
+
+```bash
+SSG_DOH_SERVER=https://dns.adguard.com/dns-query
+SSG_BLOCK_ADS=true
+SSG_BLOCK_TRACKING=true
+SSG_BLOCK_ANALYTICS=true
+SSG_LOG_BLOCKED=false
+```
+
+## �📊 Performance Optimization
 
 ### Concurrency Tuning
 

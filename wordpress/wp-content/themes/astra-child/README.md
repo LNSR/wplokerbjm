@@ -10,13 +10,22 @@
 
 ## 📁 Important Theme Files & Folders
 
-1. 🔧 **`functions.php`** - Main theme functions file. Initializes custom features and hooks.
+1. 🔧 **`functions.php`** - Main theme functions file.
 2. 🎨 **`style.css`** - Boilerplate WordPress stylesheet for the child theme. Contains theme metadata and custom styles.
 3. 📸 **`screenshot.png`** - Screenshot image for the theme, displayed in the WordPress admin area.
 4. ⚙️ **`inc/`** - Directory containing backend PHP code, including custom functions, REST APIs, hooks, and filters.
 5. 🖼️ **`src/`** - Directory containing Vue components and all client-side code that enhances the user interface.
 6. 📦 **`assets/`** - Directory for static assets like images, fonts, static site generation, and compiled CSS/JS files.
 7. 🛠️ **`tools/`** - Directory for development and build tools.
+
+## 🔌 Must-Use Plugin (MU Plugin)
+
+- 📍 **Location**: [`wordpress/wp-content/mu-plugins/astra-child-bootstrap.php`](../../mu-plugins/astra-child-bootstrap.php)
+- 🎯 **Purpose**: Loads the Composer autoloader and initializes the PHP-DI container early in the WordPress lifecycle.
+- ⚡ **Benefits**: Ensures hooks, services, and dependencies are registered before regular plugins and themes load, preventing conflicts and ensuring early execution.
+- 🚀 **Deployment**: Automatically deployed via GitHub Actions CI/CD pipeline to the remote server.
+
+This MU plugin is crucial for the theme's architecture, as it bootstraps the dependency injection system and custom hooks that power the job portal functionality.
 
 ## 📄 Theme Pages
 
@@ -44,8 +53,8 @@
 
 ## 📋 Mini Kanban Table
 
-| 📥 BACKLOG                                 | 📋 TODO | 🚧 IN PROGRESS                      | ✅ COMPLETED                        |
-| ------------------------------------------ | ------- | ----------------------------------- | ----------------------------------- |
-|                                            |         | 🔄 Implement SSG via GitHub Actions | ✅ Migrate to Vue for most frontend |
-| 🚀 Migrate to Nuxt and deploy to Vercel    |         |                                     | ✅ Fully CSR `<body>`               |
-| 🗺️ Add Job Fair Page (map & event details) |         |                                     |                                     |
+| 📥 BACKLOG                                 | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                        |
+| ------------------------------------------ | ------- | -------------- | ----------------------------------- |
+|                                            |         |                | ✅ Migrate to Vue for most frontend |
+| 🚀 Migrate to Nuxt and deploy to Vercel    |         |                | ✅ Fully CSR `<body>`               |
+| 🗺️ Add Job Fair Page (map & event details) |         |                | ✅ Implement SSG via GitHub Actions |

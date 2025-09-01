@@ -2,6 +2,7 @@
 namespace AstraChild\Services\Taxonomy;
 
 use AstraChild\QueryBuilders\JobQuery;
+use AstraChild\QueryBuilders\TaxonomyQuery;
 
 class TaxonomyManagement
 {
@@ -20,7 +21,7 @@ class TaxonomyManagement
      */
     public function deleteUnusedTerms($taxonomy)
     {
-        $terms = JobQuery::unusedTaxonomiesTermsArgs($taxonomy);
+        $terms = TaxonomyQuery::unusedTaxonomiesTermsArgs($taxonomy);
 
         foreach ($terms as $term_id) {
             $last_used = get_term_meta($term_id, 'last_used', true);

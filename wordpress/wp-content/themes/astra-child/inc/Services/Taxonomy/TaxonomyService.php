@@ -2,8 +2,11 @@
 
 namespace AstraChild\Services\Taxonomy;
 
-class TaxonomyService
+use AstraChild\Core\Cache; // Add this import near other use statements
+
+class TaxonomyService 
 {
+
     /**
      * Process taxonomy terms.
      *
@@ -50,10 +53,16 @@ class TaxonomyService
      * Build a tree structure from flat taxonomy terms.
      *
      * @param array $terms Flat array of taxonomy terms.
+     * @param string $taxonomy Taxonomy name for caching.
      * @return array Hierarchical tree of taxonomy terms.
      */
-    public function buildTermsTree($terms): array
+    public function buildTermsTree($terms, $taxonomy = ''): array
     {
+        $tree = Cache::get('taxonomy_tree_' . $taxonomy);
+        if ($tree !== false) {
+            return $tree;
+        }
+
         $terms_by_id = [];
         foreach ($terms as $term) {
             $terms_by_id[$term->term_id] = [
@@ -72,6 +81,8 @@ class TaxonomyService
             }
         }
         unset($term);
+
+        Cache::set('taxonomy_tree_' . $taxonomy, $tree, 86400); // Cache for 24 hours
         return $tree;
     }
 }

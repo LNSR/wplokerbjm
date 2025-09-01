@@ -101,10 +101,10 @@ wait
 # This prevents permission issues when container trying to access website files
 
 # Fix ownership and permissions for files and directories in one efficient pass
-# Using 774 permissions for development environment to avoid permission issues while still being reasonably secure
+# Using 775 permissions for development environment to avoid permission issues while still being reasonably secure
 find /var/www/html \( \
     \( \( -type f -o -type d \) \( ! -user wordpress -o ! -group www-data \) -exec chown -v wordpress:www-data {} \; \) -o \
-    \( \( -type f -o -type d \) ! -perm 774 -exec chmod -v 774 {} \; \) \
+    \( \( -type f -o -type d \) ! -perm 775 -exec chmod -v 775 {} \; \) \
 \)
 
 exec "$@"

@@ -2,6 +2,8 @@
 
 namespace AstraChild\Services\REST;
 
+use AstraChild\Core\Cache;
+
 class RESTData
 {
     public function __construct(
@@ -11,9 +13,16 @@ class RESTData
 
     public function getCardData(int $post_id): array
     {
+        $cacheKey = 'card_data_' . $post_id;
+
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
 
-        return [
+        $data = [
             'slug' => get_post_field('post_name', $post_id),
             'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
             'nama_perusahaan' => !empty($jobdata['perusahaan_taxo'])
@@ -35,10 +44,21 @@ class RESTData
             'permalink' => esc_url(get_permalink($post_id)),
             'post_time' => get_post_time('c', false, $post_id),
         ];
+
+        Cache::set($cacheKey, $data, 86400); // Cache for 24 hours
+
+        return $data;
     }
 
     public function getSingleOverlayData(int $post_id): array
     {
+        $cacheKey = 'single_overlay_data_' . $post_id;
+
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
 
         $data = [
@@ -75,6 +95,8 @@ class RESTData
         if (is_user_logged_in()) {
             $data['id'] = $post_id;
         }
+
+        Cache::set($cacheKey, $data, 86400); // Cache for 24 hours
 
         return $data;
     }

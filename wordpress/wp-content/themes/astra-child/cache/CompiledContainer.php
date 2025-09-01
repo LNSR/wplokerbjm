@@ -71,34 +71,49 @@ class CompiledContainer extends DI\CompiledContainer{
   'subEntry36' => 'get65',
   'subEntry37' => 'get66',
   'subEntry38' => 'get67',
-  'AstraChild\\Services\\PostsManagement\\SSG\\RedirectToSSG' => 'get68',
-  'subEntry39' => 'get69',
-  'AstraChild\\Services\\PostsManagement\\SSG\\TriggerBuild' => 'get70',
+  'AstraChild\\Services\\PostsManagement\\PostsListener' => 'get68',
+  'AstraChild\\Services\\PostsManagement\\SSG\\RedirectToSSG' => 'get69',
+  'subEntry39' => 'get70',
   'subEntry40' => 'get71',
-  'AstraChild\\Services\\PostsManagement\\SSG\\PostsCRUDListener' => 'get72',
+  'AstraChild\\Services\\PostsManagement\\SSG\\TriggerBuild' => 'get72',
   'subEntry41' => 'get73',
-  'subEntry42' => 'get74',
-  'AstraChild\\Services\\PostsManagement\\PostsManagement' => 'get75',
-  'AstraChild\\Services\\CustomField\\CustomFieldsService' => 'get76',
-  'AstraChild\\Services\\Taxonomy\\TaxonomyService' => 'get77',
-  'AstraChild\\Services\\Taxonomy\\TaxonomyManagement' => 'get78',
-  'AstraChild\\Services\\Utilities\\SSG\\URLFilterService' => 'get79',
-  'AstraChild\\Repositories\\TaxonomyRepository' => 'get80',
-  'AstraChild\\Repositories\\CustomFieldRepository' => 'get81',
-  'AstraChild\\Repositories\\JobRepository' => 'get82',
-  'subEntry43' => 'get83',
-  'subEntry44' => 'get84',
-  'subEntry45' => 'get85',
-  'AstraChild\\Core\\Init' => 'get86',
-  'customFieldsProvider' => 'get87',
-  'taxonomiesProvider' => 'get88',
-  'AstraChild\\Factories\\JobDataFactory' => 'get89',
-  'subEntry46' => 'get90',
-  'subEntry47' => 'get91',
-  'subEntry48' => 'get92',
-  'subEntry49' => 'get93',
-  'AstraChild\\QueryBuilders\\JobQuery' => 'get94',
-  'AstraChild\\Services\\Utilities\\SSG\\SSGUtilities' => 'get95',
+  'AstraChild\\Services\\PostsManagement\\SSG\\PostsCRUDListener' => 'get74',
+  'subEntry42' => 'get75',
+  'subEntry43' => 'get76',
+  'subEntry44' => 'get77',
+  'AstraChild\\Services\\PostsManagement\\PostsManagement' => 'get78',
+  'AstraChild\\Services\\CustomField\\CustomFieldsService' => 'get79',
+  'AstraChild\\Services\\Taxonomy\\TaxonomyService' => 'get80',
+  'AstraChild\\Services\\Taxonomy\\TaxonomyManagement' => 'get81',
+  'AstraChild\\Services\\Taxonomy\\TaxonomyListener' => 'get82',
+  'AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\HeaderDetector' => 'get83',
+  'AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\RateLimiter' => 'get84',
+  'AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\DnsResolver' => 'get85',
+  'AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\BotRangeFetcher' => 'get86',
+  'AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\KeywordDetector' => 'get87',
+  'AstraChild\\Services\\Utilities\\SSG\\URLFilterService' => 'get88',
+  'AstraChild\\Services\\Utilities\\SSG\\RankMathIntegration' => 'get89',
+  'AstraChild\\Repositories\\TaxonomyRepository' => 'get90',
+  'AstraChild\\Repositories\\CustomFieldRepository' => 'get91',
+  'AstraChild\\Repositories\\JobRepository' => 'get92',
+  'subEntry45' => 'get93',
+  'subEntry46' => 'get94',
+  'AstraChild\\Core\\Init' => 'get95',
+  'customFieldsProvider' => 'get96',
+  'taxonomiesProvider' => 'get97',
+  'AstraChild\\Factories\\JobDataFactory' => 'get98',
+  'subEntry47' => 'get99',
+  'subEntry48' => 'get100',
+  'subEntry49' => 'get101',
+  'subEntry50' => 'get102',
+  'AstraChild\\QueryBuilders\\JobQuery' => 'get103',
+  'AstraChild\\Services\\Utilities\\SSG\\SSGUtilities' => 'get104',
+  'AstraChild\\Services\\Utilities\\SSG\\BotDetection' => 'get105',
+  'subEntry51' => 'get106',
+  'subEntry52' => 'get107',
+  'subEntry53' => 'get108',
+  'subEntry54' => 'get109',
+  'subEntry55' => 'get110',
 );
 
     protected function get2()
@@ -465,109 +480,162 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
-    protected function get69()
-    {
-        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\SSGUtilities');
-    }
-
     protected function get68()
     {
-        $object = new AstraChild\Services\PostsManagement\SSG\RedirectToSSG($this->get69());
+        $object = new AstraChild\Services\PostsManagement\PostsListener();
         return $object;
-    }
-
-    protected function get71()
-    {
-        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\URLFilterService');
     }
 
     protected function get70()
     {
-        $object = new AstraChild\Services\PostsManagement\SSG\TriggerBuild($this->get71(), [
-        ]);
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\SSGUtilities');
+    }
+
+    protected function get71()
+    {
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\BotDetection');
+    }
+
+    protected function get69()
+    {
+        $object = new AstraChild\Services\PostsManagement\SSG\RedirectToSSG($this->get70(), $this->get71());
         return $object;
     }
 
     protected function get73()
     {
-        return $this->delegateContainer->get('AstraChild\\Services\\PostsManagement\\SSG\\TriggerBuild');
-    }
-
-    protected function get74()
-    {
-        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\SSGUtilities');
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\URLFilterService');
     }
 
     protected function get72()
     {
-        $object = new AstraChild\Services\PostsManagement\SSG\PostsCRUDListener($this->get73(), $this->get74());
+        $object = new AstraChild\Services\PostsManagement\SSG\TriggerBuild($this->get73(), [
+        ]);
         return $object;
     }
 
     protected function get75()
     {
-        $object = new AstraChild\Services\PostsManagement\PostsManagement();
-        return $object;
+        return $this->delegateContainer->get('AstraChild\\Services\\PostsManagement\\SSG\\TriggerBuild');
     }
 
     protected function get76()
     {
-        $object = new AstraChild\Services\CustomField\CustomFieldsService();
-        return $object;
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\SSGUtilities');
     }
 
     protected function get77()
     {
-        $object = new AstraChild\Services\Taxonomy\TaxonomyService();
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\RankMathIntegration');
+    }
+
+    protected function get74()
+    {
+        $object = new AstraChild\Services\PostsManagement\SSG\PostsCRUDListener($this->get75(), $this->get76(), $this->get77());
         return $object;
     }
 
     protected function get78()
     {
-        $object = new AstraChild\Services\Taxonomy\TaxonomyManagement();
+        $object = new AstraChild\Services\PostsManagement\PostsManagement();
         return $object;
     }
 
     protected function get79()
     {
-        $object = new AstraChild\Services\Utilities\SSG\URLFilterService();
+        $object = new AstraChild\Services\CustomField\CustomFieldsService();
         return $object;
     }
 
     protected function get80()
     {
-        $object = new AstraChild\Repositories\TaxonomyRepository();
+        $object = new AstraChild\Services\Taxonomy\TaxonomyService();
         return $object;
     }
 
     protected function get81()
     {
-        $object = new AstraChild\Repositories\CustomFieldRepository();
+        $object = new AstraChild\Services\Taxonomy\TaxonomyManagement();
+        return $object;
+    }
+
+    protected function get82()
+    {
+        $object = new AstraChild\Services\Taxonomy\TaxonomyListener();
         return $object;
     }
 
     protected function get83()
     {
-        return $this->delegateContainer->get('AstraChild\\Factories\\JobDataFactory');
+        $object = new AstraChild\Services\Utilities\SSG\BotDetectionHelper\HeaderDetector();
+        return $object;
     }
 
     protected function get84()
     {
-        return $this->delegateContainer->get('AstraChild\\Services\\REST\\RESTData');
+        $object = new AstraChild\Services\Utilities\SSG\BotDetectionHelper\RateLimiter();
+        return $object;
     }
 
     protected function get85()
     {
-        return $this->delegateContainer->get('AstraChild\\Services\\Job\\JobServices');
-    }
-
-    protected function get82()
-    {
-        $object = new AstraChild\Repositories\JobRepository($this->get83(), $this->get84(), $this->get85());
+        $object = new AstraChild\Services\Utilities\SSG\BotDetectionHelper\DnsResolver();
         return $object;
     }
 
     protected function get86()
+    {
+        $object = new AstraChild\Services\Utilities\SSG\BotDetectionHelper\BotRangeFetcher();
+        return $object;
+    }
+
+    protected function get87()
+    {
+        $object = new AstraChild\Services\Utilities\SSG\BotDetectionHelper\KeywordDetector();
+        return $object;
+    }
+
+    protected function get88()
+    {
+        $object = new AstraChild\Services\Utilities\SSG\URLFilterService();
+        return $object;
+    }
+
+    protected function get89()
+    {
+        $object = new AstraChild\Services\Utilities\SSG\RankMathIntegration();
+        return $object;
+    }
+
+    protected function get90()
+    {
+        $object = new AstraChild\Repositories\TaxonomyRepository();
+        return $object;
+    }
+
+    protected function get91()
+    {
+        $object = new AstraChild\Repositories\CustomFieldRepository();
+        return $object;
+    }
+
+    protected function get93()
+    {
+        return $this->delegateContainer->get('AstraChild\\Services\\REST\\RESTData');
+    }
+
+    protected function get94()
+    {
+        return $this->delegateContainer->get('AstraChild\\Services\\Job\\JobServices');
+    }
+
+    protected function get92()
+    {
+        $object = new AstraChild\Repositories\JobRepository($this->get93(), $this->get94());
+        return $object;
+    }
+
+    protected function get95()
     {
         return $this->resolveFactory(static fn($c) =>
                 new \AstraChild\Core\Init(
@@ -581,56 +649,89 @@ class CompiledContainer extends DI\CompiledContainer{
                         $c->get(\AstraChild\Services\Job\ArchiveServices::class),
                         $c->get(\AstraChild\Services\PostsManagement\SSG\PostsCRUDListener::class),
                         $c->get(\AstraChild\Services\PostsManagement\SSG\RedirectToSSG::class),
-                        $c->get(\AstraChild\Services\Cron\CronService::class)
+                        $c->get(\AstraChild\Services\Cron\CronService::class),
+                        $c->get(\AstraChild\Services\PostsManagement\PostsListener::class),
+                        $c->get(\AstraChild\Services\Taxonomy\TaxonomyListener::class)
                     ],
                 ), 'AstraChild\\Core\\Init');
     }
 
-    protected function get87()
+    protected function get96()
     {
         return $this->delegateContainer->get('AstraChild\\Repositories\\CustomFieldRepository');
     }
 
-    protected function get88()
+    protected function get97()
     {
         return $this->delegateContainer->get('AstraChild\\Repositories\\TaxonomyRepository');
     }
 
-    protected function get90()
+    protected function get99()
     {
         return $this->delegateContainer->get('customFieldsProvider');
     }
 
-    protected function get91()
+    protected function get100()
     {
         return $this->delegateContainer->get('taxonomiesProvider');
     }
 
-    protected function get92()
+    protected function get101()
     {
         return $this->delegateContainer->get('AstraChild\\Services\\CustomField\\CustomFieldsService');
     }
 
-    protected function get93()
+    protected function get102()
     {
         return $this->delegateContainer->get('AstraChild\\Services\\Taxonomy\\TaxonomyService');
     }
 
-    protected function get89()
+    protected function get98()
     {
-        $object = new AstraChild\Factories\JobDataFactory($this->get90(), $this->get91(), $this->get92(), $this->get93());
+        $object = new AstraChild\Factories\JobDataFactory($this->get99(), $this->get100(), $this->get101(), $this->get102());
         return $object;
     }
 
-    protected function get94()
+    protected function get103()
     {
         $object = new AstraChild\QueryBuilders\JobQuery();
         return $object;
     }
 
-    protected function get95()
+    protected function get104()
     {
         $object = new AstraChild\Services\Utilities\SSG\SSGUtilities();
+        return $object;
+    }
+
+    protected function get106()
+    {
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\BotRangeFetcher');
+    }
+
+    protected function get107()
+    {
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\HeaderDetector');
+    }
+
+    protected function get108()
+    {
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\KeywordDetector');
+    }
+
+    protected function get109()
+    {
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\RateLimiter');
+    }
+
+    protected function get110()
+    {
+        return $this->delegateContainer->get('AstraChild\\Services\\Utilities\\SSG\\BotDetectionHelper\\DnsResolver');
+    }
+
+    protected function get105()
+    {
+        $object = new AstraChild\Services\Utilities\SSG\BotDetection($this->get106(), $this->get107(), $this->get108(), $this->get109(), $this->get110());
         return $object;
     }
 

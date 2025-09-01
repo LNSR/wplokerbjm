@@ -4,6 +4,7 @@ namespace AstraChild\Services\PostsManagement\SSG;
 
 use AstraChild\Contracts\HooksInterface;
 use AstraChild\Services\Utilities\SSG\LiteSpeedIntegration;
+use AstraChild\Core\Cache;
 
 /**
  * SSG Service
@@ -13,9 +14,9 @@ use AstraChild\Services\Utilities\SSG\LiteSpeedIntegration;
 class RedirectToSSG implements HooksInterface
 {
     public function __construct(
-        private \AstraChild\Services\Utilities\SSG\SSGUtilities $ssgUtilities
-    )
-    {
+        private \AstraChild\Services\Utilities\SSG\SSGUtilities $ssgUtilities,
+        private \AstraChild\Services\Utilities\SSG\BotDetection $botDetection
+    ) {
     }
 
     public function registerActions(): void
@@ -30,40 +31,40 @@ class RedirectToSSG implements HooksInterface
     }
 
     /**
-     * Check if the current visitor is a bot
+     * Get SSG content with caching logic
+     *
+     * @param mixed $post The post object
+     * @param string $ssgFilePath The path to the SSG file
+     * @param bool $isBot Whether the visitor is a bot
+     * @return string|false The SSG content or false on failure
      */
-    private function isBot(): bool
+    private function getSSGContent($post, $ssgFilePath, $isBot)
     {
-        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        
-        // Exclude our own SSG bot from being treated as a bot
-        $ssgBotUserAgents = apply_filters('ssg_excluded_user_agents', [
-            'SSG-Bot/1.0',
-            'Mozilla/5.0 (compatible; SSG-Bot/1.0)'
-        ]);
-        
-        foreach ($ssgBotUserAgents as $ssgBot) {
-            if (stripos($userAgent, $ssgBot) !== false) {
-                return false; // Our SSG bot should not be redirected
+        $cacheKey = 'ssg_content_' . $post->ID;
+        $cached = Cache::get($cacheKey);
+
+        $currentMtime = @filemtime($ssgFilePath);
+        if ($currentMtime === false) {
+            LiteSpeedIntegration::logCoordination('Unable to read SSG file mtime', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+            $currentMtime = time(); // fallback to avoid fatal comparisons
+        }
+
+        $ssgContent = false;
+
+        if ($cached && is_array($cached) && isset($cached['mtime'], $cached['content']) && $cached['mtime'] >= $currentMtime) {
+            $ssgContent = $cached['content'];
+            LiteSpeedIntegration::logCoordination('Serving cached SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+        } else {
+            $ssgContent = @file_get_contents($ssgFilePath);
+            if ($ssgContent !== false) {
+                Cache::set($cacheKey, ['content' => $ssgContent, 'mtime' => $currentMtime], $this->calculateMaxAge());
+                LiteSpeedIntegration::logCoordination('Serving fresh SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+            } else {
+                LiteSpeedIntegration::logCoordination('Failed to read SSG file', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
             }
         }
-        
-        $botKeywords = apply_filters('ssg_bot_keywords', [
-            'bot', 'crawler', 'spider', 'scraper', 'googlebot', 'bingbot', 'yahoo', 'duckduckbot',
-            'facebookexternalhit', 'twitterbot', 'linkedinbot', 'whatsapp', 'slackbot', 'discordbot',
-            'telegrambot', 'applebot', 'yandexbot', 'baiduspider', 'sogou', 'exabot', 'mj12bot',
-            'dotbot', 'ahrefsbot', 'semrushbot', 'msnbot', 'slurp', 'pinterest', 'tumblr',
-            'archive.org', 'wayback', 'uptimebot', 'pingdom', 'newrelic', 'datadog', 'cdn',
-            'akamai', 'fastly', 'ia_archiver', 'quic', 'quicbot', 'quiccloud', 'lighthouse',
-            'pagespeed', 'psi', 'webpagetest', 'gtmetrix', 'web.dev', 'crux', 'google-inspectiontool',
-            'google-crawler', 'benchmark'
-        ]);
-        foreach ($botKeywords as $keyword) {
-            if (stripos($userAgent, $keyword) !== false) {
-                return true;
-            }
-        }
-        return false;
+
+        return $ssgContent;
     }
 
     /**
@@ -83,15 +84,22 @@ class RedirectToSSG implements HooksInterface
             }
         }
 
-        // Don't redirect logged-in users
+        $serveFor = get_option('ssg_serve_for', 'bots');
+        $isBot = $this->botDetection->isBot();
+
+        // Always skip SSG for logged-in users to prevent false positives from bot detection
         if (is_user_logged_in()) {
+            LiteSpeedIntegration::logCoordination('Skipping SSG for logged-in user', ['is_bot' => $isBot]);
+            return;
+        }
+
+        // Skip SSG for ESI/fragment requests to avoid returning full static pages
+        if (LiteSpeedIntegration::isEsiRequest()) {
+            LiteSpeedIntegration::logCoordination('Skipping SSG for ESI/fragment request');
             return;
         }
 
         // Get configuration for who to serve SSG to
-        $serveFor = get_option('ssg_serve_for', 'bots');
-        $isBot = $this->isBot();
-
         // Check if we should serve based on visitor type
         if ($serveFor === 'bots' && !$isBot) {
             return;
@@ -100,38 +108,47 @@ class RedirectToSSG implements HooksInterface
             return;
         }
 
-        // Get the current post
         $post = get_post();
         if (!$post) {
             return;
         }
 
-        // Get the SSG file path
         $ssgFilePath = $this->ssgUtilities->getSSGFilePath($post);
 
-        // Check if SSG file exists
         if (file_exists($ssgFilePath)) {
-            // Serve SSG content directly without redirect
-            $ssgContent = file_get_contents($ssgFilePath);
-            
-            if ($ssgContent !== false) {
-                // Log SSG serving
-                LiteSpeedIntegration::logCoordination('Serving SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+            $ssgContent = $this->getSSGContent($post, $ssgFilePath, $isBot);
 
-                // Set SSG marker headers
-                header('X-SSG: true');
-                header('X-SSG-Source: static');
-                header('X-SSG-Timestamp: ' . time());
-                header('X-SSG-Version: 1.0');
-                
-                // Set proper headers
-                header('Content-Type: text/html; charset=UTF-8');
-                header('Cache-Control: public, max-age=3600'); // Cache for 1 hour
-                
+            if ($ssgContent !== false) {
+                // Decide TTLs (configurable via WP options)
+                $maxAge = $this->calculateMaxAge();
+
+                // Centralized header emission (server-level caching is preferred)
+                LiteSpeedIntegration::sendSSGResponseHeaders((int) $post->ID, $isBot, strlen($ssgContent));
+
                 // Output the SSG content
                 echo $ssgContent;
                 exit;
             }
         }
+    }
+
+    /**
+     * Calculate the maximum age for SSG cache based on configuration
+     */
+    private function calculateMaxAge(): int
+    {
+        $maxAge = (int) get_option('ssg_cache_ttl', 3600);
+        if ($maxAge <= 0) {
+            $maxAge = 3600;
+        }
+        if (LiteSpeedIntegration::isQuicCloudActive()) {
+            $quicTtl = (int) get_option('ssg_cache_ttl_quic', 0);
+            if ($quicTtl > 0) {
+                $maxAge = $quicTtl;
+            } else {
+                $maxAge = max($maxAge, 3600);
+            }
+        }
+        return $maxAge;
     }
 }

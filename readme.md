@@ -20,6 +20,9 @@ This repository contains the source code and configuration for **WPLokerBJM**, w
 - 🎨 **`wordpress/wp-content/themes/astra-child`**  
   The main directory for theme customizations. Extends the Astra parent theme with custom features, styles, and templates for the WPLokerBJM.
 
+- 🔌 **`wordpress/wp-content/mu-plugins/astra-child-bootstrap.php`**  
+  Must-use plugin that loads the Composer autoloader and initializes the PHP-DI container early in the WordPress lifecycle, ensuring hooks and services are registered before regular plugins and themes.
+
 - ⚙️ **`wordpress/wp-content/themes/astra-child/inc`**  
   Contains backend PHP code, including custom functions, REST APIs, hooks, and filters. This may include custom post types, meta fields, and integration logic.
 
@@ -30,7 +33,7 @@ This repository contains the source code and configuration for **WPLokerBJM**, w
 
 ## 🛠️ Setup Configuration
 
-```
+```bash
 ├── Caddyfile                          # Reverse Proxy. See https://caddyserver.com/docs/
 ├── compose.yaml
 ├── docker.conf.d                      # Images Docker configurations
@@ -68,6 +71,8 @@ inc/
 │   └── REST/                  # REST API controllers
 ├── Core/                      # Core framework and dependency injection
 │   ├── AutowireScanner.php    # Scans for PHP files for autowiring
+│   ├── Cache.php              # Centralized cache management for transients
+│   ├── ObjectCache.php        # Direct object cache management
 │   ├── Container.php          # Dependency Injection container (PHP-DI)
 │   ├── Definitions/           # Container definitions
 │   ├── Enqueue/               # Enqueue management
@@ -204,7 +209,7 @@ bun run dev
 # VSCode → Terminal → Run Task → dev
 ```
 
-### 🎉 You're all set!
+### 🎉 You're all set
 
 Your development environment should now be running at `https://localhost`
 
@@ -213,6 +218,6 @@ Your development environment should now be running at `https://localhost`
 ## 📚 Additional Resources
 
 - 📋 [**Project Notes & Architecture**](wordpress/wp-content/themes/astra-child/README.md)
-- 🛠️ [**SSG Tools Documentation**](wordpress/wp-content/themes/astra-child/tools/README.md)
+- 🛠️ [**SSG Tools Documentation**](wordpress/wp-content/themes/astra-child/tools/SSG/docs/README.md)
 
 ---

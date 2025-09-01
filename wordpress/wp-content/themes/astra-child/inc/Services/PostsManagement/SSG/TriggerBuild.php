@@ -2,6 +2,8 @@
 
 namespace AstraChild\Services\PostsManagement\SSG;
 
+use AstraChild\Core\Cache;
+
 /**
  * TriggerBuild
  *
@@ -44,10 +46,10 @@ class TriggerBuild
      */
     public function trigger(array $paths, ?string $reason = null, ?bool $dryRun = null): array
     {
-        error_log("SSG Trigger: Starting build trigger - Paths: " . json_encode($paths) . ", Reason: " . ($reason ?? 'none') . ", Dry Run: " . ($dryRun ? 'true' : 'false'));
+        error_log("SSG Trigger: Starting build trigger - Paths: " . json_encode($paths) . ", Reason: " . ($reason ?? 'none') . ", Dry Run: " . ($dryRun ? 'true' : 'false') . ", Workflow: {$this->workflow}");
 
         if (empty($this->token) || empty($this->owner) || empty($this->repo) || empty($this->workflow)) {
-            error_log("SSG Trigger: ERROR - Missing GitHub Actions configuration");
+            error_log("SSG Trigger: ERROR - Missing GitHub Actions configuration - Token: " . (!empty($this->token) ? 'set' : 'missing') . ", Owner: {$this->owner}, Repo: {$this->repo}, Workflow: {$this->workflow}");
             return [
                 'success' => false,
                 'status' => null,
@@ -168,8 +170,7 @@ class TriggerBuild
      */
     private function checkDebounceCache(string $key): ?array
     {
-        $transientKey = "ssg_debounce_{$key}";
-        $cached = get_transient($transientKey);
+        $cached = Cache::get("ssg_debounce_{$key}");
 
         if ($cached !== false) {
             error_log("SSG Trigger: Found cached result for key: {$key}");
@@ -184,12 +185,10 @@ class TriggerBuild
      */
     private function setDebounceCache(string $key, array $result): void
     {
-        $transientKey = "ssg_debounce_{$key}";
-
         // Use longer debounce for LiteSpeed-coordinated operations
         $expiration = $this->isLiteSpeedCoordinatedOperation() ? 120 : 60; // 2 minutes vs 1 minute
 
-        set_transient($transientKey, $result, $expiration);
+        Cache::set("ssg_debounce_{$key}", $result, $expiration);
         error_log("SSG Trigger: Cached result for key: {$key} (expiration: {$expiration}s)");
     }
 
@@ -206,8 +205,9 @@ class TriggerBuild
             return true;
         }
 
-        // Check for recent LiteSpeed purge actions
-        if (function_exists('did_action') && did_action('litespeed_purge_post') > 0) {
+        // Check for recent LiteSpeed purge actions using transients
+        $purgeTransient = Cache::get('litespeed_recent_purge');
+        if ($purgeTransient !== false) {
             return true;
         }
 

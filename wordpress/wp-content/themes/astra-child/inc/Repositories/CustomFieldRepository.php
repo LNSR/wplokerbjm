@@ -4,6 +4,7 @@ namespace AstraChild\Repositories;
 
 use AstraChild\Contracts\DataProviderInterface;
 use AstraChild\Models\CustomFieldEntity;
+use AstraChild\Core\Cache;
 
 class CustomFieldRepository implements DataProviderInterface
 {
@@ -23,7 +24,14 @@ class CustomFieldRepository implements DataProviderInterface
      */
     public function getMetaBoxData(int $post_id): CustomFieldEntity
     {
-        return new CustomFieldEntity(
+        $cacheKey = 'custom_fields_job_data_' . $post_id;
+
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $entity = new CustomFieldEntity(
             nama_perusahaan: rwmb_meta('nama_perusahaan', [], $post_id),
             tentang_perusahaan: rwmb_meta('tentang_perusahaan', [], $post_id),
             deskripsi_pekerjaan: rwmb_meta('deskripsi_pekerjaan', [], $post_id),
@@ -42,5 +50,9 @@ class CustomFieldRepository implements DataProviderInterface
             social_media: rwmb_meta('social_media', [], $post_id),
             status_pekerjaan: rwmb_meta('status_pekerjaan', [], $post_id)
         );
+
+        Cache::set($cacheKey, $entity, 86400); // Cache for 24 hours
+
+        return $entity;
     }
 }

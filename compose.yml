@@ -51,7 +51,7 @@ services:
             // Debugging
             if (!defined('WP_DEBUG')) define('WP_DEBUG', true);
             if (!defined('WP_DEBUG_LOG')) define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug/debug.log');
-            if (!defined('WP_DEBUG_DISPLAY')) define('WP_DEBUG_DISPLAY', true);
+            if (!defined('WP_DEBUG_DISPLAY')) define('WP_DEBUG_DISPLAY', false);
             if (!defined('SCRIPT_DEBUG')) define('SCRIPT_DEBUG', true);
 
             // Performance for dev
@@ -107,7 +107,7 @@ services:
 
             // Security hardening
             define('DISALLOW_UNFILTERED_HTML', true);
-            define('WP_HTTP_BLOCK_EXTERNAL', true);
+            define('WP_HTTP_BLOCK_EXTERNAL', false);
             define('WP_ACCESSIBLE_HOSTS', 'api.wordpress.org'); // Allow updates
 
             // Prevent file editing and modifications

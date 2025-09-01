@@ -16,7 +16,7 @@ class Enqueue implements HooksInterface
      */
     public function registerActions(): void
     {
-    add_action('wp_enqueue_scripts', [$this, 'enqueueAssets'], 2);
+        add_action('wp_enqueue_scripts', [$this, 'enqueueAssets'], 7);
     }
 
     /**
@@ -24,7 +24,7 @@ class Enqueue implements HooksInterface
      */
     public function registerFilters(): void
     {
-        add_filter('style_loader_tag', [$this, 'filterStyleLoaderTag'], 2, 2);
+        add_filter('style_loader_tag', [$this, 'filterStyleLoaderTag'], 8, 2);
     }
 
     public function enqueueAssets(): void
@@ -40,7 +40,7 @@ class Enqueue implements HooksInterface
             return;
         }
 
-    $this->noOptimizeStyleHandles = array_merge($this->noOptimizeStyleHandles, $prod['noOptimizeStyleHandles'] ?? []);
+        $this->noOptimizeStyleHandles = array_merge($this->noOptimizeStyleHandles, $prod['noOptimizeStyleHandles'] ?? []);
     }
 
     /**

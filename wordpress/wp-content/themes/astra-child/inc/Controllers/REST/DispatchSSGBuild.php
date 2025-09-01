@@ -2,6 +2,8 @@
 
 namespace AstraChild\Controllers\REST;
 
+use AstraChild\Core\Cache;
+
 /**
  * REST endpoint for manually triggering SSG builds
  */
@@ -47,7 +49,7 @@ class DispatchSSGBuild
         // Rate limiting: Allow only 1 request per minute per user
         $userId = get_current_user_id();
         $rateLimitKey = "ssg_api_rate_limit_{$userId}";
-        $lastRequest = get_transient($rateLimitKey);
+        $lastRequest = Cache::get($rateLimitKey);
 
         if ($lastRequest !== false) {
             return new \WP_REST_Response([
@@ -85,7 +87,7 @@ class DispatchSSGBuild
         }
 
         // Set rate limit before processing
-        set_transient($rateLimitKey, time(), 60); // 60 seconds = 1 minute
+        Cache::set($rateLimitKey, time(), 120); // 120 seconds = 2 minutes
 
         // Trigger the build
         $result = $this->triggerBuild->trigger($filteredPaths, $reason, $dryRun);

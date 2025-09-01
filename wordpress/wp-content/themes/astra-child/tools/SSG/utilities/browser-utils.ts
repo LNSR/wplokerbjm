@@ -2,16 +2,19 @@ import { chromium } from 'playwright';
 import type { Browser, BrowserContext, Page } from 'playwright';
 import { minify } from 'html-minifier-terser';
 import { FileManager } from './file-utils.js';
+import { createAdBlockManager, type AdBlockConfig } from './adblock-utils.js';
 
 export interface BrowserConfig {
   userAgent?: string;
   ignoreHTTPSErrors?: boolean;
+  dohServer?: string;
 }
 
 export interface PageGenerationOptions {
   waitUntil?: 'load' | 'domcontentloaded' | 'networkidle';
   timeout?: number;
   minifyHtml?: boolean;
+  adBlock?: AdBlockConfig;
 }
 
 export class BrowserManager {
@@ -21,10 +24,18 @@ export class BrowserManager {
   async launch(config: BrowserConfig = {}): Promise<void> {
     const {
       userAgent = 'Mozilla/5.0 (compatible; SSG-Bot/1.0)',
-      ignoreHTTPSErrors = true
+      ignoreHTTPSErrors = true,
+      dohServer = process.env['SSG_DOH_SERVER'] || 'https://dns.adguard.com/dns-query'
     } = config;
 
-    this.browser = await chromium.launch();
+    // Prepare launch arguments
+    const launchArgs: string[] = [];
+    if (dohServer) {
+      launchArgs.push(`--dns-over-https-server=${dohServer}`);
+      console.log(`🔒 DNS over HTTPS enabled: ${dohServer}`);
+    }
+
+    this.browser = await chromium.launch({ args: launchArgs });
     this.context = await this.browser.newContext({
       ignoreHTTPSErrors,
       extraHTTPHeaders: {
@@ -73,7 +84,8 @@ export class PageGenerator {
     const {
       waitUntil = 'networkidle',
       timeout = 30000,
-      minifyHtml = false
+      minifyHtml = false,
+      adBlock
     } = options;
 
     const maxRetries = parseInt(process.env['SSG_MAX_RETRIES'] || '3');
@@ -84,12 +96,40 @@ export class PageGenerator {
       // Set page timeout
       page.setDefaultTimeout(timeout);
 
+      // Setup ad blocking if enabled
+      let adBlockManager;
+      if (adBlock || process.env['SSG_BLOCK_ADS'] !== 'false') {
+        adBlockManager = createAdBlockManager();
+        if (adBlock) {
+          adBlockManager.updateConfig(adBlock);
+        }
+        await adBlockManager.setupPageInterception(page);
+        // Dynamic message based on actual config
+        const config = adBlockManager.getConfig();
+        const blockingTypes = [];
+        if (config.blockAds) blockingTypes.push('ads');
+        if (config.blockTracking) blockingTypes.push('tracking');
+        if (config.blockAnalytics) blockingTypes.push('analytics');
+        console.log(`🛡️ AdBlock enabled - blocking ${blockingTypes.join(', ')}`);
+      }
+
       await page.goto(url, { waitUntil });
       await page.waitForLoadState('domcontentloaded');
       await page.waitForLoadState('networkidle');
       await page.waitForTimeout(2000); // Reduced from 5000ms
 
       const content = await page.content();
+
+      // Show blocking statistics if ad blocking was enabled
+      if (adBlockManager) {
+        const stats = adBlockManager.getBlockingStats();
+        if (stats.totalBlocked > 0) {
+          console.log(`🚫 Blocked ${stats.totalBlocked} requests:`);
+          Object.entries(stats.byReason).forEach(([reason, count]) => {
+            console.log(`   - ${reason}: ${count}`);
+          });
+        }
+      }
 
       // Minify HTML if enabled
       let finalContent = content;

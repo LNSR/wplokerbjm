@@ -4,6 +4,9 @@ namespace AstraChild\Services\PostsManagement\SSG;
 
 use AstraChild\Contracts\HooksInterface;
 use AstraChild\Services\Utilities\SSG\LiteSpeedIntegration;
+use AstraChild\Services\Utilities\SSG\BotDetection;
+use AstraChild\Core\Cache;
+use AstraChild\Services\Utilities\SSG\BotDetectionHelper\KeywordDetector;
 
 /**
  * Listens to post CRUD events and notifies the SSG trigger service.
@@ -12,21 +15,20 @@ class PostsCRUDListener implements HooksInterface
 {
     public function __construct(
         private \AstraChild\Services\PostsManagement\SSG\TriggerBuild $triggerBuild,
-        private \AstraChild\Services\Utilities\SSG\SSGUtilities $ssgUtilities
-    )
-    {
+        private \AstraChild\Services\Utilities\SSG\SSGUtilities $ssgUtilities,
+        private \AstraChild\Services\Utilities\SSG\RankMathIntegration $rankMathIntegration
+    ) {
     }
 
     public function registerActions(): void
     {
         // Use priority 10; adjust as needed (LiteSpeed typically uses 10-20)
         add_action('save_post', [$this, 'onSavePost'], 10, 3);
-        
+
         // Hook into post deletion with high priority to run before other cleanup
         add_action('before_delete_post', [$this, 'onBeforeDeletePost'], 1, 1);
         add_action('wp_trash_post', [$this, 'onTrashPost'], 1, 1);
-        
-        // Hook into LiteSpeed cache purge events to coordinate
+
         if (LiteSpeedIntegration::isActive()) {
             $priorities = LiteSpeedIntegration::getHookPriorities();
             add_action('litespeed_purge_post', [$this, 'onLiteSpeedPurgePost'], $priorities['ssg_after_litespeed'], 1);
@@ -40,6 +42,41 @@ class PostsCRUDListener implements HooksInterface
     public function registerFilters(): void
     {
         // No filters
+    }
+
+    /**
+     * Check if the current request is from our SSG bot
+     */
+    private function isSsgBotRequest(): bool
+    {
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $ssgBotUAs = KeywordDetector::isSsgBotGeneration();
+        foreach ($ssgBotUAs as $ua) {
+            if (stripos($userAgent, $ua) !== false) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Check if we should debounce the post update to prevent rapid successive triggers
+     */
+    private function shouldDebouncePost(int $post_id): bool
+    {
+        $lastTrigger = Cache::get("ssg_post_debounce_{$post_id}");
+
+        if ($lastTrigger !== false) {
+            error_log("SSG PostsCrudListener: Skipping duplicate trigger for post {$post_id} within debounce window");
+            return true;
+        }
+
+        // Set debounce transient before triggering
+        $debounceTiming = LiteSpeedIntegration::getDebounceTiming();
+        $debounceSeconds = LiteSpeedIntegration::isActive() ? $debounceTiming['litespeed_coordination'] : $debounceTiming['normal_operation'];
+        Cache::set("ssg_post_debounce_{$post_id}", time(), $debounceSeconds);
+
+        return false;
     }
 
     public function onSavePost(int $post_id, \WP_Post $post, bool $update): void
@@ -61,6 +98,13 @@ class PostsCRUDListener implements HooksInterface
             return;
         }
 
+        // Skip if this is an SSG bot request
+        if ($this->isSsgBotRequest()) {
+            $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+            error_log("SSG PostsCrudListener: Skipping trigger for SSG bot request - Post ID: {$post_id}, User Agent: {$userAgent}");
+            return;
+        }
+
         // Optionally skip non-public posts
         if (!in_array($post->post_status, ['publish', 'private', 'future'], true)) {
             // If you want to only handle published posts, require 'publish' here
@@ -68,11 +112,7 @@ class PostsCRUDListener implements HooksInterface
         }
 
         // Check if we recently triggered a build for this post to prevent rapid successive triggers
-        $debounceKey = "ssg_post_debounce_{$post_id}";
-        $lastTrigger = get_transient($debounceKey);
-
-        if ($lastTrigger !== false) {
-            error_log("SSG PostsCrudListener: Skipping duplicate trigger for post {$post_id} within debounce window");
+        if ($this->shouldDebouncePost($post_id)) {
             return;
         }
 
@@ -81,17 +121,12 @@ class PostsCRUDListener implements HooksInterface
 
         $paths = $this->ssgUtilities->collectPathsFromPost($post_id, $permalink, $home);
 
-        // Set debounce transient before triggering
-        $debounceTiming = LiteSpeedIntegration::getDebounceTiming();
-        $debounceSeconds = LiteSpeedIntegration::isActive() ? $debounceTiming['litespeed_coordination'] : $debounceTiming['normal_operation'];
-        set_transient($debounceKey, time(), $debounceSeconds);
-
         // Trigger GitHub Actions for updates/creations
         $this->triggerBuild->trigger($paths, $update ? 'post_updated' : 'post_created');
-    }
 
-    // Note: Delete operations are handled locally within this service
-    // No need for onDeletedPost method - deletions happen immediately
+        // Force Rank Math sitemap regeneration for immediate updates
+        $this->rankMathIntegration->regenerateSitemap($post_id, $post);
+    }
 
     /**
      * Handle post deletion before it's actually deleted
@@ -99,6 +134,7 @@ class PostsCRUDListener implements HooksInterface
     public function onBeforeDeletePost(int $post_id): void
     {
         $this->ssgUtilities->deleteSSGFile($post_id, 'post_deleted');
+        $this->rankMathIntegration->regenerateSitemapOnDelete($post_id);
     }
 
     /**
@@ -107,22 +143,7 @@ class PostsCRUDListener implements HooksInterface
     public function onTrashPost(int $post_id): void
     {
         $this->ssgUtilities->deleteSSGFile($post_id, 'post_trashed');
-    }
-
-    /**
-     * Check if LiteSpeed Cache plugin is active
-     */
-    private function isLiteSpeedCacheActive(): bool
-    {
-        return LiteSpeedIntegration::isActive();
-    }
-
-    /**
-     * Check if current operation is triggered by LiteSpeed Cache
-     */
-    private function isLiteSpeedCacheOperation(): bool
-    {
-        return LiteSpeedIntegration::isCacheOperation();
+        $this->rankMathIntegration->regenerateSitemapOnDelete($post_id);
     }
 
     /**
@@ -130,8 +151,16 @@ class PostsCRUDListener implements HooksInterface
      */
     public function onLiteSpeedPurgePost(int $post_id): void
     {
+        // Skip if this is an SSG bot request
+        if ($this->isSsgBotRequest()) {
+            return;
+        }
+
+        // Set transient to mark recent LiteSpeed purge activity
+        Cache::set('litespeed_recent_purge', time(), 300); // 5 minutes
+
         LiteSpeedIntegration::logCoordination("LiteSpeed purged post, coordinating SSG update", ['post_id' => $post_id]);
-        
+
         // Add a small delay to ensure LiteSpeed operations complete first
         wp_schedule_single_event(time() + 2, 'ssg_delayed_post_update', [$post_id]);
     }
@@ -141,9 +170,45 @@ class PostsCRUDListener implements HooksInterface
      */
     public function onLiteSpeedPurgeAll(): void
     {
+        // Skip if this is an SSG bot request
+        if ($this->isSsgBotRequest()) {
+            return;
+        }
+
+        // Set transient to mark recent LiteSpeed purge activity
+        Cache::set('litespeed_recent_purge', time(), 300); // 5 minutes
+
         LiteSpeedIntegration::logCoordination("LiteSpeed purged all cache, triggering full SSG rebuild");
-        
+
         // Trigger full site rebuild
         $this->triggerBuild->trigger([home_url('/')], 'litespeed_full_purge');
+    }
+
+    /**
+     * Handle delayed post update from LiteSpeed purge events
+     */
+    public function handleDelayedPostUpdate(int $post_id): void
+    {
+        // Skip if this is an SSG bot request
+        if ($this->isSsgBotRequest()) {
+            return;
+        }
+
+        // Check if post still exists
+        $post = get_post($post_id);
+        if (!$post) {
+            return;
+        }
+
+        $permalink = get_permalink($post_id);
+        $home = home_url('/');
+
+        $paths = $this->ssgUtilities->collectPathsFromPost($post_id, $permalink, $home);
+
+        // Trigger GitHub Actions for the delayed update
+        $this->triggerBuild->trigger($paths, 'litespeed_post_purge');
+
+        // Force Rank Math sitemap regeneration
+        $this->rankMathIntegration->regenerateSitemap($post_id, $post);
     }
 }

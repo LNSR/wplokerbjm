@@ -4,7 +4,7 @@ namespace AstraChild\Services\Utilities\SSG;
 
 /**
  * LiteSpeed Cache Integration Utilities
- *
+ * ! Do not enable ESI which causing issues with Admin Bar and Login
  * Handles coordination between SSG system and LiteSpeed Cache plugin
  * 
  * Key insight: Production uses QUIC Cloud which sends different headers,
@@ -28,16 +28,8 @@ class LiteSpeedIntegration
      */
     public static function isQuicCloudActive(): bool
     {
-        // Check for QUIC Cloud headers
-        if (isset($_SERVER['HTTP_X_LSCACHE'])) {
-            return true;
-        }
-
-        // Check for QUIC Cloud domain in server variables
-        if (
-            isset($_SERVER['HTTP_X_FORWARDED_FOR']) &&
-            strpos($_SERVER['HTTP_X_FORWARDED_FOR'], 'quic.cloud') !== false
-        ) {
+        // Use the official filter hook for QUIC.cloud verification
+        if (function_exists('apply_filters') && apply_filters('litespeed_is_from_cloud', false)) {
             return true;
         }
 
@@ -55,6 +47,34 @@ class LiteSpeedIntegration
         }
 
         return false;
+    }
+
+    /**
+     * Get the current environment based on domain and QUIC Cloud status
+     */
+    public static function getEnvironment(): string
+    {
+        $host = $_SERVER['HTTP_HOST'] ?? '';
+        $localhost = ['localhost', '127.0.0.1', '::1', '192.168.100.2'];
+
+        // Check for staging subdomain
+        if (strpos($host, 'staging.lowongankerjabanjarmasin.com') !== false) {
+            return 'staging';
+        }
+
+        foreach ($localhost as $local) {
+            if (strpos($host, $local) !== false) {
+                return 'local';
+            }
+        }
+
+        // Check for production domain
+        if (strpos($host, 'lowongankerjabanjarmasin.com') !== false) {
+            return self::isQuicCloudActive() ? 'production-quic' : 'production';
+        }
+
+        // Fallback to QUIC Cloud detection
+        return self::isQuicCloudActive() ? 'production-quic' : 'staging';
     }
 
     /**
@@ -157,6 +177,38 @@ class LiteSpeedIntegration
     }
 
     /**
+     * Detect if the current request is performing ESI (Edge Side Includes) processing.
+     *
+     * We treat a request as ESI if common surrogate/ESI headers or query params are present.
+     * This is conservative: it's better to skip SSG during ESI to avoid returning a full
+     * static page for a request that expects fragment processing.
+     */
+    public static function isEsiRequest(): bool
+    {
+        // Standard surrogate headers used by some caches (Varnish, Fastly, etc.)
+        if (isset($_SERVER['HTTP_SURROGATE_CONTROL']) || isset($_SERVER['HTTP_SURROGATE_CAPABILITY'])) {
+            return true;
+        }
+
+        // Some setups provide explicit ESI flags or LiteSpeed-specific ESI headers
+        if (isset($_SERVER['HTTP_X_ESI']) || isset($_SERVER['HTTP_X_LSCACHE_ESI']) || defined('LSCWP_ESI') && LSCWP_ESI) {
+            return true;
+        }
+
+        // Query parameters used by some systems to indicate ESI/fragment requests
+        if (isset($_REQUEST['esi']) || isset($_REQUEST['_wp_esi'])) {
+            return true;
+        }
+
+        // QUIC.cloud or other proxy-level signals sometimes set specific headers
+        if (isset($_SERVER['HTTP_X_QUIC_ESI']) || isset($_SERVER['HTTP_X_QUIC_FRAGMENT'])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Get debounce timing recommendations
      */
     public static function getDebounceTiming(): array
@@ -182,11 +234,36 @@ class LiteSpeedIntegration
      */
     public static function logCoordination(string $event, array $context = []): void
     {
-        $environment = self::isQuicCloudActive() ? 'production-quic' : 'staging';
+        $environment = self::getEnvironment();
         $message = "LiteSpeed-SSG Coordination [{$environment}]: {$event}";
         if (!empty($context)) {
             $message .= " - " . json_encode($context);
         }
         error_log($message);
+    }
+
+    /**
+     * Send minimal headers for SSG responses.
+     *
+     *
+     * @param int  $postId        Numeric post id for tagging/logging (used in logs only)
+     * @param bool $isBot         Whether the recipient is detected as a bot (used for logging only)
+     * @param int  $contentLength Length of the response content in bytes (optional). When > 0, a `Content-Length` header will be emitted.
+     * @return void
+     */
+    public static function sendSSGResponseHeaders(int $postId, bool $isBot = false, int $contentLength = 0): void
+    {
+        header('X-SSG: true');
+        header('X-SSG-Source: static');
+        header('X-SSG-Timestamp: ' . time());
+        header('X-SSG-Version: 1.0');
+        header('Content-Type: text/html; charset=UTF-8');
+        if ($contentLength > 0) {
+            header('Content-Length: ' . (int) $contentLength);
+        }
+
+        // Log coordination so operators know we're intentionally deferring caching
+        // decisions to the server layer; include post id and bot flag for context.
+        self::logCoordination('Stripped SSG response caching headers; server will control caching', ['post_id' => $postId, 'is_bot' => (bool) $isBot]);
     }
 }
