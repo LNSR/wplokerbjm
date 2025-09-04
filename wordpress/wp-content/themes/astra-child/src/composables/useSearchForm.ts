@@ -1,11 +1,25 @@
-import { ref, watch, onMounted, inject } from "vue";
+import { ref, watch, onMounted, inject, type Ref, type ComputedRef } from "vue";
 import { useSuggestions } from "./useSearchForm/useSearchFormSuggestion";
 import { useFilter, removeFilter } from "./useSearchForm/useFilter";
 import { useSearchStore, useTaxonomyStore } from "@/stores";
 import { validation } from "@/utils";
 import type { SearchFormProps, SearchResponse, TaxonomyTerm } from "@/types";
 
-export function useSearchForm(props: SearchFormProps, emit: any) {
+export function useSearchForm(props: SearchFormProps, emit: ((event: "searchResults", response: SearchResponse) => void) & ((event: "searchError", error: string) => void)): {
+  searchInput: Ref<HTMLInputElement | undefined>;
+  searchStore: ReturnType<typeof useSearchStore>;
+  taxonomyStore: ReturnType<typeof useTaxonomyStore>;
+  selectedSuggestionIndex: Ref<number>;
+  handleFocus: () => void;
+  navigateSuggestions: (direction: number) => void;
+  selectSuggestion: (suggestion: string) => void;
+  hideSuggestionsImmediate: () => void;
+  handleSubmit: () => Promise<void>;
+  mapTerms: (terms: TaxonomyTerm[], placeholder: string) => { value: string; label: string; }[];
+  removeFilter: typeof import('./useSearchForm/useFilter').removeFilter;
+  selectedFiltersWithNames: ComputedRef<{ key: string; label: string; values: string[]; names: string[]; }[]>;
+  resetFiltersAndSearch: () => Promise<void>;
+} {
   const searchInput = ref<HTMLInputElement>();
   const searchStore = useSearchStore();
   const taxonomyStore = useTaxonomyStore();
@@ -56,7 +70,7 @@ export function useSearchForm(props: SearchFormProps, emit: any) {
     hideSuggestionsImmediate,
   } = useSuggestions(searchStore, handleSubmit);
 
-  async function handleSubmit() {
+  async function handleSubmit(): Promise<void> {
     if (!validation.isValidFilters(searchStore.filters)) {
       return;
     }
@@ -86,7 +100,7 @@ export function useSearchForm(props: SearchFormProps, emit: any) {
     }
   }
 
-  async function resetFiltersAndSearch() {
+  async function resetFiltersAndSearch(): Promise<void> {
     searchStore.resetFilters();
     try {
       const response = await searchStore.searchJobs();

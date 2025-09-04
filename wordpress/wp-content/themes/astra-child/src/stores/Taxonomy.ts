@@ -34,7 +34,7 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
   )
 
   // Actions
-  async function fetchLokasiTerms() {
+  async function fetchLokasiTerms(): Promise<void> {
     if (lokasiLoaded.value && !lokasiError.value) return
     lokasiLoading.value = true
     lokasiError.value = null
@@ -50,7 +50,7 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
     }
   }
 
-  async function fetchGenderTerms() {
+  async function fetchGenderTerms(): Promise<void> {
     if (genderLoaded.value && !genderError.value) return
     genderLoading.value = true
     genderError.value = null
@@ -66,7 +66,7 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
     }
   }
 
-  async function fetchPendidikanTerms() {
+  async function fetchPendidikanTerms(): Promise<void> {
     if (pendidikanLoaded.value && !pendidikanError.value) return
     pendidikanLoading.value = true
     pendidikanError.value = null
@@ -82,7 +82,7 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
     }
   }
 
-  function clearTerms() {
+  function clearTerms(): void {
     lokasiTerms.value = []
     genderTerms.value = []
     pendidikanTerms.value = []
@@ -94,13 +94,13 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
     pendidikanError.value = null
   }
 
-  function resetLokasiError() {
+  function resetLokasiError(): void {
     lokasiError.value = null
   }
-  function resetGenderError() {
+  function resetGenderError(): void {
     genderError.value = null
   }
-  function resetPendidikanError() {
+  function resetPendidikanError(): void {
     pendidikanError.value = null
   }
 

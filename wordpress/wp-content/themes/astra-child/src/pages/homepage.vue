@@ -1,5 +1,5 @@
 <template>
-  <Header :header="props.layouts.header" />
+  <Header :logo="props.logo" />
   <main class="container mx-auto max-w-[95vmax] lg:max-w-[90vmax] px-4 py-8">
     <SearchForm v-if="props.hero" :current-search="props.hero.currentSearch" :current-lokasi="props.hero.currentLokasi"
       :current-gender="props.hero.currentGender" :current-pendidikan="props.hero.currentPendidikan"
@@ -16,9 +16,9 @@
 import { defineAsyncComponent } from 'vue';
 import Header from '@/layouts/Header.vue';
 import Footer from '@/layouts/Footer.vue';
-import SearchForm from '@/components/Homepage/SearchForm/SearchForm.vue';
+import SearchForm from '@/components/Homepage/SearchForm.vue';
 const FloatingActionButton = defineAsyncComponent(() => import('@/components/Shared/FloatingActionButton.vue'));
-import JobGrid from '@/components/Homepage/JobGrid/JobGrid.vue';
+import JobGrid from '@/components/Homepage/JobGrid.vue';
 import JobCarousel from '@/components/Homepage/JobCarousel.vue';
 import type { SearchFormProps, JobGridProps, CarouselProps, LayoutProps } from '@/types'
 
@@ -26,6 +26,6 @@ const props = defineProps<{
   hero: SearchFormProps,
   carousel: CarouselProps,
   jobGrid: JobGridProps,
-  layouts: LayoutProps
+  logo: LayoutProps['logo']
 }>();
 </script>

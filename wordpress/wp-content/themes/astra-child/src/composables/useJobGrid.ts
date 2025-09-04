@@ -1,11 +1,23 @@
-import { computed, ref, onMounted, onBeforeUnmount, watch } from "vue";
-import { useSearchStore } from "@/stores/Search";
-import { useJobOverlayStore } from "@/stores/JobOverlay";
+import { computed, ref, onMounted, onBeforeUnmount, watch, type ComputedRef, type Ref } from "vue";
+import { useSearchStore, useJobOverlayStore } from "@/stores";
 import { useRouter } from "vue-router";
 import { useRouterOverlayWatcher } from "@/composables/Router/useRouterOverlayWatcher";
 import type { CardJob, JobGridProps } from "@/types";
 
-export function useJobGrid(props: JobGridProps = {}) {
+export function useJobGrid(props: JobGridProps = {}): {
+  jobs: ComputedRef<CardJob[]>;
+  loading: ComputedRef<boolean>;
+  searchStore: ReturnType<typeof useSearchStore>;
+  sentinel: Ref<HTMLElement | null>;
+  overlayOpen: ComputedRef<boolean>;
+  selectedSlug: ComputedRef<string | null>;
+  totalJobs: ComputedRef<number>;
+  title: ComputedRef<string>;
+  handleOverlayClose: () => void;
+  handleJobClick: (job: CardJob) => void;
+  wpAdminBarOffset: Ref<string>;
+  selectedPermalink: ComputedRef<string | undefined>;
+} {
   const searchStore = useSearchStore();
   const jobs = computed(() => searchStore.jobs);
   const loading = computed(() => searchStore.loading);
@@ -21,8 +33,6 @@ export function useJobGrid(props: JobGridProps = {}) {
   const overlayOpen = computed(() => jobOverlay.overlayOpen);
   const selectedSlug = computed(() => jobOverlay.selectedSlug);
 
-  const scrollBehavior = ref<"auto" | "smooth">("auto");
-
   const totalJobs = computed(() => searchStore.totalJobs);
   const title = computed(() => searchStore.title);
 
@@ -33,7 +43,7 @@ export function useJobGrid(props: JobGridProps = {}) {
 
   useRouterOverlayWatcher(jobs);
 
-  function createObserver() {
+  function createObserver(): void {
     if (observer) observer.disconnect();
     observer = new window.IntersectionObserver(
       (entries) => {
@@ -46,24 +56,23 @@ export function useJobGrid(props: JobGridProps = {}) {
     if (sentinel.value) observer.observe(sentinel.value);
   }
 
-  function openOverlay(slug: string) {
+  function openOverlay(slug: string): void {
     const job = jobs.value.find((j) => j.slug === slug);
     jobOverlay.openOverlay(slug, job);
-    scrollBehavior.value = "smooth";
     if (job && job.permalink && window.innerWidth >= 768) {
       const url = new URL(job.permalink, window.location.origin);
       router.push(url.pathname + url.search + url.hash);
     }
   }
 
-  function handleOverlayClose() {
+  function handleOverlayClose(): void {
     jobOverlay.closeOverlay();
     if (window.innerWidth >= 768) {
       router.push("/");
     }
   }
 
-  function handleJobClick(job: CardJob) {
+  function handleJobClick(job: CardJob): void {
     if (!job.permalink) return;
     if (window.innerWidth >= 768) {
       openOverlay(job.slug ?? "");
@@ -129,7 +138,6 @@ export function useJobGrid(props: JobGridProps = {}) {
     handleOverlayClose,
     handleJobClick,
     wpAdminBarOffset,
-    jobOverlay,
     selectedPermalink
   };
 }

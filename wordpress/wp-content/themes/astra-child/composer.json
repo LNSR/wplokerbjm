@@ -9,5 +9,8 @@
     "psr-4": {
       "AstraChild\\": "./inc"
     }
+  },
+  "config": {
+    "sort-packages": true
   }
 }

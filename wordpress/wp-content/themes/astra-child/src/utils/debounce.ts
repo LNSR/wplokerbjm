@@ -4,6 +4,7 @@ import lodashDebounce from 'lodash-es/debounce'
  * Custom debounce wrapper for lodash.debounce.
  *
  */
+// eslint-disable-next-line
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait = 300,

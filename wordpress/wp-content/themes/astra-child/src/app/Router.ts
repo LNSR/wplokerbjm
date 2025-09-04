@@ -1,17 +1,15 @@
-import { createRouter, createWebHistory, type Router } from "vue-router";
-import { injectable } from "inversify";
-const Homepage = () => import("@/pages/homepage.vue");
-const SingleLowongan = () =>  import("@/pages/single-lowongan.vue");
-const PasangIklanLoker = () => import("@/pages/pasang-iklan-loker.vue");
+import { type createRouter, type createWebHistory, type Router } from "vue-router";
+import { inject, injectable } from "inversify";
+const Homepage = (): Promise<typeof import("@/pages/homepage.vue")> => import("@/pages/homepage.vue");
+const SingleLowongan = (): Promise<typeof import("@/pages/single-lowongan.vue")> => import("@/pages/single-lowongan.vue");
+const PasangIklanLoker = (): Promise<typeof import("@/pages/pasang-iklan-loker.vue")> => import("@/pages/pasang-iklan-loker.vue");
+
 @injectable()
 export class AppRouter {
-  public readonly router: Router;
+  @inject("CreateRouter") private readonly createRouter!: typeof createRouter;
+  @inject("CreateWebHistory") private readonly createWebHistory!: typeof createWebHistory;
 
-  constructor() {
-    this.router = this.createAppRouter();
-  }
-
-  private createAppRouter(): Router {
+  createAppRouter(): Router {
     const routes = [
       { path: "/", name: "Home", component: Homepage },
       {
@@ -26,6 +24,6 @@ export class AppRouter {
         component: PasangIklanLoker,
       },
     ];
-    return createRouter({ history: createWebHistory(), routes });
+    return this.createRouter({ history: this.createWebHistory(), routes });
   }
 }

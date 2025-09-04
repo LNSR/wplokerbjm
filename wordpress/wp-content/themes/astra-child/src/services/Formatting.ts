@@ -7,7 +7,7 @@ export function formatSalary(gaji_minimal?: number, gaji_maksimal?: number): str
 
   if (!has_gaji_min && !has_gaji_max) return null;
 
-  const formatIDR = (value: number) =>
+  const formatIDR = (value: number): string =>
     new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(value);
 
   const gaji_min = has_gaji_min ? formatIDR(gaji_minimal!) : null;

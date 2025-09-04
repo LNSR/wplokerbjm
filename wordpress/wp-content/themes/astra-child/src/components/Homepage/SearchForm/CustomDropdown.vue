@@ -98,11 +98,20 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, toRef, computed, inject, onBeforeMount, onUnmounted } from 'vue'
+import { ref, onMounted, onBeforeUnmount, toRef, computed, inject, onBeforeMount, onUnmounted, type Ref } from 'vue'
 import { DROPDOWN_CONTROLLER } from '@/composables/useSearchForm/useDropdown'
 import { useDropdown, type Option } from '@/composables/useSearchForm/useDropdown'
 import { useTaxonomyStore } from '@/stores'
 import type { SortOption } from '@/types'
+
+type DropdownController = {
+  register: (key: string, handle: {
+    toggle: () => void;
+    close: () => void;
+    getLabel: () => string;
+    open: boolean | Ref<boolean>;
+  }) => () => void;
+};
 const props = defineProps<{ id: string; modelValue: string[] | string | SortOption; options: Option[]; placeholder?: string; multiple?: boolean; disabled?: boolean }>()
 const emit = defineEmits(['update:modelValue', 'open', 'registered'])
 const dropdownRef = ref<HTMLElement | null>(null)
@@ -127,16 +136,16 @@ const {
   filteredOptions,
   highlightMatch,
 } = useDropdown({
-  modelValue: toRef(props, 'modelValue') as any,
+  modelValue: toRef(props, 'modelValue') as Ref<unknown>,
   options: toRef(props, 'options'),
-  emit: emit as (event: string, ...args: any[]) => void,
+  emit: emit as (event: string, ...args: unknown[]) => void,
   multiple: props.multiple,
   placeholder: props.placeholder,
 })
 
 const taxonomyStore = useTaxonomyStore();
 
-const controller = inject<any>(DROPDOWN_CONTROLLER, null)
+const controller = inject<DropdownController | null>(DROPDOWN_CONTROLLER, null)
 let unregister: (() => void) | null = null
 onBeforeMount(() => {
   if (controller && props.id) {

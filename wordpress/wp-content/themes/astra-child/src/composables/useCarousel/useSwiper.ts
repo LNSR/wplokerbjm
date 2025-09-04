@@ -1,27 +1,28 @@
 import Swiper from "swiper";
-import { createApp, type App} from "vue";
-import type { CardJob } from "@/types";
+import { type createApp, type App } from "vue";
+import type { CardJob, JobCarousel } from "@/types";
 import { Navigation, Pagination, Autoplay, Virtual } from "swiper/modules";
 import "swiper/css";
 import "swiper/css/navigation";
 import "swiper/css/pagination";
 import "swiper/css/virtual";
-import { useJobOverlayStore } from "@/stores/JobOverlay";
-import { AppRouter } from "@/app";
+import { useJobOverlayStore } from "@/stores";
+import { type AppRouter } from "@/app";
 import JobCard from "@/components/Homepage/JobCard.vue";
 import { container } from "@/inversify.config";
 
 Swiper.use([Navigation, Pagination, Autoplay, Virtual]);
 
-export class JobCarousel<T = unknown> {
-  private swiperInstance: Swiper | null = null;
-  private selector: string;
+export function getBatchSize(): number {
+  if (window.innerWidth >= 1024) return 6;
+  if (window.innerWidth >= 640) return 4;
+  return 2;
+}
 
-  constructor(selector = ".job-carousel") {
-    this.selector = selector;
-  }
+export function createJobCarousel<T = unknown>(router: AppRouter, selector = ".job-carousel"): JobCarousel<T> {
+  let swiperInstance: Swiper | null = null;
 
-  getSwiperConfig(slides: T[], onVirtualUpdate?: () => void) {
+  function getSwiperConfig(slides: T[], onVirtualUpdate?: () => void): object {
     return {
       loop: false,
       slidesPerView: 1.3,
@@ -62,56 +63,51 @@ export class JobCarousel<T = unknown> {
     };
   }
 
-  initSwiper(slides: T[] = [], onVirtualUpdate?: () => void): void {
-    const el = document.querySelector(this.selector);
+  function initSwiper(slides: T[] = [], onVirtualUpdate?: () => void): void {
+    const el = document.querySelector(selector);
     if (el) el.classList.remove("invisible");
-    this.swiperInstance = new Swiper(
-      this.selector,
-      this.getSwiperConfig(slides, onVirtualUpdate)
+    swiperInstance = new Swiper(
+      selector,
+      getSwiperConfig(slides, onVirtualUpdate)
     );
     onVirtualUpdate && onVirtualUpdate();
   }
-  
+
   // Use this method to update the slides in the swiper instance
   // This is useful when you want to change the slides dynamically
-  updateSlides(slides: T[]): void {
-    if (this.swiperInstance?.virtual) {
-      this.swiperInstance.virtual.slides = slides;
-      this.swiperInstance.virtual.update(false);
+  function updateSlides(slides: T[]): void {
+    if (swiperInstance?.virtual) {
+      swiperInstance.virtual.slides = slides;
+      swiperInstance.virtual.update(false);
     }
   }
 
-  static getBatchSize(): number {
-    if (window.innerWidth >= 1024) return 6;
-    if (window.innerWidth >= 640) return 4;
-    return 2;
-  }
-
-  mountVirtualSlides(jobs: CardJob[]) {
+  function mountVirtualSlides(jobs: CardJob[]): void {
     const jobOverlay = useJobOverlayStore();
+    const appRouter = router.createAppRouter();
     const slides = Array.from(
       document.querySelectorAll<HTMLElement>(".virtual-slide-content")
     );
     let i = 0;
 
-    function handleCarouselJobClick(slug: string) {
+    function handleCarouselJobClick(slug: string): void {
       const job = jobs.find(j => j.slug === slug);
       jobOverlay.openOverlay(slug, job);
-      const appRouter = container.get<AppRouter>("AppRouter");
-      if (appRouter.router.currentRoute.value.path === "/") {
+      if (appRouter.currentRoute.value.path === "/") {
         if (slug) {
           try {
-            appRouter.router.push({ name: "JobDetail", params: { slug } });
+            appRouter.push({ name: "JobDetail", params: { slug } });
           } catch (err) {
             console.error("Router navigation failed:", err, slug);
           }
         }
       }
     }
-    
 
-    function mountNextBatch(deadline?: IdleDeadline) {
-      const batchSize = JobCarousel.getBatchSize();
+
+    function mountNextBatch(deadline?: IdleDeadline): void {
+      const jobCardApp = container.get<typeof createApp>("CreateApp");
+      const batchSize = getBatchSize();
       let processed = 0;
       while (
         i < slides.length &&
@@ -125,7 +121,7 @@ export class JobCarousel<T = unknown> {
             const index = Number(indexAttr);
             const jobData = jobs[index];
             if (jobData) {
-              const app = createApp(JobCard, {
+              const app = jobCardApp(JobCard, {
                 jobdata: jobData,
                 permalink: jobData.permalink ?? "",
                 variant: "carousel",
@@ -157,4 +153,11 @@ export class JobCarousel<T = unknown> {
       }
     }
   }
+
+  return {
+    initSwiper,
+    updateSlides,
+    mountVirtualSlides,
+    getBatchSize,
+  };
 }

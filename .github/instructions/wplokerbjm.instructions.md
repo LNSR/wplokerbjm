@@ -18,33 +18,28 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,vue,scss,less,sass,cjs,mjs,jsx,ts
 
 ## General
 
+- Always use the latest stable versions of PHP and JavaScript/TypeScript frameworks and syntaxes.
 - Context mostly related to Wordpress **astra-child** development for Job Platform
 - Style with **Tailwind CSS** and **DaisyUI**.
+- No need to worry about backward compatibility, just override.
+- If there errors, immediately fix them.
 
-## Backend
+## Backend(PHP)
 
-- bootstrap: [astra-child-bootstrap.php](wordpress/wp-content/mu-plugins/astra-child-bootstrap.php)
-- Use **Composer** for PHP dependencies.
+- bootstrap: [astra-child-bootstrap.php](../../wordpress/wp-content/mu-plugins/astra-child-bootstrap.php)
+- Use **Composer** for PHP dependencies, ensuring the latest PHP version is used.
 - For PHP DI structure, refer to file:  
-  [Container.php](../../../wordpress/wp-content/themes/astra-child/inc/Core/Container.php)
-- Use Cache if possible.
+  [Container.php](../../wordpress/wp-content/themes/astra-child/inc/Core/Container.php)
+- Use Cache if it's the best decision.
   Choose between:
-  - ObjectCache.php
-  - Cache.php (transients)
+  - [ObjectCache.php](../../wordpress/wp-content/themes/astra-child/inc/Core/ObjectCache.php) (Redis)
+  - [Cache.php](../../wordpress/wp-content/themes/astra-child/inc/Core/Cache.php) (transients)
 
-## Frontend
+## Frontend(Vue/TypeScript)
 
-- Use **Bun** for JavaScript/TypeScript package management.
+- (Client-Side)[../../wordpress/wp-content/themes/astra-child/src]
+- (Server-Side)[../../wordpress/wp-content/themes/astra-child/inc/Views]
+- Use **Bun** for JavaScript/TypeScript package management, always using the latest versions of JavaScript/TypeScript frameworks and syntaxes.
 - Frontend tooling is using Vite
-- Use [inversify.config.ts](../../wordpress/wp-content/themes/astra-child/src/inversify.config.ts) for dependency injection
-- Prioritize OOP outside Vue ecosystem
-
-## Agent tooling MCP
-
-- Automation/assistant note: when processing or acting on these repository instructions, always use the `memory`, `sequentialthinking` and other MCP tools when available.
-  - `memory`: persist safe workspace and environment facts that help future interactions (repository, branch, key folders, shell/OS). Store secrets if necessary.
-  - `sequentialthinking`: use for structured, multi-step analysis, planning, and explanations when modifying code or configs.
-- `mysql`: use for database-related tasks, queries.
-- `redis`: use for Redis database operations, caching, and key-value storage.
-
-These preferences aim to improve context awareness and produce stepwise, auditable changes.
+- Use [inversify.config.ts](../../wordpress/wp-content/themes/astra-child/src/inversify.config.ts) for dependency injection if needed.
+- Prioritize OOP in TypeScript files except Vue related.

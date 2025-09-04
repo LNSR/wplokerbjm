@@ -1,9 +1,7 @@
 import { ref, computed, watch, type Ref, type ComputedRef } from "vue";
 import { debounce } from '@/utils/debounce'
-import type { SearchFilters } from "@/types";
-import { useTaxonomyStore } from "@/stores/Taxonomy";
+import { useTaxonomyStore } from "@/stores";
 import { useBreadcrumb } from "./useDropdownBreadcrumb";
-// Dropdown composable types
 export type SelectedItem = { value: string; label: string }
 
 export type Option = {
@@ -40,9 +38,9 @@ export interface UseDropdownReturn {
 }
 
 export function useDropdown(props: {
-  modelValue: Ref<SearchFilters>;
+  modelValue: Ref<unknown>;
   options: Ref<Option[]>;
-  emit: (event: string, ...args: any[]) => void;
+  emit: (event: string, ...args: unknown[]) => void;
   multiple?: boolean;
   placeholder?: string;
 }): UseDropdownReturn {
@@ -66,7 +64,7 @@ export function useDropdown(props: {
 
   const selectedValues = computed<SelectedItem[]>(() => {
     const val = props.modelValue.value;
-    const findOption = (v: string) => props.options.value.find((o) => o.value === v);
+    const findOption = (v: string): Option | undefined => props.options.value.find((o) => o.value === v);
     if (Array.isArray(val)) {
       return val.map((v) => {
         const opt = findOption(v);
@@ -112,7 +110,7 @@ export function useDropdown(props: {
     return `${filtered.length} filter dipilih`;
   });
 
-  function toggleValue(value: string) {
+  function toggleValue(value: string): void {
     let arr = Array.isArray(props.modelValue.value)
       ? [...(props.modelValue.value as string[])]
       : [];
@@ -122,7 +120,7 @@ export function useDropdown(props: {
     props.emit("update:modelValue", arr);
   }
 
-  function isSelected(value: string) {
+  function isSelected(value: string): boolean {
     return selectedValues.value.some((item) => item.value === value);
   }
 
@@ -134,23 +132,23 @@ export function useDropdown(props: {
     return props.options.value ?? [];
   });
 
-  function getLabel() {
-    return (multiSelectLabel && multiSelectLabel.value) || (props && (props as any).placeholder) || ''
+  function getLabel(): string {
+    return (multiSelectLabel && multiSelectLabel.value) || (props && props.placeholder) || ''
   }
 
-  function toggle() {
+  function toggle(): void {
     open.value = !open.value;
     if (open.value) {
       activeIndex.value = 0;
       props.emit("open");
     }
   }
-  function close() {
+  function close(): void {
     open.value = false;
     resetBreadcrumb();
     search.value = "";
   }
-  function select(option: Option) {
+  function select(option: Option): void {
     props.emit("update:modelValue", option);
     close();
   }
@@ -158,8 +156,8 @@ export function useDropdown(props: {
     children: Option[],
     label: string,
     parentOption?: Option
-  ) {
-    (async () => {
+  ): void {
+    (async (): Promise<void> => {
       if (parentOption?.loadChildren && (!children || children.length === 0)) {
         parentOption.isLoading = true;
         try {
@@ -225,7 +223,7 @@ export function useDropdown(props: {
 
   function highlightMatch(label: string, query: string): string {
     if (!query) return label;
-    const escapeRegex = (s: string) => s.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
+    const escapeRegex = (s: string): string => s.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
     const regex = new RegExp(`(${escapeRegex(query)})`, "gi");
     return label.replace(regex, '<b class="bg-[var(--ast-global-color-5)] font-bold rounded px-1">$1</b>');
   }
@@ -253,7 +251,32 @@ export function useDropdown(props: {
   };
 }
 export const DROPDOWN_CONTROLLER = Symbol('dropdownController');
-export function useDropdownController() {
+export function useDropdownController(): {
+  controller: {
+    register: (key: "lokasi" | "gender" | "pendidikan" | "sort", handle: { toggle: () => void; close: () => void; getLabel: () => string; open: boolean | Ref<boolean>; }) => () => void;
+    toggleRef: (key: "lokasi" | "gender" | "pendidikan" | "sort") => void;
+  };
+  lokasiRef: Ref<{ toggle: () => void; close: () => void; getLabel: () => string; open: boolean | Ref<boolean>; } | null>;
+  genderRef: Ref<{ toggle: () => void; close: () => void; getLabel: () => string; open: boolean | Ref<boolean>; } | null>;
+  pendidikanRef: Ref<{ toggle: () => void; close: () => void; getLabel: () => string; open: boolean | Ref<boolean>; } | null>;
+  sortRef: Ref<{ toggle: () => void; close: () => void; getLabel: () => string; open: boolean | Ref<boolean>; } | null>;
+  lokasiLoaded: Ref<boolean>;
+  genderLoaded: Ref<boolean>;
+  pendidikanLoaded: Ref<boolean>;
+  sortLoaded: Ref<boolean>;
+  isLokasiOpen: ComputedRef<boolean>;
+  isGenderOpen: ComputedRef<boolean>;
+  isPendidikanOpen: ComputedRef<boolean>;
+  isSortOpen: ComputedRef<boolean>;
+  lokasiLabel: ComputedRef<string>;
+  genderLabel: ComputedRef<string>;
+  pendidikanLabel: ComputedRef<string>;
+  sortLabel: ComputedRef<string>;
+  toggleLokasi: () => void;
+  toggleGender: () => void;
+  togglePendidikan: () => void;
+  toggleSort: () => void;
+} {
   interface DropdownHandle {
     toggle: () => void
     close: () => void
@@ -277,7 +300,7 @@ export function useDropdownController() {
     sort: { ref: ref(null), loaded: ref(false), label: "Urutkan", fallback: "Urutkan", pendingToggle: ref(false) },
   };
 
-  function getOpen(key: DropdownKey) {
+  function getOpen(key: DropdownKey): ComputedRef<boolean> {
     return computed(() => {
       const o = dropdowns[key].ref.value?.open;
       if (typeof o === "boolean") return o;
@@ -286,7 +309,7 @@ export function useDropdownController() {
     });
   }
 
-  function getLabel(key: DropdownKey) {
+  function getLabel(key: DropdownKey): ComputedRef<string> {
     return computed(() => {
       try {
         return dropdowns[key].ref.value?.getLabel?.() ?? dropdowns[key].fallback;
@@ -296,7 +319,7 @@ export function useDropdownController() {
     });
   }
 
-  function toggleRef(key: DropdownKey) {
+  function toggleRef(key: DropdownKey): void {
     const r = dropdowns[key].ref;
     const o = r.value?.open;
     const isOpen = typeof o === "boolean" ? o : o ? (o as Ref<boolean>).value : false;
@@ -322,7 +345,7 @@ export function useDropdownController() {
         meta.pendingToggle.value = false;
         debouncedToggleRef(key);
       }
-      return () => {
+      return (): void => {
         if (dropdowns[key].ref.value === handle) dropdowns[key].ref.value = null;
       };
     },

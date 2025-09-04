@@ -1,30 +1,28 @@
-import type { ComponentConfig } from "@/types";
 import { inject, injectable } from "inversify";
 import { VueAppFactory } from "./Factory";
 import { MounterService } from "@/services/MounterService";
+import { type ComponentConfig } from "@/types";
+import { type Component } from "vue";
 
 type MounterOptions = {
   propAttribute?: string;
   onError?: (error: unknown, element: Element, config: ComponentConfig) => void;
 };
-
-// Module-level WeakSet to track which Elements we've mounted in this page session.
 // Using WeakSet avoids leaking memory (entries are removed when elements are GC'd).
 const mountedElements = new WeakSet<Element>();
 
 @injectable()
 export class ComponentMounter {
   constructor(
-    @inject("VueAppFactory") private appFactory: VueAppFactory,
-    @inject("MounterService") private mounterService: MounterService
+    @inject("VueAppFactory") private readonly appFactory: VueAppFactory,
   ) { }
 
-  async mount(configs: ComponentConfig[] = [], options: MounterOptions = {}) {
+  async mount(configs: ComponentConfig[] = [], options: MounterOptions = {}): Promise<void> {
     const propAttr = options.propAttribute || "data-props";
     const rootApp = this.appFactory.getOrCreateRootApp();
 
-    const { getResolvePromise } = this.mounterService.createResolveCache((c) =>
-      this.mounterService.resolveComponentValue(c)
+    const { getResolvePromise } = MounterService.createResolveCache((c) =>
+      MounterService.resolveComponentValue(c)
     );
 
     const mountPromises: Promise<void>[] = [];
@@ -32,9 +30,9 @@ export class ComponentMounter {
     const mountElement = (
       element: Element,
       config: ComponentConfig,
-      resolvedPromise: Promise<any>
-    ) =>
-      this.mounterService.mountElement(
+      resolvedPromise: Promise<Component | null>
+    ): Promise<void> =>
+      MounterService.mountElement(
         element,
         config,
         resolvedPromise,

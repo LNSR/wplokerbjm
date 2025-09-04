@@ -1,6 +1,6 @@
 <?php
 
-namespace AstraChild\Core\Definitions;
+namespace AstraChild\Core\Container\Definitions;
 
 use function DI\autowire;
 use function DI\get;

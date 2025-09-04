@@ -1,11 +1,13 @@
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted, watch, type Ref } from 'vue'
 import { TimeService } from '@/services/TimeService'
 
-export function useTimeAgo(postTime: string | undefined) {
+export function useTimeAgo(postTime: string | undefined): {
+  timeAgo: Ref<string>;
+} {
   const timeAgo = ref('')
   let timeoutId: ReturnType<typeof setTimeout> | null = null
 
-  function updateTimeAgo() {
+  function updateTimeAgo(): void {
     const { text, nextUpdate } = TimeService.getTimeAgo(postTime)
     timeAgo.value = text
 

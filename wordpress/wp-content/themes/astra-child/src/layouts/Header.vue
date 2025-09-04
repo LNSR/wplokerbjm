@@ -4,7 +4,7 @@
       <input id="header-drawer" type="checkbox" class="drawer-toggle" />
       <div class="drawer-content">
         <div class="!mr-auto !ml-auto !pl-4 !pr-4 max-w-[1240px] flex items-center justify-between">
-          <div class="mt-4" v-html="props.header"></div>
+          <div class="mt-4" v-html="props.logo"></div>
           <div class="flex items-center gap-2 mt-5">
             <!-- Inlined ColorSwitchButton -->
             <div class="!backdrop-blur-lg rounded-full shadow-lg p-2">

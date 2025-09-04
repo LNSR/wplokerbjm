@@ -63,7 +63,6 @@ The backend code is organized as follows:
 
 ```sh
 inc/
-├── Components/                # PHP UI components (migrated to CSR frontend, provide only initial data)
 ├── Contracts/                 # Interfaces for data providers and hooks
 │   ├── DataProviderInterface.php
 │   └── HooksInterface.php
@@ -82,8 +81,6 @@ inc/
 │   ├── Hooks.php              # Registers custom WP actions and filters
 │   ├── Init.php               # Initializes services and hooks
 ├── Factories/                 # Factory classes
-├── Layouts/                   # Reusable page/section layouts
-│   └── Layouts.php            # (migrated to CSR frontend, provide only initial data)
 ├── Models/                    # Data models and schema definitions
 │   ├── CustomFieldEntity.php
 │   ├── Schema/                # MetaBox fields, post types, taxonomies (reference only)
@@ -105,7 +102,8 @@ inc/
 │   ├── REST/
 │   ├── Taxonomy/
 │   ├── Utilities/
-├── ViewModels/                # Page view models (migrated to CSR frontend, provide only initial data)
+├── Presenters/                # Page presenters (migrated to CSR frontend, provide only initial data)
+├── ├── Components/                # PHP UI components (migrated to CSR frontend, provide only initial data)
 └── Views/                     # PHP view templates (migrated to CSR frontend, provide only initial data)
 ```
 

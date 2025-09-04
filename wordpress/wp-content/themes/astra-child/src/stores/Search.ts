@@ -1,8 +1,7 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
 import { debounce, validation } from "@/utils";
-import type { SearchFilters, LoadMoreFilters, SearchContext } from "@/types";
-import type { Job, LoadMoreResponse, SearchResponse } from "@/types";
+import type { SearchFilters, LoadMoreFilters, SearchContext, Job, LoadMoreResponse, SearchResponse } from "@/types";
 import { useApi } from "@/composables/useAPI";
 
 export const useSearchStore = defineStore("search", () => {
@@ -53,25 +52,25 @@ export const useSearchStore = defineStore("search", () => {
   });
 
   // Actions
-  function setFilters(newFilters: Partial<SearchFilters>) {
+  function setFilters(newFilters: Partial<SearchFilters>): void {
     filters.value = {
       ...filters.value,
       ...newFilters,
       lokasi: Array.isArray(newFilters.lokasi)
         ? newFilters.lokasi
         : newFilters.lokasi
-        ? [newFilters.lokasi]
-        : filters.value.lokasi,
+          ? [newFilters.lokasi]
+          : filters.value.lokasi,
       gender: Array.isArray(newFilters.gender)
         ? newFilters.gender
         : newFilters.gender
-        ? [newFilters.gender]
-        : filters.value.gender,
+          ? [newFilters.gender]
+          : filters.value.gender,
       pendidikan: Array.isArray(newFilters.pendidikan)
         ? newFilters.pendidikan
         : newFilters.pendidikan
-        ? [newFilters.pendidikan]
-        : filters.value.pendidikan,
+          ? [newFilters.pendidikan]
+          : filters.value.pendidikan,
       sort:
         typeof newFilters.sort === "object" && newFilters.sort !== null
           ? newFilters.sort
@@ -79,7 +78,7 @@ export const useSearchStore = defineStore("search", () => {
     };
   }
 
-  function resetFilters() {
+  function resetFilters(): void {
     filters.value = {
       cari: "",
       lokasi: [],
@@ -89,7 +88,7 @@ export const useSearchStore = defineStore("search", () => {
     };
   }
 
-  function addToHistory(query: string) {
+  function addToHistory(query: string): void {
     if (query && !searchHistory.value.includes(query)) {
       searchHistory.value.unshift(query);
       if (searchHistory.value.length > 10) {
@@ -98,7 +97,7 @@ export const useSearchStore = defineStore("search", () => {
     }
   }
 
-  function clearHistory() {
+  function clearHistory(): void {
     searchHistory.value = [];
   }
 
@@ -119,19 +118,19 @@ export const useSearchStore = defineStore("search", () => {
       suggestions.value = [];
       showSuggestions.value = false;
     }
-  }, 300);
+  }, 500);
 
-  function getSuggestions(query: string) {
+  function getSuggestions(query: string): void {
     debouncedGetSuggestions(query);
   }
 
-  function selectSuggestion(suggestion: string) {
+  function selectSuggestion(suggestion: string): void {
     filters.value.cari = suggestion;
     showSuggestions.value = false;
     suggestions.value = [];
   }
 
-  function hideSuggestions() {
+  function hideSuggestions(): void {
     setTimeout(() => {
       showSuggestions.value = false;
     }, 150);

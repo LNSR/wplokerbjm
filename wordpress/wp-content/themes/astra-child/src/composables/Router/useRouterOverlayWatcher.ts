@@ -1,6 +1,6 @@
 import { watch } from "vue";
 import { useRouter } from "vue-router";
-import { useJobOverlayStore } from "@/stores/JobOverlay";
+import { useJobOverlayStore } from "@/stores";
 import { RouterService } from '@/services/RouterService'
 import type { CardJob } from "@/types";
 
@@ -9,7 +9,7 @@ import type { CardJob } from "@/types";
  * Opens the overlay when route.params.slug exists. The overlay can later
  * resolve the selected job when jobs hydrate.
  */
-export function useRouterOverlayWatcher(jobsRef: { value: CardJob[] }) {
+export function useRouterOverlayWatcher(jobsRef: { value: CardJob[] }): void {
   const router = useRouter()
   const jobOverlay = useJobOverlayStore()
 

@@ -7,7 +7,7 @@ export const validation = {
     return str.trim().replace(/[<>]/g, '')
   },
 
-  isValidFilters(filters: Record<string, any>): boolean {
+  isValidFilters(filters: Record<string, unknown>): boolean {
     return Object.values(filters).some(value => value && String(value).trim() !== '')
   }
 }

@@ -1,6 +1,9 @@
 {
   "editor.formatOnSave": true,
-  "intelephense.environment.includePaths": "${workspaceFolder:astra-child}/vendor/php-stubs",
+  "intelephense.environment.includePaths": [
+    "${workspaceFolder:astra-child}/vendor/php-stubs",
+    "${workspaceFolder:astra-child}/vendor"
+  ],
   "editor.codeLens": true,
   "files.watcherExclude": {
     "**/node_modules": true,

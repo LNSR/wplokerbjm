@@ -23,7 +23,7 @@ RUN apt-get update --allow-releaseinfo-change || true && \
     libsasl2-dev \
     libssl-dev \
     libpng-dev \
-    libjpeg-dev \
+    libjpeg62-turbo-dev \
     libfreetype6-dev \
     libxml2-dev \
     libgmp-dev \
@@ -36,8 +36,6 @@ RUN apt-get update --allow-releaseinfo-change || true && \
     libavif-dev \
     libreadline-dev \
     libedit-dev \
-    libpq-dev \
-    libmcrypt-dev \
     libbrotli-dev \
     gosu \
     less \
@@ -67,10 +65,6 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-x
     mysqli \
     opcache \
     pcntl \
-    pdo \
-    pdo_mysql \
-    pdo_pgsql \
-    pgsql \
     soap \
     sockets \
     sodium \
@@ -81,7 +75,8 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-x
     zip
 
 # Clean up unnecessary files
-RUN apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false
+# Use autoremove+clean to remove build dependencies and clean apt caches.
+RUN apt-get autoremove -y --purge && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # Copy PHP configuration files
 COPY docker.conf.d/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini

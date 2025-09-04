@@ -1,12 +1,8 @@
 import type { ComponentConfig } from "@/types";
-import { injectable } from "inversify";
-import { nextTick, createVNode, render, type VNode } from "vue";
+import { nextTick, createVNode, render, type VNode, type Component, type DefineComponent, type App, type AppContext } from "vue";
 
-@injectable()
 /**
  * Service that encapsulates component resolution, caching, and mounting.
- * Converted from standalone functions into an injectable class to support
- * DI and easier testing.
  */
 export class MounterService {
   /**
@@ -15,43 +11,60 @@ export class MounterService {
    * - a dynamic import Promise (import(...))
    * - a factory function returning a Promise (() => import(...))
    */
-  async resolveComponentValue(value: unknown) {
-    let comp: any = value as any;
+  static async resolveComponentValue(value: unknown): Promise<Component | DefineComponent | null> {
+    // The incoming value may be:
+    // - a sync component (Component | DefineComponent)
+    // - a dynamic import Promise (Promise<Module>)
+    // - a factory function returning a Promise (() => Promise<Module> | Component)
+    let comp: unknown = value;
 
-    // If it's a factory function (likely returning a Promise), call it
-    if (typeof comp === "function" && comp.prototype === undefined) {
-      const maybe = comp();
-      if (maybe && typeof (maybe as any).then === "function") {
-        const mod = await maybe;
-        comp = mod && (mod as any).default ? (mod as any).default : mod;
+    // If it's a factory function (likely returning a Promise or a sync component), call it
+    if (typeof comp === "function" && (comp as Function).prototype === undefined) {
+      const maybe = (comp as Function)();
+      // If it returned a Promise-like, await it
+      if (maybe && typeof (maybe as { then?: unknown }).then === "function") {
+        const mod = await (maybe as Promise<unknown>);
+        // prefer default export if present
+        if (mod && typeof mod === 'object' && 'default' in (mod as object)) {
+          comp = (mod as { default: Component | DefineComponent }).default;
+        } else {
+          comp = mod;
+        }
       } else {
         // returned a sync component
         comp = maybe;
       }
-    } else if (comp && typeof (comp as any).then === "function") {
-      const mod = await (comp as any);
-      comp = mod && (mod as any).default ? (mod as any).default : mod;
+    } else if (comp && typeof (comp as { then?: unknown }).then === "function") {
+      const mod = await (comp as Promise<unknown>);
+      if (mod && typeof mod === 'object' && 'default' in (mod as object)) {
+        comp = (mod as { default: Component | DefineComponent }).default;
+      } else {
+        comp = mod;
+      }
     }
 
-    return comp;
+    // coerce to Component-compatible type or null
+    if (!comp) return null;
+    return comp as Component | DefineComponent;
   }
 
   /**
    * Create a cached resolver for component values. The cache stores Promises
    * and automatically deletes entries when the promise rejects so retries are possible.
    */
-  createResolveCache(resolveFn?: (v: unknown) => Promise<any>) {
-    const cache = new Map<unknown, Promise<any>>();
+  static createResolveCache(resolveFn?: (v: unknown) => Promise<Component | DefineComponent | null>): { getResolvePromise: (component: unknown) => Promise<Component | DefineComponent | null> } {
+    const cache = new Map<unknown, Promise<Component | DefineComponent | null>>();
 
-    const resolver = resolveFn ? resolveFn : (v: unknown) => this.resolveComponentValue(v);
+    const resolver = resolveFn ? resolveFn : (v: unknown): Promise<Component | DefineComponent | null> => MounterService.resolveComponentValue(v);
 
-    const getResolvePromise = (component: unknown) => {
+    const getResolvePromise = (component: unknown): Promise<Component | DefineComponent | null> => {
       let p = cache.get(component);
       if (!p) {
-        p = (async () => {
+        p = (async (): Promise<Component | DefineComponent | null> => {
           try {
             return await resolver(component);
           } catch (err) {
+            // delete on failure so callers can retry
             cache.delete(component);
             throw err;
           }
@@ -64,11 +77,11 @@ export class MounterService {
     return { getResolvePromise } as const;
   }
 
-  placeholderRemoval(element: Element) {
+  static placeholderRemoval(element: Element): { removePlaceholderImmediate: () => void; removePlaceholderWithFade: () => Promise<void>; restoreUserState: () => void } {
     const previousActive = (typeof document !== 'undefined' && document.activeElement) ? document.activeElement as HTMLElement | null : null;
     const previousScroll = (typeof window !== 'undefined') ? { x: window.scrollX || 0, y: window.scrollY || 0 } : { x: 0, y: 0 };
 
-    const restoreUserState = () => {
+    const restoreUserState = (): void => {
       try {
         if (previousActive && typeof previousActive.focus === 'function') {
           previousActive.focus();
@@ -86,7 +99,7 @@ export class MounterService {
       }
     };
 
-    const removePlaceholderImmediate = () => {
+    const removePlaceholderImmediate = (): void => {
       try {
         const placeholder = element.querySelector('.component-placeholder') as HTMLElement | null;
         if (placeholder) {
@@ -105,7 +118,7 @@ export class MounterService {
       }
     };
 
-    const removePlaceholderWithFade = async () => {
+    const removePlaceholderWithFade = async (): Promise<void> => {
       try {
         const placeholder = element.querySelector('.component-placeholder') as HTMLElement | null;
         if (!placeholder || placeholder.parentElement !== element) return;
@@ -116,21 +129,21 @@ export class MounterService {
         placeholder.classList.add('component-placeholder--fadeout');
 
         // Wait for transitionend or fallback 400ms
-        await new Promise((resolve) => {
+        await new Promise<void>((resolve) => {
           let resolved = false;
-          const onEnd = () => {
+          const onEnd = (): void => {
             if (resolved) return;
             resolved = true;
             placeholder.removeEventListener('transitionend', onEnd);
-            resolve(null);
+            resolve();
           };
           placeholder.addEventListener('transitionend', onEnd);
           // fallback
-          setTimeout(() => {
+          setTimeout((): void => {
             if (resolved) return;
             resolved = true;
             placeholder.removeEventListener('transitionend', onEnd);
-            resolve(null);
+            resolve();
           }, 400);
         });
 
@@ -146,9 +159,9 @@ export class MounterService {
     return { removePlaceholderImmediate, removePlaceholderWithFade, restoreUserState } as const;
   }
 
-  parseProps(element: Element, propAttr: string): Record<string, unknown> {
+  static parseProps(element: Element, propAttr: string): Record<string, unknown> {
     const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`) as HTMLScriptElement | null;
-    let props: any = {};
+    let props: Record<string, unknown> = {};
 
     if (scriptElement) {
       const raw = scriptElement.textContent || scriptElement.innerHTML || "";
@@ -160,12 +173,13 @@ export class MounterService {
       }
     }
 
-    const isDev = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env && (import.meta as any).env.DEV);
-      if (!isDev) {
-        if (scriptElement && scriptElement.parentElement) {
-          try { scriptElement.remove(); } catch { /* ignore */ }
-        }
+    type ImportMetaLike = { env?: { DEV?: boolean } };
+    const isDev = typeof import.meta !== 'undefined' && Boolean((import.meta as unknown as ImportMetaLike).env?.DEV);
+    if (!isDev) {
+      if (scriptElement && scriptElement.parentElement) {
+        try { scriptElement.remove(); } catch { /* ignore */ }
       }
+    }
 
     return props;
   }
@@ -173,11 +187,11 @@ export class MounterService {
   /**
    * Mount a resolved component VNode into an element using the provided app context.
    */
-  async mountElement(
+  static async mountElement(
     element: Element,
     config: ComponentConfig,
-    resolvedPromise: Promise<any>,
-    rootApp: any,
+    resolvedPromise: Promise<Component | DefineComponent | null>,
+    rootApp: App<Element>,
     propAttr: string,
     onError?: (error: unknown, element: Element, config: ComponentConfig) => void
   ): Promise<void> {
@@ -185,7 +199,7 @@ export class MounterService {
     const FALLBACK_REMOVE_MS = 7000; // ms before we forcibly remove placeholder
     let fallbackTimer: number | undefined;
 
-    const { removePlaceholderImmediate, removePlaceholderWithFade } = this.placeholderRemoval(element);
+    const { removePlaceholderImmediate, removePlaceholderWithFade } = MounterService.placeholderRemoval(element);
 
     try {
       fallbackTimer = window.setTimeout(() => {
@@ -196,10 +210,11 @@ export class MounterService {
       const resolved = await resolvedPromise;
       if (!resolved) throw new Error("Component resolved to falsy value");
 
-      const props = this.parseProps(element, propAttr);
+      const props = MounterService.parseProps(element, propAttr);
 
-      const vnode: VNode = createVNode(resolved, props as Record<string, unknown>);
-      (vnode as any).appContext = (rootApp as any)._context;
+      const vnode: VNode = createVNode(resolved as Component, props);
+      // attach root app context so the programmatic mount shares plugins/pinia/router
+      (vnode as VNode & { appContext?: AppContext | null }).appContext = (rootApp as unknown as { _context?: AppContext | null })._context ?? null;
       render(vnode, element);
 
       element.setAttribute("component-mounted", "1");

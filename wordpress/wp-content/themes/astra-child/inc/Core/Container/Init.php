@@ -1,6 +1,6 @@
 <?php
 
-namespace AstraChild\Core;
+namespace AstraChild\Core\Container;
 
 use AstraChild\Contracts\HooksInterface;
 
@@ -15,7 +15,7 @@ use AstraChild\Contracts\HooksInterface;
  *
  * * The array of services is injected (usually via a DI container definition) and stored
  * * as a readonly property, ensuring immutability after construction.
- * @see \AstraChild\Core\Definitions\Core
+ * @see \AstraChild\Core\Container\Definitions\Core
  *
  * ## Usage
  * Call the `initialize()` in functions.php method to iterate through all injected services. For each service

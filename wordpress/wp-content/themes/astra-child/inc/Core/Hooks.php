@@ -66,7 +66,7 @@ class Hooks implements HooksInterface
     public function disablePluginsForSSG($plugins)
     {
         $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        $ssgBotUAs = ['SSG-Bot/1.0', 'Mozilla/5.0 (compatible; SSG-Bot/1.0)'];
+        $ssgBotUAs = \AstraChild\Services\Utilities\SSG\BotDetection::isSsgBotGeneration();
         $isSSGBot = false;
         foreach ($ssgBotUAs as $ua) {
             if (stripos($userAgent, $ua) !== false) {
@@ -84,7 +84,7 @@ class Hooks implements HooksInterface
                 'fast-indexing-api/',
                 'tinymce-advanced/',
                 'akismet/',
-                'litespeed-cache/',
+                //'litespeed-cache/',
                 'wps-hide-login/',
                 'health-check/',
                 'duplicate-wp-page-post/',

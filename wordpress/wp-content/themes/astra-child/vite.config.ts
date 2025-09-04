@@ -61,6 +61,7 @@ export default defineConfig(({ command }) => ({
     rollupOptions: {
       input: {
         main: "@/main.ts",
+        vendor: "@/inversify.config.ts", // ! Must define inversify.config.ts because container runtime initialization in production causing timing issues
       },
       output: {
         inlineDynamicImports: false,
@@ -80,12 +81,6 @@ export default defineConfig(({ command }) => ({
           }
           return "assets/[name]-[hash][extname]";
         },
-        // ! Must split inversify.config.ts because container runtime initialization in production causing timing issues
-        manualChunks(id) {
-          if (id.includes("inversify.config.ts")) {
-            return "vendor";
-          }
-        }
       }
     },
     minify: "terser",

@@ -1,13 +1,17 @@
 
 export type ApiErrorType = 'network' | 'timeout' | 'http' | 'unknown';
 
+type ErrorWithCaptureStackTrace = ErrorConstructor & {
+  captureStackTrace?: (target: object, constructor?: Function) => void;
+};
+
 export class ApiError extends Error {
   status: number;
-  response?: any;
-  body?: any;
+  response?: Response | unknown;
+  body?: unknown;
   url?: string;
   method?: string;
-  payload?: any;
+  payload?: unknown;
   code?: string | number;
   type: ApiErrorType;
   userMessage?: string;
@@ -15,11 +19,11 @@ export class ApiError extends Error {
   constructor(
     message: string,
     status: number = 0,
-    response?: any,
-    body?: any,
+    response?: Response | unknown,
+    body?: unknown,
     url?: string,
     method?: string,
-    payload?: any,
+    payload?: unknown,
     code?: string | number,
     type: ApiErrorType = 'unknown',
     userMessage?: string
@@ -35,8 +39,8 @@ export class ApiError extends Error {
     this.code = code;
     this.type = type;
     this.userMessage = userMessage;
-    if (typeof (Error as any).captureStackTrace === 'function') {
-      (Error as any).captureStackTrace(this, ApiError);
+    if (typeof (Error as ErrorWithCaptureStackTrace).captureStackTrace === 'function') {
+      (Error as ErrorWithCaptureStackTrace).captureStackTrace!(this, ApiError);
     }
   }
 }
@@ -46,7 +50,7 @@ export class TimeoutError extends ApiError {
     message: string = 'Request timed out',
     url?: string,
     method?: string,
-    payload?: any
+    payload?: unknown
   ) {
     super(message, 0, undefined, undefined, url, method, payload, 'ETIMEDOUT', 'timeout', 'Permintaan melebihi batas waktu. Silakan coba lagi.');
     this.name = 'TimeoutError';
@@ -58,7 +62,7 @@ export class NetworkError extends ApiError {
     message: string = 'Network error',
     url?: string,
     method?: string,
-    payload?: any
+    payload?: unknown
   ) {
     super(message, 0, undefined, undefined, url, method, payload, 'ENETWORK', 'network', 'Tidak dapat terhubung ke server. Periksa koneksi internet Anda.');
     this.name = 'NetworkError';

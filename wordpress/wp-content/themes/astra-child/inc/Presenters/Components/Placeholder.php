@@ -1,5 +1,5 @@
 <?php
-namespace AstraChild\Components;
+namespace AstraChild\Presenters\Components;
 
 class Placeholder
 {

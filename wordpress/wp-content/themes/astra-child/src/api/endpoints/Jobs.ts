@@ -1,12 +1,26 @@
-import { container, ApiClient } from '@/inversify.config'
+import { container } from '@/inversify.config'
+import { ApiClient } from '@/api'
 import type { 
   SearchFilters, 
   SearchResponse, 
   AutoSuggestResponse,
   LoadMoreFilters,
   LoadMoreResponse,
-  SingleOverlayResponse
+  SingleOverlayResponse,
+  SortOption
 } from '@/types'
+
+// Type guard to check if a value is a SortOption
+function isSortOption(value: unknown): value is SortOption {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    'value' in value &&
+    'label' in value &&
+    (value.value === 'desc' || value.value === 'asc') &&
+    typeof value.label === 'string'
+  )
+}
 
 export interface JobsApiInterface {
   getAutoSuggestions(query: string): Promise<AutoSuggestResponse>
@@ -34,7 +48,7 @@ export const jobsApi: JobsApiInterface = {
     const params: Record<string, string> = {}
 
     Object.entries(filters).forEach(([key, value]) => {
-      if (key === 'sort' && value && typeof value === 'object' && 'value' in value) {
+      if (key === 'sort' && value && isSortOption(value)) {
         params[key] = value.value
       } else if (Array.isArray(value) && value.length > 0) {
         params[key] = value.join(',')
@@ -65,7 +79,7 @@ export const jobsApi: JobsApiInterface = {
         return
       }
       
-      if (key === 'sort' && value && typeof value === 'object' && 'value' in value) {
+      if (key === 'sort' && value && isSortOption(value)) {
         params[key] = value.value // Only send 'desc' or 'asc'
       } else if (Array.isArray(value) && value.length > 0) {
         params[key] = value.join(',')

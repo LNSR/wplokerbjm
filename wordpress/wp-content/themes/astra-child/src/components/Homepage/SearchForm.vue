@@ -1,9 +1,9 @@
 <script setup lang="ts">
-import type { SearchFormProps, SearchResponse, SearchFilters, SortOption } from '@/types'
+import type { SearchFormProps, SearchResponse, SortOption } from '@/types'
 import { useSearchForm } from '@/composables/useSearchForm'
 import { defineAsyncComponent, provide } from 'vue';
 import { useDropdownController, DROPDOWN_CONTROLLER } from '@/composables/useSearchForm/useDropdown'
-const CustomDropdown = defineAsyncComponent(() => import('./Child/CustomDropdown.vue'));
+const CustomDropdown = defineAsyncComponent(() => import('./SearchForm/CustomDropdown.vue'));
 
 const props = defineProps<SearchFormProps>()
 
@@ -179,7 +179,7 @@ const sortOptions: SortOption[] = [
                 <i v-else-if="filter.key === 'pendidikan'" class="fas fa-graduation-cap !mr-1 text-green-500"></i>
                 {{ filter.label }}: {{ filter.names[idx] }}
                 <button type="button" class="!ml-2 text-blue-500 hover:text-red-600 transition-colors duration-150"
-                  @click="removeFilter(searchStore, filter.key as keyof SearchFilters, val)" aria-label="Hapus filter">
+                  @click="removeFilter(searchStore, filter.key as 'lokasi' | 'gender' | 'pendidikan', val)" aria-label="Hapus filter">
                   <i class="fas fa-times !text-xs"></i>
                 </button>
               </span>

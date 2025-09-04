@@ -16,12 +16,12 @@ class URLFilterService
      * @param string $context Context for logging (e.g., 'API', 'Trigger')
      * @return array Filtered array of paths
      */
-    public function filterPaths(array $paths, string $context = 'SSG'): array
+    public static function filterPaths(array $paths, string $context = 'SSG'): array
     {
         $filtered = [];
 
         foreach ($paths as $path) {
-            if ($this->isPathAllowed($path)) {
+            if (self::isPathAllowed($path)) {
                 $filtered[] = $path;
             } else {
                 error_log("{$context}: Filtered out path: {$path}");
@@ -37,7 +37,7 @@ class URLFilterService
      * @param string $path The URL or path to check
      * @return bool True if allowed, false if should be filtered
      */
-    public function isPathAllowed(string $path): bool
+    public static function isPathAllowed(string $path): bool
     {
         // Parse the URL to extract query parameters
         $parsedUrl = parse_url($path);
@@ -51,7 +51,7 @@ class URLFilterService
         parse_str($parsedUrl['query'], $queryParams);
 
         // Filter out specific post types
-        $blockedPostTypes = $this->getBlockedPostTypes();
+        $blockedPostTypes = self::getBlockedPostTypes();
 
         if (isset($queryParams['post_type']) && in_array($queryParams['post_type'], $blockedPostTypes, true)) {
             return false;
@@ -68,7 +68,7 @@ class URLFilterService
      *
      * @return array Array of blocked post type slugs
      */
-    public function getBlockedPostTypes(): array
+    public static function getBlockedPostTypes(): array
     {
         return [
             'od_url_metrics',
@@ -82,9 +82,9 @@ class URLFilterService
      * @param string $postType Post type slug to block
      * @return void
      */
-    public function addBlockedPostType(string $postType): void
+    public static function addBlockedPostType(string $postType): void
     {
-        $blockedTypes = $this->getBlockedPostTypes();
+        $blockedTypes = self::getBlockedPostTypes();
         if (!in_array($postType, $blockedTypes, true)) {
             $blockedTypes[] = $postType;
             // In a real implementation, you'd want to persist this or use a filter

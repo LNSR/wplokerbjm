@@ -1,13 +1,19 @@
 import { onMounted, nextTick, type Ref } from "vue";
-import { JobCarousel } from "@/composables/useCarousel/useSwiper";
 import { useRouterOverlayWatcher } from "@/composables/Router/useRouterOverlayWatcher";
+import { createJobCarousel } from "./useCarousel/useSwiper";
 import { container } from "@/inversify.config";
+import { type AppRouter } from "@/app";
+import type { CardJob } from "@/types";
 
 export function useJobCarousel(options: {
-  jobs: Ref<any[]>;
+  jobs: Ref<CardJob[]>;
   loaded: Ref<boolean>;
-}) {
-  const carousel = container.get(JobCarousel);
+}): {
+  jobs: Ref<CardJob[]>;
+  loaded: Ref<boolean>;
+} {
+  const router = container.get<AppRouter>("AppRouter");
+  const carousel = createJobCarousel(router);
   const { jobs, loaded } = options;
   const initSwiper = carousel.initSwiper.bind(carousel);
 

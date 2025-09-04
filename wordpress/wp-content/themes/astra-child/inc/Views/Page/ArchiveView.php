@@ -2,23 +2,23 @@
 
 namespace AstraChild\Views\Page;
 
-use AstraChild\ViewModels\Page\ArchiveViewModel;
-use AstraChild\Components\Placeholder;
+use AstraChild\Presenters\Page\ArchivePresenter;
+use AstraChild\Presenters\Components\Placeholder;
 
 class ArchiveView
 {
 
-    public function __construct(private ArchiveViewModel $archiveViewModel)
+    public function __construct(private ArchivePresenter $archivePresenter)
     {
     }
 
     public function render(): void
     {
-        $schemaCards = $this->archiveViewModel->viewSearchResultsSchema();
+        $schemaCards = $this->archivePresenter->viewSearchResultsSchema();
         foreach ($schemaCards as $item):
             echo $item;
         endforeach;
-        $hydration = $this->archiveViewModel->viewSearchResultsProps();
+        $hydration = $this->archivePresenter->viewSearchResultsProps();
         ?>
         <div id="archive">
             <script type="application/json" data-props>

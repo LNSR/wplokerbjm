@@ -146,13 +146,12 @@ import { formatPhone } from '@/services/Formatting'
 import type { SingleOverlayResponse } from '@/types'
 import { useSummaryJob, useContactsJob } from '@/composables/useSummary'
 import { SocialMediaService } from '@/services/SosialMediaService'
-import { container } from '@/inversify.config'
 
 const props = defineProps<{
   job: SingleOverlayResponse
 }>()
 
-const socialMediaItems = container.get<SocialMediaService>("SocialMediaService").createSocialMediaItems(props.job.social_media)
+const socialMediaItems = SocialMediaService.createSocialMediaItems(props.job.social_media)
 
 const ringkasanPekerjaan = computed(() =>
   useSummaryJob(props.job.ringkasanPekerjaan)

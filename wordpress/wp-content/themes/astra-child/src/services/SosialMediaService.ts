@@ -1,15 +1,11 @@
-import { injectable } from "inversify";
-
 export interface SocialMediaItem {
   platform: string;
   username: string;
   icon: string;
   url: string;
 }
-
-@injectable()
 export class SocialMediaService {
-  protected platforms: Record<string, { icon: string; base_url: string }> = {
+  protected static platforms: Record<string, { icon: string; base_url: string }> = {
     "X / Twitter": {
       icon: "fab fa-x-twitter",
       base_url: "https://twitter.com/",
@@ -24,17 +20,17 @@ export class SocialMediaService {
     Telegram: { icon: "fab fa-telegram", base_url: "https://t.me/" },
   };
 
-  getLinkData(platform: string, username: string): SocialMediaItem | null {
-    const config = this.platforms[platform];
+  static getLinkData(platform: string, username: string): SocialMediaItem | null {
+    const config = SocialMediaService.platforms[platform];
     if (!config || !username) return null;
     if (platform === "Whatsapp")
-      return this.getWhatsappLinkData(platform, config, username);
+      return SocialMediaService.getWhatsappLinkData(platform, config, username);
     if (platform === "LinkedIn")
-      return this.getLinkedInLinkData(platform, config, username);
-    return this.getDefaultLinkData(platform, config, username);
+      return SocialMediaService.getLinkedInLinkData(platform, config, username);
+    return SocialMediaService.getDefaultLinkData(platform, config, username);
   }
 
-  private getWhatsappLinkData(
+  private static getWhatsappLinkData(
     platform: string,
     config: { icon: string; base_url: string },
     username: string
@@ -52,7 +48,7 @@ export class SocialMediaService {
         username: `+${number}`,
       };
     }
-    if (/^https?:\/\/(api\.whatsapp\.com|web\.whatsapp\.com)/.test(username)) {
+    if (/^https?:\/\/((api|web)\.whatsapp\.com)/.test(username)) {
       return { platform, icon: config.icon, url: username, username };
     }
     const clean_number = username.replace(/[^0-9]/g, "");
@@ -64,7 +60,7 @@ export class SocialMediaService {
     };
   }
 
-  private getLinkedInLinkData(
+  private static getLinkedInLinkData(
     platform: string,
     config: { icon: string; base_url: string },
     username: string
@@ -73,7 +69,7 @@ export class SocialMediaService {
       return { platform, icon: config.icon, url: username, username };
     }
     const clean_username = username.replace(/^@/, "");
-    const companyMatch = /^company[:/](.+)$/i.exec(clean_username);
+  const companyMatch = /^company[:/](.+)$/i.exec(clean_username);
     let url;
     if (companyMatch) {
       url = `https://linkedin.com/company/${companyMatch[1]}`;
@@ -83,7 +79,7 @@ export class SocialMediaService {
     return { platform, icon: config.icon, url, username };
   }
 
-  private getDefaultLinkData(
+  private static getDefaultLinkData(
     platform: string,
     config: { icon: string; base_url: string },
     username: string
@@ -96,7 +92,7 @@ export class SocialMediaService {
     return { platform, icon: config.icon, url, username };
   }
 
-  createSocialMediaItems(
+  static createSocialMediaItems(
     socialMediaData: Record<string, string | string[]>
   ): SocialMediaItem[] {
     const processedItems: SocialMediaItem[] = [];
@@ -106,7 +102,7 @@ export class SocialMediaService {
         : [socialMediaData[platform]];
       for (const username of usernames) {
         if (!platform || !username) continue;
-        const linkData = this.getLinkData(platform, username);
+        const linkData = SocialMediaService.getLinkData(platform, username);
         if (linkData) {
           processedItems.push(linkData);
         }

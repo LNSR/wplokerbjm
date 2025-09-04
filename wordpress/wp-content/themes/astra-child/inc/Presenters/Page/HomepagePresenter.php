@@ -1,38 +1,30 @@
 <?php
 
-namespace AstraChild\ViewModels\Page;
-use AstraChild\Components\Hero;
-use AstraChild\Components\JobGrid;
-use AstraChild\Components\JobCarousel;
-use AstraChild\Layouts\Layouts;
+namespace AstraChild\Presenters\Page;
+use AstraChild\Presenters\Components\Hero;
+use AstraChild\Presenters\Components\JobGrid;
+use AstraChild\Presenters\Components\JobCarousel;
 use AstraChild\Services\Job\JobServices;
 
 use AstraChild\QueryBuilders\JobQuery;
-use AstraChild\Core\Cache;
 
-class HomepageViewModel
+class HomepagePresenter
 {
 
 	public function __construct(
 		private Hero $hero,
 		private JobGrid $jobGrid,
 		private JobCarousel $jobCarousel,
-		private JobServices $jobServices,
-		private Layouts $layouts
+		private JobServices $jobServices
 	) {
 
 	}
 
 	public function getProps(): array
 	{
-		$cache_key = 'page_homepage_props';
-		$cached = Cache::get($cache_key);
-		if ($cached !== false) {
-			return $cached;
-		}
 
 		$props = [
-			'layouts' => $this->layouts->getProps(),
+			'logo' => get_custom_logo(),
 			'hero' => $this->hero->getProps(),
 			'carousel' => $this->jobCarousel->getProps(),
 			'jobGrid' => $this->jobGrid->getProps(
@@ -42,8 +34,7 @@ class HomepageViewModel
 			)
 		];
 
-		Cache::set($cache_key, $props, 86400); // Cache for 1 day
-		return $props;
+	return $props;
 	}
 	public function getSchema(): array
 	{

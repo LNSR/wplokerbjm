@@ -16,6 +16,5 @@ require_once dirname(__DIR__, 1) . '/themes/astra-child/vendor/autoload.php';
 // Initialize the DI container
 $astra_child_container = \AstraChild\Core\Container::getContainer();
 
-// Bootstrap the theme services
-$astra_child_init = $astra_child_container->get(\AstraChild\Core\Init::class);
-$astra_child_init->initialize();
+// Bootstrap the theme hooks and services
+$astra_child_init = $astra_child_container->get(\AstraChild\Core\Container\Init::class)->initialize();

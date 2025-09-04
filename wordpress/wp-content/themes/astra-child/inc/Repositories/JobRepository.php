@@ -2,8 +2,6 @@
 
 namespace AstraChild\Repositories;
 
-use AstraChild\Core\Cache;
-
 /**
  * Job Repository
  * 
@@ -26,12 +24,6 @@ class JobRepository
      */
     public function queryCard(array $query_args): array
     {
-        $cacheKey = 'query_card_' . md5(serialize($query_args));
-
-        $cached = Cache::get($cacheKey);
-        if ($cached !== false) {
-            return $cached;
-        }
 
         $jobs_query = new \WP_Query($query_args);
 
@@ -53,8 +45,6 @@ class JobRepository
             'query' => $jobs_query,
             'schema' => $schema,
         ];
-
-        Cache::set($cacheKey, $result, 86400); // Cache for 1 day
 
         return $result;
     }

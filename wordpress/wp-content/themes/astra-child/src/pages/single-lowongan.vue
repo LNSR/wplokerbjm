@@ -1,5 +1,5 @@
 <template>
-  <Header :header="props.layouts.header" />
+  <Header :logo="props.logo" />
   <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12">
     <JobDetail :job="props.job" />
     <FloatingActionButton />
@@ -15,5 +15,5 @@ const JobDetail = defineAsyncComponent(() => import('@/components/Shared/JobDeta
 const FloatingActionButton = defineAsyncComponent(() => import('@/components/Shared/FloatingActionButton.vue'));
 import { type SingleOverlayResponse as SingleJob, type LayoutProps } from '@/types';
 
-const props = defineProps<{ job: SingleJob,  layouts: LayoutProps }>();
+const props = defineProps<{ job: SingleJob,  logo: LayoutProps['logo'] }>();
 </script>

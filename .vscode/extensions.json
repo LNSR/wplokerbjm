@@ -1,14 +1,16 @@
 {
-    "recommendations": [
-        "DEVSENSE.phptools-vscode",
-        "bradlc.vscode-tailwindcss",
-        "Vue.volar",
-        "matthewpi.caddyfile-support",
-        "aaron-bond.better-comments",
-        "dbaeumer.vscode-eslint",
-        "devsense.composer-php-vscode",
-        "docker.docker",
-        "ms-azuretools.vscode-docker",
-        "esbenp.prettier-vscode"
-    ]
+  "recommendations": [
+    "DEVSENSE.phptools-vscode",
+    "bradlc.vscode-tailwindcss",
+    "Vue.volar",
+    "matthewpi.caddyfile-support",
+    "aaron-bond.better-comments",
+    "dbaeumer.vscode-eslint",
+    "devsense.composer-php-vscode",
+    "docker.docker",
+    "ms-azuretools.vscode-docker",
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-typescript-next",
+    "Vue.vscode-typescript-vue-plugin"
+  ]
 }

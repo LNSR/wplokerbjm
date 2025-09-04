@@ -31,8 +31,7 @@
         </div>
         <div v-if="hasStatusOrDeadline" class="divider my-2"></div>
         <div class="flex items-center justify-between font-semibold">
-          <span v-if="statusInfo.label"
-            :class="['inline-block px-3 py-1 text-sm font-bold rounded', statusInfo.color]">
+          <span v-if="statusInfo.label" :class="['inline-block px-3 py-1 text-sm font-bold rounded', statusInfo.color]">
             {{ statusInfo.label }}
           </span>
           <span v-if="deadlineInfo.text"
@@ -49,21 +48,22 @@
 <script lang="ts" setup>
 import { computed } from 'vue'
 import { useTimeAgo } from '@/composables/useTime'
-import { useJobCard } from '@/composables/useJobCard'
 import { useSummaryJob } from '@/composables/useSummary'
 import { useStatusJob } from '@/composables/JobCard/useStatusJob'
 import { useDeadline } from '@/composables/JobCard/useDeadline'
+import { useJobOverlayStore } from '@/stores/JobOverlay'
 import type { JobCardProps } from '@/types/Component'
 
 const props = defineProps<JobCardProps>()
 
 const emit = defineEmits(['click'])
 
-function handleClick(event: MouseEvent) {
+const handleClick = (event: MouseEvent) => {
   const isTabletOrDesktop = window.matchMedia('(min-width: 768px)').matches
   if (!isTabletOrDesktop) return
 
-  if (event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1) return
+  const { ctrlKey, metaKey, shiftKey, button } = event
+  if (ctrlKey || metaKey || shiftKey || button === 1) return
 
   event.preventDefault()
 
@@ -81,7 +81,30 @@ function handleClick(event: MouseEvent) {
   }
 }
 
-const { cardClass, bodyClass } = useJobCard(props.variant, props.selected)
+const selected = computed(() => props.jobdata['slug'] === useJobOverlayStore().selectedSlug)
+
+const cardClass = computed(() => {
+  const baseClasses = {
+    carousel: "block group rounded-xl transition-all duration-300 cursor-pointer carousel-card max-w-full border-2 border-blue-400 shadow-md hover:shadow-lg hover:border-blue-600 hover:border-solid",
+    featured: "block group rounded-xl transition-all duration-300 cursor-pointer w-full max-w border-2 border-blue-400 shadow-lg hover:shadow-xl hover:border-blue-600 hover:scale-[1.02] hover:border-solid"
+  };
+
+  const selectedClasses = {
+    carousel: " ring-6 ring-blue-600 border-blue-700",
+    featured: " ring-4 ring-blue-500 border-blue-700"
+  };
+
+  return `${baseClasses[props.variant] || ""}${selected.value ? selectedClasses[props.variant] || "" : ""}`;
+});
+
+const bodyClass = computed(() => {
+  const bodyClasses = {
+    carousel: "card-body relative p-3 gap-0 flex flex-col min-h-[300px] h-full",
+    featured: "card-body relative p-4 gap-1 flex flex-col h-full"
+  };
+
+  return bodyClasses[props.variant] || "";
+});
 
 const summaryRows = computed(() => useSummaryJob(props.jobdata['ringkasanPekerjaan']))
 const statusInfo = computed(() => useStatusJob(Number(props.jobdata['statusjob'])))

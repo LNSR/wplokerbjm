@@ -10,15 +10,14 @@
         overlayOpen ? 'w-full lg:w-[calc(100%-420px)]' : 'w-full'
       ]">
         <div v-if="jobs.length">
-          <transition-group name="jobcard-fade" tag="div" :class="[
+          <transition-group tag="div" :class="[
             'grid gap-6 job-grid-transition',
             overlayOpen
               ? 'grid-cols-1 md:grid-cols-1 lg:grid-cols-1'
               : 'grid-cols-1 md:grid-cols-2 lg:grid-cols-3'
           ]">
             <JobCard v-for="job in jobs" :key="job.permalink" :jobdata="job" variant="featured"
-              :permalink="job.permalink ?? ''" :selected="selectedSlug === job.slug" @click="() => handleJobClick(job)"
-              style="cursor:pointer" />
+              :permalink="job.permalink ?? ''" @click="() => handleJobClick(job)" />
           </transition-group>
         </div>
         <div v-else class="text-center py-12">
@@ -50,7 +49,7 @@ import { defineAsyncComponent } from 'vue';
 import type { JobGridProps } from '@/types'
 import { useJobGrid } from '@/composables/useJobGrid'
 import JobCard from '@/components/Homepage/JobCard.vue';
-const SingleOverlay = defineAsyncComponent(() => import('@/components/Homepage/JobGrid/Child/SingleOverlay.vue'))
+const SingleOverlay = defineAsyncComponent(() => import('@/components/Homepage/JobGrid/SingleOverlay.vue'))
 const props = defineProps<JobGridProps>()
 const {
   jobs,

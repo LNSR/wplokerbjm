@@ -3,6 +3,7 @@
 namespace AstraChild\Services\PostsManagement\SSG;
 
 use AstraChild\Core\Cache;
+use AstraChild\Services\Utilities\SSG\URLFilterService;
 
 /**
  * TriggerBuild
@@ -25,7 +26,6 @@ class TriggerBuild
     private string $ref;
 
     public function __construct(
-        private \AstraChild\Services\Utilities\SSG\URLFilterService $urlFilterService,
         array $config = []
     ) {
         // Prefer explicit config, fall back to constants
@@ -73,7 +73,7 @@ class TriggerBuild
         }, $paths)));
 
         // Filter out unwanted paths
-        $filtered = $this->urlFilterService->filterPaths($normalized, 'SSG Trigger');
+        $filtered = URLFilterService::filterPaths($normalized, 'SSG Trigger');
 
         error_log("SSG Trigger: Normalized paths: " . json_encode($normalized));
         error_log("SSG Trigger: Filtered paths: " . json_encode($filtered));
@@ -145,6 +145,18 @@ class TriggerBuild
             // 204 No Content is expected on success for workflow_dispatch
             $success = ($status >= 200 && $status < 300);
 
+            // Log specific errors for credential issues
+            if ($status === 401) {
+                error_log("SSG Trigger: ERROR - Authentication failed (401 Unauthorized). Check GitHub token (token is " . (empty($this->token) ? 'empty' : 'set') . ")");
+                error_log("SSG Trigger: GitHub API response body: {$resp_body}");
+            } elseif ($status === 403) {
+                error_log("SSG Trigger: ERROR - Access forbidden (403 Forbidden). Check repository permissions or token scope.");
+                error_log("SSG Trigger: GitHub API response body: {$resp_body}");
+            } elseif ($status === 404) {
+                error_log("SSG Trigger: ERROR - Workflow or repository not found (404 Not Found). Check owner: {$this->owner}, repo: {$this->repo}, workflow: {$this->workflow}");
+                error_log("SSG Trigger: GitHub API response body: {$resp_body}");
+            }
+
             error_log("SSG Trigger: Request completed - Status: $status, Success: " . ($success ? 'true' : 'false'));
 
             $result = [
@@ -196,22 +208,70 @@ class TriggerBuild
     }
 
     /**
-     * Cache the result for debouncing (1 minute expiration)
+     * Cache the result for debouncing (dynamic timing based on urgency)
      */
     private function setDebounceCache(string $key, array $result): void
     {
         try {
-            // Use longer debounce for LiteSpeed-coordinated operations
-            $expiration = $this->isLiteSpeedCoordinatedOperation() ? 120 : 60; // 2 minutes vs 1 minute
+            // Determine debounce timing based on multiple factors
+            $debounceSeconds = $this->calculateDynamicDebounceTime($result);
 
             $cacheKey = "ssg_debounce_{$key}";
 
-            Cache::set($cacheKey, $result, $expiration);
+            Cache::set($cacheKey, $result, $debounceSeconds);
+
+            error_log("SSG Trigger: Set debounce cache for key: {$key} (expiration: {$debounceSeconds}s)");
         } catch (\Exception $e) {
-            error_log("SSG Trigger: Cached result for key: {$key} (expiration: {$expiration}s)");
             error_log("SSG Trigger: ERROR setting debounce cache for key: {$key} - " . $e->getMessage());
             return;
         }
+    }
+
+    /**
+     * Calculate dynamic debounce timing based on various factors
+     */
+    private function calculateDynamicDebounceTime(array $result): int
+    {
+        $baseTime = 60; // Base 1 minute
+
+        // Increase time if this was a failed request (retry sooner)
+        if (isset($result['success']) && !$result['success']) {
+            $baseTime = 30; // 30 seconds for failures
+        }
+
+        // Use longer debounce for LiteSpeed-coordinated operations
+        if ($this->isLiteSpeedCoordinatedOperation()) {
+            $baseTime = 120; // 2 minutes for coordination
+        }
+
+        // Check for high-priority rebuild scenarios
+        $highPriorityReasons = ['post_deleted', 'config_changed', 'emergency_rebuild'];
+        if (isset($_REQUEST['ssg_reason']) && in_array($_REQUEST['ssg_reason'], $highPriorityReasons)) {
+            $baseTime = max(15, $baseTime / 4); // Reduce by 75% for high priority
+        }
+
+        // Check for cache bypass requests (reduce debounce)
+        if (isset($_GET['ssg_no_cache']) || isset($_GET['ssg_refresh'])) {
+            $baseTime = max(10, $baseTime / 6); // Reduce by 83% for cache bypass
+        }
+
+        // Environment-based adjustments
+        if (defined('WP_ENVIRONMENT_TYPE')) {
+            switch (WP_ENVIRONMENT_TYPE) {
+                case 'local':
+                case 'development':
+                    $baseTime = max(5, $baseTime / 12); // Much shorter for dev
+                    break;
+                case 'staging':
+                    $baseTime = max(15, $baseTime / 4); // Shorter for staging
+                    break;
+                case 'production':
+                    $baseTime = min(300, $baseTime * 1.5); // Slightly longer for production
+                    break;
+            }
+        }
+
+        return (int) $baseTime;
     }
 
     /**

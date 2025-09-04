@@ -1,27 +1,27 @@
-import { injectable } from "inversify";
-import { ApiError, TimeoutError, NetworkError } from "./Error";
 import { AuthService } from "@/services/AuthService";
+import { injectable } from "inversify";
+import { ApiError, NetworkError, TimeoutError } from "@/api";
 
 @injectable()
 export class ApiClient {
-  private baseUrl: string
-  private timeout = 15000; // 15 seconds
+  private readonly baseUrl: string
+  private readonly timeout = 15000; // 15 seconds
 
   constructor() {
     this.baseUrl = `${window.location.origin}/wp-json/astra-child/v1`
   }
 
   // Helper type for request options
-  private isBodyAllowed(method?: string) {
+  private isBodyAllowed(method?: string): boolean {
     const m = (method || '').toUpperCase();
     return m === 'POST' || m === 'PUT' || m === 'PATCH' || m === 'DELETE' && false; // DELETE usually has no body for compatibility
   }
 
-  private isFormData(value: any): value is FormData {
+  private isFormData(value: unknown): value is FormData {
     return typeof FormData !== 'undefined' && value instanceof FormData;
   }
 
-  private async fetchWithTimeout(resource: string, options: RequestInit = {}) {
+  private async fetchWithTimeout(resource: string, options: RequestInit = {}): Promise<Response> {
     const controller = (typeof AbortController !== 'undefined') ? new AbortController() : undefined;
     const id = controller ? setTimeout(() => controller.abort(), this.timeout) : undefined;
     try {
@@ -32,15 +32,15 @@ export class ApiClient {
       });
       if (id) clearTimeout(id);
       return response;
-    } catch (error: any) {
+    } catch (error: unknown) {
       if (id) clearTimeout(id);
-      const method = options && (options as any).method;
-      if (error && error.name === 'AbortError') {
-        throw new TimeoutError('Request timed out', resource, method, (options as any).body);
+      const method = options.method;
+      if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') {
+        throw new TimeoutError('Request timed out', resource, method, options.body);
       }
       // Browser network failure yields TypeError in many runtimes
       if (error instanceof TypeError) {
-        throw new NetworkError(error.message || 'Network error', resource, method, (options as any).body);
+        throw new NetworkError(error.message || 'Network error', resource, method, options.body);
       }
       throw new ApiError(
         error instanceof Error ? error.message : 'Unknown error',
@@ -49,7 +49,7 @@ export class ApiClient {
         undefined,
         resource,
         method,
-        (options as any).body,
+        options.body,
         undefined,
         'unknown',
         'Terjadi kesalahan tak terduga.'
@@ -57,9 +57,9 @@ export class ApiClient {
     }
   }
 
-  private async handleResponse(response: Response, url?: string, method?: string, payload?: any) {
+  private async handleResponse(response: Response, url?: string, method?: string, payload?: unknown): Promise<unknown> {
     const contentType = response.headers.get('content-type') || '';
-    let data: any = undefined;
+    let data: unknown = undefined;
     try {
       if (contentType.includes('application/json')) {
         data = await response.json();
@@ -76,7 +76,14 @@ export class ApiClient {
     }
 
     if (!response.ok) {
-      const message = (data && (data.message || data.error || JSON.stringify(data))) || response.statusText || `HTTP ${response.status}`;
+      let message: string;
+      if (data && typeof data === 'object' && data !== null) {
+        const d = data as Record<string, unknown>;
+        message = String(d['message'] || d['error'] || JSON.stringify(data));
+      } else {
+        message = String(data);
+      }
+      message = message || response.statusText || `HTTP ${response.status}`;
       throw new ApiError(
         message,
         response.status,
@@ -90,7 +97,7 @@ export class ApiClient {
     return data;
   }
 
-  private buildHeaders(headers: Record<string, string> = {}) {
+  private buildHeaders(headers: Record<string, string> = {}): Record<string, string> {
     const normalized: Record<string, string> = {};
     Object.entries(headers || {}).forEach(([k, v]) => {
       normalized[k] = v;
@@ -111,10 +118,10 @@ export class ApiClient {
     return base;
   }
 
-  private async request<T = any>(
+  private async request<T = unknown>(
     method: string,
     endpoint: string,
-    { params, data, headers }: { params?: Record<string, string | number>, data?: any, headers?: Record<string, string> } = {}
+    { params, data, headers }: { params?: Record<string, string | number>, data?: unknown, headers?: Record<string, string> } = {}
   ): Promise<T> {
     let url = new URL(`${this.baseUrl}${endpoint}`);
     if (params) {
@@ -144,8 +151,8 @@ export class ApiClient {
         headers: builtHeaders,
         body,
       });
-      return await this.handleResponse(response, url.toString(), method, data);
-    } catch (error: any) {
+      return await this.handleResponse(response, url.toString(), method, data) as T;
+    } catch (error: unknown) {
       if (error instanceof ApiError) throw error;
       if (error instanceof TimeoutError) throw error;
       if (error instanceof NetworkError) throw error;
@@ -164,19 +171,19 @@ export class ApiClient {
     }
   }
 
-  async get<T = any>(endpoint: string, params?: Record<string, string | number>, headers: Record<string, string> = {}): Promise<T> {
+  async get<T = unknown>(endpoint: string, params?: Record<string, string | number>, headers: Record<string, string> = {}): Promise<T> {
     return this.request<T>('GET', endpoint, { params, headers });
   }
 
-  async post<T = any>(endpoint: string, data?: Record<string, any>, headers: Record<string, string> = {}): Promise<T> {
+  async post<T = unknown>(endpoint: string, data?: Record<string, unknown>, headers: Record<string, string> = {}): Promise<T> {
     return this.request<T>('POST', endpoint, { data, headers });
   }
 
-  async put<T = any>(endpoint: string, data?: Record<string, any>, headers: Record<string, string> = {}): Promise<T> {
+  async put<T = unknown>(endpoint: string, data?: Record<string, unknown>, headers: Record<string, string> = {}): Promise<T> {
     return this.request<T>('PUT', endpoint, { data, headers });
   }
 
-  async delete<T = any>(endpoint: string, headers: Record<string, string> = {}): Promise<T> {
+  async delete<T = unknown>(endpoint: string, headers: Record<string, string> = {}): Promise<T> {
     return this.request<T>('DELETE', endpoint, { headers });
   }
 }

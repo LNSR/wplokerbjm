@@ -1,6 +1,6 @@
 <?php
 
-namespace AstraChild\Core;
+namespace AstraChild\Core\Container;
 
 use ReflectionClass;
 use RecursiveDirectoryIterator;
@@ -19,7 +19,7 @@ class AutowireScanner
     }
 
     /**
-     * Scan directories recursively and return definitions for autowiring.
+     * Scan directories recursively and return definitions for autowirable.
      * Skips interfaces, abstract classes, and static-only classes.
      */
     public function scanForAutowirableClasses(): array
@@ -37,6 +37,58 @@ class AutowireScanner
         }
 
         return $definitions;
+    }
+
+    /**
+     * Scan directories recursively and return definitions for autowirable classes
+     * that implement a specific interface.
+     * 
+     * @param string $interface The fully qualified interface name
+     * @return array Array of autowire definitions for classes implementing the interface
+     */
+    public function scanForInterfaceImplementers(string $interface): array
+    {
+        $definitions = [];
+        $phpFiles = $this->findPhpFiles();
+
+        foreach ($phpFiles as $file) {
+            $className = $this->getClassNameFromFile($file);
+            
+            if ($className && $this->isAutowirable($className)) {
+                // Check if class implements the interface
+                if (is_subclass_of($className, $interface) || in_array($interface, class_implements($className))) {
+                    // Use autowiring for this class
+                    $definitions[$className] = \DI\autowire($className);
+                }
+            }
+        }
+
+        return $definitions;
+    }
+
+    /**
+     * Get class names of autowirable classes that implement a specific interface.
+     * 
+     * @param string $interface The fully qualified interface name
+     * @return string[] Array of fully qualified class names
+     */
+    public function getInterfaceImplementerClassNames(string $interface): array
+    {
+        $implementers = [];
+        $phpFiles = $this->findPhpFiles();
+
+        foreach ($phpFiles as $file) {
+            $className = $this->getClassNameFromFile($file);
+            
+            if ($className && $this->isAutowirable($className)) {
+                // Check if class implements the interface
+                if (is_subclass_of($className, $interface) || in_array($interface, class_implements($className))) {
+                    $implementers[] = $className;
+                }
+            }
+        }
+
+        return $implementers;
     }
 
     /**
@@ -123,7 +175,7 @@ class AutowireScanner
         $namespace = $namespaceMatches['namespace'] ?? '';
 
         // Extract class name (supports abstract classes which we'll filter later)
-        $classPattern = '/(?:abstract\s+)?class\s+(?<className>[a-zA-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)/';
+        $classPattern = '/(?:abstract\s+)?class\s+(?<className>[A-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)/';
         preg_match($classPattern, $fileContent, $classMatches);
         $className = $classMatches['className'] ?? '';
 

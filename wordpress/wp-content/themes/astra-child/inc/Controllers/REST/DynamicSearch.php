@@ -3,7 +3,6 @@
 namespace AstraChild\Controllers\REST;
 
 use AstraChild\Services\Utilities\Utilities;
-use AstraChild\Core\Cache;
 
 class DynamicSearch
 {
@@ -23,12 +22,6 @@ class DynamicSearch
                 'sort' => $request->get_param('sort') ?? 'desc',
             ];
 
-            $cacheKey = 'dynamic_search_api_' . sanitize_key($filters['cari']) . '_' . implode('_', array_map('sanitize_key', $filters['lokasi'])) . '_' . implode('_', array_map('sanitize_key', $filters['gender'])) . '_' . implode('_', array_map('sanitize_key', $filters['pendidikan'])) . '_' . sanitize_key($filters['sort']);
-
-            $cached = Cache::get($cacheKey);
-            if ($cached !== false) {
-                return rest_ensure_response($cached);
-            }
 
             $args = \AstraChild\QueryBuilders\JobQuery::searchJobsArgs($filters, 1, 36);
 
@@ -44,8 +37,6 @@ class DynamicSearch
                 'context' => 'search',
                 'filters' => $filters,
             ];
-
-            Cache::set($cacheKey, $response, 86400); // Cache for 24 hours
 
             return rest_ensure_response($response);
         } catch (\Exception $e) {

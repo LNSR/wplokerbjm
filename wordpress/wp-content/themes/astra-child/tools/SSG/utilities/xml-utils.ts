@@ -63,14 +63,15 @@ export class SitemapParser {
     return this.extractUrlsFromParsedXml(parsed);
   }
 
-  private extractUrlsFromParsedXml(parsed: any): SitemapUrl[] {
+  private extractUrlsFromParsedXml(parsed: unknown): SitemapUrl[] {
+    const p = parsed as any; // XML parsed object
     const urls: SitemapUrl[] = [];
 
     // Check if this is a sitemap index
-    if (parsed.sitemapindex) {
-      const sitemaps = Array.isArray(parsed.sitemapindex.sitemap)
-        ? parsed.sitemapindex.sitemap
-        : [parsed.sitemapindex.sitemap];
+    if (p.sitemapindex) {
+      const sitemaps = Array.isArray(p.sitemapindex.sitemap)
+        ? p.sitemapindex.sitemap
+        : [p.sitemapindex.sitemap];
 
       console.log(`Found ${sitemaps.length} sitemap references in index`);
 
@@ -79,10 +80,10 @@ export class SitemapParser {
     }
 
     // This is a regular sitemap with urlset
-    if (parsed.urlset && parsed.urlset.url) {
-      const urlEntries = Array.isArray(parsed.urlset.url)
-        ? parsed.urlset.url
-        : [parsed.urlset.url];
+    if (p.urlset && p.urlset.url) {
+      const urlEntries = Array.isArray(p.urlset.url)
+        ? p.urlset.url
+        : [p.urlset.url];
 
       console.log(`Found ${urlEntries.length} URLs in sitemap`);
 

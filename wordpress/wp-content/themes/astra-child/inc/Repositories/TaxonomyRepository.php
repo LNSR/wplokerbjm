@@ -4,7 +4,6 @@ namespace AstraChild\Repositories;
 
 use AstraChild\Contracts\DataProviderInterface;
 use AstraChild\Models\TaxonomyEntity;
-use AstraChild\Core\Cache;
 
 class TaxonomyRepository implements DataProviderInterface
 {
@@ -22,11 +21,6 @@ class TaxonomyRepository implements DataProviderInterface
 	 */
 	public function getMetaBoxData(int $post_id): TaxonomyEntity
 	{
-		$cacheKey = 'taxonomies_job_data_' . $post_id;
-		$cached = Cache::get($cacheKey);
-		if ($cached !== false) {
-			return $cached;
-		}
 		$entity = new TaxonomyEntity(
 			perusahaan_taxo: get_the_terms($post_id, 'perusahaan'),
 			kategori_lowongan_taxo: get_the_terms($post_id, 'kategori-lowongan'),
@@ -35,17 +29,11 @@ class TaxonomyRepository implements DataProviderInterface
 			gender_taxo: get_the_terms($post_id, 'gender'),
 			pendidikan_taxo: get_the_terms($post_id, 'pendidikan')
 		);
-		Cache::set($cacheKey, $entity, 86400); // Cache for 24 hours
 		return $entity;
 	}
 
 	public function getTaxonomyTerms(): array
 	{
-		$cacheKey = 'taxonomy_terms_all';
-		$cached_terms = Cache::get($cacheKey);
-		if ($cached_terms !== false) {
-			return $cached_terms;
-		}
 
 		$terms = [
 			'perusahaan_terms' => get_terms([
@@ -77,7 +65,6 @@ class TaxonomyRepository implements DataProviderInterface
 				'hide_empty' => true,
 			])
 		];
-		Cache::set($cacheKey, $terms, 86400); // Cache for 24 hours
 		return $terms;
 	}
 }

@@ -2,21 +2,17 @@
 
 namespace AstraChild\Core;
 use AstraChild\Contracts\HooksInterface;
+use AstraChild\Core\Enqueue\Vite;
 
 class Enqueue implements HooksInterface
 {
-
-    public function __construct(private \AstraChild\Core\Enqueue\Vite $vite)
-    {
-    }
-    private array $noOptimizeStyleHandles = [];
 
     /**
      * Register scripts and styles.
      */
     public function registerActions(): void
     {
-        add_action('wp_enqueue_scripts', [$this, 'enqueueAssets'], 7);
+        add_action('wp_enqueue_scripts', [$this, 'enqueueAssets'], 20);
     }
 
     /**
@@ -24,23 +20,22 @@ class Enqueue implements HooksInterface
      */
     public function registerFilters(): void
     {
-        add_filter('style_loader_tag', [$this, 'filterStyleLoaderTag'], 8, 2);
+        add_filter('style_loader_tag', [$this, 'filterStyleLoaderTag'], 21, 2);
     }
 
     public function enqueueAssets(): void
     {
         try {
-            if ($this->vite->isDevelopment()) {
-                $this->vite->enqueueForDevelopment();
+            if (Vite::isDevelopment()) {
+                Vite::enqueueForDevelopment();
                 return;
             }
 
-            $prod = $this->vite->enqueueForProduction();
+            $prod = Vite::enqueueForProduction();
             if (empty($prod)) {
                 return;
             }
-
-            $this->noOptimizeStyleHandles = array_merge($this->noOptimizeStyleHandles, $prod['noOptimizeStyleHandles'] ?? []);
+            // No need to merge, just use the static property in filterStyleLoaderTag
         } catch (\Exception $e) {
             error_log('Enqueue::enqueueAssets error: ' . $e->getMessage());
         }
@@ -53,7 +48,7 @@ class Enqueue implements HooksInterface
     public function filterStyleLoaderTag(string $tag, string $handle): string
     {
         try {
-            if (in_array($handle, $this->noOptimizeStyleHandles, true)) {
+            if (in_array($handle, Vite::$noOptimizeStyleHandles, true)) {
                 return str_replace('<link ', '<link data-no-optimize="1" ', $tag);
             }
             return $tag;

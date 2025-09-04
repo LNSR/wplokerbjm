@@ -1,4 +1,4 @@
-import { ref } from "vue";
+import { ref, type Ref } from "vue";
 import { JobService } from "@/services/APIService";
 import type {
   SearchFilters,
@@ -6,10 +6,16 @@ import type {
   SearchResponse,
   AutoSuggestResponse,
   LoadMoreResponse,
+  SingleOverlayResponse,
 } from "@/types";
-import type { SingleOverlayResponse } from "@/types";
 
-export function useApi() {
+export function useApi(): {
+  loading: Ref<boolean>;
+  fetchAutoSuggestions: (query: string) => Promise<AutoSuggestResponse>;
+  searchJobs: (filters: SearchFilters) => Promise<SearchResponse>;
+  loadMore: (filters: LoadMoreFilters) => Promise<LoadMoreResponse>;
+  fetchSingleOverlay: (slug: string) => Promise<SingleOverlayResponse | null>;
+} {
   const loading = ref(false);
 
   async function fetchAutoSuggestions(

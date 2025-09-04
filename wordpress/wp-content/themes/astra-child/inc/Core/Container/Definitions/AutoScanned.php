@@ -1,8 +1,8 @@
 <?php
 
-namespace AstraChild\Core\Definitions;
+namespace AstraChild\Core\Container\Definitions;
 
-use AstraChild\Core\AutowireScanner;
+use AstraChild\Core\Container\AutowireScanner;
 
 /**
  * Auto-scanned definitions for autowiring.
@@ -20,7 +20,7 @@ class AutoScanned
     {
         // Create scanner instance directly (not from container)
         $scanner = new AutowireScanner(
-            dirname(__DIR__, 2), // Points to the inc/ directory
+            dirname(__DIR__, 3), // Points to the inc/ directory
             'AstraChild'
         );
 

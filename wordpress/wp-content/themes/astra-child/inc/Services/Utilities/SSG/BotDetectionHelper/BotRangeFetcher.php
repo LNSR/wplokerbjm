@@ -53,9 +53,17 @@ class BotRangeFetcher
             return false;
         }
 
+        // Check cache first
+        $cacheKey = 'ssg_ip_in_bot_ranges_' . $ip;
+        $cachedResult = ObjectCache::get($cacheKey);
+        if ($cachedResult !== false) {
+            return (bool) $cachedResult;
+        }
+
         $ranges = $this->getBotRanges();
         $ipLong = ip2long($ip);
         if ($ipLong === false) {
+            ObjectCache::set($cacheKey, false, 86400); // Cache for 24 hours
             return false;
         }
 
@@ -74,10 +82,12 @@ class BotRangeFetcher
             }
             $maskLong = ~((1 << (32 - $mask)) - 1);
             if (($ipLong & $maskLong) === ($subnetLong & $maskLong)) {
+                ObjectCache::set($cacheKey, true, 86400); // Cache for 24 hours
                 return true;
             }
         }
 
+        ObjectCache::set($cacheKey, false, 86400); // Cache for 24 hours
         return false;
     }
 
@@ -140,9 +150,33 @@ class BotRangeFetcher
         $quicCloudRanges = $this->fetchQuicCloudRanges();
         $ranges = array_merge($ranges, $quicCloudRanges);
 
-        // Rank Math bot ranges
-        $rankMathRanges = $this->fetchRankMathBotRanges();
-        $ranges = array_merge($ranges, $rankMathRanges);
+        // Baidu ranges
+        $baiduRanges = $this->fetchBaiduRanges();
+        $ranges = array_merge($ranges, $baiduRanges);
+
+        // Sogou ranges
+        $sogouRanges = $this->fetchSogouRanges();
+        $ranges = array_merge($ranges, $sogouRanges);
+
+        // 360Spider ranges
+        $sp360Ranges = $this->fetch360SpiderRanges();
+        $ranges = array_merge($ranges, $sp360Ranges);
+
+        // SEO tool ranges (Ahrefs, SEMrush, Moz)
+        $seoToolRanges = $this->fetchSeoToolRanges();
+        $ranges = array_merge($ranges, $seoToolRanges);
+
+        // Social preview crawlers (Facebook, Twitter)
+        $socialRanges = $this->fetchSocialPreviewRanges();
+        $ranges = array_merge($ranges, $socialRanges);
+
+        // Monitoring and archive services
+        $monitorRanges = $this->fetchMonitoringAndArchiveRanges();
+        $ranges = array_merge($ranges, $monitorRanges);
+
+        // Additional bot ranges from open-source databases
+        $openSourceRanges = $this->fetchOpenSourceBotRanges();
+        $ranges = array_merge($ranges, $openSourceRanges);
 
         return array_unique($ranges);
     }
@@ -230,9 +264,15 @@ class BotRangeFetcher
             $html = $this->fetchUrl('https://yandex.com/ips');
             if ($html) {
                 // Parse the HTML to extract IPv4 ranges
-                // Yandex lists them as: 5.45.192.0/18 5.255.192.0/18 etc.
-                if (preg_match_all('/(\d+\.\d+\.\d+\.\d+\/\d+)/', $html, $matches)) {
-                    $ranges = $matches[1];
+                // Yandex lists them as: 5.45.192.0/18 5.255.192.0/18 etc., but sometimes concatenated
+                // Use regex to find all IP/CIDR patterns
+                if (preg_match_all('/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2})/', $html, $matches)) {
+                    foreach ($matches[1] as $range) {
+                        // Validate the CIDR range
+                        if ($this->isValidCidr($range)) {
+                            $ranges[] = $range;
+                        }
+                    }
                 }
             }
         } catch (\Exception $e) {
@@ -448,6 +488,8 @@ class BotRangeFetcher
     /**
      * Fetch Pinterest bot IP ranges
      * Pinterest uses IP range 54.236.1.0/24
+     *
+     * @source https://help.pinterest.com/en/business/article/pinterest-crawler
      */
     private function fetchPinterestBotRanges(): array
     {
@@ -500,20 +542,169 @@ class BotRangeFetcher
     }
 
     /**
-     * Fetch Rank Math bot IP ranges
-     * Rank Math uses specific IP addresses for their SEO analysis bot
+     * Fetch Baidu IP ranges (China) - Baidu doesn't provide a JSON API; using official documented ranges
+     *
+     * @source https://help.baidu.com/question?prod_id=99&class=0&id=3001
      */
-    private function fetchRankMathBotRanges(): array
+    private function fetchBaiduRanges(): array
+    {
+        return [
+            '123.125.71.0/24',
+            '180.76.15.0/24',
+            '220.181.38.0/24',
+        ];
+    }
+
+    /**
+     * Fetch Sogou spider IP ranges (curated examples)
+     *
+     * @source https://www.sogou.com/docs/help/webmasters.htm
+     */
+    private function fetchSogouRanges(): array
+    {
+        return [
+            '218.30.103.0/24',
+            '220.181.7.0/24',
+        ];
+    }
+
+    /**
+     * Fetch 360Spider ranges (curated examples)
+     *
+     * @source https://www.so.com/help/help_3_2.html
+     */
+    private function fetch360SpiderRanges(): array
+    {
+        return [
+            '42.236.99.0/24',
+            '101.199.97.0/24',
+        ];
+    }
+
+    /**
+     * Fetch common SEO tool IP ranges (Ahrefs, SEMrush, Moz examples)
+     *
+     * @source https://ahrefs.com/robot (Ahrefs)
+     * @source https://www.semrush.com/bot/ (SEMrush)
+     * @source https://moz.com/help/mozbot (Moz)
+     */
+    private function fetchSeoToolRanges(): array
+    {
+        return [
+            // Ahrefs (sample blocks - verify against ahrefs.com current list)
+            '54.36.148.0/24',
+            '54.36.149.0/24',
+            '54.36.150.0/24',
+            // SEMrush (sample)
+            '85.208.96.0/24',
+            '85.208.97.0/24',
+            // Moz (sample)
+            '192.69.160.0/24',
+            '192.69.161.0/24',
+        ];
+    }
+
+    /**
+     * Fetch social preview crawler IP ranges (Facebook, Twitter samples)
+     *
+     * @source https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/ (Meta/Facebook)
+     * @source https://help.twitter.com/en/rules-and-policies/twitter-crawler (Twitter)
+     */
+    private function fetchSocialPreviewRanges(): array
     {
         $ranges = [];
 
-        // Rank Math's documented IP addresses (converted to /32 CIDR)
-        $ranges[] = '172.66.40.202/32';
-        $ranges[] = '172.66.43.54/32';
-        $ranges[] = '193.138.6.5/32';
-        $ranges[] = '204.48.29.92/32';
+        // Try to fetch Meta's peering/geofeed which contains authoritative network prefixes.
+        // Docs: https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/
+        try {
+            $data = $this->fetchUrl('https://www.facebook.com/peering/geofeed');
+            if ($data) {
+                // Extract any IPv4 CIDR occurrences from the feed/CSV/HTML
+                if (preg_match_all('/\b(?:\d{1,3}\.){3}\d{1,3}\/\d{1,2}\b/', $data, $matches)) {
+                    foreach (array_unique($matches[0]) as $cidr) {
+                        if ($this->isValidCidr($cidr)) {
+                            $ranges[] = $cidr;
+                        }
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('Failed to fetch Meta peering geofeed: ' . $e->getMessage());
+        }
 
-        return $ranges;
+        // If fetching/parsing failed or returned nothing, fall back to curated examples
+        if (empty($ranges)) {
+            $ranges = [
+                // Facebook / Meta (curated examples from official docs)
+                '31.13.24.0/21',
+                '31.13.64.0/18',
+                '66.220.144.0/20',
+                '69.63.176.0/21',
+                '69.63.184.0/21',
+                '69.63.176.0/20',
+                '69.171.224.0/20',
+            ];
+        }
+
+        // Twitter (examples) - keep existing samples
+        $ranges = array_merge($ranges, [
+            '199.59.148.0/22',
+            '199.16.156.0/22',
+        ]);
+
+        return array_unique($ranges);
+    }
+
+    /**
+     * Monitoring and archival services ranges
+     *
+     * @source https://uptimerobot.com/faq/#What-are-the-IP-addresses-used-by-UptimeRobot (UptimeRobot)
+     * @source https://archive.org/details/wayback-machine-crawler (Archive.org)
+     */
+    private function fetchMonitoringAndArchiveRanges(): array
+    {
+        return [
+            // UptimeRobot (examples)
+            '216.144.248.0/21',
+            '208.115.199.0/24',
+            // Archive.org
+            '207.241.224.0/20',
+        ];
+    }
+
+    /**
+     * Fetch additional bot IP ranges from open-source databases
+     * These provide coverage for bots that don't have official APIs
+     */
+    private function fetchOpenSourceBotRanges(): array
+    {
+        $ranges = [];
+
+        // FireHOL abusers list (contains various bot IPs)
+        try {
+            $fireholData = $this->fetchUrl('https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/_generator_lists/bad-ip-addresses.list');
+            if ($fireholData) {
+                $lines = explode("\n", $fireholData);
+                foreach ($lines as $line) {
+                    $line = trim($line);
+                    // Skip comments and empty lines
+                    if (empty($line) || str_starts_with($line, '#')) {
+                        continue;
+                    }
+                    // Convert individual IPs to /32 CIDR ranges
+                    if (filter_var($line, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+                        $ranges[] = $line . '/32';
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            error_log('Failed to fetch FireHOL bot ranges: ' . $e->getMessage());
+        }
+
+        // Additional open-source bot databases can be added here
+        // Example: AbuseIPDB, etc.
+
+        return array_unique($ranges);
     }
 
     /**
@@ -530,5 +721,30 @@ class BotRangeFetcher
 
         $content = @file_get_contents($url, false, $context);
         return $content ?: null;
+    }
+
+    /**
+     * Validate CIDR notation
+     */
+    private function isValidCidr(string $cidr): bool
+    {
+        if (!preg_match('/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/', $cidr, $matches)) {
+            return false;
+        }
+
+        $ip = $matches[1];
+        $mask = (int) $matches[2];
+
+        // Validate IP
+        if (!filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+            return false;
+        }
+
+        // Validate mask
+        if ($mask < 0 || $mask > 32) {
+            return false;
+        }
+
+        return true;
     }
 }

@@ -1,10 +1,10 @@
 // Client
-export { ApiClient } from './Client'
-export { ApiError } from './Error'
+export * from './Error'
+export * from './Client'
 
 // Endpoints
-export { jobsApi } from './endpoints/Jobs'
-export { taxonomyApi } from './endpoints/Taxonomy'
+export * from './endpoints/Jobs'
+export * from './endpoints/Taxonomy'
 
 // Types
 export type * from '@/types/API'

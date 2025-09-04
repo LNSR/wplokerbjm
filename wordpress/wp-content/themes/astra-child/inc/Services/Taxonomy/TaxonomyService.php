@@ -2,8 +2,6 @@
 
 namespace AstraChild\Services\Taxonomy;
 
-use AstraChild\Core\Cache; // Add this import near other use statements
-
 class TaxonomyService 
 {
 
@@ -64,11 +62,6 @@ class TaxonomyService
     public function buildTermsTree($terms, $taxonomy = ''): array
     {
         try {
-            $cacheKey = 'taxonomy_tree_' . $taxonomy;
-            $tree = Cache::get($cacheKey);
-            if ($tree !== false) {
-                return $tree;
-            }
 
             $terms_by_id = [];
             foreach ($terms as $term) {
@@ -89,7 +82,6 @@ class TaxonomyService
             }
             unset($term);
 
-            Cache::set($cacheKey, $tree, 86400); // Cache for 24 hours
             return $tree;
         } catch (\Exception $e) {
             error_log('TaxonomyService::buildTermsTree error: ' . $e->getMessage());

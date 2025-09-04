@@ -4,8 +4,6 @@ namespace AstraChild\Controllers\REST;
 
 use AstraChild\QueryBuilders\JobQuery;
 use AstraChild\Services\Utilities\Utilities;
-use AstraChild\Core\Cache;
-
 class LoadMore
 {
     public function __construct(
@@ -30,13 +28,6 @@ class LoadMore
                 'pendidikan' => Utilities::parseMulti($request->get_param('pendidikan')),
                 'sort' => $request->get_param('sort') ?? 'desc',
             ];
-
-            $cacheKey = 'load_more_api_' . $paged . '_' . sanitize_key($context) . '_' . sanitize_key($filters['cari']) . '_' . implode('_', array_map('sanitize_key', $filters['lokasi'])) . '_' . implode('_', array_map('sanitize_key', $filters['gender'])) . '_' . implode('_', array_map('sanitize_key', $filters['pendidikan'])) . '_' . sanitize_key($filters['sort']);
-
-            $cached = Cache::get($cacheKey);
-            if ($cached !== false) {
-                return rest_ensure_response($cached);
-            }
 
             $args = match ($context) {
                 'search' => JobQuery::searchJobsArgs($filters, $paged, 36),
@@ -69,8 +60,6 @@ class LoadMore
                 'context' => $context,
                 'filters' => $filters,
             ];
-
-            Cache::set($cacheKey, $response, 86400); // Cache for 24 hours
 
             return rest_ensure_response($response);
         } catch (\Exception $e) {

@@ -49,16 +49,16 @@ class Container
     {
         $builder->addDefinitions(array_merge(
             // Auto-scanned definitions from the inc/ directory
-            \AstraChild\Core\Definitions\AutoScanned::getDefinitions(),
+            \AstraChild\Core\Container\Definitions\AutoScanned::getDefinitions(),
 
             // Manually defined dependencies for core services
-            \AstraChild\Core\Definitions\Core::getDefinitions(),
-            
+            \AstraChild\Core\Container\Definitions\Core::getDefinitions(),
+
             // Repository definitions
-            \AstraChild\Core\Definitions\Repositories::getDefinitions(),
-            
+            \AstraChild\Core\Container\Definitions\Repositories::getDefinitions(),
+
             // Factory definitions
-            \AstraChild\Core\Definitions\Factories::getDefinitions(),
+            \AstraChild\Core\Container\Definitions\Factories::getDefinitions(),
         ));
     }
 
@@ -75,14 +75,25 @@ class Container
 
         // Compiled container file path
         $compiledFile = $cacheDir . '/CompiledContainer.php';
+        // Cache keys
         $transientKey = 'compiled_container_hash';
+        $apcuKey = 'astra_child_container_cache';
 
         if ($isProduction && is_file($compiledFile)) {
-            // Get current file hash
             $currentHash = @hash_file('sha1', $compiledFile);
-            // Get stored hash from object cache
             $storedHash = \AstraChild\Core\ObjectCache::get($transientKey);
             if ($storedHash !== $currentHash) {
+                // Clear APCu cache entries related to the container
+                if (function_exists('apcu_delete') && function_exists('apcu_cache_info')) {
+                    $cacheInfo = apcu_cache_info();
+                    if (!empty($cacheInfo['cache_list'])) {
+                        foreach ($cacheInfo['cache_list'] as $entry) {
+                            if (isset($entry['info']) && strpos($entry['info'], $apcuKey) === 0) {
+                                apcu_delete($entry['info']);
+                            }
+                        }
+                    }
+                }
                 // Invalidate cache if hash changed
                 array_map('unlink', glob("$cacheDir/*"));
                 \AstraChild\Core\ObjectCache::set($transientKey, $currentHash, 0);
@@ -96,7 +107,7 @@ class Container
         if ($isProduction && $cacheDir && is_dir($cacheDir)) {
             $builder->enableCompilation($cacheDir);
             if (function_exists('apcu_enabled') && apcu_enabled()) {
-                $builder->enableDefinitionCache();
+                $builder->enableDefinitionCache('astra_child_container_cache');
             }
         }
     }

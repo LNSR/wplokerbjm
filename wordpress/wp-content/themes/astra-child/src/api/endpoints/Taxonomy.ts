@@ -1,5 +1,6 @@
 import type { TaxonomyTermsResponse, TaxonomyTerm } from '@/types'
-import { container, ApiClient } from '@/inversify.config'
+import { container } from '@/inversify.config'
+import { ApiClient } from '@/api'
 
 export interface TaxonomyApiInterface {
   getAllTerms(): Promise<TaxonomyTermsResponse>

@@ -1,9 +1,6 @@
 <?php
 
-namespace AstraChild\Components;
-
-use AstraChild\Core\Container;
-use AstraChild\Repositories\TaxonomyRepository;
+namespace AstraChild\Presenters\Components;
 
 class Hero
 {

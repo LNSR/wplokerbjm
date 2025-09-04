@@ -12,7 +12,7 @@ class SSGUtilities
     /**
      * Get the file path for the SSG version
      */
-    public function getSSGFilePath(\WP_Post $post): string
+    public static function getSSGFilePath(\WP_Post $post): string
     {
         $themeDir = get_stylesheet_directory();
         $postUrl = get_permalink($post);
@@ -43,7 +43,7 @@ class SSGUtilities
     /**
      * Delete the SSG file for a post
      */
-    public function deleteSSGFile(int $post_id, string $reason): void
+    public static function deleteSSGFile(int $post_id, string $reason): void
     {
         $post = get_post($post_id);
         if (!$post) {
@@ -51,7 +51,7 @@ class SSGUtilities
         }
 
         // Get the SSG file path
-        $ssgFilePath = $this->getSSGFilePath($post);
+        $ssgFilePath = self::getSSGFilePath($post);
 
         // Delete the file if it exists
         if (file_exists($ssgFilePath)) {
@@ -73,13 +73,13 @@ class SSGUtilities
         }
 
         // Also clean up empty directories
-        $this->cleanupEmptyDirectories(dirname($ssgFilePath));
+        self::cleanupEmptyDirectories(dirname($ssgFilePath));
     }
 
     /**
      * Clean up empty directories recursively
      */
-    public function cleanupEmptyDirectories(string $dirPath): void
+    public static function cleanupEmptyDirectories(string $dirPath): void
     {
         $ssgBaseDir = get_stylesheet_directory() . '/assets/ssg';
 
@@ -104,7 +104,7 @@ class SSGUtilities
     /**
      * Collect paths from a post for SSG generation
      */
-    public function collectPathsFromPost(int $post_id, string $permalink, string $homeUrl): array
+    public static function collectPathsFromPost(int $post_id, string $permalink, string $homeUrl): array
     {
         // Convert permalinks to full URLs for SSG generation
         $paths = [];

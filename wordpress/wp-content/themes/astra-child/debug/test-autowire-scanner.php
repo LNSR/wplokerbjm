@@ -2,13 +2,14 @@
 
 /**
  * Test script to debug the AutowireScanner
- * This file can be run from the command line to see what classes are being detected
+ * * This file can be run from the command line to see what classes are being detected:
+ * * "php debug/test-autowire-scanner.php"
  */
 
 // Include the autoloader
-require_once __DIR__ . '/vendor/autoload.php';
+require_once dirname(__DIR__, 1) . '/vendor/autoload.php';
 
-use AstraChild\Core\AutowireScanner;
+use AstraChild\Core\Container\AutowireScanner;
 
 /**
  * Output colored text to terminal
@@ -23,7 +24,7 @@ function colorize(string $text, string $color): string
         'reset' => "\033[0m",
         'bold' => "\033[1m"
     ];
-    
+
     return ($colors[$color] ?? '') . $text . $colors['reset'];
 }
 
@@ -32,14 +33,14 @@ function colorize(string $text, string $color): string
  */
 function formatResult(array $result): string
 {
-    $status = $result['autowirable'] 
-        ? colorize('✓ AUTOWIRABLE', 'green') 
+    $status = $result['autowirable']
+        ? colorize('✓ AUTOWIRABLE', 'green')
         : colorize('✗ SKIPPED', 'red');
-    
+
     $className = colorize($result['class'], 'bold');
     $fileName = basename($result['file']);
     $reason = $result['reason'] ?: 'N/A';
-    
+
     return sprintf(
         "%s: %s\n   File: %s\n   Reason: %s\n",
         $status,
@@ -51,12 +52,12 @@ function formatResult(array $result): string
 
 // Create scanner instance
 $scanner = new AutowireScanner(
-    __DIR__ . '/inc', // Points to the inc/ directory
+    dirname(__DIR__, 1) . '/inc', // Points to the inc/ directory
     'AstraChild'
 );
 
 echo colorize("=== AutowireScanner Debug Results ===\n", 'blue');
-echo "Scanning directory: " . __DIR__ . "/inc\n";
+echo "Scanning directory: " . dirname(__DIR__, 1) . "/inc\n";
 echo "Namespace: AstraChild\n\n";
 
 // Get debug results
@@ -99,6 +100,21 @@ if (empty($definitions)) {
 } else {
     echo "Found " . count($definitions) . " autowirable definitions:\n";
     foreach ($definitions as $className => $definition) {
+        echo colorize("- $className", 'green') . "\n";
+    }
+}
+
+// Test HooksInterface implementers
+echo "\n" . colorize("=== HooksInterface Implementers ===\n", 'blue');
+$hooksImplementers = $scanner->getInterfaceImplementerClassNames(
+    \AstraChild\Contracts\HooksInterface::class
+);
+
+if (empty($hooksImplementers)) {
+    echo colorize("No HooksInterface implementers found.\n", 'yellow');
+} else {
+    echo "Found " . count($hooksImplementers) . " classes implementing HooksInterface:\n";
+    foreach ($hooksImplementers as $className) {
         echo colorize("- $className", 'green') . "\n";
     }
 }

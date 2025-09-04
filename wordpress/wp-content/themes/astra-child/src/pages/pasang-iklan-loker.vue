@@ -1,22 +1,24 @@
 <template>
-    <Header :header="props.header" />
+    <Header :logo="props.logo" />
     <main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <header>
-            <h1 class="text-3xl md:text-4xl font-bold !mb-8 text-center">Pasang Iklan Lowongan Kerja</h1>
+            <h1 class="text-3xl md:text-4xl font-bold !mb-8 !text-gray-900 dark:!text-gray-100 text-center">Pasang Iklan Lowongan Kerja</h1>
         </header>
         <!-- Benefit Section -->
         <section
             class="rounded-xl border-2 border-blue-500 dark:border-blue-400 shadow-md p-4 sm:p-6 md:p-8 mb-12 bg-white dark:bg-gray-900"
             aria-labelledby="section-benefit">
-            <h2 id="section-benefit" class="text-2xl font-bold text-blue-600 dark:text-blue-400 mb-4 break-words">
+            <h2 id="section-benefit" class="text-2xl font-bold !text-blue-600 dark:!text-blue-400 mb-4 break-words">
                 Tingkatkan Peluang Mendapatkan Kandidat Terbaik
             </h2>
-            <p class="text-justify mb-4 text-gray-700 dark:text-gray-200 break-words">
+            <p class="text-justify mb-4 !text-gray-700 dark:!text-gray-200 break-words">
+            
                 Sebarkan informasi lowongan kerja Anda ke ribuan pencari kerja di Banjarmasin dan sekitarnya melalui
                 platform kami.
                 Dengan jangkauan luas dan fitur pencarian yang efektif, Anda dapat menemukan kandidat yang tepat dengan
                 cepat.
             </p>
+            
             <div class="flex flex-row items-center gap-3 mt-6 p-4 bg-blue-200 dark:bg-blue-900/40 rounded-lg border border-blue-300 dark:border-blue-700 break-words"
                 role="note">
                 <i class="fas fa-lightbulb text-yellow-500 dark:text-yellow-300 text-xl mt-1" aria-hidden="true"></i>
@@ -26,7 +28,6 @@
                 </span>
             </div>
         </section>
-
         <!-- Cara Memasang Section -->
         <section
             class="rounded-xl border-2 border-blue-500 dark:border-blue-400 shadow-md p-4 sm:p-6 md:p-8 mb-12 bg-white dark:bg-gray-900"
@@ -39,22 +40,23 @@
                 <div class="hidden md:block absolute left-1/2 top-4 bottom-4 w-[2px] bg-gradient-to-b from-blue-300 via-blue-500 to-blue-300 transform -translate-x-1/2"
                     aria-hidden="true"></div>
                 <div class="grid grid-cols-1 md:grid-cols-2 md:gap-12 gap-8 pt-4">
-                    <div class="md:pr-6">
-                        <h3 class="text-xl font-semibold text-blue-600 dark:text-blue-400 mb-3 break-words">Hubungi Kami
+                    <div class="md:pr-5">
+                        <h3 class="text-xl font-semibold !text-blue-600 dark:!text-blue-400 mb-3 break-words">Hubungi Kami
                         </h3>
-                        <p class="mb-4 text-gray-700 dark:text-gray-200 break-words">Silakan hubungi admin kami melalui:
+                        <p class="!mb-2 text-gray-700 dark:text-gray-200 break-words">Silakan hubungi admin kami
+                            melalui:
                         </p>
                         <ul class="space-y-4">
                             <li class="flex items-center">
                                 <span
                                     class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 dark:from-purple-700 dark:via-pink-600 dark:to-orange-500 mr-4 shadow-sm">
-                                    <i class="fab fa-instagram text-xl text-white" aria-hidden="true"></i>
+                                    <i class="fa-brands fa-instagram text-xl text-white" aria-hidden="true"></i>
                                 </span>
                                 <div class="min-w-0 break-words">
                                     <span
-                                        class="font-medium block text-gray-800 dark:text-gray-100 break-words">Instagram:</span>
+                                        class="font-medium block !text-gray-800 dark:!text-gray-100 break-words">Instagram:</span>
                                     <a href="https://instagram.com/loker_banjarmasin" target="_blank" rel="noopener"
-                                        class="text-blue-600 dark:text-blue-400 font-medium hover:underline break-words">
+                                        class="!text-blue-600 dark:!text-blue-400 font-medium hover:underline break-words">
                                         @loker_banjarmasin
                                     </a>
                                 </div>
@@ -62,13 +64,13 @@
                             <li class="flex items-center">
                                 <span
                                     class="flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full bg-[#25D366] dark:bg-[#128C7E] mr-4 shadow-sm">
-                                    <i class="fab fa-whatsapp text-xl text-white" aria-hidden="true"></i>
+                                    <i class="fa-brands fa-whatsapp text-xl text-white" aria-hidden="true"></i>
                                 </span>
                                 <div class="min-w-0 break-words">
                                     <span
-                                        class="font-medium block text-gray-800 dark:text-gray-100 break-words">WhatsApp:</span>
+                                           class="font-medium block !text-gray-800 dark:!text-gray-100 break-words">WhatsApp:</span>
                                     <a href="https://wa.me/6283862447271" target="_blank" rel="noopener"
-                                        class="text-blue-600 dark:text-blue-400 font-medium hover:underline break-words">
+                                           class="!text-blue-600 dark:!text-blue-400 font-medium hover:underline break-words">
                                         +62 838-6244-7271
                                     </a>
                                 </div>
@@ -80,9 +82,9 @@
                                 </span>
                                 <div class="min-w-0 break-words">
                                     <span
-                                        class="font-medium block text-gray-800 dark:text-gray-100 text-wrap break-words">Email:</span>
+                                           class="font-medium block !text-gray-800 dark:!text-gray-100 text-wrap break-words">Email:</span>
                                     <a href="mailto:muhammadindra003@gmail.com"
-                                        class="text-blue-600 dark:text-blue-400 font-medium hover:underline break-words">
+                                           class="!text-blue-600 dark:!text-blue-400 font-medium hover:underline break-words">
                                         muhammadindra003@gmail.com
                                     </a>
                                 </div>
@@ -92,7 +94,7 @@
                     <aside class="p-6 md:pl-8 bg-blue-50 dark:bg-blue-900/30 rounded-xl"
                         aria-labelledby="info-dibutuhkan">
                         <h3 id="info-dibutuhkan"
-                            class="flex flex-row items-center justify-center text-lg font-semibold mb-3 text-blue-700 dark:text-blue-300 break-words">
+                            class="flex flex-row items-center justify-center text-lg font-semibold !mb-3 !text-blue-700 dark:!text-blue-300 break-words">
                             <i class="fas fa-info-circle text-blue-500 dark:text-blue-300 mr-4" aria-hidden="true"></i>
                             <span>Informasi yang Dibutuhkan:</span>
                         </h3>
@@ -100,27 +102,27 @@
                             <li class="flex items-start">
                                 <i class="fas fa-check-circle text-green-500 dark:text-green-400 mt-1 mr-2"
                                     aria-hidden="true"></i>
-                                <span class="text-gray-800 dark:text-gray-100 break-words">Nama perusahaan</span>
+                                    <span class="!text-gray-800 dark:!text-gray-100 break-words">Nama perusahaan</span>
                             </li>
                             <li class="flex items-start">
                                 <i class="fas fa-check-circle text-green-500 dark:text-green-400 mt-1 mr-2"
                                     aria-hidden="true"></i>
-                                <span class="text-gray-800 dark:text-gray-100 break-words">Posisi yang dibutuhkan</span>
+                                    <span class="!text-gray-800 dark:!text-gray-100 break-words">Posisi yang dibutuhkan</span>
                             </li>
                             <li class="flex items-start">
                                 <i class="fas fa-check-circle text-green-500 dark:text-green-400 mt-1 mr-2"
                                     aria-hidden="true"></i>
-                                <span class="text-gray-800 dark:text-gray-100 break-words">Persyaratan pekerjaan</span>
+                                    <span class="!text-gray-800 dark:!text-gray-100 break-words">Persyaratan pekerjaan</span>
                             </li>
                             <li class="flex items-start">
                                 <i class="fas fa-check-circle text-green-500 dark:text-green-400 mt-1 mr-2"
                                     aria-hidden="true"></i>
-                                <span class="text-gray-800 dark:text-gray-100 break-words">Lokasi kerja</span>
+                                    <span class="!text-gray-800 dark:!text-gray-100 break-words">Lokasi kerja</span>
                             </li>
                             <li class="flex items-start">
                                 <i class="fas fa-check-circle text-green-500 dark:text-green-400 mt-1 mr-2"
                                     aria-hidden="true"></i>
-                                <span class="text-gray-800 dark:text-gray-100 break-words">Kontak untuk lamaran</span>
+                                    <span class="!text-gray-800 dark:!text-gray-100 break-words">Kontak untuk lamaran</span>
                             </li>
                         </ul>
                     </aside>
@@ -155,7 +157,7 @@
             <h2 id="section-syarat" class="text-2xl font-bold mb-4 text-gray-900 dark:text-gray-100 break-words">Syarat
                 &amp; Ketentuan</h2>
             <div class="space-y-4">
-                <p class="text-gray-700 dark:text-gray-200 break-words">
+                <p class="text-gray-700 dark:text-gray-200 break-words !mb-2">
                     Dengan memasang iklan lowongan kerja di platform kami, Anda menyetujui ketentuan berikut:
                 </p>
                 <ol class="list-decimal pl-5 space-y-2 text-gray-700 dark:text-gray-200 break-words">
@@ -176,7 +178,6 @@
 import { defineAsyncComponent } from 'vue';
 import Header from '@/layouts/Header.vue';
 import Footer from '@/layouts/Footer.vue';
-import type { LayoutProps } from '@/types';
-const props = defineProps<LayoutProps>();
+const props = defineProps<{ logo: string }>();
 const FloatingActionButton = defineAsyncComponent(() => import('@/components/Shared/FloatingActionButton.vue'));
 </script>

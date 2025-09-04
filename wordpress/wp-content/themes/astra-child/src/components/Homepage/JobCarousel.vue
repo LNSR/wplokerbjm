@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
-import type { Job } from '@/types/Job'
+import type { Job, CarouselProps } from '@/types'
 import { useJobCarousel } from '@/composables/useCarousel'
-import { type CarouselProps } from '@/types'
 
 const props = defineProps<CarouselProps>()
 
@@ -34,14 +33,14 @@ useJobCarousel({
         </button>
       </div>
     </div>
-    <div v-if="jobs.length" class="swiper job-carousel invisible" role="region" aria-label="Lowongan Darurat" aria-live="polite">
+    <div v-if="jobs.length" class="swiper job-carousel invisible" role="region" aria-label="Lowongan Darurat">
       <div class="swiper-wrapper">
         <!-- Virtual slides will be dynamically created by Swiper -->
       </div>
       <div class="flex justify-center !mt-24">
-        <div class="swiper-pagination" aria-label="Navigasi halaman carousel" tabindex="0"></div>
+        <div class="swiper-pagination"></div>
       </div>
     </div>
-    <p v-else class="text-center text-gray-500" role="status">Belum ada lowongan darurat</p>
+    <p v-else class="text-center text-gray-500">Belum ada lowongan darurat</p>
   </section>
 </template>

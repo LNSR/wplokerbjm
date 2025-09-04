@@ -17,6 +17,7 @@
 5. 🖼️ **`src/`** - Directory containing Vue components and all client-side code that enhances the user interface.
 6. 📦 **`assets/`** - Directory for static assets like images, fonts, static site generation, and compiled CSS/JS files.
 7. 🛠️ **`tools/`** - Directory for development and build tools.
+8. 🧪 **`debug/`** - Directory for debug scripts and utilities.
 
 ## 🔌 Must-Use Plugin (MU Plugin)
 
@@ -93,12 +94,6 @@ inc/
 │       ├── Repositories.php   # Interface bindings
 │       ├── Factories.php      # Factory definitions
 │       └── UnsolvableWiring.php # Complex definitions (not used often)
-├── Components/
-├── Controllers/
-├── Factories/
-├── Models/
-├── Repositories/
-├── Services/
 └── ... (other directories)
 ```
 
@@ -115,7 +110,7 @@ class JobService
         private JobRepository $jobRepo,
         private TaxonomyService $taxService
     ) {}
-    
+
     // ... methods
 }
 ```

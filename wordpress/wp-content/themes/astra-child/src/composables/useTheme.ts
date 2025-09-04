@@ -1,7 +1,12 @@
 import { onMounted, onUnmounted, watch, ref, type Ref } from 'vue'
 import { debounce } from '@/utils/debounce'
 
-let mediaQuery: MediaQueryList | null = null
+type MediaQueryListWithLegacy = MediaQueryList & {
+  addListener?: (listener: (e: MediaQueryListEvent) => void) => void;
+  removeListener?: (listener: (e: MediaQueryListEvent) => void) => void;
+};
+
+let mediaQuery: MediaQueryListWithLegacy | null = null
 
 interface ThemeState {
   isDark: Ref<boolean>
@@ -20,7 +25,7 @@ function prefersReducedMotion(): boolean {
   }
 }
 
-function setThemeDirect(dark: boolean) {
+function setThemeDirect(dark: boolean): void {
   const newTheme = dark ? 'dark' : 'light'
   if (themeState.currentTheme.value === newTheme) return
   themeState.currentTheme.value = newTheme
@@ -51,7 +56,7 @@ function setThemeDirect(dark: boolean) {
 
 const debouncedSetTheme = debounce(setThemeDirect, 10)
 
-function handleSystemThemeChange(e: MediaQueryListEvent | MediaQueryList) {
+function handleSystemThemeChange(e: MediaQueryListEvent | MediaQueryList): void {
   let hasStored = false
   try {
     hasStored = !!localStorage.getItem('astra-theme')
@@ -65,8 +70,11 @@ function handleSystemThemeChange(e: MediaQueryListEvent | MediaQueryList) {
   }
 }
 
-export function useTheme() {
-  function init() {
+export function useTheme(): {
+  isDark: Ref<boolean>;
+  setTheme: (dark: boolean) => void;
+} {
+  function init(): void {
     let saved = ''
     try {
       saved = localStorage.getItem('astra-theme') || ''
@@ -74,7 +82,7 @@ export function useTheme() {
       saved = ''
     }
 
-    const systemPrefersDark = (() => {
+    const systemPrefersDark = ((): boolean => {
       try {
         return window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
       } catch {
@@ -95,8 +103,8 @@ export function useTheme() {
       if (mediaQuery) {
         if (typeof mediaQuery.addEventListener === 'function') {
           mediaQuery.addEventListener('change', handleSystemThemeChange as unknown as (e: MediaQueryListEvent) => void, { passive: true })
-        } else if (typeof (mediaQuery as any).addListener === 'function') {
-          ; (mediaQuery as any).addListener(handleSystemThemeChange)
+        } else if (typeof mediaQuery.addListener === 'function') {
+          mediaQuery.addListener!(handleSystemThemeChange)
         }
       }
     } catch {
@@ -107,13 +115,13 @@ export function useTheme() {
     watch(() => themeState.isDark.value, (v) => debouncedSetTheme(v))
   }
 
-  function teardown() {
+  function teardown(): void {
     if (!mediaQuery) return
     try {
       if (typeof mediaQuery.removeEventListener === 'function') {
         mediaQuery.removeEventListener('change', handleSystemThemeChange as unknown as (e: MediaQueryListEvent) => void)
-      } else if (typeof (mediaQuery as any).removeListener === 'function') {
-        ; (mediaQuery as any).removeListener(handleSystemThemeChange)
+      } else if (typeof mediaQuery.removeListener === 'function') {
+        mediaQuery.removeListener!(handleSystemThemeChange)
       }
     } catch {
       // ignore
@@ -125,7 +133,7 @@ export function useTheme() {
 
   return {
     isDark: themeState.isDark,
-    setTheme: (dark: boolean) => {
+    setTheme: (dark: boolean): void => {
       themeState.isDark.value = dark
       debouncedSetTheme(dark)
     }

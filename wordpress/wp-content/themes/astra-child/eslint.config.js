@@ -3,11 +3,22 @@ import vue from 'eslint-plugin-vue';
 import typescript from '@typescript-eslint/eslint-plugin';
 import typescriptParser from '@typescript-eslint/parser';
 import vueParser from 'vue-eslint-parser';
+import importPlugin from 'eslint-plugin-import';
 import globals from "globals";
 
 export default [
   js.configs.recommended,
+  importPlugin.flatConfigs.recommended,
+  importPlugin.flatConfigs.typescript,
   {
+    settings: {
+      'import/resolver': {
+        typescript: {
+          project: './tsconfig.app.json',
+          extensions: ['.ts', '.tsx', '.vue', '.css'],
+        },
+      },
+    },
     files: ['**/*.ts', '**/*.tsx'],
     languageOptions: {
       parser: typescriptParser,
@@ -29,9 +40,20 @@ export default [
     rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['warn'],
+      '@typescript-eslint/explicit-function-return-type': 'warn',
+      '@typescript-eslint/no-explicit-any': 'warn',
+      '@typescript-eslint/prefer-readonly': 'warn',
+      'import/no-unresolved': ['error', { ignore: ['\\.css$'] }],
     },
   },
   {
+    settings: {
+      'import/resolver': {
+        typescript: {
+          project: './tsconfig.node.json',
+        },
+      },
+    },
     files: ['tools/**/*.ts'],
     languageOptions: {
       parser: typescriptParser,
@@ -56,6 +78,14 @@ export default [
     },
   },
   {
+    settings: {
+      'import/resolver': {
+        typescript: {
+          project: './tsconfig.app.json',
+          extensions: ['.ts', '.tsx', '.vue', '.css'],
+        },
+      },
+    },
     files: ['**/*.vue'],
     languageOptions: {
       parser: vueParser,
@@ -77,9 +107,11 @@ export default [
     rules: {
       'no-unused-vars': 'off',
       '@typescript-eslint/no-unused-vars': ['warn'],
+      '@typescript-eslint/no-explicit-any': 'warn',
       // Basic Vue rules
       'vue/no-unused-vars': 'warn',
       'vue/no-undef': 'off',
+      'vue/require-explicit-emits': 'warn',
     },
   },
   {

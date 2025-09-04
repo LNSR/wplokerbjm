@@ -1,6 +1,13 @@
-import { computed } from "vue";
+import { computed, type ComputedRef } from "vue";
 
-export function useFilter(searchStore: any, taxonomyStore: any) {
+export function useFilter(searchStore: ReturnType<
+  typeof import("@/stores").useSearchStore>,
+  taxonomyStore: ReturnType<typeof import("@/stores").useTaxonomyStore>): ComputedRef<{
+    key: "lokasi" | "gender" | "pendidikan";
+    label: string;
+    values: string[];
+    names: string[];
+  }[]> {
   return computed(() => {
     const SEMUA_VALUE = "";
     const filters: {
@@ -61,7 +68,9 @@ export function useFilter(searchStore: any, taxonomyStore: any) {
   });
 }
 
-export function removeFilter(searchStore: any, key: string, value: string) {
+export function removeFilter(searchStore: ReturnType<
+  typeof import("@/stores").useSearchStore>,
+  key: "lokasi" | "gender" | "pendidikan", value: string): void {
   const arr = Array.isArray(searchStore.filters[key])
     ? [...(searchStore.filters[key] as string[])]
     : [];

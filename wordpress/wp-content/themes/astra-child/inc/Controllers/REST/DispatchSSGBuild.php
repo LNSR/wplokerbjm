@@ -2,6 +2,7 @@
 
 namespace AstraChild\Controllers\REST;
 
+use AstraChild\Services\Utilities\SSG\URLFilterService;
 use AstraChild\Core\Cache;
 
 /**
@@ -10,8 +11,7 @@ use AstraChild\Core\Cache;
 class DispatchSSGBuild
 {
     public function __construct(
-        private \AstraChild\Services\PostsManagement\SSG\TriggerBuild $triggerBuild,
-        private \AstraChild\Services\Utilities\SSG\URLFilterService $urlFilterService
+        private \AstraChild\Services\PostsManagement\SSG\TriggerBuild $triggerBuild
     ) {
     }
 
@@ -77,7 +77,7 @@ class DispatchSSGBuild
             }
 
             // Filter out unwanted URLs (e.g., od_url_metrics post type)
-            $filteredPaths = $this->urlFilterService->filterPaths($paths, 'SSG API');
+            $filteredPaths = URLFilterService::filterPaths($paths, 'SSG API');
 
             // Check if all paths were filtered out
             if (empty($filteredPaths)) {

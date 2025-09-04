@@ -2,8 +2,6 @@
 
 namespace AstraChild\Services\REST;
 
-use AstraChild\Core\Cache;
-
 class RESTData
 {
     public function __construct(
@@ -14,13 +12,6 @@ class RESTData
     public function getCardData(int $post_id): array
     {
         try {
-            $cacheKey = 'card_data_' . $post_id;
-
-            $cached = Cache::get($cacheKey);
-            if ($cached !== false) {
-                return $cached;
-            }
-
             $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
 
             $data = [
@@ -46,8 +37,6 @@ class RESTData
                 'post_time' => get_post_time('c', false, $post_id),
             ];
 
-            Cache::set($cacheKey, $data, 86400); // Cache for 24 hours
-
             return $data;
         } catch (\Exception $e) {
             error_log('RESTData::getCardData error for post ' . $post_id . ': ' . $e->getMessage());
@@ -58,13 +47,6 @@ class RESTData
     public function getSingleOverlayData(int $post_id): array
     {
         try {
-            $cacheKey = 'single_overlay_data_' . $post_id;
-
-            $cached = Cache::get($cacheKey);
-            if ($cached !== false) {
-                return $cached;
-            }
-
             $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
 
             $data = [
@@ -101,8 +83,6 @@ class RESTData
             if (is_user_logged_in()) {
                 $data['id'] = $post_id;
             }
-
-            Cache::set($cacheKey, $data, 86400); // Cache for 24 hours
 
             return $data;
         } catch (\Exception $e) {

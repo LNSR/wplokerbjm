@@ -1,45 +1,19 @@
 {
   "servers": {
     "playwright": {
-      "command": "docker",
+      "command": "bunx",
       "args": [
-        "run",
-        "-i",
-        "--rm",
-        "--network",
-        "host",
-        "-v",
-        "${workspaceFolder}/mcp/playwright:${workspaceFolder}",
-        "mcp/playwright",
-        "--ignore-https-errors"
+        "-y",
+        "@playwright/mcp@latest",
+        "--ignore-https-errors",
+        "--browser=chrome-beta",
+        "--isolated"
       ],
       "type": "stdio"
-    },
-    "github": {
-      "type": "stdio",
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "--env-file",
-        "${workspaceFolder}/.env",
-        "-v",
-        "${workspaceFolder}/mcp/github:${workspaceFolder}",
-        "ghcr.io/github/github-mcp-server"
-      ]
     },
     "sequentialthinking": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-v",
-        "${workspaceFolder}/mcp/sequentialthinking:${workspaceFolder}",
-        "mcp/sequentialthinking"
-      ],
-      "type": "stdio"
+      "type": "http",
+      "url": "https://remote.mcpservers.org/sequentialthinking/mcp"
     },
     "context7": {
       "type": "http",
@@ -49,17 +23,9 @@
       }
     },
     "memory": {
-      "command": "docker",
-      "args": [
-        "run",
-        "-i",
-        "--rm",
-        "--env-file",
-        "${workspaceFolder}/.env",
-        "-v",
-        "${workspaceFolder}/mcp/memory:${workspaceFolder}",
-        "mcp/memory"
-      ]
+      "command": "bunx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "type": "stdio"
     },
     "redis": {
       "command": "docker",
