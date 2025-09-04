@@ -261,6 +261,8 @@ class LiteSpeedIntegration
         if ($contentLength > 0) {
             header('Content-Length: ' . (int) $contentLength);
         }
+        header('Cache-Control: public, max-age=120'); // 2 minutes
+        header('Vary: Accept-Encoding');
 
         // Log coordination so operators know we're intentionally deferring caching
         // decisions to the server layer; include post id and bot flag for context.

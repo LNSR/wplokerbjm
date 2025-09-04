@@ -3,6 +3,7 @@
 namespace AstraChild\Components;
 use AstraChild\Repositories\JobRepository;
 use AstraChild\Services\Job\JobServices;
+use AstraChild\Core\Cache;
 
 class JobGrid
 {
@@ -37,6 +38,12 @@ class JobGrid
 
     public function getProps(array $query_args, string $title, string $context = 'latest', int $total_jobs = 0): array
     {
+        $cache_key = 'component_job_grid_' . md5(serialize($query_args) . $title . $context . $total_jobs);
+        $cached = Cache::get($cache_key);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         $result = $this->jobRepository->queryCard($query_args);
 
         $jobs = $result['jobs'] ?? [];
@@ -51,7 +58,10 @@ class JobGrid
             };
         }
 
-        return $this->getVueProps($jobs, $jobs_query, $context, $title, $total_jobs);
+        $props = $this->getVueProps($jobs, $jobs_query, $context, $title, $total_jobs);
+
+        Cache::set($cache_key, $props, 86400); // Cache for 1 day
+        return $props;
     }
 
     public function getSchemaCard(array $query_args): array

@@ -61,7 +61,7 @@ This repository contains the source code and configuration for **WPLokerBJM**, w
 
 The backend code is organized as follows:
 
-```
+```sh
 inc/
 ├── Components/                # PHP UI components (migrated to CSR frontend, provide only initial data)
 ├── Contracts/                 # Interfaces for data providers and hooks
@@ -113,7 +113,7 @@ inc/
 
 ## 🎨 Frontend Structure
 
-```
+```sh
 src/
 ├── api                        # REST API logic
 │   ├── endpoints              # API endpoint logic

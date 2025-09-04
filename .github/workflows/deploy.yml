@@ -18,8 +18,8 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     env:
-      RCLONE_TRANSFERS: "3"
-      RCLONE_CHECKERS: "6"
+      RCLONE_TRANSFERS: "4"
+      RCLONE_CHECKERS: "4"
       RCLONE_RETRIES: "3"
       RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"

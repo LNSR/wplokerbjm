@@ -12,8 +12,12 @@ class JQuery
             if ($wp_scripts instanceof \WP_Scripts) {
                 foreach ($wp_scripts->registered as $handle => $script) {
                     if (strpos($handle, 'jquery') === 0) {
-                        wp_dequeue_script($handle);
-                        wp_deregister_script($handle);
+                        try {
+                            wp_dequeue_script($handle);
+                            wp_deregister_script($handle);
+                        } catch (\Exception $e) {
+                            error_log('JQuery::disableJquery error for handle ' . $handle . ': ' . $e->getMessage());
+                        }
                     }
                 }
             }

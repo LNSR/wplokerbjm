@@ -17,12 +17,6 @@ class BotRangeFetcher
     private static array $knownBotRanges = [];
 
     /**
-     * Cache key for storing parsed bot ranges
-     */
-    private const BOT_RANGES_CACHE_KEY = 'ssg_bot_ip_ranges';
-    private const BOT_RANGES_CACHE_TTL = 86400; // 24 hours
-
-    /**
      * Get bot IP ranges from cache or fetch from official sources
      */
     public function getBotRanges(): array
@@ -31,8 +25,10 @@ class BotRangeFetcher
             return self::$knownBotRanges;
         }
 
+        $cacheKey = 'ssg_bot_ip_ranges';
+
         // Try to get from cache first
-        $cached = ObjectCache::get(self::BOT_RANGES_CACHE_KEY);
+        $cached = ObjectCache::get($cacheKey);
         if ($cached !== false && is_array($cached)) {
             self::$knownBotRanges = $cached;
             return $cached;
@@ -42,7 +38,7 @@ class BotRangeFetcher
         $ranges = $this->fetchBotRanges();
 
         // Cache the results
-        ObjectCache::set(self::BOT_RANGES_CACHE_KEY, $ranges, self::BOT_RANGES_CACHE_TTL);
+        ObjectCache::set($cacheKey, $ranges, expiration: 86400);
 
         self::$knownBotRanges = $ranges;
         return $ranges;
@@ -143,6 +139,10 @@ class BotRangeFetcher
         // QUIC.cloud ranges
         $quicCloudRanges = $this->fetchQuicCloudRanges();
         $ranges = array_merge($ranges, $quicCloudRanges);
+
+        // Rank Math bot ranges
+        $rankMathRanges = $this->fetchRankMathBotRanges();
+        $ranges = array_merge($ranges, $rankMathRanges);
 
         return array_unique($ranges);
     }
@@ -496,6 +496,23 @@ class BotRangeFetcher
         } catch (\Exception $e) {
             error_log('Failed to fetch QUIC.cloud ranges: ' . $e->getMessage());
         }
+        return $ranges;
+    }
+
+    /**
+     * Fetch Rank Math bot IP ranges
+     * Rank Math uses specific IP addresses for their SEO analysis bot
+     */
+    private function fetchRankMathBotRanges(): array
+    {
+        $ranges = [];
+
+        // Rank Math's documented IP addresses (converted to /32 CIDR)
+        $ranges[] = '172.66.40.202/32';
+        $ranges[] = '172.66.43.54/32';
+        $ranges[] = '193.138.6.5/32';
+        $ranges[] = '204.48.29.92/32';
+
         return $ranges;
     }
 

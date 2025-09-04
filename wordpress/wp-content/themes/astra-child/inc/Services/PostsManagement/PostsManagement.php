@@ -13,33 +13,57 @@ class PostsManagement
 
     public function deleteOldJobs(): void
     {
-        $old_jobs = get_posts(JobQuery::oldJobsArgs());
-        foreach ($old_jobs as $job) {
-            $post_id = is_object($job) ? $job->ID : (int) $job;
+        try {
+            $old_jobs = get_posts(JobQuery::oldJobsArgs());
+            foreach ($old_jobs as $job) {
+                $post_id = is_object($job) ? $job->ID : (int) $job;
 
-            $attachments = get_posts(AttachmentQuery::byParentArgs($post_id, true));
-            foreach ($attachments as $att_id) {
-                wp_delete_attachment($att_id, false);
+                try {
+                    $attachments = get_posts(AttachmentQuery::byParentArgs($post_id, true));
+                    foreach ($attachments as $att_id) {
+                        wp_delete_attachment($att_id, false);
+                    }
+                } catch (\Exception $e) {
+                    error_log('PostsManagement::deleteOldJobs error deleting attachments for post ' . $post_id . ': ' . $e->getMessage());
+                }
+
+                try {
+                    $comments = get_comments(['post_id' => $post_id, 'status' => 'all']);
+                    foreach ($comments as $comment) {
+                        wp_delete_comment($comment->comment_ID, false);
+                    }
+                } catch (\Exception $e) {
+                    error_log('PostsManagement::deleteOldJobs error deleting comments for post ' . $post_id . ': ' . $e->getMessage());
+                }
+
+                try {
+                    wp_delete_post($post_id, false);
+                } catch (\Exception $e) {
+                    error_log('PostsManagement::deleteOldJobs error deleting post ' . $post_id . ': ' . $e->getMessage());
+                }
             }
-
-            $comments = get_comments(['post_id' => $post_id, 'status' => 'all']);
-            foreach ($comments as $comment) {
-                wp_delete_comment($comment->comment_ID, false);
-            }
-
-            wp_delete_post($post_id, false);
+        } catch (\Exception $e) {
+            error_log('PostsManagement::deleteOldJobs error: ' . $e->getMessage());
         }
     }
 
     public function updateAllJobStatuses(): void
     {
-        $job_ids = get_posts(JobQuery::allJobsIdsArgs());
-        foreach ($job_ids as $post_id) {
-            $deadline = get_post_meta($post_id, 'deadline', true);
-            $status = (int) get_post_meta($post_id, 'status_pekerjaan', true);
-            if ($deadline) {
-                $this->updateJobStatusIfExpired($post_id, $deadline, $status);
+        try {
+            $job_ids = get_posts(JobQuery::allJobsIdsArgs());
+            foreach ($job_ids as $post_id) {
+                try {
+                    $deadline = get_post_meta($post_id, 'deadline', true);
+                    $status = (int) get_post_meta($post_id, 'status_pekerjaan', true);
+                    if ($deadline) {
+                        $this->updateJobStatusIfExpired($post_id, $deadline, $status);
+                    }
+                } catch (\Exception $e) {
+                    error_log('PostsManagement::updateAllJobStatuses error for post ' . $post_id . ': ' . $e->getMessage());
+                }
             }
+        } catch (\Exception $e) {
+            error_log('PostsManagement::updateAllJobStatuses error: ' . $e->getMessage());
         }
     }
 
@@ -52,10 +76,14 @@ class PostsManagement
      */
     public function updateJobStatusIfExpired(int $post_id, string $deadline, int $current_status): void
     {
-        $deadline_ts = strtotime($deadline . ' 23:59:59');
-        $now = time();
-        if ($now > $deadline_ts && $current_status !== 0) {
-            update_post_meta($post_id, 'status_pekerjaan', 0);
+        try {
+            $deadline_ts = strtotime($deadline . ' 23:59:59');
+            $now = time();
+            if ($now > $deadline_ts && $current_status !== 0) {
+                update_post_meta($post_id, 'status_pekerjaan', 0);
+            }
+        } catch (\Exception $e) {
+            error_log('PostsManagement::updateJobStatusIfExpired error for post ' . $post_id . ': ' . $e->getMessage());
         }
     }
 }

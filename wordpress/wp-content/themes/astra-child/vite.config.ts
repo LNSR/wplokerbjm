@@ -80,7 +80,7 @@ export default defineConfig(({ command }) => ({
           }
           return "assets/[name]-[hash][extname]";
         },
-        // ! Must split inversify.config.ts because MOUNT runtime in production causing timing issues
+        // ! Must split inversify.config.ts because container runtime initialization in production causing timing issues
         manualChunks(id) {
           if (id.includes("inversify.config.ts")) {
             return "vendor";

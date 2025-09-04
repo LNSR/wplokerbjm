@@ -2,8 +2,8 @@ name: Clean Noisy Workflows
 
 on:
   schedule:
-    # Run every day at 2 AM UTC to clean up old workflow runs
-    - cron: "0 2 * * *"
+    # Run every day at 1 AM Makassar time (17:00 UTC, since Makassar is UTC+8)
+    - cron: "0 17 * * *"
   workflow_dispatch:
     inputs:
       days_to_keep:

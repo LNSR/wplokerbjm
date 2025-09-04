@@ -10,81 +10,105 @@ class TaxonomyDepth {
     }
 
     public function handle(\WP_REST_Request $request) {
-        $cacheKey = 'taxonomy_depth_all';
+        try {
+            $cacheKey = 'taxonomy_depth_all_api_';
 
-        $cached = Cache::get($cacheKey);
-        if ($cached !== false) {
-            return rest_ensure_response($cached);
+            $cached = Cache::get($cacheKey);
+            if ($cached !== false) {
+                return rest_ensure_response($cached);
+            }
+
+            $terms = $this->repository->getTaxonomyTerms();
+
+            $response = [
+                'lokasiTerms' => $this->service->buildTermsTree($terms['lokasi_terms']),
+                'genderTerms' => array_values(array_map(fn($term) => [
+                    'slug' => $term->slug,
+                    'name' => $term->name
+                ], $terms['gender_terms'])),
+                'pendidikanTerms' => $this->service->buildTermsTree($terms['pendidikan_terms']),
+            ];
+
+            // Cache for 24 hours
+            Cache::set($cacheKey, $response, 86400);
+
+            return rest_ensure_response($response);
+        } catch (\Exception $e) {
+            error_log('TaxonomyDepth::handle error: ' . $e->getMessage());
+            return rest_ensure_response([
+                'lokasiTerms' => [],
+                'genderTerms' => [],
+                'pendidikanTerms' => []
+            ]);
         }
-
-        $terms = $this->repository->getTaxonomyTerms();
-
-        $response = [
-            'lokasiTerms' => $this->service->buildTermsTree($terms['lokasi_terms']),
-            'genderTerms' => array_values(array_map(fn($term) => [
-                'slug' => $term->slug,
-                'name' => $term->name
-            ], $terms['gender_terms'])),
-            'pendidikanTerms' => $this->service->buildTermsTree($terms['pendidikan_terms']),
-        ];
-
-        // Cache for 24 hours
-        Cache::set($cacheKey, $response, 86400);
-
-        return rest_ensure_response($response);
     }
 
     public function lokasi(\WP_REST_Request $request) {
-        $cacheKey = 'taxonomy_depth_lokasi';
+        try {
+            $cacheKey = 'taxonomy_depth_api_lokasi';
 
-        $cached = Cache::get($cacheKey);
-        if ($cached !== false) {
-            return rest_ensure_response($cached);
+            $cached = Cache::get($cacheKey);
+            if ($cached !== false) {
+                return rest_ensure_response($cached);
+            }
+
+            $terms = $this->repository->getTaxonomyTerms();
+            $response = $this->service->buildTermsTree($terms['lokasi_terms']);
+
+            // Cache for 24 hours
+            Cache::set($cacheKey, $response, 86400);
+
+            return rest_ensure_response($response);
+        } catch (\Exception $e) {
+            error_log('TaxonomyDepth::lokasi error: ' . $e->getMessage());
+            return rest_ensure_response([]);
         }
-
-        $terms = $this->repository->getTaxonomyTerms();
-        $response = $this->service->buildTermsTree($terms['lokasi_terms']);
-
-        // Cache for 24 hours
-        Cache::set($cacheKey, $response, 86400);
-
-        return rest_ensure_response($response);
     }
 
     public function gender(\WP_REST_Request $request) {
-        $cacheKey = 'taxonomy_depth_gender';
+        try {
+            $cacheKey = 'taxonomy_depth_api_gender';
 
-        $cached = Cache::get($cacheKey);
-        if ($cached !== false) {
-            return rest_ensure_response($cached);
+            $cached = Cache::get($cacheKey);
+            if ($cached !== false) {
+                return rest_ensure_response($cached);
+            }
+
+            $terms = $this->repository->getTaxonomyTerms();
+            $response = array_values(array_map(fn($term) => [
+                'slug' => $term->slug,
+                'name' => $term->name
+            ], $terms['gender_terms']));
+
+            // Cache for 24 hours
+            Cache::set($cacheKey, $response, 86400);
+
+            return rest_ensure_response($response);
+        } catch (\Exception $e) {
+            error_log('TaxonomyDepth::gender error: ' . $e->getMessage());
+            return rest_ensure_response([]);
         }
-
-        $terms = $this->repository->getTaxonomyTerms();
-        $response = array_values(array_map(fn($term) => [
-            'slug' => $term->slug,
-            'name' => $term->name
-        ], $terms['gender_terms']));
-
-        // Cache for 24 hours
-        Cache::set($cacheKey, $response, 86400);
-
-        return rest_ensure_response($response);
     }
 
     public function pendidikan(\WP_REST_Request $request) {
-        $cacheKey = 'taxonomy_depth_pendidikan';
+        try {
+            $cacheKey = 'taxonomy_depth_api_pendidikan';
 
-        $cached = Cache::get($cacheKey);
-        if ($cached !== false) {
-            return rest_ensure_response($cached);
+            $cached = Cache::get($cacheKey);
+            if ($cached !== false) {
+                return rest_ensure_response($cached);
+            }
+
+            $terms = $this->repository->getTaxonomyTerms();
+            $response = $this->service->buildTermsTree($terms['pendidikan_terms']);
+
+            // Cache for 24 hours
+            Cache::set($cacheKey, $response, 86400);
+
+            return rest_ensure_response($response);
+        } catch (\Exception $e) {
+            error_log('TaxonomyDepth::pendidikan error: ' . $e->getMessage());
+            return rest_ensure_response([]);
         }
-
-        $terms = $this->repository->getTaxonomyTerms();
-        $response = $this->service->buildTermsTree($terms['pendidikan_terms']);
-
-        // Cache for 24 hours
-        Cache::set($cacheKey, $response, 86400);
-
-        return rest_ensure_response($response);
     }
 }

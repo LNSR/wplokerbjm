@@ -21,8 +21,6 @@ class Litespeed
         // Flush object cache to clear cached transients
         ObjectCache::flush();
 
-        error_log('Litespeed: Cleared compiled container and all transients with prefix: ' . Cache::TRANSIENT_PREFIX . '. Flushed object cache for cached transients.');
-
     }
 
     /**

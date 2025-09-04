@@ -4,7 +4,7 @@
     <section v-if="job.title" class="top-0 backdrop-blur text-center">
       <h1 class="text-3xl !font-bold">{{ job.title }}</h1>
       <div v-if="job.post_time" class="text-sm mt-2 flex items-center justify-center gap-2 font-semibold text-center">
-        <i class="fas fa-clock text-blue-500"></i>
+        <i class="fas fa-clock text-blue-500 inline-block static"></i>
         <span>Diupdate {{ computedTimeAgo }}</span>
       </div>
     </section>
@@ -14,7 +14,7 @@
     <!-- Nama Perusahaan -->
     <section v-if="job.namaPerusahaan">
       <h2 class="text-2xl flex items-center gap-2 !mb-4">
-        <i class="fas fa-user-tie text-blue-500"></i>
+        <i class="fas fa-user-tie text-blue-500 inline-block static"></i>
         <span class="!font-bold">{{ job.namaPerusahaan }}</span>
       </h2>
       <div class="divider"></div>
@@ -23,7 +23,7 @@
     <!-- Tentang Perusahaan -->
     <section v-if="job.tentangPerusahaan">
       <h2 class="text-xl flex items-center gap-2 !mb-4">
-        <i class="fas fa-map-marker-alt text-blue-600"></i>
+        <i class="fas fa-map-marker-alt text-blue-600 inline-block static"></i>
         <span class="font-bold">Tentang Perusahaan</span>
       </h2>
       <Viewer v-html="job.tentangPerusahaan" @click="onWysiwygImgClick" />
@@ -39,7 +39,7 @@
       <div class="gap-4 mt-4">
         <div class="gap-x-6 gap-y-4 text-lg">
           <div v-for="row in ringkasanPekerjaan" :key="row.label" class="flex items-start lg:space-x-2 space-x-1 mb-2">
-            <i :class="`fas ${row.icon} text-blue-600 w-3 text-justify pt-2`"></i>
+            <i :class="`fas ${row.icon} text-blue-600 w-3 text-justify pt-2 inline-block static`"></i>
             <span class="ml-3 !font-semibold whitespace-nowrap min-w-[120px]">{{ row.label }}</span>
             <span :class="[getLabelClass(row.label), '!font-semibold']">:</span>
             <span class="!font-semibold" v-html="row.value"></span>
@@ -52,7 +52,7 @@
     <!-- Deskripsi Pekerjaan -->
     <section v-if="job.deskripsiPekerjaan">
       <h2 class="text-xl flex items-center gap-2 !mb-4">
-        <i class="fas fa-info-circle text-blue-600"></i>
+        <i class="fas fa-info-circle text-blue-600 inline-block static"></i>
         <span class="font-bold">Deskripsi Pekerjaan</span>
       </h2>
       <Viewer v-html="job.deskripsiPekerjaan" @click="onWysiwygImgClick" />
@@ -62,7 +62,7 @@
     <!-- Persyaratan -->
     <section v-if="job.persyaratan">
       <h2 class="text-xl flex items-center gap-2 !mb-4">
-        <i class="fas fa-check-circle text-blue-600"></i>
+        <i class="fas fa-check-circle text-blue-600 inline-block static"></i>
         <span class="font-bold">Persyaratan</span>
       </h2>
       <Viewer v-html="job.persyaratan" @click="onWysiwygImgClick" />
@@ -72,7 +72,7 @@
     <!-- Cara Melamar -->
     <section v-if="job.caraMelamar">
       <h2 class="text-xl flex items-center gap-2 !mb-4">
-        <i class="fas fa-file-signature text-blue-600"></i>
+        <i class="fas fa-file-signature text-blue-600 inline-block static"></i>
         <span class="font-bold">Cara Melamar</span>
       </h2>
       <Viewer v-html="job.caraMelamar" @click="onWysiwygImgClick" />
@@ -82,7 +82,7 @@
     <!-- Benefit -->
     <section v-if="job.benefit">
       <h2 class="text-xl flex items-center gap-2 !mb-4">
-        <i class="fas fa-hand-holding-heart text-blue-600"></i>
+        <i class="fas fa-hand-holding-heart text-blue-600 inline-block static"></i>
         <span class="font-bold">Benefit</span>
       </h2>
       <Viewer v-html="job.benefit" @click="onWysiwygImgClick" />
@@ -100,7 +100,7 @@
       <div class="grid grid-cols-1 gap-4 mt-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
           <div v-for="contact in contacts" :key="contact.label" class="flex items-center">
-            <i :class="`${contact.icon} text-blue-600 w-6 text-center text-xl`"></i>
+            <i :class="`${contact.icon} text-blue-600 w-6 text-center text-xl inline-block static`"></i>
             <div class="ml-2 font-semibold text-md">
               <span class="block font-semibold">{{ contact.label }}:</span>
               <a :href="contact.href" target="_blank" rel="noopener noreferrer"
@@ -121,7 +121,7 @@
       <div class="grid grid-cols-1 gap-4 mt-4">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4">
           <div v-for="item in socialMediaItems" :key="item.platform + item.username" class="flex items-center">
-            <i :class="`${item.icon} text-blue-600 w-6 text-center text-xl`"></i>
+            <i :class="`${item.icon} text-blue-600 w-6 text-center text-xl inline-block static`"></i>
             <div class="ml-2 font-semibold text-md">
               <span class="block">{{ item.platform }}:</span>
               <a :href="item.url" target="_blank" rel="noopener noreferrer"

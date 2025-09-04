@@ -124,8 +124,8 @@ class BotDetection
         /** @var int $botScore Modified score after applying custom filters */
         $botScore = apply_filters('ssg_bot_score', $botScore, $userAgent, $remoteAddr, $referer);
 
-        // Log suspicious activity for debugging (score >= 3 or debug mode)
-        if ($botScore >= 3 || (defined('WP_DEBUG') && WP_DEBUG)) {
+        // Log suspicious activity for debugging (score >= 4)
+        if ($botScore >= 4) {
             $uaShort = $userAgent !== '' ? substr($userAgent, 0, 200) : 'empty';
             $ip = $remoteAddr !== '' ? $remoteAddr : 'unknown';
             error_log(sprintf(
@@ -137,7 +137,7 @@ class BotDetection
         }
 
         // Final decision: bot if score reaches threshold
-        // Threshold: 3+ points from various detection methods
-        return $botScore >= 3;
+        // Threshold: 4+ points from various detection methods
+        return $botScore >= 4;
     }
 }

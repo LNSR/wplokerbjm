@@ -18,7 +18,7 @@
         class="btn btn-primary flex items-center gap-2 rounded-full !px-4 !py-3 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 !bg-[var(--ast-global-color-5)] !text-[var(--ast-global-color-1)]"
         @mousedown.prevent="toggleDropdown" @keydown.enter.space.prevent="toggleDropdown" @keydown.esc="closeDropdown"
         :aria-expanded="dropdownOpen" aria-haspopup="menu" title="Kontak Admin" tabindex="0">
-        <i class="fas fa-user-headset"></i>
+        <i class="fas fa-headset text-xl w-6 text-center" aria-hidden="true"></i>
         <span>Kontak Admin</span>
         <svg class="w-4 h-4 ml-1 transition-transform" :class="{ 'rotate-180': dropdownOpen }" fill="none"
           stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
@@ -60,7 +60,7 @@
               class="btn btn-outline flex items-center gap32 rounded-full !px-4 !py-2 w-full justify-between transition hover:border-blue-600 hover:scale-105"
               :aria-expanded="socialDropdownOpen" aria-haspopup="menu" type="button">
               <span class="flex items-center gap-2">
-                <i class="fas fa-hashtag text-pink-500"></i>
+                <i class="fas fa-hashtag text-pink-500 text-xl w-6 inline-block text-center static"></i>
                 <span class="font-semibold">Social Media</span>
               </span>
               <svg class="w-4 h-4 ml-1 transition-transform" :class="{ 'rotate-180': socialDropdownOpen }" fill="none"
@@ -77,7 +77,7 @@
                 <a v-for="link in socialLinks" :key="link.url" :href="link.url" target="_blank" rel="noopener"
                   class="btn btn-outline flex items-center !gap-3 rounded-full !px-4 !py-2 transition hover:border-blue-600 hover:scale-105"
                   role="menuitem" tabindex="0">
-                  <i :class="`${link.icon} ${link.color} text-xl !w-6 text-center`"></i>
+                  <i :class="`${link.icon} ${link.color} text-xl w-6 inline-block text-center static`"></i>
                   <span class="font-semibold">{{ link.label }}</span>
                 </a>
               </div>

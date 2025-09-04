@@ -172,7 +172,20 @@ export class PageGenerator {
         useShortDoctype: true,
         minifyCSS: true,
         minifyJS: true,
-        minifyURLs: true
+        minifyURLs: true,
+        collapseBooleanAttributes: true,
+        collapseInlineTagWhitespace: true,
+        decodeEntities: true,
+        html5: true,
+        keepClosingSlash: false,
+        preserveLineBreaks: false,
+        removeAttributeQuotes: true,
+        removeEmptyAttributes: true,
+        removeOptionalTags: true,
+        removeTagWhitespace: true,
+        sortAttributes: true,
+        sortClassName: true,
+        trimCustomFragments: true
       });
     } catch (minifyError) {
       console.warn(`Warning: HTML minification failed:`, minifyError);

@@ -48,9 +48,13 @@ class Init
     public function initialize(): void
     {
         foreach ($this->services as $service) {
-            if ($service instanceof HooksInterface) {
-                $service->registerActions();
-                $service->registerFilters();
+            try {
+                if ($service instanceof HooksInterface) {
+                    $service->registerActions();
+                    $service->registerFilters();
+                }
+            } catch (\Exception $e) {
+                error_log('Init::initialize error in service ' . get_class($service) . ': ' . $e->getMessage());
             }
         }
     }

@@ -76,14 +76,19 @@ class TaxonomyQuery
      */
     public static function unusedTaxonomiesTermsArgs(string $taxonomy): array
     {
-        $terms = get_terms([
-            'taxonomy'   => $taxonomy,
-            'hide_empty' => false,
-            'fields'     => 'ids',
-        ]);
-        if (is_wp_error($terms) || !is_array($terms)) {
+        try {
+            $terms = get_terms([
+                'taxonomy'   => $taxonomy,
+                'hide_empty' => false,
+                'fields'     => 'ids',
+            ]);
+            if (is_wp_error($terms) || !is_array($terms)) {
+                return [];
+            }
+            return $terms;
+        } catch (\Exception $e) {
+            error_log('TaxonomyQuery::unusedTaxonomiesTermsArgs error: ' . $e->getMessage());
             return [];
         }
-        return $terms;
     }
 }

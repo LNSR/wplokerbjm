@@ -155,36 +155,41 @@ class JobQuery
 	 */
 	public static function buildPostsSearchSql(\wpdb $wpdb, string $q): string
 	{
-		if ($q === '') {
+		try {
+			if ($q === '') {
+				return '';
+			}
+
+			// Safely escape the search term for LIKE queries
+			$q_esc = esc_sql($wpdb->esc_like($q));
+			$q_html = esc_sql($wpdb->esc_like(htmlentities($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+
+			$posts = $wpdb->posts;
+			$postmeta = $wpdb->postmeta;
+			$terms = $wpdb->terms;
+			$term_taxonomy = $wpdb->term_taxonomy;
+			$term_relationships = $wpdb->term_relationships;
+
+			$sql = " AND (";
+			$sql .= "{$posts}.post_title LIKE '%{$q_esc}%' OR ";
+			$sql .= "{$posts}.post_title LIKE '%{$q_html}%' OR ";
+			$sql .= "{$posts}.ID IN (
+				SELECT post_id FROM {$postmeta}
+				WHERE meta_key = 'nama_perusahaan' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
+			) OR ";
+			$sql .= "{$posts}.ID IN (
+				SELECT object_id FROM {$term_relationships}
+				INNER JOIN {$term_taxonomy} ON {$term_taxonomy}.term_taxonomy_id = {$term_relationships}.term_taxonomy_id
+				INNER JOIN {$terms} ON {$terms}.term_id = {$term_taxonomy}.term_id
+				WHERE {$term_taxonomy}.taxonomy = 'perusahaan'
+				AND {$terms}.name LIKE '%{$q_esc}%'
+			)";
+			$sql .= ")";
+
+			return $sql;
+		} catch (\Exception $e) {
+			error_log('JobQuery::buildPostsSearchSql error: ' . $e->getMessage());
 			return '';
 		}
-
-		// Safely escape the search term for LIKE queries
-		$q_esc = esc_sql($wpdb->esc_like($q));
-		$q_html = esc_sql($wpdb->esc_like(htmlentities($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
-
-		$posts = $wpdb->posts;
-		$postmeta = $wpdb->postmeta;
-		$terms = $wpdb->terms;
-		$term_taxonomy = $wpdb->term_taxonomy;
-		$term_relationships = $wpdb->term_relationships;
-
-		$sql = " AND (";
-		$sql .= "{$posts}.post_title LIKE '%{$q_esc}%' OR ";
-		$sql .= "{$posts}.post_title LIKE '%{$q_html}%' OR ";
-		$sql .= "{$posts}.ID IN (
-			SELECT post_id FROM {$postmeta}
-			WHERE meta_key = 'nama_perusahaan' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
-		) OR ";
-		$sql .= "{$posts}.ID IN (
-			SELECT object_id FROM {$term_relationships}
-			INNER JOIN {$term_taxonomy} ON {$term_taxonomy}.term_taxonomy_id = {$term_relationships}.term_taxonomy_id
-			INNER JOIN {$terms} ON {$terms}.term_id = {$term_taxonomy}.term_id
-			WHERE {$term_taxonomy}.taxonomy = 'perusahaan'
-			AND {$terms}.name LIKE '%{$q_esc}%'
-		)";
-		$sql .= ")";
-
-		return $sql;
 	}
 }

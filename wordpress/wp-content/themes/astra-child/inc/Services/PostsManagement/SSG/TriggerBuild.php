@@ -118,7 +118,17 @@ class TriggerBuild
 
         error_log("SSG Trigger: Making request to GitHub Actions - Endpoint: $endpoint, Ref: {$this->ref}");
 
-        $response = wp_remote_post($endpoint, $args);
+        try {
+            $response = wp_remote_post($endpoint, $args);
+        } catch (\Exception $e) {
+            error_log("SSG Trigger: ERROR - Exception during HTTP request: " . $e->getMessage());
+            return [
+                'success' => false,
+                'status' => null,
+                'body' => null,
+                'error' => 'Exception during HTTP request: ' . $e->getMessage(),
+            ];
+        }
 
         if (is_wp_error($response)) {
             error_log("SSG Trigger: ERROR - HTTP request failed: " . $response->get_error_message());
@@ -170,11 +180,16 @@ class TriggerBuild
      */
     private function checkDebounceCache(string $key): ?array
     {
-        $cached = Cache::get("ssg_debounce_{$key}");
+        try {
+            $cached = Cache::get("ssg_debounce_{$key}");
 
-        if ($cached !== false) {
-            error_log("SSG Trigger: Found cached result for key: {$key}");
-            return $cached;
+            if ($cached !== false) {
+                error_log("SSG Trigger: Found cached result for key: {$key}");
+                return $cached;
+            }
+        } catch (\Exception $e) {
+            error_log("SSG Trigger: ERROR checking debounce cache for key: {$key} - " . $e->getMessage());
+            return null;
         }
 
         return null;
@@ -185,11 +200,18 @@ class TriggerBuild
      */
     private function setDebounceCache(string $key, array $result): void
     {
-        // Use longer debounce for LiteSpeed-coordinated operations
-        $expiration = $this->isLiteSpeedCoordinatedOperation() ? 120 : 60; // 2 minutes vs 1 minute
+        try {
+            // Use longer debounce for LiteSpeed-coordinated operations
+            $expiration = $this->isLiteSpeedCoordinatedOperation() ? 120 : 60; // 2 minutes vs 1 minute
 
-        Cache::set("ssg_debounce_{$key}", $result, $expiration);
-        error_log("SSG Trigger: Cached result for key: {$key} (expiration: {$expiration}s)");
+            $cacheKey = "ssg_debounce_{$key}";
+
+            Cache::set($cacheKey, $result, $expiration);
+        } catch (\Exception $e) {
+            error_log("SSG Trigger: Cached result for key: {$key} (expiration: {$expiration}s)");
+            error_log("SSG Trigger: ERROR setting debounce cache for key: {$key} - " . $e->getMessage());
+            return;
+        }
     }
 
     /**
@@ -197,20 +219,25 @@ class TriggerBuild
      */
     private function isLiteSpeedCoordinatedOperation(): bool
     {
-        // Check for LiteSpeed coordination markers
-        if (
-            isset($_REQUEST['litespeed_ssg_coord']) ||
-            (isset($_SERVER['HTTP_USER_AGENT']) && strpos($_SERVER['HTTP_USER_AGENT'], 'LiteSpeed-SSG') !== false)
-        ) {
-            return true;
-        }
+        try {
+            // Check for LiteSpeed coordination markers
+            if (
+                isset($_REQUEST['litespeed_ssg_coord']) ||
+                (isset($_SERVER['HTTP_USER_AGENT']) && strpos($_SERVER['HTTP_USER_AGENT'], 'LiteSpeed-SSG') !== false)
+            ) {
+                return true;
+            }
 
-        // Check for recent LiteSpeed purge actions using transients
-        $purgeTransient = Cache::get('litespeed_recent_purge');
-        if ($purgeTransient !== false) {
-            return true;
-        }
+            // Check for recent LiteSpeed purge actions using transients
+            $purgeTransient = Cache::get('litespeed_recent_purge');
+            if ($purgeTransient !== false) {
+                return true;
+            }
 
-        return false;
+            return false;
+        } catch (\Exception $e) {
+            error_log('TriggerBuild::isLiteSpeedCoordinatedOperation error: ' . $e->getMessage());
+            return false;
+        }
     }
 }

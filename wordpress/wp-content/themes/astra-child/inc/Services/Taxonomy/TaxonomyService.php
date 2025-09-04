@@ -15,38 +15,43 @@ class TaxonomyService
      */
     public function processTaxonomyTerms($terms): array
     {
-        // Handle different input types
-        if (is_wp_error($terms) || empty($terms)) {
+        try {
+            // Handle different input types
+            if (is_wp_error($terms) || empty($terms)) {
+                return [];
+            }
+
+            // If it's already a string, return it as an array element
+            if (is_string($terms)) {
+                return [sanitize_text_field($terms)];
+            }
+
+            // If it's not an array, try to convert or return empty
+            if (!is_array($terms)) {
+                return [];
+            }
+
+            // Process array of term objects
+            return array_map(function ($term) {
+                // Handle term objects
+                if (is_object($term) && isset($term->name)) {
+                    return sanitize_text_field($term->name);
+                }
+                // Handle term arrays
+                if (is_array($term) && isset($term['name'])) {
+                    return sanitize_text_field($term['name']);
+                }
+                // Handle strings
+                if (is_string($term)) {
+                    return sanitize_text_field($term);
+                }
+                // Fallback for other types
+                return sanitize_text_field((string) $term);
+            }, $terms);
+        } catch (\Exception $e) {
+            error_log('TaxonomyService::processTaxonomyTerms error: ' . $e->getMessage());
             return [];
         }
-
-        // If it's already a string, return it as an array element
-        if (is_string($terms)) {
-            return [sanitize_text_field($terms)];
-        }
-
-        // If it's not an array, try to convert or return empty
-        if (!is_array($terms)) {
-            return [];
-        }
-
-        // Process array of term objects
-        return array_map(function ($term) {
-            // Handle term objects
-            if (is_object($term) && isset($term->name)) {
-                return sanitize_text_field($term->name);
-            }
-            // Handle term arrays
-            if (is_array($term) && isset($term['name'])) {
-                return sanitize_text_field($term['name']);
-            }
-            // Handle strings
-            if (is_string($term)) {
-                return sanitize_text_field($term);
-            }
-            // Fallback for other types
-            return sanitize_text_field((string) $term);
-        }, $terms);
     }
 
     /**
@@ -58,31 +63,37 @@ class TaxonomyService
      */
     public function buildTermsTree($terms, $taxonomy = ''): array
     {
-        $tree = Cache::get('taxonomy_tree_' . $taxonomy);
-        if ($tree !== false) {
-            return $tree;
-        }
-
-        $terms_by_id = [];
-        foreach ($terms as $term) {
-            $terms_by_id[$term->term_id] = [
-                'slug' => $term->slug,
-                'name' => $term->name,
-                'parent' => $term->parent,
-                'children' => []
-            ];
-        }
-        $tree = [];
-        foreach ($terms_by_id as &$term) {
-            if ($term['parent'] && isset($terms_by_id[$term['parent']])) {
-                $terms_by_id[$term['parent']]['children'][] = &$term;
-            } else {
-                $tree[] = &$term;
+        try {
+            $cacheKey = 'taxonomy_tree_' . $taxonomy;
+            $tree = Cache::get($cacheKey);
+            if ($tree !== false) {
+                return $tree;
             }
-        }
-        unset($term);
 
-        Cache::set('taxonomy_tree_' . $taxonomy, $tree, 86400); // Cache for 24 hours
-        return $tree;
+            $terms_by_id = [];
+            foreach ($terms as $term) {
+                $terms_by_id[$term->term_id] = [
+                    'slug' => $term->slug,
+                    'name' => $term->name,
+                    'parent' => $term->parent,
+                    'children' => []
+                ];
+            }
+            $tree = [];
+            foreach ($terms_by_id as &$term) {
+                if ($term['parent'] && isset($terms_by_id[$term['parent']])) {
+                    $terms_by_id[$term['parent']]['children'][] = &$term;
+                } else {
+                    $tree[] = &$term;
+                }
+            }
+            unset($term);
+
+            Cache::set($cacheKey, $tree, 86400); // Cache for 24 hours
+            return $tree;
+        } catch (\Exception $e) {
+            error_log('TaxonomyService::buildTermsTree error: ' . $e->getMessage());
+            return [];
+        }
     }
 }

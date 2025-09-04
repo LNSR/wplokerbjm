@@ -15,12 +15,13 @@ services:
       FORCE_SSL_ADMIN: "true"
       WP_HOME: ${WORDPRESS_WP_HOME}
       WORDPRESS_WP_SITEURL: ${WORDPRESS_WP_SITEURL}
+      WP_REDIS_PATH: /var/run/redis/redis.sock
       WORDPRESS_CONFIG_EXTRA: |
         if (!defined('WP_CACHE')) define('WP_CACHE', true);
         define('WP_CACHE_KEY_SALT', '${WORDPRESS_WP_SITEURL}');
-        define('WP_REDIS_HOST', 'redis');
-        define('WP_REDIS_PASSWORD', '${REDIS_PASSWORD}');
-        define('WP_REDIS_DATABASE', ${REDIS_DATABASE});
+        define('WP_REDIS_HOST', '${REDIS_HOST}');
+        define('WP_REDIS_PASSWORD', '${REDIS_PWD}');
+        define('WP_REDIS_DATABASE', ${REDIS_DB});
 
         if (!defined('WP_ENV')) {
           define('WP_ENV', getenv('WP_ENV') ?: 'production');
@@ -78,6 +79,7 @@ services:
             define('COMPRESS_SCRIPTS', false);
             define('CONCATENATE_SCRIPTS', false);
             define('ENFORCE_GZIP', false);
+            define('FS_METHOD', 'direct');
             break;
 
           case 'production':
@@ -110,7 +112,6 @@ services:
             define('WP_HTTP_BLOCK_EXTERNAL', false);
             define('WP_ACCESSIBLE_HOSTS', 'api.wordpress.org'); // Allow updates
 
-            // Prevent file editing and modifications
             define('FS_METHOD', 'direct');
             break;
         }
@@ -120,6 +121,7 @@ services:
     volumes:
       - wordpress:/var/www/html
       - ./wordpress/wp-content:/var/www/html/wp-content
+      - redis-socket:/var/run/redis
     depends_on:
       - db
     healthcheck:
@@ -155,15 +157,15 @@ services:
     container_name: wordpress_db
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
-      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_DATABASE: ${MYSQL_DB}
       MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_PASS: ${MYSQL_PASS}
     volumes:
       - db:/var/lib/mysql
     ports:
       - "3306:3306"
     healthcheck:
-      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1"]
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASS || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -183,12 +185,13 @@ services:
   redis:
     image: redis:alpine
     container_name: wordpress_redis
-    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory ${REDIS_MAXMEMORY} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY}
+    command: sh -c "mkdir -p /var/run/redis && chmod 777 /var/run/redis && redis-server --requirepass ${REDIS_PWD} --maxmemory ${REDIS_MAXMEMORY} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY} --port ${REDIS_PORT} --unixsocket /var/run/redis/redis.sock --unixsocketperm 777"
     ports:
-      - "6379:6379"
+      - "${REDIS_PORT}:${REDIS_PORT}"
     volumes:
       - type: tmpfs
         target: /data
+      - redis-socket:/var/run/redis
 
 # ngrok:
 #   image: ngrok/ngrok:latest
@@ -205,3 +208,4 @@ services:
 volumes:
   wordpress:
   db:
+  redis-socket:

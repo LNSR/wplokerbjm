@@ -41,7 +41,8 @@ class TaxonomyRepository implements DataProviderInterface
 
 	public function getTaxonomyTerms(): array
 	{
-		$cached_terms = Cache::get('taxonomy_terms_all');
+		$cacheKey = 'taxonomy_terms_all';
+		$cached_terms = Cache::get($cacheKey);
 		if ($cached_terms !== false) {
 			return $cached_terms;
 		}
@@ -76,7 +77,7 @@ class TaxonomyRepository implements DataProviderInterface
 				'hide_empty' => true,
 			])
 		];
-		Cache::set('taxonomy_terms_all', $terms, 86400); // Cache for 24 hours
+		Cache::set($cacheKey, $terms, 86400); // Cache for 24 hours
 		return $terms;
 	}
 }

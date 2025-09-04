@@ -6,9 +6,12 @@
         "run",
         "-i",
         "--rm",
+        "--network",
+        "host",
         "-v",
         "${workspaceFolder}/mcp/playwright:${workspaceFolder}",
-        "mcp/playwright"
+        "mcp/playwright",
+        "--ignore-https-errors"
       ],
       "type": "stdio"
     },
@@ -38,16 +41,57 @@
       ],
       "type": "stdio"
     },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "${env:CONTEXT7_API_KEY}"
+      }
+    },
     "memory": {
       "command": "docker",
       "args": [
         "run",
         "-i",
         "--rm",
+        "--env-file",
+        "${workspaceFolder}/.env",
         "-v",
         "${workspaceFolder}/mcp/memory:${workspaceFolder}",
         "mcp/memory"
       ]
+    },
+    "redis": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--network",
+        "host",
+        "--env-file",
+        "${workspaceFolder}/.env",
+        "-v",
+        "${workspaceFolder}/mcp/redis:${workspaceFolder}",
+        "mcp/redis"
+      ],
+      "type": "stdio"
+    },
+    "mysql": {
+      "command": "docker",
+      "args": [
+        "run",
+        "-i",
+        "--rm",
+        "--network",
+        "host",
+        "--env-file",
+        "${workspaceFolder}/.env",
+        "-v",
+        "${workspaceFolder}/mcp/mysql:${workspaceFolder}",
+        "docker.io/acuvity/mcp-server-benborla-mysql:latest"
+      ],
+      "type": "stdio"
     }
   }
 }

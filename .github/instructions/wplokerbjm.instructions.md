@@ -23,9 +23,14 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,vue,scss,less,sass,cjs,mjs,jsx,ts
 
 ## Backend
 
+- bootstrap: [astra-child-bootstrap.php](wordpress/wp-content/mu-plugins/astra-child-bootstrap.php)
 - Use **Composer** for PHP dependencies.
 - For PHP DI structure, refer to file:  
   [Container.php](../../../wordpress/wp-content/themes/astra-child/inc/Core/Container.php)
+- Use Cache if possible.
+  Choose between:
+  - ObjectCache.php
+  - Cache.php (transients)
 
 ## Frontend
 
@@ -34,10 +39,12 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,vue,scss,less,sass,cjs,mjs,jsx,ts
 - Use [inversify.config.ts](../../wordpress/wp-content/themes/astra-child/src/inversify.config.ts) for dependency injection
 - Prioritize OOP outside Vue ecosystem
 
-## Agent tooling
+## Agent tooling MCP
 
-- Automation/assistant note: when processing or acting on these repository instructions, always prefer using the `memory`, `sequentialthinking` and other MCP tools when available.
+- Automation/assistant note: when processing or acting on these repository instructions, always use the `memory`, `sequentialthinking` and other MCP tools when available.
   - `memory`: persist safe workspace and environment facts that help future interactions (repository, branch, key folders, shell/OS). Store secrets if necessary.
   - `sequentialthinking`: use for structured, multi-step analysis, planning, and explanations when modifying code or configs.
+- `mysql`: use for database-related tasks, queries.
+- `redis`: use for Redis database operations, caching, and key-value storage.
 
 These preferences aim to improve context awareness and produce stepwise, auditable changes.

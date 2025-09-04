@@ -28,34 +28,40 @@ class JobDataFactory
      */
     public function buatDataPekerjaan(int $post_id): array
     {
-        $combinedData = Cache::get('job_data_factory_' . $post_id);
-        if ($combinedData !== false) {
-            return $combinedData;
-        }
-
-        $customFields = $this->customFieldsProvider?->getMetaBoxData($post_id) ?? [];
-        $taxonomies = $this->taxonomiesProvider?->getMetaBoxData($post_id) ?? [];
-
-        // Process custom fields
-        $processedCustomFields = is_object($this->customFieldsService)
-            ? $this->customFieldsService->processCustomFields((array) $customFields)
-            : [];
-
-        // Process taxonomies
-        $processedTaxonomies = [];
-        if (is_object($this->taxonomyService)) {
-            foreach ($taxonomies as $key => $terms) {
-                $processedTerms = $this->taxonomyService->processTaxonomyTerms($terms);
-                $processedTaxonomies[$key] = is_array($processedTerms) ? implode(', ', $processedTerms) : 'N/A';
+        try {
+            $cacheKey = 'job_data_factory_' . $post_id;
+            $combinedData = Cache::get($cacheKey);
+            if ($combinedData !== false) {
+                return $combinedData;
             }
+
+            $customFields = $this->customFieldsProvider?->getMetaBoxData($post_id) ?? [];
+            $taxonomies = $this->taxonomiesProvider?->getMetaBoxData($post_id) ?? [];
+
+            // Process custom fields
+            $processedCustomFields = is_object($this->customFieldsService)
+                ? $this->customFieldsService->processCustomFields((array) $customFields)
+                : [];
+
+            // Process taxonomies
+            $processedTaxonomies = [];
+            if (is_object($this->taxonomyService)) {
+                foreach ($taxonomies as $key => $terms) {
+                    $processedTerms = $this->taxonomyService->processTaxonomyTerms($terms);
+                    $processedTaxonomies[$key] = is_array($processedTerms) ? implode(', ', $processedTerms) : 'N/A';
+                }
+            }
+
+            // Combine meta and taxonomy data
+            $combinedData = array_merge($processedCustomFields, $processedTaxonomies);
+
+            // Cache for 1 day
+            Cache::set($cacheKey, $combinedData, 86400);
+
+            return $combinedData;
+        } catch (\Exception $e) {
+            error_log('JobDataFactory::buatDataPekerjaan error for post ' . $post_id . ': ' . $e->getMessage());
+            return []; // Return empty array on error
         }
-
-        // Combine meta and taxonomy data
-        $combinedData = array_merge($processedCustomFields, $processedTaxonomies);
-
-        // Cache for 1 day
-        Cache::set('job_data_' . $post_id, $combinedData, 86400);
-
-        return $combinedData;
     }
 }

@@ -8,6 +8,7 @@ use AstraChild\Layouts\Layouts;
 use AstraChild\Services\Job\JobServices;
 
 use AstraChild\QueryBuilders\JobQuery;
+use AstraChild\Core\Cache;
 
 class HomepageViewModel
 {
@@ -24,7 +25,13 @@ class HomepageViewModel
 
 	public function getProps(): array
 	{
-		return [
+		$cache_key = 'page_homepage_props';
+		$cached = Cache::get($cache_key);
+		if ($cached !== false) {
+			return $cached;
+		}
+
+		$props = [
 			'layouts' => $this->layouts->getProps(),
 			'hero' => $this->hero->getProps(),
 			'carousel' => $this->jobCarousel->getProps(),
@@ -34,6 +41,9 @@ class HomepageViewModel
 				'latest'
 			)
 		];
+
+		Cache::set($cache_key, $props, 86400); // Cache for 1 day
+		return $props;
 	}
 	public function getSchema(): array
 	{

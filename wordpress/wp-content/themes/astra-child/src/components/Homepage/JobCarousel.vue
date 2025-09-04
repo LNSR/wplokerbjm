@@ -18,14 +18,14 @@ useJobCarousel({
     <div class="flex items-center md:justify-between mb-4">
       <h2 class="text-lg font-semibold !mt-4 !mb-0">Lowongan Darurat</h2>
       <div class="hidden sm:flex gap-1">
-        <button type="button" class="job-carousel-prev rounded-xs hover:bg-gray-100 transition">
+        <button type="button" class="job-carousel-prev rounded-xs hover:bg-gray-100 transition" aria-label="Sebelumnya" tabindex="0">
           <!-- Left Arrow SVG -->
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
             <path d="M15 19l-7-7 7-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
               stroke-linejoin="round" />
           </svg>
         </button>
-        <button type="button" class="job-carousel-next rounded-xs hover:bg-gray-100 transition">
+        <button type="button" class="job-carousel-next rounded-xs hover:bg-gray-100 transition" aria-label="Berikutnya" tabindex="0">
           <!-- Right Arrow SVG -->
           <svg width="18" height="18" fill="none" viewBox="0 0 24 24">
             <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -34,14 +34,14 @@ useJobCarousel({
         </button>
       </div>
     </div>
-    <div v-if="jobs.length" class="swiper job-carousel invisible">
+    <div v-if="jobs.length" class="swiper job-carousel invisible" role="region" aria-label="Lowongan Darurat" aria-live="polite">
       <div class="swiper-wrapper">
         <!-- Virtual slides will be dynamically created by Swiper -->
       </div>
       <div class="flex justify-center !mt-24">
-        <div class="swiper-pagination"></div>
+        <div class="swiper-pagination" aria-label="Navigasi halaman carousel" tabindex="0"></div>
       </div>
     </div>
-    <p v-else class="text-center text-gray-500">Belum ada lowongan darurat</p>
+    <p v-else class="text-center text-gray-500" role="status">Belum ada lowongan darurat</p>
   </section>
 </template>

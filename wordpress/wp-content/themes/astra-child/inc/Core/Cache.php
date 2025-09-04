@@ -19,8 +19,14 @@ class Cache
      */
     public static function set($key, $value, $expiration = 0)
     {
-        $transient_key = self::TRANSIENT_PREFIX . $key;
-        return set_transient($transient_key, $value, $expiration);
+        try {
+            $transient_key = self::TRANSIENT_PREFIX . $key;
+            $result = set_transient($transient_key, $value, $expiration);
+            return $result;
+        } catch (\Exception $e) {
+            error_log('Cache::set error: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -31,8 +37,14 @@ class Cache
      */
     public static function get($key): mixed
     {
-        $transient_key = self::TRANSIENT_PREFIX . $key;
-        return get_transient($transient_key);
+        try {
+            $transient_key = self::TRANSIENT_PREFIX . $key;
+            $value = get_transient($transient_key);
+            return $value;
+        } catch (\Exception $e) {
+            error_log('Cache::get error: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -43,8 +55,15 @@ class Cache
      */
     public static function delete($key): bool
     {
-        $transient_key = self::TRANSIENT_PREFIX . $key;
-        return delete_transient($transient_key);
+        try {
+            $transient_key = self::TRANSIENT_PREFIX . $key;
+            $result = delete_transient($transient_key);
+            error_log('Transient key deleted: ' . $transient_key);
+            return $result;
+        } catch (\Exception $e) {
+            error_log('Cache::delete error: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -52,12 +71,20 @@ class Cache
      * * Note: Use delete() for exact keys (e.g., 'carousel_jobs_api_').
      * * Use deletePattern() for wildcard patterns (e.g., 'auto_suggestion_%') to clear multiple caches.
      * * deletePattern() performs a database query and is slower for large datasets.
+     * * When LiteSpeed Cache redirects transients to Redis, also deletes from Redis.
      * @param string $pattern The pattern to match (e.g., 'auto_suggestion_%').
      * @return int Number of transients deleted.
      */
     public static function deletePattern($pattern): int
     {
-        return \AstraChild\QueryBuilders\DBQuery\CacheQuery::deletePatternQuery($pattern);
+        try {
+            $result = \AstraChild\QueryBuilders\DBQuery\CacheQuery::deletePatternQuery($pattern);
+            error_log('Pattern deleted: ' . $pattern . ', total deleted: ' . $result);
+            return $result;
+        } catch (\Exception $e) {
+            error_log('Cache::deletePattern error: ' . $e->getMessage());
+            return 0;
+        }
     }
 
     /**
@@ -84,6 +111,33 @@ class Cache
             return $new_value;
         } catch (\Exception $e) {
             error_log('Cache increment fallback failed: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Decrement a cache value using transients (redirected to Redis).
+     *
+     * This method uses WordPress transients for decrements, which are redirected to Redis object cache
+     * when LiteSpeed Cache's "Store Transients" is enabled. This provides atomic-like decrements
+     * with Redis performance for counters.
+     *
+     * Used as a fallback by ObjectCache::decrement() when object cache is unavailable or fails.
+     *
+     * @param string $key The cache key (will be prefixed with TRANSIENT_PREFIX).
+     * @param int $value The value to decrement by. Default 1.
+     * @return int|false The new decremented value, or false if decrement failed.
+     */
+    public static function decrementTransient($key, $value = 1): int|false
+    {
+        // fallback to transient decrement
+        try {
+            $current = (int) self::get($key) ?: 0;
+            $new_value = $current - $value;
+            self::set($key, $new_value, 0); // No expiration for decrement
+            return $new_value;
+        } catch (\Exception $e) {
+            error_log('Cache decrement fallback failed: ' . $e->getMessage());
             return false;
         }
     }

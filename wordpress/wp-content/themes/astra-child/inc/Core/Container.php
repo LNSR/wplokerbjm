@@ -11,47 +11,93 @@ class Container
 
     /**
      * Get the DI container instance.
+     * 
+     * Creates and configures a PHP-DI container with autowiring, caching, and custom definitions.
+     * Uses singleton pattern to ensure only one container instance exists.
+     * 
+     * @return ContainerInterface The configured DI container
+     * @throws \Exception If container creation fails
      */
     public static function getContainer(): ContainerInterface
     {
         if (self::$container === null) {
-            $builder = new ContainerBuilder();
+            try {
+                $builder = new ContainerBuilder();
 
-            $cacheDir = get_stylesheet_directory() . '/cache';
-            if (!is_dir($cacheDir)) {
-                if (!mkdir($cacheDir, 0755, true)) {
-                    error_log("Failed to create cache directory: $cacheDir");
-                }
+                // Configure caching for performance
+                self::setupCache($builder);
+
+                // Enable autowiring and attributes for automatic dependency injection
+                $builder->useAutowiring(true);
+                $builder->useAttributes(true);
+
+                // Add all service definitions
+                self::setupDefinitions($builder);
+
+                // Build the container
+                self::$container = $builder->build();
+            } catch (\Exception $e) {
+                error_log('Container::getContainer error: ' . $e->getMessage());
+                throw $e; // Re-throw as container is critical for application functionality
             }
-
-            $isProduction = defined('WP_ENV') && WP_ENV === 'production';
-
-            if (!$isProduction && is_dir($cacheDir)) {
-                array_map('unlink', glob("$cacheDir/*"));
-            }
-
-            if ($isProduction && $cacheDir && is_dir($cacheDir)) {
-                $builder->enableCompilation($cacheDir);
-                if (function_exists('apcu_enabled') && apcu_enabled()) {
-                    $builder->enableDefinitionCache();
-                }
-            }
-            $builder->useAutowiring(true);
-            $builder->useAttributes(true);
-
-            $builder->addDefinitions(array_merge(
-                // Auto-scanned definitions
-                \AstraChild\Core\Definitions\AutoScanned::getDefinitions(),
-
-                // Manually defined dependencies
-                \AstraChild\Core\Definitions\Core::getDefinitions(),
-                \AstraChild\Core\Definitions\Repositories::getDefinitions(),
-                \AstraChild\Core\Definitions\Factories::getDefinitions(),
-            ));
-
-            self::$container = $builder->build();
         }
 
         return self::$container;
+    }
+
+    private static function setupDefinitions(ContainerBuilder $builder): void
+    {
+        $builder->addDefinitions(array_merge(
+            // Auto-scanned definitions from the inc/ directory
+            \AstraChild\Core\Definitions\AutoScanned::getDefinitions(),
+
+            // Manually defined dependencies for core services
+            \AstraChild\Core\Definitions\Core::getDefinitions(),
+            
+            // Repository definitions
+            \AstraChild\Core\Definitions\Repositories::getDefinitions(),
+            
+            // Factory definitions
+            \AstraChild\Core\Definitions\Factories::getDefinitions(),
+        ));
+    }
+
+    private static function setupCache(ContainerBuilder $builder): void
+    {
+        $cacheDir = get_stylesheet_directory() . '/cache';
+        if (!is_dir($cacheDir)) {
+            if (!mkdir($cacheDir, 0755, true)) {
+                error_log("Failed to create cache directory: $cacheDir");
+            }
+        }
+
+        $isProduction = defined('WP_ENV') && WP_ENV === 'production';
+
+        // Compiled container file path
+        $compiledFile = $cacheDir . '/CompiledContainer.php';
+        $transientKey = 'compiled_container_hash';
+
+        if ($isProduction && is_file($compiledFile)) {
+            // Get current file hash
+            $currentHash = @hash_file('sha1', $compiledFile);
+            // Get stored hash from object cache
+            $storedHash = \AstraChild\Core\ObjectCache::get($transientKey);
+            if ($storedHash !== $currentHash) {
+                // Invalidate cache if hash changed
+                array_map('unlink', glob("$cacheDir/*"));
+                \AstraChild\Core\ObjectCache::set($transientKey, $currentHash, 0);
+            }
+        }
+
+        if (!$isProduction && is_dir($cacheDir)) {
+            array_map('unlink', glob("$cacheDir/*"));
+        }
+
+        if ($isProduction && $cacheDir && is_dir($cacheDir)) {
+            $builder->enableCompilation($cacheDir);
+            if (function_exists('apcu_enabled') && apcu_enabled()) {
+                $builder->enableDefinitionCache();
+            }
+        }
     }
 }

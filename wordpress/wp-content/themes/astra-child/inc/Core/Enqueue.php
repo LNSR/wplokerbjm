@@ -29,18 +29,21 @@ class Enqueue implements HooksInterface
 
     public function enqueueAssets(): void
     {
+        try {
+            if ($this->vite->isDevelopment()) {
+                $this->vite->enqueueForDevelopment();
+                return;
+            }
 
-        if ($this->vite->isDevelopment()) {
-            $this->vite->enqueueForDevelopment();
-            return;
+            $prod = $this->vite->enqueueForProduction();
+            if (empty($prod)) {
+                return;
+            }
+
+            $this->noOptimizeStyleHandles = array_merge($this->noOptimizeStyleHandles, $prod['noOptimizeStyleHandles'] ?? []);
+        } catch (\Exception $e) {
+            error_log('Enqueue::enqueueAssets error: ' . $e->getMessage());
         }
-
-        $prod = $this->vite->enqueueForProduction();
-        if (empty($prod)) {
-            return;
-        }
-
-        $this->noOptimizeStyleHandles = array_merge($this->noOptimizeStyleHandles, $prod['noOptimizeStyleHandles'] ?? []);
     }
 
     /**
@@ -49,9 +52,14 @@ class Enqueue implements HooksInterface
      */
     public function filterStyleLoaderTag(string $tag, string $handle): string
     {
-        if (in_array($handle, $this->noOptimizeStyleHandles, true)) {
-            return str_replace('<link ', '<link data-no-optimize="1" ', $tag);
+        try {
+            if (in_array($handle, $this->noOptimizeStyleHandles, true)) {
+                return str_replace('<link ', '<link data-no-optimize="1" ', $tag);
+            }
+            return $tag;
+        } catch (\Exception $e) {
+            error_log('Enqueue::filterStyleLoaderTag error: ' . $e->getMessage());
+            return $tag;
         }
-        return $tag;
     }
 }

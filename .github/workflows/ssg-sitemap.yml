@@ -2,8 +2,8 @@ name: SSG Build & Deploy (Sitemap)
 
 on:
   schedule:
-    # Run every day at 0 AM
-    - cron: "0 0 * * *"
+    # Run every day at 0 AM Makassar time (16:00 UTC, since Makassar is UTC+8)
+    - cron: "0 16 * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -23,8 +23,8 @@ jobs:
       actions: write
       contents: read
     env:
-      RCLONE_TRANSFERS: "3"
-      RCLONE_CHECKERS: "6"
+      RCLONE_TRANSFERS: "4"
+      RCLONE_CHECKERS: "4"
       RCLONE_RETRIES: "3"
       RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"
@@ -39,15 +39,6 @@ jobs:
           theme-dir: ${{ env.THEME_DIR }}
           install-jq: true
           install-playwright: true
-      - name: Setup deployment
-        uses: ./.github/actions/setup-deployment
-        with:
-          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-          ssh-key-passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }}
-          host: ${{ secrets.HOST }}
-          ssh-port: ${{ secrets.SSH_PORT }}
-          ssh-user: ${{ secrets.SSH_USER }}
-
       - name: Setup GitHub CLI
         uses: sersoft-gmbh/setup-gh-cli-action@v2
         with:
@@ -57,20 +48,28 @@ jobs:
       - name: Disable selective url SSG workflow to prevent duplicate runs
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh workflow disable 185023324
+        run: |
+          STATE=$(gh workflow list --json id,name,state | jq -r '.[] | select(.id == 185023324) | .state')
+          echo "Workflow state: $STATE"
+          if [ "$STATE" = "active" ]; then
+            gh workflow disable 185023324
+            echo "Workflow disabled"
+          else
+            echo "Workflow already disabled or inactive"
+          fi
 
       - name: Generate SSG Content (Sitemap)
         working-directory: ${{ env.THEME_DIR }}
         env:
           SSG_MINIFY_HTML: "true"
           # Reduce concurrency to avoid exhausting runner resources and crashing Chromium
-          SSG_CONCURRENCY: "4"
+          SSG_CONCURRENCY: "9"
           # Increase per-page timeout to tolerate slow pages (ms)
           SSG_PAGE_TIMEOUT: "60000"
           # Allow continuing when some pages fail; useful for sitemap runs
           SSG_CONTINUE_ON_ERROR: "false"
           # Number of retries for failed pages
-          SSG_MAX_RETRIES: "4"
+          SSG_MAX_RETRIES: "10"
           # AdBlock settings for policy compliance
           SSG_BLOCK_ADS: "true"
           SSG_BLOCK_TRACKING: "true"
@@ -81,6 +80,14 @@ jobs:
         run: |
           echo "Using sitemap: ${{ env.SITE_URL }}/sitemap_index.xml"
           bun run ssg:sitemap "${{ env.SITE_URL }}/sitemap_index.xml"
+      - name: Setup deployment
+        uses: ./.github/actions/setup-deployment
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+          ssh-key-passphrase: ${{ secrets.SSH_KEY_PASSPHRASE }}
+          host: ${{ secrets.HOST }}
+          ssh-port: ${{ secrets.SSH_PORT }}
+          ssh-user: ${{ secrets.SSH_USER }}
 
       - name: Install rclone and sync via SFTP (sitemap mode)
         working-directory: ${{ env.THEME_DIR }}
