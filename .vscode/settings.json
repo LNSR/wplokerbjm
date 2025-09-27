@@ -14,13 +14,14 @@
     "**/uploads": true,
     "**/cache": true
   },
-  "chat.mcp.serverSampling": {
-    "wplokerbjm/.vscode/mcp.json: context7": {
-      "allowedModels": [
-        "copilot/gpt-4.1",
-        "copilot/gpt-5-mini",
-        "copilot/grok-code-fast-1"
-      ]
-    }
-  }
+  "editor.quickSuggestions": {
+    "other": "on",
+    "comments": "on",
+    "strings": "on"
+  },
+  "tailwindCSS.includeLanguages": {
+    "vue": "vue",
+    "php": "php"
+  },
+  "caddyfile.executable": "${workspaceFolder:wplokerbjm}/Caddyfile"
 }

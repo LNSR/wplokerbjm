@@ -23,11 +23,13 @@ jobs:
       actions: write
       contents: read
     env:
-      RCLONE_TRANSFERS: "4"
-      RCLONE_CHECKERS: "4"
+      RCLONE_TRANSFERS: "6"
+      RCLONE_CHECKERS: "2"
       RCLONE_RETRIES: "3"
       RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"
+      RCLONE_BWLIMIT: "100M"
+      RCLONE_TPSLIMIT: "3"
 
     steps:
       - name: Checkout repository

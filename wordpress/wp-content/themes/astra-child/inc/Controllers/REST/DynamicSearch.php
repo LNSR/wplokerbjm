@@ -30,24 +30,29 @@ class DynamicSearch
             $jobs = $result['jobs'] ?? [];
             $query = $result['query'] ?? new \WP_Query();
 
-            $response = [
+            $response = new \WP_REST_Response([
                 'jobs' => $jobs,
-                'totalJobs' => $query->found_posts,
-                'maxNumPages' => (int) $query->max_num_pages,
                 'context' => 'search',
                 'filters' => $filters,
-            ];
+            ]);
 
-            return rest_ensure_response($response);
+            // Set pagination headers
+            $response->header('X-WP-Total', $query->found_posts);
+            $response->header('X-WP-TotalPages', $query->max_num_pages);
+
+            // Set Link header for pagination
+            Utilities::setPaginationLinks($response, $request, 1, $query->max_num_pages, 'dynamic-search', 'page');
+
+            return $response;
         } catch (\Exception $e) {
             error_log('DynamicSearch::handle error: ' . $e->getMessage());
-            return rest_ensure_response([
+            $response = new \WP_REST_Response([
                 'jobs' => [],
-                'totalJobs' => 0,
-                'maxNumPages' => 0,
                 'context' => 'search',
                 'filters' => []
             ]);
+            $response->set_status(500);
+            return $response;
         }
     }
 }

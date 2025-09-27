@@ -81,10 +81,11 @@ RCLONE_BASE_OPTS=(
   --timeout 5m
   --contimeout 30s
   --log-level "${RCLONE_LOG_LEVEL}"
-  --bwlimit 5M
-  --tpslimit 2
+  --bwlimit "${RCLONE_BWLIMIT:-5M}"
+  --tpslimit "${RCLONE_TPSLIMIT:-2}"
   --tpslimit-burst 4
   --delete-after
+  --fast-list
 )
 
 echo "Ensuring remote SSG directory exists: $REMOTE_SSG_DIR"

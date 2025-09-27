@@ -20,7 +20,7 @@ class AutoScanned
     {
         // Create scanner instance directly (not from container)
         $scanner = new AutowireScanner(
-            dirname(__DIR__, 3), // Points to the inc/ directory
+            get_stylesheet_directory() . '/inc', // Points to the inc/ directory
             'AstraChild'
         );
 

@@ -1,6 +1,7 @@
 import { AuthService } from "@/services/AuthService";
 import { injectable } from "inversify";
 import { ApiError, NetworkError, TimeoutError } from "@/api";
+import type { ApiResponse, ApiMeta } from "@/types";
 
 @injectable()
 export class ApiClient {
@@ -57,7 +58,7 @@ export class ApiClient {
     }
   }
 
-  private async handleResponse(response: Response, url?: string, method?: string, payload?: unknown): Promise<unknown> {
+  private async handleResponse(response: Response, url?: string, method?: string, payload?: unknown): Promise<{ data: unknown, meta: ApiMeta }> {
     const contentType = response.headers.get('content-type') || '';
     let data: unknown = undefined;
     try {
@@ -73,6 +74,32 @@ export class ApiClient {
       } catch {
         data = undefined;
       }
+    }
+
+    // Extract pagination metadata from headers
+    const total = response.headers.get('x-wp-total');
+    const totalPages = response.headers.get('x-wp-totalpages');
+    const linkHeader = response.headers.get('link');
+    const links: Record<string, string> = {};
+    if (linkHeader) {
+      const linkParts = linkHeader.split(',');
+      linkParts.forEach(part => {
+        const match = part.trim().match(/<([^>]+)>;\s*rel="([^"]+)"/);
+        if (match && match[1] && match[2]) {
+          links[match[2]] = match[1];
+        }
+      });
+    }
+    const meta: ApiMeta = {
+      total: total ? parseInt(total, 10) : undefined,
+      totalPages: totalPages ? parseInt(totalPages, 10) : undefined,
+      links: Object.keys(links).length > 0 ? links : undefined,
+    };
+
+    // Update nonce from response header if present
+    const newNonce = response.headers.get('x-wp-nonce');
+    if (newNonce) {
+      AuthService.setRestNonce(newNonce);
     }
 
     if (!response.ok) {
@@ -94,7 +121,7 @@ export class ApiClient {
         payload
       );
     }
-    return data;
+    return { data, meta };
   }
 
   private buildHeaders(headers: Record<string, string> = {}): Record<string, string> {
@@ -122,7 +149,7 @@ export class ApiClient {
     method: string,
     endpoint: string,
     { params, data, headers }: { params?: Record<string, string | number>, data?: unknown, headers?: Record<string, string> } = {}
-  ): Promise<T> {
+  ): Promise<ApiResponse<T>> {
     let url = new URL(`${this.baseUrl}${endpoint}`);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -151,7 +178,8 @@ export class ApiClient {
         headers: builtHeaders,
         body,
       });
-      return await this.handleResponse(response, url.toString(), method, data) as T;
+      const { data: responseData, meta } = await this.handleResponse(response, url.toString(), method, data);
+      return { data: responseData as T, meta };
     } catch (error: unknown) {
       if (error instanceof ApiError) throw error;
       if (error instanceof TimeoutError) throw error;
@@ -171,19 +199,19 @@ export class ApiClient {
     }
   }
 
-  async get<T = unknown>(endpoint: string, params?: Record<string, string | number>, headers: Record<string, string> = {}): Promise<T> {
+  async get<T = unknown>(endpoint: string, params?: Record<string, string | number>, headers: Record<string, string> = {}): Promise<ApiResponse<T>> {
     return this.request<T>('GET', endpoint, { params, headers });
   }
 
-  async post<T = unknown>(endpoint: string, data?: Record<string, unknown>, headers: Record<string, string> = {}): Promise<T> {
+  async post<T = unknown>(endpoint: string, data?: Record<string, unknown>, headers: Record<string, string> = {}): Promise<ApiResponse<T>> {
     return this.request<T>('POST', endpoint, { data, headers });
   }
 
-  async put<T = unknown>(endpoint: string, data?: Record<string, unknown>, headers: Record<string, string> = {}): Promise<T> {
+  async put<T = unknown>(endpoint: string, data?: Record<string, unknown>, headers: Record<string, string> = {}): Promise<ApiResponse<T>> {
     return this.request<T>('PUT', endpoint, { data, headers });
   }
 
-  async delete<T = unknown>(endpoint: string, headers: Record<string, string> = {}): Promise<T> {
+  async delete<T = unknown>(endpoint: string, headers: Record<string, string> = {}): Promise<ApiResponse<T>> {
     return this.request<T>('DELETE', endpoint, { headers });
   }
 }

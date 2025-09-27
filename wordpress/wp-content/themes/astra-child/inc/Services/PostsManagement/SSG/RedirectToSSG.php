@@ -3,6 +3,7 @@
 namespace AstraChild\Services\PostsManagement\SSG;
 
 use AstraChild\Contracts\HooksInterface;
+use AstraChild\Services\Utilities\SSG\Integrations\SSGIntegration;
 use AstraChild\Services\Utilities\SSG\Integrations\LiteSpeedIntegration;
 use AstraChild\Services\Utilities\SSG\SSGUtilities;
 use AstraChild\Core\Cache;
@@ -46,22 +47,38 @@ class RedirectToSSG implements HooksInterface
 
 			$currentMtime = @filemtime($ssgFilePath);
 			if ($currentMtime === false) {
-				LiteSpeedIntegration::logCoordination('Unable to read SSG file mtime', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+				SSGIntegration::logCoordination('Unable to read SSG file mtime', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 				$currentMtime = time(); // fallback to avoid fatal comparisons
 			}
 
+			// Check if SSG file exists and is readable
+			if (is_readable($ssgFilePath)) {
+				$mtime = filemtime($ssgFilePath);
+				if ($mtime !== false) {
+					$age = time() - $mtime;
+					if ($age < 86400) { // 1 day
+						SSGIntegration::logCoordination('Serving cached SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+					} else {
+						SSGIntegration::logCoordination('Serving fresh SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+					}
+				} else {
+					SSGIntegration::logCoordination('Failed to read SSG file', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+				}
+			} else {
+				return false;
+			}
 			$ssgContent = false;
 
 			if ($cached && is_array($cached) && isset($cached['mtime'], $cached['content']) && $cached['mtime'] >= $currentMtime) {
 				$ssgContent = $cached['content'];
-				LiteSpeedIntegration::logCoordination('Serving cached SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+				SSGIntegration::logCoordination('Serving cached SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 			} else {
 				$ssgContent = @file_get_contents($ssgFilePath);
 				if ($ssgContent !== false) {
 					Cache::set($cacheKey, ['content' => $ssgContent, 'mtime' => $currentMtime], expiration: 86400); // Cache for 1 day
-					LiteSpeedIntegration::logCoordination('Serving fresh SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+					SSGIntegration::logCoordination('Serving fresh SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 				} else {
-					LiteSpeedIntegration::logCoordination('Failed to read SSG file', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+					SSGIntegration::logCoordination('Failed to read SSG file', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 				}
 			}
 
@@ -75,24 +92,6 @@ class RedirectToSSG implements HooksInterface
 	public function serveSSG(): void
 	{
 		try {
-			// Check LiteSpeed coordination
-			if (LiteSpeedIntegration::isActive()) {
-				if (LiteSpeedIntegration::isCacheOperation()) {
-					LiteSpeedIntegration::logCoordination('Skipping SSG during LiteSpeed cache operation');
-					return;
-				}
-				if (LiteSpeedIntegration::shouldSkipDuringMaintenance()) {
-					LiteSpeedIntegration::logCoordination('Skipping SSG during LiteSpeed maintenance');
-					return;
-				}
-			}
-
-			// Check if cache should be bypassed
-			$cacheBypassed = LiteSpeedIntegration::shouldBypassSSGCache();
-			if ($cacheBypassed) {
-				LiteSpeedIntegration::logCoordination('SSG cache bypassed due to configuration or maintenance');
-			}
-
 			$serveFor = get_option('ssg_serve_for', 'bots');
 			$isBot = $this->botDetection->isBot();
 
@@ -102,7 +101,7 @@ class RedirectToSSG implements HooksInterface
 			$acceptLanguage = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
 			$acceptHeader = $_SERVER['HTTP_ACCEPT'] ?? '';
 			$referer = $_SERVER['HTTP_REFERER'] ?? '';
-			LiteSpeedIntegration::logCoordination('Browser info for SSG request', [
+			SSGIntegration::logCoordination('Browser info for SSG request', [
 				'user_agent' => $userAgent,
 				'ip' => $remoteAddr,
 				'accept_language' => $acceptLanguage,
@@ -110,18 +109,6 @@ class RedirectToSSG implements HooksInterface
 				'referer' => $referer,
 				'is_bot' => $isBot
 			]);
-
-			// Always skip SSG for logged-in users to prevent false positives from bot detection
-			if (is_user_logged_in()) {
-				LiteSpeedIntegration::logCoordination('Skipping SSG for logged-in user', ['is_bot' => $isBot]);
-				return;
-			}
-
-			// Skip SSG for ESI/fragment requests to avoid returning full static pages
-			if (LiteSpeedIntegration::isEsiRequest()) {
-				LiteSpeedIntegration::logCoordination('Skipping SSG for ESI/fragment request');
-				return;
-			}
 
 			// Get configuration for who to serve SSG to
 			// Check if we should serve based on visitor type
@@ -143,7 +130,13 @@ class RedirectToSSG implements HooksInterface
 				$ssgContent = $this->getSSGContent($post, $ssgFilePath, $isBot);
 
 				if ($ssgContent !== false) {
-					LiteSpeedIntegration::sendSSGResponseHeaders((int) $post->ID, $isBot, strlen($ssgContent));
+					header('X-SSG: true');
+					header('X-SSG-Source: static');
+					header('X-SSG-Timestamp: ' . time());
+					header('X-SSG-Version: 1.0');
+					header('X-SSG-Visitor-Type: ' . ($isBot ? 'bot' : 'human'));
+					header('Content-Type: text/html; charset=UTF-8');
+					header('Cache-Control: public, max-age=120');
 
 					// Output the SSG content
 					echo $ssgContent;

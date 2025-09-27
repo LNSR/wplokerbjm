@@ -7,8 +7,13 @@
         "@playwright/mcp@latest",
         "--ignore-https-errors",
         "--browser=chrome-beta",
-        "--isolated"
+        "--shared-browser-context",
+        "--storage-state=${workspaceFolder:wplokerbjm}/mcp/playwright/persistent-state.json",
+        "--extension"
       ],
+      "env": {
+        "PLAYWRIGHT_MCP_EXTENSION_TOKEN": "${env:PLAYWRIGHT_MCP_EXTENSION_TOKEN}"
+      },
       "type": "stdio"
     },
     "sequentialthinking": {
@@ -37,8 +42,6 @@
         "host",
         "--env-file",
         "${workspaceFolder}/.env",
-        "-v",
-        "${workspaceFolder}/mcp/redis:${workspaceFolder}",
         "mcp/redis"
       ],
       "type": "stdio"
@@ -53,8 +56,6 @@
         "host",
         "--env-file",
         "${workspaceFolder}/.env",
-        "-v",
-        "${workspaceFolder}/mcp/mysql:${workspaceFolder}",
         "docker.io/acuvity/mcp-server-benborla-mysql:latest"
       ],
       "type": "stdio"

@@ -6,7 +6,7 @@ set -euo pipefail
 # RCLONE_TRANSFERS, RCLONE_CHECKERS, RCLONE_RETRIES, RCLONE_LOW_RETRIES, RCLONE_LOG_LEVEL
 
 echo "Starting deploy (no persistent logs will be written)"
-echo "Performance settings: Transfers=${RCLONE_TRANSFERS}, Checkers=${RCLONE_CHECKERS}, BW Limit=5M, TPS Limit=2"
+echo "Performance settings: Transfers=${RCLONE_TRANSFERS}, Checkers=${RCLONE_CHECKERS}, BW Limit=${RCLONE_BWLIMIT:-5M}, TPS Limit=${RCLONE_TPSLIMIT:-2}"
 START_TIME=$(date +%s)
 
 # Check system resources before starting deployment
@@ -63,7 +63,7 @@ SELECTED=(
 
 PIDS=()
 
-RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 5m --contimeout 60s --log-level ${RCLONE_LOG_LEVEL} --bwlimit 5M --tpslimit 2 --tpslimit-burst 4 --delete-after"
+RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 5m --contimeout 60s --log-level ${RCLONE_LOG_LEVEL} --bwlimit ${RCLONE_BWLIMIT:-5M} --tpslimit ${RCLONE_TPSLIMIT:-2} --tpslimit-burst 4 --delete-after --fast-list"
 
 if [ "${DRY_RUN:-false}" = "true" ]; then
   DRY_FLAG="--dry-run"
@@ -135,7 +135,7 @@ DURATION=$((END_TIME - START_TIME))
 echo "Date: $(date -u)"
 echo "Duration: ${DURATION} seconds"
 echo "Rclone options: $RCLONE_BASE_OPTS"
-echo "Note: Using balanced settings to prevent server overload (BW: 5M, TPS: 2, concurrent operations, delete-after for safety)"
+echo "Note: Using balanced settings to prevent server overload (BW: ${RCLONE_BWLIMIT:-5M}, TPS: ${RCLONE_TPSLIMIT:-2}, concurrent operations, delete-after for safety)"
 echo "Check the run logs in Actions for details."
 
 

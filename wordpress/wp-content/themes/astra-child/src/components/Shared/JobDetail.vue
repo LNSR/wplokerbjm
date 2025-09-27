@@ -1,5 +1,5 @@
 <template>
-  <div class="space-y-8">
+  <div class="!space-y-8">
     <!-- Job Title -->
     <section v-if="job.title" class="top-0 backdrop-blur text-center">
       <h1 class="text-3xl !font-bold">{{ job.title }}</h1>
@@ -37,10 +37,10 @@
         <span class="font-bold">Ringkasan Pekerjaan</span>
       </h2>
       <div class="gap-4 mt-4">
-        <div class="gap-x-6 gap-y-4 text-lg">
+        <div class="gap-x-6 gap-y-4 text-lg ml-2">
           <div v-for="row in ringkasanPekerjaan" :key="row.label" class="flex items-start lg:space-x-2 space-x-1 mb-2">
-            <i :class="`fas ${row.icon} text-blue-600 w-3 text-justify pt-2 inline-block static`"></i>
-            <span class="ml-3 !font-semibold whitespace-nowrap min-w-[120px]">{{ row.label }}</span>
+            <i :class="`fas ${row.icon} text-blue-600 !w-3 text-justify pt-2 inline-block static`"></i>
+            <span class="!ml-3 !font-semibold text-wrap min-w-[40%] md:min-w-[20%]">{{ row.label }}</span>
             <span :class="[getLabelClass(row.label), '!font-semibold']">:</span>
             <span class="!font-semibold" v-html="row.value"></span>
           </div>

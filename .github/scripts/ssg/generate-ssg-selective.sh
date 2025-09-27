@@ -240,7 +240,7 @@ cd "$SSG_SRC_DIR"
 echo "Copying SSG assets from: $SSG_SRC_DIR"
 echo "Remote destination: ${REMOTE_PATH}/assets/ssg"
 
-RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --sftp-disable-hashcheck --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 5m --contimeout 30s --log-level ${RCLONE_LOG_LEVEL} --bwlimit 5M --tpslimit 2 --tpslimit-burst 4"
+RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --sftp-disable-hashcheck --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 5m --contimeout 30s --log-level ${RCLONE_LOG_LEVEL} --bwlimit ${RCLONE_BWLIMIT:-5M} --tpslimit ${RCLONE_TPSLIMIT:-2} --tpslimit-burst 4 --fast-list"
 
 # Test rclone remote connectivity before heavy operations
 if ! rclone lsd sftpdeploy: >/dev/null 2>&1; then

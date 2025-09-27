@@ -30,6 +30,16 @@
         "cwd": "${workspaceFolder:astra-child}"
       },
       "problemMatcher": []
+    },
+    {
+      "label": "php-lint",
+      "type": "shell",
+      "command": "composer run lint:php",
+      "group": "test",
+      "options": {
+        "cwd": "${workspaceFolder:astra-child}"
+      },
+      "problemMatcher": []
     }
   ]
 }

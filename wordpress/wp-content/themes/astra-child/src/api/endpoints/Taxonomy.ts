@@ -12,9 +12,9 @@ export const taxonomyApi: TaxonomyApiInterface = {
    * Get all taxonomy terms at once
    */
   async getAllTerms(): Promise<TaxonomyTermsResponse> {
-    return await container.get<ApiClient>("ApiClient").get<TaxonomyTermsResponse>('/taxonomies/')
+    return (await container.get<ApiClient>("ApiClient").get<TaxonomyTermsResponse>('/taxonomies/')).data
   },
   async getTermsByType(type: string): Promise<TaxonomyTerm[]> {
-    return await container.get<ApiClient>("ApiClient").get<TaxonomyTerm[]>(`/taxonomies/${type}`)
+    return (await container.get<ApiClient>("ApiClient").get<TaxonomyTerm[]>(`/taxonomies/${type}`)).data
   }
 }

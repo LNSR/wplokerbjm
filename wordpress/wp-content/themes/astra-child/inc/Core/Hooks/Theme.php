@@ -15,19 +15,6 @@ class Theme
         <?php
     }
 
-    /**
-     * Injects a meta attribute indicating if the user is logged in to WordPress.
-     */
-    public static function injectWpUserLoggedInFlag(): void
-    {
-        if (is_user_logged_in()) {
-            ?>
-            <meta name="wp-user-logged-in" content="true">
-            <meta name="wp-rest-nonce" content="<?php echo esc_attr(wp_create_nonce('wp_rest')); ?>">
-            <?php
-        }
-    }
-
     public static function injectThemeScript(): void
     {
         ?>

@@ -59,10 +59,8 @@ class SSGUtilities
                 error_log("SSG Delete: Successfully deleted SSG file: $ssgFilePath (Reason: $reason)");
 
                 // Purge LiteSpeed cache for this post and SSG tag
-                if (function_exists('litespeed_purge_post')) {
-                    litespeed_purge_post($post_id);
-                }
                 if (function_exists('do_action')) {
+                    do_action('litespeed_purge_post', $post_id);
                     do_action('litespeed_purge_tag', 'ssg');
                 }
             } else {

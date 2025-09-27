@@ -1,10 +1,32 @@
+{
+  storage redis {
+        host           "redis"
+        port           6379
+        password       "{env.REDIS_PWD}"
+        db             0
+        key_prefix     "caddy"
+        compression    true
+        tls_enabled    false
+        tls_insecure   true
+    }
+}
+
+
 :443 {
   tls /var/www/certs/localhost.crt /var/www/certs/localhost.key # ! Use your own certificate
   root * /var/www/html
   # WordPress: try existing file, then directory, otherwise fall back to index.php
   # This enables pretty permalinks to be handled by WordPress.
   try_files {path} {path}/ /index.php?{query}
-  php_fastcgi wordpress:9000
+  # Pass request host/proto headers into PHP-FPM so PHP's $_SERVER sees
+  # HTTP_X_FORWARDED_HOST and HTTP_X_FORWARDED_PROTO when using AUTO mode.
+  # This preserves the original host/proto coming from the client/proxy
+  # and allows WordPress to choose the correct siteurl/home dynamically.
+  php_fastcgi wordpress:9000 {
+    env HTTP_X_FORWARDED_PROTO {scheme}
+    env HTTP_X_FORWARDED_HOST {host}
+    env HTTP_HOST {host}
+  }
 
   # * Rewrite /node_modules/* to the {your-theme} node_modules directory
   # * Use this to serve local node_modules for development purposes
@@ -16,42 +38,38 @@
     precompressed
   }
 
-  encode {
+  @production expression {env.WP_ENV} == "production"
+  encode @production {
     zstd best
   }
+
+  @static path /wp-content/* /wp-includes/* /favicon.ico /robots.txt
+  @dynamic not path /wp-content/* /wp-includes/* /favicon.ico /robots.txt
 
   # Default security headers
   header {
     Access-Control-Allow-Origin *
     Access-Control-Allow-Methods "GET, POST, OPTIONS, PUT, DELETE"
-    Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization"
+    Access-Control-Allow-Headers "Origin, X-Requested-With, Content-Type, Accept, Authorization, X-WP-Nonce, Content-Disposition, Content-MD5"
+    Access-Control-Expose-Headers "X-WP-Total, X-WP-TotalPages, Link, X-WP-Nonce"
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     Referrer-Policy "strict-origin-when-cross-origin"
     X-Content-Type-Options "nosniff"
     X-Frame-Options "SAMEORIGIN"
     X-XSS-Protection "1; mode=block"
     Permissions-Policy "geolocation=(), microphone=(), camera=()"
+    -X-Powered-By
   }
 
-  # Aggressive cache for static assets
-  @static_assets {
-    path_regexp static_assets ".*\.(?:js|css|png|jpg|jpeg|gif|svg|webp|ico|woff2?|ttf|eot|otf|mp4|webm|ogg|mp3|json|xml|map)$"
-  }
-  header @static_assets {
-    Cache-Control "public, max-age=31536000, immutable"
-    Expires "Thu, 31 Dec 2037 23:55:55 GMT"
-    Pragma "cache"
-  }
+  # Cache static assets long-term, prevent caching dynamic content
+  header @static Cache-Control "public, max-age=31536000, immutable"
+  header @static Expires "Thu, 31 Dec 2037 23:55:55 GMT"
 
-  # No cache for HTML/PHP (dynamic content)
-  @dynamic_content {
-    path_regexp dynamic_content ".*\.(?:php|html?)$"
-  }
-  header @dynamic_content {
-    Cache-Control "no-store, no-cache, must-revalidate, max-age=0"
-    Pragma "no-cache"
-    Expires "0"
-  }
+  header @dynamic Cache-Control "no-cache, no-store, must-revalidate"
+  header @dynamic Pragma "no-cache"
+  header @dynamic Expires "0"
+
+  replace "https://localhost/wp-content/uploads/" "https://{host}/wp-content/uploads/"
 
   log {
     output stdout

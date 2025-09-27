@@ -3,6 +3,7 @@
 namespace AstraChild\Services\PostsManagement\SSG;
 
 use AstraChild\Contracts\HooksInterface;
+use AstraChild\Services\Utilities\SSG\Integrations\SSGIntegration;
 use AstraChild\Services\Utilities\SSG\Integrations\LiteSpeedIntegration;
 use \AstraChild\Services\Utilities\SSG\Integrations\RankMathIntegration;
 use AstraChild\Core\Cache;
@@ -81,18 +82,6 @@ class PostsCRUDListener implements HooksInterface {
 				return;
 			}
 
-			// Skip if this is a LiteSpeed cache operation
-			if ( LiteSpeedIntegration::isCacheOperation() ) {
-				LiteSpeedIntegration::logCoordination( "Skipping SSG trigger for LiteSpeed cache operation", [ 'post_id' => $post_id ] );
-				return;
-			}
-
-			// Skip during LiteSpeed maintenance operations
-			if ( LiteSpeedIntegration::shouldSkipDuringMaintenance() ) {
-				LiteSpeedIntegration::logCoordination( "Skipping SSG trigger during LiteSpeed maintenance", [ 'post_id' => $post_id ] );
-				return;
-			}
-
 			// Skip if this is an SSG bot request
 			if ( $this->isSsgBotRequest() ) {
 				$userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
@@ -163,7 +152,7 @@ class PostsCRUDListener implements HooksInterface {
 			// Set transient to mark recent LiteSpeed purge activity
 			Cache::set( 'litespeed_recent_purge', time(), 300 ); // 5 minutes
 
-			LiteSpeedIntegration::logCoordination( "LiteSpeed purged post, coordinating SSG update", [ 'post_id' => $post_id ] );
+			SSGIntegration::logCoordination( "LiteSpeed purged post, coordinating SSG update", [ 'post_id' => $post_id ] );
 
 			// Add a small delay to ensure LiteSpeed operations complete first
 			wp_schedule_single_event( time() + 2, 'ssg_delayed_post_update', [ $post_id ] );
@@ -185,7 +174,7 @@ class PostsCRUDListener implements HooksInterface {
 			// Set transient to mark recent LiteSpeed purge activity
 			Cache::set( 'litespeed_recent_purge', time(), 300 ); // 5 minutes
 
-			LiteSpeedIntegration::logCoordination( "LiteSpeed purged all cache, triggering full SSG rebuild" );
+			SSGIntegration::logCoordination( "LiteSpeed purged all cache, triggering full SSG rebuild" );
 
 			// Trigger full site rebuild
 			$this->triggerBuild->trigger( [ home_url( '/' ) ], 'litespeed_full_purge' );

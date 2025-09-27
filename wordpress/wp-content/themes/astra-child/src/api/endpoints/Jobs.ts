@@ -38,7 +38,7 @@ export const jobsApi: JobsApiInterface = {
       return []
     }
     
-    return await container.get<ApiClient>("ApiClient").get<AutoSuggestResponse>('/auto-suggest/', { query })
+    return (await container.get<ApiClient>("ApiClient").get<AutoSuggestResponse>('/auto-suggest/', { query })).data
   },
 
   /**
@@ -57,7 +57,8 @@ export const jobsApi: JobsApiInterface = {
       }
     })
 
-    return await container.get<ApiClient>("ApiClient").get<SearchResponse>('/search/', params)
+    const res = await container.get<ApiClient>("ApiClient").get<SearchResponse>('/search/', params)
+    return { ...res.data, meta: res.meta }
   },
 
   /**
@@ -88,13 +89,14 @@ export const jobsApi: JobsApiInterface = {
       }
     })
 
-    return await container.get<ApiClient>("ApiClient").get<LoadMoreResponse>('/load-more/', params)
+    const res = await container.get<ApiClient>("ApiClient").get<LoadMoreResponse>('/load-more/', params)
+    return { ...res.data, meta: res.meta }
   },
 
   /**
    * Fetch single job overlay by slug
    */
   async fetchSingleOverlay(slug: string): Promise<SingleOverlayResponse> {
-    return await container.get<ApiClient>("ApiClient").get<SingleOverlayResponse>('/single-overlay/', { slug })
+    return (await container.get<ApiClient>("ApiClient").get<SingleOverlayResponse>('/single-overlay/', { slug })).data
   }
 }

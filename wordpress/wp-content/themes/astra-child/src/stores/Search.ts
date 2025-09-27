@@ -145,8 +145,8 @@ export const useSearchStore = defineStore("search", () => {
       jobs.value = [...response.jobs];
       context.value = response.context || "search";
       title.value = response.title || "Hasil Pencarian";
-      totalJobs.value = response.totalJobs;
-      maxNumPages.value = response.maxNumPages;
+      totalJobs.value = response.meta?.total || 0;
+      maxNumPages.value = response.meta?.totalPages || 1;
       page.value = 1; // Reset page on new search
       if (filters.value.cari) {
         addToHistory(filters.value.cari);
@@ -178,8 +178,8 @@ export const useSearchStore = defineStore("search", () => {
       const response: LoadMoreResponse = await apiLoadMore(loadMoreFilters);
       if (Array.isArray(response.jobs) && response.jobs.length) {
         jobs.value.push(...response.jobs);
-        page.value = response.pagination.current;
-        maxNumPages.value = response.pagination.max;
+        page.value = loadMoreFilters.page;
+        maxNumPages.value = response.meta?.totalPages || maxNumPages.value;
       } else {
         // dont increment page
         page.value = maxNumPages.value;

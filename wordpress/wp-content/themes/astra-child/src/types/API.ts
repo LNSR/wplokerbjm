@@ -12,13 +12,25 @@ export interface SearchFilters {
 // Context type for search operations
 export type SearchContext = 'search' | 'archive' | 'latest'
 
+// API response metadata from headers
+export interface ApiMeta {
+  total?: number
+  totalPages?: number
+  links?: Record<string, string>
+}
+
+// Generic API response wrapper
+export interface ApiResponse<T> {
+  data: T
+  meta: ApiMeta
+}
+
 // Base response structure for job operations
 export interface BaseJobResponse {
   jobs: Job[]
-  totalJobs: number
-  maxNumPages: number
   context?: SearchContext
   filters?: SearchFilters
+  meta?: ApiMeta
 }
 
 // Extended response for initial search operations
@@ -27,16 +39,8 @@ export interface SearchResponse extends BaseJobResponse {
   shouldScroll?: boolean
 }
 
-// Response for pagination operations (keeps it simple)
-export interface LoadMoreResponse {
-  jobs: Job[]
-  pagination: {
-    current: number
-    max: number
-  }
-  context?: SearchContext
-  filters?: Partial<SearchFilters>
-}
+// Response for pagination operations
+export interface LoadMoreResponse extends BaseJobResponse {}
 
 // Simplified load more filters - flattened structure
 export interface LoadMoreFilters extends Partial<SearchFilters> {
@@ -95,6 +99,7 @@ export type JobContactRow = {
 
 export interface SingleOverlayResponse {
   id?: number;
+  duplicateNonce?: string; // Nonce for plugin 'Duplicate post as draft'
   title: string;
   namaPerusahaan: string;
   tentangPerusahaan: string;

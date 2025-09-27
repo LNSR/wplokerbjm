@@ -142,10 +142,6 @@ class BotRangeFetcher
         $pinterestRanges = $this->fetchPinterestBotRanges();
         $ranges = array_merge($ranges, $pinterestRanges);
 
-        // Reddit bot ranges
-        $redditRanges = $this->fetchRedditBotRanges();
-        $ranges = array_merge($ranges, $redditRanges);
-
         // QUIC.cloud ranges
         $quicCloudRanges = $this->fetchQuicCloudRanges();
         $ranges = array_merge($ranges, $quicCloudRanges);
@@ -497,21 +493,6 @@ class BotRangeFetcher
 
         // Pinterest's documented IP range
         $ranges[] = '54.236.1.0/24';
-
-        return $ranges;
-    }
-
-    /**
-     * Fetch Reddit bot IP ranges
-     * Reddit doesn't publish official IP ranges, but uses redditbot user agent
-     */
-    private function fetchRedditBotRanges(): array
-    {
-        $ranges = [];
-
-        // Reddit doesn't provide official IP ranges
-        // We'll rely on user agent and domain detection instead
-        // No IP ranges to add here
 
         return $ranges;
     }

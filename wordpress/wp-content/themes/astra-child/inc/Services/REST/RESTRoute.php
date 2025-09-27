@@ -7,13 +7,13 @@ use AstraChild\Contracts\HooksInterface;
 
 class RESTRoute implements HooksInterface
 {
+    public static string $baseURI = 'astra-child/v1';
 
     public function __construct(
         private readonly \AstraChild\Controllers\REST\TaxonomyDepth $taxonomyDepth,
         private readonly \AstraChild\Controllers\REST\AutoSuggestionSearch $autoSuggestionSearch,
         private readonly \AstraChild\Controllers\REST\LoadMore $loadMore,
         private readonly \AstraChild\Controllers\REST\DynamicSearch $dynamicSearch,
-        private readonly \AstraChild\Controllers\REST\Carousel $carousel,
         private readonly \AstraChild\Controllers\REST\SingleOverlay $singleOverlay,
         private readonly \AstraChild\Controllers\REST\DispatchSSGBuild $dispatchSSGBuild
     ) {
@@ -25,48 +25,39 @@ class RESTRoute implements HooksInterface
     }
     public function registerFilters(): void
     {
-        // No filters to register in this class
-    }
-
-    /**
-     * Arguments configuration for the /dispatch-ssg/ REST route.
-     *
-     * Extracted to a single method to keep registerRoutes() concise and
-     * allow reuse or testing of the args definition.
-     *
-     * @return array
-     */
-    private function getDispatchSSGArgs(): array
-    {
-        // Deprecated: moved to DispatchSSGBuild::getRouteArgs() so the handler owns its route contract.
-        return [];
+        add_filter('rest_pre_serve_request', function ($served, $result, $request, $server) {
+            if (!headers_sent()) {
+                header('Access-Control-Expose-Headers: X-WP-Total, X-WP-TotalPages, Link, X-WP-Nonce');
+            }
+            return $served;
+        }, 10, 4);
     }
 
     public function registerRoutes(): void
     {
         /** @see \AstraChild\Controllers\REST\AutoSuggestionSearch::handle() */
-        register_rest_route('astra-child/v1', '/auto-suggest/', [
+        register_rest_route(self::$baseURI, '/auto-suggest/', [
             'methods' => 'GET',
             'callback' => [$this->autoSuggestionSearch, 'handle'],
             'permission_callback' => '__return_true',
         ]);
 
         /** @see \AstraChild\Controllers\REST\LoadMore::handle() */
-        register_rest_route('astra-child/v1', '/load-more/', [
+        register_rest_route(self::$baseURI, '/load-more/', [
             'methods' => 'GET',
             'callback' => [$this->loadMore, 'handle'],
             'permission_callback' => '__return_true',
         ]);
 
         /** @see \AstraChild\Controllers\REST\DynamicSearch::handle() */
-        register_rest_route('astra-child/v1', '/search/', [
+        register_rest_route(self::$baseURI, '/search/', [
             'methods' => 'GET',
             'callback' => [$this->dynamicSearch, 'handle'],
             'permission_callback' => '__return_true',
         ]);
 
         /** @see \AstraChild\Controllers\REST\TaxonomyDepth::handle() */
-        register_rest_route('astra-child/v1', '/taxonomies/', [
+        register_rest_route(self::$baseURI, '/taxonomies/', [
             'methods' => 'GET',
             'callback' => [$this->taxonomyDepth, 'handle'],
             'permission_callback' => '__return_true',
@@ -79,29 +70,22 @@ class RESTRoute implements HooksInterface
         ];
         foreach ($taxonomies as $taxonomy) {
             /** @see \AstraChild\Controllers\REST\TaxonomyDepth::handle() */
-            register_rest_route('astra-child/v1', "/taxonomies/$taxonomy", [
+            register_rest_route(self::$baseURI, "/taxonomies/$taxonomy", [
                 'methods' => 'GET',
                 'callback' => [$this->taxonomyDepth, $taxonomy],
                 'permission_callback' => '__return_true',
             ]);
         }
 
-        /** @see \AstraChild\Controllers\REST\Carousel::handle() */
-        register_rest_route('astra-child/v1', '/carousel/', [
-            'methods' => 'GET',
-            'callback' => [$this->carousel, 'handle'],
-            'permission_callback' => '__return_true',
-        ]);
-
         /** @see \AstraChild\Controllers\REST\SingleOverlay::handle() */
-        register_rest_route('astra-child/v1', '/single-overlay/', [
+        register_rest_route(self::$baseURI, '/single-overlay/', [
             'methods' => 'GET',
             'callback' => [$this->singleOverlay, 'handle'],
             'permission_callback' => '__return_true',
         ]);
 
         /** @see \AstraChild\Controllers\REST\DispatchSSGBuild::handle() */
-        register_rest_route('astra-child/v1', '/dispatch-ssg/', [
+        register_rest_route(self::$baseURI, '/dispatch-ssg/', [
             'methods' => 'POST',
             'callback' => [$this->dispatchSSGBuild, 'handle'],
             'permission_callback' => function () {

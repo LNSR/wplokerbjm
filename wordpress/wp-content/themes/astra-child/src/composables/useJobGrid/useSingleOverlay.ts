@@ -1,7 +1,7 @@
 import { ref, watch, onMounted, type Ref } from 'vue'
 import { debounce } from '@/utils'
 import type { SingleOverlayResponse } from '@/types'
-import { useApi } from '../useAPI'
+import { useApi } from '@/composables/useAPI'
 import { useRoute } from 'vue-router'
 import { AuthService } from '@/services/AuthService'
 
@@ -12,6 +12,7 @@ export function useSingleOverlay(props: { slug?: string; visible?: boolean }): {
   isLoggedIn: Ref<boolean>;
   editPostId: Ref<number | null>;
   useSingleOverlayAPI: (slug: string) => Promise<void>;
+  getCloneHref: (postId?: number | null) => string;
 } {
   const data = ref<SingleOverlayResponse | null>(null)
   const loading = ref(false)
@@ -54,8 +55,25 @@ export function useSingleOverlay(props: { slug?: string; visible?: boolean }): {
     }
   }
 
+  /**
+   * Build the admin duplicate (clone) URL for the Duplicate Page/Post plugin.
+   */
+  function getCloneHref(postId?: number | null): string {
+    if (!postId) return '#'
+    const base = `/wp-admin/admin.php?action=dt_dpp_post_as_draft&post=${postId}`
+
+    try {
+      const dup = data.value?.duplicateNonce
+      if (typeof dup === 'string' && dup.length > 0) return `${base}&nonce=${encodeURIComponent(dup)}`
+    } catch {
+      error.value = 'Failed to get clone URL nonce.'
+    }
+
+    return base
+  }
+
   onMounted(() => {
-    isLoggedIn.value = AuthService.isUserLoggedIn()
+    isLoggedIn.value = !!AuthService.getRestNonce()
     fetchJob()
   })
 
@@ -71,7 +89,6 @@ export function useSingleOverlay(props: { slug?: string; visible?: boolean }): {
     () => props.visible,
     fetchJob
   )
-
   return {
     data,
     loading,
@@ -79,5 +96,6 @@ export function useSingleOverlay(props: { slug?: string; visible?: boolean }): {
     isLoggedIn,
     editPostId,
     useSingleOverlayAPI: debouncedUseSingleOverlayAPI,
+    getCloneHref,
   }
 }

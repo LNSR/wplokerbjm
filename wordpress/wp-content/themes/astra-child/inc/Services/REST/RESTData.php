@@ -79,9 +79,10 @@ class RESTData
                 'social_media' => $jobdata['social_media'] ?? [],
                 'post_time' => get_post_time('c', false, $post_id),
             ];
-            
+
             if (is_user_logged_in()) {
                 $data['id'] = $post_id;
+                $data['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
             }
 
             return $data;
@@ -89,5 +90,19 @@ class RESTData
             error_log('RESTData::getSingleOverlayData error for post ' . $post_id . ': ' . $e->getMessage());
             return [];
         }
+    }
+
+    /**
+     * Provides plugin-specific nonce for actions
+     * @param string $action
+     * @param int $post_id
+     * @return string
+     */
+    private static function pluginSpecificNonce(string $action, int $post_id): string
+    {
+        return match ($action) {
+            'duplicatePost' => wp_create_nonce('dt-duplicate-page-' . $post_id),
+            default => '',
+        };
     }
 }

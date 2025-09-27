@@ -18,11 +18,13 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     env:
-      RCLONE_TRANSFERS: "4"
-      RCLONE_CHECKERS: "4"
+      RCLONE_TRANSFERS: "6"
+      RCLONE_CHECKERS: "2"
       RCLONE_RETRIES: "3"
       RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"
+      RCLONE_BWLIMIT: "100M"
+      RCLONE_TPSLIMIT: "3"
 
     steps:
       - name: Checkout repository
@@ -48,7 +50,7 @@ jobs:
       - name: Composer install (no-dev)
         working-directory: ${{ env.THEME_DIR }}
         run: |
-          composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader --classmap-authoritative --apcu-autoloader
+          composer install --no-dev --prefer-dist --no-interaction --no-progress --optimize-autoloader --apcu-autoloader
 
       - name: Setup deployment
         uses: ./.github/actions/setup-deployment

@@ -1,32 +1,30 @@
-FROM wordpress:php8.4-fpm
+## Builder stage: compile PECL extensions and PHP extensions
+FROM wordpress:fpm AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
-# Fix for time synchronization issues and package repositories
-RUN mkdir -p /etc/apt/apt.conf.d/ && \
-    echo 'Acquire::Check-Valid-Until "false";' > /etc/apt/apt.conf.d/10no-check-valid-until && \
-    echo 'APT::Get::AllowUnauthenticated "true";' > /etc/apt/apt.conf.d/10allow-unauthenticated
-
-# Install all system dependencies
-RUN apt-get update --allow-releaseinfo-change || true && \
+# Install build tools and -dev packages required to compile extensions
+RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
-    libmagickwand-dev \
-    libzip-dev \
-    libicu-dev \
-    git \
-    curl \
+    ca-certificates \
+    build-essential \
+    autoconf \
+    make \
+    gcc \
+    g++ \
     pkg-config \
-    libmemcached-dev \
     zlib1g-dev \
     libzstd-dev \
     libyaml-dev \
     libsasl2-dev \
+    libmemcached-dev \
     libssl-dev \
     libpng-dev \
     libjpeg62-turbo-dev \
     libfreetype6-dev \
     libxml2-dev \
     libgmp-dev \
+    libicu-dev \
     libsodium-dev \
     libonig-dev \
     libcurl4-openssl-dev \
@@ -37,53 +35,65 @@ RUN apt-get update --allow-releaseinfo-change || true && \
     libreadline-dev \
     libedit-dev \
     libbrotli-dev \
+    libzip-dev \
+    git \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install WP-CLI early so builder can use it if needed
+RUN curl -o /usr/local/bin/wp -L https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && \
+    chmod +x /usr/local/bin/wp
+
+# Install PECL extensions (build stage)
+RUN pecl install redis imagick apcu igbinary msgpack yaml brotli memcached xdebug && \
+    docker-php-ext-enable redis imagick apcu igbinary msgpack yaml brotli memcached xdebug
+
+# Configure and build PHP extensions that use docker-php-ext-install
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm --with-avif && \
+    docker-php-ext-install -j$(nproc) \
+    bcmath calendar curl exif gd gettext gmp intl mbstring mysqli opcache pcntl soap sockets sodium sysvmsg sysvsem sysvshm xml zip
+
+# Copy any custom PHP ini files to the builder so they are baked in and can be copied to final
+COPY docker.conf.d/ /usr/local/etc/php/conf.d/
+
+
+## Final stage: runtime image
+FROM wordpress:fpm
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# Install runtime packages only (no compilers). Add CLI tools and runtimes.
+RUN apt-get update --allow-releaseinfo-change && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    imagemagick \
+    jpegoptim \
+    optipng \
+    pngquant \
+    memcached \
+    libmemcached11 \
+    libxpm4 \
+    libyaml-0-2 \
+    default-jre-headless \
     gosu \
     less \
     && rm -rf /var/lib/apt/lists/*
 
-# Install wp-cli
-RUN curl -o wp-cli.phar https://raw.githubusercontent.com/wp-cli/builds/gh-pages/phar/wp-cli.phar && \
-    chmod +x wp-cli.phar && \
-    mv wp-cli.phar /usr/local/bin/wp
+# Copy WP-CLI from builder (already present there)
+COPY --from=builder /usr/local/bin/wp /usr/local/bin/wp
 
-# Install and enable PECL extensions
-RUN pecl install redis xdebug imagick apcu memcached igbinary msgpack yaml brotli && \
-    docker-php-ext-enable redis xdebug imagick apcu memcached igbinary msgpack yaml brotli
+# Copy compiled PHP extensions (.so files) from builder to the PHP extensions dir
+RUN set -eux; \
+    for f in $(ls /usr/local/lib/php/extensions || true); do echo "$f"; done || true
+COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions/
 
-# Configure and install PHP extensions
-RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm --with-avif && \
-    docker-php-ext-install -j$(nproc) \
-    bcmath \
-    calendar \
-    curl \
-    exif \
-    gd \
-    gettext \
-    gmp \
-    intl \
-    mbstring \
-    mysqli \
-    opcache \
-    pcntl \
-    soap \
-    sockets \
-    sodium \
-    sysvmsg \
-    sysvsem \
-    sysvshm \
-    xml \
-    zip
+# Copy php conf.d files from builder
+COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
 
-# Clean up unnecessary files
-# Use autoremove+clean to remove build dependencies and clean apt caches.
-RUN apt-get autoremove -y --purge && apt-get clean && rm -rf /var/lib/apt/lists/*
+# Ensure pecl-installed extensions are enabled (safe no-op if already enabled by copied .ini)
+RUN php -m || true
 
-# Copy PHP configuration files
-COPY docker.conf.d/xdebug.ini /usr/local/etc/php/conf.d/xdebug.ini
-COPY docker.conf.d/opcache.ini /usr/local/etc/php/conf.d/opcache.ini
-COPY docker.conf.d/php.ini /usr/local/etc/php/conf.d/php.ini
-
-# Add WordPress user and setup wp-cli
+# Add WordPress user, ensure wp-cli is executable and entrypoint
 RUN useradd -r -u 1000 wordpress && \
     usermod -a -G www-data wordpress && \
     chmod +x /usr/local/bin/wp && \

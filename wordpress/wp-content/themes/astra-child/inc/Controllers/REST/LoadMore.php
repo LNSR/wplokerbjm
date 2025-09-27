@@ -7,7 +7,7 @@ use AstraChild\Services\Utilities\Utilities;
 class LoadMore
 {
     public function __construct(
-    private \AstraChild\Repositories\JobRepository $jobRepository
+        private \AstraChild\Repositories\JobRepository $jobRepository
     ) {
     }
 
@@ -51,20 +51,24 @@ class LoadMore
                 return new \WP_Error('no_jobs', 'No jobs found for the given parameters.', ['status' => 404]);
             }
 
-            $response = [
+            $response = new \WP_REST_Response([
                 'jobs' => $jobs,
-                'pagination' => [
-                    'current' => $paged,
-                    'max' => (int) $query->max_num_pages,
-                ],
                 'context' => $context,
                 'filters' => $filters,
-            ];
+            ]);
 
-            return rest_ensure_response($response);
+            // Set pagination headers
+            $response->header('X-WP-Total', $query->found_posts);
+            $response->header('X-WP-TotalPages', $query->max_num_pages);
+
+            // Set Link header for pagination
+            Utilities::setPaginationLinks($response, $request, $paged, $query->max_num_pages, 'load-more', 'paged');
+
+            return $response;
         } catch (\Exception $e) {
             error_log('LoadMore::handle error: ' . $e->getMessage());
             return new \WP_Error('server_error', 'An error occurred while processing the request.', ['status' => 500]);
         }
     }
+
 }

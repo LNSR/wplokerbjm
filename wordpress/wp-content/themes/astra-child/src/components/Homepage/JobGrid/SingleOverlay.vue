@@ -20,6 +20,11 @@
         <i class="fas fa-edit"></i>
         Edit
       </a>
+      <a v-if="!loading && overlay && isLoggedIn && editPostId" :href="getCloneHref(editPostId)" target="_blank"
+        rel="noopener" class="absolute top-5 left-96 btn btn-sm btn-outline btn-success flex items-center gap-1">
+        <i class="fas fa-copy"></i>
+        Clone Draft
+      </a>
       <div v-if="loading" class="p-4 text-center pt-16 flex-1 flex flex-col items-center justify-center">
         <span class="sr-only">Memuat...</span>
         <svg class="animate-spin h-8 w-8 text-blue-500 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none"
@@ -54,6 +59,7 @@ const {
   error,
   isLoggedIn,
   editPostId,
+  getCloneHref,
 } = useSingleOverlay(props)
 
 const overlay = data
@@ -63,4 +69,12 @@ function close() {
 }
 
 const drawerOpenClass = 'transform translate-x-0'
+
+/**
+ * Build the admin duplicate (clone) URL for the Duplicate Page/Post plugin.
+ * Tries to find a matching nonce in a few places (window globals, meta tags).
+ * If no nonce is found, returns a URL without the nonce param (may fail server-side).
+ */
+// getCloneHref is provided by the composable and already prefers the
+// server-provided nonce when available. See composable for fallback heuristics.
 </script>

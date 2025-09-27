@@ -10,11 +10,11 @@ services:
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
       WORDPRESS_DEBUG: "true"
-      WP_ENV: ${WP_ENV} # "development" | "production"
+      WP_ENV: ${WP_ENV}
       WP_REPAIR: "false"
       FORCE_SSL_ADMIN: "true"
       WP_HOME: ${WORDPRESS_WP_HOME}
-      WORDPRESS_WP_SITEURL: ${WORDPRESS_WP_SITEURL}
+      WP_SITEURL: ${WORDPRESS_WP_SITEURL}
       WP_REDIS_PATH: /var/run/redis/redis.sock
       WORDPRESS_CONFIG_EXTRA: |
         if (!defined('WP_CACHE')) define('WP_CACHE', true);
@@ -27,21 +27,24 @@ services:
           define('WP_ENV', getenv('WP_ENV') ?: 'production');
         }
 
-        // Set protocol and hostname
-        if (isset($$_SERVER['HTTP_HOST'])) {
-          $$hostname = $$_SERVER['HTTP_HOST'];
-        } else {
-          $$hostname = 'localhost';
-        }
-        $$protocol = (!empty($$_SERVER['HTTPS']) && $$_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
+        // Auto-discover protocol and hostname from forwarded headers (for all proxies)
+        $$hostname = 'localhost'; // default fallback
+        $$protocol = 'http://'; // default fallback
 
-        // Ngrok/Proxy detection
-        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO']) && strpos($$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) {
-          $$_SERVER['HTTPS'] = 'on';
-          $$protocol = 'https://';
-        }
-        if (isset($$_SERVER['HTTP_X_FORWARDED_HOST']) && strpos($$_SERVER['HTTP_X_FORWARDED_HOST'], 'ngrok') !== false) {
+        // Prioritize forwarded headers over direct headers
+        if (isset($$_SERVER['HTTP_X_FORWARDED_HOST'])) {
           $$hostname = $$_SERVER['HTTP_X_FORWARDED_HOST'];
+        } elseif (isset($$_SERVER['HTTP_HOST'])) {
+          $$hostname = $$_SERVER['HTTP_HOST'];
+        }
+
+        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO'])) {
+          $$protocol = (strpos($$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) ? 'https://' : 'http://';
+          if ($$protocol === 'https://') {
+            $$_SERVER['HTTPS'] = 'on';
+          }
+        } else {
+          $$protocol = (!empty($$_SERVER['HTTPS']) && $$_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
         }
 
         define('WP_HOME', $$protocol . $$hostname);
@@ -65,7 +68,7 @@ services:
             define('WP_AUTO_UPDATE_CORE', true);
 
             // Memory
-            define('WP_MEMORY_LIMIT', '1024M');
+            define('WP_MEMORY_LIMIT', '4096M');
             define('WP_MAX_MEMORY_LIMIT', '8196M');
 
             // Dev mode
@@ -95,7 +98,7 @@ services:
             define('AUTOSAVE_INTERVAL', 300); // Autosave every 5 minutes
             define('EMPTY_TRASH_DAYS', 7); // Empty trash every week
             define('WP_POST_REVISIONS', 10); // Limit post revisions
-            define('WP_MEMORY_LIMIT', '2048M'); // Set memory limit
+            define('WP_MEMORY_LIMIT', '4096M'); // Set memory limit
             define('WP_MAX_MEMORY_LIMIT', '8196M'); // Set max memory limit
             define('WP_CRON_LOCK_TIMEOUT', 60); // Cron lock timeout
             
@@ -133,8 +136,13 @@ services:
       - "host.docker.internal:host-gateway"
 
   caddy:
-    image: caddy:latest
+    build:
+      context: .
+      dockerfile: caddy.Dockerfile
     container_name: caddy
+    environment:
+      WP_ENV: ${WP_ENV}
+      REDIS_PWD: ${REDIS_PWD}
     depends_on:
       - wordpress
     ports:
@@ -160,7 +168,7 @@ services:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DB}
       MYSQL_USER: ${MYSQL_USER}
-      MYSQL_PASS: ${MYSQL_PASS}
+      MYSQL_PASSWORD: ${MYSQL_PASS}
     volumes:
       - db:/var/lib/mysql
     ports:
@@ -169,7 +177,7 @@ services:
       test:
         [
           "CMD-SHELL",
-          "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASS || exit 1",
+          "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1",
         ]
       interval: 30s
       timeout: 10s
@@ -198,17 +206,16 @@ services:
         target: /data
       - redis-socket:/var/run/redis
 
-# ngrok:
-#   image: ngrok/ngrok:latest
-#   container_name: ngrok
-#   restart: unless-stopped
-#   command: http wordpress:80
-#   environment:
-#     - NGROK_AUTHTOKEN=${NGROK_AUTH_TOKEN}
-#   ports:
-#     - "4040:4040"
-#   depends_on:
-#     - wordpress
+  # ngrok:
+  #   image: ngrok/ngrok:latest
+  #   container_name: ngrok
+  #   command: http caddy:443
+  #   environment:
+  #     - NGROK_AUTHTOKEN=${NGROK_AUTH_TOKEN}
+  #   ports:
+  #     - "4040:4040"
+  #   depends_on:
+  #     - caddy
 
 volumes:
   wordpress:

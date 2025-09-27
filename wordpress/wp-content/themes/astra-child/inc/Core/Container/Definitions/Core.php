@@ -30,7 +30,7 @@ class Core
             \AstraChild\Core\Container\Init::class => function ($c) {
                 // Automatically find all autowirable classes that implement HooksInterface
                 $scanner = new \AstraChild\Core\Container\AutowireScanner(
-                    dirname(__DIR__, 3), // Points to the inc/ directory
+                    get_stylesheet_directory() . '/inc', // Points to the inc/ directory
                     'AstraChild'
                 );
 

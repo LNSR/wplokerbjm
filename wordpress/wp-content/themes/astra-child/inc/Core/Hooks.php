@@ -3,9 +3,8 @@
 namespace AstraChild\Core;
 
 use AstraChild\Contracts\HooksInterface;
-use AstraChild\Core\Hooks\JQuery;
 use AstraChild\Core\Hooks\Theme;
-use AstraChild\Core\Hooks\Google;
+use AstraChild\Core\Hooks\Nonce;
 use AstraChild\Core\Hooks\Litespeed;
 
 
@@ -17,13 +16,11 @@ class Hooks implements HooksInterface
 
     public function registerActions(): void
     {
-        add_action('wp_enqueue_scripts', [JQuery::class, 'disableJquery'], 0);
-        add_action('wp_head', [JQuery::class, 'suppressJqueryErrors'], 0);
         add_action('wp_head', [Theme::class, 'injectThemeScript'], 3);
-        add_action('wp_head', [Google::class, 'injectAdHideInlineStyle'], 3);
         add_action('wp_head', [Theme::class, 'injectNoScriptWarning'], 5);
-        add_action('wp_head', [Theme::class, 'injectWpUserLoggedInFlag'], 5); // login status
         add_action('litespeed_purged_all', [Litespeed::class, 'clearObjectCacheAndTransient'], 20);
+        add_action('wp_head', [Nonce::class, 'injectNonceScript']);
+        add_action('send_headers', [Nonce::class, 'SendNonceHeader']);
     }
 
     /*======================================================================
@@ -36,6 +33,7 @@ class Hooks implements HooksInterface
         add_filter('litespeed_optimize_js_excludes', [Litespeed::class, 'lscJsExcludes'], 0);
         add_filter('litespeed_optimize_css_excludes', [Litespeed::class, 'lscCssExcludes'], 0);
         add_filter('option_active_plugins', [$this, 'disablePluginsForSSG'], 0);
+        add_filter('option_active_plugins', [$this, 'disablePluginsForDev'], 0);
     }
 
 
@@ -84,11 +82,36 @@ class Hooks implements HooksInterface
                 'fast-indexing-api/',
                 'tinymce-advanced/',
                 'akismet/',
-                //'litespeed-cache/',
+                'litespeed-cache/', // ! Must disable for SSG, for less unpredictable issues
                 'wps-hide-login/',
                 'health-check/',
                 'duplicate-wp-page-post/',
                 'child-theme-configurator/',
+            ];
+            return array_filter($plugins, function ($plugin) use ($pluginsToDisable) {
+                foreach ($pluginsToDisable as $disable) {
+                    if (strpos($plugin, $disable) === 0) {
+                        return false;
+                    }
+                }
+                return true;
+            });
+        }
+        return $plugins;
+    }
+    /**
+     * Temporarily disable specific plugins if in development environment.
+     */
+    public function disablePluginsForDev($plugins)
+    {
+        $isDev = getenv('WP_ENV') === 'development';
+        if ($isDev) {
+            $pluginsToDisable = [
+                'google-site-kit/',
+                'seo-by-rank-math/',
+                'fast-indexing-api/',
+                'wps-hide-login/',
+                'litespeed-cache/',
             ];
             return array_filter($plugins, function ($plugin) use ($pluginsToDisable) {
                 foreach ($pluginsToDisable as $disable) {
