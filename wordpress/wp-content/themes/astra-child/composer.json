@@ -3,6 +3,8 @@
     "php-di/php-di": "*"
   },
   "require-dev": {
+    "php-parallel-lint/php-console-highlighter": "^1.0",
+    "php-parallel-lint/php-parallel-lint": "^1.4",
     "php-stubs/wordpress-stubs": "*"
   },
   "autoload": {
@@ -14,6 +16,7 @@
     "sort-packages": true
   },
   "scripts": {
-    "lint:php": "find . -type f -name \"*.php\" -not -path \"./vendor/*\" -print0 | xargs -0 -n1 php -l"
+    "lint:php": "./vendor/bin/parallel-lint --colors --exclude vendor --exclude node_modules -j $(nproc) .",
+    "post-install-cmd": "@lint:php"
   }
 }

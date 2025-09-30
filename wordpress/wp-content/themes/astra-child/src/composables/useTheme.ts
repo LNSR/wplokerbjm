@@ -1,12 +1,7 @@
 import { onMounted, onUnmounted, watch, ref, type Ref } from 'vue'
 import { debounce } from '@/utils/debounce'
 
-type MediaQueryListWithLegacy = MediaQueryList & {
-  addListener?: (listener: (e: MediaQueryListEvent) => void) => void;
-  removeListener?: (listener: (e: MediaQueryListEvent) => void) => void;
-};
-
-let mediaQuery: MediaQueryListWithLegacy | null = null
+let mediaQuery: MediaQueryList | null = null
 
 interface ThemeState {
   isDark: Ref<boolean>
@@ -42,16 +37,37 @@ function setThemeDirect(dark: boolean): void {
     }
     try {
       localStorage.setItem('astra-theme', newTheme)
-    } catch (err) {
-  // ignore storage errors
-  console.error('Error saving theme to localStorage:', err)
+    } catch {
+      // ignore storage errors
     }
     if (!prefersReducedMotion()) {
       setTimeout(() => {
         document.documentElement.classList.remove('theme-switching')
       }, 30)
     }
+    // update mobile browser chrome color to match the site theme
+    updateMetaThemeColor(dark)
   })
+}
+
+function updateMetaThemeColor(dark: boolean): void {
+  try {
+    const root = document.documentElement
+    const cs = getComputedStyle(root)
+    // Try a project-level color var first; fall back to an Astra global color or defaults.
+    let color = (cs.getPropertyValue('--theme-color') || cs.getPropertyValue('--ast-global-color-4') || '').trim()
+    if (!color) color = dark ? '#0b1220' : '#ffffff'
+
+    let meta = document.querySelector('meta[name="theme-color"]') as HTMLMetaElement | null
+    if (!meta) {
+      meta = document.createElement('meta')
+      meta.name = 'theme-color'
+      document.head.appendChild(meta)
+    }
+    meta.setAttribute('content', color)
+  } catch {
+    // ignore in restricted environments
+  }
 }
 
 const debouncedSetTheme = debounce(setThemeDirect, 10)
@@ -100,18 +116,13 @@ export function useTheme(): {
 
     try {
       mediaQuery = window.matchMedia('(prefers-color-scheme: dark)')
-      if (mediaQuery) {
-        if (typeof mediaQuery.addEventListener === 'function') {
-          mediaQuery.addEventListener('change', handleSystemThemeChange as unknown as (e: MediaQueryListEvent) => void, { passive: true })
-        } else if (typeof mediaQuery.addListener === 'function') {
-          mediaQuery.addListener!(handleSystemThemeChange)
-        }
+      if (mediaQuery && typeof mediaQuery.addEventListener === 'function') {
+        mediaQuery.addEventListener('change', handleSystemThemeChange as (e: MediaQueryListEvent) => void, { passive: true })
       }
     } catch {
       mediaQuery = null
     }
 
-    // Fix: watch the value of the ref, not the ref itself
     watch(() => themeState.isDark.value, (v) => debouncedSetTheme(v))
   }
 
@@ -119,9 +130,7 @@ export function useTheme(): {
     if (!mediaQuery) return
     try {
       if (typeof mediaQuery.removeEventListener === 'function') {
-        mediaQuery.removeEventListener('change', handleSystemThemeChange as unknown as (e: MediaQueryListEvent) => void)
-      } else if (typeof mediaQuery.removeListener === 'function') {
-        mediaQuery.removeListener!(handleSystemThemeChange)
+        mediaQuery.removeEventListener('change', handleSystemThemeChange as (e: MediaQueryListEvent) => void)
       }
     } catch {
       // ignore

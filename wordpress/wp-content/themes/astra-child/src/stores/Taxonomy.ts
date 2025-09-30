@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { TaxonomyService } from '@/services/APIService'
-import type { TaxonomyTerm } from '@/types/API'
+import type { TaxonomyTerm } from '@/types'
+import { TaxonomyType } from '@/types'
 
 export const useTaxonomyStore = defineStore('taxonomy', () => {
   // State
@@ -104,11 +105,11 @@ export const useTaxonomyStore = defineStore('taxonomy', () => {
     pendidikanError.value = null
   }
 
-  function getTermNameBySlug(type: 'lokasi' | 'gender' | 'pendidikan', slug: string): string {
+  function getTermNameBySlug(type: TaxonomyType, slug: string): string {
     let terms: TaxonomyTerm[] = []
-    if (type === 'lokasi') terms = lokasiTerms.value
-    if (type === 'gender') terms = genderTerms.value
-    if (type === 'pendidikan') terms = pendidikanTerms.value
+    if (type === TaxonomyType.lokasi) terms = lokasiTerms.value
+    if (type === TaxonomyType.gender) terms = genderTerms.value
+    if (type === TaxonomyType.pendidikan) terms = pendidikanTerms.value
 
     function findInTree(terms: TaxonomyTerm[]): string | undefined {
       for (const t of terms) {

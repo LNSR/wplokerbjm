@@ -1,4 +1,4 @@
-import { formatSalary, formatAge } from "@/services/Formatting";
+import { FormattingService } from "@/services/Formatting";
 import { type JobSummary, type JobContactRow } from "@/types";
 
 export interface SummaryRow {
@@ -54,7 +54,7 @@ export function useSummaryJob(jobdata: JobSummary | null | undefined): SummaryRo
   }
   const gaji_min = data['gaji_minimal'] ? Number(data['gaji_minimal']) : undefined;
   const gaji_max = data['gaji_maksimal'] ? Number(data['gaji_maksimal']) : undefined;
-  const gaji_display = formatSalary(gaji_min, gaji_max);
+  const gaji_display = FormattingService.formatSalary(gaji_min, gaji_max);
   if (gaji_display) {
     rows.push({
       icon: 'fa-money-bill-wave',
@@ -64,7 +64,7 @@ export function useSummaryJob(jobdata: JobSummary | null | undefined): SummaryRo
   }
   const umur_min = data['umur_min'] ? Number(data['umur_min']) : undefined;
   const umur_max = data['umur_max'] ? Number(data['umur_max']) : undefined;
-  const umur_display = formatAge(umur_min, umur_max);
+  const umur_display = FormattingService.formatAge(umur_min, umur_max);
   if (umur_display) {
     rows.push({
       icon: 'fa-birthday-cake',

@@ -12,7 +12,7 @@ class Enqueue implements HooksInterface
      */
     public function registerActions(): void
     {
-        add_action('wp_enqueue_scripts', [$this, 'enqueueAssets'], 20);
+        add_action('wp_enqueue_scripts', [$this, 'enqueueAssets']);
     }
 
     /**
@@ -20,7 +20,7 @@ class Enqueue implements HooksInterface
      */
     public function registerFilters(): void
     {
-        add_filter('style_loader_tag', [$this, 'filterStyleLoaderTag'], 21, 2);
+        add_filter('style_loader_tag', [$this, 'filterStyleLoaderTag'], 10, 2);
     }
 
     public function enqueueAssets(): void

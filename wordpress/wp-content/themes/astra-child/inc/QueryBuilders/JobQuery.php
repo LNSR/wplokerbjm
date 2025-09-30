@@ -7,6 +7,19 @@ use AstraChild\QueryBuilders\TaxonomyQuery;
 class JobQuery
 {
 	/**
+	 * Get base WP_Query args common to all job queries.
+	 *
+	 * @return array
+	 */
+	private static function getBaseArgs(): array
+	{
+		return [
+			'post_type' => 'lowongan',
+			'post_status' => 'publish',
+		];
+	}
+
+	/**
 	 * Get WP_Query args for latest jobs.
 	 *
 	 * @param int $paged
@@ -15,14 +28,12 @@ class JobQuery
 	 */
 	public static function latestJobsArgs(int $paged = 1, $posts_per_page = 9): array
 	{
-		return [
-			'post_type' => 'lowongan',
+		return array_merge(self::getBaseArgs(), [
 			'posts_per_page' => $posts_per_page,
 			'paged' => $paged,
 			'orderby' => 'date',
 			'order' => 'DESC',
-			'post_status' => 'publish',
-		];
+		]);
 	}
 
 	/**
@@ -33,14 +44,12 @@ class JobQuery
 	 */
 	public static function autoSuggestionArgs(string $query): array
 	{
-		return [
-			'post_type' => 'lowongan',
-			'post_status' => 'publish',
+		return array_merge(self::getBaseArgs(), [
 			's' => $query,
 			'fields' => 'ids',
 			'posts_per_page' => 10,
 			'no_found_rows' => true,
-		];
+		]);
 	}
 
 	/*
@@ -52,8 +61,7 @@ class JobQuery
 		$today = date('Y-m-d');
 		$seven_days = date('Y-m-d', strtotime('+7 days'));
 
-		return [
-			'post_type' => 'lowongan',
+		return array_merge(self::getBaseArgs(), [
 			'posts_per_page' => $per_page,
 			'meta_query' => [
 				[
@@ -69,11 +77,10 @@ class JobQuery
 					'type' => 'DATE',
 				],
 			],
-			'post_status' => 'publish',
 			'orderby' => 'meta_value',
 			'meta_key' => 'deadline',
 			'order' => 'ASC',
-		];
+		]);
 	}
 
 	/**
@@ -88,14 +95,12 @@ class JobQuery
 	{
 		$order = (isset($params['sort']) && strtolower($params['sort']) === 'asc') ? 'ASC' : 'DESC';
 
-		$args = [
-			'post_type' => 'lowongan',
+		$args = array_merge(self::getBaseArgs(), [
 			'posts_per_page' => $per_page,
 			'paged' => $paged,
 			'orderby' => 'date',
 			'order' => $order,
-			'post_status' => 'publish',
-		];
+		]);
 
 		// Delegate taxonomy parts construction to TaxonomyQuery for separation of concerns.
 		$tax_query_parts = TaxonomyQuery::jobTaxQueryParts($params);
@@ -119,28 +124,24 @@ class JobQuery
 	 */
 	public static function oldJobsArgs(): array
 	{
-		return [
-			'post_type' => 'lowongan',
-			'post_status' => 'publish',
+		return array_merge(self::getBaseArgs(), [
 			'posts_per_page' => -1,
 			'date_query' => [
 				[
 					'column' => 'post_date',
-					'before' => '1 month ago',
+					'before' => '1 month ago', // delete jobs older than 1 month
 				],
 			],
 			'fields' => 'ids',
-		];
+		]);
 	}
 
 	public static function allJobsIdsArgs(): array
 	{
-		return [
-			'post_type' => 'lowongan',
-			'post_status' => 'publish',
+		return array_merge(self::getBaseArgs(), [
 			'posts_per_page' => -1,
 			'fields' => 'ids',
-		];
+		]);
 	}
 
 	/**

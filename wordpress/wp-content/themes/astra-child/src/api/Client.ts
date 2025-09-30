@@ -67,8 +67,7 @@ export class ApiClient {
       } else {
         data = await response.text();
       }
-    } catch (e) {
-      console.error('Error parsing response:', e);
+    } catch {
       try {
         data = await response.text();
       } catch {

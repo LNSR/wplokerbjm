@@ -7,9 +7,11 @@
             <h3 class="card-title text-lg md:text-xl !font-bold group-hover:text-blue-700 transition-colors">
               {{ jobdata['title'] }}
             </h3>
-            <time class="text-lg !font-semibold text-center gap-2" :datetime="jobdata['post_time']">
-              {{ timeAgo }}
-            </time>
+            <div class="flex items-center gap-2">
+              <time class="text-lg !font-semibold text-center" :datetime="jobdata['post_time']">
+                {{ timeAgo }}
+              </time>
+            </div>
           </div>
           <div v-if="!jobdata['nama_perusahaan']" class="divider mt-0"></div>
           <template v-else>
@@ -29,16 +31,20 @@
             </template>
           </div>
         </div>
-        <div v-if="hasStatusOrDeadline" class="divider my-2"></div>
-        <div class="flex items-center justify-between font-semibold">
-          <span v-if="statusInfo.label" :class="['inline-block px-3 py-1 text-sm font-bold rounded', statusInfo.color]">
+        <div class="divider !my-2"></div>
+        <div class="flex items-center justify-between !font-semibold">
+          <span v-if="statusInfo.label"
+            :class="['inline-block !px-3 !py-1 text-sm font-bold rounded', statusInfo.color]">
             {{ statusInfo.label }}
           </span>
-          <span v-if="deadlineInfo.text"
-            :class="['flex items-center gap-2 px-3 py-1 rounded font-semibold text-sm', deadlineInfo.style]">
-            <i class="fas fa-calendar-alt"></i>
-            <span>{{ deadlineInfo.text }}</span>
-          </span>
+          <div class="flex items-center !gap-2 !ml-auto">
+            <span v-if="deadlineInfo.text"
+              :class="['flex items-center gap-2 !px-3 !py-1 rounded font-semibold !text-sm', deadlineInfo.style]">
+              <i class="fas fa-calendar-alt"></i>
+              <span>{{ deadlineInfo.text }}</span>
+            </span>
+            <BookmarkButton :job-id="jobdata.id || 0" :variant="props.variant" />
+          </div>
         </div>
       </div>
     </a>
@@ -49,23 +55,27 @@
 import { computed } from 'vue'
 import { useTimeAgo } from '@/composables/useTime'
 import { useSummaryJob } from '@/composables/useSummary'
-import { useStatusJob } from '@/composables/JobCard/useStatusJob'
-import { useDeadline } from '@/composables/JobCard/useDeadline'
+import { useStatusJob } from '@/composables/useStatusJob'
+import { useDeadline } from '@/composables/useDeadline'
 import { useJobOverlayStore } from '@/stores/JobOverlay'
+import BookmarkButton from '@/components/Shared/BookmarkButton.vue'
 import type { JobCardProps } from '@/types/Component'
 
 const props = defineProps<JobCardProps>()
 
 const emit = defineEmits(['click'])
-
 const handleClick = (event: MouseEvent) => {
   const isTabletOrDesktop = window.matchMedia('(min-width: 768px)').matches
-  if (!isTabletOrDesktop) return
 
   const { ctrlKey, metaKey, shiftKey, button } = event
   if (ctrlKey || metaKey || shiftKey || button === 1) return
 
-  event.preventDefault()
+  event.preventDefault();
+
+  if (!isTabletOrDesktop) {
+    window.open(props.permalink, '_blank')
+    return
+  }
 
   if (props.variant === 'carousel' && props.onClick) {
     props.onClick(props.jobdata['slug'] ?? '', event, 0)
@@ -109,7 +119,8 @@ const bodyClass = computed(() => {
 const summaryRows = computed(() => useSummaryJob(props.jobdata['ringkasanPekerjaan']))
 const statusInfo = computed(() => useStatusJob(Number(props.jobdata['statusjob'])))
 const deadlineInfo = computed(() => useDeadline(props.jobdata['deadline']));
-const hasStatusOrDeadline = computed(() => !!statusInfo.value.label || !!deadlineInfo.value.text)
+
+
 
 const { timeAgo } = useTimeAgo(props.jobdata['post_time'])
 </script>

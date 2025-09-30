@@ -1,49 +1,35 @@
-import { ref, computed, watch, type Ref, type ComputedRef } from "vue";
+import { ref, computed, type Ref, type ComputedRef } from "vue";
 import { debounce } from '@/utils/debounce'
+import { TaxonomyType } from "@/types";
 import { useTaxonomyStore } from "@/stores";
-import { useBreadcrumb } from "./useDropdownBreadcrumb";
+import type { DropdownOption } from '@/types/Component';
 export type SelectedItem = { value: string; label: string }
 
-export type Option = {
-  value: string
-  label: string
-  children?: Option[]
-  isLoading?: boolean
-  hasMoreChildren?: boolean
-  loadChildren?: () => Promise<Option[]>
-  __breadcrumbs?: string[]
-  __key?: string
-}
-
-export interface UseDropdownReturn {
+export function useDropdown(props: {
+  modelValue: Ref<unknown>;
+  options: Ref<DropdownOption[]>;
+  multiple?: boolean;
+  placeholder?: string;
+}): {
   open: Ref<boolean>;
   activeIndex: Ref<number>;
   search: Ref<string>;
   breadcrumb: ComputedRef<string[]>;
+  breadcrumbLabels: Ref<string[]>;
+  stack: Ref<DropdownOption[][]>;
   selectedValues: ComputedRef<SelectedItem[]>;
   multiSelectLabel: ComputedRef<string>;
   isSelected: (value: string) => boolean;
-  toggleValue: (value: string) => void;
+  toggleValue: (value: string) => string[];
   isMultiple: ComputedRef<boolean>;
   getLabel: () => string;
   SEMUA_VALUE: string;
-  toggle: () => void;
-  close: () => void;
-  select: (option: Option) => void;
-  goBack: () => void;
-  navigateChildren: (children: Option[], label: string, parentOption?: Option) => void;
-  goToBreadcrumb: (idx: number) => void;
-  filteredOptions: ComputedRef<Option[]>;
+  currentOptions: ComputedRef<DropdownOption[]>;
+  filteredOptions: ComputedRef<DropdownOption[]>;
+  filteredNonEmpty: ComputedRef<DropdownOption[]>;
   highlightMatch: (label: string, query: string) => string;
-}
-
-export function useDropdown(props: {
-  modelValue: Ref<unknown>;
-  options: Ref<Option[]>;
-  emit: (event: string, ...args: unknown[]) => void;
-  multiple?: boolean;
-  placeholder?: string;
-}): UseDropdownReturn {
+  flattenOptions: (options: DropdownOption[], breadcrumbs?: string[]) => DropdownOption[];
+} {
   const open = ref(false);
   const search = ref("");
   const SEMUA_VALUE = "";
@@ -51,20 +37,15 @@ export function useDropdown(props: {
   const isMultiple = computed(() => !!props.multiple);
   const taxonomyStore = useTaxonomyStore();
 
-  // Use breadcrumb composable for stack and breadcrumbLabels
-  const {
-    breadcrumb,
-    stack,
-    activeIndex,
-    goBack,
-    goToBreadcrumb,
-    pushBreadcrumb,
-    resetBreadcrumb,
-  } = useBreadcrumb();
+  // Breadcrumb state (moved from useDropdownBreadcrumb)
+  const breadcrumbLabels = ref<string[]>([])
+  const stack = ref<DropdownOption[][]>([])
+  const activeIndex = ref(0)
+  const breadcrumb = computed(() => breadcrumbLabels.value)
 
   const selectedValues = computed<SelectedItem[]>(() => {
     const val = props.modelValue.value;
-    const findOption = (v: string): Option | undefined => props.options.value.find((o) => o.value === v);
+    const findOption = (v: string): DropdownOption | undefined => props.options.value.find((o) => o.value === v);
     if (Array.isArray(val)) {
       return val.map((v) => {
         const opt = findOption(v);
@@ -94,7 +75,7 @@ export function useDropdown(props: {
         if (props.options.value.some((opt) => opt.value === item.value)) {
           name = item.label;
         } else {
-          const taxKeys: string[] = ["lokasi", "gender", "pendidikan"];
+          const taxKeys: TaxonomyType[] = [TaxonomyType.lokasi, TaxonomyType.gender, TaxonomyType.pendidikan];
           for (let i = 0; i < taxKeys.length; i++) {
             const t = taxKeys[i] as Parameters<typeof taxonomyStore.getTermNameBySlug>[0];
             const n = taxonomyStore.getTermNameBySlug(t, item.value);
@@ -110,21 +91,21 @@ export function useDropdown(props: {
     return `${filtered.length} filter dipilih`;
   });
 
-  function toggleValue(value: string): void {
+  function toggleValue(value: string): string[] {
     let arr = Array.isArray(props.modelValue.value)
       ? [...(props.modelValue.value as string[])]
       : [];
     const exists = arr.includes(value);
-    if (!isMultiple.value) return;
+    if (!isMultiple.value) return arr;
     arr = exists ? arr.filter((item) => item !== value) : [...arr, value];
-    props.emit("update:modelValue", arr);
+    return arr;
   }
 
   function isSelected(value: string): boolean {
     return selectedValues.value.some((item) => item.value === value);
   }
 
-  const currentOptions = computed<Option[]>(() => {
+  const currentOptions = computed<DropdownOption[]>(() => {
     if (stack.value.length > 0) {
       const lastStack = stack.value[stack.value.length - 1];
       return lastStack || [];
@@ -136,49 +117,11 @@ export function useDropdown(props: {
     return (multiSelectLabel && multiSelectLabel.value) || (props && props.placeholder) || ''
   }
 
-  function toggle(): void {
-    open.value = !open.value;
-    if (open.value) {
-      activeIndex.value = 0;
-      props.emit("open");
-    }
-  }
-  function close(): void {
-    open.value = false;
-    resetBreadcrumb();
-    search.value = "";
-  }
-  function select(option: Option): void {
-    props.emit("update:modelValue", option);
-    close();
-  }
-  function navigateChildren(
-    children: Option[],
-    label: string,
-    parentOption?: Option
-  ): void {
-    (async (): Promise<void> => {
-      if (parentOption?.loadChildren && (!children || children.length === 0)) {
-        parentOption.isLoading = true;
-        try {
-          const loaded = await parentOption.loadChildren();
-          parentOption.children = loaded;
-        } finally {
-          parentOption.isLoading = false;
-        }
-        pushBreadcrumb(label, parentOption.children);
-      } else {
-        pushBreadcrumb(label, children);
-      }
-      activeIndex.value = 0;
-    })();
-  }
-
   function flattenOptions(
-    options: Option[],
+    options: DropdownOption[],
     breadcrumbs: string[] = []
-  ): Option[] {
-    const result: Option[] = [];
+  ): DropdownOption[] {
+    const result: DropdownOption[] = [];
     for (let i = 0; i < options.length; i++) {
       const opt = options[i];
       if (!opt) continue;
@@ -197,7 +140,7 @@ export function useDropdown(props: {
     return result;
   }
 
-  const filteredOptions = computed<Option[]>(() => {
+  const filteredOptions = computed<DropdownOption[]>(() => {
     if (search.value.trim()) {
       const q = search.value.trim().toLowerCase();
       return flattenOptions(props.options.value).filter((opt) =>
@@ -210,16 +153,7 @@ export function useDropdown(props: {
     }));
   });
 
-  watch(open, (val: boolean) => {
-    if (!val) {
-      activeIndex.value = 0;
-      resetBreadcrumb();
-      search.value = "";
-    }
-  });
-  watch(search, () => {
-    activeIndex.value = 0;
-  });
+  const filteredNonEmpty = computed(() => filteredOptions.value.filter((opt) => opt.value !== ''))
 
   function highlightMatch(label: string, query: string): string {
     if (!query) return label;
@@ -233,6 +167,8 @@ export function useDropdown(props: {
     activeIndex,
     search,
     breadcrumb,
+    breadcrumbLabels,
+    stack,
     selectedValues,
     multiSelectLabel,
     isSelected,
@@ -240,21 +176,18 @@ export function useDropdown(props: {
     toggleValue,
     isMultiple,
     SEMUA_VALUE,
-    toggle,
-    close,
-    select,
-    goBack,
-    navigateChildren,
-    goToBreadcrumb,
+    currentOptions,
     filteredOptions,
+    filteredNonEmpty,
     highlightMatch,
+    flattenOptions,
   };
 }
 export const DROPDOWN_CONTROLLER = Symbol('dropdownController');
 export function useDropdownController(): {
   controller: {
-    register: (key: "lokasi" | "gender" | "pendidikan" | "sort", handle: { toggle: () => void; close: () => void; getLabel: () => string; open: boolean | Ref<boolean>; }) => () => void;
-    toggleRef: (key: "lokasi" | "gender" | "pendidikan" | "sort") => void;
+    register: (key: TaxonomyType | "sort", handle: { toggle: () => void; close: () => void; getLabel: () => string; open: boolean | Ref<boolean>; }) => () => void;
+    toggleRef: (key: TaxonomyType | "sort") => void;
   };
   lokasiRef: Ref<{ toggle: () => void; close: () => void; getLabel: () => string; open: boolean | Ref<boolean>; } | null>;
   genderRef: Ref<{ toggle: () => void; close: () => void; getLabel: () => string; open: boolean | Ref<boolean>; } | null>;
@@ -291,12 +224,12 @@ export function useDropdownController(): {
     fallback: string;
     pendingToggle?: Ref<boolean>;
   };
-  type DropdownKey = "lokasi" | "gender" | "pendidikan" | "sort";
+  type DropdownKey = TaxonomyType | "sort";
 
   const dropdowns: Record<DropdownKey, DropdownMeta> = {
-    lokasi: { ref: ref(null), loaded: ref(false), label: "Semua Lokasi", fallback: "Semua Lokasi", pendingToggle: ref(false) },
-    gender: { ref: ref(null), loaded: ref(false), label: "Semua Gender", fallback: "Semua Gender", pendingToggle: ref(false) },
-    pendidikan: { ref: ref(null), loaded: ref(false), label: "Semua Pendidikan", fallback: "Semua Pendidikan", pendingToggle: ref(false) },
+    [TaxonomyType.lokasi]: { ref: ref(null), loaded: ref(false), label: "Semua Lokasi", fallback: "Semua Lokasi", pendingToggle: ref(false) },
+    [TaxonomyType.gender]: { ref: ref(null), loaded: ref(false), label: "Semua Gender", fallback: "Semua Gender", pendingToggle: ref(false) },
+    [TaxonomyType.pendidikan]: { ref: ref(null), loaded: ref(false), label: "Semua Pendidikan", fallback: "Semua Pendidikan", pendingToggle: ref(false) },
     sort: { ref: ref(null), loaded: ref(false), label: "Urutkan", fallback: "Urutkan", pendingToggle: ref(false) },
   };
 
@@ -353,27 +286,27 @@ export function useDropdownController(): {
   } as const;
 
   function toggleLokasi(): void {
-    const meta = dropdowns.lokasi;
+    const meta = dropdowns[TaxonomyType.lokasi];
     if (meta.loaded.value) {
-      if (meta.ref.value) debouncedToggleRef('lokasi');
+      if (meta.ref.value) debouncedToggleRef(TaxonomyType.lokasi);
       else meta.pendingToggle!.value = true;
     } else {
       meta.loaded.value = true;
     }
   }
   function toggleGender(): void {
-    const meta = dropdowns.gender;
+    const meta = dropdowns[TaxonomyType.gender];
     if (meta.loaded.value) {
-      if (meta.ref.value) debouncedToggleRef('gender');
+      if (meta.ref.value) debouncedToggleRef(TaxonomyType.gender);
       else meta.pendingToggle!.value = true;
     } else {
       meta.loaded.value = true;
     }
   }
   function togglePendidikan(): void {
-    const meta = dropdowns.pendidikan;
+    const meta = dropdowns[TaxonomyType.pendidikan];
     if (meta.loaded.value) {
-      if (meta.ref.value) debouncedToggleRef('pendidikan');
+      if (meta.ref.value) debouncedToggleRef(TaxonomyType.pendidikan);
       else meta.pendingToggle!.value = true;
     } else {
       meta.loaded.value = true;
@@ -401,14 +334,14 @@ export function useDropdownController(): {
     pendidikanLoaded: dropdowns.pendidikan.loaded,
     sortLoaded: dropdowns.sort.loaded,
 
-    isLokasiOpen: getOpen("lokasi"),
-    isGenderOpen: getOpen("gender"),
-    isPendidikanOpen: getOpen("pendidikan"),
+    isLokasiOpen: getOpen(TaxonomyType.lokasi),
+    isGenderOpen: getOpen(TaxonomyType.gender),
+    isPendidikanOpen: getOpen(TaxonomyType.pendidikan),
     isSortOpen: getOpen("sort"),
 
-    lokasiLabel: getLabel("lokasi"),
-    genderLabel: getLabel("gender"),
-    pendidikanLabel: getLabel("pendidikan"),
+    lokasiLabel: getLabel(TaxonomyType.lokasi),
+    genderLabel: getLabel(TaxonomyType.gender),
+    pendidikanLabel: getLabel(TaxonomyType.pendidikan),
     sortLabel: getLabel("sort"),
 
     toggleLokasi,

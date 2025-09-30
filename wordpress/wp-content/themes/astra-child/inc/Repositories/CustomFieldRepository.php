@@ -3,7 +3,6 @@
 namespace AstraChild\Repositories;
 
 use AstraChild\Contracts\DataProviderInterface;
-use AstraChild\Models\CustomFieldEntity;
 
 class CustomFieldRepository implements DataProviderInterface
 {
@@ -20,30 +19,28 @@ class CustomFieldRepository implements DataProviderInterface
      * @link https://docs.metabox.io/functions/rwmb-meta/
      * 
      * @param int $post_id Post ID
+     * @return array The data representing the custom field data
      */
-    public function getMetaBoxData(int $post_id): CustomFieldEntity
+    public function getMetaBoxData(int $post_id): array
     {
-
-        $entity = new CustomFieldEntity(
-            nama_perusahaan: rwmb_meta('nama_perusahaan', [], $post_id),
-            tentang_perusahaan: rwmb_meta('tentang_perusahaan', [], $post_id),
-            deskripsi_pekerjaan: rwmb_meta('deskripsi_pekerjaan', [], $post_id),
-            umur_min: rwmb_meta('umur_min', [], $post_id),
-            umur_max: rwmb_meta('umur_max', [], $post_id),
-            pengalaman: rwmb_meta('pengalaman', [], $post_id),
-            persyaratan: rwmb_meta('persyaratan', [], $post_id),
-            cara_melamar: rwmb_meta('cara_melamar', [], $post_id),
-            benefit: rwmb_meta('benefit', [], $post_id),
-            gaji_minimal: rwmb_meta('gaji_minimal', [], $post_id),
-            gaji_maksimal: rwmb_meta('gaji_maksimal', [], $post_id),
-            deadline: rwmb_meta('deadline', [], $post_id),
-            email_kontak: rwmb_meta('email_kontak', [], $post_id),
-            nomor_kontak: rwmb_meta('nomor_kontak', [], $post_id),
-            situs_kontak: rwmb_meta('situs_kontak', [], $post_id),
-            social_media: rwmb_meta('social_media', [], $post_id),
-            status_pekerjaan: rwmb_meta('status_pekerjaan', [], $post_id)
-        );
-
-        return $entity;
+        return [
+            'nama_perusahaan'    => rwmb_meta('nama_perusahaan', [], $post_id),
+            'tentang_perusahaan' => rwmb_meta('tentang_perusahaan', [], $post_id),
+            'deskripsi_pekerjaan'=> rwmb_meta('deskripsi_pekerjaan', [], $post_id),
+            'umur_min'           => rwmb_meta('umur_min', [], $post_id),
+            'umur_max'           => rwmb_meta('umur_max', [], $post_id),
+            'pengalaman'         => rwmb_meta('pengalaman', [], $post_id),
+            'persyaratan'        => rwmb_meta('persyaratan', [], $post_id),
+            'cara_melamar'       => rwmb_meta('cara_melamar', [], $post_id),
+            'benefit'            => rwmb_meta('benefit', [], $post_id),
+            'gaji_minimal'       => rwmb_meta('gaji_minimal', [], $post_id),
+            'gaji_maksimal'      => rwmb_meta('gaji_maksimal', [], $post_id),
+            'deadline'           => rwmb_meta('deadline', [], $post_id),
+            'email_kontak'       => rwmb_meta('email_kontak', [], $post_id),
+            'nomor_kontak'       => rwmb_meta('nomor_kontak', [], $post_id),
+            'situs_kontak'       => rwmb_meta('situs_kontak', [], $post_id),
+            'social_media'       => rwmb_meta('social_media', [], $post_id),
+            'status_pekerjaan'   => rwmb_meta('status_pekerjaan', [], $post_id)
+        ];
     }
 }

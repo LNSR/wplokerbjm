@@ -34,17 +34,13 @@ class JobDataFactory
             $taxonomies = $this->taxonomiesProvider?->getMetaBoxData($post_id) ?? [];
 
             // Process custom fields
-            $processedCustomFields = is_object($this->customFieldsService)
-                ? $this->customFieldsService->processCustomFields((array) $customFields)
-                : [];
+            $processedCustomFields = $this->customFieldsService->processCustomFields($customFields);
 
             // Process taxonomies
             $processedTaxonomies = [];
-            if (is_object($this->taxonomyService)) {
-                foreach ($taxonomies as $key => $terms) {
-                    $processedTerms = $this->taxonomyService->processTaxonomyTerms($terms);
-                    $processedTaxonomies[$key] = is_array($processedTerms) ? implode(', ', $processedTerms) : 'N/A';
-                }
+            foreach ($taxonomies as $key => $terms) {
+                $processedTerms = $this->taxonomyService->processTaxonomyTerms($terms);
+                $processedTaxonomies[$key] = is_array($processedTerms) ? implode(', ', $processedTerms) : 'N/A';
             }
 
             // Combine meta and taxonomy data

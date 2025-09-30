@@ -1,7 +1,6 @@
 <?php
 namespace AstraChild\Services\Taxonomy;
 
-use AstraChild\QueryBuilders\JobQuery;
 use AstraChild\QueryBuilders\TaxonomyQuery;
 
 class TaxonomyManagement

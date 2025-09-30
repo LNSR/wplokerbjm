@@ -10,8 +10,8 @@ export const useNonceStore = defineStore('nonce', {
             if (typeof sessionStorage !== 'undefined') {
                 try {
                     return sessionStorage.getItem('wp-rest-nonce');
-                } catch (error) {
-                    console.error('Failed to get nonce from sessionStorage:', error);
+                } catch {
+                    // ignore
                 }
             }
             return null;
@@ -23,8 +23,8 @@ export const useNonceStore = defineStore('nonce', {
             if (typeof sessionStorage !== 'undefined') {
                 try {
                     sessionStorage.setItem('wp-rest-nonce', nonce);
-                } catch (error) {
-                    console.error('Failed to set nonce in sessionStorage:', error);
+                } catch {
+                    // ignore
                 }
             }
         },

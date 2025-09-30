@@ -2,54 +2,37 @@
 
 namespace AstraChild\Services\Taxonomy;
 
-class TaxonomyService 
+class TaxonomyService
 {
 
     /**
      * Process taxonomy terms.
      *
-     * @param array|false|\WP_Error|null|string $terms Raw taxonomy terms.
+     * @param array $terms Raw taxonomy terms (array of term objects/arrays/strings).
      * @return array Processed taxonomy term names.
      */
-    public function processTaxonomyTerms($terms): array
+    public function processTaxonomyTerms(array $terms): array
     {
-        try {
-            // Handle different input types
-            if (is_wp_error($terms) || empty($terms)) {
-                return [];
-            }
-
-            // If it's already a string, return it as an array element
-            if (is_string($terms)) {
-                return [sanitize_text_field($terms)];
-            }
-
-            // If it's not an array, try to convert or return empty
-            if (!is_array($terms)) {
-                return [];
-            }
-
-            // Process array of term objects
-            return array_map(function ($term) {
-                // Handle term objects
-                if (is_object($term) && isset($term->name)) {
-                    return sanitize_text_field($term->name);
-                }
-                // Handle term arrays
-                if (is_array($term) && isset($term['name'])) {
-                    return sanitize_text_field($term['name']);
-                }
-                // Handle strings
-                if (is_string($term)) {
-                    return sanitize_text_field($term);
-                }
-                // Fallback for other types
-                return sanitize_text_field((string) $term);
-            }, $terms);
-        } catch (\Exception $e) {
-            error_log('TaxonomyService::processTaxonomyTerms error: ' . $e->getMessage());
+        if (empty($terms)) {
             return [];
         }
+
+        $names = [];
+        foreach ($terms as $term) {
+            if ($term instanceof \WP_Term && isset($term->name)) {
+                $names[] = sanitize_text_field($term->name);
+                continue;
+            }
+            if (is_array($term) && isset($term['name'])) {
+                $names[] = sanitize_text_field($term['name']);
+                continue;
+            }
+            if (is_string($term) && $term !== '') {
+                $names[] = sanitize_text_field($term);
+            }
+        }
+
+        return $names;
     }
 
     /**
@@ -59,7 +42,7 @@ class TaxonomyService
      * @param string $taxonomy Taxonomy name for caching.
      * @return array Hierarchical tree of taxonomy terms.
      */
-    public function buildTermsTree($terms, $taxonomy = ''): array
+    public function buildTermsTree(array $terms, $taxonomy = ''): array
     {
         try {
 

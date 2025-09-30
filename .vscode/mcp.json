@@ -8,7 +8,6 @@
         "--ignore-https-errors",
         "--browser=chrome-beta",
         "--shared-browser-context",
-        "--storage-state=${workspaceFolder:wplokerbjm}/mcp/playwright/persistent-state.json",
         "--extension"
       ],
       "env": {

@@ -7,7 +7,8 @@ import type {
   LoadMoreFilters,
   LoadMoreResponse,
   SingleOverlayResponse,
-  SortOption
+  SortOption,
+  BookmarkedJobsResponse
 } from '@/types'
 
 // Type guard to check if a value is a SortOption
@@ -27,6 +28,7 @@ export interface JobsApiInterface {
   searchJobs(filters: SearchFilters): Promise<SearchResponse>
   loadMore(filters: LoadMoreFilters): Promise<LoadMoreResponse>
   fetchSingleOverlay(slug: string): Promise<SingleOverlayResponse>
+  syncBookmark(ids: number[]): Promise<BookmarkedJobsResponse>
 }
 
 export const jobsApi: JobsApiInterface = {
@@ -98,5 +100,16 @@ export const jobsApi: JobsApiInterface = {
    */
   async fetchSingleOverlay(slug: string): Promise<SingleOverlayResponse> {
     return (await container.get<ApiClient>("ApiClient").get<SingleOverlayResponse>('/single-overlay/', { slug })).data
+  },
+
+  /**
+   * Sync saved jobs by IDs, returning existing jobs with updated permalinks
+   */
+  async syncBookmark(ids: number[]): Promise<BookmarkedJobsResponse> {
+    if (ids.length === 0) {
+      return []
+    }
+    const idsParam = ids.join(',')
+    return (await container.get<ApiClient>("ApiClient").get<BookmarkedJobsResponse>('/bookmarked-jobs/', { ids: idsParam })).data
   }
 }

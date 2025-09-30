@@ -171,13 +171,10 @@
         </section>
         <FloatingActionButton />
     </main>
-    <Footer />
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue';
 import Header from '@/layouts/Header.vue';
-import Footer from '@/layouts/Footer.vue';
 const props = defineProps<{ logo: string }>();
-const FloatingActionButton = defineAsyncComponent(() => import('@/components/Shared/FloatingActionButton.vue'));
+import FloatingActionButton from '@/components/Shared/FloatingActionButton.vue';
 </script>

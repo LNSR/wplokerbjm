@@ -10,14 +10,11 @@
       :total-jobs="props.jobGrid.totalJobs" />
     <FloatingActionButton />
   </main>
-  <Footer />
 </template>
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue';
 import Header from '@/layouts/Header.vue';
-import Footer from '@/layouts/Footer.vue';
 import SearchForm from '@/components/Homepage/SearchForm.vue';
-const FloatingActionButton = defineAsyncComponent(() => import('@/components/Shared/FloatingActionButton.vue'));
+import FloatingActionButton from '@/components/Shared/FloatingActionButton.vue';
 import JobGrid from '@/components/Homepage/JobGrid.vue';
 import JobCarousel from '@/components/Homepage/JobCarousel.vue';
 import type { SearchFormProps, JobGridProps, CarouselProps, LayoutProps } from '@/types'

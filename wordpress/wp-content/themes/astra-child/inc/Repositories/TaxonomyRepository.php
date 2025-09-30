@@ -3,33 +3,38 @@
 namespace AstraChild\Repositories;
 
 use AstraChild\Contracts\DataProviderInterface;
-use AstraChild\Models\TaxonomyEntity;
+use stdClass;
 
 class TaxonomyRepository implements DataProviderInterface
 {
-
-	public function __construct()
-	{
-		// Constructor code if needed
-	}
-
 	/**
 	 * Get job taxonomies
 	 *
 	 * @param int $post_id Post ID
-	 * @return TaxonomyEntity
+	 * @return array The data representing the taxonomy data
 	 */
-	public function getMetaBoxData(int $post_id): TaxonomyEntity
+	public function getMetaBoxData(int $post_id): array
 	{
-		$entity = new TaxonomyEntity(
-			perusahaan_taxo: get_the_terms($post_id, 'perusahaan'),
-			kategori_lowongan_taxo: get_the_terms($post_id, 'kategori-lowongan'),
-			lokasi_taxo: get_the_terms($post_id, 'lokasi-pekerjaan'),
-			jenis_pekerjaan_taxo: get_the_terms($post_id, 'jenis-pekerjaan'),
-			gender_taxo: get_the_terms($post_id, 'gender'),
-			pendidikan_taxo: get_the_terms($post_id, 'pendidikan')
-		);
-		return $entity;
+		$map = [
+			'perusahaan_taxo' => 'perusahaan',
+			'kategori_lowongan_taxo' => 'kategori-lowongan',
+			'lokasi_taxo' => 'lokasi-pekerjaan',
+			'jenis_pekerjaan_taxo' => 'jenis-pekerjaan',
+			'gender_taxo' => 'gender',
+			'pendidikan_taxo' => 'pendidikan',
+		];
+
+		$result = [];
+		foreach ($map as $key => $taxonomy) {
+			$terms = get_the_terms($post_id, $taxonomy);
+			if (is_wp_error($terms) || empty($terms) || $terms === false) {
+				$result[$key] = [];
+			} else {
+				$result[$key] = is_array($terms) ? $terms : [];
+			}
+		}
+
+		return $result;
 	}
 
 	public function getTaxonomyTerms(): array

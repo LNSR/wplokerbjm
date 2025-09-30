@@ -3,7 +3,7 @@ import { Container } from "inversify";
 import { createPinia } from "pinia";
 import { createApp } from "vue";
 import { VueAppFactory, ComponentMounter, AppRouter } from "@/app";
-import { ApiClient } from "@/api/Client";
+import { ApiClient } from "@/api";
 import { createRouter, createWebHistory } from "vue-router";
 const container = new Container({ autobind: true });
 

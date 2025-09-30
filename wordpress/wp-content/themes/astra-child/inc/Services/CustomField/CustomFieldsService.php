@@ -7,25 +7,29 @@ class CustomFieldsService
 	/**
 	 * Process custom fields data.
 	 *
-	 * @param mixed $customFields Raw custom fields data.
-	 * @return mixed Processed custom fields data.
+	 * @param array $customFields Raw custom fields data.
+	 * @return array Processed custom fields data.
 	 */
-	public function processCustomFields(mixed $customFields): mixed
+	public function processCustomFields(array $customFields): array
 	{
 		try {
 			// Process WYSIWYG fields
 			$wysiwyg_fields = ['tentang_perusahaan', 'deskripsi_pekerjaan', 'persyaratan', 'cara_melamar', 'benefit'];
 			foreach ($wysiwyg_fields as $field) {
-				if (!empty($customFields[$field]) && is_string($customFields[$field])) {
-					$customFields[$field] = do_shortcode(wpautop(wp_kses_post($customFields[$field])));
+				if (!empty($customFields[$field])) {
+					// Accept strings only; other types are ignored
+					if (is_string($customFields[$field])) {
+						$customFields[$field] = do_shortcode(wpautop(wp_kses_post($customFields[$field])));
+					}
 				}
 			}
 
 			// Process number fields
 			$number_fields = ['umur_min', 'umur_max', 'pengalaman', 'gaji_minimal', 'gaji_maksimal'];
 			foreach ($number_fields as $field) {
-				if (!empty($customFields[$field]) && (is_numeric($customFields[$field]) || is_string($customFields[$field]))) {
-					$customFields[$field] = is_numeric($customFields[$field]) ? (int)$customFields[$field] : null;
+				if (!empty($customFields[$field]) && is_numeric($customFields[$field])) {
+					// Cast numeric strings or numbers to int
+					$customFields[$field] = (int) $customFields[$field];
 				}
 			}
 
@@ -68,29 +72,38 @@ class CustomFieldsService
 			if (!empty($customFields['social_media'])) {
 				$socialMediaData = $customFields['social_media'];
 
-				// If it's a JSON string, decode it
+				// Meta Box sometimes stores serialized arrays; handle string (serialized or json) and arrays
 				if (is_string($socialMediaData)) {
-					$socialMediaData = json_decode($socialMediaData, true);
+					// Try json first, then attempt to unserialize
+					$decoded = json_decode($socialMediaData, true);
+					if (json_last_error() === JSON_ERROR_NONE && is_array($decoded)) {
+						$socialMediaData = $decoded;
+					} else {
+						$maybeUnserialized = @unserialize($socialMediaData);
+						if ($maybeUnserialized !== false && is_array($maybeUnserialized)) {
+							$socialMediaData = $maybeUnserialized;
+						}
+					}
 				}
 
 				$processedSocialMedia = [];
 
-				// Flatten all sets and keep only non-empty usernames, last non-empty wins
+				// Flatten all sets and keep only non-empty usernames
 				if (is_array($socialMediaData)) {
 					foreach ($socialMediaData as $platformSet) {
-						if (is_array($platformSet)) {
-							foreach ($platformSet as $platform => $username) {
-								if (is_string($platform) && is_string($username)) {
-									$platform = sanitize_text_field(trim($platform));
-									$username = sanitize_text_field(trim($username));
-									if (!empty($platform) && !empty($username)) {
-										if (!isset($processedSocialMedia[$platform])) {
-											$processedSocialMedia[$platform] = [];
-										}
-										$processedSocialMedia[$platform][] = $username;
-									}
-								}
+						if (!is_array($platformSet)) {
+							continue;
+						}
+						foreach ($platformSet as $platform => $username) {
+							if (!is_string($platform) || (!is_string($username) && !is_numeric($username))) {
+								continue;
 							}
+							$platform = sanitize_text_field(trim($platform));
+							$username = sanitize_text_field(trim((string) $username));
+							if ($platform === '' || $username === '') {
+								continue;
+							}
+							$processedSocialMedia[$platform][] = $username;
 						}
 					}
 				}

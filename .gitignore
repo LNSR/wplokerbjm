@@ -13,6 +13,8 @@ wordpress/wp-content/themes/astra-child/assets/ssg
 !wordpress/wp-content/themes/astra-child/cache
 **/dist
 .env
+**/.playwright-mcp
+**/mcp
 **/vendor
 **/node_modules
 **/bun.lock

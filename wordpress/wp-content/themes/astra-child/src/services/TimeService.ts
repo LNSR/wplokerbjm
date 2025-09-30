@@ -9,8 +9,8 @@ export class TimeService {
     let text = ''
 
     if (diff < 60) {
-      text = `${diff} detik lalu`
-      nextUpdate = 1000
+      text = 'Baru saja diposting'
+      nextUpdate = 60000
     } else if (diff < 3600) {
       text = `${Math.floor(diff / 60)} menit lalu`
       nextUpdate = (60 - (diff % 60)) * 1000

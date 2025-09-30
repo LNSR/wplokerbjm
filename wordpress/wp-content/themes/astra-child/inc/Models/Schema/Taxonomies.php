@@ -5,8 +5,14 @@ use AstraChild\Contracts\HooksInterface;
 
 /**
  * Taxonomies Schema
- * 
- * Defines custom taxonomies for job listings
+ *
+ * Defines custom taxonomies for job listings.
+ *
+ * @note This class serves as a blueprint/template for defining WordPress custom taxonomies.
+ *       The actual source of truth for taxonomy configurations is this code. Changes here
+ *       directly affect the registered taxonomies in WordPress.
+ *
+ * @package AstraChild\Models\Schema
  */
 class Taxonomies implements HooksInterface
 {

@@ -28,15 +28,16 @@ class DnsResolver
             return $cachedResult === 'null' ? null : $cachedResult;
         }
 
-        // Get PTR record
-        $ptr = gethostbyaddr($ip);
+        // Get PTR record with timeout handling
+        $ptr = @gethostbyaddr($ip);
         if (empty($ptr) || $ptr === $ip) {
             ObjectCache::set($cacheKey, 'null', 86400); // Cache null result for 1 day
             return null;
         }
 
         // Resolve PTR back to IP addresses (A/AAAA) and ensure the original IP is present
-        $records = dns_get_record($ptr, DNS_A + DNS_AAAA);
+        // Use @ to suppress warnings for timeout/failure cases
+        $records = @dns_get_record($ptr, DNS_A + DNS_AAAA);
         if (empty($records) || !is_array($records)) {
             ObjectCache::set($cacheKey, 'null', 86400); // Cache null result for 1 day
             return null;
@@ -73,6 +74,11 @@ class DnsResolver
             ],
             'amazon' => [
                 '/\.amazon\.com$/i',
+                '/\.amazonaws\.com$/i',
+            ],
+            'anthropic' => [
+                '/\.anthropic\.com$/i',
+                '/claude/i',
             ],
             'apple' => [
                 '/\.apple\.com$/i',
@@ -115,6 +121,10 @@ class DnsResolver
             'cloudfront' => [
                 '/\.cloudfront\.net$/i',
             ],
+            'cohere' => [
+                '/\.cohere\.ai$/i',
+                '/\.cohere\.com$/i',
+            ],
             'discord' => [
                 '/\.discord\.com$/i',
             ],
@@ -131,6 +141,7 @@ class DnsResolver
                 '/\.facebook\.com$/i',
                 '/\.facebook\.net$/i',
                 '/facebookexternalhit/i',
+                '/\.meta\.com$/i',
             ],
             'fastly' => [
                 '/\.fastly\.com$/i',
@@ -165,6 +176,9 @@ class DnsResolver
             'highwinds' => [
                 '/\.highwinds\.com$/i',
             ],
+            'huggingface' => [
+                '/\.huggingface\.co$/i',
+            ],
             'imperva' => [
                 '/\.imperva\.com$/i',
             ],
@@ -198,6 +212,11 @@ class DnsResolver
             'meta' => [
                 '/\.meta\.com$/i',
             ],
+            'microsoft' => [
+                '/\.microsoft\.com$/i',
+                '/\.msn\.com$/i',
+                '/\.live\.com$/i',
+            ],
             'moz' => [
                 '/\.moz\.com$/i',
             ],
@@ -206,6 +225,16 @@ class DnsResolver
             ],
             'oculus' => [
                 '/\.oculus\.com$/i',
+            ],
+            'openai' => [
+                '/\.openai\.com$/i',
+                '/\.openai\.org$/i',
+                '/gptbot/i',
+                '/chatgpt/i',
+            ],
+            'perplexity' => [
+                '/\.perplexity\.ai$/i',
+                '/perplexitybot/i',
             ],
             'pinterest' => [
                 '/\.pinterest\.com$/i',
@@ -222,6 +251,11 @@ class DnsResolver
             ],
             'reddit' => [
                 '/\.reddit\.com$/i',
+            ],
+            'semrush' => [
+                '/\.semrush\.com$/i',
+                '/semrushbot/i',
+                '/semrush/i',
             ],
             'seoprofiler' => [
                 '/\.seoprofiler\.com$/i',
@@ -253,6 +287,7 @@ class DnsResolver
             'twitter' => [
                 '/\.twitter\.com$/i',
                 '/twitterbot/i',
+                '/\.x\.com$/i',
             ],
             'uptrends' => [
                 '/\.uptrends\.com$/i',

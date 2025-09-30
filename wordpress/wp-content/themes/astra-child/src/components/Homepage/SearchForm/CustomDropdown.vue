@@ -70,7 +70,7 @@
           @click="!isMultiple && select(option)">
           <label v-if="isMultiple" class="flex items-center cursor-pointer">
             <input type="checkbox" class="!mr-3 w-6 h-6 accent-blue-500" :checked="isSelected(option.value)"
-              @change="toggleValue(option.value)" tabindex="-1" />
+              @change="emit('update:modelValue', toggleValue(option.value))" tabindex="-1" />
           </label>
           <i
             :class="option.children?.length ? 'fas fa-folder !mr-2 text-yellow-400' : 'fas fa-file-alt !mr-2 text-gray-400'"></i>
@@ -81,7 +81,7 @@
           <span v-if="option.isLoading" class="ml-2 text-xs text-gray-400 italic">Memuat...</span>
         </span>
         <button v-if="option.children?.length && !search"
-          class="!ml-2 flex items-center justify-center w-10 h-10 rounded hover:!bg-blue-300 relative"
+          class="!ml-2 flex items-center justify-center w-10 h-10 rounded relative"
           @mousedown.stop.prevent="navigateChildren(option.children, option.label, option)" tabindex="-1"
           aria-label="Lihat sub">
           <span
@@ -98,11 +98,10 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, toRef, computed, inject, onBeforeMount, onUnmounted, type Ref } from 'vue'
-import { DROPDOWN_CONTROLLER } from '@/composables/useSearchForm/useDropdown'
-import { useDropdown, type Option } from '@/composables/useSearchForm/useDropdown'
+import { ref, onMounted, onBeforeUnmount, toRef, inject, onBeforeMount, onUnmounted, watch, type Ref } from 'vue'
+import { DROPDOWN_CONTROLLER, useDropdown } from '@/composables/useSearchForm/useDropdown'
 import { useTaxonomyStore } from '@/stores'
-import type { SortOption } from '@/types'
+import type { SortOption, DropdownOption } from '@/types'
 
 type DropdownController = {
   register: (key: string, handle: {
@@ -112,7 +111,7 @@ type DropdownController = {
     open: boolean | Ref<boolean>;
   }) => () => void;
 };
-const props = defineProps<{ id: string; modelValue: string[] | string | SortOption; options: Option[]; placeholder?: string; multiple?: boolean; disabled?: boolean }>()
+const props = defineProps<{ id: string; modelValue: string[] | string | SortOption; options: DropdownOption[]; placeholder?: string; multiple?: boolean; disabled?: boolean }>()
 const emit = defineEmits(['update:modelValue', 'open', 'registered'])
 const dropdownRef = ref<HTMLElement | null>(null)
 
@@ -121,29 +120,103 @@ const {
   activeIndex,
   search,
   breadcrumb,
+  breadcrumbLabels,
+  stack,
   selectedValues,
   getLabel,
   isSelected,
-  select,
   toggleValue,
   isMultiple,
   SEMUA_VALUE,
-  toggle,
-  close,
-  goBack,
-  navigateChildren,
-  goToBreadcrumb,
-  filteredOptions,
+  filteredNonEmpty,
   highlightMatch,
 } = useDropdown({
   modelValue: toRef(props, 'modelValue') as Ref<unknown>,
   options: toRef(props, 'options'),
-  emit: emit as (event: string, ...args: unknown[]) => void,
   multiple: props.multiple,
   placeholder: props.placeholder,
 })
 
 const taxonomyStore = useTaxonomyStore();
+
+function goBack(): void {
+  if (stack.value.length) {
+    stack.value.pop()
+    breadcrumbLabels.value.pop()
+    activeIndex.value = 0
+  }
+}
+
+function goToBreadcrumb(idx: number): void {
+  stack.value = stack.value.slice(0, idx + 1)
+  breadcrumbLabels.value = breadcrumbLabels.value.slice(0, idx + 1)
+  activeIndex.value = 0
+}
+
+function pushBreadcrumb(label: string, children: DropdownOption[]): void {
+  stack.value.push(children)
+  breadcrumbLabels.value.push(label)
+  activeIndex.value = 0
+}
+
+function resetBreadcrumb(): void {
+  stack.value = []
+  breadcrumbLabels.value = []
+  activeIndex.value = 0
+}
+
+function toggle(): void {
+  open.value = !open.value;
+  if (open.value) {
+    activeIndex.value = 0;
+    emit("open");
+  }
+}
+
+function close(): void {
+  open.value = false;
+  resetBreadcrumb();
+  search.value = "";
+}
+
+function select(option: DropdownOption): void {
+  emit("update:modelValue", option);
+  close();
+}
+
+function navigateChildren(
+  children: DropdownOption[],
+  label: string,
+  parentOption?: DropdownOption
+): void {
+  (async (): Promise<void> => {
+    if (parentOption?.loadChildren && (!children || children.length === 0)) {
+      parentOption.isLoading = true;
+      try {
+        const loaded = await parentOption.loadChildren();
+        parentOption.children = loaded;
+      } finally {
+        parentOption.isLoading = false;
+      }
+      pushBreadcrumb(label, parentOption.children);
+    } else {
+      pushBreadcrumb(label, children);
+    }
+    activeIndex.value = 0;
+  })();
+}
+
+watch(open, (val: boolean) => {
+  if (!val) {
+    activeIndex.value = 0;
+    resetBreadcrumb();
+    search.value = "";
+  }
+});
+
+watch(search, () => {
+  activeIndex.value = 0;
+});
 
 const controller = inject<DropdownController | null>(DROPDOWN_CONTROLLER, null)
 let unregister: (() => void) | null = null
@@ -164,7 +237,6 @@ onUnmounted(() => {
 })
 
 // Small helpers local to the component to keep template clean
-const filteredNonEmpty = computed(() => filteredOptions.value.filter((opt) => opt.value !== ''))
 function clearFilters() {
   emit('update:modelValue', [SEMUA_VALUE])
 }

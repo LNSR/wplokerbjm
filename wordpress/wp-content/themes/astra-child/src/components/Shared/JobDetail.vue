@@ -2,10 +2,13 @@
   <div class="!space-y-8">
     <!-- Job Title -->
     <section v-if="job.title" class="top-0 backdrop-blur text-center">
-      <h1 class="text-3xl !font-bold">{{ job.title }}</h1>
+      <div class="flex items-center justify-center gap-4">
+        <h1 class="text-3xl !font-bold">{{ job.title }}</h1>
+      </div>
       <div v-if="job.post_time" class="text-sm mt-2 flex items-center justify-center gap-2 font-semibold text-center">
-        <i class="fas fa-clock text-blue-500 inline-block static"></i>
-        <span>Diupdate {{ computedTimeAgo }}</span>
+        <i class="fas fa-clock text-blue-500 !inline-block !static"></i>
+        <span>Diupdate: {{ computedTimeAgo }}</span>
+        <BookmarkButton :job-id="job.id || 0" variant="detail" />
       </div>
     </section>
 
@@ -126,7 +129,7 @@
               <span class="block">{{ item.platform }}:</span>
               <a :href="item.url" target="_blank" rel="noopener noreferrer"
                 class="block font-semibold break-all max-w-xs whitespace-normal">
-                {{ item.platform === 'Whatsapp' ? formatPhone(item.username) : item.username }}
+                {{ item.platform === 'Whatsapp' ? FormattingService.formatPhone(item.username) : item.username }}
               </a>
             </div>
           </div>
@@ -142,10 +145,11 @@ import { computed } from 'vue'
 import 'viewerjs/dist/viewer.css'
 import { component as Viewer } from 'v-viewer'
 import { useTimeAgo } from '@/composables/useTime'
-import { formatPhone } from '@/services/Formatting'
+import { FormattingService } from '@/services/Formatting'
 import type { SingleOverlayResponse } from '@/types'
 import { useSummaryJob, useContactsJob } from '@/composables/useSummary'
 import { SocialMediaService } from '@/services/SosialMediaService'
+import BookmarkButton from '@/components/Shared/BookmarkButton.vue'
 
 const props = defineProps<{
   job: SingleOverlayResponse

@@ -43,14 +43,14 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue';
+import { defineAsyncComponent, onMounted, onUnmounted } from 'vue';
 import { useSingleOverlay } from '@/composables/useJobGrid/useSingleOverlay'
 const JobDetail = defineAsyncComponent(() => import('@/components/Shared/JobDetail.vue'));
 const props = defineProps<{
   slug: string
   visible: boolean
   permalink?: string
-}>()
+}>();
 const emit = defineEmits(['close'])
 
 const {
@@ -68,13 +68,16 @@ function close() {
   emit('close')
 }
 
+function onkeydown(event: KeyboardEvent) {
+  if (event.key === 'Escape') {
+    close()
+  }
+}
+onMounted(() => {
+  document.addEventListener('keydown', onkeydown)
+})
+onUnmounted(() => {
+  document.removeEventListener('keydown', onkeydown)
+})
 const drawerOpenClass = 'transform translate-x-0'
-
-/**
- * Build the admin duplicate (clone) URL for the Duplicate Page/Post plugin.
- * Tries to find a matching nonce in a few places (window globals, meta tags).
- * If no nonce is found, returns a URL without the nonce param (may fail server-side).
- */
-// getCloneHref is provided by the composable and already prefers the
-// server-provided nonce when available. See composable for fallback heuristics.
 </script>

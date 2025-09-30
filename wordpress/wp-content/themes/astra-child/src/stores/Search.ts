@@ -53,24 +53,31 @@ export const useSearchStore = defineStore("search", () => {
 
   // Actions
   function setFilters(newFilters: Partial<SearchFilters>): void {
+    // Sanitize incoming filter strings before merging into state
+    const sanitized: Partial<SearchFilters> = { ...newFilters };
+    if (typeof newFilters.cari === 'string') {
+      sanitized.cari = validation.sanitizeString(newFilters.cari);
+    }
+    const sanitizeArr = (arrOrVal: unknown): string[] | undefined => {
+      if (Array.isArray(arrOrVal)) {
+        return arrOrVal.map(v => {
+          if (typeof v === 'string') return validation.sanitizeString(v)
+          if (typeof v === 'number') return String(v)
+          return validation.sanitizeString(String(v ?? ''))
+        }) as string[]
+      }
+      if (typeof arrOrVal === 'string') {
+        return [validation.sanitizeString(arrOrVal)]
+      }
+      return undefined
+    }
+
     filters.value = {
       ...filters.value,
-      ...newFilters,
-      lokasi: Array.isArray(newFilters.lokasi)
-        ? newFilters.lokasi
-        : newFilters.lokasi
-          ? [newFilters.lokasi]
-          : filters.value.lokasi,
-      gender: Array.isArray(newFilters.gender)
-        ? newFilters.gender
-        : newFilters.gender
-          ? [newFilters.gender]
-          : filters.value.gender,
-      pendidikan: Array.isArray(newFilters.pendidikan)
-        ? newFilters.pendidikan
-        : newFilters.pendidikan
-          ? [newFilters.pendidikan]
-          : filters.value.pendidikan,
+      ...sanitized,
+      lokasi: sanitizeArr(newFilters.lokasi) ?? filters.value.lokasi,
+      gender: sanitizeArr(newFilters.gender) ?? filters.value.gender,
+      pendidikan: sanitizeArr(newFilters.pendidikan) ?? filters.value.pendidikan,
       sort:
         typeof newFilters.sort === "object" && newFilters.sort !== null
           ? newFilters.sort
@@ -101,16 +108,27 @@ export const useSearchStore = defineStore("search", () => {
     searchHistory.value = [];
   }
 
+  // Helper to deeply sanitize filter values before sending to API
+  function sanitizeFilters(f: SearchFilters): SearchFilters {
+    return {
+      ...f,
+      cari: typeof f.cari === 'string' ? validation.sanitizeString(f.cari) : f.cari,
+      lokasi: Array.isArray(f.lokasi) ? f.lokasi.map(v => (typeof v === 'string' ? validation.sanitizeString(v) : String(v))) : f.lokasi,
+      gender: Array.isArray(f.gender) ? f.gender.map(v => (typeof v === 'string' ? validation.sanitizeString(v) : String(v))) : f.gender,
+      pendidikan: Array.isArray(f.pendidikan) ? f.pendidikan.map(v => (typeof v === 'string' ? validation.sanitizeString(v) : String(v))) : f.pendidikan,
+    }
+  }
+
   const debouncedGetSuggestions = debounce(async (query: string) => {
-    if (validation.isValidQuery(query)) {
+    const cleanQuery = validation.sanitizeString(query);
+    if (validation.isValidQuery(cleanQuery)) {
       suggestionsLoading.value = true;
       try {
-        suggestions.value = await fetchAutoSuggestions(query);
+        suggestions.value = await fetchAutoSuggestions(cleanQuery);
         showSuggestions.value = suggestions.value.length > 0;
-      } catch (err) {
+      } catch {
         suggestions.value = [];
         showSuggestions.value = false;
-        console.error("Error fetching auto suggestions:", err);
       } finally {
         suggestionsLoading.value = false;
       }
@@ -125,7 +143,7 @@ export const useSearchStore = defineStore("search", () => {
   }
 
   function selectSuggestion(suggestion: string): void {
-    filters.value.cari = suggestion;
+    filters.value.cari = validation.sanitizeString(suggestion);
     showSuggestions.value = false;
     suggestions.value = [];
   }
@@ -141,15 +159,16 @@ export const useSearchStore = defineStore("search", () => {
     loading.value = true;
     error.value = null;
     try {
-      const response = await apiSearchJobs(filters.value);
+      const cleaned = sanitizeFilters(filters.value);
+      const response = await apiSearchJobs(cleaned);
       jobs.value = [...response.jobs];
       context.value = response.context || "search";
       title.value = response.title || "Hasil Pencarian";
       totalJobs.value = response.meta?.total || 0;
       maxNumPages.value = response.meta?.totalPages || 1;
       page.value = 1; // Reset page on new search
-      if (filters.value.cari) {
-        addToHistory(filters.value.cari);
+      if (cleaned.cari) {
+        addToHistory(String(cleaned.cari));
       }
       return response;
     } catch (err) {
@@ -173,7 +192,7 @@ export const useSearchStore = defineStore("search", () => {
       const loadMoreFilters: LoadMoreFilters = {
         page: page.value + 1,
         context: context.value,
-        ...filters.value,
+        ...sanitizeFilters(filters.value),
       };
       const response: LoadMoreResponse = await apiLoadMore(loadMoreFilters);
       if (Array.isArray(response.jobs) && response.jobs.length) {

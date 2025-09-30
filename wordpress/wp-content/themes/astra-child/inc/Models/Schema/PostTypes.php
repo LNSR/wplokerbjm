@@ -5,8 +5,15 @@ use AstraChild\Contracts\HooksInterface;
 
 /**
  * Post Types Schema
- * 
- * Defines custom post types for the application
+ *
+ * Defines custom post types for the application.
+ *
+ * @note This class serves as a blueprint/template for defining WordPress custom post types.
+ *       The actual source of truth for post type configurations is this code. Changes here
+ *       directly affect the registered post types in WordPress. Post types are registered
+ *       in-memory and not stored in the database by default.
+ *
+ * @package AstraChild\Models\Schema
  */
 class PostTypes implements HooksInterface {
     /**

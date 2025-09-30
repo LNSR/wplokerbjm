@@ -72,8 +72,14 @@ inc/
 │   ├── AutowireScanner.php    # Scans for PHP files for autowiring
 │   ├── Cache.php              # Centralized cache management for transients
 │   ├── ObjectCache.php        # Direct object cache management
-│   ├── Container.php          # Dependency Injection container (PHP-DI)
-│   ├── Definitions/           # Container definitions
+│   ├── Container/             # Container setup and definitions
+│   │    ├── AutowireScanner.php    # Autowire scanner
+│   │    ├── Init.php               # Container initialization
+│   │    └── Definitions/           # Container definitions
+│   │        ├── AutoScanned.php    # Auto-scanned definitions
+│   │        ├── Core.php           # Core definitions
+│   │        ├── Factories.php      # Factory definitions
+│   │        └── Repositories.php   # Repository definitions
 │   ├── Enqueue/               # Enqueue management
 │   │   └── Vite.php           # Vite integration for asset management
 │   ├── Enqueue.php            # Registers/enqueues scripts and styles
@@ -128,7 +134,7 @@ src/
 ├── components                 # Vue UI components
 │   ├── Homepage               # Homepage-specific components
 │   ├── Shared                 # Shared inter-components
-├── composables                # Vue composables (reusable logic)
+├── composables                # Vue composables (reusable/extracted logic)
 ├── layouts                    # App layout components
 ├── pages                      # Page-level Vue components
 ├── services                   # Service classes (API, Auth, etc.)
@@ -186,11 +192,14 @@ mkcert localhost 127.0.0.1 ::1  # Use your own IP or domain if needed
   sudo chown -R $USER:$USER ./wordpress
   ```
 
-- 🚀 **Start the containers**:
+- 🚀 **Start the containers**
+
   ```sh
   docker compose up -d
   ```
+
   - Use [wpcli.sh](wpcli.sh) for WP commands
+
     ```bash
     source wpcli.sh
     #example:

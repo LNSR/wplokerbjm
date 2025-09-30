@@ -1,6 +1,7 @@
 import { taxonomyApi } from '@/api/endpoints/Taxonomy'
 import { jobsApi } from '@/api/endpoints/Jobs'
-import type { TaxonomyTerm, SearchFilters, LoadMoreFilters } from '@/types'
+import type { SearchFilters, LoadMoreFilters } from '@/types'
+import { TaxonomyType } from '@/types'
 
 export class JobService {
   static async getAutoSuggestions(query: string): Promise<ReturnType<typeof jobsApi.getAutoSuggestions>> {
@@ -18,18 +19,25 @@ export class JobService {
   static async fetchSingleOverlay(slug: string): Promise<ReturnType<typeof jobsApi.fetchSingleOverlay>> {
     return await jobsApi.fetchSingleOverlay(slug)
   }
+
+  static async syncBookmark(ids: number[]): Promise<ReturnType<typeof jobsApi.syncBookmark>> {
+    return await jobsApi.syncBookmark(ids)
+  }
 }
 
 export class TaxonomyService {
-  static async fetchLokasiTerms(): Promise<TaxonomyTerm[]> {
-    return await taxonomyApi.getTermsByType('lokasi')
+  static async fetchAllTerms(): Promise<ReturnType<typeof taxonomyApi.getAllTerms>> {
+    return await taxonomyApi.getAllTerms()
+  }
+  static async fetchLokasiTerms(): Promise<ReturnType<typeof taxonomyApi.getTermsByType>> {
+    return await taxonomyApi.getTermsByType(TaxonomyType.lokasi)
   }
 
-  static async fetchGenderTerms(): Promise<TaxonomyTerm[]> {
-    return await taxonomyApi.getTermsByType('gender')
+  static async fetchGenderTerms(): Promise<ReturnType<typeof taxonomyApi.getTermsByType>> {
+    return await taxonomyApi.getTermsByType(TaxonomyType.gender)
   }
 
-  static async fetchPendidikanTerms(): Promise<TaxonomyTerm[]> {
-    return await taxonomyApi.getTermsByType('pendidikan')
+  static async fetchPendidikanTerms(): Promise<ReturnType<typeof taxonomyApi.getTermsByType>> {
+    return await taxonomyApi.getTermsByType(TaxonomyType.pendidikan)
   }
 }

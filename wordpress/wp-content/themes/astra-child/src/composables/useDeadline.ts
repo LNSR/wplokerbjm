@@ -16,10 +16,10 @@ export function useDeadline(deadline: string | null | undefined): { text: string
 	let text = '';
 	let style = '';
 	if (days_left > 1) {
-		text = `Tersisa ${days_left} hari`;
+		text = `Sisa ${days_left} hari`;
 		style = 'bg-blue-600 text-white border border-blue-800';
 	} else if (days_left === 1) {
-		text = 'Tersisa 1 hari';
+		text = 'Sisa 1 hari';
 		style = 'bg-yellow-400 text-black border border-yellow-600';
 	} else if (days_left === 0) {
 		text = 'Hari terakhir';

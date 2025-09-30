@@ -1,32 +1,20 @@
-import { ref, watch, onMounted, inject, type Ref, type ComputedRef } from "vue";
-import { useSuggestions } from "./useSearchForm/useSearchFormSuggestion";
-import { useFilter, removeFilter } from "./useSearchForm/useFilter";
+import { ref, watch, onMounted, computed, type Ref, type ComputedRef } from "vue";
 import { useSearchStore, useTaxonomyStore } from "@/stores";
-import { validation } from "@/utils";
-import type { SearchFormProps, SearchResponse, TaxonomyTerm } from "@/types";
+import { TaxonomyType } from "@/types";
+import type { SearchFormProps, TaxonomyTerm } from "@/types";
 
-export function useSearchForm(props: SearchFormProps, emit: ((event: "searchResults", response: SearchResponse) => void) & ((event: "searchError", error: string) => void)): {
+export function useSearchForm(props: SearchFormProps): {
   searchInput: Ref<HTMLInputElement | undefined>;
   searchStore: ReturnType<typeof useSearchStore>;
   taxonomyStore: ReturnType<typeof useTaxonomyStore>;
   selectedSuggestionIndex: Ref<number>;
-  handleFocus: () => void;
-  navigateSuggestions: (direction: number) => void;
   selectSuggestion: (suggestion: string) => void;
-  hideSuggestionsImmediate: () => void;
-  handleSubmit: () => Promise<void>;
   mapTerms: (terms: TaxonomyTerm[], placeholder: string) => { value: string; label: string; }[];
-  removeFilter: typeof import('./useSearchForm/useFilter').removeFilter;
   selectedFiltersWithNames: ComputedRef<{ key: string; label: string; values: string[]; names: string[]; }[]>;
-  resetFiltersAndSearch: () => Promise<void>;
 } {
   const searchInput = ref<HTMLInputElement>();
   const searchStore = useSearchStore();
   const taxonomyStore = useTaxonomyStore();
-  const onSearchResults = inject<((searchData: SearchResponse) => void) | null>(
-    "onSearchResults",
-    null
-  );
 
   onMounted(() => {
     searchStore.setFilters({
@@ -34,18 +22,18 @@ export function useSearchForm(props: SearchFormProps, emit: ((event: "searchResu
       lokasi: Array.isArray(props.currentLokasi)
         ? props.currentLokasi
         : props.currentLokasi
-        ? [props.currentLokasi]
-        : [],
+          ? [props.currentLokasi]
+          : [],
       gender: Array.isArray(props.currentGender)
         ? props.currentGender
         : props.currentGender
-        ? [props.currentGender]
-        : [],
+          ? [props.currentGender]
+          : [],
       pendidikan: Array.isArray(props.currentPendidikan)
         ? props.currentPendidikan
         : props.currentPendidikan
-        ? [props.currentPendidikan]
-        : [],
+          ? [props.currentPendidikan]
+          : [],
       sort: props.currentSort,
     });
     if (props.currentSearch && searchInput.value) {
@@ -62,69 +50,11 @@ export function useSearchForm(props: SearchFormProps, emit: ((event: "searchResu
     }
   );
 
-  const {
-    selectedSuggestionIndex,
-    handleFocus,
-    navigateSuggestions,
-    selectSuggestion,
-    hideSuggestionsImmediate,
-  } = useSuggestions(searchStore, handleSubmit);
+  // Suggestion state (moved from useSearchFormSuggestion)
+  const selectedSuggestionIndex = ref(-1);
 
-  async function handleSubmit(): Promise<void> {
-    if (!validation.isValidFilters(searchStore.filters)) {
-      return;
-    }
-    if (selectedSuggestionIndex.value >= 0 && searchStore.hasSuggestions) {
-      const suggestion = searchStore.suggestions[selectedSuggestionIndex.value];
-      if (suggestion) {
-        selectSuggestion(suggestion);
-        return;
-      }
-    }
-    try {
-      const response = await searchStore.searchJobs();
-      hideSuggestionsImmediate();
-      emit("searchResults", {
-        ...response,
-        shouldScroll: true,
-        filters: { ...searchStore.filters },
-      });
-      setTimeout(() => {
-        const grid = document.getElementById("job-grid");
-        if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
-      }, 100);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Search failed";
-      emit("searchError", errorMessage);
-      console.error("Search failed:", err);
-    }
-  }
-
-  async function resetFiltersAndSearch(): Promise<void> {
-    searchStore.resetFilters();
-    try {
-      const response = await searchStore.searchJobs();
-      searchStore.title = "Lowongan Terbaru"; // JobGrid Title
-      searchStore.context = "latest";
-      response.title = "Lowongan Terbaru";
-      response.context = "latest";
-      hideSuggestionsImmediate();
-      emit("searchResults", {
-        ...response,
-        shouldScroll: false,
-        filters: { ...searchStore.filters },
-      });
-      if (onSearchResults)
-        onSearchResults({
-          ...response,
-          shouldScroll: false,
-          filters: { ...searchStore.filters },
-        });
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Search failed";
-      emit("searchError", errorMessage);
-      console.error("Search failed:", err);
-    }
+  function selectSuggestion(suggestion: string): void {
+    searchStore.selectSuggestion(suggestion);
   }
 
   interface MappedTerm {
@@ -145,20 +75,72 @@ export function useSearchForm(props: SearchFormProps, emit: ((event: "searchResu
     return mapped;
   }
 
-  const selectedFiltersWithNames = useFilter(searchStore, taxonomyStore);
+  // Filter logic (moved from useFilter)
+  const selectedFiltersWithNames = computed(() => {
+    const SEMUA_VALUE = "";
+    const filters: {
+      key: TaxonomyType;
+      label: string;
+      values: string[];
+      names: string[];
+    }[] = [];
+    if (searchStore.filters.lokasi && searchStore.filters.lokasi.length) {
+      const filtered = searchStore.filters.lokasi.filter(
+        (slug: string) => slug !== SEMUA_VALUE
+      );
+      if (filtered.length) {
+        filters.push({
+          key: TaxonomyType.lokasi,
+          label: "Lokasi",
+          values: filtered,
+          names: filtered.map((slug: string) =>
+            taxonomyStore.getTermNameBySlug(TaxonomyType.lokasi, slug)
+          ),
+        });
+      }
+    }
+    if (searchStore.filters.gender && searchStore.filters.gender.length) {
+      const filtered = searchStore.filters.gender.filter(
+        (slug: string) => slug !== SEMUA_VALUE
+      );
+      if (filtered.length) {
+        filters.push({
+          key: TaxonomyType.gender,
+          label: "Gender",
+          values: filtered,
+          names: filtered.map((slug: string) =>
+            taxonomyStore.getTermNameBySlug(TaxonomyType.gender, slug)
+          ),
+        });
+      }
+    }
+    if (
+      searchStore.filters.pendidikan &&
+      searchStore.filters.pendidikan.length
+    ) {
+      const filtered = searchStore.filters.pendidikan.filter(
+        (slug: string) => slug !== SEMUA_VALUE
+      );
+      if (filtered.length) {
+        filters.push({
+          key: TaxonomyType.pendidikan,
+          label: "Pendidikan",
+          values: filtered,
+          names: filtered.map((slug: string) =>
+            taxonomyStore.getTermNameBySlug(TaxonomyType.pendidikan, slug)
+          ),
+        });
+      }
+    }
+    return filters;
+  });
 
   return {
     searchInput,
     searchStore,
     taxonomyStore,
     selectedSuggestionIndex,
-    handleFocus,
-    navigateSuggestions,
     selectSuggestion,
-    hideSuggestionsImmediate,
-    handleSubmit,
-    resetFiltersAndSearch,
-    removeFilter,
     mapTerms,
     selectedFiltersWithNames,
   };

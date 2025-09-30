@@ -45,11 +45,10 @@
 </template>
 
 <script setup lang="ts">
-import { defineAsyncComponent } from 'vue';
 import type { JobGridProps } from '@/types'
 import { useJobGrid } from '@/composables/useJobGrid'
 import JobCard from '@/components/Homepage/JobCard.vue';
-const SingleOverlay = defineAsyncComponent(() => import('@/components/Homepage/JobGrid/SingleOverlay.vue'))
+import SingleOverlay from '@/components/Homepage/JobGrid/SingleOverlay.vue';
 const props = defineProps<JobGridProps>()
 const {
   jobs,

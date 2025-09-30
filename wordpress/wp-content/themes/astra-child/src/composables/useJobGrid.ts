@@ -1,4 +1,5 @@
 import { computed, ref, onMounted, onBeforeUnmount, watch, type ComputedRef, type Ref } from "vue";
+import { getWpAdminBarTopOffset } from "@/utils/elements";
 import { useSearchStore, useJobOverlayStore } from "@/stores";
 import { useRouter } from "vue-router";
 import { useRouterOverlayWatcher } from "@/composables/Router/useRouterOverlayWatcher";
@@ -8,7 +9,7 @@ export function useJobGrid(props: JobGridProps = {}): {
   jobs: ComputedRef<CardJob[]>;
   loading: ComputedRef<boolean>;
   searchStore: ReturnType<typeof useSearchStore>;
-  sentinel: Ref<HTMLElement | null>;
+  sentinel: Ref<Element | null>;
   overlayOpen: ComputedRef<boolean>;
   selectedSlug: ComputedRef<string | null>;
   totalJobs: ComputedRef<number>;
@@ -26,7 +27,7 @@ export function useJobGrid(props: JobGridProps = {}): {
 
   const router = useRouter();
 
-  const sentinel = ref<HTMLElement | null>(null);
+  const sentinel = ref<Element | null>();
   let observer: IntersectionObserver | null = null;
 
   const jobOverlay = useJobOverlayStore();
@@ -53,7 +54,7 @@ export function useJobGrid(props: JobGridProps = {}): {
       },
       { root: null, rootMargin: "0px", threshold: 0.1 }
     );
-    if (sentinel.value) observer.observe(sentinel.value);
+  if (sentinel.value) observer.observe(sentinel.value as Element);
   }
 
   function openOverlay(slug: string): void {
@@ -92,12 +93,7 @@ export function useJobGrid(props: JobGridProps = {}): {
   // Calculate the height of the WordPress admin bar
   const wpAdminBarOffset = ref("0px");
   onMounted(() => {
-    const bar = document.getElementById("wpadminbar");
-    if (bar) {
-      wpAdminBarOffset.value = bar.offsetHeight + "px";
-    } else {
-      wpAdminBarOffset.value = "0px";
-    }
+    wpAdminBarOffset.value = getWpAdminBarTopOffset() + 'px';
   });
 
   onMounted(() => {
@@ -130,7 +126,7 @@ export function useJobGrid(props: JobGridProps = {}): {
     jobs,
     loading,
     searchStore,
-    sentinel,
+  sentinel: sentinel as Ref<Element | null>,
     overlayOpen,
     selectedSlug,
     totalJobs,

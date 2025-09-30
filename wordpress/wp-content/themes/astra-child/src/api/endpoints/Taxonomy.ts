@@ -1,10 +1,11 @@
 import type { TaxonomyTermsResponse, TaxonomyTerm } from '@/types'
+import { TaxonomyType } from '@/types'
 import { container } from '@/inversify.config'
 import { ApiClient } from '@/api'
 
 export interface TaxonomyApiInterface {
   getAllTerms(): Promise<TaxonomyTermsResponse>
-  getTermsByType(type: string): Promise<TaxonomyTerm[]>
+  getTermsByType(type: TaxonomyType): Promise<TaxonomyTerm[]>
 }
 
 export const taxonomyApi: TaxonomyApiInterface = {
@@ -14,7 +15,7 @@ export const taxonomyApi: TaxonomyApiInterface = {
   async getAllTerms(): Promise<TaxonomyTermsResponse> {
     return (await container.get<ApiClient>("ApiClient").get<TaxonomyTermsResponse>('/taxonomies/')).data
   },
-  async getTermsByType(type: string): Promise<TaxonomyTerm[]> {
+  async getTermsByType(type: TaxonomyType): Promise<TaxonomyTerm[]> {
     return (await container.get<ApiClient>("ApiClient").get<TaxonomyTerm[]>(`/taxonomies/${type}`)).data
   }
 }

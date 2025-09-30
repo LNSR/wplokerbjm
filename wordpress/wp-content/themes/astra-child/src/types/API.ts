@@ -1,4 +1,4 @@
-import type { SortOption, Job } from '@/types';
+import type { SortOption, Job, JobSummary, JobContactRow, CardJob } from '@/types';
 
 // Base filters for search operations
 export interface SearchFilters {
@@ -25,7 +25,7 @@ export interface ApiResponse<T> {
   meta: ApiMeta
 }
 
-// Base response structure for job operations
+// * Base response for SearchResponse and LoadMoreResponse
 export interface BaseJobResponse {
   jobs: Job[]
   context?: SearchContext
@@ -40,7 +40,7 @@ export interface SearchResponse extends BaseJobResponse {
 }
 
 // Response for pagination operations
-export interface LoadMoreResponse extends BaseJobResponse {}
+export interface LoadMoreResponse extends BaseJobResponse { }
 
 // Simplified load more filters - flattened structure
 export interface LoadMoreFilters extends Partial<SearchFilters> {
@@ -48,7 +48,15 @@ export interface LoadMoreFilters extends Partial<SearchFilters> {
   context?: SearchContext
 }
 
-export interface AutoSuggestResponse extends Array<string> {}
+export interface AutoSuggestResponse extends Array<string> { }
+
+export type BookmarkedJobsResponse = CardJob[];
+
+export enum TaxonomyType {
+  lokasi = 'lokasi',
+  gender = 'gender',
+  pendidikan = 'pendidikan'
+}
 
 
 // Standardized taxonomy term interface
@@ -65,37 +73,6 @@ export interface TaxonomyTermsResponse {
   genderTerms: TaxonomyTerm[]
   pendidikanTerms: TaxonomyTerm[]
 }
-
-export interface JobSummary {
-  jenis_pekerjaan_taxo?: string | string[] | null;
-  pendidikan_taxo?: string | string[] | null;
-  pengalaman?: string | number | null;
-  gender_taxo?: string | string[] | null;
-  gaji_minimal?: string | number | null;
-  gaji_maksimal?: string | number | null;
-  umur_min?: string | number | null;
-  umur_max?: string | number | null;
-  lokasi_taxo?: string | string[] | null;
-  deadline?: string | null;
-}
-
-// Shape returned by RESTData::getCardData()
-export interface CardJob {
-  slug?: string;
-  title: string;
-  nama_perusahaan?: string;
-  ringkasanPekerjaan?: JobSummary | null;
-  deadline?: string | null;
-  statusjob?: number | string | null;
-  permalink?: string;
-  post_time?: string;
-}
-
-export type JobContactRow = {
-  email_kontak?: string[];
-  nomor_kontak?: string[];
-  situs_kontak?: string[];
-};
 
 export interface SingleOverlayResponse {
   id?: number;

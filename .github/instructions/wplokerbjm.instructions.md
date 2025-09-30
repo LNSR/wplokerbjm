@@ -23,6 +23,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,vue,scss,less,sass,cjs,mjs,jsx,ts
 - Style with **Tailwind CSS** and **DaisyUI**.
 - No need to worry about backward compatibility, just override.
 - If there errors, immediately fix them.
+- Always ESNext for JavaScript/TypeScript files and PHP 8.4+ conventions.
 
 ## Backend(PHP)
 

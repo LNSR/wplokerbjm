@@ -9,6 +9,7 @@ export function debounce<T extends (...args: any[]) => any>(
   func: T,
   wait = 300,
   options?: { leading?: boolean; trailing?: boolean }
-): (...args: Parameters<T>) => ReturnType<T> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+): any {
   return lodashDebounce(func, wait, options)
 }

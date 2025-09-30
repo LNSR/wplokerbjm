@@ -1,65 +1,6 @@
-<script setup lang="ts">
-import type { SearchFormProps, SearchResponse, SortOption } from '@/types'
-import { useSearchForm } from '@/composables/useSearchForm'
-import { defineAsyncComponent, provide } from 'vue';
-import { useDropdownController, DROPDOWN_CONTROLLER } from '@/composables/useSearchForm/useDropdown'
-const CustomDropdown = defineAsyncComponent(() => import('./SearchForm/CustomDropdown.vue'));
-
-const props = defineProps<SearchFormProps>()
-
-const emit = defineEmits<{
-  searchResults: [response: SearchResponse]
-  searchError: [error: string]
-}>()
-
-const {
-  searchInput,
-  searchStore,
-  taxonomyStore,
-  selectedSuggestionIndex,
-  handleFocus,
-  navigateSuggestions,
-  selectSuggestion,
-  hideSuggestionsImmediate,
-  handleSubmit,
-  mapTerms,
-  removeFilter,
-  selectedFiltersWithNames,
-  resetFiltersAndSearch
-} = useSearchForm(props, emit)
-
-
-const {
-  toggleGender,
-  togglePendidikan,
-  toggleSort,
-  toggleLokasi,
-  lokasiLabel,
-  genderLabel,
-  pendidikanLabel,
-  sortLabel,
-  isLokasiOpen,
-  isGenderOpen,
-  isPendidikanOpen,
-  isSortOpen,
-  genderLoaded,
-  lokasiLoaded,
-  pendidikanLoaded,
-  sortLoaded,
-  controller
-} = useDropdownController()
-
-provide(DROPDOWN_CONTROLLER, controller);
-
-const sortOptions: SortOption[] = [
-  { value: 'desc', label: 'Terbaru' },
-  { value: 'asc', label: 'Terlama' }
-]
-</script>
-
 <template>
   <section class="mx-auto px-4 py-8 text-center">
-    <h1 class="text-3xl md:text-5xl !font-bold !mb-2">Temukan Lowongan Kerja Terbaru di Banjarmasin</h1>
+    <h1 class="text-3xl md:text-5xl !font-bold !mb-2">Temukan Lowongan Kerja Terbaru di Sekitar</h1>
     <p class="mb-8 text-lg !text-semibold">Update setiap hari, mudah diakses, dan gratis!</p>
     <div class="border-2 border-blue-500 rounded-xl p-4 md:p-6 min-h-[220px] sm:min-h-[306px] md:min-h-[204px]">
       <form class="space-y-4" :action="archiveLink" method="get" @submit.prevent="handleSubmit">
@@ -94,7 +35,7 @@ const sortOptions: SortOption[] = [
                 <ul class="divide-y divide-blue-200 dark:divide-blue-800 max-h-52 overflow-y-auto">
                   <li v-for="(suggestion, idx) in searchStore.suggestions" :key="`${suggestion}-${idx}`">
                     <a class="block px-4 py-2 text-center text-gray-800 dark:text-white hover:bg-blue-200 dark:hover:bg-blue-900 hover:text-blue-700 dark:hover:text-blue-300 transition-colors cursor-pointer whitespace-nowrap"
-                      @click="selectSuggestion(suggestion)" @mouseenter="selectedSuggestionIndex = idx">
+                      @click="selectSuggestionUI(suggestion)" @mouseenter="selectedSuggestionIndex = idx">
                       {{ suggestion }}
                     </a>
                   </li>
@@ -179,7 +120,7 @@ const sortOptions: SortOption[] = [
                 <i v-else-if="filter.key === 'pendidikan'" class="fas fa-graduation-cap !mr-1 text-green-500"></i>
                 {{ filter.label }}: {{ filter.names[idx] }}
                 <button type="button" class="!ml-2 text-blue-500 hover:text-red-600 transition-colors duration-150"
-                  @click="removeFilter(searchStore, filter.key as 'lokasi' | 'gender' | 'pendidikan', val)" aria-label="Hapus filter">
+                  @click="removeFilter(searchStore, filter.key as TaxonomyType, val)" aria-label="Hapus filter">
                   <i class="fas fa-times !text-xs"></i>
                 </button>
               </span>
@@ -236,3 +177,173 @@ const sortOptions: SortOption[] = [
     </div>
   </section>
 </template>
+<script setup lang="ts">
+import type { SearchFormProps, SearchResponse, SortOption } from '@/types'
+import { TaxonomyType } from '@/types';
+import { useSearchForm } from '@/composables/useSearchForm'
+import { useSearchStore } from '@/stores'
+import { validation } from '@/utils'
+import { defineAsyncComponent, provide, inject } from 'vue';
+import { useDropdownController, DROPDOWN_CONTROLLER } from '@/composables/useSearchForm/useDropdown'
+const CustomDropdown = defineAsyncComponent(() => import('./SearchForm/CustomDropdown.vue'));
+
+const props = defineProps<SearchFormProps>()
+
+const emit = defineEmits<{
+  searchResults: [response: SearchResponse]
+  searchError: [error: string]
+}>()
+
+const onSearchResults = inject<((searchData: SearchResponse) => void) | null>(
+  "onSearchResults",
+  null
+);
+
+const {
+  searchInput,
+  searchStore,
+  taxonomyStore,
+  selectedSuggestionIndex,
+  selectSuggestion,
+  mapTerms,
+  selectedFiltersWithNames
+} = useSearchForm(props)
+
+function handleFocus(): void {
+  if (searchStore.hasSuggestions) {
+    searchStore.showSuggestions = true;
+    selectedSuggestionIndex.value = -1;
+  }
+}
+
+function navigateSuggestions(direction: number): void {
+  if (!searchStore.showSuggestions || !searchStore.hasSuggestions) return;
+
+  const maxIndex = searchStore.suggestions.length - 1;
+
+  if (direction > 0) {
+    selectedSuggestionIndex.value =
+      selectedSuggestionIndex.value < maxIndex
+        ? selectedSuggestionIndex.value + 1
+        : 0;
+  } else {
+    selectedSuggestionIndex.value =
+      selectedSuggestionIndex.value > 0
+        ? selectedSuggestionIndex.value - 1
+        : maxIndex;
+  }
+}
+
+function selectSuggestionUI(suggestion: string): void {
+  selectSuggestion(suggestion);
+  selectedSuggestionIndex.value = -1;
+  handleSubmit();
+}
+
+function hideSuggestionsImmediate(): void {
+  searchStore.showSuggestions = false;
+  selectedSuggestionIndex.value = -1;
+}
+
+async function performSearch(): Promise<SearchResponse> {
+  if (!validation.isValidFilters(searchStore.filters)) {
+    throw new Error("Invalid filters");
+  }
+  if (selectedSuggestionIndex.value >= 0 && searchStore.hasSuggestions) {
+    const suggestion = searchStore.suggestions[selectedSuggestionIndex.value];
+    if (suggestion) {
+      selectSuggestion(suggestion);
+      return await searchStore.searchJobs();
+    }
+  }
+  return await searchStore.searchJobs();
+}
+
+async function performReset(): Promise<SearchResponse> {
+  searchStore.resetFilters();
+  const response = await searchStore.searchJobs();
+  searchStore.title = "Lowongan Terbaru";
+  searchStore.context = "latest";
+  response.title = "Lowongan Terbaru";
+  response.context = "latest";
+  return response;
+}
+
+async function handleSubmit(): Promise<void> {
+  try {
+    const response = await performSearch();
+    hideSuggestionsImmediate();
+    emit("searchResults", {
+      ...response,
+      shouldScroll: true,
+      filters: { ...searchStore.filters },
+    });
+    setTimeout(() => {
+      const grid = document.getElementById("job-grid");
+      if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 100);
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Search failed";
+    emit("searchError", errorMessage);
+  }
+}
+
+async function resetFiltersAndSearch(): Promise<void> {
+  try {
+    const response = await performReset();
+    hideSuggestionsImmediate();
+    emit("searchResults", {
+      ...response,
+      shouldScroll: false,
+      filters: { ...searchStore.filters },
+    });
+    if (onSearchResults)
+      onSearchResults({
+        ...response,
+        shouldScroll: false,
+        filters: { ...searchStore.filters },
+      });
+  } catch (err) {
+    const errorMessage = err instanceof Error ? err.message : "Search failed";
+    emit("searchError", errorMessage);
+  }
+}
+
+function removeFilter(store: ReturnType<typeof useSearchStore>, key: TaxonomyType, value: string): void {
+  const arr = Array.isArray(store.filters[key])
+    ? [...(store.filters[key] as string[])]
+    : [];
+  const idx = arr.indexOf(value);
+  if (idx !== -1) {
+    arr.splice(idx, 1);
+    store.filters[key] = arr;
+  }
+}
+
+const {
+  toggleGender,
+  togglePendidikan,
+  toggleSort,
+  toggleLokasi,
+  lokasiLabel,
+  genderLabel,
+  pendidikanLabel,
+  sortLabel,
+  isLokasiOpen,
+  isGenderOpen,
+  isPendidikanOpen,
+  isSortOpen,
+  genderLoaded,
+  lokasiLoaded,
+  pendidikanLoaded,
+  sortLoaded,
+  controller
+} = useDropdownController()
+
+provide(DROPDOWN_CONTROLLER, controller);
+
+const sortOptions: SortOption[] = [
+  { value: 'desc', label: 'Terbaru' },
+  { value: 'asc', label: 'Terlama' }
+]
+</script>

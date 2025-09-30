@@ -1,5 +1,5 @@
 <template>
-  <div class="fixed bottom-6 right-6 z-100 flex flex-col items-end gap-4">
+  <div class="fixed bottom-3 right-3 z-100 flex flex-col items-end gap-4">
     <!-- Scroll to Top Button -->
     <transition enter-active-class="transition-opacity duration-200"
       leave-active-class="transition-opacity duration-200" enter-from-class="opacity-0" leave-to-class="opacity-0">
@@ -12,7 +12,7 @@
 
     <!-- Contact Dropdown -->
     <div class="relative" ref="dropdownRef">
-      <!-- Overlay: place BEFORE the dropdown list -->
+      <!-- Overlay -->
       <div v-if="dropdownOpen" class="fixed inset-0 z-40" @click="closeDropdown" tabindex="-1" aria-hidden="true"></div>
       <button
         class="btn btn-primary flex items-center gap-2 rounded-full !px-4 !py-3 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 !bg-[var(--ast-global-color-5)] !text-[var(--ast-global-color-1)]"
@@ -57,7 +57,7 @@
           <!-- Social Media Nested Dropdown -->
           <div class="relative">
             <button @click="socialDropdownOpen = !socialDropdownOpen"
-              class="btn btn-outline flex items-center gap32 rounded-full !px-4 !py-2 w-full justify-between transition hover:border-blue-600 hover:scale-105"
+              class="btn btn-outline flex items-center rounded-full !px-4 !py-2 w-full justify-between transition hover:border-blue-600 hover:scale-105"
               :aria-expanded="socialDropdownOpen" aria-haspopup="menu" type="button">
               <span class="flex items-center gap-2">
                 <i class="fas fa-hashtag text-pink-500 text-xl w-6 inline-block text-center static"></i>
@@ -183,7 +183,7 @@ onMounted(() => {
   document.addEventListener('mousedown', handleClickOutside)
   observeJobGrid()
   window.addEventListener('scroll', handleScroll)
-  handleScroll() // initialize state
+  handleScroll()
 })
 
 onBeforeUnmount(() => {

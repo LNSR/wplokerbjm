@@ -47,17 +47,30 @@ class PostsManagement
         }
     }
 
+    /**
+     * Update job statuses based on deadlines:
+     * - Set to normal (0) if past deadline
+     * - Set to urgent (2) if within 7 days of deadline
+     * - Leave unchanged otherwise
+     * @return void
+     */
     public function updateAllJobStatuses(): void
     {
         try {
-            $job_ids = get_posts(JobQuery::allJobsIdsArgs());
-            foreach ($job_ids as $post_id) {
+            $job_items = get_posts(JobQuery::allJobsIdsArgs());
+            foreach ($job_items as $job_item) {
+                $post_id = is_object($job_item) ? (int) $job_item->ID : (int) $job_item;
+
                 try {
                     $deadline = get_post_meta($post_id, 'deadline', true);
-                    $status = (int) get_post_meta($post_id, 'status_pekerjaan', true);
-                    if ($deadline) {
-                        $this->updateJobStatusIfExpired($post_id, $deadline, $status);
+                    if (!$deadline) {
+                        continue;
                     }
+
+                    $status = (int) get_post_meta($post_id, 'status_pekerjaan', true);
+
+                    $this->updateJobStatusIfExpired($post_id, $deadline, $status);
+                    $this->setJobStatustoUrgent($post_id, $deadline, $status);
                 } catch (\Exception $e) {
                     error_log('PostsManagement::updateAllJobStatuses error for post ' . $post_id . ': ' . $e->getMessage());
                 }
@@ -68,16 +81,20 @@ class PostsManagement
     }
 
     /**
-     * Summary of updateJobStatusIfExpired
+     * Set job status to expired(normal or not set) if the deadline has passed
      * @param int $post_id
      * @param string $deadline
      * @param int $current_status
      * @return void
      */
-    public function updateJobStatusIfExpired(int $post_id, string $deadline, int $current_status): void
+    private function updateJobStatusIfExpired(int $post_id, string $deadline, int $current_status): void
     {
         try {
             $deadline_ts = strtotime($deadline . ' 23:59:59');
+            if ($deadline_ts === false) {
+                error_log('PostsManagement::updateJobStatusIfExpired invalid deadline for post ' . $post_id . ': ' . $deadline);
+                return;
+            }
             $now = time();
             if ($now > $deadline_ts && $current_status !== 0) {
                 update_post_meta($post_id, 'status_pekerjaan', 0);
@@ -86,4 +103,30 @@ class PostsManagement
             error_log('PostsManagement::updateJobStatusIfExpired error for post ' . $post_id . ': ' . $e->getMessage());
         }
     }
+
+    /**
+     * Set job status to urgent if the deadline is within 7 days
+     * @param int $post_id
+     * @param string $deadline
+     * @param int $current_status
+     * @return void
+     */
+    private function setJobStatustoUrgent(int $post_id, string $deadline, int $current_status): void
+    {
+        try {
+            $deadline_ts = strtotime($deadline . ' 23:59:59');
+            if ($deadline_ts === false) {
+                error_log('PostsManagement::setJobStatustoUrgent invalid deadline for post ' . $post_id . ': ' . $deadline);
+                return;
+            }
+            $now = time();
+            $seven_days_ahead = strtotime('+7 days 23:59:59', strtotime('today', $now));
+            if ($deadline_ts >= $now && $deadline_ts <= $seven_days_ahead && $current_status !== 2) {
+                update_post_meta($post_id, 'status_pekerjaan', 2);
+            }
+        } catch (\Exception $e) {
+            error_log('PostsManagement::setJobStatustoUrgent error for post ' . $post_id . ': ' . $e->getMessage());
+        }
+    }
+
 }

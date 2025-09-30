@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted, watch, type Ref } from 'vue'
+import { ref, onUnmounted, type Ref } from 'vue'
 import { TimeService } from '@/services/TimeService'
 
 export function useTimeAgo(postTime: string | undefined): {
@@ -15,13 +15,16 @@ export function useTimeAgo(postTime: string | undefined): {
     timeoutId = setTimeout(updateTimeAgo, nextUpdate)
   }
 
-  onMounted(updateTimeAgo)
+  updateTimeAgo()
+
+  // * Note: onUnmounted is included for proper cleanup in components like JobCard.vue and JobDetail.vue,
+  // * where useTimeAgo is called during setup and components unmount frequently (e.g., during live search).
+  // * However, this causes a Vue warning in BookmarkedModal.vue because useTimeAgo is called inside
+  // * a computed property (displayedSavedJobs), which runs outside of setup and doesn't have its own lifecycle.
+  // * The warning is harmless, and onUnmounted still works for the modal's overall unmounting.
+  // * If the warning becomes an issue, we can remove onUnmounted and accept minor timeout buildup.
   onUnmounted(() => {
     if (timeoutId) clearTimeout(timeoutId)
-  })
-
-  watch(() => postTime, () => {
-    updateTimeAgo()
   })
 
   return { timeAgo }

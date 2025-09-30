@@ -1,4 +1,4 @@
-import type { JobSummary } from './API'
+import type { JobSummary } from '@/types'
 
 export interface Job {
     id?: number;
@@ -18,4 +18,3 @@ export interface Job {
     ringkasanPekerjaan?: JobSummary | null;
     post_time?: string;
 }
-

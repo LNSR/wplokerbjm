@@ -155,8 +155,8 @@ The `AutowireScanner` includes debug methods to help identify which classes are 
 
 ## 📋 Mini Kanban Table
 
-| 📥 BACKLOG                                 | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                        |
-| ------------------------------------------ | ------- | -------------- | ----------------------------------- |
-|                                            |         |                | ✅ Migrate to Vue for most frontend |
-| 🚀 Migrate to Nuxt and deploy to Vercel    |         |                | ✅ Fully CSR `<body>`               |
-| 🗺️ Add Job Fair Page (map & event details) |         |                | ✅ Implement SSG via GitHub Actions |
+| 📥 BACKLOG                                 | 📋 TODO | 🚧 IN PROGRESS              | ✅ COMPLETED                        |
+| ------------------------------------------ | ------- | --------------------------- | ----------------------------------- |
+|                                            |         | Client side bookmark system | ✅ Migrate to Vue for most frontend |
+| 🚀 Migrate to Nuxt and deploy to Vercel    |         |                             | ✅ Fully CSR `<body>`               |
+| 🗺️ Add Job Fair Page (map & event details) |         |                             | ✅ Implement SSG via GitHub Actions |

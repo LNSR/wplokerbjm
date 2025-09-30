@@ -15,7 +15,8 @@ class RESTRoute implements HooksInterface
         private readonly \AstraChild\Controllers\REST\LoadMore $loadMore,
         private readonly \AstraChild\Controllers\REST\DynamicSearch $dynamicSearch,
         private readonly \AstraChild\Controllers\REST\SingleOverlay $singleOverlay,
-        private readonly \AstraChild\Controllers\REST\DispatchSSGBuild $dispatchSSGBuild
+        private readonly \AstraChild\Controllers\REST\DispatchSSGBuild $dispatchSSGBuild,
+        private readonly \AstraChild\Controllers\REST\JobBookmark $jobBookmark
     ) {
     }
 
@@ -92,6 +93,13 @@ class RESTRoute implements HooksInterface
                 return current_user_can('manage_options');
             },
             'args' => $this->dispatchSSGBuild->getRouteArgs()
+        ]);
+
+        /** @see \AstraChild\Controllers\REST\JobBookmark::handle() */
+        register_rest_route(self::$baseURI, '/bookmarked-jobs/', [
+            'methods' => 'GET',
+            'callback' => [$this->jobBookmark, 'handle'],
+            'permission_callback' => '__return_true',
         ]);
     }
 }

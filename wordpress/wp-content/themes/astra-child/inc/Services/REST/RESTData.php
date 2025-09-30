@@ -15,6 +15,7 @@ class RESTData
             $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
 
             $data = [
+                'id' => $post_id,
                 'slug' => get_post_field('post_name', $post_id),
                 'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 'nama_perusahaan' => !empty($jobdata['perusahaan_taxo'])
@@ -50,6 +51,7 @@ class RESTData
             $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
 
             $data = [
+                'id' => $post_id,
                 'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 'namaPerusahaan' => !empty($jobdata['perusahaan_taxo'])
                     ? html_entity_decode($jobdata['perusahaan_taxo'], ENT_QUOTES | ENT_HTML5, 'UTF-8')
@@ -81,7 +83,6 @@ class RESTData
             ];
 
             if (is_user_logged_in()) {
-                $data['id'] = $post_id;
                 $data['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
             }
 

@@ -37,8 +37,13 @@ class BotRangeFetcher
         // Fetch from official sources
         $ranges = $this->fetchBotRanges();
 
-        // Cache the results
-        ObjectCache::set($cacheKey, $ranges, expiration: 86400);
+        // Remove duplicates and ensure we have valid ranges
+        $ranges = array_unique($ranges);
+        $ranges = array_filter($ranges, [$this, 'isValidCidr']);
+
+        // Cache the results (shorter cache time if using fallbacks)
+        $cacheTime = count($ranges) > 100 ? 86400 : 3600; // 1 day vs 1 hour
+        ObjectCache::set($cacheKey, $ranges, expiration: $cacheTime);
 
         self::$knownBotRanges = $ranges;
         return $ranges;
@@ -92,58 +97,58 @@ class BotRangeFetcher
     }
 
     /**
-     * Fetch bot IP ranges from official JSON sources
+     * Fetch bot IP ranges from official JSON sources with improved error handling
      */
     private function fetchBotRanges(): array
     {
         $ranges = [];
 
-        // Googlebot ranges
-        $googleRanges = $this->fetchGoogleBotRanges();
+        // Googlebot ranges (with retry logic)
+        $googleRanges = $this->fetchWithRetry([$this, 'fetchGoogleBotRanges']);
         $ranges = array_merge($ranges, $googleRanges);
 
         // Bingbot ranges
-        $bingRanges = $this->fetchBingBotRanges();
+        $bingRanges = $this->fetchWithRetry([$this, 'fetchBingBotRanges']);
         $ranges = array_merge($ranges, $bingRanges);
 
         // DuckDuckBot ranges
-        $duckRanges = $this->fetchDuckDuckBotRanges();
+        $duckRanges = $this->fetchWithRetry([$this, 'fetchDuckDuckBotRanges']);
         $ranges = array_merge($ranges, $duckRanges);
 
         // Yandex ranges
-        $yandexRanges = $this->fetchYandexRanges();
+        $yandexRanges = $this->fetchWithRetry([$this, 'fetchYandexRanges']);
         $ranges = array_merge($ranges, $yandexRanges);
 
         // Applebot ranges
-        $appleRanges = $this->fetchAppleBotRanges();
+        $appleRanges = $this->fetchWithRetry([$this, 'fetchAppleBotRanges']);
         $ranges = array_merge($ranges, $appleRanges);
 
         // Google special crawlers ranges (AdsBot, etc.)
-        $specialRanges = $this->fetchGoogleSpecialCrawlersRanges();
+        $specialRanges = $this->fetchWithRetry([$this, 'fetchGoogleSpecialCrawlersRanges']);
         $ranges = array_merge($ranges, $specialRanges);
 
         // Google user triggered fetchers ranges
-        $userFetchersRanges = $this->fetchGoogleUserTriggeredFetchersRanges();
+        $userFetchersRanges = $this->fetchWithRetry([$this, 'fetchGoogleUserTriggeredFetchersRanges']);
         $ranges = array_merge($ranges, $userFetchersRanges);
 
         // Google user triggered fetchers Google ranges
-        $userFetchersGoogleRanges = $this->fetchGoogleUserTriggeredFetchersGoogleRanges();
+        $userFetchersGoogleRanges = $this->fetchWithRetry([$this, 'fetchGoogleUserTriggeredFetchersGoogleRanges']);
         $ranges = array_merge($ranges, $userFetchersGoogleRanges);
 
         // OpenAI bot ranges
-        $openAiRanges = $this->fetchOpenAiBotRanges();
+        $openAiRanges = $this->fetchWithRetry([$this, 'fetchOpenAiBotRanges']);
         $ranges = array_merge($ranges, $openAiRanges);
 
         // Perplexity bot ranges
-        $perplexityRanges = $this->fetchPerplexityBotRanges();
+        $perplexityRanges = $this->fetchWithRetry([$this, 'fetchPerplexityBotRanges']);
         $ranges = array_merge($ranges, $perplexityRanges);
 
         // Pinterest bot ranges
-        $pinterestRanges = $this->fetchPinterestBotRanges();
+        $pinterestRanges = $this->fetchWithRetry([$this, 'fetchPinterestBotRanges']);
         $ranges = array_merge($ranges, $pinterestRanges);
 
         // QUIC.cloud ranges
-        $quicCloudRanges = $this->fetchQuicCloudRanges();
+        $quicCloudRanges = $this->fetchWithRetry([$this, 'fetchQuicCloudRanges']);
         $ranges = array_merge($ranges, $quicCloudRanges);
 
         // Baidu ranges
@@ -163,7 +168,7 @@ class BotRangeFetcher
         $ranges = array_merge($ranges, $seoToolRanges);
 
         // Social preview crawlers (Facebook, Twitter)
-        $socialRanges = $this->fetchSocialPreviewRanges();
+        $socialRanges = $this->fetchWithRetry([$this, 'fetchSocialPreviewRanges']);
         $ranges = array_merge($ranges, $socialRanges);
 
         // Monitoring and archive services
@@ -171,10 +176,33 @@ class BotRangeFetcher
         $ranges = array_merge($ranges, $monitorRanges);
 
         // Additional bot ranges from open-source databases
-        $openSourceRanges = $this->fetchOpenSourceBotRanges();
+        $openSourceRanges = $this->fetchWithRetry([$this, 'fetchOpenSourceBotRanges']);
         $ranges = array_merge($ranges, $openSourceRanges);
 
         return array_unique($ranges);
+    }
+
+    /**
+     * Fetch data with retry logic to handle temporary failures
+     */
+    private function fetchWithRetry(callable $fetchFunction, int $maxRetries = 2): array
+    {
+        $attempt = 0;
+        while ($attempt < $maxRetries) {
+            try {
+                $result = call_user_func($fetchFunction);
+                if (!empty($result)) {
+                    return $result;
+                }
+            } catch (\Exception $e) {
+                error_log('[SSG BotRangeFetcher] Fetch attempt ' . ($attempt + 1) . ' failed: ' . $e->getMessage());
+            }
+            $attempt++;
+            if ($attempt < $maxRetries) {
+                sleep(1); // Brief pause between retries
+            }
+        }
+        return [];
     }
 
     /**
@@ -565,27 +593,32 @@ class BotRangeFetcher
     /**
      * Fetch common SEO tool IP ranges (Ahrefs, SEMrush, Moz examples)
      *
-     * @source https://ahrefs.com/robot (Ahrefs)
      * @source https://www.semrush.com/bot/ (SEMrush)
+     * @source https://ahrefs.com/robot (Ahrefs)
      * @source https://moz.com/help/mozbot (Moz)
      */
     private function fetchSeoToolRanges(): array
     {
         return [
+            // SEMrush Bot - Known IP ranges
+            '85.208.96.0/24',    // SEMrush primary range
+            '85.208.97.0/24',    // SEMrush secondary range
+            '185.191.171.0/24',  // SEMrushBot range (confirmed from logs: 185.191.171.16, 185.191.171.19)
+            '185.191.172.0/24',  // Additional SEMrushBot range
+            '185.191.173.0/24',  // Additional SEMrushBot range
+            '185.191.174.0/24',  // Additional SEMrushBot range
+            '185.191.175.0/24',  // Additional SEMrushBot range
+            
             // Ahrefs (sample blocks - verify against ahrefs.com current list)
             '54.36.148.0/24',
             '54.36.149.0/24',
             '54.36.150.0/24',
-            // SEMrush (sample)
-            '85.208.96.0/24',
-            '85.208.97.0/24',
+            
             // Moz (sample)
             '192.69.160.0/24',
             '192.69.161.0/24',
         ];
-    }
-
-    /**
+    }    /**
      * Fetch social preview crawler IP ranges (Facebook, Twitter samples)
      *
      * @source https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/ (Meta/Facebook)
@@ -689,25 +722,36 @@ class BotRangeFetcher
     }
 
     /**
-     * Fetch URL content with timeout
+     * Fetch URL content with timeout and better error handling
      */
     private function fetchUrl(string $url): ?string
     {
         $context = stream_context_create([
             'http' => [
-                'timeout' => 10, // 10 second timeout
+                'timeout' => 15, // Increased timeout
                 'user_agent' => 'WordPress/SSG-BotDetection',
+                'method' => 'GET',
+                'ignore_errors' => true, // Don't fail on HTTP errors
             ]
         ]);
 
         $content = @file_get_contents($url, false, $context);
+
+        // Check if request was successful
+        if ($content === false && isset($http_response_header)) {
+            $statusLine = $http_response_header[0] ?? '';
+            if (strpos($statusLine, '200') === false) {
+                error_log('[SSG BotRangeFetcher] HTTP error for ' . $url . ': ' . $statusLine);
+            }
+        }
+
         return $content ?: null;
     }
 
     /**
      * Validate CIDR notation
      */
-    private function isValidCidr(string $cidr): bool
+    public function isValidCidr(string $cidr): bool
     {
         if (!preg_match('/^(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3})\/(\d{1,2})$/', $cidr, $matches)) {
             return false;

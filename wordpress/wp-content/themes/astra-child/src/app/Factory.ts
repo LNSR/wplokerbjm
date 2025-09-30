@@ -24,8 +24,8 @@ export class VueAppFactory {
       this.app = this.createAppFn({});
       this.app!.use(this.pinia);
       if (this.AppRouter) this.app!.use(this.AppRouter.createAppRouter());
-      this.app!.config.errorHandler = (err: unknown, _instance: unknown, info: string): void => {
-        console.error("Root App Error:", err, info);
+      this.app!.config.errorHandler = (): void => {
+        // ignore
       };
     }
     return this.app!;

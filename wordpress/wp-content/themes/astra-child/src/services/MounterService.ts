@@ -113,8 +113,8 @@ export class MounterService {
         }
 
         restoreUserState();
-      } catch (err) {
-        console.error('Failed to remove placeholder (immediate)', err);
+      } catch {
+        // ignore
       }
     };
 
@@ -167,8 +167,7 @@ export class MounterService {
       const raw = scriptElement.textContent || scriptElement.innerHTML || "";
       try {
         props = raw ? JSON.parse(raw) : {};
-      } catch (err) {
-        console.error('Failed to parse props from <script> content:', err);
+      } catch {
         props = {};
       }
     }
@@ -203,7 +202,6 @@ export class MounterService {
 
     try {
       fallbackTimer = window.setTimeout(() => {
-        console.warn(`Mount timeout (${FALLBACK_REMOVE_MS}ms) for ${config.selector} — removing placeholder.`);
         removePlaceholderImmediate();
       }, FALLBACK_REMOVE_MS);
 
@@ -237,8 +235,6 @@ export class MounterService {
 
       if (onError) {
         onError(error, element, config);
-      } else {
-        console.error(`Failed to mount component at ${config.selector}:`, error);
       }
     }
   }
