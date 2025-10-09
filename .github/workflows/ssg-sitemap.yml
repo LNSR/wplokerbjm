@@ -12,7 +12,7 @@ on:
         default: "false"
 
 env:
-  THEME_DIR: wordpress/wp-content/themes/astra-child
+  THEME_DIR: wordpress/wp-content/themes/wplokerbjm
   SITE_URL: ${{ secrets.SITE_URL }}
 
 jobs:
@@ -23,9 +23,9 @@ jobs:
       actions: write
       contents: read
     env:
-      RCLONE_TRANSFERS: "6"
+      RCLONE_TRANSFERS: "4"
       RCLONE_CHECKERS: "2"
-      RCLONE_RETRIES: "3"
+      RCLONE_RETRIES: "100"
       RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"
       RCLONE_BWLIMIT: "100M"
@@ -65,7 +65,7 @@ jobs:
         env:
           SSG_MINIFY_HTML: "true"
           # Reduce concurrency to avoid exhausting runner resources and crashing Chromium
-          SSG_CONCURRENCY: "30"
+          SSG_CONCURRENCY: "10"
           # Increase per-page timeout to tolerate slow pages (ms)
           SSG_PAGE_TIMEOUT: "60000"
           # Allow continuing when some pages fail; useful for sitemap runs

@@ -3,9 +3,9 @@ description: "Setup common dependencies with caching for Node.js modules and Pla
 
 inputs:
   theme-dir:
-    description: "Theme directory path"
-    required: true
-    default: "wordpress/wp-content/themes/astra-child"
+    description: "Path to the theme directory"
+    required: false
+    default: "wordpress/wp-content/themes/wplokerbjm"
   install-jq:
     description: "Whether to install jq"
     required: false
@@ -15,17 +15,43 @@ inputs:
     required: false
     default: "false"
 
+  enable-apt-cache:
+    description: "Enable APT caching behavior in this action"
+    required: false
+    default: "true"
+
 runs:
   using: "composite"
   steps:
+    - name: Compute APT cache key
+      if: ${{ inputs.enable-apt-cache == 'true' }}
+      id: compute-apt-key
+      run: |
+        set -euo pipefail
+        # Attempt to get a stable identifier for apt sources and distro
+        CODENAME=$(lsb_release -cs 2>/dev/null || echo "${RUNNER_OS:-${{ runner.os }}}")
+        # Hash sources files if present
+        SHA=""
+        if [ -f /etc/apt/sources.list ] || [ -d /etc/apt/sources.list.d ]; then
+          find /etc/apt -maxdepth 2 -type f -name '*.list' -print0 2>/dev/null | sort -z | xargs -0 sha256sum 2>/dev/null | sha256sum | awk '{print $1}' || SHA=""
+        fi
+        # Fallback to action file hash + codename if no sources hash
+        if [ -z "$SHA" ]; then
+          SHA=$(sha256sum .github/actions/setup-dependencies/action.yml 2>/dev/null | awk '{print $1}' || echo "base")
+        fi
+        APT_KEY="${CODENAME}-${SHA}"
+        echo "apt_key=$APT_KEY" >> $GITHUB_OUTPUT
+      shell: bash
+
     - name: Cache APT archives and lists
+      if: ${{ inputs.enable-apt-cache == 'true' }}
       uses: actions/cache@v4
       id: apt-cache
       with:
         path: |
           ~/.apt-cache/archives
           ~/.apt-cache/lists
-        key: ${{ runner.os }}-apt-${{ hashFiles('.github/actions/setup-dependencies/action.yml') }}
+        key: ${{ runner.os }}-apt-${{ steps.compute-apt-key.outputs.apt_key }}
         restore-keys: |
           ${{ runner.os }}-apt-
 
@@ -55,13 +81,31 @@ runs:
           # If cache wasn't restored, we need to refresh package lists
           if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
             echo "❌ APT cache miss - running apt-get update"
-            sudo apt-get update
+            # Retry apt-get update a few times to avoid transient network errors
+            n=0
+            until [ $n -ge 3 ]; do
+              sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && break
+              n=$((n+1))
+              echo "apt-get update failed, retrying ($n/3)..."; sleep $((n*2))
+            done
             # Copy updated lists to user cache for future runs
             cp -a /var/lib/apt/lists/* ~/.apt-cache/lists/ 2>/dev/null || true
+          else
+            # Validate that restored lists are not empty; if they look empty, do an update
+            if [ -z "$(ls -A /var/lib/apt/lists 2>/dev/null)" ]; then
+              echo "Restored APT lists appear empty; running apt-get update"
+              sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
+            fi
           fi
           
           # Use noninteractive and no-install-recommends to speed and reduce size
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq
+          # Retry apt-get install with backoff for robustness
+          n=0
+          until [ $n -ge 3 ]; do
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq && break
+            n=$((n+1))
+            echo "apt-get install failed, retrying ($n/3)..."; sleep $((n*2))
+          done
         else
           echo "✅ jq already installed: $(jq --version)"
         fi

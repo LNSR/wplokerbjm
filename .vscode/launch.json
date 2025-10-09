@@ -2,12 +2,12 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Listen for Xdebug (Child Theme)",
+      "name": "Listen for Xdebug (wplokerbjm Theme)",
       "type": "php",
       "request": "launch",
       "port": 9004,
       "pathMappings": {
-        "/var/www/html/wp-content/themes/astra-child": "${workspaceFolder:astra-child}"
+        "/var/www/html/wp-content/themes/wplokerbjm": "${workspaceFolder:wplokerbjm-svelte}"
       }
     }
   ]

@@ -15,6 +15,14 @@
       },
       "type": "stdio"
     },
+    "motion": {
+      "command": "bunx",
+      "args": ["-y", "motion-ai"]
+    },
+    "svelte": {
+      "type": "http",
+      "url": "https://mcp.svelte.dev/mcp"
+    },
     "sequentialthinking": {
       "type": "http",
       "url": "https://remote.mcpservers.org/sequentialthinking/mcp"

@@ -1,8 +1,12 @@
 {
   "editor.formatOnSave": true,
+  // "intelephense.environment.includePaths": [
+  //   "${workspaceFolder:wplokerbjm}/vendor/php-stubs",
+  //   "${workspaceFolder:wplokerbjm}/vendor"
+  // ],
   "intelephense.environment.includePaths": [
-    "${workspaceFolder:astra-child}/vendor/php-stubs",
-    "${workspaceFolder:astra-child}/vendor"
+    "${workspaceFolder:wplokerbjm-svelte/vendor/php-stubs",
+    "${workspaceFolder:wplokerbjm-svelte/vendor"
   ],
   "editor.codeLens": true,
   "files.watcherExclude": {
@@ -14,14 +18,13 @@
     "**/uploads": true,
     "**/cache": true
   },
+  "files.associations": {
+    "*.css": "tailwindcss"
+  },
   "editor.quickSuggestions": {
     "other": "on",
     "comments": "on",
     "strings": "on"
-  },
-  "tailwindCSS.includeLanguages": {
-    "vue": "vue",
-    "php": "php"
   },
   "caddyfile.executable": "${workspaceFolder:wplokerbjm}/Caddyfile"
 }

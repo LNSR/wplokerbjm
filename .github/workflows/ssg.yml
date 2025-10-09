@@ -17,16 +17,16 @@ on:
         default: "false"
 
 env:
-  THEME_DIR: wordpress/wp-content/themes/astra-child
+  THEME_DIR: wordpress/wp-content/themes/wplokerbjm
 
 jobs:
   build-and-deploy:
     name: Build and deploy SSG
     runs-on: ubuntu-latest
     env:
-      RCLONE_TRANSFERS: "6"
+      RCLONE_TRANSFERS: "4"
       RCLONE_CHECKERS: "2"
-      RCLONE_RETRIES: "3"
+      RCLONE_RETRIES: "100"
       RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"
       RCLONE_BWLIMIT: "100M"

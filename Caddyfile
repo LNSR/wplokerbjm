@@ -32,7 +32,7 @@
   # * Use this to serve local node_modules for development purposes
   # * This assumes the node_modules directory is located at /var/www/html/wp-content/themes/{your-theme}/node_modules
   @node_modules_path path_regexp node_modules ^/node_modules/(.*)$
-  rewrite @node_modules_path /wp-content/themes/astra-child/node_modules/{re.node_modules.1}
+  rewrite @node_modules_path /wp-content/themes/wplokerbjm/node_modules/{re.node_modules.1}
 
   file_server {
     precompressed
@@ -69,7 +69,7 @@
   header @dynamic Pragma "no-cache"
   header @dynamic Expires "0"
 
-  replace "https://localhost/wp-content/uploads/" "https://{host}/wp-content/uploads/"
+  replace "https://localhost" "https://{host}"
 
   log {
     output stdout

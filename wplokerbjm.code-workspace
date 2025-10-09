@@ -5,12 +5,11 @@
       "path": "."
     },
     {
-      "name": "astra",
-      "path": "wordpress/wp-content/themes/astra"
-    },
-    {
-      "name": "astra-child",
-      "path": "wordpress/wp-content/themes/astra-child"
+      "name": "wplokerbjm-svelte",
+      "path": "wordpress/wp-content/themes/wplokerbjm"
     }
-  ]
+  ],
+  "settings": {
+    "php.version": "8.5"
+  }
 }

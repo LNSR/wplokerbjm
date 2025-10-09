@@ -1,0 +1,291 @@
+import { APIService } from '@/services/APIService'
+import { taxonomyStore } from './Taxonomy.svelte'
+import { debounce, validation } from '@/utils'
+import type {
+    SearchFilters,
+    LoadMoreFilters,
+    SearchContext,
+    Job,
+    LoadMoreResponse,
+    SearchResponse,
+    TaxonomyTerm,
+    SortOption,
+} from '@/types'
+import { TaxonomyType } from '@/types'
+import type { DropdownOption } from '@/types'
+
+export class SearchManager {
+    // State
+    public filters = $state<SearchFilters>({
+        cari: '',
+        lokasi: [],
+        gender: [],
+        pendidikan: [],
+        sort: { value: 'desc', label: 'Terbaru' } as SortOption,
+    })
+
+    public searchHistory = $state<string[]>([])
+    public suggestions = $state<string[]>([])
+    public showSuggestions = $state(false)
+    public jobs = $state<Job[]>([])
+    public context = $state<SearchContext>('latest')
+    public title = $state('Hasil Pencarian')
+    public totalJobs = $state(0)
+    public maxNumPages = $state(1)
+    public page = $state(1)
+
+    public loading = $state(false)
+    public error = $state<string | null>(null)
+    public suggestionsLoading = $state(false)
+    public selectedSuggestionIndex = $state(-1)
+
+    // Computed helpers
+    public get hasFilters(): boolean {
+        const f = this.filters
+        return !!(
+            (typeof f.cari === 'string' && f.cari.trim() !== '') ||
+            (Array.isArray(f.lokasi) && f.lokasi.length > 0) ||
+            (Array.isArray(f.gender) && f.gender.length > 0) ||
+            (Array.isArray(f.pendidikan) && f.pendidikan.length > 0)
+        )
+    }
+
+    public get recentSearches(): string[] {
+        return this.searchHistory.slice(0, 5)
+    }
+
+    public get hasSuggestions(): boolean {
+        return this.suggestions.length > 0
+    }
+
+    public get hasMore(): boolean {
+        return this.page < this.maxNumPages
+    }
+
+    // Debounced suggestions
+    private debouncedGetSuggestions = debounce(async (query: string) => {
+        const cleanQuery = validation.sanitizeString(query)
+        if (validation.isValidQuery(cleanQuery)) {
+            this.suggestionsLoading = true
+            try {
+                const data = await APIService.getAutoSuggestions(cleanQuery)
+                this.suggestions = data || []
+                this.showSuggestions = this.suggestions.length > 0
+            } catch {
+                this.suggestions = []
+                this.showSuggestions = false
+            } finally {
+                this.suggestionsLoading = false
+            }
+        } else {
+            this.suggestions = []
+            this.showSuggestions = false
+        }
+    }, 500)
+
+    // Actions
+    public setFilters(newFilters: Partial<SearchFilters>): void {
+        const sanitized: Partial<SearchFilters> = { ...newFilters }
+        if (typeof newFilters.cari === 'string') sanitized.cari = validation.sanitizeString(newFilters.cari)
+
+        this.filters.cari = typeof sanitized.cari === 'string' ? sanitized.cari : this.filters.cari
+        this.filters.lokasi = SearchUtils.sanitizeArr(newFilters.lokasi) ?? this.filters.lokasi
+        this.filters.gender = SearchUtils.sanitizeArr(newFilters.gender) ?? this.filters.gender
+        this.filters.pendidikan = SearchUtils.sanitizeArr(newFilters.pendidikan) ?? this.filters.pendidikan
+        this.filters.sort = typeof newFilters.sort === 'object' && newFilters.sort !== null ? (newFilters.sort as SortOption) : this.filters.sort
+    }
+
+    public resetFilters(): void {
+        this.filters.cari = ''
+        this.filters.lokasi = []
+        this.filters.gender = []
+        this.filters.pendidikan = []
+        this.filters.sort = { value: 'desc', label: 'Terbaru' }
+    }
+
+    public addToHistory(query: string): void {
+        if (query && !this.searchHistory.includes(query)) {
+            this.searchHistory.unshift(query)
+            if (this.searchHistory.length > 10) this.searchHistory = this.searchHistory.slice(0, 10)
+        }
+    }
+
+    public clearHistory(): void {
+        this.searchHistory = []
+    }
+
+    public getSuggestions(query: string): void {
+        this.debouncedGetSuggestions(query)
+    }
+
+    public selectSuggestion(suggestion: string): void {
+        this.filters.cari = validation.sanitizeString(suggestion)
+        this.showSuggestions = false
+        this.suggestions = []
+    }
+
+    public hideSuggestions(): void {
+        setTimeout(() => {
+            this.showSuggestions = false
+        }, 150)
+    }
+
+    public async searchJobs(): Promise<SearchResponse> {
+        this.loading = true
+        this.error = null
+        try {
+            const cleaned = SearchUtils.sanitizeFilters({ ...this.filters })
+            const response = await APIService.searchJobs(cleaned)
+            this.jobs = [...(response.jobs || [])]
+            this.context = (response.context as SearchContext) || 'search'
+            this.title = response.title || 'Hasil Pencarian'
+            this.totalJobs = response.meta?.total || 0
+            this.maxNumPages = response.meta?.totalPages || 1
+            this.page = 1
+            if (cleaned.cari) this.addToHistory(String(cleaned.cari))
+            return response
+        } catch (err) {
+            this.error = err instanceof Error ? err.message : 'Search failed'
+            throw err
+        } finally {
+            this.loading = false
+        }
+    }
+
+    public async loadMore(): Promise<LoadMoreResponse> {
+        if (this.loading || this.page >= this.maxNumPages) {
+            throw new Error('Cannot load more: already loading or no more pages')
+        }
+
+        this.loading = true
+        this.error = null
+        try {
+            const loadMoreFilters: LoadMoreFilters = {
+                page: this.page + 1,
+                context: this.context,
+                ...SearchUtils.sanitizeFilters({ ...this.filters }),
+            }
+
+            const response = await APIService.loadMoreJobs(loadMoreFilters)
+
+            if (Array.isArray(response.jobs) && response.jobs.length) {
+                // Filter out jobs that already exist (by permalink) to prevent duplicates
+                const newJobs = response.jobs.filter(newJob =>
+                  !this.jobs.some(existingJob => existingJob.permalink === newJob.permalink)
+                );
+                this.jobs.push(...newJobs)
+                this.page = loadMoreFilters.page
+                this.maxNumPages = response.meta?.totalPages || this.maxNumPages
+            } else {
+                this.page = this.maxNumPages
+            }
+            return response
+        } catch (err) {
+            console.error('SearchStore: Load more failed:', err);
+            this.error = err instanceof Error ? err.message : 'Load more failed'
+            throw err
+        } finally {
+            this.loading = false
+        }
+    }
+
+    public get selectedFiltersWithNames() {
+        // No empty-string sentinel anymore; ignore any blank values here
+        const filters: {
+            key: TaxonomyType
+            label: string
+            values: string[]
+            names: string[]
+        }[] = []
+
+        if (this.filters.lokasi && this.filters.lokasi.length) {
+            const filtered = this.filters.lokasi.filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
+            if (filtered.length) {
+                filters.push({
+                    key: TaxonomyType.lokasi,
+                    label: 'Lokasi',
+                    values: filtered,
+                    names: filtered.map((slug) => taxonomyStore.getTermNameBySlug(TaxonomyType.lokasi, slug)),
+                })
+            }
+        }
+
+        if (this.filters.gender && this.filters.gender.length) {
+            const filtered = this.filters.gender.filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
+            if (filtered.length) {
+                filters.push({
+                    key: TaxonomyType.gender,
+                    label: 'Gender',
+                    values: filtered,
+                    names: filtered.map((slug) => taxonomyStore.getTermNameBySlug(TaxonomyType.gender, slug)),
+                })
+            }
+        }
+
+        if (this.filters.pendidikan && this.filters.pendidikan.length) {
+            const filtered = this.filters.pendidikan.filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
+            if (filtered.length) {
+                filters.push({
+                    key: TaxonomyType.pendidikan,
+                    label: 'Pendidikan',
+                    values: filtered,
+                    names: filtered.map((slug) => taxonomyStore.getTermNameBySlug(TaxonomyType.pendidikan, slug)),
+                })
+            }
+        }
+
+        return filters
+    }
+}
+
+export class SearchUtils {
+    static sanitizeArr(arrOrVal: unknown): string[] | undefined {
+        if (Array.isArray(arrOrVal)) {
+            // sanitize each item and remove any empty/blank results
+            return arrOrVal
+                .map((v) => {
+                    if (typeof v === 'string') return validation.sanitizeString(v)
+                    if (typeof v === 'number') return String(v)
+                    return validation.sanitizeString(String(v ?? ''))
+                })
+                .filter((s) => typeof s === 'string' && String(s).trim() !== '') as string[]
+        }
+        if (typeof arrOrVal === 'string') {
+            const s = validation.sanitizeString(arrOrVal)
+            return s.trim() ? [s] : []
+        }
+        return undefined
+    }
+
+    static sanitizeFilters(f: SearchFilters): SearchFilters {
+        return {
+            ...f,
+            cari: typeof f.cari === 'string' ? validation.sanitizeString(f.cari) : f.cari,
+            lokasi: Array.isArray(f.lokasi)
+                ? f.lokasi
+                      .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
+                      .filter((s) => String(s).trim() !== '')
+                : f.lokasi,
+            gender: Array.isArray(f.gender)
+                ? f.gender
+                      .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
+                      .filter((s) => String(s).trim() !== '')
+                : f.gender,
+            pendidikan: Array.isArray(f.pendidikan)
+                ? f.pendidikan
+                      .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
+                      .filter((s) => String(s).trim() !== '')
+                : f.pendidikan,
+        }
+    }
+
+    static mapTerms(terms: TaxonomyTerm[], placeholder = 'Semua'): DropdownOption[] {
+        return terms.map((t) => ({
+            value: t.slug,
+            label: t.name,
+            children: t.children ? SearchUtils.mapTerms(t.children, placeholder) : undefined,
+        }))
+    }
+}
+
+export const searchStore = new SearchManager()

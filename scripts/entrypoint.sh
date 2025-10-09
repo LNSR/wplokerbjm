@@ -100,9 +100,7 @@ wait
 # After WordPress setup is complete, ensure correct ownership and permissions
 # This prevents permission issues when container trying to access website files
 
-# Parallelize chown and chmod using all CPU cores
-# Using 775 permissions for development environment to avoid permission issues while still being reasonably secure
-find /var/www/html \( -type f -o -type d \) \( ! -user wordpress -o ! -group www-data \) -print0 | xargs -0 -P $(nproc) chown -v wordpress:www-data
-find /var/www/html \( -type f -o -type d \) ! -perm 775 -print0 | xargs -0 -P $(nproc) chmod -v 775
+find /var/www/html \( -type f -o -type d \) \( ! -user wordpress -o ! -group www-data \) -print0 | xargs -0 -r -P $(nproc) chown -v wordpress:www-data
+find /var/www/html \( -type f -o -type d \) ! -perm 775 -print0 | xargs -0 -r -P $(nproc) chmod -v 775
 
 exec "$@"

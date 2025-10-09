@@ -48,17 +48,14 @@ cd "$SRC_DIR"
 
 SELECTED=(
   "cache"
-  "inc"
+  "server"
   "footer.php"
   "header.php"
-  "functions.php"
+  "index.php"
   "composer.json"
-  "page-homepage.php"
   "page-pasang-lowongan.php"
   "single-lowongan.php"
-  "archive-lowongan.php"
   "assets"
-  "vendor"
 )
 
 PIDS=()
@@ -111,14 +108,14 @@ done
 
 # Start mu-plugin sync if needed
 if [ -n "${MU_PLUGIN_REMOTE_PATH:-}" ]; then
-  MU_PLUGIN_FILE="../../mu-plugins/astra-child-bootstrap.php"
+  MU_PLUGIN_FILE="../../mu-plugins/wplokerbjm-bootstrap.php"
   if [ -f "$MU_PLUGIN_FILE" ]; then
-    echo "Starting syncing astra-child-bootstrap.php to $MU_PLUGIN_REMOTE_PATH"
+    echo "Starting syncing wplokerbjm-bootstrap.php to $MU_PLUGIN_REMOTE_PATH"
     rclone copy $DRY_FLAG $RCLONE_BASE_OPTS "$MU_PLUGIN_FILE" "sftpdeploy:$MU_PLUGIN_REMOTE_PATH" 2>&1 || true &
     PIDS+=($!)
     sleep 0.5
   else
-    echo "astra-child-bootstrap.php not found at $MU_PLUGIN_FILE"
+    echo "wplokerbjm-bootstrap.php not found at $MU_PLUGIN_FILE"
   fi
 else
   echo "MU_PLUGIN_REMOTE_PATH not set, skipping mu-plugins sync"
@@ -129,6 +126,16 @@ for pid in "${PIDS[@]}"; do
   wait $pid
 done
 echo "All rclone operations completed"
+
+if [ "${DRY_RUN:-false}" != "true" ]; then
+  echo "Running composer install on remote server..."
+  ssh -p $PORT $SSH_USER@$HOST "cd $REMOTE_PATH && composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader --apcu-autoloader --no-scripts"
+  echo "Purging LiteSpeed cache..."
+  ssh -p $PORT $SSH_USER@$HOST "cd $REMOTE_PATH && if wp plugin is-active litespeed-cache >/dev/null 2>&1; then wp litespeed-purge all; else echo 'LiteSpeed plugin not active, skipping purge'; fi"
+else
+  echo "Dry run: would run composer install on remote and purge cache"
+fi
+
 echo "---- DEPLOY SUMMARY ----"
 END_TIME=$(date +%s)
 DURATION=$((END_TIME - START_TIME))
