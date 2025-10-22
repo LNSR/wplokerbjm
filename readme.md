@@ -90,7 +90,7 @@ server/
 │       ├── SingleOverlay.php
 │       └── TaxonomyDepth.php
 ├── Core/                      # Core framework and dependency injection
-│   ├── Cache.php              # Centralized cache management for transients
+│   ├── TransientCache.php              # Centralized cache management for transients
 │   ├── Container/             # Container setup and definitions
 │   │   ├── AutowireScanner.php    # Autowire scanner
 │   │   ├── Definitions/           # Container definitions

@@ -21,8 +21,8 @@ class RouteManager {
   isInitialLoad = $state(true);
   isLoading = $state(false);
   loadingComponent = $state<string | null>(null);
-  scrollPositions = $state<Record<string, number>>({});
-  searchStates = $state<Record<string, SearchState>>({});
+  scrollPositions = $state(new Map<string, number>());
+  searchStates = $state(new Map<string, SearchState>());
 
   setCurrentPath(path: string) {
     this.currentPath = path;
@@ -38,7 +38,7 @@ class RouteManager {
   }
 
   saveScrollPosition(path: string) {
-    this.scrollPositions[path] = window.scrollY;
+    this.scrollPositions.set(path, window.scrollY);
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem(`scroll_${path}`, window.scrollY.toString());
@@ -49,13 +49,13 @@ class RouteManager {
   }
 
   getScrollPosition(path: string): number | undefined {
-    let pos = this.scrollPositions[path];
+    let pos = this.scrollPositions.get(path);
     if (pos === undefined && typeof sessionStorage !== 'undefined') {
       try {
         const stored = sessionStorage.getItem(`scroll_${path}`);
         if (stored) {
           pos = parseInt(stored, 10);
-          this.scrollPositions[path] = pos; // cache in memory
+          this.scrollPositions.set(path, pos); // cache in memory
         }
       } catch (e) {
         console.warn('Failed to load scroll position from sessionStorage', e);
@@ -77,7 +77,7 @@ class RouteManager {
     }
 
     const stateWithTimestamp = { ...searchState, timestamp: Date.now(), serverLastJobUpdate: serverLast };
-    this.searchStates[path] = stateWithTimestamp;
+    this.searchStates.set(path, stateWithTimestamp);
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem(`searchState_${path}`, JSON.stringify(stateWithTimestamp));
@@ -88,20 +88,20 @@ class RouteManager {
   }
 
   getSearchState(path: string): SearchState | undefined {
-    let state = this.searchStates[path];
+    let state = this.searchStates.get(path);
     if (!state && typeof sessionStorage !== 'undefined') {
       try {
         const stored = sessionStorage.getItem(`searchState_${path}`);
         if (stored) {
-          state = JSON.parse(stored);
+          const parsed = JSON.parse(stored) as SearchState;
+          if (parsed) {
+            // Normalize numeric timestamp fields that may have been stringified
+            parsed.timestamp = typeof parsed.timestamp === 'number' ? parsed.timestamp : (parsed.timestamp ? Number(parsed.timestamp) : undefined);
+            parsed.serverLastJobUpdate = typeof parsed.serverLastJobUpdate === 'number' ? parsed.serverLastJobUpdate : (parsed.serverLastJobUpdate ? Number(parsed.serverLastJobUpdate) : undefined);
 
-          // Normalize numeric timestamp fields that may have been stringified
-          if (state) {
-            state.timestamp = typeof state.timestamp === 'number' ? state.timestamp : (state.timestamp ? Number(state.timestamp) : undefined);
-            state.serverLastJobUpdate = typeof state.serverLastJobUpdate === 'number' ? state.serverLastJobUpdate : (state.serverLastJobUpdate ? Number(state.serverLastJobUpdate) : undefined);
+            this.searchStates.set(path, parsed); // cache in memory
+            state = parsed;
           }
-
-          this.searchStates[path] = state; // cache in memory
         }
       } catch (e) {
         console.warn('Failed to load search state from sessionStorage', e);
@@ -111,7 +111,7 @@ class RouteManager {
   }
 
   clearSearchState(path: string) {
-    delete this.searchStates[path];
+    this.searchStates.delete(path);
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.removeItem(`searchState_${path}`);

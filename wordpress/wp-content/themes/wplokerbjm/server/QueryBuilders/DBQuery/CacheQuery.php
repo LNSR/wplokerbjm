@@ -1,7 +1,7 @@
 <?php
 
 namespace WPLokerBJM\QueryBuilders\DBQuery;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Core\TransientCache;
 /**
  * Cache Query Builder for database operations with LiteSpeed Cache compatibility.
  *
@@ -19,7 +19,7 @@ class CacheQuery
      * Delete transients matching a pattern using WordPress transient functions.
      *
      * This method queries the database to find matching transient keys, then uses
-     * Cache::delete() to properly delete each transient. This ensures compatibility
+     * TransientCache::delete() to properly delete each transient. This ensures compatibility
      * with LiteSpeed Cache's Redis redirection, where transients are stored in Redis
      * instead of the database.
      *
@@ -31,7 +31,7 @@ class CacheQuery
      *
      * @note This method performs a database query to discover transient keys,
      *       then uses WordPress transient functions for actual deletion.
-     *       For exact key deletion, use Cache::delete() directly.
+     *       For exact key deletion, use TransientCache::delete() directly.
      *       Compatible with LiteSpeed Cache Redis redirection.
      */
     public static function deletePatternQuery($pattern): int
@@ -39,8 +39,8 @@ class CacheQuery
         global $wpdb;
 
         try {
-            $full_pattern = Cache::TRANSIENT_PREFIX . $pattern;
-            $full_timeout_pattern = '_transient_timeout_' . Cache::TRANSIENT_PREFIX . $pattern;
+            $full_pattern = TransientCache::TRANSIENT_PREFIX . $pattern;
+            $full_timeout_pattern = '_transient_timeout_' . TransientCache::TRANSIENT_PREFIX . $pattern;
 
             // Escape the patterns for safety, then restore % as wildcard (assuming % is intentional in controlled patterns)
             $escaped_pattern = str_replace('\\%', '%', $wpdb->esc_like($full_pattern));
@@ -62,11 +62,11 @@ class CacheQuery
 
             $deleted_count = 0;
 
-            // Delete each transient using Cache::delete() (works with LiteSpeed Redis)
+            // Delete each transient using TransientCache::delete() (works with LiteSpeed Redis)
             foreach ($transient_keys as $key) {
                 // Remove _transient_ and prefix to get the original key
-                $transient_name = str_replace('_transient_' . Cache::TRANSIENT_PREFIX, '', $key);
-                if (Cache::delete($transient_name)) {
+                $transient_name = str_replace('_transient_' . TransientCache::TRANSIENT_PREFIX, '', $key);
+                if (TransientCache::delete($transient_name)) {
                     $deleted_count++;
                 }
             }

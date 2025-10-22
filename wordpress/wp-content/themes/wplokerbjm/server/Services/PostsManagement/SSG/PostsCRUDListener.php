@@ -3,10 +3,8 @@
 namespace WPLokerBJM\Services\PostsManagement\SSG;
 
 use WPLokerBJM\Contracts\HooksInterface;
-use WPLokerBJM\Services\Utilities\SSG\Integrations\SSGIntegration;
-use WPLokerBJM\Services\Utilities\SSG\Integrations\LiteSpeedIntegration;
-use \WPLokerBJM\Services\Utilities\SSG\Integrations\RankMathIntegration;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Services\Utilities\SSG\Integrations\{SSGIntegration, LiteSpeedIntegration, RankMathIntegration};
+use WPLokerBJM\Core\TransientCache;
 use WPLokerBJM\Services\Utilities\SSG\SSGUtilities;
 
 /**
@@ -60,7 +58,7 @@ class PostsCRUDListener implements HooksInterface {
 	 */
 	private function shouldDebouncePost( int $post_id ): bool {
 		$cacheKey = "ssg_post_debounce_{$post_id}";
-		$lastTrigger = Cache::get( $cacheKey );
+		$lastTrigger = TransientCache::get( $cacheKey );
 
 		if ( $lastTrigger !== false ) {
 			error_log( "SSG PostsCrudListener: Skipping duplicate trigger for post {$post_id} within debounce window" );
@@ -70,7 +68,7 @@ class PostsCRUDListener implements HooksInterface {
 		// Set debounce transient before triggering
 		$debounceTiming = LiteSpeedIntegration::getDebounceTiming();
 		$debounceSeconds = LiteSpeedIntegration::isActive() ? $debounceTiming['litespeed_coordination'] : $debounceTiming['normal_operation'];
-		Cache::set( $cacheKey, time(), $debounceSeconds );
+		TransientCache::set( $cacheKey, time(), $debounceSeconds );
 
 		return false;
 	}
@@ -150,7 +148,7 @@ class PostsCRUDListener implements HooksInterface {
 			}
 
 			// Set transient to mark recent LiteSpeed purge activity
-			Cache::set( 'litespeed_recent_purge', time(), 300 ); // 5 minutes
+			TransientCache::set( 'litespeed_recent_purge', time(), 300 ); // 5 minutes
 
 			SSGIntegration::logCoordination( "LiteSpeed purged post, coordinating SSG update", [ 'post_id' => $post_id ] );
 
@@ -172,7 +170,7 @@ class PostsCRUDListener implements HooksInterface {
 			}
 
 			// Set transient to mark recent LiteSpeed purge activity
-			Cache::set( 'litespeed_recent_purge', time(), 300 ); // 5 minutes
+			TransientCache::set( 'litespeed_recent_purge', time(), 300 ); // 5 minutes
 
 			SSGIntegration::logCoordination( "LiteSpeed purged all cache, triggering full SSG rebuild" );
 

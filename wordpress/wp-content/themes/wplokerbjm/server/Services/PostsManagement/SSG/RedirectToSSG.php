@@ -3,10 +3,9 @@
 namespace WPLokerBJM\Services\PostsManagement\SSG;
 
 use WPLokerBJM\Contracts\HooksInterface;
-use WPLokerBJM\Services\Utilities\SSG\Integrations\SSGIntegration;
-use WPLokerBJM\Services\Utilities\SSG\Integrations\LiteSpeedIntegration;
+use WPLokerBJM\Services\Utilities\SSG\Integrations\{SSGIntegration, LiteSpeedIntegration};
 use WPLokerBJM\Services\Utilities\SSG\SSGUtilities;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Core\TransientCache;
 
 /**
  * SSG Service
@@ -43,7 +42,7 @@ class RedirectToSSG implements HooksInterface
 	{
 		try {
 			$cacheKey = 'ssg_content_' . $post->ID;
-			$cached = Cache::get($cacheKey);
+			$cached = TransientCache::get($cacheKey);
 
 			$currentMtime = @filemtime($ssgFilePath);
 			if ($currentMtime === false) {
@@ -75,7 +74,7 @@ class RedirectToSSG implements HooksInterface
 			} else {
 				$ssgContent = @file_get_contents($ssgFilePath);
 				if ($ssgContent !== false) {
-					Cache::set($cacheKey, ['content' => $ssgContent, 'mtime' => $currentMtime], expiration: 86400); // Cache for 1 day
+					TransientCache::set($cacheKey, ['content' => $ssgContent, 'mtime' => $currentMtime], expiration: 86400); // Cache for 1 day
 					SSGIntegration::logCoordination('Serving fresh SSG to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 				} else {
 					SSGIntegration::logCoordination('Failed to read SSG file', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);

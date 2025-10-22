@@ -3,7 +3,6 @@
 namespace WPLokerBJM\Repositories;
 
 use WPLokerBJM\Contracts\DataProviderInterface;
-use stdClass;
 
 class TaxonomyRepository implements DataProviderInterface
 {

@@ -2,7 +2,7 @@
 
 namespace WPLokerBJM\Services\Utilities\SSG\Integrations;
 
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Core\TransientCache;
 
 /**
  * Rank Math Integration Service
@@ -27,12 +27,12 @@ class RankMathIntegration {
 	 * Debounce sitemap regeneration to prevent rapid successive calls
 	 */
 	private static function debounceSitemapRegeneration( string $debounceKey, int $duration, string $skipMessage ): bool {
-		$lastRegeneration = Cache::get( $debounceKey );
+		$lastRegeneration = TransientCache::get( $debounceKey );
 		if ( $lastRegeneration !== false ) {
 			error_log( $skipMessage );
 			return false;
 		}
-		Cache::set( $debounceKey, time(), $duration );
+		TransientCache::set( $debounceKey, time(), $duration );
 		return true;
 	}
 
@@ -166,7 +166,7 @@ class RankMathIntegration {
 	 * Clear all Rank Math related transients (for maintenance)
 	 */
 	public static function clearAllTransients(): void {
-		$deleted = Cache::deletePattern( 'rankmath_' );
+		$deleted = TransientCache::deletePattern( 'rankmath_' );
 
 		self::clearCaches();
 

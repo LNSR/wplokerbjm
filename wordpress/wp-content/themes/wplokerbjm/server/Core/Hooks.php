@@ -3,10 +3,8 @@
 namespace WPLokerBJM\Core;
 
 use WPLokerBJM\Contracts\HooksInterface;
-use WPLokerBJM\Core\Hooks\Theme;
-use WPLokerBJM\Core\Hooks\Nonce;
-use WPLokerBJM\Core\Hooks\Litespeed;
-
+use WPLokerBJM\Core\Hooks\Theme\{Enqueue, ThemeInject, UnregisterWPBloat};
+use WPLokerBJM\Core\Hooks\{LiteSpeedFilters, Litespeed};
 
 class Hooks implements HooksInterface
 {
@@ -16,13 +14,12 @@ class Hooks implements HooksInterface
 
     public function registerActions(): void
     {
-        // Ensure theme features (like custom-logo) are registered early
-        add_action('after_setup_theme', [Theme::class, 'addThemeSupport']);
-        add_action('wp_enqueue_scripts', [Theme::class, 'unregisterUnneededWPScripts']);
-        add_action('wp_head', [Theme::class, 'injectThemeScript'], 3);
-        add_action('litespeed_purged_all', [Litespeed::class, 'clearObjectCacheAndTransient'], 20);
-        add_action('wp_head', [Nonce::class, 'injectNonceScript']);
-        add_action('send_headers', [Nonce::class, 'SendNonceHeader']);
+        add_action('after_setup_theme', [ThemeInject::class, 'addThemeSupport']);
+        add_action('wp_head', [ThemeInject::class, 'injectThemeScript'], 0);
+        add_action('wp_enqueue_scripts', [UnregisterWPBloat::class, 'unregisterJquery']);
+        add_action('wp_enqueue_scripts', [UnregisterWPBloat::class, 'unregisterUnneededWPStyles']);
+        add_action('litespeed_purged_all', [LiteSpeed::class, 'clearObjectCacheAndTransient']);
+        add_action('wp_enqueue_scripts', [Enqueue::class, 'enqueueAssets']);
         add_action('template_redirect', [$this, 'redirectToHome'], 0);
     }
 
@@ -32,9 +29,10 @@ class Hooks implements HooksInterface
 
     public function registerFilters(): void
     {
+        add_filter('style_loader_tag', [Enqueue::class, 'filterStyleLoaderTag'], 10, 2);
         add_filter('posts_search', [$this, 'jobPostsSearchFilter'], 10, 2);
-        add_filter('litespeed_optimize_js_excludes', [Litespeed::class, 'lscJsExcludes'], 0);
-        add_filter('litespeed_optimize_css_excludes', [Litespeed::class, 'lscCssExcludes'], 0);
+        add_filter('litespeed_optimize_js_excludes', [LiteSpeedFilters::class, 'lscJsExcludes'], 0);
+        add_filter('litespeed_optimize_css_excludes', [LiteSpeedFilters::class, 'lscCssExcludes'], 0);
         add_filter('option_active_plugins', [$this, 'disablePluginsForDev'], 0);
     }
 
@@ -66,43 +64,54 @@ class Hooks implements HooksInterface
     /**
      * Customizes the SQL WHERE clause for WordPress search queries on job posts.
      */
-    public function jobPostsSearchFilter($search, $wp_query)
+    public function jobPostsSearchFilter(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
-        if (!is_object($wpdb)) {
-            // $wpdb is not available, return original search
+        if ($wpdb === null) {
             return $search;
         }
-        if (!empty($wp_query->query_vars['s'])) {
-            $q = $wp_query->query_vars['s'];
+
+        $q = $wp_query->query_vars['s'] ?? '';
+        if ($q !== '') {
             $search = \WPLokerBJM\QueryBuilders\JobQuery::buildPostsSearchSql($wpdb, $q);
         }
+
         return $search;
     }
+
+    /*======================================================================
+     | ENVIRONMENT FILTERS
+     ======================================================================*/
 
     /**
      * Temporarily disable specific plugins if in development environment.
      */
-    public function disablePluginsForDev($plugins)
+    public function disablePluginsForDev(array $plugins): array
     {
         $isDev = getenv('WP_ENV') === 'development';
-        if ($isDev) {
-            $pluginsToDisable = [
-                'google-site-kit/',
-                'seo-by-rank-math/',
-                'fast-indexing-api/',
-                'wps-hide-login/',
-                'litespeed-cache/',
-            ];
-            return array_filter($plugins, function ($plugin) use ($pluginsToDisable) {
-                foreach ($pluginsToDisable as $disable) {
-                    if (strpos($plugin, $disable) === 0) {
-                        return false;
-                    }
-                }
-                return true;
-            });
+        if (!$isDev) {
+            return $plugins;
         }
-        return $plugins;
+
+        $pluginsToDisable = [
+            'google-site-kit/',
+            'seo-by-rank-math/',
+            'fast-indexing-api/',
+            'wps-hide-login/',
+            'litespeed-cache/',
+        ];
+
+        // Keep plugins that do NOT start with any of the items in $pluginsToDisable
+        $filtered = array_filter($plugins, function (string $plugin) use ($pluginsToDisable): bool {
+            foreach ($pluginsToDisable as $disable) {
+                if (str_starts_with($plugin, $disable)) {
+                    return false;
+                }
+            }
+            return true;
+        });
+
+        // reindex array to ensure a clean numerically indexed array
+        return array_values($filtered);
     }
 }

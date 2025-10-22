@@ -3,14 +3,12 @@
 namespace WPLokerBJM\Services\PostsManagement;
 
 use WPLokerBJM\QueryBuilders\JobQuery;
-use WPLokerBJM\QueryBuilders\AttachmentQuery;
 
 /**
  * Handles job-related operations, including deletion and status updates.
  */
 class PostsManagement
 {
-
     public function deleteOldJobs(): void
     {
         try {
@@ -19,7 +17,7 @@ class PostsManagement
                 $post_id = is_object($job) ? $job->ID : (int) $job;
 
                 try {
-                    $attachments = get_posts(AttachmentQuery::byParentArgs($post_id, true));
+                    $attachments = get_posts(JobQuery::byParentArgs($post_id, true));
                     foreach ($attachments as $att_id) {
                         wp_delete_attachment($att_id, false);
                     }

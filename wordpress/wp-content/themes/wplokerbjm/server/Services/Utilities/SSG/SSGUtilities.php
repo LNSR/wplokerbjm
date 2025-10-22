@@ -6,6 +6,7 @@ namespace WPLokerBJM\Services\Utilities\SSG;
  * SSG Utilities
  *
  * Utility class for Static Site Generation file operations
+ * Handles file path generation, deletion, and cleanup
  */
 class SSGUtilities
 {
@@ -77,7 +78,7 @@ class SSGUtilities
     /**
      * Clean up empty directories recursively
      */
-    public static function cleanupEmptyDirectories(string $dirPath): void
+    private static function cleanupEmptyDirectories(string $dirPath): void
     {
         $ssgBaseDir = get_stylesheet_directory() . '/assets/ssg';
 

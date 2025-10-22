@@ -1,12 +1,17 @@
 <?php
 namespace WPLokerBJM\Core\Hooks;
-use WPLokerBJM\Core\Cache;
-use WPLokerBJM\Core\ObjectCache;
+use WPLokerBJM\Core\{TransientCache, ObjectCache};
 
-class Litespeed
+/**
+ * LiteSpeed General Hooks
+ */
+class LiteSpeed
 {
     /**
      * Deletes the compiled container cache file when LiteSpeed cache is purged.
+     * Also clears APCu and OPCache caches.
+     * * Useful when deploying new code to ensure no stale cached code is used.
+     * @return void
      */
     public static function clearObjectCacheAndTransient(): void
     {
@@ -16,13 +21,30 @@ class Litespeed
             unlink($file);
         }
 
+        // clear APCu cache
+        if (function_exists('apcu_clear_cache')) {
+            apcu_clear_cache();
+        }
+
+        // clear OPCache
+        if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
+            wp_opcache_invalidate($file, true);
+            wp_opcache_invalidate_directory(get_stylesheet_directory() . '/server');
+        }
+
         // Clear all transients with the cache prefix using Cache class (now includes timeouts)
-        Cache::deletePattern('%');
+        TransientCache::deletePattern('%');
         // Flush object cache to clear cached transients
         ObjectCache::flush();
 
     }
+}
 
+/**
+ * LiteSpeed Filters Focused Hooks
+ */
+class LiteSpeedFilters
+{
     /**
      * Exclude specific JS files from LiteSpeed Cache JS optimization.
      */

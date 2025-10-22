@@ -8,14 +8,14 @@
     "php-stubs/wordpress-stubs": "*"
   },
   "autoload": {
-    "psr-4": {
-      "WPLokerBJM\\": "./server"
-    }
+    "classmap": ["server"]
   },
   "config": {
     "sort-packages": true
   },
   "scripts": {
+    "watch:autoload": "composer dump-autoload --apcu -a",
+    "post-update-cmd": ["composer dump-autoload --apcu -a"],
     "lint:php": "./vendor/bin/parallel-lint --colors --exclude vendor --exclude node_modules -j $(nproc) ."
   }
 }

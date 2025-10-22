@@ -129,7 +129,7 @@ echo "All rclone operations completed"
 
 if [ "${DRY_RUN:-false}" != "true" ]; then
   echo "Running composer install on remote server..."
-  ssh -p $PORT $SSH_USER@$HOST "cd $REMOTE_PATH && composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader --apcu-autoloader --no-scripts"
+  ssh -p $PORT $SSH_USER@$HOST "cd $REMOTE_PATH && composer install --no-dev --prefer-dist --no-interaction --classmap-authoritative --apcu-autoloader --no-scripts"
   echo "Purging LiteSpeed cache..."
   ssh -p $PORT $SSH_USER@$HOST "cd $REMOTE_PATH && if wp plugin is-active litespeed-cache >/dev/null 2>&1; then wp litespeed-purge all; else echo 'LiteSpeed plugin not active, skipping purge'; fi"
 else

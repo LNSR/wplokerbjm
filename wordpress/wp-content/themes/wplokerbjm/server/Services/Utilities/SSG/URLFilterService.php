@@ -37,7 +37,7 @@ class URLFilterService
      * @param string $path The URL or path to check
      * @return bool True if allowed, false if should be filtered
      */
-    public static function isPathAllowed(string $path): bool
+    private static function isPathAllowed(string $path): bool
     {
         // Parse the URL to extract query parameters
         $parsedUrl = parse_url($path);
@@ -68,7 +68,7 @@ class URLFilterService
      *
      * @return array Array of blocked post type slugs
      */
-    public static function getBlockedPostTypes(): array
+    private static function getBlockedPostTypes(): array
     {
         return [
             'od_url_metrics',
@@ -82,7 +82,7 @@ class URLFilterService
      * @param string $postType Post type slug to block
      * @return void
      */
-    public static function addBlockedPostType(string $postType): void
+    private static function addBlockedPostType(string $postType): void
     {
         $blockedTypes = self::getBlockedPostTypes();
         if (!in_array($postType, $blockedTypes, true)) {

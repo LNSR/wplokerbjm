@@ -2,9 +2,7 @@
 
 namespace WPLokerBJM\Views\Page;
 
-use WPLokerBJM\Presenters\Components\Hero;
-use WPLokerBJM\Presenters\Components\JobGrid;
-use WPLokerBJM\Presenters\Components\JobCarousel;
+use WPLokerBJM\Presenters\Components\{Hero, JobGrid, JobCarousel};
 use WPLokerBJM\Services\Job\JobServices;
 use WPLokerBJM\QueryBuilders\JobQuery;
 

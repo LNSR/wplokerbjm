@@ -172,7 +172,8 @@
   <div
     class={`${handler.className} mb-2 mt-2 transition-opacity duration-500 ease-out ${handler.adLoaded ? "opacity-100" : "opacity-0"}`}
     aria-hidden="false"
-    transition:slide={{ duration: 1000 }}
+    in:slide={{ duration: 1000 }}
+    out:slide={{ duration: 1000 }}
     onoutroend={() => handler.outroEnd()}
   >
     <div bind:this={handler.container} aria-hidden="false"></div>

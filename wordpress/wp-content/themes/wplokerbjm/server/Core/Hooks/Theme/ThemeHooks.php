@@ -1,7 +1,7 @@
 <?php
-namespace WPLokerBJM\Core\Hooks;
+namespace WPLokerBJM\Core\Hooks\Theme;
 
-class Theme
+class ThemeInject
 {
 
     /**
@@ -53,6 +53,10 @@ class Theme
                     window.wpTheme.lastJobUpdate = '<?= esc_js($last_update_iso); ?>';
                     window.wpTheme.loggedIn = <?= is_user_logged_in() ? 'true' : 'false'; ?>;
 
+                    <?php if (is_user_logged_in()): ?>
+                    sessionStorage.setItem('wp-rest-nonce', '<?= esc_js(wp_create_nonce('wp_rest')); ?>');
+                    <?php endif; ?>
+
                     var KEY = 'wplokerbjm-theme';
                     var root = document.documentElement;
 
@@ -89,7 +93,10 @@ class Theme
         </script>
         <?php
     }
+}
 
+class UnregisterWPBloat
+{
     /**
      * Unregister and dequeue unneeded WordPress scripts and styles to avoid frontend bloat.
      *
@@ -101,7 +108,7 @@ class Theme
      *
      * @return void
      */
-    public static function unregisterUnneededWPScripts(): void
+    public static function unregisterJquery(): void
     {
         global $wp_scripts;
 
@@ -115,12 +122,10 @@ class Theme
                 }
             }
         }
+    }
 
-        // Dequeue and deregister hoverintent if not needed
-        wp_dequeue_script('hoverintent-js');
-        wp_deregister_script('hoverintent-js');
-
-        // Dequeue and deregister block library and related styles
+    public static function unregisterUnneededWPStyles(): void
+    {
         wp_dequeue_style('wp-block-library');
         wp_dequeue_style('wp-block-library-theme');
         wp_dequeue_style('wc-block-style');
@@ -128,4 +133,5 @@ class Theme
         wp_deregister_style('wp-block-library-theme');
         wp_deregister_style('wc-block-style');
     }
+
 }

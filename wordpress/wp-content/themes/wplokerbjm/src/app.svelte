@@ -1,73 +1,84 @@
+<script module lang="ts">
+  import { routeStore } from "$lib/stores/route.svelte";
+  import { SEOService } from "$lib/utils/SEO.svelte";
+
+  let pathname = $derived(routeStore.currentPath);
+  let isLoading = $derived(routeStore.isLoading);
+  let loadingComponent = $derived(routeStore.loadingComponent);
+  let CurrentComponent: typeof SvelteComponent | null = $state(null);
+
+  class RouteHandler {
+    static async loadRoute(
+      importPromise: Promise<any>,
+      componentName: string
+    ): Promise<void> {
+      const loadForPath = pathname; // capture current path to guard against race
+      try {
+        routeStore.setIsLoading(true, componentName);
+        const m = await importPromise;
+        if (loadForPath !== pathname) return; // prevent race condition
+        CurrentComponent = m.default;
+      } catch (err) {
+        CurrentComponent = null;
+        console.error("Error loading route component:", pathname, err);
+      } finally {
+        routeStore.setIsLoading(false);
+      }
+    }
+    static restoreScrollPosition(pathname: string): void {
+      if (!routeStore.isInitialLoad && pathname !== "/") {
+        const savedScroll = routeStore.getScrollPosition(pathname);
+        if (savedScroll !== undefined) {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setTimeout(() => window.scrollTo(0, savedScroll), 50);
+            });
+          });
+        } else {
+          // Scroll to top for new routes
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setTimeout(() => window.scrollTo(0, 0), 50);
+            });
+          });
+        }
+      }
+    }
+  }
+</script>
+
 <script lang="ts">
   import "@css/app.css";
-  import { onMount } from "svelte";
+  import { onMount, type SvelteComponent } from "svelte";
   import { fade } from "svelte/transition";
-  import { routeStore } from "$lib/stores/route.svelte";
   import FloatingActionButton from "@components/ui/Shared/FloatingActionButton.svelte";
   import SkeletonHomepage from "@components/ui/Skeletons/SkeletonHomepage.svelte";
   import SkeletonPasangIklanLoker from "@components/ui/Skeletons/SkeletonPasangIklanLoker.svelte";
   import Header from "@components/layouts/Header.svelte";
-  import { SEOService } from "$lib/utils/SEO.svelte";
 
   let props = $props();
-  let pathname = $derived(routeStore.currentPath);
-  let isLoading = $derived(routeStore.isLoading);
-  let loadingComponent = $derived(routeStore.loadingComponent);
-  let CurrentComponent: any = $state(null);
 
   $effect(() => {
     if (pathname === "/") {
-      import("@routes/Homepage.svelte")
-        .then((m) => {
-          CurrentComponent = m.default;
-          routeStore.setIsLoading(false);
-        })
-        .catch(() => {
-          routeStore.setIsLoading(false);
-        });
-    } else if (pathname.startsWith("/pasang-iklan-loker")) {
-      import("@routes/PasangIklanLoker.svelte")
-        .then((m) => {
-          CurrentComponent = m.default;
-          routeStore.setIsLoading(false);
-        })
-        .catch(() => {
-          routeStore.setIsLoading(false);
-        });
-    } else if (pathname.startsWith("/lowongan/")) {
-      import("@routes/SingleLowongan.svelte")
-        .then((m) => {
-          CurrentComponent = m.default;
-          routeStore.setIsLoading(false);
-        })
-        .catch(() => {
-          routeStore.setIsLoading(false);
-        });
-    } else {
-      CurrentComponent = null;
-      routeStore.setIsLoading(false);
+      RouteHandler.loadRoute(import("@routes/Homepage.svelte"), "Homepage");
+    }
+    if (pathname.startsWith("/pasang-iklan-loker")) {
+      RouteHandler.loadRoute(
+        import("@routes/PasangIklanLoker.svelte"),
+        "PasangIklanLoker"
+      );
+    }
+    if (pathname.startsWith("/lowongan/")) {
+      RouteHandler.loadRoute(
+        import("@routes/SingleLowongan.svelte"),
+        "SingleLowongan"
+      );
     }
   });
 
   // Scroll restoration for non-homepage routes (homepage handles its own)
   $effect(() => {
-    if (!routeStore.isInitialLoad && pathname !== "/") {
-      const savedScroll = routeStore.getScrollPosition(pathname);
-      if (savedScroll !== undefined) {
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            setTimeout(() => window.scrollTo(0, savedScroll), 50);
-          });
-        });
-      } else {
-        // Scroll to top for new routes
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            setTimeout(() => window.scrollTo(0, 0), 50);
-          });
-        });
-      }
-    }
+    RouteHandler.restoreScrollPosition(pathname);
   });
 
   onMount(() => {

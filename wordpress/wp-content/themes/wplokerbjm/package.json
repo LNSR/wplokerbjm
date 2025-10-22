@@ -8,6 +8,8 @@
     "@types/html-minifier-terser": "^7.0.2",
     "@types/lodash-es": "^4.17.12",
     "@types/node": "^24.9.1",
+    "chokidar-cli": "^3.0.0",
+    "concurrently": "^9.2.1",
     "daisyui": "^5.3.7",
     "fast-xml-parser": "^5.3.0",
     "html-minifier-terser": "^7.2.0",
@@ -23,12 +25,13 @@
   },
   "private": true,
   "scripts": {
-    "dev": "vite",
+    "dev": "concurrently \"vite\" \"bun run watch:autoload\"",
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
     "ssg": "bun tools/SSG/ssg.ts",
-    "ssg:sitemap": "bun tools/SSG/ssg-sitemap.ts"
+    "ssg:sitemap": "bun tools/SSG/ssg-sitemap.ts",
+    "watch:autoload": "chokidar 'server/**/*.php' -c 'composer run watch:autoload'"
   },
   "trustedDependencies": [
     "@tailwindcss/oxide"
@@ -37,6 +40,6 @@
   "dependencies": {
     "idb": "^8.0.3",
     "lodash-es": "^4.17.21",
-    "swiper": "^12.0.2"
+    "swiper": "^12.0.3"
   }
 }

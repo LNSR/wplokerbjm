@@ -2,8 +2,7 @@
 
 namespace WPLokerBJM\Core\Container\Definitions;
 
-use function DI\autowire;
-use function DI\get;
+use function DI\{autowire, get};
 
 class Factories
 {

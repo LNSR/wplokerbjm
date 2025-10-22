@@ -1,6 +1,44 @@
 <?php
 
-namespace WPLokerBJM\Core\Enqueue;
+namespace WPLokerBJM\Core\Hooks\Theme;
+
+class Enqueue
+{
+    public static function enqueueAssets(): void
+    {
+        try {
+            if (Vite::isDevelopment()) {
+                Vite::enqueueForDevelopment();
+                return;
+            }
+
+            $prod = Vite::enqueueForProduction();
+            if (empty($prod)) {
+                return;
+            }
+            // No need to merge, just use the static property in filterStyleLoaderTag
+        } catch (\Exception $e) {
+            error_log('Enqueue::enqueueAssets error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Filter callback for style_loader_tag.
+     * Adds data-no-optimize attribute to specific styles.
+     */
+    public static function filterStyleLoaderTag(string $tag, string $handle): string
+    {
+        try {
+            if (in_array($handle, Vite::$noOptimizeStyleHandles, true)) {
+                return str_replace('<link ', '<link data-no-optimize="1" ', $tag);
+            }
+            return $tag;
+        } catch (\Exception $e) {
+            error_log('Enqueue::filterStyleLoaderTag error: ' . $e->getMessage());
+            return $tag;
+        }
+    }
+}
 
 /**
  * Encapsulates Vite dev/prod enqueue logic.
@@ -105,7 +143,7 @@ class Vite
         }
 
         return [
-            'noOptimizeStyleHandles' => self::$noOptimizeStyleHandles
+            'noOptimizeStyleHandles' => self::$noOptimizeStyleHandles,
         ];
     }
 }

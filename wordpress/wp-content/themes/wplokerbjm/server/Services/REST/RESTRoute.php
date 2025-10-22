@@ -25,6 +25,14 @@ class RESTRoute implements HooksInterface
     public function registerActions(): void
     {
         add_action('rest_api_init', [$this, 'registerRoutes']);
+        add_action('send_headers', function () {
+            if (!is_user_logged_in()) {
+                return;
+            }
+
+            $nonce = wp_create_nonce('wp_rest');
+            header('X-WP-Nonce: ' . $nonce);
+        });
     }
     public function registerFilters(): void
     {
@@ -101,7 +109,7 @@ class RESTRoute implements HooksInterface
             'permission_callback' => function () {
                 return current_user_can('manage_options');
             },
-            'args' => $this->dispatchSSGBuild->getRouteArgs()
+            'args' => $this->dispatchSSGBuild->getRouteArgs(),
         ]);
 
         /** @see \WPLokerBJM\Controllers\REST\JobBookmark::handle() */

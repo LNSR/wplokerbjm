@@ -8,6 +8,7 @@
     "${workspaceFolder:wplokerbjm-svelte/vendor/php-stubs",
     "${workspaceFolder:wplokerbjm-svelte/vendor"
   ],
+  "intelephense.files.exclude": ["**/vendor/**", "**/node_modules/**"],
   "editor.codeLens": true,
   "files.watcherExclude": {
     "**/node_modules": true,
