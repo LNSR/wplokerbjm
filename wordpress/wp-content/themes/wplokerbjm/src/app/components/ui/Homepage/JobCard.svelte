@@ -2,7 +2,8 @@
   import { GeneralStore } from "$lib/stores/General.svelte";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
-  import { navigateTo } from "$lib/stores/route.svelte";
+  import { navigateTo } from "$lib/stores/Route.svelte";
+  import { isMobile } from "$lib/utils/elements.svelte";
   import type { CardJob, JobCardProps } from "@/types";
 
   let {
@@ -31,7 +32,7 @@
 
   const selected = $derived.by(() => {
     try {
-      return ($jobOverlay?.selectedSlug ?? null) === (jobdata?.slug ?? null);
+      return (jobOverlay.selectedSlug ?? null) === (jobdata?.slug ?? null);
     } catch {
       return false;
     }
@@ -46,9 +47,6 @@
   });
 
   async function handleClick(event: MouseEvent) {
-    const isTabletOrDesktop =
-      typeof window !== "undefined" &&
-      window.matchMedia("(min-width: 768px)").matches;
     const { ctrlKey, metaKey, shiftKey, button } = event as MouseEvent;
     if (ctrlKey || metaKey || shiftKey || button === 1) return;
 
@@ -60,10 +58,10 @@
       return;
     }
 
-    if (!isTabletOrDesktop) {
+    if (isMobile()) {
       event.preventDefault();
       if (permalink)
-        navigateTo(new URL(permalink, window.location.origin).pathname);
+        await navigateTo(new URL(permalink, window.location.origin).pathname);
       return;
     }
 

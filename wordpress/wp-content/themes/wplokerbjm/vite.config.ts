@@ -10,26 +10,7 @@ import path from "path";
 
 export default defineConfig(({ command }) => ({
   plugins: [
-    svelte({
-      dynamicCompileOptions({ filename }) {
-        if (filename.includes('node_modules')) {
-          // Whitelist packages that ship Svelte 5 source and therefore
-          // must be compiled with runes enabled.
-          const runesWhitelist = [
-            'svelte-awesome-icons',
-          ];
-          for (const pkg of runesWhitelist) {
-            if (filename.includes(`node_modules/${pkg}`)) {
-              return { runes: true };
-            }
-          }
-          // Most node_modules packages are authored for legacy mode ---
-          // compile those with runes disabled to avoid invalid-runes
-          // syntax errors (export let, $$restProps, etc.).
-          return { runes: false };
-        }
-      }
-    }),
+    svelte(),
     tailwindcss(),
     liveReload(["./**/*.php"]),
     visualizer({ open: true }),
@@ -39,7 +20,7 @@ export default defineConfig(({ command }) => ({
       "@@": resolve(__dirname, "./"),
       "@": resolve(__dirname, "./src"),
       "$lib": resolve(__dirname, "./src/app/lib"),
-      "@routes": resolve(__dirname, "./src/routes"),
+      "@routes": resolve(__dirname, "./src/app/routes"),
       "@components": resolve(__dirname, "./src/app/components"),
       "@css": resolve(__dirname, "./src/assets/css"),
     },
@@ -58,14 +39,6 @@ export default defineConfig(({ command }) => ({
       return base;
     }
   })(),
-  // Ensure svelte-awesome-icons is pre-bundled in dev and compiled for SSR
-  // so the package's .svelte sources are handled consistently with the app.
-  optimizeDeps: {
-    include: ["svelte-awesome-icons"],
-  },
-  ssr: {
-    noExternal: ["svelte-awesome-icons"],
-  },
   ...(command === "build"
     ? { base: "/wp-content/themes/wplokerbjm/assets/dist/" }
     : {}),
@@ -81,7 +54,7 @@ export default defineConfig(({ command }) => ({
       },
       output: {
         inlineDynamicImports: false,
-        format: "es",
+        format: "esm",
         entryFileNames: "js/[name]-[hash].js",
         chunkFileNames: "js/[name]-[hash].js",
         assetFileNames: (assetInfo): string => {

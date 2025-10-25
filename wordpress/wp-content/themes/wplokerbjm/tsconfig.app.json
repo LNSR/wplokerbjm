@@ -14,7 +14,7 @@
       "@@/*": ["./*"],
       "@css/*": ["./src/assets/css/*"],
       "$lib/*": ["./src/app/lib/*"],
-      "@routes/*": ["./src/routes/*"],
+      "@routes/*": ["./src/app/routes/*"],
       "@components/*": ["./src/app/components/*"]
     },
 

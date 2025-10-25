@@ -2,6 +2,8 @@
 
 namespace WPLokerBJM\Services\Utilities\SSG\Integrations;
 
+use WPLokerBJM\Services\Utilities\Utilities;
+
 /**
  * SSG Integration Utilities
  * Handles general SSG coordination and utilities
@@ -35,18 +37,14 @@ class SSGIntegration
 		}
 
 		// Check for localhost/development environments
-		$localhost = ['localhost', '127.0.0.1', '::1', '192.168.', '10.0.', '172.'];
-
-		foreach ($localhost as $local) {
-			if (strpos($host, $local) !== false || strpos($serverName, $local) !== false) {
-				return 'local';
-			}
+		if (Utilities::isLocalhost()) {
+			return 'local';
 		}
 
 		// Check for production domain with more flexible pattern matching
 		$productionDomains = [
-			'lowongankerjabanjarmasin.com',
-			'www.lowongankerjabanjarmasin.com',
+			'lokerbanjarmasin.my.id',
+			'www.lokerbanjarmasin.my.id',
 		];
 
 		foreach ($productionDomains as $domain) {

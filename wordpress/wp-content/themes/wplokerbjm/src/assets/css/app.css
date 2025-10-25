@@ -1,6 +1,4 @@
 @import "tailwindcss";
 @plugin "daisyui";
-@import "./google.css";
-@import "./svelte-lightbox.css";
 @import "./theme.css";
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));

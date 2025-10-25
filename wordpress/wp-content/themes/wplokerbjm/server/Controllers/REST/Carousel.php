@@ -32,7 +32,7 @@ class Carousel
             return rest_ensure_response($response);
         } catch (\Exception $e) {
             error_log('Carousel::handle error: ' . $e->getMessage());
-            return rest_ensure_response(['jobs' => [], 'totalJobs' => 0]);
+            return Utilities::failedResponse('Internal server error', 500);
         }
     }
 }

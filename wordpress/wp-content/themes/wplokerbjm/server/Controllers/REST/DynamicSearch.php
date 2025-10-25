@@ -40,13 +40,7 @@ class DynamicSearch
             return $response;
         } catch (\Exception $e) {
             error_log('DynamicSearch::handle error: ' . $e->getMessage());
-            $response = new \WP_REST_Response([
-                'jobs' => [],
-                'context' => 'search',
-                'filters' => []
-            ]);
-            $response->set_status(500);
-            return $response;
+            return Utilities::failedResponse('An error occurred while processing the request.', 500);
         }
     }
 }

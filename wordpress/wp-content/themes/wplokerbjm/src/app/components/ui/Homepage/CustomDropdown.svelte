@@ -488,7 +488,7 @@
             {#if multiple && selectedValues.length > 0}
               <button
                 type="button"
-                class="dropdown-btn hover:underline mt-2 border rounded-full"
+                class="dropdown-btn hover:underline border rounded-full"
                 onclick={() => CustomDropdownController.clearFilters(update)}
               >
                 <TrashSolid class="mr-2" aria-hidden="true" />Hapus filter
@@ -502,7 +502,7 @@
         >
           <button
             type="button"
-            class="dropdown-btn hover:underline mt-2 border rounded-full"
+            class="dropdown-btn hover:underline border rounded-full"
             onclick={() => CustomDropdownController.clearFilters(update)}
           >
             <TrashSolid class="mr-2" aria-hidden="true" />Hapus filter

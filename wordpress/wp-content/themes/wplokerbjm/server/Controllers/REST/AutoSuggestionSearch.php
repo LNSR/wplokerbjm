@@ -1,6 +1,7 @@
 <?php
 
 namespace WPLokerBJM\Controllers\REST;
+use WPLokerBJM\Services\Utilities\Utilities;
 
 class AutoSuggestionSearch
 {
@@ -27,7 +28,7 @@ class AutoSuggestionSearch
             return rest_ensure_response($uniqueResults);
         } catch (\Exception $e) {
             error_log('AutoSuggestionSearch::handle error: ' . $e->getMessage());
-            return rest_ensure_response([]);
+            return Utilities::failedResponse('Internal server error', 500);
         }
     }
 }

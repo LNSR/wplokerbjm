@@ -1,5 +1,12 @@
 
-<main class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+<script lang="ts">
+  import { headerStore } from "$lib/stores/HeaderStore.svelte";
+</script>
+
+<main
+  class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8"
+  style:padding-top={headerStore.totalOffset + 'px'}
+>
   <!-- Search Form Skeleton -->
   <div class="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
     <div class="animate-pulse">

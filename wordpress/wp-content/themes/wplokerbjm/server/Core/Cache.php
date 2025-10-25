@@ -276,6 +276,11 @@ class ObjectCache
         }
     }
 
+    /**
+     * Flush the entire object cache.
+     *
+     * @return bool True if the cache was flushed, false otherwise.
+     */
     public static function flush(): bool
     {
         try {

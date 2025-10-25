@@ -1,31 +1,19 @@
-import type { SearchFilters, SearchContext, Job } from '@/types'
-import { removeJobPostingJsonLd } from '@/utils'
+import type { SearchState } from '@/types'
+import { removeJobPostingJsonLd } from '$lib/utils/elements.svelte'
+import { SvelteMap, SvelteURL } from 'svelte/reactivity'
+import { scrollY } from 'svelte/reactivity/window'
 import { SEOService } from '$lib/utils/SEO.svelte'
+import { GoogleServices } from '$lib/utils/Google.svelte'
+import { WPThemeDataStore } from '$lib/stores/WPThemeData'
 
-interface SearchState {
-  jobs: Job[]
-  context: SearchContext
-  title: string
-  totalJobs: number
-  maxNumPages: number
-  page: number
-  filters: SearchFilters
-  loading: boolean
-  error: string | null
-  timestamp?: number
-  serverLastJobUpdate?: number
-}
-
-class RouteManager {
-  currentPath = $state('');
+export class RouteManager {
+  currentUrl = $state(new SvelteURL(window.location.href));
   isInitialLoad = $state(true);
   isLoading = $state(false);
   loadingComponent = $state<string | null>(null);
-  scrollPositions = $state(new Map<string, number>());
-  searchStates = $state(new Map<string, SearchState>());
 
   setCurrentPath(path: string) {
-    this.currentPath = path;
+    this.currentUrl.href = new URL(path, window.location.origin).href;
   }
 
   setIsInitialLoad(value: boolean) {
@@ -37,11 +25,23 @@ class RouteManager {
     this.loadingComponent = component || null;
   }
 
-  saveScrollPosition(path: string) {
-    this.scrollPositions.set(path, window.scrollY);
+  getComponentNamePath(path: string): string {
+    if (path === '/') return 'Homepage';
+    if (path.startsWith('/pasang-iklan-loker')) return 'PasangIklanLoker';
+    if (path.startsWith('/lowongan/')) return 'SingleLowongan';
+    return 'Unknown';
+  }
+}
+
+export class RouteStateManager {
+  scrollPositions = new SvelteMap<string, number>();
+  searchStates = new SvelteMap<string, SearchState>();
+
+  saveScrollPosition(path: string, scrollY: number) {
+    this.scrollPositions.set(path, scrollY);
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.setItem(`scroll_${path}`, window.scrollY.toString());
+        sessionStorage.setItem(`scroll_${path}`, scrollY.toString());
       } catch (e) {
         console.warn('Failed to save scroll position to sessionStorage', e);
       }
@@ -68,8 +68,9 @@ class RouteManager {
     // Capture server-side lastJobUpdate if available (more reliable for freshness checks)
     let serverLast = 0;
     try {
-      if (typeof window !== 'undefined' && window.wpTheme?.lastJobUpdate) {
-        const parsed = Date.parse(window.wpTheme.lastJobUpdate);
+      const themeData = WPThemeDataStore.getThemeData();
+      if (themeData?.lastJobUpdate) {
+        const parsed = Date.parse(themeData.lastJobUpdate);
         serverLast = isNaN(parsed) ? 0 : parsed;
       }
     } catch (e) {
@@ -120,48 +121,29 @@ class RouteManager {
       }
     }
   }
-
-  static getComponentNamePath(path: string): string {
-    if (path === '/') return 'Homepage';
-    if (path.startsWith('/pasang-iklan-loker')) return 'PasangIklanLoker';
-    if (path.startsWith('/lowongan/')) return 'SingleLowongan';
-    return 'Unknown';
-  }
 }
 
 export const routeStore = new RouteManager();
+export const routeStateStore = new RouteStateManager();
 
-/**
- * Attempt to remove JobPosting JSON-LD, but only on the first successful attempt.
- * Subsequent calls become no-ops.
-*/
-let _jobPostingJsonLdRemovalAttempted = $state(false); // Ensure we only attempt removal once.
-function removeJobPostingJsonLdOnce(postId?: number | string, context?: string): number {
-  if (_jobPostingJsonLdRemovalAttempted) return 0;
-  try {
-    const removed = removeJobPostingJsonLd(postId);
-    _jobPostingJsonLdRemovalAttempted = true;
-    return removed;
-  } catch (e) {
-    console.warn(context ? `Failed to remove JobPosting JSON-LD (${context})` : 'Failed to remove JobPosting JSON-LD', e);
-    return 0;
-  }
-}
-
-export function navigateTo(path: string, searchState?: SearchState) {
+/** Navigate to a new path within the SPA.
+ * @param path The target path to navigate to.
+ * @param searchState Optional search state to save for the current path before navigating away.
+ */
+export async function navigateTo(path: string, searchState?: SearchState) {
   // Save current scroll position
-  routeStore.saveScrollPosition(window.location.pathname);
+  routeStateStore.saveScrollPosition(window.location.pathname, scrollY.current ?? 0);
 
   // Save current search state if provided
   if (searchState) {
-    routeStore.saveSearchState(window.location.pathname, searchState);
+    routeStateStore.saveSearchState(window.location.pathname, searchState);
   }
 
   // Set loading state
-  routeStore.setIsLoading(true, RouteManager.getComponentNamePath(path));
+  routeStore.setIsLoading(true, routeStore.getComponentNamePath(path));
 
   // Remove any leftover JobPosting JSON-LD once.
-  removeJobPostingJsonLdOnce();
+  removeJobPostingJsonLd();
 
   routeStore.setCurrentPath(path);
   window.history.pushState(null, '', path);
@@ -169,7 +151,11 @@ export function navigateTo(path: string, searchState?: SearchState) {
 
   // Fetch RankMath head data only for SPA navigation, not initial load
   if (!routeStore.isInitialLoad) {
-    SEOService.fetchHeadData(path);
+    await SEOService.fetchHeadData(path);
+    // Push page_view to gtag / GTM for SPA navigation after head update
+    GoogleServices.sendPageView(path);
+    // Trigger optional AdSense refresh for SPA navigation. Debounced in the handler.
+    GoogleServices.adSenseRefresh();
   }
 
   // Add loading timeout (1 second max)
@@ -178,27 +164,4 @@ export function navigateTo(path: string, searchState?: SearchState) {
       routeStore.setIsLoading(false);
     }
   }, 1000);
-}
-
-// Listen to browser back/forward
-if (typeof window !== 'undefined') {
-  window.addEventListener('popstate', () => {
-    const newPath = window.location.pathname;
-    routeStore.setCurrentPath(newPath);
-    routeStore.setIsInitialLoad(false);
-    routeStore.setIsLoading(true, RouteManager.getComponentNamePath(newPath));
-
-    // Ensure we only attempt removal once on popstate as well.
-    removeJobPostingJsonLdOnce(undefined, 'popstate');
-
-    // Fetch RankMath head data
-    SEOService.fetchHeadData(newPath);
-
-    // Add loading timeout for popstate as well
-    setTimeout(() => {
-      if (routeStore.isLoading) {
-        routeStore.setIsLoading(false);
-      }
-    }, 500);
-  });
 }

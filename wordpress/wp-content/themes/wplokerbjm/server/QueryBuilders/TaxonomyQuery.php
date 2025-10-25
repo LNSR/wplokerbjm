@@ -59,8 +59,8 @@ class TaxonomyQuery
             $search_term = sanitize_text_field($params['cari']);
             $tax_query[] = [
                 'taxonomy' => 'perusahaan',
-                'field'    => 'name',
-                'terms'    => $search_term,
+                'field' => 'name',
+                'terms' => $search_term,
                 'operator' => 'LIKE',
             ];
         }
@@ -74,21 +74,16 @@ class TaxonomyQuery
      * @param string $taxonomy
      * @return array
      */
-    public static function unusedTaxonomiesTermsArgs(string $taxonomy): array
+    public static function allTaxonomiesTermsArgs(string $taxonomy): array
     {
-        try {
-            $terms = get_terms([
-                'taxonomy'   => $taxonomy,
-                'hide_empty' => false,
-                'fields'     => 'ids',
-            ]);
-            if (is_wp_error($terms) || !is_array($terms)) {
-                return [];
-            }
-            return $terms;
-        } catch (\Exception $e) {
-            error_log('TaxonomyQuery::unusedTaxonomiesTermsArgs error: ' . $e->getMessage());
+        $terms = get_terms([
+            'taxonomy' => $taxonomy,
+            'hide_empty' => false,
+            'fields' => 'ids',
+        ]);
+        if (is_wp_error($terms) || !is_array($terms)) {
             return [];
         }
+        return $terms;
     }
 }

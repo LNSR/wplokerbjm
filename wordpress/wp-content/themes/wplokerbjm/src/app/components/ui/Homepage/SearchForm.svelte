@@ -166,7 +166,7 @@
   import { onMount } from "svelte";
   import { taxonomyStore } from "$lib/stores/Taxonomy.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import Adsense from "@components/adsense/Adsense.svelte";
+  import Adsense from "@components/ui/Shared/Adsense.svelte";
   import {
     MagnifyingGlassSolid,
     MapPinSolid,
@@ -194,8 +194,6 @@
   let isGenderOpen = $state(false);
   let isPendidikanOpen = $state(false);
   let isSortOpen = $state(false);
-  // Use the <Adsense> component to render an ad. Import above and add
-  // `<Adsense clientId="ca-pub-..." adSlot="..." />` where you want the ad to appear.
 
   // UI function to remove a filter by key and value
   function removeFilter(key: TaxonomyType | string, value: string) {
@@ -336,8 +334,6 @@
           : [],
       sort: currentSort,
     });
-
-    // no-op: AdSense is handled by the standalone <Adsense /> component
   });
 </script>
 
@@ -767,6 +763,6 @@
 <style lang="postcss">
   @reference "@css/app.css";
   button {
-    @apply text-[var(--wpl-global-color-1)];
+    @apply text-[var(--wpl-global-color-1)] hover:border-3;
   }
 </style>

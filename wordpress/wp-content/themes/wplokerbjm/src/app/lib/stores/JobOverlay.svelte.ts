@@ -1,8 +1,10 @@
-import { toStore, type Readable } from 'svelte/store'
 import type { Job, SingleOverlayResponse } from '@/types'
-import { HeaderUtils } from "$lib/stores/HeaderStore.svelte";
+import { headerStore } from "$lib/stores/HeaderStore.svelte";
 import { APIService } from '@/services/APIService'
 import { SEOService } from "$lib/utils/SEO.svelte";
+import { GoogleServices } from "$lib/utils/Google.svelte";
+import { scrollY } from 'svelte/reactivity/window';
+import { isMobile } from '$lib/utils/elements.svelte';
 
 export class JobOverlayManager {
 	public overlayOpen = $state(false)
@@ -19,24 +21,8 @@ export class JobOverlayManager {
 	private debounceTimer: ReturnType<typeof setTimeout> | null = null
 	private deliberateAbort = false
 
-	public readonly store: Readable<{
-		overlayOpen: boolean
-		selectedSlug: string | null
-		selectedJob: Job | null
-		overlayData: SingleOverlayResponse | null
-		overlayLoading: boolean
-		overlayError: string | null
-	}>
-
 	constructor() {
-		this.store = toStore(() => ({
-			overlayOpen: this.overlayOpen,
-			selectedSlug: this.selectedSlug,
-			selectedJob: this.selectedJob,
-			overlayData: this.overlayData,
-			overlayLoading: this.overlayLoading,
-			overlayError: this.overlayError,
-		}))
+		// No store needed
 	}
 
 	public async openOverlay(slug: string, job?: Job): Promise<void> {
@@ -45,10 +31,14 @@ export class JobOverlayManager {
 		this.overlayOpen = true
 
 		// Handle page push and SEO for desktop
-		if (job && job.permalink && typeof window !== "undefined" && window.innerWidth >= 768) {
+		const isDesktop = !isMobile();
+		if (job && job.permalink && isDesktop) {
 			const url = new URL(job.permalink, window.location.origin);
 			const path = url.pathname + url.search + url.hash;
-			window.history.pushState({}, "", path);
+			window.history.replaceState({}, "", path);
+
+			// Send overlay page view event
+			GoogleServices.sendPageView(path, 'overlay_page_view');
 
 			try {
 				await SEOService.fetchHeadData(path);
@@ -61,7 +51,7 @@ export class JobOverlayManager {
 		this.debouncedFetch(slug)
 	}
 
-	public closeOverlay(): void {
+	public async closeOverlay(): Promise<void> {
 		this.overlayOpen = false
 		this.selectedSlug = null
 		this.selectedJob = null
@@ -69,6 +59,18 @@ export class JobOverlayManager {
 		this.deliberateAbort = true
 		this.currentAbortController?.abort()
 		this.clearOverlayState()
+
+		try {
+			await SEOService.fetchHeadData("/");
+		} catch (e) {
+			// non-fatal
+		}
+
+		if (!isMobile()) {
+			window.history.replaceState({}, "", "/");
+			// Send overlay page view event for closing
+			GoogleServices.sendPageView("/", 'overlay_page_view');
+		}
 	}
 
 	public scrollToCard(slug?: string, delay = 220, buffer = 12): void {
@@ -83,8 +85,8 @@ export class JobOverlayManager {
 				const cardElement = document.querySelector(selector) as HTMLElement | null
 
 				const headerOffset =
-					typeof HeaderUtils !== "undefined" && HeaderUtils.getTotalHeaderOffset
-						? HeaderUtils.getTotalHeaderOffset()
+					typeof headerStore !== "undefined" && headerStore.getTotalHeaderOffset
+						? headerStore.getTotalHeaderOffset()
 						: (document.querySelector("header")?.getBoundingClientRect().height ?? 0)
 				const extra = Number(buffer) || 12
 
@@ -100,7 +102,7 @@ export class JobOverlayManager {
 				const jobGridElement = document.getElementById("job-grid")
 				if (jobGridElement) {
 					const rect = jobGridElement.getBoundingClientRect()
-					const scrollTop = window.pageYOffset || document.documentElement.scrollTop
+					const scrollTop = scrollY.current ?? 0
 					const targetY = scrollTop + rect.top - headerOffset - extra - 8
 					window.scrollTo({ top: targetY, behavior: "smooth" })
 				}
@@ -170,13 +172,23 @@ export class JobOverlayManager {
 		}, 600)
 	}
 
-	// Subscribe helper so this manager can be used as a Svelte store if needed
-	public subscribe(run: (v: {
-		overlayOpen: boolean; selectedSlug: string | null; selectedJob: Job |
-		null; overlayData: SingleOverlayResponse | null; overlayLoading: boolean; overlayError: string | null
-	}) => void) {
-		return this.store.subscribe(run)
+	public setupPopstateListener(): () => void {
+		const handlePopState = () => {
+			if (this.overlayOpen) {
+				this.closeOverlay()
+			}
+		}
+		window.addEventListener('popstate', handlePopState)
+		return () => window.removeEventListener('popstate', handlePopState)
 	}
+
+	public closeIfOpen(): void {
+		if (this.overlayOpen) {
+			this.closeOverlay()
+		}
+	}
+
+	// No subscribe needed, use properties directly
 }
 
 export const jobOverlay = new JobOverlayManager()

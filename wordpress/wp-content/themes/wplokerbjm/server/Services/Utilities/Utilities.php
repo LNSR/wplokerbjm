@@ -56,4 +56,46 @@ class Utilities
             'sort' => $request->get_param('sort') ?? 'desc',
         ];
     }
+
+    public static function isLocalhost(): bool
+    {
+        $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+        $httpHost = $_SERVER['HTTP_HOST'] ?? '';
+        $serverName = $_SERVER['SERVER_NAME'] ?? '';
+
+        // Check exact localhost addresses
+        $exactLocalhost = [
+            '127.0.0.1',
+            '::1',
+            'localhost',
+        ];
+
+        if (in_array($remoteAddr, $exactLocalhost)) {
+            return true;
+        }
+
+        // Check for localhost in host/server name
+        if (strpos($httpHost, 'localhost') !== false || strpos($serverName, 'localhost') !== false) {
+            return true;
+        }
+
+        // Check for private network ranges (development environments)
+        $privateRanges = ['192.168.', '10.0.', '172.'];
+
+        foreach ($privateRanges as $range) {
+            if (strpos($remoteAddr, $range) !== false || strpos($httpHost, $range) !== false || strpos($serverName, $range) !== false) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public static function failedResponse(string $message, int $code = 400): \WP_REST_Response
+    {
+        return new \WP_REST_Response([
+            'success' => false,
+            'error' => $message,
+        ], $code);
+    }
 }

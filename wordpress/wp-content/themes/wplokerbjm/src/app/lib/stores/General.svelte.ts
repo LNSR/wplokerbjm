@@ -25,13 +25,13 @@ import {
   TwitterBrands,
 } from "svelte-awesome-icons";
 
-export interface SummaryRow {
+interface SummaryRow {
     icon: Component
     label: string
     value: string
 }
 
-export interface ContactRow {
+interface ContactRow {
     type: string
     icon: Component
     label: string
@@ -43,19 +43,14 @@ export class GeneralStore {
         if (!deadline) {
             return { text: '', style: '' }
         }
-        let normalized = deadline
-        if (typeof normalized === 'string' && /^\d{2}-\d{2}-\d{4}$/.test(normalized)) {
-            const [day, month, year] = normalized.split('-')
-            normalized = `${year}-${month}-${day}`
-        }
-        const deadlineDateRaw = new SvelteDate(normalized)
-        const nowRaw = new SvelteDate()
-        const deadlineDate = new SvelteDate(
+        const deadlineDateRaw = new Date(deadline)
+        const nowRaw = new Date()
+        const deadlineDate = new Date(
             deadlineDateRaw.getFullYear(),
             deadlineDateRaw.getMonth(),
             deadlineDateRaw.getDate()
         )
-        const now = new SvelteDate(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate())
+        const now = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate())
         const msPerDay = 1000 * 60 * 60 * 24
         const days_left = Math.floor((deadlineDate.getTime() - now.getTime()) / msPerDay)
         let text = ''
@@ -105,6 +100,24 @@ export class GeneralStore {
     static useSummaryJob(jobdata: JobSummary | null | undefined): SummaryRow[] {
         const rows: SummaryRow[] = []
         const data: JobSummary = (jobdata ?? {}) as JobSummary
+        
+        /**
+         * Format deadline date to Indonesian format
+         */
+        function deadlineFormat(dateStr: string): string {
+            if (!dateStr) return ''
+            const date = new Date(dateStr)
+            if (isNaN(date.getTime())) return dateStr
+            const day = date.getDate()
+            const month = date.getMonth()
+            const year = date.getFullYear()
+            const indonesianMonths = [
+                'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+            ]
+            return `${day} ${indonesianMonths[month]} ${year}`
+        }
+
 
         if (data['jenis_pekerjaan_taxo']) {
             rows.push({
@@ -169,11 +182,12 @@ export class GeneralStore {
                     : String(data['lokasi_taxo'] ?? ''),
             })
         }
+
         if (data['deadline']) {
             rows.push({
                 icon: CalendarSolid,
                 label: 'Deadline',
-                value: data['deadline'],
+                value: deadlineFormat(data['deadline']),
             })
         }
 
@@ -248,7 +262,7 @@ export class GeneralStore {
                 return () => clearInterval(id)
             })
         } else {
-            _nowClock = new SvelteDate(0)
+            _nowClock = new SvelteDate(new Date())
         }
 
         const time = $derived.by(() => {
@@ -265,7 +279,6 @@ export class GeneralStore {
     }
 
     static useSocialMedia(): { socialMediaItems: (data: Record<string, string | string[]>) => SocialMediaItem[] } {
-    // Icons are Svelte components (migration complete).
     const platforms: Record<string, { icon: Component; base_url: string }> = {
             "X / Twitter": {
                 icon: TwitterBrands,

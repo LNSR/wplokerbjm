@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Services\Job;
 use WPLokerBJM\Factories\JobDataFactory;
+use WPLokerBJM\Core\TransientCache;
 
 class JobServices
 {
@@ -18,7 +19,7 @@ class JobServices
      */
     public function renderJobPostingJsonLd(int $post_id): string
     {
-        $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
+        $jobdata = $this->jobDataFactory->createJobData($post_id);
 
         $lokasi = $jobdata['lokasi_taxo'] ?? '';
         if (is_array($lokasi)) {
@@ -148,7 +149,7 @@ class JobServices
 
         // Mark the script with data attributes so client-side code can target
         // this specific JobPosting JSON-LD (e.g. data-ld-id="jobposting-123").
-        $jsonLd = '<script type="application/ld+json" data-ld-type="JobPosting" data-ld-id="jobposting-' . intval($post_id) . '">' . json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT) . '</script>';
+        $jsonLd = '<script type="application/ld+json" data-ld-type="JobPosting" data-ld-id="jobposting-' . intval($post_id) . '">' . json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>';
 
         return $jsonLd;
     }

@@ -1,4 +1,11 @@
-<main class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
+<script lang="ts">
+  import { headerStore } from "$lib/stores/HeaderStore.svelte";
+</script>
+
+<main
+  class="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12"
+  style:padding-top={headerStore.totalOffset + 'px'}
+>
   <!-- Header Skeleton -->
   <div class="animate-pulse">
     <div class="h-12 w-96 bg-gray-300 dark:bg-gray-600 rounded mx-auto mb-8"></div>

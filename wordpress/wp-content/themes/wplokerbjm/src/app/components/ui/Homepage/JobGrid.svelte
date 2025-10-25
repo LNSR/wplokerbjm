@@ -1,8 +1,24 @@
 <script module lang="ts">
-  import type { CardJob } from "@/types";
+  import type { CardJob, JobGridProps, SearchState } from "@/types";
   import type { SearchManager } from "$lib/stores/Search.svelte";
-  import type { JobOverlayManager } from "$lib/stores/JobOverlay.svelte";
-  import { SEOService } from "$lib/utils/SEO.svelte";
+  import { routeStateStore, navigateTo } from "$lib/stores/Route.svelte";
+  import { GoogleServices } from "$lib/utils/Google.svelte";
+  import {
+    type JobOverlayManager,
+    jobOverlay,
+  } from "$lib/stores/JobOverlay.svelte";
+  import { isMobile } from "$lib/utils/elements.svelte";
+
+  let skipScrollRestore = $state(false);
+
+  const displayJobs = $derived(searchStore.jobs);
+  const loading = $derived(searchStore.loading);
+  const hasMore = $derived(searchStore.hasMore);
+  const overlayOpen = $derived(jobOverlay.overlayOpen);
+  const selectedSlug = $derived(jobOverlay.selectedSlug);
+  const displayTotalJobs = $derived(searchStore.totalJobs);
+  const displayTitle = $derived(searchStore.title);
+  const isDesktop = $derived.by(() => !isMobile());
 
   class OverlayController {
     public searchStore: SearchManager;
@@ -20,16 +36,6 @@
 
     async handleOverlayClose(): Promise<void> {
       this.jobOverlay.closeOverlay();
-
-      try {
-        await SEOService.fetchHeadData("/");
-      } catch (e) {
-        // non-fatal
-      }
-
-      if (typeof window !== "undefined" && window.innerWidth >= 768) {
-        window.history.replaceState({}, "", "/");
-      }
     }
 
     async handleJobClick(job: CardJob): Promise<void> {
@@ -52,27 +58,39 @@
       };
 
       // Save current search state before navigation (always save for homepage path)
-      routeStore.saveSearchState("/", currentSearchState);
+      routeStateStore.saveSearchState("/", currentSearchState);
 
-      if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      if (isDesktop) {
         await this.openOverlay(job.slug ?? "");
         // After opening overlay on desktop, ensure the clicked card is scrolled into view
         this.scrollToCard(job.slug ?? "");
       } else {
         // For mobile: use SPA navigation to SingleLowongan.svelte route
         const url = new URL(job.permalink, window.location.origin);
-        navigateTo(url.pathname + url.search + url.hash, currentSearchState);
+        await navigateTo(
+          url.pathname + url.search + url.hash,
+          currentSearchState
+        );
       }
     }
 
-    handleJobsChange(): void {
-      if (this.jobOverlay.overlayOpen) {
-        this.jobOverlay.closeOverlay();
+    /**
+     *  Check URL for overlay slug on mount and
+     *  handle opening overlay if present/scroll skipping.
+     */
+    checkUrlForOverlay() {
+      if (typeof window !== "undefined") {
+        const path = window.location.pathname;
+        const match = path.match(/\/lowongan\/([^/]+)\/?$/);
+        if (match && match[1] && isDesktop) {
+          const slug = match[1];
+          overlayManager.openOverlay(slug);
+          skipScrollRestore = true;
+        }
       }
     }
 
     scrollToCard(slug: string, delay = 350, buffer = 12): void {
-      // Delegate scrolling to shared jobOverlay manager so logic is centralized
       try {
         this.jobOverlay.scrollToCard(slug, delay, buffer);
       } catch (err) {
@@ -97,22 +115,27 @@
       }
     }
   }
+
   export const overlayManager = new OverlayController(searchStore, jobOverlay);
 </script>
 
 <script lang="ts">
   import { onMount, untrack, tick } from "svelte";
-  import { HeaderUtils } from "$lib/stores/HeaderStore.svelte";
-  import { APIService } from "@/services/APIService";
+  import { headerStore } from "$lib/stores/HeaderStore.svelte";
+  import { WPThemeDataStore } from "$lib/stores/WPThemeData";
   import { searchStore } from "$lib/stores/Search.svelte";
-  import { routeStore, navigateTo } from "$lib/stores/route.svelte";
-  import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import { APIService } from "@/services/APIService";
   import JobCard from "@components/ui/Homepage/JobCard.svelte";
   import SingleOverlay from "@components/ui/Homepage/SingleOverlay.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import Adsense from "@components/adsense/Adsense.svelte";
-  import type { JobGridProps } from "@/types";
+  import Adsense from "@components/ui/Shared/Adsense.svelte";
+
+  let sentinel = $state<HTMLDivElement | null>(null);
+  let observer: IntersectionObserver | null = null;
+  let initialLoading = $state(false);
+  let hasRestoredState = $state(false);
+  let isRefreshing = $state(false);
 
   let {
     jobs = [],
@@ -123,22 +146,7 @@
     totalJobs,
   }: JobGridProps = $props();
 
-  let sentinel = $state<HTMLDivElement | null>(null);
-  let observer: IntersectionObserver | null = null;
-  let initialLoading = $state(false);
-  let hasRestoredState = $state(false);
-  let isRefreshing = $state(false);
-  let skipScrollRestore = $state(false);
-
-  // Reactive store values
-  const displayJobs = $derived(searchStore.jobs);
-  const loading = $derived(searchStore.loading);
-  const hasMore = $derived(searchStore.hasMore);
-  const overlayOpen = $derived(jobOverlay.overlayOpen);
-  const selectedSlug = $derived(jobOverlay.selectedSlug);
-  const displayTotalJobs = $derived(searchStore.totalJobs);
-  const displayTitle = $derived(searchStore.title);
-
+  // Observe for infinite scrolling
   function createObserver(): void {
     if (observer) observer.disconnect();
     observer = new IntersectionObserver(
@@ -150,60 +158,60 @@
           untrack(() => searchStore.loadMore());
         }
       },
-      { root: null, rootMargin: "0px", threshold: 0 }
+      { root: null, rootMargin: "100px", threshold: 0 }
     );
     if (sentinel) observer.observe(sentinel);
   }
 
-  async function fetchJobGrid(): Promise<JobGridProps> {
-    try {
-      const response = await APIService.fetchJobGrid({
-        paged: 1,
-        context: context || "latest",
-        title: title || "",
-        total_jobs: totalJobs || 0,
-        ...filters,
-      });
-      return response;
-    } catch (error) {
-      console.error("Error fetching job grid:", error);
-      throw error;
-    }
-  }
-
-  async function initializeJobs(): Promise<void> {
-    // If we've already restored state for this component instance, don't do it again
-    if (hasRestoredState) {
-      console.log(
-        "JobGrid: Already restored state for this component instance, skipping"
-      );
-      return;
+  class JobGridHandler {
+    private async fetchJobGrid(): Promise<JobGridProps> {
+      try {
+        const response = await APIService.fetchJobGrid({
+          paged: 1,
+          context: context || "latest",
+          title: title || "",
+          total_jobs: totalJobs || 0,
+          ...filters,
+        });
+        return response;
+      } catch (error) {
+        console.error("Error fetching job grid:", error);
+        throw error;
+      }
     }
 
-    // Check if there's a saved search state for this path
-    const savedSearchState = routeStore.getSearchState(
-      window.location.pathname
-    );
+    /**
+     * Check if saved search state is valid based on last job update timestamp
+     */
+    private isValidState(
+      savedSearchState: SearchState | undefined
+    ): boolean | undefined {
+      let lastJobUpdateMs = 0;
+      const themeData = WPThemeDataStore.getThemeData();
+      if (themeData?.lastJobUpdate) {
+        const parsed = Date.parse(themeData.lastJobUpdate);
+        lastJobUpdateMs = isNaN(parsed) ? 0 : parsed;
+      }
+      const savedTimestamp =
+        typeof savedSearchState?.timestamp === "number"
+          ? savedSearchState.timestamp
+          : 0;
 
-    // Robust timestamp comparison: treat missing/invalid timestamps as stale
-    let lastJobUpdateMs = 0;
-    if (window.wpTheme?.lastJobUpdate) {
-      const parsed = Date.parse(window.wpTheme.lastJobUpdate);
-      lastJobUpdateMs = isNaN(parsed) ? 0 : parsed;
+      const shouldRestore =
+        savedSearchState &&
+        lastJobUpdateMs > 0 &&
+        savedTimestamp > 0 &&
+        savedTimestamp >= lastJobUpdateMs;
+
+      return shouldRestore;
     }
-    const savedTimestamp =
-      typeof savedSearchState?.timestamp === "number"
-        ? savedSearchState.timestamp
-        : 0;
 
-    const shouldRestore =
-      savedSearchState &&
-      lastJobUpdateMs > 0 &&
-      savedTimestamp > 0 &&
-      savedTimestamp >= lastJobUpdateMs;
-
-    if (shouldRestore) {
-      // Deduplicate jobs by permalink to prevent Svelte key conflicts
+    /**
+     * Restore state according context from saved search state
+     * context are from (e.g., "latest", "search")
+     */
+    private async restoreState(savedSearchState: SearchState): Promise<void> {
+      if (!savedSearchState) return;
       const uniqueJobs = savedSearchState.jobs.filter(
         (job, index, self) =>
           index === self.findIndex((j) => j.permalink === job.permalink)
@@ -215,7 +223,7 @@
       searchStore.maxNumPages = savedSearchState.maxNumPages;
       searchStore.page = savedSearchState.page;
       searchStore.setFilters(savedSearchState.filters);
-      searchStore.loading = false; // Always reset loading to false on restore
+      searchStore.loading = false;
       searchStore.error = savedSearchState.error;
 
       hasRestoredState = true;
@@ -228,25 +236,23 @@
         requestAnimationFrame(() => {
           setTimeout(() => {
             if (!skipScrollRestore) {
-              const savedScroll = routeStore.getScrollPosition(
+              const savedScroll = routeStateStore.getScrollPosition(
                 window.location.pathname
               );
               if (savedScroll !== undefined) {
-                window.scrollTo(0, savedScroll);
+                window.scrollTo({ top: savedScroll, behavior: "smooth" });
               }
             }
-          }, 500); // ! Delay to ensure DOM is ready so we scroll to correct position
+          }, 500);
         });
       });
-    } else {
-      // Clear stale saved state to keep sessionStorage clean
-      if (savedSearchState) {
-        routeStore.clearSearchState(window.location.pathname);
-      }
+    }
+
+    private async initializeFreshData(): Promise<void> {
       if (!jobs || jobs.length === 0) {
         initialLoading = true;
         try {
-          const gridData = await fetchJobGrid();
+          const gridData = await this.fetchJobGrid();
           // Update search store with fetched data
           searchStore.jobs = gridData.jobs || [];
           searchStore.maxNumPages = gridData.maxNumPages || 1;
@@ -276,97 +282,108 @@
         if (filters) searchStore.setFilters(filters);
       }
     }
-  }
 
-  async function refreshJobGrid() {
-    if (isRefreshing) return;
-    isRefreshing = true;
-    try {
-      if (searchStore.context !== "search") {
-        const response = await APIService.fetchJobGrid({
-          paged: 1,
-          context: searchStore.context,
-          title: searchStore.title,
-          total_jobs: 0,
-          ...searchStore.filters,
-        });
-        searchStore.jobs = response.jobs || [];
-        searchStore.maxNumPages = response.maxNumPages || 1;
-        searchStore.context = response.context || "latest";
-        searchStore.title = response.title || "Lowongan Terbaru";
-        searchStore.totalJobs = response.totalJobs || 0;
-        if (response.filters) {
-          searchStore.setFilters(response.filters);
-        }
-        searchStore.page = 1; // Reset page
-        searchStore.error = null;
-        // Reset observer after DOM update to ensure load more works
-        setTimeout(() => createObserver(), 0);
+    public async initializeJobs(): Promise<void> {
+      // If we've already restored state for this component instance, don't do it again
+      if (hasRestoredState) {
+        console.log(
+          "JobGrid: Already restored state for this component instance, skipping"
+        );
+        return;
+      }
+
+      // Check if there's a saved search state for this path
+      const savedSearchState = routeStateStore.getSearchState(
+        window.location.pathname
+      ) as SearchState | undefined;
+
+      if (this.isValidState(savedSearchState)) {
+        await this.restoreState(savedSearchState!);
       } else {
-        // In search mode, re-run search
-        await searchStore.searchJobs();
-        // Reset observer after DOM update
-        setTimeout(() => createObserver(), 0);
+        // Clear stale saved state to keep sessionStorage clean
+        if (savedSearchState) {
+          routeStateStore.clearSearchState(window.location.pathname);
+        }
+        await this.initializeFreshData();
       }
-      // If overlay was open, reset URL to "/"
-      if (overlayOpen) {
-        window.history.replaceState({}, "", "/");
+    }
+    public async refreshJobGrid() {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      try {
+        if (searchStore.context !== "search") {
+          const response = await APIService.fetchJobGrid({
+            paged: 1,
+            context: searchStore.context,
+            title: searchStore.title,
+            total_jobs: 0,
+            ...searchStore.filters,
+          });
+          searchStore.jobs = response.jobs || [];
+          searchStore.maxNumPages = response.maxNumPages || 1;
+          searchStore.context = response.context || "latest";
+          searchStore.title = response.title || "Lowongan Terbaru";
+          searchStore.totalJobs = response.totalJobs || 0;
+          if (response.filters) {
+            searchStore.setFilters(response.filters);
+          }
+          searchStore.page = 1; // Reset page
+          searchStore.error = null;
+          // Reset observer after DOM update to ensure load more works
+          setTimeout(() => createObserver(), 0);
+        } else {
+          // In search mode, re-run search
+          await searchStore.searchJobs();
+          // Reset observer after DOM update
+          setTimeout(() => createObserver(), 0);
+        }
+        // If overlay was open, close it properly
+        if (overlayOpen) {
+          jobOverlay.closeIfOpen();
+        }
+      } catch (err) {
+        console.error("Failed to refresh job grid:", err);
+        searchStore.error = "Failed to refresh job grid";
+      } finally {
+        isRefreshing = false;
       }
-    } catch (err) {
-      console.error("Failed to refresh job grid:", err);
-      searchStore.error = "Failed to refresh job grid";
-    } finally {
-      isRefreshing = false;
     }
   }
+
+  const jobGridHandler = new JobGridHandler();
 
   onMount(() => {
-    // Check URL for overlay slug first
-    if (typeof window !== "undefined") {
-      const path = window.location.pathname;
-      const match = path.match(/\/lowongan\/([^/]+)\/?$/);
-      if (match && match[1]) {
-        skipScrollRestore = true;
-      }
-    }
-
-    initializeJobs();
-
-    // Setup intersection observer
+    overlayManager.checkUrlForOverlay();
+    jobGridHandler.initializeJobs();
     createObserver();
-
-    // Open overlay if slug in URL
-    if (typeof window !== "undefined") {
-      const path = window.location.pathname;
-      const match = path.match(/\/lowongan\/([^/]+)\/?$/);
-      if (match && match[1]) {
-        const slug = match[1];
-        overlayManager.openOverlay(slug);
-      }
-    }
+    const cleanupPopstate = jobOverlay.setupPopstateListener();
 
     return () => {
       if (observer) observer.disconnect();
+      cleanupPopstate();
     };
   });
 
   // Watch for jobs changes and close overlay
   $effect(() => {
-    // Access the reactive value
     searchStore.jobs;
 
     // Close overlay when jobs change (untrack to avoid circular dependencies)
     untrack(() => {
-      overlayManager.handleJobsChange();
+      jobOverlay.closeIfOpen();
     });
+  });
+
+  // Manage AdSense ads on overlay toggle
+  $effect(() => {
+    overlayOpen
+      ? GoogleServices.adSenseDestroy()
+      : GoogleServices.adSenseRefresh();
   });
 
   // When an overlay opens (including from URL) ensure the selected card scrolls into view
   $effect(() => {
-    overlayOpen;
-    selectedSlug;
     if (overlayOpen && selectedSlug) {
-      // Small delay to allow overlay DOM/layout to settle
       setTimeout(() => {
         overlayManager.scrollToCard(selectedSlug);
       }, 300);
@@ -387,7 +404,7 @@
       class="job-grid-refresh btn btn-lg rounded-full h-10 w-10 p-0 flex items-center justify-center text-current bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-1)] overflow-visible focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--wpl-global-color-1)]"
       aria-label="Segarkan lowongan"
       title="Segarkan"
-      onclick={refreshJobGrid}
+      onclick={jobGridHandler.refreshJobGrid}
       disabled={isRefreshing || loading}
       tabindex="0"
     >
@@ -516,9 +533,9 @@
         <div
           class={[
             "hidden md:block w-full",
-            overlayOpen ? "sticky top-0 self-start" : "relative",
+            overlayOpen ? "sticky self-start" : "relative",
           ].join(" ")}
-          style={HeaderUtils.headerSpace()}
+          style:top={overlayOpen ? headerStore.totalOffset + "px" : undefined}
         >
           <SingleOverlay
             visible={overlayOpen}

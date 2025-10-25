@@ -3,15 +3,21 @@
   import { MediaQuery } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
-  import { navigateTo } from "$lib/stores/route.svelte";
-  import { headerStore, HeaderUtils } from "$lib/stores/HeaderStore.svelte";
-  import { ThemeName, type CardJob } from "@/types";
+  import { WPThemeDataStore } from "$lib/stores/WPThemeData";
+
+  let BookmarkModalComponent:
+    | typeof import("@components/ui/Header/BookmarkModal.svelte").default
+    | null = $state(null);
+  let isMobileValue = $derived.by(() => isMobile());
+  let showBookmarkModal = $state(false);
+  let bookmarkJobs = $derived(bookmarkStore.jobs);
 
   class ThemeManager {
     private mediaQuery: MediaQuery | null = null;
     private debouncedSetTheme: (d: boolean) => void = () => {};
     public isDark = $state(false);
     public currentTheme = $state<ThemeName>(ThemeName.Light);
+    private _initialized = false;
 
     private prefersReducedMotion(): boolean {
       try {
@@ -79,8 +85,6 @@
         this.updateMetaThemeColor(dark);
       });
     }
-
-    private _initialized = false;
 
     public init(): void {
       if (this._initialized) return;
@@ -155,13 +159,6 @@
     }
   }
 
-  let BookmarkModalComponent:
-    | typeof import("@components/ui/Header/BookmarkModal.svelte").default
-    | null = $state(null);
-  let isMobileValue = $state(false);
-  let showBookmarkModal = $state(false);
-  let bookmarkJobs = $state<CardJob[]>([]);
-
   class HeaderManager {
     headerEl: HTMLElement | null = null;
     rafId: number | null = null;
@@ -184,18 +181,18 @@
     updateOffsets() {
       this.headerEl = document.querySelector("header");
       try {
-        HeaderUtils.setSiteHeaderVars({
+        headerStore.setSiteHeaderVars({
           headerEl: this.headerEl,
         });
 
         // Update the signal-based store
-        const adminBarHeight = HeaderUtils.getWpAdminBarHeight();
+        const adminBarHeight = headerStore.getWpAdminBarHeight();
         const headerHeight = this.headerEl ? this.headerEl.offsetHeight : 0;
         headerStore.headerTop = adminBarHeight;
         headerStore.headerHeight = headerHeight;
       } catch (e) {
         // Fallback: ensure at least --site-header-top is set using admin bar height
-        const adminBarHeight = HeaderUtils.getWpAdminBarHeight();
+        const adminBarHeight = headerStore.getWpAdminBarHeight();
         document.documentElement.style.setProperty(
           "--site-header-top",
           adminBarHeight + "px"
@@ -317,34 +314,59 @@
 
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
+  import type { HTMLImgAttributes } from "svelte/elements";
+  import { navigateTo } from "$lib/stores/Route.svelte";
+  import { headerStore } from "$lib/stores/HeaderStore.svelte";
+  import { ThemeName } from "@/types";
 
-  const isDev = import.meta.env.DEV;
   let { logo = "" } = $props();
+  let logoSrcset = $state("");
+  let logoSizes = $state("");
+  let logoWidth = $state<number | undefined>(undefined);
+  let logoHeight = $state<number | undefined>(undefined);
+  let logoDecoding = $state<HTMLImgAttributes["decoding"]>(undefined);
+
+  function updateLogo(): void {
+    try {
+      const themeData = WPThemeDataStore.getThemeData();
+      const runtimeLogo = themeData?.logo;
+      const runtimeLogoSrcset = themeData?.logoSrcset;
+      const runtimeLogoSizes = themeData?.logoSizes;
+      const runtimeLogoDecoding = themeData?.logoDecoding;
+      const runtimeLogoWidth = themeData?.logoWidth;
+      const runtimeLogoHeight = themeData?.logoHeight;
+
+      function parseDimension(value: unknown): number | undefined {
+        if (typeof value === "number" && value > 0) return value;
+        if (typeof value === "string" && value.trim()) {
+          const parsed = Number(value.trim());
+          if (!Number.isNaN(parsed) && parsed > 0) return parsed;
+        }
+        return undefined;
+      }
+
+      if (runtimeLogo) {
+        logo = runtimeLogo;
+        logoSrcset = runtimeLogoSrcset || "";
+        logoSizes = runtimeLogoSizes || "";
+        logoDecoding = runtimeLogoDecoding;
+        logoWidth = parseDimension(runtimeLogoWidth);
+        logoHeight = parseDimension(runtimeLogoHeight);
+      }
+    } catch (e) {
+      console.error("Error updating logo:", e);
+    }
+  }
+
+  if (typeof window !== 'undefined') {
+    updateLogo();
+  }
 
   onMount(() => {
     try {
       themeStore.init();
     } catch (e) {
       console.error("Theme initialization error:", e);
-    }
-
-    // Resolve logo at runtime in the browser using window.wpTheme (set by PHP hook).
-    try {
-      const wpTheme = (window as any).wpTheme || {};
-      const runtimeLogo: string | undefined = wpTheme.logo;
-      const themeUrl: string | undefined = wpTheme.themeUrl;
-
-      if (runtimeLogo) {
-        logo = runtimeLogo;
-      } else if (themeUrl) {
-        logo =
-          themeUrl +
-          (isDev
-            ? "/public/img/Logo-LOKER-Watermark.avif"
-            : "/assets/dist/img/Logo-LOKER-Watermark.avif");
-      }
-    } catch (e) {
-      console.error("Error resolving wpTheme logo:", e);
     }
 
     // Start header manager after DOM is available
@@ -361,18 +383,6 @@
     if (showBookmarkModal && !BookmarkModalComponent) {
       loadBookmarkModal();
     }
-  });
-
-  $effect(() => {
-    const unsub = bookmarkStore.store.subscribe((v) => {
-      bookmarkJobs = v.jobs;
-    });
-    return unsub;
-  });
-
-  $effect(() => {
-    const unsub = isMobile.subscribe((v) => (isMobileValue = v));
-    return unsub;
   });
 </script>
 
@@ -393,11 +403,19 @@
         class="mr-auto ml-auto pl-4 pr-4 max-w-screen-xl w-full flex items-center justify-between"
       >
         <div class="mt-3">
-          <button onclick={() => navigateTo("/")} class="focus:outline-none">
+          <button
+            onclick={async () => await navigateTo("/")}
+            class="focus:outline-none"
+          >
             {#if logo}
               <img
                 src={logo}
+                srcset={logoSrcset}
+                sizes={logoSizes}
+                decoding={logoDecoding}
                 alt="Site logo"
+                width={logoWidth}
+                height={logoHeight}
                 class="h-12 w-auto mt-1 md:h-16 md:w-auto"
               />
             {/if}
@@ -509,7 +527,7 @@
           </button>
           <button
             class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)] hidden rounded-full md:inline-flex"
-            onclick={() => navigateTo("/pasang-iklan-loker")}
+            onclick={async () => await navigateTo("/pasang-iklan-loker")}
           >
             <svg
               class="h-6 w-6"
@@ -571,7 +589,7 @@
         >
           <li>
             <button
-              onclick={() => navigateTo("/pasang-iklan-loker")}
+              onclick={async () => await navigateTo("/pasang-iklan-loker")}
               class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] justify-start"
             >
               <svg

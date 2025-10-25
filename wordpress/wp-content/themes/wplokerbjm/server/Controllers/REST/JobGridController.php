@@ -21,7 +21,7 @@ class JobGridController
             $total_jobs = intval($request->get_param('total_jobs') ?? 0);
 
             if ($paged < 1) {
-                return new \WP_Error('invalid_paged', 'Parameter "paged" must be greater than 0.', ['status' => 400]);
+                return Utilities::failedResponse('Parameter "paged" must be a positive integer.', 400);
             }
 
             $filters = Utilities::parseJobFilters($request);
@@ -40,11 +40,14 @@ class JobGridController
             if (isset($props['maxNumPages'])) {
                 $response->header('X-WP-TotalPages', $props['maxNumPages']);
             }
+            if (isset($props['totalJobs'])) {
+                $response->header('X-WP-Total', $props['totalJobs']);
+            }
 
             return $response;
         } catch (\Exception $e) {
             error_log('JobGrid::handle error: ' . $e->getMessage());
-            return new \WP_Error('server_error', 'An error occurred while processing the request.', ['status' => 500]);
+            return Utilities::failedResponse('An error occurred while processing the request.', 500);
         }
     }
 }

@@ -23,23 +23,21 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - Style with **Tailwind CSS** and **DaisyUI**.
 - No need to think about backward compatibility, prefer latest.
 - If there errors, immediately fix them.
-- Prioritize OOP.
+- Never run Vite dev and Vite build.
+- Production on shared hosting with 1GB RAM and 1 CPU core, its using Litespeed Server.
 
 ## Backend(PHP)
 
+- Composer's "classmap" autoloading is used for PHP files in the theme's server directory.
 - bootstrap: [wplokerbjm-bootstrap.php](../../wordpress/wp-content/mu-plugins/wplokerbjm-bootstrap.php)
 - Use **Composer** for PHP dependencies, ensuring the latest PHP version is used.
 - For PHP DI structure, refer to file:  
   [Container.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Container.php)
 - Use Cache if it's the best decision.
-  Choose between:
-  - [ObjectCache.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/ObjectCache.php) (Redis)
-  - [Cache.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Cache.php) (transients)
+  - [Cache.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Cache.php)
 
 ## Frontend(Svelte/TypeScript)
 
-- (Client-Side)[../../wordpress/wp-content/themes/wplokerbjm/src]
-- (Server-Side)[../../wordpress/wp-content/themes/wplokerbjm/server/Views]
 - Use **Bun** for JavaScript/TypeScript package management, always using the latest versions of JavaScript/TypeScript frameworks and syntaxes.
 - Frontend tooling is using Vite.
 - Svelte 5 Runes mode.

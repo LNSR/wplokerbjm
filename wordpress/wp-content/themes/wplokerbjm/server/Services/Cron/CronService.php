@@ -28,19 +28,22 @@ class CronService implements HooksInterface
         /** @see \WPLokerBJM\Services\PostsManagement\PostsManagement::updateAllJobStatuses() */
         add_action('wplokerbjm_update_job_statuses', [$this->postsManagement, 'updateAllJobStatuses']);
 
-        /** @see \WPLokerBJM\Services\Taxonomy\TaxonomyManagement::deleteUnusedTermsCron() */
-        add_action('wplokerbjm_cleanup_taxonomy', [$this->taxonomyManagement, 'deleteUnusedTermsCron']);
+        /** @see \WPLokerBJM\Services\Taxonomy\TaxonomyManagement::deleteUnusedTerms() */
+        add_action('wplokerbjm_cleanup_taxonomy', [$this->taxonomyManagement, 'deleteUnusedTerms']);
 
         // Ensure scheduled events exist (single place for scheduling)
         if (!wp_next_scheduled('wplokerbjm_delete_old_jobs')) {
+            /** @see \WPLokerBJM\Services\PostsManagement\PostsManagement::deleteOldJobs() */
             wp_schedule_event(time(), 'daily', 'wplokerbjm_delete_old_jobs');
         }
 
         if (!wp_next_scheduled('wplokerbjm_update_job_statuses')) {
+            /** @see \WPLokerBJM\Services\PostsManagement\PostsManagement::updateAllJobStatuses() */
             wp_schedule_event(time(), 'daily', 'wplokerbjm_update_job_statuses');
         }
 
         if (!wp_next_scheduled('wplokerbjm_cleanup_taxonomy')) {
+            /** @see \WPLokerBJM\Services\Taxonomy\TaxonomyManagement::deleteUnusedTerms() */
             wp_schedule_event(time(), 'weekly', 'wplokerbjm_cleanup_taxonomy');
         }
     }

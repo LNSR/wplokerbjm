@@ -1,4 +1,11 @@
-<main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12">
+<script lang="ts">
+  import { headerStore } from "$lib/stores/HeaderStore.svelte";
+</script>
+
+<main
+  class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12"
+  style:padding-top={headerStore.totalOffset + 'px'}
+>
   <!-- Job Title Skeleton -->
   <section class="top-0 backdrop-blur">
     <div class="flex items-center justify-center gap-4 animate-pulse">

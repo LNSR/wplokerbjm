@@ -1,5 +1,5 @@
 ## Builder stage: compile PECL extensions and PHP extensions
-FROM wordpress:fpm AS builder
+FROM wordpress:beta-fpm AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -45,8 +45,8 @@ RUN curl -o /usr/local/bin/wp -L https://raw.githubusercontent.com/wp-cli/builds
     chmod +x /usr/local/bin/wp
 
 # Install PECL extensions (build stage)
-RUN pecl install redis imagick apcu igbinary msgpack yaml brotli memcached xdebug && \
-    docker-php-ext-enable redis imagick apcu igbinary msgpack yaml brotli memcached xdebug
+RUN pecl install redis imagick apcu igbinary msgpack yaml brotli memcached && \
+    docker-php-ext-enable redis imagick apcu igbinary msgpack yaml brotli memcached
 
 # Configure and build PHP extensions that use docker-php-ext-install
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-xpm --with-avif && \
@@ -54,11 +54,13 @@ RUN docker-php-ext-configure gd --with-freetype --with-jpeg --with-webp --with-x
     bcmath calendar curl exif gd gettext gmp intl mbstring mysqli opcache pcntl soap sockets sodium sysvmsg sysvsem sysvshm xml zip
 
 # Copy any custom PHP ini files to the builder so they are baked in and can be copied to final
-COPY docker.conf.d/ /usr/local/etc/php/conf.d/
+COPY docker.conf.d/prod/*.ini /usr/local/etc/php/conf.d/
+# Copy www.conf as zz-www.conf to override the base image's zz-docker.conf which sets listen=9000
+COPY docker.conf.d/prod/www.conf /usr/local/etc/php-fpm.d/zz-www.conf
 
 
 ## Final stage: runtime image
-FROM wordpress:fpm
+FROM wordpress:beta-fpm
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -89,6 +91,7 @@ COPY --from=builder /usr/local/lib/php/extensions/ /usr/local/lib/php/extensions
 
 # Copy php conf.d files from builder
 COPY --from=builder /usr/local/etc/php/conf.d/ /usr/local/etc/php/conf.d/
+COPY --from=builder /usr/local/etc/php-fpm.d/ /usr/local/etc/php-fpm.d/
 
 # Ensure pecl-installed extensions are enabled (safe no-op if already enabled by copied .ini)
 RUN php -m || true

@@ -13,28 +13,6 @@ class JobGrid
     ) {
     }
 
-
-    /**
-     * Build Svelte props array for hydration.
-     */
-    protected static function getSvelteProps(array $jobs, \WP_Query $jobs_query, string $context, string $title, int $total_jobs): array
-    {
-        return [
-            'jobs' => $jobs,
-            'maxNumPages' => (int) $jobs_query->max_num_pages,
-            'context' => $context,
-            'filters' => [
-                'cari' => $_GET['cari'] ?? '',
-                'lokasi' => $_GET['lokasi'] ?? '',
-                'gender' => $_GET['gender'] ?? '',
-                'pendidikan' => $_GET['pendidikan'] ?? '',
-                'sort' => $_GET['sort'] ?? 'desc',
-            ],
-            'title' => $title,
-            'totalJobs' => $total_jobs
-        ];
-    }
-
     public function getProps(array $query_args, string $title, string $context = 'latest', int $total_jobs = 0): array
     {
 
@@ -52,14 +30,21 @@ class JobGrid
             };
         }
 
-        $props = $this->getSvelteProps($jobs, $jobs_query, $context, $title, $total_jobs);
+        $props = [
+            'jobs' => $jobs,
+            'maxNumPages' => (int) $jobs_query->max_num_pages,
+            'context' => $context,
+            'filters' => [
+                'cari' => $_GET['cari'] ?? '',
+                'lokasi' => $_GET['lokasi'] ?? '',
+                'gender' => $_GET['gender'] ?? '',
+                'pendidikan' => $_GET['pendidikan'] ?? '',
+                'sort' => $_GET['sort'] ?? 'desc',
+            ],
+            'title' => $title,
+            'totalJobs' => $jobs_query->found_posts
+        ];
 
         return $props;
-    }
-
-    public function getSchemaCard(array $query_args): array
-    {
-        $result = $this->jobRepository->queryCard($query_args);
-        return $result['schema'] ?? [];
     }
 }

@@ -3,10 +3,10 @@
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { GeneralStore } from "$lib/stores/General.svelte";
   import type { CardJob } from "@/types";
-  import { mobileMq } from "$lib/utils/elements.svelte";
+  import { isMobile } from "$lib/utils/elements.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import { navigateTo } from "$lib/stores/route.svelte";
+  import { navigateTo } from "@/app/lib/stores/Route.svelte";
   import { fade } from "svelte/transition";
 
   interface Props {
@@ -14,6 +14,8 @@
   }
 
   let { open = $bindable() }: Props = $props();
+
+  let isMobileValue = $derived.by(() => isMobile());
 
   let modalEl: HTMLDialogElement;
   let deleteConfirmModal: HTMLDialogElement;
@@ -28,10 +30,8 @@
   let startClientY = 0;
   let startHeight = 0;
 
-  const isMobile = mobileMq;
-
   let modalStyle = $derived(
-    `transform: translate(${translateX}px, ${translateY}px); transition: ${isDragging ? "none" : "transform 180ms ease"}; touch-action: ${isMobile?.current ? "none" : "auto"};`
+    `transform: translate(${translateX}px, ${translateY}px); transition: ${isDragging ? "none" : "transform 180ms ease"}; touch-action: ${isMobileValue ? "none" : "auto"};`
   );
 
   function clamp(n: number, min: number, max: number): number {
@@ -50,7 +50,7 @@
     activePointerId = e.pointerId;
     isDragging = true;
     startClientY = e.clientY;
-    if (isMobile?.current) {
+    if (isMobile()) {
       startHeight = modalBox?.clientHeight || 0;
     }
     window.addEventListener("pointermove", onPointerMove);
@@ -62,7 +62,7 @@
     if (!isDragging) return;
     if (activePointerId !== null && e.pointerId !== activePointerId) return;
     if (!modalBox) return;
-    if (isMobile?.current) {
+    if (isMobile()) {
       const vh = window.innerHeight;
       const minH = Math.round(vh * 0.25);
       const maxH = Math.round(vh * 0.95);
@@ -92,7 +92,7 @@
     activePointerId = null;
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerUp);
-    if (isMobile?.current) {
+    if (isMobile()) {
       const releaseDy = e.clientY - startClientY;
       if (releaseDy > 150) {
         closeModal();
@@ -123,10 +123,10 @@
   const STALE_THRESHOLD = 5 * 60 * 1000;
 
   // Store bindings
-  let savedJobs = $state<CardJob[]>([]);
-  let warning = $state<string>("");
-  let deletedJobs = $state<number[]>([]);
-  let lastSyncTime = $state<number>(0);
+  let savedJobs = $derived(bookmarkStore.jobs);
+  let warning = $derived(bookmarkStore.warning);
+  let deletedJobs = $derived(bookmarkStore.deletedJobs);
+  let lastSyncTime = $derived(bookmarkStore.lastSyncTime);
 
   let displayedSavedJobs = $derived(
     savedJobs.map((job) => ({
@@ -226,14 +226,14 @@
     open = false;
   }
 
-  function handleJobClick(job: CardJob): void {
+  async function handleJobClick(job: CardJob): Promise<void> {
     // Close modal first
     closeModal();
 
     // Navigate to job detail page
     if (job.permalink) {
       const url = new URL(job.permalink, window.location.origin);
-      navigateTo(url.pathname + url.search + url.hash);
+      await navigateTo(url.pathname + url.search + url.hash);
     }
   }
 
@@ -242,25 +242,7 @@
   }
 
   $effect(() => {
-    const unsub = bookmarkStore.store.subscribe(
-      (v: {
-        jobs: CardJob[];
-        isInitialized: boolean;
-        isSyncing: boolean;
-        warning: string;
-        deletedJobs: number[];
-        lastSyncTime: number;
-      }) => {
-        savedJobs = v.jobs;
-        warning = v.warning;
-        deletedJobs = v.deletedJobs;
-        lastSyncTime = v.lastSyncTime;
-        // mirror store syncing state to local loading
-        // this keeps the UI disabled when a sync is in progress regardless of local timers
-        loading = v.isSyncing ?? false;
-      }
-    );
-    return unsub;
+    loading = bookmarkStore.isSyncing;
   });
 
   $effect(() => {
@@ -268,7 +250,7 @@
       bookmarkStore.flushSync();
       fetchJobs();
       modalEl?.showModal();
-      if (isMobile?.current && modalBox) {
+      if (isMobileValue && modalBox) {
         const vh = window.innerHeight;
         const initialHeight = Math.round(vh * 0.6);
         modalBox.style.setProperty("height", `${initialHeight}px`, "important");
@@ -313,12 +295,12 @@
   <div
     bind:this={modalBox}
     class="modal-box p-0 flex flex-col relative max-h-[80vh] rounded-t-xl overflow-hidden md:mx-auto md:!max-w-2xl md:z-60 md:rounded-b-xl"
-    class:mobile-sheet={isMobile?.current}
+    class:mobile-sheet={isMobileValue}
     style={modalStyle}
     onpointerdown={startDrag}
   >
     <!-- Drag Handle -->
-    {#if isMobile?.current}
+    {#if isMobileValue}
       <div
         bind:this={dragHandle}
         class="drag-handle !w-12 !h-2 bg-base-content/20 rounded-full mx-auto mt-3 mb-2 cursor-grab active:cursor-grabbing touch-none select-none transition-colors duration-200 hover:bg-base-content/30 active:bg-base-content/40 md:bg-base-content/15 md:hover:bg-base-content/25 md:active:bg-base-content/35"

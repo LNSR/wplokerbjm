@@ -48,7 +48,7 @@ class Container
     private static function setupDefinitions(ContainerBuilder $builder): void
     {
         $builder->addDefinitions(array_merge(
-                        // Auto-scanned definitions from the server/ directory
+            // Auto-scanned definitions from the server/ directory
             \WPLokerBJM\Core\Container\Definitions\AutoScanned::getDefinitions(),
 
             // Manually defined dependencies for core services
@@ -73,28 +73,13 @@ class Container
 
         $isProduction = defined('WP_ENV') && WP_ENV === 'production';
 
-        // Compiled container file path
         $compiledFile = $cacheDir . '/CompiledContainer.php';
-        // Cache keys
         $transientKey = 'compiled_container_hash';
-        $apcuKey = 'wplokerbjm_container_cache';
 
         if ($isProduction && is_file($compiledFile)) {
             $currentHash = @hash_file('sha1', $compiledFile);
             $storedHash = \WPLokerBJM\Core\ObjectCache::get($transientKey);
             if ($storedHash !== $currentHash) {
-                // Clear APCu cache entries related to the container
-                if (function_exists('apcu_delete') && function_exists('apcu_cache_info')) {
-                    $cacheInfo = apcu_cache_info();
-                    if (!empty($cacheInfo['cache_list'])) {
-                        foreach ($cacheInfo['cache_list'] as $entry) {
-                            if (isset($entry['info']) && strpos($entry['info'], $apcuKey) === 0) {
-                                apcu_delete($entry['info']);
-                            }
-                        }
-                    }
-                }
-                // Invalidate cache if hash changed
                 array_map('unlink', glob("$cacheDir/*"));
                 \WPLokerBJM\Core\ObjectCache::set($transientKey, $currentHash, 0);
             }

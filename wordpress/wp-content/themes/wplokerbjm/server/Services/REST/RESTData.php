@@ -9,10 +9,16 @@ class RESTData
     ) {
     }
 
+    /**
+     * Get card data for a Homepage Jobcard listing
+     * used for JobGrid and JobCarousel props
+     * @param int $post_id
+     * @return array
+     */
     public function getCardData(int $post_id): array
     {
         try {
-            $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
+            $jobdata = $this->jobDataFactory->createJobData($post_id);
 
             $data = [
                 'id' => $post_id,
@@ -45,10 +51,16 @@ class RESTData
         }
     }
 
+    /**
+     * Get detailed data for a single job overlay
+     * Also used for SingleView props
+     * @param int $post_id
+     * @return array
+     */
     public function getSingleOverlayData(int $post_id): array
     {
         try {
-            $jobdata = $this->jobDataFactory->buatDataPekerjaan($post_id);
+            $jobdata = $this->jobDataFactory->createJobData($post_id);
 
             $data = [
                 'id' => $post_id,
@@ -105,5 +117,15 @@ class RESTData
             'duplicatePost' => wp_create_nonce('dt-duplicate-page-' . $post_id),
             default => '',
         };
+    }
+
+    /**
+     * Get theme data for REST responses
+     * !Useful in future for headless setups
+     * @return array
+     */
+    public function getThemeData()
+    {
+        return \WPLokerBJM\Core\Hooks\Theme\ThemeInject::themeData();
     }
 }

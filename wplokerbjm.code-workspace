@@ -11,6 +11,112 @@
   ],
   "settings": {
     "php.version": "8.5",
-    "php.format.rules.addCommaAfterLastArrayElement": true
+    "php.format.rules.addCommaAfterLastArrayElement": true,
+    "caddyfile.executable": "${workspaceFolder:wplokerbjm}/Caddyfile",
+    "intelephense.files.exclude": ["**/vendor/**", "**/node_modules/**"],
+    "editor.codeLens": true,
+    "files.watcherExclude": {
+      "**/node_modules/**": true,
+      "**/vendor/**": true,
+      "**/.git": true,
+      "**/dist": true,
+      "**/build": true,
+      "**/uploads": true,
+      "**/cache": true
+    },
+    "[svelte]": {
+      "editor.defaultFormatter": "svelte.svelte-vscode"
+    },
+    "files.associations": {
+      "*.css": "tailwindcss"
+    },
+    "editor.quickSuggestions": {
+      "other": "on",
+      "comments": "on",
+      "strings": "on"
+    },
+    "php.stubs": ["all"],
+    "[php]": {
+      "editor.defaultFormatter": "DEVSENSE.phptools-vscode"
+    },
+    "editor.fontFamily": "'Cascadia Code NF'",
+    "editor.fontSize": 14,
+    "debug.console.fontSize": 12,
+    "scm.inputFontSize": 12,
+    "terminal.integrated.fontSize": 13
+  },
+  "extensions": {
+    "recommendations": [
+      "DEVSENSE.phptools-vscode",
+      "bradlc.vscode-tailwindcss",
+      "matthewpi.caddyfile-support",
+      "aaron-bond.better-comments",
+      "dbaeumer.vscode-eslint",
+      "devsense.composer-php-vscode",
+      "docker.docker",
+      "ms-azuretools.vscode-docker",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-typescript-next",
+      "svelte.svelte-vscode"
+    ]
+  },
+  "launch": {
+    "version": "0.2.0",
+    "configurations": [
+      {
+        "name": "Listen for Xdebug (wplokerbjm Theme)",
+        "type": "php",
+        "request": "launch",
+        "port": 9004,
+        "pathMappings": {
+          "/var/www/html/wp-content/themes/wplokerbjm": "${workspaceFolder:wplokerbjm-svelte}"
+        }
+      }
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "php-lint",
+        "type": "shell",
+        "command": "composer run lint:php",
+        "group": "test",
+        "options": {
+          "cwd": "${workspaceFolder:wplokerbjm-svelte}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "dev",
+        "type": "shell",
+        "command": "bun run dev",
+        "group": "build",
+        "options": {
+          "cwd": "${workspaceFolder:wplokerbjm-svelte}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "build",
+        "type": "shell",
+        "command": "bun run build",
+        "group": "build",
+        "options": {
+          "cwd": "${workspaceFolder:wplokerbjm-svelte}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "check",
+        "type": "shell",
+        "command": "bun run check",
+        "group": "test",
+        "options": {
+          "cwd": "${workspaceFolder:wplokerbjm-svelte}"
+        },
+        "problemMatcher": []
+      }
+    ]
   }
 }

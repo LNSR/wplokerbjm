@@ -1,9 +1,8 @@
-import { toStore, type Readable } from 'svelte/store'
 import { debounce } from '@/utils/debounce'
 import { SvelteMap, SvelteSet } from 'svelte/reactivity'
 import { saveBookmarks, loadBookmarks, clearBookmarks } from '@/utils'
 import { APIService } from '@/services/APIService'
-import type { CardJob } from '@/types/Component'
+import type { CardJob } from '@/types'
 
 export class BookmarkManager {
     public jobs = $state<CardJob[]>([])
@@ -30,25 +29,7 @@ export class BookmarkManager {
         return this.operationQueue
     }
 
-    public readonly store: Readable<{
-        jobs: CardJob[]
-        isInitialized: boolean
-        isSyncing: boolean
-        warning: string
-        deletedJobs: number[]
-        lastSyncTime: number
-    }>
-
     constructor() {
-        // Readable view for components
-        this.store = toStore(() => ({
-            jobs: this.jobs,
-            isInitialized: this.isInitialized,
-            isSyncing: this.isSyncing,
-            warning: this.warning,
-            deletedJobs: this.deletedJobs,
-            lastSyncTime: this.lastSyncTime,
-        }))
 
         // Debounced sync
         this.debouncedSync = debounce(this.syncWithAPI.bind(this), 3000)
@@ -341,11 +322,6 @@ export class BookmarkManager {
     private async initialize(): Promise<void> {
         await this.loadFromStorage()
         await this.syncWithAPI()
-    }
-
-    // Allow components to subscribe to the readable snapshot
-    public subscribe(run: (v: { jobs: CardJob[]; isInitialized: boolean; warning: string; deletedJobs: number[]; lastSyncTime: number }) => void) {
-        return this.store.subscribe(run)
     }
 }
 

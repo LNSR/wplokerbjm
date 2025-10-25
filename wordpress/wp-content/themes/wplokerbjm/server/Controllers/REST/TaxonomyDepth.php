@@ -3,6 +3,7 @@ namespace WPLokerBJM\Controllers\REST;
 
 use WPLokerBJM\Services\Taxonomy\TaxonomyService;
 use WPLokerBJM\Repositories\TaxonomyRepository;
+use WPLokerBJM\Services\Utilities\Utilities;
 class TaxonomyDepth {
     public function __construct(private TaxonomyService $service, private TaxonomyRepository $repository) {
     }
@@ -24,11 +25,7 @@ class TaxonomyDepth {
             return rest_ensure_response($response);
         } catch (\Exception $e) {
             error_log('TaxonomyDepth::handle error: ' . $e->getMessage());
-            return rest_ensure_response([
-                'lokasiTerms' => [],
-                'genderTerms' => [],
-                'pendidikanTerms' => []
-            ]);
+            return Utilities::failedResponse('Internal server error', 500);
         }
     }
 
@@ -41,7 +38,7 @@ class TaxonomyDepth {
             return rest_ensure_response($response);
         } catch (\Exception $e) {
             error_log('TaxonomyDepth::lokasi error: ' . $e->getMessage());
-            return rest_ensure_response([]);
+            return Utilities::failedResponse('Internal server error', 500);
         }
     }
 
@@ -57,7 +54,7 @@ class TaxonomyDepth {
             return rest_ensure_response($response);
         } catch (\Exception $e) {
             error_log('TaxonomyDepth::gender error: ' . $e->getMessage());
-            return rest_ensure_response([]);
+            return Utilities::failedResponse('Internal server error', 500);
         }
     }
 
@@ -70,7 +67,7 @@ class TaxonomyDepth {
             return rest_ensure_response($response);
         } catch (\Exception $e) {
             error_log('TaxonomyDepth::pendidikan error: ' . $e->getMessage());
-            return rest_ensure_response([]);
+            return Utilities::failedResponse('Internal server error', 500);
         }
     }
 }

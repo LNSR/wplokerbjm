@@ -2,8 +2,8 @@ name: SSG Build & Deploy (Sitemap)
 
 on:
   schedule:
-    # Run every day at 0 AM Makassar time (16:00 UTC, since Makassar is UTC+8)
-    - cron: "0 16 * * *"
+    # Run every hour
+    - cron: "0 * * * *"
   workflow_dispatch:
     inputs:
       dry_run:
@@ -22,14 +22,6 @@ jobs:
     permissions:
       actions: write
       contents: read
-    env:
-      RCLONE_TRANSFERS: "4"
-      RCLONE_CHECKERS: "2"
-      RCLONE_RETRIES: "100"
-      RCLONE_LOW_RETRIES: "5"
-      RCLONE_LOG_LEVEL: "INFO"
-      RCLONE_BWLIMIT: "100M"
-      RCLONE_TPSLIMIT: "3"
 
     steps:
       - name: Checkout repository
@@ -65,13 +57,13 @@ jobs:
         env:
           SSG_MINIFY_HTML: "true"
           # Reduce concurrency to avoid exhausting runner resources and crashing Chromium
-          SSG_CONCURRENCY: "10"
+          SSG_CONCURRENCY: "20"
           # Increase per-page timeout to tolerate slow pages (ms)
           SSG_PAGE_TIMEOUT: "60000"
           # Allow continuing when some pages fail; useful for sitemap runs
           SSG_CONTINUE_ON_ERROR: "false"
           # Number of retries for failed pages
-          SSG_MAX_RETRIES: "10"
+          SSG_MAX_RETRIES: "100"
           # AdBlock settings for policy compliance
           SSG_BLOCK_ADS: "true"
           SSG_BLOCK_TRACKING: "true"
@@ -91,7 +83,7 @@ jobs:
           ssh-port: ${{ secrets.SSH_PORT }}
           ssh-user: ${{ secrets.SSH_USER }}
 
-      - name: Install rclone and sync via SFTP (sitemap mode)
+      - name: Compress and deploy SSG via SCP (sitemap mode)
         working-directory: ${{ env.THEME_DIR }}
         env:
           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
@@ -100,13 +92,7 @@ jobs:
           HOST: ${{ secrets.HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
           REMOTE_PATH: ${{ secrets.REMOTE_PATH }}
-          SRC_DIR: ${{ env.THEME_DIR }}
           DRY_RUN: ${{ github.event.inputs.dry_run }}
-          RCLONE_TRANSFERS: ${{ env.RCLONE_TRANSFERS }}
-          RCLONE_CHECKERS: ${{ env.RCLONE_CHECKERS }}
-          RCLONE_RETRIES: ${{ env.RCLONE_RETRIES }}
-          RCLONE_LOW_RETRIES: ${{ env.RCLONE_LOW_RETRIES }}
-          RCLONE_LOG_LEVEL: ${{ env.RCLONE_LOG_LEVEL }}
         run: bash ../../../../.github/scripts/ssg/generate-ssg-sitemap.sh
 
       - name: Enable selective url SSG workflow

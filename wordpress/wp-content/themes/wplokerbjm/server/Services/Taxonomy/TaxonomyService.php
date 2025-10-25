@@ -4,37 +4,6 @@ namespace WPLokerBJM\Services\Taxonomy;
 
 class TaxonomyService
 {
-
-    /**
-     * Process taxonomy terms.
-     *
-     * @param array $terms Raw taxonomy terms (array of term objects/arrays/strings).
-     * @return array Processed taxonomy term names.
-     */
-    public function processTaxonomyTerms(array $terms): array
-    {
-        if (empty($terms)) {
-            return [];
-        }
-
-        $names = [];
-        foreach ($terms as $term) {
-            if ($term instanceof \WP_Term && isset($term->name)) {
-                $names[] = sanitize_text_field($term->name);
-                continue;
-            }
-            if (is_array($term) && isset($term['name'])) {
-                $names[] = sanitize_text_field($term['name']);
-                continue;
-            }
-            if (is_string($term) && $term !== '') {
-                $names[] = sanitize_text_field($term);
-            }
-        }
-
-        return $names;
-    }
-
     /**
      * Build a tree structure from flat taxonomy terms.
      *
@@ -52,7 +21,7 @@ class TaxonomyService
                     'slug' => $term->slug,
                     'name' => $term->name,
                     'parent' => $term->parent,
-                    'children' => []
+                    'children' => [],
                 ];
             }
             $tree = [];

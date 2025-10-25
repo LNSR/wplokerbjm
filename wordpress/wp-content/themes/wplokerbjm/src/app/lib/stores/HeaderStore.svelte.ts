@@ -1,11 +1,9 @@
-class HeaderStore {
-  headerHeight = $state(0);
-  headerTop = $state(0);
-  totalOffset = $derived(this.headerHeight + this.headerTop);
-}
+export class HeaderStore {
 
-export class HeaderUtils {
-    static getWpAdminBarHeight(): number {
+    public headerHeight = $state(0);
+    public headerTop = $state(0);
+    public totalOffset = $derived(this.headerHeight + this.headerTop);
+    getWpAdminBarHeight(): number {
         const el = document.getElementById("wpadminbar");
         if (!el) return 0;
         const rect = el.getBoundingClientRect();
@@ -39,7 +37,7 @@ export class HeaderUtils {
      * Compute and set CSS vars for site header (top offset and header height)
      * Returns the previous main padding value (or null) so callers can restore it later.
      */
-    static setSiteHeaderVars(opts?: {
+    setSiteHeaderVars(opts?: {
         headerEl?: HTMLElement | null;
         mainEl?: HTMLElement | null;
         isMobile?: boolean;
@@ -80,27 +78,21 @@ export class HeaderUtils {
         return { previousMainPadding: prevPadding };
     }
 
-    private static getSiteHeaderTop(): number {
+    private getSiteHeaderTop(): number {
         if (typeof document === 'undefined') return 0;
         const v = getComputedStyle(document.documentElement).getPropertyValue('--site-header-top') || '0';
         return Math.max(0, parseFloat(v) || 0);
     }
 
-    private static getSiteHeaderHeight(): number {
+    private getSiteHeaderHeight(): number {
         if (typeof document === 'undefined') return 0;
         const v = getComputedStyle(document.documentElement).getPropertyValue('--site-header-height') || '0';
         return Math.max(0, parseFloat(v) || 0);
     }
 
-    static getTotalHeaderOffset(): number {
+    getTotalHeaderOffset(): number {
         return this.getSiteHeaderTop() + this.getSiteHeaderHeight();
     }
-    static headerSpace(top?: number, height?: number): string {
-        const t = top ?? this.getSiteHeaderTop();
-        const h = height ?? this.getSiteHeaderHeight();
-        return `top: calc(var(--site-header-top, ${t}px) + var(--site-header-height, ${h}px))`;
-    }
-
 }
 
 export const headerStore = new HeaderStore();

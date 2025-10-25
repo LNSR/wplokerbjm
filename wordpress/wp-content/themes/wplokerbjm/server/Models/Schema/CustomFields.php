@@ -228,7 +228,7 @@ class CustomFields implements HooksInterface
                     'id' => $prefix . 'situs_kontak',
                     'type' => 'url',
                     'label_description' => __('Alamat website resmi perusahaan.', 'wplokerbjm'),
-                    'desc' => __('Bisa diisi lebih dari satu situs jika ada(contoh:https://lowongankerjabanjarmasin.com).', 'wplokerbjm'),
+                    'desc' => __('Bisa diisi lebih dari satu situs jika ada(contoh:https://lokerbanjarmasin.my.id).', 'wplokerbjm'),
                     'required' => false,
                     'disabled' => false,
                     'readonly' => false,

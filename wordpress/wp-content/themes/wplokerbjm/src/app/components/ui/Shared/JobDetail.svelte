@@ -1,27 +1,4 @@
 <script module lang="ts">
-  interface LightboxController {
-    open: () => void;
-    close: () => void;
-    toggle: () => void;
-    openImage: (index: number) => void;
-  }
-
-  function getLabelClass(label: string): string {
-    switch (label) {
-      case "Jenis Pekerjaan":
-        return "lg:ml-3 ml-5";
-      case "Pendidikan":
-      case "Pengalaman":
-      case "Gender":
-      case "Usia":
-      case "Deadline":
-      case "Gaji":
-      case "Lokasi":
-        return "ml-5";
-      default:
-        return "ml-4";
-    }
-  }
   function extractImages(html: string): string[] {
     if (!html) return [];
     const parser = new DOMParser();
@@ -34,11 +11,11 @@
 </script>
 
 <script lang="ts">
-  import "$lib/localizations/svelte-lightbox";
+  import type Viewer from "viewerjs";
   import { GeneralStore } from "$lib/stores/General.svelte";
   import { FormattingService } from "@/services/Formatting";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
-  import Adsense from "@components/adsense/Adsense.svelte";
+  import Adsense from "@components/ui/Shared/Adsense.svelte";
   import {
     ClockSolid,
     UserTieSolid,
@@ -51,7 +28,6 @@
     AddressCardSolid,
     AddressBookSolid,
   } from "svelte-awesome-icons";
-  import { LightboxGallery, GalleryImage } from "svelte-lightbox";
   import type { SingleOverlayResponse } from "@/types";
 
   let { job }: { job: SingleOverlayResponse } = $props();
@@ -74,36 +50,104 @@
       ...extractImages(job.benefit),
     ].filter((v, i, a) => a.indexOf(v) === i)
   );
-  let controller = $state<LightboxController | undefined>();
+  let galleryRef = $state<HTMLElement>();
+  let viewer = $state<Viewer>();
 
-  function onWysiwygImgClick(e: MouseEvent): void {
-    const target = e.target as HTMLElement;
-    if (target.tagName === "IMG") {
-      if (target.parentElement?.tagName === "A") {
-        e.preventDefault();
-      }
+  const viewerOptions: unknown = {
+    hidden: true,
+    focus: true,
+    toolbar: {
+      zoomIn: false,
+      zoomOut: false,
+      oneToOne: false,
+      reset: false,
+      prev: true,
+      play: {
+        show: false,
+        size: "large",
+      },
+      next: true,
+      rotateLeft: false,
+      rotateRight: false,
+      flipHorizontal: false,
+      flipVertical: false,
+    },
+  };
 
-      const clickedAnchor = (target as HTMLImageElement).closest(
-        "a"
-      ) as HTMLAnchorElement | null;
-      const clickedSrc =
-        (clickedAnchor && clickedAnchor.href) ||
-        (target as HTMLImageElement).src ||
-        target.getAttribute("data-src") ||
-        "";
-      const imageIndex = allImages.indexOf(clickedSrc);
-      if (controller && imageIndex >= 0) {
-        controller.openImage(imageIndex);
-      }
+  async function setupViewer(): Promise<void> {
+    const [{ default: Viewer }] = await Promise.all([
+      import("viewerjs"),
+      import("viewerjs/dist/viewer.min.css"),
+    ]);
+    viewer = new Viewer(galleryRef!, viewerOptions as Viewer.Options);
+    /** Aria-hidden issue best-effort fix for now */
+    const viewerElement = (viewer as any).element;
+    if (viewerElement) {
+      viewerElement.addEventListener("shown", () => {
+        viewerElement.removeAttribute("aria-hidden");
+        viewerElement.removeAttribute("inert");
+      });
+      viewerElement.addEventListener("hide", () => {
+        const focused = document.activeElement as HTMLElement | null;
+        if (focused && viewerElement.contains(focused)) {
+          focused.blur();
+        }
+      });
+      viewerElement.addEventListener("hidden", () => {
+        viewerElement.removeAttribute("aria-hidden");
+        viewerElement.setAttribute("inert", "true");
+      });
     }
   }
+
+  async function onWysiwygImgClick(e: MouseEvent): Promise<void> {
+    const target = e.target as HTMLElement;
+    if (target.tagName !== "IMG") return;
+
+    const img = target as HTMLImageElement;
+    const anchor = img.closest("a") as HTMLAnchorElement | null;
+
+    anchor && e.preventDefault();
+
+    const href = anchor?.href ?? "";
+    const dataSrc = img.getAttribute("data-src") ?? "";
+
+    const isImageUrl = (url: string | undefined | null): url is string =>
+      typeof url === "string" &&
+      /\.(avif|webp|jpe?g|png|gif|svg|bmp|tiff)(\?.*)?$/i.test(url);
+
+    const src = isImageUrl(href)
+      ? href
+      : isImageUrl(img.src)
+        ? img.src
+        : isImageUrl(dataSrc)
+          ? dataSrc
+          : img.currentSrc || href || img.src || dataSrc || "";
+
+    const imageIndex = allImages.indexOf(src);
+    if (imageIndex >= 0) {
+      if (!viewer) {
+        await setupViewer();
+      }
+      viewer!.show();
+      viewer!.view(imageIndex);
+    }
+  }
+
+  $effect(() => {
+    return () => {
+      if (viewer) {
+        viewer.destroy();
+        viewer = undefined;
+      }
+    };
+  });
 </script>
 
 <div class="space-y-8">
   <!-- Job Title -->
   {#if job.title}
     <section class="top-0 backdrop-blur text-center">
-      <Adsense adSlot="6531671839" />
       <div class="flex items-center justify-center gap-4">
         <h1 class="text-3xl font-bold">{job.title}</h1>
       </div>
@@ -118,6 +162,7 @@
           <span>Diupdate: {timeAgo()}</span>
           <BookmarkButton jobId={job.id || 0} variant="detail" />
         </div>
+        <Adsense adSlot="6531671839" />
       {/if}
     </section>
 
@@ -169,19 +214,22 @@
         <div class="gap-x-6 gap-y-2 ml-1">
           {#each ringkasanPekerjaan as row (row.label)}
             {@const Icon = row.icon}
-            <div class="flex items-start lg:space-x-2 space-x-1 mb-2">
+            <div class="flex items-start mb-2">
               {#if Icon}
                 <Icon
                   class="text-[var(--wpl-global-color-1)] min-w-5 min-h-5 w-5 h-5 mt-1 inline-block align-middle"
                   aria-hidden="true"
                 />
               {/if}
-              <span
-                class="ml-2 font-semibold text-lg text-wrap min-w-[40%] md:min-w-[20%]"
-                >{row.label}</span
-              >
-              <span class={`${getLabelClass(row.label)} font-semibold`}>:</span>
-              <span class="font-semibold">{@html row.value}</span>
+              <div class="ml-2 flex w-full">
+                <span class="w-40 md:w-56 flex-shrink-0 font-semibold text-lg"
+                  >{row.label}</span
+                >
+                <span class="mx-2 font-semibold">:</span>
+                <span class="flex-1 font-semibold break-words"
+                  >{@html row.value}</span
+                >
+              </div>
             </div>
           {/each}
         </div>
@@ -349,11 +397,9 @@
   <Adsense adSlot="4495507760" />
 </div>
 {#if allImages.length}
-  <LightboxGallery bind:programmaticController={controller}>
+  <div bind:this={galleryRef} class="hidden">
     {#each allImages as img}
-      <GalleryImage>
-        <img src={img} alt="" />
-      </GalleryImage>
+      <img src={img} alt="" />
     {/each}
-  </LightboxGallery>
+  </div>
 {/if}

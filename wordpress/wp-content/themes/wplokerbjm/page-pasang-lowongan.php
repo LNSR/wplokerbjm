@@ -3,10 +3,6 @@
 /**
  * Template Name: Pasang Iklan Loker
  */
+use WPLokerBJM\Core\Container;
 
-
-get_header();
-?>
-<div id="app"></div>
-<?php
-get_footer();
+Container::getContainer()->get(\WPLokerBJM\Views\Page\PasangIklanLokerView::class)->render();

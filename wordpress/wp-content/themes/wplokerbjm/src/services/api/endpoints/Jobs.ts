@@ -76,7 +76,7 @@ export const jobsApi: JobsApiInterface = {
    */
   async loadMore(filters: LoadMoreFilters): Promise<LoadMoreResponse> {
     const params: Record<string, string | number> = { 
-      paged: filters.page 
+      paged: filters.paged
     }
 
     if (filters.context) {

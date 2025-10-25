@@ -1,9 +1,9 @@
 services:
   wordpress:
-    build: .
-    container_name: wordpress
-    expose:
-      - "9000"
+    build:
+      context: .
+      dockerfile: Dockerfile.${WP_ENV}
+    container_name: wordpress-${WP_ENV}
     environment:
       WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
@@ -15,7 +15,7 @@ services:
       FORCE_SSL_ADMIN: "true"
       WP_HOME: ${WORDPRESS_WP_HOME}
       WP_SITEURL: ${WORDPRESS_WP_SITEURL}
-      WP_REDIS_PATH: /var/run/redis/redis.sock
+      WP_REDIS_PATH: /var/run/sock/redis.sock
       WORDPRESS_CONFIG_EXTRA: |
         if (!defined('WP_CACHE')) define('WP_CACHE', true);
         define('WP_CACHE_KEY_SALT', '${WORDPRESS_WP_SITEURL}');
@@ -124,7 +124,7 @@ services:
     volumes:
       - wordpress:/var/www/html
       - ./wordpress/wp-content:/var/www/html/wp-content
-      - redis-socket:/var/run/redis
+      - sock:/var/run/sock
     depends_on:
       - db
     healthcheck:
@@ -160,10 +160,12 @@ services:
         target: /data
       - type: tmpfs
         target: /config
+      - sock:/var/run/sock:ro
 
   db:
     image: mysql:latest
     container_name: wordpress_db
+    command: --socket=/var/run/sock/mysql.sock --port=3306
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DB}
@@ -171,13 +173,14 @@ services:
       MYSQL_PASSWORD: ${MYSQL_PASS}
     volumes:
       - db:/var/lib/mysql
+      - sock:/var/run/sock
     ports:
       - "3306:3306"
     healthcheck:
       test:
         [
           "CMD-SHELL",
-          "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1",
+          "mysqladmin ping -S /var/run/sock/mysql.sock -u$$MYSQL_USER -p$$MYSQL_PASSWORD || exit 1",
         ]
       interval: 30s
       timeout: 10s
@@ -198,13 +201,13 @@ services:
   redis:
     image: redis:latest
     container_name: wordpress_redis
-    command: sh -c "mkdir -p /var/run/redis && chmod 777 /var/run/redis && redis-server --requirepass ${REDIS_PWD} --maxmemory ${REDIS_MAXMEMORY} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY} --port ${REDIS_PORT} --unixsocket /var/run/redis/redis.sock --unixsocketperm 777"
+    command: sh -c "mkdir -p /var/run/sock && chmod 777 /var/run/sock && redis-server --requirepass ${REDIS_PWD} --maxmemory ${REDIS_MAXMEMORY} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY} --port ${REDIS_PORT} --unixsocket /var/run/sock/redis.sock --unixsocketperm 777"
     ports:
       - "${REDIS_PORT}:${REDIS_PORT}"
     volumes:
       - type: tmpfs
         target: /data
-      - redis-socket:/var/run/redis
+      - sock:/var/run/sock
 
   # ngrok:
   #   image: ngrok/ngrok:latest
@@ -220,4 +223,4 @@ services:
 volumes:
   wordpress:
   db:
-  redis-socket:
+  sock:

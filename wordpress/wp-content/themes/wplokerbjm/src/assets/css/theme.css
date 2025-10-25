@@ -1,12 +1,6 @@
 body {
   background-color: var(--wpl-global-color-4);
 }
-
-:root,
-[data-theme="light"] {
-  color-scheme: light;
-}
-/* Light Mode */
 :root {
   --wpl-global-color-0: #0067ff;
   --wpl-global-color-1: #005ee9;

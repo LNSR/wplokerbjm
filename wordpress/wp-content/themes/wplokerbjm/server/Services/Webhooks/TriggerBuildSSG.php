@@ -1,6 +1,6 @@
 <?php
 
-namespace WPLokerBJM\Services\PostsManagement\SSG;
+namespace WPLokerBJM\Services\Webhooks;
 
 use WPLokerBJM\Core\TransientCache;
 use WPLokerBJM\Services\Utilities\SSG\URLFilterService;
@@ -17,7 +17,7 @@ use WPLokerBJM\Services\Utilities\SSG\URLFilterService;
  * - SSG_GITHUB_WORKFLOW (required)  // workflow filename or id
  * - SSG_GITHUB_REF (optional, default 'main')
  */
-class TriggerBuild
+class TriggerBuildSSG
 {
     private string $token;
     private string $owner;

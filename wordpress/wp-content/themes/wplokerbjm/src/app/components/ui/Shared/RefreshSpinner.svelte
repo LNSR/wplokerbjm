@@ -1,5 +1,4 @@
 <script lang="ts">
-  // Prefer runes-style prop handling in Svelte 5: use $props() and destructuring.
   interface Props {
     size?: string;
     spin?: boolean;

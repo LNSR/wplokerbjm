@@ -16,12 +16,4 @@ export class AuthService {
   static setRestNonce(nonce: string): void {
     nonceStore.setNonce(nonce);
   }
-
-  /**
-   * Checks if the user is logged in based on window.wpTheme.loggedIn
-   */
-  static isLoggedIn(): boolean {
-    if (typeof window === 'undefined') return false;
-    return window.wpTheme?.loggedIn === true;
-  }
 }

@@ -44,7 +44,7 @@ export interface LoadMoreResponse extends BaseJobResponse { }
 
 // Simplified load more filters - flattened structure
 export interface LoadMoreFilters extends Partial<SearchFilters> {
-  page: number
+  paged: number
   context?: SearchContext
 }
 
@@ -95,6 +95,9 @@ export interface HeadData {
   og_site_name?: string;
   article_publisher?: string;
   og_updated_time?: string;
+  og_video?: string;
+  og_audio?: string;
+  og_determiner?: string;
   twitter_title?: string;
   twitter_description?: string;
   twitter_image?: string;
@@ -103,5 +106,14 @@ export interface HeadData {
   twitter_data1?: string;
   twitter_label2?: string;
   twitter_data2?: string;
+  twitter_site?: string;
+  twitter_creator?: string;
+  fb_app_id?: string;
+  article_author?: string;
+  article_published_time?: string;
+  article_modified_time?: string;
+  article_section?: string;
+  article_tag?: string;
+  author?: string;
   schema?: Record<string, any>;
 }

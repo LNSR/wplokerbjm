@@ -161,7 +161,7 @@ export class SearchManager {
         this.error = null
         try {
             const loadMoreFilters: LoadMoreFilters = {
-                page: this.page + 1,
+                paged: this.page + 1,
                 context: this.context,
                 ...SearchUtils.sanitizeFilters({ ...this.filters }),
             }
@@ -174,7 +174,7 @@ export class SearchManager {
                   !this.jobs.some(existingJob => existingJob.permalink === newJob.permalink)
                 );
                 this.jobs.push(...newJobs)
-                this.page = loadMoreFilters.page
+                this.page = loadMoreFilters.paged
                 this.maxNumPages = response.meta?.totalPages || this.maxNumPages
             } else {
                 this.page = this.maxNumPages

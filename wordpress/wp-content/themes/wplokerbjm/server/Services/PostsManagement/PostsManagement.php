@@ -12,9 +12,25 @@ class PostsManagement
     public function deleteOldJobs(): void
     {
         try {
+            // Fetch jobs older than 1 month but exclude ones with future deadline via JobQuery::oldJobsArgs
             $old_jobs = get_posts(JobQuery::oldJobsArgs());
             foreach ($old_jobs as $job) {
                 $post_id = is_object($job) ? $job->ID : (int) $job;
+
+                // Skip deletion if the job still has a deadline in the future (guard against accidental deletion)
+                try {
+                    $deadline = get_post_meta($post_id, 'deadline', true);
+                    if (!empty($deadline)) {
+                        $deadline_ts = strtotime($deadline . ' 23:59:59');
+                        if ($deadline_ts !== false && $deadline_ts >= time()) {
+                            error_log('PostsManagement::deleteOldJobs skipping deletion for post ' . $post_id . ' due to future deadline ' . $deadline);
+                            continue;
+                        }
+                    }
+                } catch (\Exception $e) {
+                    // Do not block deletion if deadline cannot be read; log and continue
+                    error_log('PostsManagement::deleteOldJobs error checking deadline for post ' . $post_id . ': ' . $e->getMessage());
+                }
 
                 try {
                     $attachments = get_posts(JobQuery::byParentArgs($post_id, true));
@@ -67,8 +83,8 @@ class PostsManagement
 
                     $status = (int) get_post_meta($post_id, 'status_pekerjaan', true);
 
-                    $this->updateJobStatusIfExpired($post_id, $deadline, $status);
-                    $this->setJobStatustoUrgent($post_id, $deadline, $status);
+                    PostsJobStatus::updateJobStatusIfExpired($post_id, $deadline, $status);
+                    PostsJobStatus::setJobStatustoUrgent($post_id, $deadline, $status);
                 } catch (\Exception $e) {
                     error_log('PostsManagement::updateAllJobStatuses error for post ' . $post_id . ': ' . $e->getMessage());
                 }
@@ -77,7 +93,13 @@ class PostsManagement
             error_log('PostsManagement::updateAllJobStatuses error: ' . $e->getMessage());
         }
     }
+}
 
+/**
+ * Helper class for updating job statuses based on deadlines.
+ */
+class PostsJobStatus
+{
     /**
      * Set job status to expired(normal or not set) if the deadline has passed
      * @param int $post_id
@@ -85,7 +107,7 @@ class PostsManagement
      * @param int $current_status
      * @return void
      */
-    private function updateJobStatusIfExpired(int $post_id, string $deadline, int $current_status): void
+    public static function updateJobStatusIfExpired(int $post_id, string $deadline, int $current_status): void
     {
         try {
             $deadline_ts = strtotime($deadline . ' 23:59:59');
@@ -109,7 +131,7 @@ class PostsManagement
      * @param int $current_status
      * @return void
      */
-    private function setJobStatustoUrgent(int $post_id, string $deadline, int $current_status): void
+    public static function setJobStatustoUrgent(int $post_id, string $deadline, int $current_status): void
     {
         try {
             $deadline_ts = strtotime($deadline . ' 23:59:59');
@@ -126,5 +148,4 @@ class PostsManagement
             error_log('PostsManagement::setJobStatustoUrgent error for post ' . $post_id . ': ' . $e->getMessage());
         }
     }
-
 }

@@ -18,7 +18,7 @@ class LoadMore
             $context = $request->get_param('context') ?? 'archive';
 
             if ($paged < 1) {
-                return new \WP_Error('invalid_paged', 'Parameter "paged" must be greater than 0.', ['status' => 400]);
+                return Utilities::failedResponse('Parameter "paged" must be greater than 0.', 400);
             }
 
             $filters = Utilities::parseJobFilters($request);
@@ -34,15 +34,12 @@ class LoadMore
             $query = $result['query'] ?? new \WP_Query();
 
             if ($paged > $query->max_num_pages && $query->max_num_pages > 0) {
-                return new \WP_Error('exceed_max_pages', 'Parameter "paged" exceeds max_num_pages.', [
-                    'status' => 400,
-                    'max_num_pages' => $query->max_num_pages,
-                ]);
+                return Utilities::failedResponse('Parameter "paged" exceeds max_num_pages.', 400);
             }
 
             // If no jobs found, you can return a 404 or empty array (optional)
             if (empty($jobs)) {
-                return new \WP_Error('no_jobs', 'No jobs found for the given parameters.', ['status' => 404]);
+                return Utilities::failedResponse('No jobs found for the given parameters.', 404);
             }
 
             $response = new \WP_REST_Response([
@@ -61,7 +58,7 @@ class LoadMore
             return $response;
         } catch (\Exception $e) {
             error_log('LoadMore::handle error: ' . $e->getMessage());
-            return new \WP_Error('server_error', 'An error occurred while processing the request.', ['status' => 500]);
+            return Utilities::failedResponse('An error occurred while processing the request.', 500);
         }
     }
 

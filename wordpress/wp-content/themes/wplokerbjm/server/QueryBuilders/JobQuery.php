@@ -6,18 +6,11 @@ use WPLokerBJM\QueryBuilders\TaxonomyQuery;
 
 class JobQuery
 {
-	/**
-	 * Get base WP_Query args common to all job queries.
-	 *
-	 * @return array
-	 */
-	private static function getBaseArgs(): array
-	{
-		return [
-			'post_type' => 'lowongan',
-			'post_status' => 'publish',
-		];
-	}
+
+	const array getBaseArgs = [
+		'post_type' => 'lowongan',
+		'post_status' => 'publish',
+	];
 
 	/**
 	 * Get WP_Query args for latest jobs.
@@ -28,7 +21,7 @@ class JobQuery
 	 */
 	public static function latestJobsArgs(int $paged = 1, $posts_per_page = 9): array
 	{
-		return array_merge(self::getBaseArgs(), [
+		return array_merge(self::getBaseArgs, [
 			'posts_per_page' => $posts_per_page,
 			'paged' => $paged,
 			'orderby' => 'date',
@@ -44,7 +37,7 @@ class JobQuery
 	 */
 	public static function autoSuggestionArgs(string $query): array
 	{
-		return array_merge(self::getBaseArgs(), [
+		return array_merge(self::getBaseArgs, [
 			's' => $query,
 			'fields' => 'ids',
 			'posts_per_page' => 10,
@@ -61,7 +54,7 @@ class JobQuery
 		$today = date('Y-m-d');
 		$seven_days = date('Y-m-d', strtotime('+7 days'));
 
-		return array_merge(self::getBaseArgs(), [
+		return array_merge(self::getBaseArgs, [
 			'posts_per_page' => $per_page,
 			'meta_query' => [
 				[
@@ -95,7 +88,7 @@ class JobQuery
 	{
 		$order = (isset($params['sort']) && strtolower($params['sort']) === 'asc') ? 'ASC' : 'DESC';
 
-		$args = array_merge(self::getBaseArgs(), [
+		$args = array_merge(self::getBaseArgs, [
 			'posts_per_page' => $per_page,
 			'paged' => $paged,
 			'orderby' => 'date',
@@ -120,11 +113,15 @@ class JobQuery
 	}
 
 	/**
-	 * * IMPORTANT Used for deleting old jobs according context (\WPLokerBJM\Services\PostsManagement\PostsManagement)
+	 * IMPORTANT Used for deleting old jobs according context (\WPLokerBJM\Services\PostsManagement\PostsManagement)
+	 *
+	 * NOTE: This query excludes jobs that have a future 'deadline' meta value —
+	 * we want to avoid deleting job postings that are still active.
 	 */
 	public static function oldJobsArgs(): array
 	{
-		return array_merge(self::getBaseArgs(), [
+		$today = date('Y-m-d');
+		return array_merge(self::getBaseArgs, [
 			'posts_per_page' => -1,
 			'date_query' => [
 				[
@@ -132,13 +129,32 @@ class JobQuery
 					'before' => '1 month ago', // delete jobs older than 1 month
 				],
 			],
+			/* Exclude posts that have a future deadline. We only want to delete posts
+			 * that either don't have a deadline or have a deadline that is already past.
+			 */
+			'meta_query' => [
+				'relation' => 'OR',
+				// posts without a deadline
+				[
+					'key' => 'deadline',
+					'compare' => 'NOT EXISTS',
+				],
+				// posts with deadline less than or equal to today
+				[
+					'key' => 'deadline',
+					'value' => $today,
+					'compare' => '<=',
+					'type' => 'DATE',
+				],
+			],
 			'fields' => 'ids',
 		]);
 	}
 
+
 	public static function allJobsIdsArgs(): array
 	{
-		return array_merge(self::getBaseArgs(), [
+		return array_merge(self::getBaseArgs, [
 			'posts_per_page' => -1,
 			'fields' => 'ids',
 		]);
@@ -244,6 +260,23 @@ class JobQuery
 		}
 
 		return $args;
+	}
+
+	/**
+	 * Get WP_Query args to check if a job post exists in trash by name.
+	 *
+	 * @param string $post_name
+	 * @return array
+	 */
+	public static function getTrashedJobByNameArgs(string $post_name): array
+	{
+		return [
+			'name' => $post_name,
+			'post_type' => 'lowongan',
+			'post_status' => 'trash',
+			'numberposts' => 1,
+			'fields' => 'ids',
+		];
 	}
 
 }

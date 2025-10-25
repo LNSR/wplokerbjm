@@ -3,9 +3,8 @@ import type { HeadData } from '@/types'
 
 /**
  * SEO Service to manage RankMath head data
- * * Purely for cosmetic purposes in SPA navigation
  */
-class SEOService {
+export class SEOService {
 
 
     static async fetchHeadData(path: string): Promise<HeadData | null> {
@@ -51,6 +50,9 @@ class SEOService {
                     case 'robots':
                         headData.robots = content
                         break
+                    case 'author':
+                        headData.author = content
+                        break
                     case 'og:title':
                         headData.og_title = content
                         break
@@ -78,6 +80,15 @@ class SEOService {
                     case 'og:updated_time':
                         headData.og_updated_time = content
                         break
+                    case 'og:video':
+                        headData.og_video = content
+                        break
+                    case 'og:audio':
+                        headData.og_audio = content
+                        break
+                    case 'og:determiner':
+                        headData.og_determiner = content
+                        break
                     case 'twitter:title':
                         headData.twitter_title = content
                         break
@@ -101,6 +112,30 @@ class SEOService {
                         break
                     case 'twitter:data2':
                         headData.twitter_data2 = content
+                        break
+                    case 'twitter:site':
+                        headData.twitter_site = content
+                        break
+                    case 'twitter:creator':
+                        headData.twitter_creator = content
+                        break
+                    case 'fb:app_id':
+                        headData.fb_app_id = content
+                        break
+                    case 'article:author':
+                        headData.article_author = content
+                        break
+                    case 'article:published_time':
+                        headData.article_published_time = content
+                        break
+                    case 'article:modified_time':
+                        headData.article_modified_time = content
+                        break
+                    case 'article:section':
+                        headData.article_section = content
+                        break
+                    case 'article:tag':
+                        headData.article_tag = content
                         break
                 }
             }
@@ -140,6 +175,9 @@ class SEOService {
         // Update meta description
         this.updateMetaTag('name', 'description', headData.description);
 
+        // Update author meta
+        this.updateMetaTag('name', 'author', headData.author);
+
         // Update canonical link
         this.updateCanonicalLink(headData.canonical);
 
@@ -156,6 +194,9 @@ class SEOService {
         this.updateMetaTag('property', 'og:site_name', headData.og_site_name);
         this.updateMetaTag('property', 'article:publisher', headData.article_publisher);
         this.updateMetaTag('property', 'og:updated_time', headData.og_updated_time);
+        this.updateMetaTag('property', 'og:video', headData.og_video);
+        this.updateMetaTag('property', 'og:audio', headData.og_audio);
+        this.updateMetaTag('property', 'og:determiner', headData.og_determiner);
 
         // Update Twitter meta tags
         this.updateMetaTag('name', 'twitter:title', headData.twitter_title);
@@ -166,15 +207,34 @@ class SEOService {
         this.updateMetaTag('name', 'twitter:data1', headData.twitter_data1);
         this.updateMetaTag('name', 'twitter:label2', headData.twitter_label2);
         this.updateMetaTag('name', 'twitter:data2', headData.twitter_data2);
+        this.updateMetaTag('name', 'twitter:site', headData.twitter_site);
+        this.updateMetaTag('name', 'twitter:creator', headData.twitter_creator);
+
+        // Update Facebook meta tags
+        this.updateMetaTag('property', 'fb:app_id', headData.fb_app_id);
+
+        // Update Article meta tags
+        this.updateMetaTag('property', 'article:author', headData.article_author);
+        this.updateMetaTag('property', 'article:published_time', headData.article_published_time);
+        this.updateMetaTag('property', 'article:modified_time', headData.article_modified_time);
+        this.updateMetaTag('property', 'article:section', headData.article_section);
+        this.updateMetaTag('property', 'article:tag', headData.article_tag);
 
         // Update schema markup if present
         if (headData.schema) {
             this.updateSchemaMarkup(headData.schema);
+        } else {
+            const existingSchemas = document.querySelectorAll('script[type="application/ld+json"]:not([data-ld-type="JobPosting"]):not([data-ld-id^="jobposting-"])');
+            existingSchemas.forEach(script => script.remove());
         }
     }
 
     private static updateMetaTag(attrName: string, attrValue: string, content?: string) {
-        if (!content) return;
+        if (!content) {
+            const existingMeta = document.querySelector(`meta[${attrName}="${attrValue}"]`);
+            if (existingMeta) existingMeta.remove();
+            return;
+        }
 
         let meta = document.querySelector(`meta[${attrName}="${attrValue}"]`) as HTMLMetaElement;
         if (meta) {
@@ -188,7 +248,11 @@ class SEOService {
     }
 
     private static updateCanonicalLink(href?: string) {
-        if (!href) return;
+        if (!href) {
+            const existingLink = document.querySelector('link[rel="canonical"]');
+            if (existingLink) existingLink.remove();
+            return;
+        }
 
         let link = document.querySelector('link[rel="canonical"]') as HTMLLinkElement;
         if (link) {
@@ -214,5 +278,3 @@ class SEOService {
         }
     }
 }
-
-export { SEOService }

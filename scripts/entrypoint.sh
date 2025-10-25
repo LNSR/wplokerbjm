@@ -103,4 +103,8 @@ wait
 find /var/www/html \( -type f -o -type d \) \( ! -user wordpress -o ! -group www-data \) -print0 | xargs -0 -r -P $(nproc) chown -v wordpress:www-data
 find /var/www/html \( -type f -o -type d \) ! -perm 775 -print0 | xargs -0 -r -P $(nproc) chmod -v 775
 
+# Ensure socket directories exist with correct permissions
+mkdir -p /var/run/sock
+chmod 755 /var/run/sock
+
 exec "$@"

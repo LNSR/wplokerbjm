@@ -18,7 +18,8 @@ class RESTRoute implements HooksInterface
         private readonly \WPLokerBJM\Controllers\REST\SingleOverlay $singleOverlay,
         private readonly \WPLokerBJM\Controllers\REST\DispatchSSGBuild $dispatchSSGBuild,
         private readonly \WPLokerBJM\Controllers\REST\JobBookmark $jobBookmark,
-        private readonly \WPLokerBJM\Controllers\REST\JobGridController $jobGrid
+        private readonly \WPLokerBJM\Controllers\REST\JobGridController $jobGrid,
+        private readonly \WPLokerBJM\Controllers\REST\WPThemeData $wpThemeData
     ) {
     }
 
@@ -109,7 +110,25 @@ class RESTRoute implements HooksInterface
             'permission_callback' => function () {
                 return current_user_can('manage_options');
             },
-            'args' => $this->dispatchSSGBuild->getRouteArgs(),
+            'args' => (function () {
+                return [
+                    'paths' => [
+                        'required' => true,
+                        'validate_callback' => function ($value) {
+                            return is_array($value) && !empty($value);
+                        },
+                    ],
+                    'reason' => [
+                        'required' => false,
+                        'default' => 'manual_trigger',
+                    ],
+                    'dry_run' => [
+                        'required' => false,
+                        'default' => false,
+                        'type' => 'boolean',
+                    ],
+                ];
+            })(),
         ]);
 
         /** @see \WPLokerBJM\Controllers\REST\JobBookmark::handle() */
@@ -123,6 +142,13 @@ class RESTRoute implements HooksInterface
         register_rest_route(self::$baseURI, '/job-grid/', [
             'methods' => 'GET',
             'callback' => [$this->jobGrid, 'handle'],
+            'permission_callback' => '__return_true',
+        ]);
+
+        /** @see \WPLokerBJM\Controllers\REST\WPThemeData::handle() */
+        register_rest_route(self::$baseURI, '/theme-data/', [
+            'methods' => 'GET',
+            'callback' => [$this->wpThemeData, 'handle'],
             'permission_callback' => '__return_true',
         ]);
     }

@@ -26,6 +26,84 @@ class BotDetection
 	) {
 	}
 
+		/**
+	 * Check if the current visitor is a bot using enhanced conservative detection.
+	 *
+	 * This method implements an enhanced conservative bot detection strategy that
+	 * relies on reliable methods to avoid false positives:
+	 *
+	 * Detection Flow:
+	 * 1. Official bot IP ranges (immediate return true if matched)
+	 * 2. DNS-based detection (immediate return true for high-confidence detections)
+	 * 3. Request pattern analysis (behavioral detection without user agents)
+	 * 4. Everything else = human (return false)
+	 *
+	 * @return bool True if visitor is detected as a bot, false otherwise
+	 */
+	public function isBot(): bool
+	{
+		// Extract request data from server variables
+		/** @var string $userAgent Browser/client user agent string */
+		$userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+
+		/** @var string $acceptLanguage Accept-Language header */
+		$acceptLanguage = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
+
+		/** @var string $acceptHeader Accept header */
+		$acceptHeader = $_SERVER['HTTP_ACCEPT'] ?? '';
+
+		/** @var string $remoteAddr Client IP address */
+		$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
+
+		// Create cache key from key request parameters
+		$cacheKey = 'ssg_is_bot_' . md5($userAgent . $acceptLanguage . $acceptHeader . $remoteAddr);
+		$cachedResult = ObjectCache::get($cacheKey);
+		if ($cachedResult !== false) {
+			return (bool) $cachedResult;
+		}
+
+		//! Exclude our own SSG bot from being treated as a bot
+		if (in_array($userAgent, self::isSsgBotGeneration(), true)) {
+			ObjectCache::set($cacheKey, false, 86400); // Cache for 1 day
+			return false;
+		}
+
+
+		// 1. Check if IP is in known bot ranges - IMMEDIATE BOT FLAG (most reliable)
+		if ($this->botRangeFetcher->isIpInBotRanges($remoteAddr)) {
+			error_log('[SSG BotDetection] BOT DETECTED BY IP: ' . $remoteAddr);
+			ObjectCache::set($cacheKey, true, 86400); // Cache for 1 day
+			return true;
+		}
+
+		// 2. Forward-confirmed Reverse DNS (highly reliable for legitimate bots)
+		if (!empty($remoteAddr) && filter_var($remoteAddr, FILTER_VALIDATE_IP)) {
+			$ptr = $this->dnsResolver->forwardConfirmedReverseDns($remoteAddr);
+
+			// IMMEDIATE BOT FLAG for confirmed known bot PTR patterns
+			if ($this->dnsResolver->isKnownBotPtr($ptr)) {
+				error_log('[SSG BotDetection] BOT DETECTED BY PTR: ' . $remoteAddr . ' PTR: ' . $ptr);
+				ObjectCache::set($cacheKey, true, 86400); // Cache for 1 day
+				return true;
+			}
+		}
+
+		// 3. Request Pattern Analysis (for bots that don't identify themselves properly)
+		if ($this->analyzeRequestPatterns()) {
+			error_log('[SSG BotDetection] BOT DETECTED BY REQUEST PATTERN: IP=' . $remoteAddr . ' Headers=' . json_encode([
+				'accept' => $_SERVER['HTTP_ACCEPT'] ?? '',
+				'accept_language' => $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '',
+				'accept_encoding' => $_SERVER['HTTP_ACCEPT_ENCODING'] ?? '',
+				'connection' => $_SERVER['HTTP_CONNECTION'] ?? ''
+			]));
+			ObjectCache::set($cacheKey, true, 86400); // Cache for 1 day
+			return true;
+		}
+
+		ObjectCache::set($cacheKey, false, 86400); // Cache for 1 day
+		return false;
+	}
+
 	/**
 	 * Check if the current visitor is our SSG bot generation
 	 */
@@ -42,6 +120,17 @@ class BotDetection
 	 */
 	private function analyzeRequestPatterns(): bool
 	{
+		// Quick UA checks using curated/known bot user agents lists (txt/json sources).
+		// Sources: Monperrus crawler-user-agents JSON and MitchellKrogza bad-user-agents list
+		// See: https://github.com/monperrus/crawler-user-agents and
+		// https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker
+
+		$userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+		if (!empty($userAgent) && $this->isUserAgentKnownBot($userAgent)) {
+			ObjectCache::set('ssg_user_agent_bot_' . md5($userAgent), true, 3600);
+			return true;
+		}
+
 		// Cache pattern analysis
 		$patternKey = 'ssg_request_pattern_' . md5(
 			($_SERVER['HTTP_ACCEPT'] ?? '') .
@@ -110,85 +199,38 @@ class BotDetection
 			return true;
 		}
 
+
 		ObjectCache::set($patternKey, false, 3600);
 		return false;
 	}
 
 	/**
-	 * Check if the current visitor is a bot using enhanced conservative detection.
-	 *
-	 * This method implements an enhanced conservative bot detection strategy that
-	 * relies on reliable methods to avoid false positives:
-	 *
-	 * Detection Flow:
-	 * 1. Official bot IP ranges (immediate return true if matched)
-	 * 2. DNS-based detection (immediate return true for high-confidence detections)
-	 * 3. Request pattern analysis (behavioral detection without user agents)
-	 * 4. Everything else = human (return false)
-	 *
-	 * @return bool True if visitor is detected as a bot, false otherwise
+	 * Check whether a User Agent matches known bot UA patterns
+	 * Uses cached UA lists fetched from TXT/JSON sources (see BotRangeFetcher::getBotUserAgentPatterns)
 	 */
-	public function isBot(): bool
+	private function isUserAgentKnownBot(string $userAgent): bool
 	{
-		// Extract request data from server variables
-		/** @var string $userAgent Browser/client user agent string */
-		$userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-
-		/** @var string $acceptLanguage Accept-Language header */
-		$acceptLanguage = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
-
-		/** @var string $acceptHeader Accept header */
-		$acceptHeader = $_SERVER['HTTP_ACCEPT'] ?? '';
-
-		/** @var string $remoteAddr Client IP address */
-		$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
-
-		// Create cache key from key request parameters
-		$cacheKey = 'ssg_is_bot_' . md5($userAgent . $acceptLanguage . $acceptHeader . $remoteAddr);
-		$cachedResult = ObjectCache::get($cacheKey);
-		if ($cachedResult !== false) {
-			return (bool) $cachedResult;
+		if (empty($userAgent)) {
+			return false;
 		}
 
-		// Exclude our own SSG bot from being treated as a bot
-		if (in_array($userAgent, self::isSsgBotGeneration(), true)) {
-			ObjectCache::set($cacheKey, false, 86400); // Cache for 1 day
-			return false; // Allow our own bot
+		$patterns = $this->botRangeFetcher->getBotUserAgentPatterns();
+		if (empty($patterns)) {
+			return false;
 		}
 
-
-		// 1. Check if IP is in known bot ranges - IMMEDIATE BOT FLAG (most reliable)
-		if ($this->botRangeFetcher->isIpInBotRanges($remoteAddr)) {
-			error_log('[SSG BotDetection] BOT DETECTED BY IP: ' . $remoteAddr);
-			ObjectCache::set($cacheKey, true, 86400); // Cache for 1 day
-			return true;
-		}
-
-		// 2. Forward-confirmed Reverse DNS (highly reliable for legitimate bots)
-		if (!empty($remoteAddr) && filter_var($remoteAddr, FILTER_VALIDATE_IP)) {
-			$ptr = $this->dnsResolver->forwardConfirmedReverseDns($remoteAddr);
-
-			// IMMEDIATE BOT FLAG for confirmed known bot PTR patterns
-			if ($this->dnsResolver->isKnownBotPtr($ptr)) {
-				error_log('[SSG BotDetection] BOT DETECTED BY PTR: ' . $remoteAddr . ' PTR: ' . $ptr);
-				ObjectCache::set($cacheKey, true, 86400); // Cache for 1 day
-				return true;
+		foreach ($patterns as $pattern) {
+			// patterns are prepared as valid PCRE regex strings
+			try {
+				if (@preg_match($pattern, $userAgent)) {
+					return true;
+				}
+			} catch (\Throwable $e) {
+				// ignore invalid regex from external sources; continue
+				continue;
 			}
 		}
 
-		// 3. Request Pattern Analysis (for bots that don't identify themselves properly)
-		if ($this->analyzeRequestPatterns()) {
-			error_log('[SSG BotDetection] BOT DETECTED BY REQUEST PATTERN: IP=' . $remoteAddr . ' Headers=' . json_encode([
-				'accept' => $_SERVER['HTTP_ACCEPT'] ?? '',
-				'accept_language' => $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '',
-				'accept_encoding' => $_SERVER['HTTP_ACCEPT_ENCODING'] ?? '',
-				'connection' => $_SERVER['HTTP_CONNECTION'] ?? ''
-			]));
-			ObjectCache::set($cacheKey, true, 86400); // Cache for 1 day
-			return true;
-		}
-
-		ObjectCache::set($cacheKey, false, 86400); // Cache for 1 day
 		return false;
 	}
 }
@@ -551,6 +593,35 @@ class DnsResolver
 		ObjectCache::set($cacheKey, false, 86400); // Cache for 24 hours
 		return false;
 	}
+
+	/**
+	 * Combined PTR verification for an IP address.
+	 * Performs forward-confirmed reverse DNS and checks whether PTR matches known
+	 * provider suffix patterns. Result is cached for 24 hours.
+	 *
+	 * Source: provider PTR suffix patterns are defined in getProviderPtrPatterns() referencing official provider docs.
+	 */
+	public function isPtrKnownBotForIp(string $ip): bool
+	{
+		if (empty($ip) || !filter_var($ip, FILTER_VALIDATE_IP)) {
+			return false;
+		}
+
+		$cacheKey = 'dns_is_known_bot_ip_' . $ip;
+		$cachedResult = ObjectCache::get($cacheKey);
+		if ($cachedResult !== false) {
+			return (bool) $cachedResult;
+		}
+
+		$ptr = $this->forwardConfirmedReverseDns($ip);
+		if ($this->isKnownBotPtr($ptr)) {
+			ObjectCache::set($cacheKey, true, 86400);
+			return true;
+		}
+
+		ObjectCache::set($cacheKey, false, 86400);
+		return false;
+	}
 }
 /**
  * Helper class for fetching and caching bot IP ranges
@@ -570,6 +641,8 @@ class BotRangeFetcher
 		if (!empty(self::$knownBotRanges)) {
 			return self::$knownBotRanges;
 		}
+
+        
 
 		$cacheKey = 'ssg_bot_ip_ranges';
 
@@ -593,6 +666,90 @@ class BotRangeFetcher
 
 		self::$knownBotRanges = $ranges;
 		return $ranges;
+	}
+
+	/**
+	 * Get known bot user-agent patterns (compiled as PCRE regex strings)
+	 * Fetches from JSON/TXT public sources and caches results.
+	 *
+	 * Sources:
+	 * - Monperrus crawler-user-agents JSON: https://github.com/monperrus/crawler-user-agents
+	 * - MitchellKrogza bad-user-agents list: https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker
+	 *
+	 * Note: This method avoids request-time blocking by using the cached patterns when available.
+	 */
+	public function getBotUserAgentPatterns(): array
+	{
+		$cacheKey = 'ssg_bot_user_agents';
+		$cached = ObjectCache::get($cacheKey);
+		if ($cached !== false && is_array($cached)) {
+			return $cached;
+		}
+
+		$patterns = $this->fetchBotUserAgentLists();
+		$patterns = array_unique($patterns);
+
+		// Cache for 1 day by default
+		ObjectCache::set($cacheKey, $patterns, 86400);
+		return $patterns;
+	}
+
+	/**
+	 * Fetch UA lists from TXT/JSON sources and convert them into PCRE patterns.
+	 */
+	private function fetchBotUserAgentLists(): array
+	{
+		$patterns = [];
+
+		// 1) Monperrus crawler-user-agents JSON
+		try {
+			$json = $this->fetchUrl('https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json');
+			if ($json) {
+				$data = json_decode($json, true);
+				if (is_array($data)) {
+					foreach ($data as $entry) {
+						if (isset($entry['pattern']) && !empty($entry['pattern'])) {
+							$raw = $entry['pattern'];
+							// Normalize pattern into regex; wrap in non-capturing group, case-insensitive.
+							$escaped = str_replace('/', '\/', $raw);
+							$patterns[] = '/(?:' . $escaped . ')/i';
+						}
+						// Instances are full UA strings - turn into exact word regex
+						if (isset($entry['instances']) && is_array($entry['instances'])) {
+							foreach ($entry['instances'] as $instance) {
+								$instance = trim($instance);
+								if ($instance === '') {
+									continue;
+								}
+								$patterns[] = '/\b' . preg_quote($instance, '/') . '\b/i';
+							}
+						}
+					}
+				}
+			}
+		} catch (\Exception $e) {
+			error_log('[SSG BotRangeFetcher] Failed fetching crawler-user-agents JSON: ' . $e->getMessage());
+		}
+
+		// 2) MitchellKrogza 'bad-user-agents' text list (line-separated)
+		try {
+			$raw = $this->fetchUrl('https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/_generator_lists/bad-user-agents.list');
+			if ($raw) {
+				$lines = explode("\n", $raw);
+				foreach ($lines as $line) {
+					$line = trim($line);
+					if ($line === '' || str_starts_with($line, '#')) {
+						continue;
+					}
+					// Convert to safe regex match on word boundary
+					$patterns[] = '/\b' . preg_quote($line, '/') . '\b/i';
+				}
+			}
+		} catch (\Exception $e) {
+			error_log('[SSG BotRangeFetcher] Failed fetching bad-user-agents list: ' . $e->getMessage());
+		}
+
+		return array_unique(array_filter($patterns));
 	}
 
 	/**

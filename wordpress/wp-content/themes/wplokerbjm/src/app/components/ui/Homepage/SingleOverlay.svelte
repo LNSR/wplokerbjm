@@ -7,7 +7,6 @@
 
   let slideIn = $state(false);
 
-  // Use store-provided overlay values
   const data = $derived(jobOverlay.overlayData) as SingleOverlayResponse | null;
   const loading = $derived(jobOverlay.overlayLoading);
   const error = $derived(jobOverlay.overlayError);
@@ -46,7 +45,7 @@
 </script>
 
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
 
   let { visible, close } = $props<{
     visible: boolean;
@@ -66,8 +65,17 @@
     };
   });
 
+  // Explicitly set slideIn to false first so it shows everytime JobOverlay is opened
+  // without setting slideIn to false explicitly, the slideIn only trigger once
   $effect(() => {
-    slideIn = visible;
+    if (visible) {
+      slideIn = false;
+      tick().then(() => {
+        slideIn = true;
+      });
+    } else {
+      slideIn = false;
+    }
   });
 
   // Update editPostId when data changes
