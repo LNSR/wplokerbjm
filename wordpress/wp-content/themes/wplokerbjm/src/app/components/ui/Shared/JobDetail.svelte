@@ -39,7 +39,7 @@
   const socialMediaItems = $derived(
     GeneralStore.useSocialMedia().socialMediaItems(job.social_media)
   );
-  const timeAgo = GeneralStore.useTimeAgo(job.post_time);
+  const timeAgo = $derived(GeneralStore.useTimeAgo(job.post_time));
 
   const allImages = $derived(
     [

@@ -1,5 +1,5 @@
 ## Builder stage: compile PECL extensions and PHP extensions
-FROM wordpress:beta-fpm AS builder
+FROM wordpress:beta-php8.4-fpm AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -60,7 +60,7 @@ COPY docker.conf.d/prod/www.conf /usr/local/etc/php-fpm.d/zz-www.conf
 
 
 ## Final stage: runtime image
-FROM wordpress:beta-fpm
+FROM wordpress:beta-php8.4-fpm
 
 ENV DEBIAN_FRONTEND=noninteractive
 

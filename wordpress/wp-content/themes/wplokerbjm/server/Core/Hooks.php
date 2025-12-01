@@ -6,9 +6,13 @@ use WPLokerBJM\Contracts\HooksInterface;
 use WPLokerBJM\Core\Hooks\Theme\{Enqueue, ThemeInject, DebloatWPTheme, Google};
 use WPLokerBJM\Core\Hooks\{LiteSpeedFilters, Litespeed};
 use WPLokerBJM\Services\Utilities\Utilities;
-
 class Hooks implements HooksInterface
 {
+
+    public function __construct(private \WPLokerBJM\Services\Utilities\SSG\BotDetection $botDetection)
+    {
+    }
+
     /*======================================================================
      | REGISTER HOOKS
      ======================================================================*/
@@ -16,14 +20,14 @@ class Hooks implements HooksInterface
     public function registerActions(): void
     {
         add_action('after_setup_theme', [ThemeInject::class, 'addThemeSupport']);
-        add_action('wp_head', [Google::class, 'addGTM'], 0);
         add_action('wp_head', [ThemeInject::class, 'injectThemeScript'], 0);
+        add_action('wp_head', [Enqueue::class, 'outputPreloadLinks'], 1);
         add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeJquery']);
-        add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeWPLibrary'], 20);
+        add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeWPLibrary'], 100);
         add_action('litespeed_purged_all', [LiteSpeed::class, 'clearObjectCacheAndTransient']);
         add_action('wp_enqueue_scripts', [Enqueue::class, 'enqueueAssets']);
+        add_action('template_redirect', [$this, 'oldPost410Redirect'], 0);
         add_action('template_redirect', [$this, 'redirectToHome'], 0);
-        add_action('template_redirect', [$this, 'oldPost410Redirect'], 1);
     }
 
     /*======================================================================
@@ -32,12 +36,12 @@ class Hooks implements HooksInterface
 
     public function registerFilters(): void
     {
-        add_filter('style_loader_tag', [Enqueue::class, 'filterStyleLoaderTag'], 10, 2);
         add_filter('posts_search', [$this, 'jobPostsSearchFilter'], 10, 2);
         add_filter('litespeed_optimize_js_excludes', [LiteSpeedFilters::class, 'lscJsExcludes'], 0);
         add_filter('litespeed_optimize_css_excludes', [LiteSpeedFilters::class, 'lscCssExcludes'], 0);
-        add_filter('option_active_plugins', [$this, 'disablePluginsForDev'], 0);
-        add_filter('option_active_plugins', [$this, 'disablePluginsforSimulatedProd'], 0);
+        add_filter('option_active_plugins', [$this, 'disablePluginsForDev'], -1);
+        add_filter('option_active_plugins', [$this, 'disablePluginsDuringSSG'], -1);
+        add_filter('option_active_plugins', [$this, 'disablePluginsforSimulatedProd'], -1);
     }
 
     /*======================================================================
@@ -57,19 +61,31 @@ class Hooks implements HooksInterface
     public function oldPost410Redirect(): void
     {
         if (is_404()) {
-            if (is_singular('lowongan')) {
+            if (is_singular('lowongan') || strpos($_SERVER['REQUEST_URI'] ?? '', '/lowongan/') !== false) {
                 // Check if the post exists in trash (deleted due to age)
                 global $wp_query;
                 $post_name = $wp_query->query_vars['name'] ?? '';
                 if ($post_name) {
                     $trashed_post = get_posts(\WPLokerBJM\QueryBuilders\JobQuery::getTrashedJobByNameArgs($post_name));
                     if (!empty($trashed_post)) {
-                        wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
+                        // Only send 410 to bots; redirect humans to home
+                        if ($this->botDetection->isBot()) {
+                            status_header(410);
+                            wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
+                        } else {
+                            wp_safe_redirect(home_url('/'), 302);
+                            exit;
+                        }
                     }
                 }
-                // If not in trash or no name, redirect to home (fallback)
-                wp_safe_redirect(home_url('/'), 302);
-                exit;
+                // If not in trash or no name, but URI has /lowongan/, assume removed, send 410 to bots
+                if ($this->botDetection->isBot()) {
+                    status_header(410);
+                    wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
+                } else {
+                    wp_safe_redirect(home_url('/'), 302);
+                    exit;
+                }
             } else {
                 // Other 404s redirect to home
                 wp_safe_redirect(home_url('/'), 302);
@@ -79,7 +95,7 @@ class Hooks implements HooksInterface
     }
 
     /**
-     * Redirect to home if accessing the lowongan post type archive or a 404 page.
+     * Redirect to home if accessing the lowongan post type archive.
      */
     public function redirectToHome(): void
     {
@@ -132,6 +148,22 @@ class Hooks implements HooksInterface
         }
 
         $pluginsToDisable = array_merge($this->listPluginsToDisable(), ['litespeed-cache/']);
+        return $this->filteredPlugins($plugins, $pluginsToDisable);
+    }
+
+    public function disablePluginsDuringSSG(array $plugins): array
+    {
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        $isSSGbot = $this->botDetection::isSsgBotGeneration();
+        
+        if (stripos($userAgent, $isSSGbot[0]) === false) {
+            return $plugins;
+        }
+
+        $pluginsToDisable = [
+            'litespeed-cache/',
+        ];
+
         return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
 

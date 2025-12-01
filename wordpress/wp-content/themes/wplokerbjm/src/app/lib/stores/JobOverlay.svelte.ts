@@ -84,10 +84,7 @@ export class JobOverlayManager {
 				const selector = `div[data-job-slug="${safeSlug}"]`
 				const cardElement = document.querySelector(selector) as HTMLElement | null
 
-				const headerOffset =
-					typeof headerStore !== "undefined" && headerStore.getTotalHeaderOffset
-						? headerStore.getTotalHeaderOffset()
-						: (document.querySelector("header")?.getBoundingClientRect().height ?? 0)
+				const headerOffset = headerStore.totalOffset || 0
 				const extra = Number(buffer) || 12
 
 				if (cardElement) {

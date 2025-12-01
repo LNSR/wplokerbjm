@@ -416,6 +416,7 @@
                 alt="Site logo"
                 width={logoWidth}
                 height={logoHeight}
+                fetchpriority="high"
                 class="h-12 w-auto mt-1 md:h-16 md:w-auto"
               />
             {/if}

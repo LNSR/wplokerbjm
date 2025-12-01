@@ -77,6 +77,9 @@ services:
             define('WP_ENVIRONMENT_TYPE', 'development');
             define('WP_DEVELOPMENT_MODE', 'all');
 
+            // Enable Query Monitor caps panel for debugging
+            define('QM_ENABLE_CAPS_PANEL', true);
+
             // Asset concatenation/compression
             define('COMPRESS_CSS', false);
             define('COMPRESS_SCRIPTS', false);

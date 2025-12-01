@@ -500,6 +500,19 @@
           </div>
         {/if}
 
+        {#if hasMore}
+          <div class="flex justify-center mt-8">
+            <button
+              type="button"
+              class="btn rounded-lg font-semibold bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] border border-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)]"
+              onclick={() => searchStore.loadMore()}
+              disabled={loading}
+            >
+              {loading ? 'Memuat...' : 'Muat Lebih Banyak'}
+            </button>
+          </div>
+        {/if}
+
         {#if loading}
           <div class="flex justify-center mt-8">
             <span class="sr-only">Memuat...</span>

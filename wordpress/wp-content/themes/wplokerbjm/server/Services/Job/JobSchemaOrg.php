@@ -2,10 +2,11 @@
 
 namespace WPLokerBJM\Services\Job;
 use WPLokerBJM\Factories\JobDataFactory;
-use WPLokerBJM\Core\TransientCache;
+use WPLokerBJM\Core\ObjectCache;
 
-class JobServices
+class JobSchemaOrg
 {
+    const SCHEMA_JOB_KEY_PREFIX = 'job_schema_';
 
     public function __construct(
         private JobDataFactory $jobDataFactory
@@ -19,6 +20,12 @@ class JobServices
      */
     public function renderJobPostingJsonLd(int $post_id): string
     {
+        $cacheKey = self::SCHEMA_JOB_KEY_PREFIX . $post_id;
+        $cached = ObjectCache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         $jobdata = $this->jobDataFactory->createJobData($post_id);
 
         $lokasi = $jobdata['lokasi_taxo'] ?? '';
@@ -150,6 +157,8 @@ class JobServices
         // Mark the script with data attributes so client-side code can target
         // this specific JobPosting JSON-LD (e.g. data-ld-id="jobposting-123").
         $jsonLd = '<script type="application/ld+json" data-ld-type="JobPosting" data-ld-id="jobposting-' . intval($post_id) . '">' . json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>';
+
+        ObjectCache::set($cacheKey, $jsonLd, 86400);
 
         return $jsonLd;
     }

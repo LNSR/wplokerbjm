@@ -2,8 +2,14 @@
 
 namespace WPLokerBJM\Services\REST;
 
+use WPLokerBJM\Core\ObjectCache;
+
 class RESTData
 {
+    public const CARD_CACHE_PREFIX = 'rest_card_';
+    public const OVERLAY_CACHE_PREFIX = 'rest_overlay_';
+    public const CACHE_TTL = 86400; // 1 day
+
     public function __construct(
         public \WPLokerBJM\Factories\JobDataFactory $jobDataFactory
     ) {
@@ -17,6 +23,12 @@ class RESTData
      */
     public function getCardData(int $post_id): array
     {
+        $cacheKey = self::CARD_CACHE_PREFIX . $post_id;
+        $cached = ObjectCache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         try {
             $jobdata = $this->jobDataFactory->createJobData($post_id);
 
@@ -44,6 +56,7 @@ class RESTData
                 'post_time' => get_post_time('c', false, $post_id),
             ];
 
+            ObjectCache::set($cacheKey, $data, self::CACHE_TTL);
             return $data;
         } catch (\Exception $e) {
             error_log('RESTData::getCardData error for post ' . $post_id . ': ' . $e->getMessage());
@@ -59,6 +72,12 @@ class RESTData
      */
     public function getSingleOverlayData(int $post_id): array
     {
+        $cacheKey = self::OVERLAY_CACHE_PREFIX . $post_id . (is_user_logged_in() ? '_logged_in' : '_public');
+        $cached = ObjectCache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         try {
             $jobdata = $this->jobDataFactory->createJobData($post_id);
 
@@ -98,6 +117,7 @@ class RESTData
                 $data['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
             }
 
+            ObjectCache::set($cacheKey, $data, self::CACHE_TTL);
             return $data;
         } catch (\Exception $e) {
             error_log('RESTData::getSingleOverlayData error for post ' . $post_id . ': ' . $e->getMessage());

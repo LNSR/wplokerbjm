@@ -11,7 +11,7 @@ class JobRepository
 {
     public function __construct(
         private \WPLokerBJM\Services\REST\RESTData $restData,
-        private \WPLokerBJM\Services\Job\JobServices $jobServices
+        private \WPLokerBJM\Services\Job\JobSchemaOrg $jobServices
     ) {
     }
 

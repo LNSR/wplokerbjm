@@ -2,13 +2,13 @@
 
 namespace WPLokerBJM\Presenters\Components;
 use WPLokerBJM\Repositories\JobRepository;
-use WPLokerBJM\Services\Job\JobServices;
+use WPLokerBJM\Services\Job\JobSchemaOrg;
 
 class JobGrid
 {
 
     public function __construct(
-        private JobServices $jobServices,
+        private JobSchemaOrg $jobServices,
         private JobRepository $jobRepository
     ) {
     }

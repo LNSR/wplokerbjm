@@ -28,7 +28,7 @@
   const deadlineInfo = $derived.by(() =>
     GeneralStore.useDeadline(jobdata?.deadline)
   );
-  const timeAgo = GeneralStore.useTimeAgo(jobdata?.post_time);
+  const timeAgo = $derived.by(() => GeneralStore.useTimeAgo(jobdata?.post_time));
 
   const selected = $derived.by(() => {
     try {
@@ -142,7 +142,7 @@
                     aria-hidden="true"
                   />
                 {/if}
-                <span>{@html row.value ?? ""}</span>
+                <span>{row.value ?? ""}</span>
               </span>
             {/if}
           {/each}

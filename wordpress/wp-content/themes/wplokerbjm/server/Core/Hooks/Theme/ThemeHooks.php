@@ -1,8 +1,5 @@
 <?php
 namespace WPLokerBJM\Core\Hooks\Theme;
-
-use WPLokerBJM\Services\REST\RESTData;
-
 class ThemeInject
 {
 
@@ -118,8 +115,9 @@ class ThemeInject
     {
         $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
         $isSSGBot = in_array($userAgent, \WPLokerBJM\Services\Utilities\SSG\BotDetection::isSsgBotGeneration(), true);
+        $disableTracking = $isSSGBot || !!is_user_logged_in();
 
-        $logoData = \WPLokerBJM\Core\Hooks\Theme\ThemeInject::getLogoData();
+        $logoData = ThemeInject::getLogoData();
         if (empty($logoData['sizes'])) {
             $logoData['sizes'] = '(max-width: 640px) 48px, (max-width: 1024px) 64px, 128px';
         }
@@ -135,7 +133,7 @@ class ThemeInject
             'logoWidth' => intval($logoData['width'] ?? 0),
             'logoHeight' => intval($logoData['height'] ?? 0),
             'lastJobUpdate' => $last_update_iso,
-            'disableTracking' => $isSSGBot,
+            'disableTracking' => $disableTracking,
         ];
         return $wpThemeData;
     }
@@ -253,9 +251,19 @@ class DebloatWPTheme
      */
     public static function removeWPLibrary(): void
     {
+        remove_action('wp_head', 'print_emoji_detection_script', 7); // must use 7
+        remove_action('wp_print_styles', 'print_emoji_styles');
+        remove_action('admin_print_scripts', 'print_emoji_detection_script');
+        remove_action('admin_print_styles', 'print_emoji_styles');
+        remove_filter('wp_mail', 'wp_staticize_emoji_for_email');
+        remove_filter('the_content_feed', 'wp_staticize_emoji');
+        remove_filter('comment_text_rss', 'wp_staticize_emoji');
+        add_filter('emoji_svg_url', '__return_false');
+
         wp_dequeue_style('wp-block-library');
         wp_dequeue_style('wp-block-library-theme');
         wp_dequeue_style('wc-block-style');
+        wp_dequeue_style('wp-emoji-styles');
         wp_dequeue_style('global-styles');
         wp_dequeue_style('global-styles-inline-css');
         wp_dequeue_style('classic-theme-styles');
@@ -265,5 +273,6 @@ class DebloatWPTheme
         wp_deregister_style('global-styles');
         wp_deregister_style('classic-theme-styles');
         wp_deregister_style('global-styles-inline-css');
+        wp_deregister_style('wp-emoji-styles');
     }
 }

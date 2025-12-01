@@ -6,9 +6,13 @@ use ReflectionClass;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
+use WPLokerBJM\Core\TransientCache;
 
 class AutowireScanner
 {
+    private const CACHE_KEY_PREFIX = 'autowire_scanner_';
+    private const CACHE_TTL = 86400; // 1 day
+
     private string $baseDirectory;
     private string $namespace;
 
@@ -19,10 +23,52 @@ class AutowireScanner
     }
 
     /**
+     * Get the cache key for the scanner results.
+     * Includes the CompiledContainer mtime to invalidate when container changes.
+     */
+    private function getCacheKey(): string
+    {
+        $compiledContainerPath = get_stylesheet_directory() . '/cache/CompiledContainer.php';
+        $mtime = file_exists($compiledContainerPath) ? filemtime($compiledContainerPath) : 0;
+        return self::CACHE_KEY_PREFIX . md5($this->baseDirectory . $this->namespace . $mtime);
+    }
+
+    /**
      * Scan directories recursively and return definitions for autowirable.
      * Skips interfaces, abstract classes, and static-only classes.
      */
     public function scanForAutowirableClasses(): array
+    {
+        $isProduction = defined('WP_ENV') && WP_ENV === 'production';
+        
+        if (!$isProduction) {
+            // Skip caching in development for immediate feedback
+            return $this->performAutowirableScan();
+        }
+
+        $cacheKey = $this->getCacheKey();
+
+        // Try transient cache (redirected to Redis via LiteSpeed Cache)
+        $cached = TransientCache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        // Perform the scan
+        $definitions = $this->performAutowirableScan();
+
+        // Cache the result
+        TransientCache::set($cacheKey, $definitions, self::CACHE_TTL);
+
+        return $definitions;
+    }
+
+    /**
+     * Perform the actual autowirable class scanning logic.
+     * 
+     * @return array Array of autowire definitions
+     */
+    private function performAutowirableScan(): array
     {
         $definitions = [];
         $phpFiles = $this->findPhpFiles();
@@ -40,39 +86,44 @@ class AutowireScanner
     }
 
     /**
-     * Scan directories recursively and return definitions for autowirable classes
-     * that implement a specific interface.
-     * 
-     * @param string $interface The fully qualified interface name
-     * @return array Array of autowire definitions for classes implementing the interface
-     */
-    public function scanForInterfaceImplementers(string $interface): array
-    {
-        $definitions = [];
-        $phpFiles = $this->findPhpFiles();
-
-        foreach ($phpFiles as $file) {
-            $className = $this->getClassNameFromFile($file);
-            
-            if ($className && $this->isAutowirable($className)) {
-                // Check if class implements the interface
-                if (is_subclass_of($className, $interface) || in_array($interface, class_implements($className))) {
-                    // Use autowiring for this class
-                    $definitions[$className] = \DI\autowire($className);
-                }
-            }
-        }
-
-        return $definitions;
-    }
-
-    /**
      * Get class names of autowirable classes that implement a specific interface.
      * 
      * @param string $interface The fully qualified interface name
      * @return string[] Array of fully qualified class names
      */
     public function getInterfaceImplementerClassNames(string $interface): array
+    {
+        $isProduction = defined('WP_ENV') && WP_ENV === 'production';
+        
+        if (!$isProduction) {
+            // Skip caching in development for immediate feedback
+            return $this->performInterfaceImplementerScan($interface);
+        }
+
+        $cacheKey = $this->getCacheKey() . '_interface_names_' . md5($interface);
+
+        // Try transient cache (redirected to Redis via LiteSpeed Cache)
+        $cached = TransientCache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        // Perform the scan
+        $implementers = $this->performInterfaceImplementerScan($interface);
+
+        // Cache the result
+        TransientCache::set($cacheKey, $implementers, self::CACHE_TTL);
+
+        return $implementers;
+    }
+
+    /**
+     * Perform the actual interface implementer scanning logic.
+     * 
+     * @param string $interface The fully qualified interface name
+     * @return string[] Array of fully qualified class names
+     */
+    private function performInterfaceImplementerScan(string $interface): array
     {
         $implementers = [];
         $phpFiles = $this->findPhpFiles();

@@ -69,7 +69,7 @@
         "request": "launch",
         "port": 9004,
         "pathMappings": {
-          "/var/www/html/wp-content/themes/wplokerbjm": "${workspaceFolder:wplokerbjm-svelte}"
+          "/var/www/html/": "${workspaceFolder:wplokerbjm}/wordpress/"
         }
       }
     ]

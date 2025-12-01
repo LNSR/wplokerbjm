@@ -64,7 +64,7 @@ class BotDetection
 
 		//! Exclude our own SSG bot from being treated as a bot
 		if (in_array($userAgent, self::isSsgBotGeneration(), true)) {
-			ObjectCache::set($cacheKey, false, 86400); // Cache for 1 day
+			ObjectCache::set($cacheKey, false, 3600); // Cache for 1 day
 			return false;
 		}
 
@@ -72,7 +72,7 @@ class BotDetection
 		// 1. Check if IP is in known bot ranges - IMMEDIATE BOT FLAG (most reliable)
 		if ($this->botRangeFetcher->isIpInBotRanges($remoteAddr)) {
 			error_log('[SSG BotDetection] BOT DETECTED BY IP: ' . $remoteAddr);
-			ObjectCache::set($cacheKey, true, 86400); // Cache for 1 day
+			ObjectCache::set($cacheKey, true, 3600); // Cache for 1 day
 			return true;
 		}
 
@@ -83,7 +83,7 @@ class BotDetection
 			// IMMEDIATE BOT FLAG for confirmed known bot PTR patterns
 			if ($this->dnsResolver->isKnownBotPtr($ptr)) {
 				error_log('[SSG BotDetection] BOT DETECTED BY PTR: ' . $remoteAddr . ' PTR: ' . $ptr);
-				ObjectCache::set($cacheKey, true, 86400); // Cache for 1 day
+				ObjectCache::set($cacheKey, true, 3600); // Cache for 1 day
 				return true;
 			}
 		}
@@ -96,11 +96,11 @@ class BotDetection
 				'accept_encoding' => $_SERVER['HTTP_ACCEPT_ENCODING'] ?? '',
 				'connection' => $_SERVER['HTTP_CONNECTION'] ?? ''
 			]));
-			ObjectCache::set($cacheKey, true, 86400); // Cache for 1 day
+			ObjectCache::set($cacheKey, true, 3600); // Cache for 1 day
 			return true;
 		}
 
-		ObjectCache::set($cacheKey, false, 86400); // Cache for 1 day
+		ObjectCache::set($cacheKey, false, 3600); // Cache for 1 day
 		return false;
 	}
 
@@ -259,7 +259,7 @@ class DnsResolver
 		// Get PTR record with timeout handling
 		$ptr = @gethostbyaddr($ip);
 		if (empty($ptr) || $ptr === $ip) {
-			ObjectCache::set($cacheKey, 'null', 86400); // Cache null result for 1 day
+			ObjectCache::set($cacheKey, 'null', 3600); // Cache null result for 1 day
 			return null;
 		}
 
@@ -267,22 +267,22 @@ class DnsResolver
 		// Use @ to suppress warnings for timeout/failure cases
 		$records = @dns_get_record($ptr, DNS_A + DNS_AAAA);
 		if (empty($records) || !is_array($records)) {
-			ObjectCache::set($cacheKey, 'null', 86400); // Cache null result for 1 day
+			ObjectCache::set($cacheKey, 'null', 3600); // Cache null result for 1 day
 			return null;
 		}
 
 		foreach ($records as $r) {
 			if (!empty($r['ip']) && $r['ip'] === $ip) {
-				ObjectCache::set($cacheKey, $ptr, 86400); // Cache successful result for 1 day
+				ObjectCache::set($cacheKey, $ptr, 3600); // Cache successful result for 1 day
 				return $ptr;
 			}
 			if (!empty($r['ipv6']) && $r['ipv6'] === $ip) {
-				ObjectCache::set($cacheKey, $ptr, 86400); // Cache successful result for 1 day
+				ObjectCache::set($cacheKey, $ptr, 3600); // Cache successful result for 1 day
 				return $ptr;
 			}
 		}
 
-		ObjectCache::set($cacheKey, 'null', 86400); // Cache null result for 1 day
+		ObjectCache::set($cacheKey, 'null', 3600); // Cache null result for 1 day
 		return null;
 	}
 
@@ -585,12 +585,12 @@ class DnsResolver
 		$providerPatterns = $this->getProviderPtrPatterns();
 		foreach ($providerPatterns as $provider => $patterns) {
 			if ($this->ptrMatchesProvider($ptr, $patterns)) {
-				ObjectCache::set($cacheKey, true, 86400); // Cache for 24 hours
+				ObjectCache::set($cacheKey, true, 3600); // Cache for 24 hours
 				return true;
 			}
 		}
 
-		ObjectCache::set($cacheKey, false, 86400); // Cache for 24 hours
+		ObjectCache::set($cacheKey, false, 3600); // Cache for 24 hours
 		return false;
 	}
 
@@ -615,11 +615,11 @@ class DnsResolver
 
 		$ptr = $this->forwardConfirmedReverseDns($ip);
 		if ($this->isKnownBotPtr($ptr)) {
-			ObjectCache::set($cacheKey, true, 86400);
+			ObjectCache::set($cacheKey, true, 3600);
 			return true;
 		}
 
-		ObjectCache::set($cacheKey, false, 86400);
+		ObjectCache::set($cacheKey, false, 3600);
 		return false;
 	}
 }
@@ -661,7 +661,7 @@ class BotRangeFetcher
 		$ranges = array_filter($ranges, [$this, 'isValidCidr']);
 
 		// Cache the results (shorter cache time if using fallbacks)
-		$cacheTime = count($ranges) > 100 ? 86400 : 3600; // 1 day vs 1 hour
+		$cacheTime = count($ranges) > 100 ? 3600 : 3600; // 1 day vs 1 hour
 		ObjectCache::set($cacheKey, $ranges, expiration: $cacheTime);
 
 		self::$knownBotRanges = $ranges;
@@ -690,7 +690,7 @@ class BotRangeFetcher
 		$patterns = array_unique($patterns);
 
 		// Cache for 1 day by default
-		ObjectCache::set($cacheKey, $patterns, 86400);
+		ObjectCache::set($cacheKey, $patterns, 3600);
 		return $patterns;
 	}
 
@@ -711,7 +711,7 @@ class BotRangeFetcher
 						if (isset($entry['pattern']) && !empty($entry['pattern'])) {
 							$raw = $entry['pattern'];
 							// Normalize pattern into regex; wrap in non-capturing group, case-insensitive.
-							$escaped = str_replace('/', '\/', $raw);
+							$escaped = preg_quote($raw, '/');
 							$patterns[] = '/(?:' . $escaped . ')/i';
 						}
 						// Instances are full UA strings - turn into exact word regex
@@ -771,7 +771,7 @@ class BotRangeFetcher
 		$ranges = $this->getBotRanges();
 		$ipLong = ip2long($ip);
 		if ($ipLong === false) {
-			ObjectCache::set($cacheKey, false, 86400); // Cache for 24 hours
+			ObjectCache::set($cacheKey, false, 3600); // Cache for 24 hours
 			return false;
 		}
 
@@ -790,12 +790,12 @@ class BotRangeFetcher
 			}
 			$maskLong = ~((1 << (32 - $mask)) - 1);
 			if (($ipLong & $maskLong) === ($subnetLong & $maskLong)) {
-				ObjectCache::set($cacheKey, true, 86400); // Cache for 24 hours
+				ObjectCache::set($cacheKey, true, 3600); // Cache for 24 hours
 				return true;
 			}
 		}
 
-		ObjectCache::set($cacheKey, false, 86400); // Cache for 24 hours
+		ObjectCache::set($cacheKey, false, 3600); // Cache for 24 hours
 		return false;
 	}
 

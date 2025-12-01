@@ -139,6 +139,9 @@ export async function navigateTo(path: string, searchState?: SearchState) {
     routeStateStore.saveSearchState(window.location.pathname, searchState);
   }
 
+  // Destroy AdSense ads before route change for clean navigation
+  GoogleServices.adSenseDestroy();
+
   // Set loading state
   routeStore.setIsLoading(true, routeStore.getComponentNamePath(path));
 

@@ -9,7 +9,7 @@ use WPLokerBJM\QueryBuilders\JobQuery;
  */
 class PostsManagement
 {
-    public function deleteOldJobs(): void
+    public static function deleteOldJobs(): void
     {
         try {
             // Fetch jobs older than 1 month but exclude ones with future deadline via JobQuery::oldJobsArgs
@@ -51,6 +51,16 @@ class PostsManagement
                 }
 
                 try {
+                    // Notify search engines to remove the URL from index
+                    if (class_exists('RM_GIAPI')) {
+                        $rm_giapi = new \RM_GIAPI();
+                        $rm_giapi->send_to_api([get_permalink($post_id)], 'delete', false);
+                    }
+                } catch (\Exception $e) {
+                    error_log('PostsManagement::deleteOldJobs error notifying API for post ' . $post_id . ': ' . $e->getMessage());
+                }
+
+                try {
                     wp_delete_post($post_id, false);
                 } catch (\Exception $e) {
                     error_log('PostsManagement::deleteOldJobs error deleting post ' . $post_id . ': ' . $e->getMessage());
@@ -68,7 +78,7 @@ class PostsManagement
      * - Leave unchanged otherwise
      * @return void
      */
-    public function updateAllJobStatuses(): void
+    public static function updateAllJobStatuses(): void
     {
         try {
             $job_items = get_posts(JobQuery::allJobsIdsArgs());

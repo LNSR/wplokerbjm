@@ -152,7 +152,7 @@ export class SearchManager {
         }
     }
 
-    public async loadMore(): Promise<LoadMoreResponse> {
+    public async loadMore(retries = 2): Promise<LoadMoreResponse> {
         if (this.loading || this.page >= this.maxNumPages) {
             throw new Error('Cannot load more: already loading or no more pages')
         }
@@ -183,6 +183,14 @@ export class SearchManager {
         } catch (err) {
             console.error('SearchStore: Load more failed:', err);
             this.error = err instanceof Error ? err.message : 'Load more failed'
+            
+            // Retry logic
+            if (retries > 0) {
+                console.log(`Retrying loadMore, attempts left: ${retries}`)
+                await new Promise(resolve => setTimeout(resolve, 1000))  // Simple delay
+                return this.loadMore(retries - 1)
+            }
+            
             throw err
         } finally {
             this.loading = false

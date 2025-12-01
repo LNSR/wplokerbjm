@@ -3,9 +3,12 @@
 namespace WPLokerBJM\Factories;
 
 use WPLokerBJM\Contracts\DataProviderInterface;
+use WPLokerBJM\Core\ObjectCache;
 
 class JobDataFactory
 {
+    const FACTORY_JOB_PREFIX = 'job_data_';
+
     public function __construct(
         private DataProviderInterface $customFieldsProvider,
         private DataProviderInterface $taxonomiesProvider,
@@ -24,38 +27,43 @@ class JobDataFactory
      */
     public function createJobData(int $post_id): array
     {
+        $cacheKey = self::FACTORY_JOB_PREFIX . $post_id;
+        $cachedData = ObjectCache::get($cacheKey);
+        if ($cachedData !== false) {
+            return $cachedData;
+        }
+
         try {
             $customFields = $this->customFieldsProvider?->getMetaBoxData($post_id) ?? [];
             $taxonomies = $this->taxonomiesProvider?->getMetaBoxData($post_id) ?? [];
 
-            $processedCustomFields = CustomFieldsFactory::processCustomFields($customFields);
+            $processedCustomFields = $this->processCustomFields($customFields);
 
             $processedTaxonomies = [];
             foreach ($taxonomies as $key => $terms) {
-                $processedTerms = TaxonomyFactory::processTaxonomyTerms($terms);
+                $processedTerms = $this->processTaxonomyTerms($terms);
                 $processedTaxonomies[$key] = is_array($processedTerms) ? implode(', ', $processedTerms) : 'N/A';
             }
 
             // Combine meta and taxonomy data
             $combinedData = array_merge($processedCustomFields, $processedTaxonomies);
 
+            ObjectCache::set($cacheKey, $combinedData, 86400); // Cache for 1 day
+
             return $combinedData;
         } catch (\Exception $e) {
-            error_log('JobDataFactory::buatDataPekerjaan error for post ' . $post_id . ': ' . $e->getMessage());
+            error_log('JobDataFactory::createJobData error for post ' . $post_id . ': ' . $e->getMessage());
             return []; // Return empty array on error
         }
     }
-}
 
-class CustomFieldsFactory
-{
     /**
      * Process custom fields data.
      *
      * @param array $customFields Raw custom fields data.
      * @return array Processed custom fields data.
      */
-    static public function processCustomFields(array $customFields): array
+    public function processCustomFields(array $customFields): array
     {
         try {
             // Process WYSIWYG fields
@@ -161,18 +169,13 @@ class CustomFieldsFactory
             return $customFields;
         }
     }
-}
-
-class TaxonomyFactory
-{
-
     /**
      * Process taxonomy terms.
      *
      * @param array $terms Raw taxonomy terms (array of term objects/arrays/strings).
      * @return array Processed taxonomy term names.
      */
-    public static function processTaxonomyTerms(array $terms): array
+    public function processTaxonomyTerms(array $terms): array
     {
         if (empty($terms)) {
             return [];

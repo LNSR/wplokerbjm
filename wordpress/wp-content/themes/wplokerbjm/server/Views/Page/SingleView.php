@@ -6,7 +6,7 @@ class SingleView
 {
 	
 	public function __construct(
-		private \WPLokerBJM\Services\Job\JobServices $jobServices,
+		private \WPLokerBJM\Services\Job\JobSchemaOrg $jobServices,
 		private \WPLokerBJM\Services\REST\RESTData $restData,
 	) {
 	}

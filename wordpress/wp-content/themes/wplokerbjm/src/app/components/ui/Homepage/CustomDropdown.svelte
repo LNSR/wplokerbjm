@@ -253,7 +253,7 @@
   // DOM ref
   let dropdownRef: HTMLElement | null = null;
   let listboxEl = $state<HTMLElement | null>(null);
-  const listboxId = String(id ?? "custom-dropdown") + "-listbox";
+  let listboxId = $derived(String(id ?? "custom-dropdown") + "-listbox");
 
   const currentOptions = $derived.by(() =>
     stack.length > 0 ? stack[stack.length - 1] : (options ?? [])

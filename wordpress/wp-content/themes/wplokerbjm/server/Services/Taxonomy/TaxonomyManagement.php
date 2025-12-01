@@ -9,7 +9,7 @@ class TaxonomyManagement
      * Delete unused terms from all taxonomies.
      * A term is considered unused if it hasn't been associated with any posts for over 3 months.
      */
-    public function deleteUnusedTerms()
+    public static function deleteUnusedTerms()
     {
         $taxonomies = get_taxonomies([], 'names');
         foreach ($taxonomies as $taxonomy) {

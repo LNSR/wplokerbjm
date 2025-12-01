@@ -53,22 +53,23 @@ export default defineConfig(({ command }) => ({
         main: "src/main.ts",
       },
       output: {
+        minify: true,
         inlineDynamicImports: false,
         format: "esm",
-        entryFileNames: "js/[name]-[hash].js",
-        chunkFileNames: "js/[name]-[hash].js",
+        entryFileNames: "js/[name]-[hash:32].js",
+        chunkFileNames: "js/[name]-[hash:32].js",
         assetFileNames: (assetInfo): string => {
           const assetName =
             assetInfo.names && assetInfo.names.length > 0
               ? assetInfo.names[0]
               : "";
           if (assetName.endsWith(".css")) {
-            return "css/[name]-[hash][extname]";
+            return "css/[name]-[hash:32][extname]";
           }
           if (assetName && /\.(woff2?|ttf|otf|eot)$/.test(assetName)) {
-            return "webfonts/[name]-[hash][extname]";
+            return "webfonts/[name]-[hash:32][extname]";
           }
-          return "assets/[name]-[hash][extname]";
+          return "assets/[name]-[hash:32][extname]";
         },
       }
     },

@@ -4,15 +4,14 @@
   import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
   import { APIService } from "@/services/APIService";
   import { type SingleOverlayResponse as SingleJob } from "@/types";
-  import { headerStore } from "$lib/stores/HeaderStore.svelte";
 
   let { job: initialJob, slug: passedSlug } = $props<{
     job?: SingleJob;
     slug?: string;
   }>();
 
-  let job = $state<SingleJob | null>(initialJob || null);
-  let isLoading = $state(!initialJob); // Show skeleton if no initial job data
+  let job = $state<SingleJob | null>(null);
+  let isLoading = $state(true);
   let currentRequestId = $state(0);
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let abortController: AbortController | null = null;
@@ -62,7 +61,10 @@
   }
 
   onMount(() => {
-    if (!job) {
+    if (initialJob) {
+      job = initialJob;
+      isLoading = false;
+    } else {
       // Fallback to API
       const slug =
         passedSlug || window.location.pathname.split("/").filter(Boolean).pop();
@@ -72,8 +74,6 @@
       } else {
         isLoading = false;
       }
-    } else {
-      isLoading = false;
     }
 
     return () => {
@@ -96,17 +96,11 @@
 </script>
 
 {#if isLoading}
-  <main
-    class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8"
-    style:padding-top={headerStore.totalOffset + "px"}
-  >
+  <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8">
     <SkeletonSingleLowongan />
   </main>
 {:else if job}
-  <main
-    class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12"
-    style:padding-top={headerStore.totalOffset + "px"}
-  >
+  <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12">
     <JobDetail {job} />
   </main>
 {/if}

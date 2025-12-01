@@ -3,13 +3,22 @@
   import { debounce } from "@/utils/debounce";
   import { tick } from "svelte";
   import { nonceStore } from "$lib/stores/Nonce.svelte";
+  import { GoogleServices } from "$lib/utils/Google.svelte";
+
+  interface AdsenseProps {
+    clientId?: string;
+    adSlot?: string;
+    test?: boolean;
+    className?: string;
+    disable?: boolean;
+  }
 
   export class AdsenseHandler {
     clientId: string;
     adSlot: string;
     test: boolean;
     className: string;
-    disable = true;
+    disable = false;
     container = $state<HTMLDivElement | null>(null);
     adLoaded = $state(false);
     adFailed = $state(false);
@@ -23,19 +32,12 @@
     _debouncedRefresh: any = null;
     _lastRefreshTime: number = 0;
 
-    constructor(props: {
-      clientId?: string;
-      adSlot?: string;
-      test?: boolean;
-      className?: string;
-      disable?: boolean;
-    }) {
+    constructor(props: AdsenseProps) {
       this.clientId = props.clientId ?? "ca-pub-3206452872913415";
       this.adSlot = props.adSlot ?? "";
       this.test = props.test ?? isDevelopmentMode();
       this.className = props.className ?? "";
-      // Support both `disable` and `disabled` incoming properties (alias)
-      this.disable = props.disable ?? (props as any).disabled ?? false;
+      this.disable = props.disable ?? false;
 
       // If disable is true, mark destroyed so the UI (template) won't render
       if (this.disable) {
@@ -210,7 +212,7 @@
      * Immediate refresh implementation (non-debounced).
      * Separated so we can expose a debounced public `refresh()`.
      */
-    refreshImmediate() {
+    async refreshImmediate() {
       try {
         if (this.disable) return;
         // Avoid refreshing while the page is not visible (background tabs)
@@ -251,19 +253,14 @@
         }
 
         // If the AdSense script is present, push immediately. Otherwise init() will load script.
-        const scriptSelector =
-          'script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]';
-        const existing = document.querySelector(
-          scriptSelector
-        ) as HTMLScriptElement | null;
-        if (existing) {
+        try {
+          await GoogleServices.injectAdSenseScript();
           // Slight delay to allow DOM updates from Svelte before inserting
           tick().then(() =>
-            setTimeout(() => this.ensureContainerHasSizeAndPush(), 50)
+            setTimeout(() => this.ensureContainerHasSizeAndPush(), 300)
           );
-        } else {
-          // fallback to init which will append the script then push
-          this.init();
+        } catch (e) {
+          console.warn("Failed to inject AdSense script in refresh", e);
         }
       } catch (e) {
         console.warn("Failed to refresh AdSense slot", e);
@@ -313,7 +310,7 @@
       }
     }
 
-    init() {
+    async init() {
       if (this.disable) return;
       if (typeof window === "undefined") return;
       if (!this.clientId || !this.adSlot) return;
@@ -321,54 +318,17 @@
       // Don't load ads if user is logged in(has a nonce)
       if (nonceStore.getNonce()) return;
 
-      const scriptSelector =
-        'script[src*="pagead2.googlesyndication.com/pagead/js/adsbygoogle.js"]';
-
       const loadAd = () =>
         tick().then(() =>
           setTimeout(() => this.ensureContainerHasSizeAndPush(), 300)
         );
 
-      // Helper to find an existing AdSense script element
-      const findExistingScript = () =>
-        document.querySelector(scriptSelector) as HTMLScriptElement | null;
-
-      // If already present, just refresh the slot in-place.
-      let existing = findExistingScript();
-      if (existing) {
-        this.refresh();
-        return;
+      try {
+        await GoogleServices.injectAdSenseScript();
+        loadAd();
+      } catch (e) {
+        console.warn("Failed to inject AdSense script", e);
       }
-
-      // Short grace period to handle race where Site Kit (or another plugin)
-      // injects the AdSense script a few moments after our component runs.
-      // We poll the head for up to `graceMs` before deciding to append our own
-      // script. This avoids duplicate script tags and timing oddities.
-      const graceMs = 500;
-      const pollInterval = 100;
-      let waited = 0;
-
-      const pollForScript = () => {
-        existing = findExistingScript();
-        if (existing) {
-          this.refresh();
-          return;
-        }
-        waited += pollInterval;
-        if (waited >= graceMs) {
-          // still not present — inject our script
-          const s = document.createElement("script");
-          s.async = true;
-          s.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${this.clientId}`;
-          s.crossOrigin = "anonymous";
-          s.onload = loadAd;
-          document.head.appendChild(s);
-          return;
-        }
-        setTimeout(pollForScript, pollInterval);
-      };
-
-      pollForScript();
     }
 
     destroy() {
@@ -414,15 +374,14 @@
   import { onMount, onDestroy } from "svelte";
   import { slide } from "svelte/transition";
 
-  const props = $props();
-  // Temporary default: disable ads on this domain unless caller explicitly passes disable
-  const finalProps = { ...props, disable: (props as any).disable ?? true };
+  const props: AdsenseProps = $props();
+  const finalProps = { ...props, disable: props.disable ?? false };
   let handler = new AdsenseHandler(finalProps);
   let _refreshListener: (() => void) | null = null;
   let _destroyListener: (() => void) | null = null;
 
-  onMount(() => {
-    handler.init();
+  onMount(async () => {
+    await handler.init();
     // Register optional global refresh hook used by SPA routing logic.
     _refreshListener = () => handler.refresh();
     window.addEventListener("adsense:refresh", _refreshListener);

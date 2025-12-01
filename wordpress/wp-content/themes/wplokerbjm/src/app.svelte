@@ -62,6 +62,9 @@
       // Ensure we only attempt removal once on popstate as well.
       removeJobPostingJsonLd(undefined, "popstate");
 
+      // Destroy AdSense ads before route change for clean navigation
+      GoogleServices.adSenseDestroy();
+
       // Fetch RankMath head data
       await SEOService.fetchHeadData(newPath);
       // GTAG / GTM page view for back/forward SPA navigation after head update
@@ -88,6 +91,7 @@
   import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
   import SkeletonPasangIklanLoker from "@components/ui/Skeletons/SkeletonPasangIklanLoker.svelte";
   import Header from "@components/layouts/Header.svelte";
+  import { headerStore } from "$lib/stores/HeaderStore.svelte";
 
   let props = $props();
 
@@ -118,7 +122,9 @@
 
   onMount(() => {
     routeStore.setCurrentPath(window.location.pathname);
-    GoogleServices.sendPageView(); // Send initial pageview on mount
+    GoogleServices.injectGTMScript().then(() => {
+      GoogleServices.sendPageView(); // Send initial pageview after GTM loads
+    });
 
     // Listen to browser back/forward
     if (typeof window !== "undefined") {
@@ -138,6 +144,7 @@
     {#if isLoading && loadingComponent === "Homepage"}
       <div
         class="page-transition fade-in"
+        style:padding-top="{headerStore.totalOffset}px"
         in:fade={{ duration: 200 }}
         out:fade={{ duration: 150 }}
       >
@@ -146,6 +153,7 @@
     {:else if isLoading && loadingComponent === "PasangIklanLoker"}
       <div
         class="page-transition fade-in"
+        style:padding-top="{headerStore.totalOffset}px"
         in:fade={{ duration: 200 }}
         out:fade={{ duration: 150 }}
       >
@@ -154,6 +162,7 @@
     {:else if isLoading && loadingComponent === "SingleLowongan"}
       <div
         class="page-transition fade-in"
+        style:padding-top="{headerStore.totalOffset}px"
         in:fade={{ duration: 200 }}
         out:fade={{ duration: 150 }}
       >
@@ -162,6 +171,7 @@
     {:else if CurrentComponent}
       <div
         class="page-transition fade-in"
+        style:padding-top="{headerStore.totalOffset}px"
         in:fade={{ duration: 250 }}
         out:fade={{ duration: 200 }}
       >

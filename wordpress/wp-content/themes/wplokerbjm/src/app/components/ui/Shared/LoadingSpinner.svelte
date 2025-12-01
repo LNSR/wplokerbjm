@@ -4,8 +4,9 @@
     size?: "sm" | "md" | "lg" | string;
   }>();
 
-  const sizeClass =
-    size === "sm" ? "h-5 w-5" : size === "lg" ? "h-12 w-12" : "h-8 w-8";
+  let sizeClass = $derived(
+    size === "sm" ? "h-5 w-5" : size === "lg" ? "h-12 w-12" : "h-8 w-8"
+  );
 </script>
 
 <span class="sr-only">{srLabel}</span>

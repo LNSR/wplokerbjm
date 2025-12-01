@@ -10,6 +10,10 @@ on:
         description: "Perform a dry-run instead of a real deploy"
         required: false
         default: "false"
+  workflow_run:
+    workflows: ["Build & Deploy Theme via Rclone"]
+    types:
+      - completed
 
 env:
   THEME_DIR: wordpress/wp-content/themes/wplokerbjm

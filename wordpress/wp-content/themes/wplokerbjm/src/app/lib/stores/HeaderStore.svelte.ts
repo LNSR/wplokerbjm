@@ -78,21 +78,6 @@ export class HeaderStore {
         return { previousMainPadding: prevPadding };
     }
 
-    private getSiteHeaderTop(): number {
-        if (typeof document === 'undefined') return 0;
-        const v = getComputedStyle(document.documentElement).getPropertyValue('--site-header-top') || '0';
-        return Math.max(0, parseFloat(v) || 0);
-    }
-
-    private getSiteHeaderHeight(): number {
-        if (typeof document === 'undefined') return 0;
-        const v = getComputedStyle(document.documentElement).getPropertyValue('--site-header-height') || '0';
-        return Math.max(0, parseFloat(v) || 0);
-    }
-
-    getTotalHeaderOffset(): number {
-        return this.getSiteHeaderTop() + this.getSiteHeaderHeight();
-    }
 }
 
 export const headerStore = new HeaderStore();
