@@ -35,13 +35,14 @@ class Enqueue
             }
 
             $urls = Vite::getPreloadUrls($_SERVER['REQUEST_URI'] ?? '/');
-            foreach ($urls as $url) {
+            foreach ($urls as $url):
                 if (str_ends_with($url, '.js')) {
                     echo '<link rel="modulepreload" as="script" crossorigin href="' . esc_url($url) . '">' . "\n";
                 } elseif (str_ends_with($url, '.css')) {
                     echo '<link rel="preload" as="style" crossorigin href="' . esc_url($url) . '">' . "\n";
+                    echo '<link rel="stylesheet" crossorigin href="' . esc_url($url) . '">' . "\n";
                 }
-            }
+            endforeach;
         } catch (\Exception $e) {
             error_log('Enqueue::outputPreloadLinks error: ' . $e->getMessage());
             return;
@@ -152,14 +153,22 @@ class Vite
             $vite_handle,
             "{$vite_base_url}/" . self::viteEntry(),
             [],
-            null
+            null,
+            [
+                'in_footer' => false,
+                'fetchpriority' => 'high',
+            ]
         );
 
         wp_enqueue_script_module(
             $client_handle,
             "{$vite_base_url}/@vite/client",
             [],
-            null
+            null,
+            [
+                'in_footer' => false,
+                'fetchpriority' => 'high',
+            ]
         );
 
         return [];
@@ -189,7 +198,11 @@ class Vite
             $svelte_handle,
             $dist_uri . '/' . $main_js,
             [],
-            null
+            null,
+            [
+                'in_footer' => false,
+                'fetchpriority' => 'high',
+            ]
         );
         return [];
     }

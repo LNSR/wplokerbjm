@@ -2,9 +2,7 @@
 
 namespace WPLokerBJM\Repositories;
 
-use WPLokerBJM\Contracts\DataProviderInterface;
-
-class TaxonomyRepository implements DataProviderInterface
+class TaxonomyRepository
 {
 	/**
 	 * Get job taxonomies
@@ -12,7 +10,7 @@ class TaxonomyRepository implements DataProviderInterface
 	 * @param int $post_id Post ID
 	 * @return array The data representing the taxonomy data
 	 */
-	public function getMetaBoxData(int $post_id): array
+	public function getMetaBoxTaxonomies(int $post_id): array
 	{
 		$map = [
 			'perusahaan_taxo' => 'perusahaan',

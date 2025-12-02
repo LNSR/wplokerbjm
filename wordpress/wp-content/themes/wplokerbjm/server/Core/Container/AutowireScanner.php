@@ -24,13 +24,41 @@ class AutowireScanner
 
     /**
      * Get the cache key for the scanner results.
-     * Includes the CompiledContainer mtime to invalidate when container changes.
+     * Includes the CompiledContainer mtime and directory hash to invalidate when container or files change.
      */
     private function getCacheKey(): string
     {
         $compiledContainerPath = get_stylesheet_directory() . '/cache/CompiledContainer.php';
         $mtime = file_exists($compiledContainerPath) ? filemtime($compiledContainerPath) : 0;
-        return self::CACHE_KEY_PREFIX . md5($this->baseDirectory . $this->namespace . $mtime);
+        return self::CACHE_KEY_PREFIX . md5($this->baseDirectory . $this->namespace . $this->getDirectoryHash() . $mtime);
+    }
+
+    /**
+     * Get a hash of the modification times of all PHP files in the scanned directory.
+     * Used for cache invalidation when files change.
+     */
+    private function getDirectoryHash(): string
+    {
+        $hash = '';
+        try {
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($this->baseDirectory, RecursiveDirectoryIterator::SKIP_DOTS)
+            );
+            $excludedDirectories = $this->getExcludedDirectories();
+            foreach ($iterator as $file) {
+                if ($file->isFile() && $file->getExtension() === 'php') {
+                    $filePath = $file->getPathname();
+                    if (!$this->isFileInExcludedDirectory($filePath, $excludedDirectories)) {
+                        $hash .= $file->getMTime();
+                    }
+                }
+            }
+        } catch (\Exception $e) {
+            // If directory scanning fails, return empty hash to avoid caching issues
+            error_log('AutowireScanner::getDirectoryHash error: ' . $e->getMessage());
+            return '';
+        }
+        return md5($hash);
     }
 
     /**
@@ -48,7 +76,15 @@ class AutowireScanner
 
         $cacheKey = $this->getCacheKey();
 
-        // Try transient cache (redirected to Redis via LiteSpeed Cache)
+        // Try APCu first (primary cache for performance)
+        if (function_exists('apcu_enabled') && apcu_enabled()) {
+            $cached = apcu_fetch($cacheKey);
+            if ($cached !== false) {
+                return $cached;
+            }
+        }
+
+        // Fallback to transient cache (redirected to Redis via LiteSpeed Cache)
         $cached = TransientCache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -57,8 +93,12 @@ class AutowireScanner
         // Perform the scan
         $definitions = $this->performAutowirableScan();
 
-        // Cache the result
-        TransientCache::set($cacheKey, $definitions, self::CACHE_TTL);
+        // Cache the result - APCu first, then fallback to Redis
+        if (function_exists('apcu_enabled') && apcu_enabled()) {
+            apcu_store($cacheKey, $definitions, self::CACHE_TTL);
+        } else {
+            TransientCache::set($cacheKey, $definitions, self::CACHE_TTL);
+        }
 
         return $definitions;
     }
@@ -78,7 +118,7 @@ class AutowireScanner
             
             if ($className && $this->isAutowirable($className)) {
                 // Use autowiring for this class
-                $definitions[$className] = \DI\autowire($className);
+                $definitions[$className] = \DI\autowire($className)->lazy();
             }
         }
 
@@ -102,7 +142,15 @@ class AutowireScanner
 
         $cacheKey = $this->getCacheKey() . '_interface_names_' . md5($interface);
 
-        // Try transient cache (redirected to Redis via LiteSpeed Cache)
+        // Try APCu first (primary cache for performance)
+        if (function_exists('apcu_enabled') && apcu_enabled()) {
+            $cached = apcu_fetch($cacheKey);
+            if ($cached !== false) {
+                return $cached;
+            }
+        }
+
+        // Fallback to transient cache (redirected to Redis via LiteSpeed Cache)
         $cached = TransientCache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -111,8 +159,12 @@ class AutowireScanner
         // Perform the scan
         $implementers = $this->performInterfaceImplementerScan($interface);
 
-        // Cache the result
-        TransientCache::set($cacheKey, $implementers, self::CACHE_TTL);
+        // Cache the result - APCu first, then fallback to Redis
+        if (function_exists('apcu_enabled') && apcu_enabled()) {
+            apcu_store($cacheKey, $implementers, self::CACHE_TTL);
+        } else {
+            TransientCache::set($cacheKey, $implementers, self::CACHE_TTL);
+        }
 
         return $implementers;
     }
@@ -206,7 +258,7 @@ class AutowireScanner
     /**
      * Extract the fully qualified class name from a PHP file.
      * 
-     * This method reads the file content and uses regex to extract the namespace
+     * This method reads the file content and uses token parsing to extract the namespace
      * and class name, then combines them into a fully qualified class name.
      * 
      * @param string $filePath The absolute path to the PHP file
@@ -214,21 +266,37 @@ class AutowireScanner
      */
     private function getClassNameFromFile(string $filePath): ?string
     {
-        $fileContent = file_get_contents($filePath);
+        $tokens = token_get_all(file_get_contents($filePath));
         
-        if ($fileContent === false) {
+        if ($tokens === false) {
             return null; // File could not be read
         }
 
-        // Extract namespace using named capture group for clarity
-        $namespacePattern = '/namespace\s+(?<namespace>[^;]+);/';
-        preg_match($namespacePattern, $fileContent, $namespaceMatches);
-        $namespace = $namespaceMatches['namespace'] ?? '';
+        $namespace = '';
+        $className = '';
+        $inNamespace = false;
+        $inClass = false;
 
-        // Extract class name (supports abstract classes which we'll filter later)
-        $classPattern = '/(?:abstract\s+)?class\s+(?<className>[A-Z_\x7f-\xff][a-zA-Z0-9_\x7f-\xff]*)/';
-        preg_match($classPattern, $fileContent, $classMatches);
-        $className = $classMatches['className'] ?? '';
+        foreach ($tokens as $token) {
+            if (is_array($token)) {
+                $tokenType = $token[0];
+                $tokenValue = $token[1];
+
+                if ($tokenType === T_NAMESPACE) {
+                    $inNamespace = true;
+                    $namespace = '';
+                } elseif ($inNamespace && $tokenType === T_NAME_QUALIFIED) {
+                    $namespace = $tokenValue;
+                } elseif ($tokenType === T_CLASS) {
+                    $inClass = true;
+                } elseif ($inClass && $tokenType === T_STRING) {
+                    $className = $tokenValue;
+                    break;
+                }
+            } elseif ($token === ';') {
+                $inNamespace = false;
+            }
+        }
 
         // Validate that both namespace and class name were found
         if (empty($className) || empty($namespace)) {
@@ -244,7 +312,7 @@ class AutowireScanner
      * Performs multiple validation checks to determine if a class can be autowired:
      * - Class must exist
      * - Must not be the scanner itself (circular dependency)
-     * - Must be a concrete class (not interface, abstract, or trait)
+     * - Must be a concrete class (not interface, abstract, trait, or final)
      * - Must not be static-only
      * - Must have a public constructor (or no constructor)
      * 
@@ -307,6 +375,9 @@ class AutowireScanner
     /**
      * Check if the reflection represents a concrete class.
      * 
+     * A concrete class is one that can be instantiated and proxied.
+     * Excludes interfaces, abstract classes, traits, and final classes.
+     * 
      * @param ReflectionClass $reflection The class reflection
      * @return bool True if it's a concrete class
      */
@@ -314,7 +385,8 @@ class AutowireScanner
     {
         return !$reflection->isInterface() 
             && !$reflection->isAbstract() 
-            && !$reflection->isTrait();
+            && !$reflection->isTrait()
+            && !$reflection->isFinal();
     }
 
     /**
@@ -351,32 +423,25 @@ class AutowireScanner
      */
     private function isStaticOnlyClass(ReflectionClass $reflection): bool
     {
-        $methods = $reflection->getMethods();
         $properties = $reflection->getProperties();
-
-        // Check for non-static properties - if any exist, it's not static-only
         foreach ($properties as $property) {
             if (!$property->isStatic()) {
                 return false;
             }
         }
 
-        // Check for non-static methods (excluding magic methods)
-        $hasInstanceMethod = false;
+        $methods = $reflection->getMethods();
         foreach ($methods as $method) {
             // Skip magic methods like __construct, __destruct, etc.
             if (strpos($method->getName(), '__') === 0) {
                 continue;
             }
-
             if (!$method->isStatic()) {
-                $hasInstanceMethod = true;
-                break;
+                return false;
             }
         }
 
-        // If no instance methods and no non-static properties, consider it static-only
-        return !$hasInstanceMethod;
+        return true;
     }
 
     /**
@@ -479,6 +544,9 @@ class AutowireScanner
                 }
                 if ($reflection->isTrait()) {
                     return 'Trait';
+                }
+                if ($reflection->isFinal()) {
+                    return 'Final class (cannot be proxied)';
                 }
                 return 'Not a concrete class';
             }

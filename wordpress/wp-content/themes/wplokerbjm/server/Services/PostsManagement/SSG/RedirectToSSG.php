@@ -109,10 +109,10 @@ class RedirectToSSG implements HooksInterface
 	{
 
 		$isBot = $this->botDetection->isBot();
-		$visitorType = $isBot ? 'bot' : 'human';
-
+		
 		$UserAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
 		$isSSGbot = in_array($UserAgent, $this->botDetection::isSsgBotGeneration(), true);
+		$visitorType = $isSSGbot ? 'ssg_bot' : ($isBot ? 'bot' : 'human');
 
 		// LiteSpeed expects: X-LiteSpeed-Vary: cookie=my_cookie_name or header=...
 		$cookieName = self::COOKIE_NAME;

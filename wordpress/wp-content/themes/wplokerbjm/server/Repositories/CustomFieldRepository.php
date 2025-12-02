@@ -2,9 +2,7 @@
 
 namespace WPLokerBJM\Repositories;
 
-use WPLokerBJM\Contracts\DataProviderInterface;
-
-class CustomFieldRepository implements DataProviderInterface
+class CustomFieldRepository
 {
 
     /**
@@ -21,7 +19,7 @@ class CustomFieldRepository implements DataProviderInterface
      * @param int $post_id Post ID
      * @return array The data representing the custom field data
      */
-    public function getMetaBoxData(int $post_id): array
+    public function getMetaBoxCustomFields(int $post_id): array
     {
         return [
             'nama_perusahaan'    => rwmb_meta('nama_perusahaan', [], $post_id),

@@ -83,10 +83,10 @@ if [[ -n "${GITHUB_PATHS:-}" ]]; then
             output_file="./assets/ssg/${filename}"
             
             echo "Generating: $url_path -> $output_file"
-            echo "Running: bun run ssg \"$path\" \"$output_file\""
+            echo "Running: bun -b run ssg \"$path\" \"$output_file\""
 
             # Add timeout and memory limits to prevent resource exhaustion
-            if timeout 180 bun run ssg "$path" "$output_file"; then
+            if timeout 180 bun -b run ssg "$path" "$output_file"; then
                 echo "✅ Completed: $path"
             else
                 echo "❌ Timeout or error occurred for $path"
@@ -126,10 +126,10 @@ if [[ -n "${GITHUB_PATHS:-}" ]]; then
 
             echo "Generating: $url_path -> $output_file"
 
-      echo "Running: bun run ssg \"$path\" \"$output_file\""
+      echo "Running: bun -b run ssg \"$path\" \"$output_file\""
 
       # Add timeout and memory limits to prevent resource exhaustion
-      timeout 180 bun run ssg "$path" "$output_file" || {
+      timeout 180 bun -b run ssg "$path" "$output_file" || {
         echo "❌ Timeout or error occurred for $path"
         FAILED_PATHS+=("$path")
         continue

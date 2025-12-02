@@ -17,12 +17,14 @@ class CacheQuery
 
     /**
      * Delete transients matching a pattern using WordPress transient functions.
-     *
+     * 
+     * ! N+1 query(delete) pattern - may be inefficient for large numbers of keys
+     * 
      * This method queries the database to find matching transient keys, then uses
      * TransientCache::delete() to properly delete each transient. This ensures compatibility
      * with LiteSpeed Cache's Redis redirection, where transients are stored in Redis
      * instead of the database.
-     *
+     * 
      * @param string $pattern The pattern to match (e.g., 'auto_suggestion_%').
      *                        Should include wildcards (%) for partial matching.
      * @return int Number of transients successfully deleted.

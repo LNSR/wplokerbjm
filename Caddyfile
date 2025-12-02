@@ -35,7 +35,7 @@
   rewrite @node_modules_path /wp-content/themes/wplokerbjm/node_modules/{re.node_modules.1}
 
   file_server {
-    precompressed
+    precompressed zstd
   }
 
   @production expression {env.WP_ENV} == "production"

@@ -7,12 +7,13 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 ## Cache
 
 - Cache plugin used: **LiteSpeed Cache** with object caching redis.
+
+## Dynamic Data Framework
 - Dynamic data framework: **Metabox Lite**
 
 ## SEO
 
 - SEO plugin used: **Rank Math Free**
-- Adsense, Analytics, Google Tag Manager integrated via: **Site Kit**
 
 # Development Instructions for WPLokerBJM
 
@@ -24,7 +25,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - No need to think about backward compatibility, prefer latest.
 - If there errors, immediately fix them.
 - Never run Vite dev and Vite build.
-- Production on shared hosting with 1GB RAM and 1 CPU core, its using Litespeed Server.
+- Production on shared hosting with 1GB RAM and 1 CPU core, its using Litespeed Server and QUIC Cloud.
 
 ## Backend(PHP)
 
@@ -35,6 +36,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
   [Container.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Container.php)
 - Use Cache if it's the best decision.
   - [Cache.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Cache.php)
+  - Use APCu if is appropriate.
 
 ## Frontend(Svelte/TypeScript)
 

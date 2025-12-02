@@ -11,10 +11,9 @@ inputs:
     required: false
     default: "false"
   install-playwright:
-    description: "Whether to install Playwright"
+    description: "Whether to install Playwright browsers"
     required: false
     default: "false"
-
   enable-apt-cache:
     description: "Enable APT caching behavior in this action"
     required: false

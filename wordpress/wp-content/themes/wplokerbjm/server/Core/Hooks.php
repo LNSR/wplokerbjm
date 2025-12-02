@@ -20,11 +20,11 @@ class Hooks implements HooksInterface
     public function registerActions(): void
     {
         add_action('after_setup_theme', [ThemeInject::class, 'addThemeSupport']);
-        add_action('wp_head', [ThemeInject::class, 'injectThemeScript'], 0);
-        add_action('wp_head', [Enqueue::class, 'outputPreloadLinks'], 1);
-        add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeJquery']);
-        add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeWPLibrary'], 100);
-        add_action('litespeed_purged_all', [LiteSpeed::class, 'clearObjectCacheAndTransient']);
+        add_action('wp_head', [ThemeInject::class, 'injectThemeScript']);
+        add_action('wp_head', [Enqueue::class, 'outputPreloadLinks']);
+        add_action('wp_head', [ThemeInject::class, 'preloadLogo']);
+        add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeWPLibrary'], 1);
+        add_action('litespeed_purged_all', [Litespeed::class, 'clearObjectCacheAndTransient']);
         add_action('wp_enqueue_scripts', [Enqueue::class, 'enqueueAssets']);
         add_action('template_redirect', [$this, 'oldPost410Redirect'], 0);
         add_action('template_redirect', [$this, 'redirectToHome'], 0);
@@ -40,8 +40,8 @@ class Hooks implements HooksInterface
         add_filter('litespeed_optimize_js_excludes', [LiteSpeedFilters::class, 'lscJsExcludes'], 0);
         add_filter('litespeed_optimize_css_excludes', [LiteSpeedFilters::class, 'lscCssExcludes'], 0);
         add_filter('option_active_plugins', [$this, 'disablePluginsForDev'], -1);
-        add_filter('option_active_plugins', [$this, 'disablePluginsDuringSSG'], -1);
         add_filter('option_active_plugins', [$this, 'disablePluginsforSimulatedProd'], -1);
+        add_filter('wp_robots', [$this, 'noindexLowonganArchive']);
     }
 
     /*======================================================================
@@ -133,6 +133,17 @@ class Hooks implements HooksInterface
         return $search;
     }
 
+    /**
+     * Adds noindex directive to the lowongan post type archive page.
+     */
+    public function noindexLowonganArchive(array $robots): array
+    {
+        if (is_post_type_archive('lowongan')) {
+            $robots['noindex'] = true;
+        }
+        return $robots;
+    }
+
     /*======================================================================
      | ENVIRONMENT FILTERS
      ======================================================================*/
@@ -148,22 +159,6 @@ class Hooks implements HooksInterface
         }
 
         $pluginsToDisable = array_merge($this->listPluginsToDisable(), ['litespeed-cache/']);
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
-    }
-
-    public function disablePluginsDuringSSG(array $plugins): array
-    {
-        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        $isSSGbot = $this->botDetection::isSsgBotGeneration();
-        
-        if (stripos($userAgent, $isSSGbot[0]) === false) {
-            return $plugins;
-        }
-
-        $pluginsToDisable = [
-            'litespeed-cache/',
-        ];
-
         return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
 

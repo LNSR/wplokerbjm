@@ -5,6 +5,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "path";
 import liveReload from "vite-plugin-live-reload";
 import { visualizer } from "rollup-plugin-visualizer";
+// import { compression, defineAlgorithm } from 'vite-plugin-compression2'
 import fs from "fs";
 import path from "path";
 
@@ -14,6 +15,21 @@ export default defineConfig(({ command }) => ({
     tailwindcss(),
     liveReload(["./**/*.php"]),
     visualizer({ open: true }),
+    // compression({
+    //   deleteOriginalAssets: true,
+    //   exclude: ["**/*.json"],
+    //   threshold: 0,
+    //   skipIfLargerOrEqual: false,
+    //   logLevel: 'info',
+    //   algorithms: [defineAlgorithm('zstd', {
+    //     params: {
+    //       [require('zlib').constants.ZSTD_c_compressionLevel]: 22,
+    //       [require('zlib').constants.ZSTD_c_checksumFlag]: 1,
+    //       [require('zlib').constants.ZSTD_c_strategy]: require('zlib').constants.ZSTD_btultra2,
+    //       [require('zlib').constants.ZSTD_c_windowLog]: 27,
+    //     },
+    //   })],
+    // })
   ],
   resolve: {
     alias: {
@@ -53,6 +69,8 @@ export default defineConfig(({ command }) => ({
         main: "src/main.ts",
       },
       output: {
+        exports: "auto",
+        hashCharacters: "base64",
         minify: true,
         inlineDynamicImports: false,
         format: "esm",

@@ -54,11 +54,6 @@ class Container
             // Manually defined dependencies for core services
             \WPLokerBJM\Core\Container\Definitions\Core::getDefinitions(),
 
-            // Repository definitions
-            \WPLokerBJM\Core\Container\Definitions\Repositories::getDefinitions(),
-
-            // Factory definitions
-            \WPLokerBJM\Core\Container\Definitions\Factories::getDefinitions(),
         ));
     }
 
@@ -74,14 +69,14 @@ class Container
         $isProduction = defined('WP_ENV') && WP_ENV === 'production';
 
         $compiledFile = $cacheDir . '/CompiledContainer.php';
-        $transientKey = 'compiled_container_hash';
+        $objectKey = 'compiled_container_hash';
 
         if ($isProduction && is_file($compiledFile)) {
             $currentHash = @hash_file('sha1', $compiledFile);
-            $storedHash = \WPLokerBJM\Core\ObjectCache::get($transientKey);
+            $storedHash = \WPLokerBJM\Core\ObjectCache::get($objectKey);
             if ($storedHash !== $currentHash) {
                 array_map('unlink', glob("$cacheDir/*"));
-                \WPLokerBJM\Core\ObjectCache::set($transientKey, $currentHash, 0);
+                \WPLokerBJM\Core\ObjectCache::set($objectKey, $currentHash, 0);
             }
         }
 
@@ -94,6 +89,8 @@ class Container
             if (function_exists('apcu_enabled') && apcu_enabled()) {
                 $builder->enableDefinitionCache('wplokerbjm_container_cache');
             }
+            // Write proxies to disk for additional performance boost
+            $builder->writeProxiesToFile(true, $cacheDir . '/');
         }
     }
 }

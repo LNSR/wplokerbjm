@@ -90,7 +90,7 @@
       {
         "label": "dev",
         "type": "shell",
-        "command": "bun run dev",
+        "command": "bun -b run dev",
         "group": "build",
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-svelte}"
@@ -100,7 +100,7 @@
       {
         "label": "build",
         "type": "shell",
-        "command": "bun run build",
+        "command": "bun -b run build",
         "group": "build",
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-svelte}"
@@ -110,7 +110,7 @@
       {
         "label": "check",
         "type": "shell",
-        "command": "bun run check",
+        "command": "bun -b run check",
         "group": "test",
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-svelte}"

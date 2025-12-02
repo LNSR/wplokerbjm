@@ -2,16 +2,16 @@
 
 namespace WPLokerBJM\Factories;
 
-use WPLokerBJM\Contracts\DataProviderInterface;
 use WPLokerBJM\Core\ObjectCache;
 
 class JobDataFactory
 {
-    const FACTORY_JOB_PREFIX = 'job_data_';
+    const FACTORY_JOB_PREFIX_CACHE = 'job_data_';
+    const FACTORY_JOB_TTL_CACHE = 86400; // 1 day
 
     public function __construct(
-        private DataProviderInterface $customFieldsProvider,
-        private DataProviderInterface $taxonomiesProvider,
+        private \WPLokerBJM\Repositories\CustomFieldRepository $customFieldRepository,
+        private \WPLokerBJM\Repositories\TaxonomyRepository $taxonomyRepository
     ) {
     }
 
@@ -27,15 +27,15 @@ class JobDataFactory
      */
     public function createJobData(int $post_id): array
     {
-        $cacheKey = self::FACTORY_JOB_PREFIX . $post_id;
+        $cacheKey = self::FACTORY_JOB_PREFIX_CACHE . $post_id;
         $cachedData = ObjectCache::get($cacheKey);
         if ($cachedData !== false) {
             return $cachedData;
         }
 
         try {
-            $customFields = $this->customFieldsProvider?->getMetaBoxData($post_id) ?? [];
-            $taxonomies = $this->taxonomiesProvider?->getMetaBoxData($post_id) ?? [];
+            $customFields = $this->customFieldRepository->getMetaBoxCustomFields($post_id) ?? [];
+            $taxonomies = $this->taxonomyRepository->getMetaBoxTaxonomies($post_id) ?? [];
 
             $processedCustomFields = $this->processCustomFields($customFields);
 
@@ -48,7 +48,7 @@ class JobDataFactory
             // Combine meta and taxonomy data
             $combinedData = array_merge($processedCustomFields, $processedTaxonomies);
 
-            ObjectCache::set($cacheKey, $combinedData, 86400); // Cache for 1 day
+            ObjectCache::set($cacheKey, $combinedData, self::FACTORY_JOB_TTL_CACHE); // Cache for 1 day
 
             return $combinedData;
         } catch (\Exception $e) {

@@ -108,6 +108,42 @@ class ThemeInject
     }
 
     /**
+     * Output preload <link> for the logo image.
+     *
+     * If a custom logo is set, this outputs a <link rel="preload" as="image"> tag
+     * with appropriate srcset and sizes attributes for responsive loading.
+     * This helps prioritize logo loading for better performance and user experience.
+     *
+     * Side effects:
+     * - Echoes HTML directly to the output buffer.
+     *
+     * @return void
+     */
+    public static function preloadLogo(): void
+    {
+        $logoData = self::getLogoData();
+        if (empty($logoData['url'])) {
+            return;
+        }
+
+        $Attrs = [
+            'rel' => 'preload',
+            'as' => 'image',
+            'href' => esc_url($logoData['url']),
+            'imagesrcset' => esc_attr($logoData['srcset'] ?: ''),
+            'imagesizes' => esc_attr($logoData['sizes'] ?: ''),
+            'fetchpriority' => 'high',  // Matches your img tag
+        ];
+
+        $preloadAttrs = array_filter($Attrs, fn($value) => !empty($value));
+        echo '<link ' . implode(' ', array: array_map(
+            fn($key, $value) => $key . '="' . $value . '"',
+            array_keys($preloadAttrs),
+            $preloadAttrs
+        )) . ' />' . "\n";
+    }
+
+    /**
      * Provide theme runtime data for client-side hydration as an associative array.
      * 
      */
@@ -156,8 +192,8 @@ class ThemeInject
         $wpThemeData = self::themeData(); // theme data for hydration
         ?>
         <script type="application/json" id="wp-theme-data">
-                    <?= json_encode($wpThemeData); ?>
-                </script>
+                                                                                    <?= json_encode($wpThemeData); ?>
+                                                                                </script>
         <script id="theme-preferences" data-no-optimize="1">
             (() => {
                 function removeScriptEl() {
@@ -211,21 +247,21 @@ class ThemeInject
 class DebloatWPTheme
 {
     /**
-     * Dequeue and deregister any registered script whose handle contains 'jquery'.
+     * Remove default WP block/library styles and unwanted scripts that are often not needed for custom themes.
      *
-     * This attempts to remove bundled jQuery and its related variants to reduce front-end weight.
-     * It is conservative: it checks that the global $wp_scripts exists and is an instance of WP_Scripts.
+     * Removes jQuery and related scripts, deregisters/dequeues:
+     * - wp-block-library
+     * - wp-block-library-theme
+     * - wc-block-style
      *
-     * Notes:
-     * - This may break plugins/themes that rely on jQuery. Use only when you control/enforce
-     *   frontend dependencies or provide vanilla replacements.
+     * Use this to avoid loading Gutenberg's styles and jQuery when building a custom-styled frontend.
      *
      * @return void
      */
-    public static function removeJquery(): void
+    public static function removeWPLibrary(): void
     {
+        // Remove jQuery and related scripts
         global $wp_scripts;
-
         if (isset($wp_scripts) && ($wp_scripts instanceof WP_Scripts)) {
             foreach ($wp_scripts->registered as $handle => $script) {
                 // Check if the handle contains 'jquery' (case-insensitive)
@@ -235,44 +271,31 @@ class DebloatWPTheme
                 }
             }
         }
-    }
 
-    /**
-     * Remove default WP block/library styles that are often not needed for custom themes.
-     *
-     * Deregisters/dequeues:
-     * - wp-block-library
-     * - wp-block-library-theme
-     * - wc-block-style
-     *
-     * Use this to avoid loading Gutenberg's styles when building a custom-styled frontend.
-     *
-     * @return void
-     */
-    public static function removeWPLibrary(): void
-    {
-        remove_action('wp_head', 'print_emoji_detection_script', 7); // must use 7
+        // Remove actions that enqueue unwanted styles and scripts
+        remove_action('wp_enqueue_scripts', 'wp_enqueue_block_style_variation_styles', 1);
+        remove_action('wp_enqueue_scripts', 'WP_Duotone::output_block_styles', 9);
+        remove_action('wp_enqueue_scripts', 'wp_enqueue_emoji_styles', 10);
+        remove_action('wp_enqueue_scripts', 'wp_common_block_scripts_and_styles', 10);
+        remove_action('wp_enqueue_scripts', 'wp_enqueue_classic_theme_styles', 10);
+        remove_action('wp_enqueue_scripts', 'wp_enqueue_global_styles', 10);
+        remove_action('wp_enqueue_scripts', 'wp_enqueue_stored_styles', 10);
+        remove_action('wp_enqueue_scripts', 'WP_Duotone::output_global_styles', 11);
+        remove_action('wp_enqueue_scripts', 'wp_enqueue_block_template_skip_link', 10);
+        remove_action('wp_enqueue_scripts', 'wp_localize_jquery_ui_datepicker', 1000);
+        remove_filter('print_scripts_array', 'wp_prototype_before_jquery', 10);
         remove_action('wp_print_styles', 'print_emoji_styles');
-        remove_action('admin_print_scripts', 'print_emoji_detection_script');
-        remove_action('admin_print_styles', 'print_emoji_styles');
-        remove_filter('wp_mail', 'wp_staticize_emoji_for_email');
-        remove_filter('the_content_feed', 'wp_staticize_emoji');
-        remove_filter('comment_text_rss', 'wp_staticize_emoji');
-        add_filter('emoji_svg_url', '__return_false');
+        remove_action('wp_head', 'print_emoji_detection_script', 7);
 
-        wp_dequeue_style('wp-block-library');
-        wp_dequeue_style('wp-block-library-theme');
+        // Remove actions that enqueue global styles and duotone in WP 6.9+
+        remove_action('wp_footer', 'wp_enqueue_global_styles', 1);
+        remove_action('wp_footer', 'wp_enqueue_stored_styles', 1);
+        remove_action('wp_footer', 'wp_maybe_inline_styles', 1);
+        remove_action('wp_footer', array('WP_Duotone', 'output_footer_assets'), 10);
+
         wp_dequeue_style('wc-block-style');
-        wp_dequeue_style('wp-emoji-styles');
-        wp_dequeue_style('global-styles');
         wp_dequeue_style('global-styles-inline-css');
-        wp_dequeue_style('classic-theme-styles');
-        wp_deregister_style('wp-block-library');
-        wp_deregister_style('wp-block-library-theme');
         wp_deregister_style('wc-block-style');
-        wp_deregister_style('global-styles');
-        wp_deregister_style('classic-theme-styles');
         wp_deregister_style('global-styles-inline-css');
-        wp_deregister_style('wp-emoji-styles');
     }
 }

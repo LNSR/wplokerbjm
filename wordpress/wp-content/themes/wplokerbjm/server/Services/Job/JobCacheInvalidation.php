@@ -70,7 +70,7 @@ class JobCacheInvalidation implements HooksInterface
             return false;
         }
 
-        $jobDataCacheKey = JobDataFactory::FACTORY_JOB_PREFIX . $post_id;
+        $jobDataCacheKey = JobDataFactory::FACTORY_JOB_PREFIX_CACHE . $post_id;
         $cardCacheKey = RESTData::CARD_CACHE_PREFIX . $post_id;
         $overlayCacheKeyLoggedIn = RESTData::OVERLAY_CACHE_PREFIX . $post_id . '_logged_in';
         $overlayCacheKeyPublic = RESTData::OVERLAY_CACHE_PREFIX . $post_id . '_public';

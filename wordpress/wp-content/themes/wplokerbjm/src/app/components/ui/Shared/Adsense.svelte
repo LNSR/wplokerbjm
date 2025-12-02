@@ -18,7 +18,7 @@
     adSlot: string;
     test: boolean;
     className: string;
-    disable = false;
+    disable = true;
     container = $state<HTMLDivElement | null>(null);
     adLoaded = $state(false);
     adFailed = $state(false);
@@ -37,7 +37,7 @@
       this.adSlot = props.adSlot ?? "";
       this.test = props.test ?? isDevelopmentMode();
       this.className = props.className ?? "";
-      this.disable = props.disable ?? false;
+      this.disable = props.disable ?? true;
 
       // If disable is true, mark destroyed so the UI (template) won't render
       if (this.disable) {
@@ -375,7 +375,7 @@
   import { slide } from "svelte/transition";
 
   const props: AdsenseProps = $props();
-  const finalProps = { ...props, disable: props.disable ?? false };
+  const finalProps = { ...props, disable: props.disable ?? true };
   let handler = new AdsenseHandler(finalProps);
   let _refreshListener: (() => void) | null = null;
   let _destroyListener: (() => void) | null = null;

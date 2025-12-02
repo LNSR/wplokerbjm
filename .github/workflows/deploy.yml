@@ -39,7 +39,7 @@ jobs:
 
       - name: Build (theme)
         working-directory: ${{ env.THEME_DIR }}
-        run: bun run build
+        run: bun -b run build
 
       - name: Setup deployment
         uses: ./.github/actions/setup-deployment

@@ -5,7 +5,7 @@ use WPLokerBJM\Core\{TransientCache, ObjectCache};
 /**
  * LiteSpeed General Hooks
  */
-class LiteSpeed
+class Litespeed
 {
     /**
      * Deletes the compiled container cache file when LiteSpeed cache is purged.
@@ -15,22 +15,27 @@ class LiteSpeed
      */
     public static function clearObjectCacheAndTransient(): void
     {
-        $file = get_stylesheet_directory() . '/cache/CompiledContainer.php';
-        if (file_exists($file)) {
-            unlink($file);
-        }
-
+        // Clear APCu cache first
         if (function_exists('apcu_clear_cache')) {
             apcu_clear_cache();
         }
 
+        // Invalidate OPCache
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
+            $file = get_stylesheet_directory() . '/cache/CompiledContainer.php';
             wp_opcache_invalidate($file, true);
             wp_opcache_invalidate_directory(get_stylesheet_directory() . '/server');
         }
 
+        // Clear transients and object cache
         TransientCache::deletePattern('%');
         ObjectCache::flush();
+
+        // Clear entire cache folder last
+        $cacheDir = get_stylesheet_directory() . '/cache';
+        if (is_dir($cacheDir)) {
+            array_map('unlink', glob("$cacheDir/*"));
+        }
 
     }
 }
@@ -40,7 +45,7 @@ class LiteSpeed
  */
 class LiteSpeedFilters
 {
-    const pattern = '/wp-content\/themes\/wplokerbjm\//';
+    const pattern = '/wp-content/themes/wplokerbjm/';
     /**
      * Exclude specific JS files from LiteSpeed Cache JS optimization.
      */
