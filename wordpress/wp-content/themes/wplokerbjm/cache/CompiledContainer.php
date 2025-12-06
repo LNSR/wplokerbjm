@@ -4,128 +4,133 @@
  */
 class CompiledContainer extends DI\CompiledContainer{
     const METHOD_MAPPING = array (
-  'WPLokerBJM\\Views\\Page\\PasangIklanLokerView' => 'get1',
+  'WPLokerBJM\\Controllers\\REST\\JobGridController' => 'get1',
   'subEntry1' => 'get2',
-  'WPLokerBJM\\Views\\Page\\SingleView' => 'get3',
-  'subEntry2' => 'get4',
+  'subEntry2' => 'get3',
+  'WPLokerBJM\\Controllers\\REST\\WPThemeData' => 'get4',
   'subEntry3' => 'get5',
   'subEntry4' => 'get6',
-  'WPLokerBJM\\Views\\Page\\HomepageView' => 'get7',
+  'WPLokerBJM\\Controllers\\REST\\AutoSuggestionSearch' => 'get7',
   'subEntry5' => 'get8',
-  'subEntry6' => 'get9',
-  'subEntry7' => 'get10',
-  'subEntry8' => 'get11',
-  'WPLokerBJM\\Presenters\\Components\\JobCarousel' => 'get12',
-  'subEntry9' => 'get13',
-  'subEntry10' => 'get14',
-  'WPLokerBJM\\Presenters\\Components\\JobGrid' => 'get15',
-  'subEntry11' => 'get16',
-  'subEntry12' => 'get17',
-  'subEntry13' => 'get18',
-  'WPLokerBJM\\Models\\Schema\\CustomFields' => 'get19',
-  'subEntry14' => 'get20',
-  'WPLokerBJM\\Models\\Schema\\PostTypes' => 'get21',
-  'subEntry15' => 'get22',
-  'WPLokerBJM\\Models\\Schema\\Taxonomies' => 'get23',
+  'WPLokerBJM\\Controllers\\REST\\DynamicSearch' => 'get9',
+  'subEntry6' => 'get10',
+  'subEntry7' => 'get11',
+  'WPLokerBJM\\Controllers\\REST\\SingleOverlay' => 'get12',
+  'subEntry8' => 'get13',
+  'subEntry9' => 'get14',
+  'WPLokerBJM\\Controllers\\REST\\TaxonomyDepth' => 'get15',
+  'subEntry10' => 'get16',
+  'subEntry11' => 'get17',
+  'subEntry12' => 'get18',
+  'WPLokerBJM\\Controllers\\REST\\Carousel' => 'get19',
+  'subEntry13' => 'get20',
+  'subEntry14' => 'get21',
+  'WPLokerBJM\\Controllers\\REST\\JobBookmark' => 'get22',
+  'subEntry15' => 'get23',
   'subEntry16' => 'get24',
-  'WPLokerBJM\\Repositories\\CustomFieldRepository' => 'get25',
+  'WPLokerBJM\\Controllers\\REST\\DispatchSSGBuild' => 'get25',
   'subEntry17' => 'get26',
-  'WPLokerBJM\\Repositories\\TaxonomyRepository' => 'get27',
-  'subEntry18' => 'get28',
-  'WPLokerBJM\\Repositories\\JobRepository' => 'get29',
-  'subEntry19' => 'get30',
-  'subEntry20' => 'get31',
+  'subEntry18' => 'get27',
+  'WPLokerBJM\\Controllers\\REST\\LoadMore' => 'get28',
+  'subEntry19' => 'get29',
+  'subEntry20' => 'get30',
+  'WPLokerBJM\\Repositories\\CustomFieldRepository' => 'get31',
   'subEntry21' => 'get32',
-  'WPLokerBJM\\Controllers\\REST\\DispatchSSGBuild' => 'get33',
+  'WPLokerBJM\\Repositories\\TaxonomyRepository' => 'get33',
   'subEntry22' => 'get34',
-  'subEntry23' => 'get35',
-  'WPLokerBJM\\Controllers\\REST\\WPThemeData' => 'get36',
+  'WPLokerBJM\\Repositories\\JobRepository' => 'get35',
+  'subEntry23' => 'get36',
   'subEntry24' => 'get37',
   'subEntry25' => 'get38',
-  'WPLokerBJM\\Controllers\\REST\\AutoSuggestionSearch' => 'get39',
+  'WPLokerBJM\\Core\\Hooks' => 'get39',
   'subEntry26' => 'get40',
-  'WPLokerBJM\\Controllers\\REST\\JobBookmark' => 'get41',
-  'subEntry27' => 'get42',
+  'subEntry27' => 'get41',
+  'WPLokerBJM\\Services\\Utilities\\SSG\\BotDetection' => 'get42',
   'subEntry28' => 'get43',
-  'WPLokerBJM\\Controllers\\REST\\Carousel' => 'get44',
-  'subEntry29' => 'get45',
-  'subEntry30' => 'get46',
-  'WPLokerBJM\\Controllers\\REST\\JobGridController' => 'get47',
-  'subEntry31' => 'get48',
+  'subEntry29' => 'get44',
+  'subEntry30' => 'get45',
+  'WPLokerBJM\\Services\\Webhooks\\TriggerBuildSSG' => 'get46',
+  'subEntry31' => 'get47',
+  'WPLokerBJM\\Services\\Job\\JobCacheInvalidation' => 'get48',
   'subEntry32' => 'get49',
-  'WPLokerBJM\\Controllers\\REST\\TaxonomyDepth' => 'get50',
+  'WPLokerBJM\\Services\\Job\\JobSchemaOrg' => 'get50',
   'subEntry33' => 'get51',
   'subEntry34' => 'get52',
-  'subEntry35' => 'get53',
-  'WPLokerBJM\\Controllers\\REST\\DynamicSearch' => 'get54',
+  'WPLokerBJM\\Services\\PostsManagement\\SSG\\RedirectToSSG' => 'get53',
+  'subEntry35' => 'get54',
   'subEntry36' => 'get55',
   'subEntry37' => 'get56',
-  'WPLokerBJM\\Controllers\\REST\\SingleOverlay' => 'get57',
+  'WPLokerBJM\\Services\\PostsManagement\\SSG\\PostsCRUDListener' => 'get57',
   'subEntry38' => 'get58',
   'subEntry39' => 'get59',
-  'WPLokerBJM\\Controllers\\REST\\LoadMore' => 'get60',
-  'subEntry40' => 'get61',
+  'subEntry40' => 'get60',
+  'WPLokerBJM\\Services\\REST\\RESTRoute' => 'get61',
   'subEntry41' => 'get62',
-  'WPLokerBJM\\Factories\\JobDataFactory' => 'get63',
-  'subEntry42' => 'get64',
-  'subEntry43' => 'get65',
-  'subEntry44' => 'get66',
-  'WPLokerBJM\\Core\\Hooks' => 'get67',
-  'subEntry45' => 'get68',
-  'subEntry46' => 'get69',
-  'WPLokerBJM\\Services\\Job\\JobCacheInvalidation' => 'get70',
-  'subEntry47' => 'get71',
-  'WPLokerBJM\\Services\\Job\\JobSchemaOrg' => 'get72',
-  'subEntry48' => 'get73',
-  'subEntry49' => 'get74',
-  'WPLokerBJM\\Services\\Taxonomy\\TaxonomyService' => 'get75',
-  'subEntry50' => 'get76',
-  'WPLokerBJM\\Services\\PostsManagement\\SSG\\PostsCRUDListener' => 'get77',
-  'subEntry51' => 'get78',
-  'subEntry52' => 'get79',
-  'subEntry53' => 'get80',
-  'WPLokerBJM\\Services\\PostsManagement\\SSG\\RedirectToSSG' => 'get81',
-  'subEntry54' => 'get82',
-  'subEntry55' => 'get83',
-  'subEntry56' => 'get84',
-  'WPLokerBJM\\Services\\Utilities\\SSG\\BotDetection' => 'get85',
-  'subEntry57' => 'get86',
-  'subEntry58' => 'get87',
-  'subEntry59' => 'get88',
-  'WPLokerBJM\\Services\\Cron\\CronService' => 'get89',
-  'subEntry60' => 'get90',
-  'WPLokerBJM\\Services\\REST\\RESTData' => 'get91',
-  'subEntry61' => 'get92',
-  'subEntry62' => 'get93',
-  'WPLokerBJM\\Services\\REST\\RESTRoute' => 'get94',
-  'subEntry63' => 'get95',
-  'subEntry64' => 'get96',
-  'subEntry65' => 'get97',
-  'subEntry66' => 'get98',
-  'subEntry67' => 'get99',
-  'subEntry68' => 'get100',
-  'subEntry69' => 'get101',
+  'subEntry42' => 'get63',
+  'subEntry43' => 'get64',
+  'subEntry44' => 'get65',
+  'subEntry45' => 'get66',
+  'subEntry46' => 'get67',
+  'subEntry47' => 'get68',
+  'subEntry48' => 'get69',
+  'subEntry49' => 'get70',
+  'subEntry50' => 'get71',
+  'subEntry51' => 'get72',
+  'WPLokerBJM\\Services\\REST\\RESTData' => 'get73',
+  'subEntry52' => 'get74',
+  'subEntry53' => 'get75',
+  'WPLokerBJM\\Services\\Cron\\CronService' => 'get76',
+  'subEntry54' => 'get77',
+  'WPLokerBJM\\Services\\Taxonomy\\TaxonomyService' => 'get78',
+  'subEntry55' => 'get79',
+  'WPLokerBJM\\Models\\Schema\\PostTypes' => 'get80',
+  'subEntry56' => 'get81',
+  'WPLokerBJM\\Models\\Schema\\Taxonomies' => 'get82',
+  'subEntry57' => 'get83',
+  'WPLokerBJM\\Models\\Schema\\CustomFields' => 'get84',
+  'subEntry58' => 'get85',
+  'WPLokerBJM\\Factories\\JobDataFactory' => 'get86',
+  'subEntry59' => 'get87',
+  'subEntry60' => 'get88',
+  'subEntry61' => 'get89',
+  'WPLokerBJM\\Views\\Page\\SingleView' => 'get90',
+  'subEntry62' => 'get91',
+  'subEntry63' => 'get92',
+  'subEntry64' => 'get93',
+  'WPLokerBJM\\Views\\Page\\PasangIklanLokerView' => 'get94',
+  'subEntry65' => 'get95',
+  'WPLokerBJM\\Views\\Page\\HomepageView' => 'get96',
+  'subEntry66' => 'get97',
+  'subEntry67' => 'get98',
+  'subEntry68' => 'get99',
+  'subEntry69' => 'get100',
+  'WPLokerBJM\\Presenters\\Components\\JobCarousel' => 'get101',
   'subEntry70' => 'get102',
   'subEntry71' => 'get103',
-  'subEntry72' => 'get104',
-  'subEntry73' => 'get105',
-  'WPLokerBJM\\Services\\Webhooks\\TriggerBuildSSG' => 'get106',
+  'WPLokerBJM\\Presenters\\Components\\JobGrid' => 'get104',
+  'subEntry72' => 'get105',
+  'subEntry73' => 'get106',
   'subEntry74' => 'get107',
   'WPLokerBJM\\Core\\Container\\Init' => 'get108',
   'WPLokerBJM\\Services\\Utilities\\SSG\\BotRangeFetcher' => 'get109',
   'WPLokerBJM\\Services\\Utilities\\SSG\\DnsResolver' => 'get110',
 );
 
+    protected function get3()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Presenters\\Components\\JobGrid');
+    }
+
     protected function get2()
     {
-        $object = new WPLokerBJM\Views\Page\PasangIklanLokerView();
+        $object = new WPLokerBJM\Controllers\REST\JobGridController($this->get3());
         return $object;
     }
 
     protected function get1()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Views\Page\PasangIklanLokerView',
+            'WPLokerBJM\Controllers\REST\JobGridController',
             function () {
                 return $this->get2();
             }
@@ -133,58 +138,38 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
-    protected function get5()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Job\\JobSchemaOrg');
-    }
-
     protected function get6()
     {
         return $this->delegateContainer->get('WPLokerBJM\\Services\\REST\\RESTData');
     }
 
-    protected function get4()
+    protected function get5()
     {
-        $object = new WPLokerBJM\Views\Page\SingleView($this->get5(), $this->get6());
+        $object = new WPLokerBJM\Controllers\REST\WPThemeData($this->get6());
         return $object;
     }
 
-    protected function get3()
+    protected function get4()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Views\Page\SingleView',
+            'WPLokerBJM\Controllers\REST\WPThemeData',
             function () {
-                return $this->get4();
+                return $this->get5();
             }
         );
         return $object;
     }
 
-    protected function get9()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Presenters\\Components\\JobGrid');
-    }
-
-    protected function get10()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Presenters\\Components\\JobCarousel');
-    }
-
-    protected function get11()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\JobRepository');
-    }
-
     protected function get8()
     {
-        $object = new WPLokerBJM\Views\Page\HomepageView($this->get9(), $this->get10(), $this->get11());
+        $object = new WPLokerBJM\Controllers\REST\AutoSuggestionSearch();
         return $object;
     }
 
     protected function get7()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Views\Page\HomepageView',
+            'WPLokerBJM\Controllers\REST\AutoSuggestionSearch',
             function () {
                 return $this->get8();
             }
@@ -192,21 +177,43 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
-    protected function get14()
+    protected function get11()
     {
         return $this->delegateContainer->get('WPLokerBJM\\Repositories\\JobRepository');
     }
 
+    protected function get10()
+    {
+        $object = new WPLokerBJM\Controllers\REST\DynamicSearch($this->get11());
+        return $object;
+    }
+
+    protected function get9()
+    {
+                $object = $this->proxyFactory->createProxy(
+            'WPLokerBJM\Controllers\REST\DynamicSearch',
+            function () {
+                return $this->get10();
+            }
+        );
+        return $object;
+    }
+
+    protected function get14()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\REST\\RESTData');
+    }
+
     protected function get13()
     {
-        $object = new WPLokerBJM\Presenters\Components\JobCarousel($this->get14());
+        $object = new WPLokerBJM\Controllers\REST\SingleOverlay($this->get14());
         return $object;
     }
 
     protected function get12()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Presenters\Components\JobCarousel',
+            'WPLokerBJM\Controllers\REST\SingleOverlay',
             function () {
                 return $this->get13();
             }
@@ -216,24 +223,24 @@ class CompiledContainer extends DI\CompiledContainer{
 
     protected function get17()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Job\\JobSchemaOrg');
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Taxonomy\\TaxonomyService');
     }
 
     protected function get18()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\JobRepository');
+        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\TaxonomyRepository');
     }
 
     protected function get16()
     {
-        $object = new WPLokerBJM\Presenters\Components\JobGrid($this->get17(), $this->get18());
+        $object = new WPLokerBJM\Controllers\REST\TaxonomyDepth($this->get17(), $this->get18());
         return $object;
     }
 
     protected function get15()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Presenters\Components\JobGrid',
+            'WPLokerBJM\Controllers\REST\TaxonomyDepth',
             function () {
                 return $this->get16();
             }
@@ -241,16 +248,21 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
+    protected function get21()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Presenters\\Components\\JobCarousel');
+    }
+
     protected function get20()
     {
-        $object = new WPLokerBJM\Models\Schema\CustomFields();
+        $object = new WPLokerBJM\Controllers\REST\Carousel($this->get21());
         return $object;
     }
 
     protected function get19()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Models\Schema\CustomFields',
+            'WPLokerBJM\Controllers\REST\Carousel',
             function () {
                 return $this->get20();
             }
@@ -258,50 +270,43 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
-    protected function get22()
-    {
-        $object = new WPLokerBJM\Models\Schema\PostTypes();
-        return $object;
-    }
-
-    protected function get21()
-    {
-                $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Models\Schema\PostTypes',
-            function () {
-                return $this->get22();
-            }
-        );
-        return $object;
-    }
-
     protected function get24()
     {
-        $object = new WPLokerBJM\Models\Schema\Taxonomies();
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\REST\\RESTData');
     }
 
     protected function get23()
     {
+        $object = new WPLokerBJM\Controllers\REST\JobBookmark($this->get24());
+        return $object;
+    }
+
+    protected function get22()
+    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Models\Schema\Taxonomies',
+            'WPLokerBJM\Controllers\REST\JobBookmark',
             function () {
-                return $this->get24();
+                return $this->get23();
             }
         );
         return $object;
     }
 
+    protected function get27()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Webhooks\\TriggerBuildSSG');
+    }
+
     protected function get26()
     {
-        $object = new WPLokerBJM\Repositories\CustomFieldRepository();
+        $object = new WPLokerBJM\Controllers\REST\DispatchSSGBuild($this->get27());
         return $object;
     }
 
     protected function get25()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Repositories\CustomFieldRepository',
+            'WPLokerBJM\Controllers\REST\DispatchSSGBuild',
             function () {
                 return $this->get26();
             }
@@ -309,65 +314,55 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
-    protected function get28()
+    protected function get30()
     {
-        $object = new WPLokerBJM\Repositories\TaxonomyRepository();
+        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\JobRepository');
+    }
+
+    protected function get29()
+    {
+        $object = new WPLokerBJM\Controllers\REST\LoadMore($this->get30());
         return $object;
     }
 
-    protected function get27()
+    protected function get28()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Repositories\TaxonomyRepository',
+            'WPLokerBJM\Controllers\REST\LoadMore',
             function () {
-                return $this->get28();
+                return $this->get29();
             }
         );
+        return $object;
+    }
+
+    protected function get32()
+    {
+        $object = new WPLokerBJM\Repositories\CustomFieldRepository();
         return $object;
     }
 
     protected function get31()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\REST\\RESTData');
-    }
-
-    protected function get32()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Job\\JobSchemaOrg');
-    }
-
-    protected function get30()
-    {
-        $object = new WPLokerBJM\Repositories\JobRepository($this->get31(), $this->get32());
-        return $object;
-    }
-
-    protected function get29()
-    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Repositories\JobRepository',
+            'WPLokerBJM\Repositories\CustomFieldRepository',
             function () {
-                return $this->get30();
+                return $this->get32();
             }
         );
         return $object;
     }
 
-    protected function get35()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Webhooks\\TriggerBuildSSG');
-    }
-
     protected function get34()
     {
-        $object = new WPLokerBJM\Controllers\REST\DispatchSSGBuild($this->get35());
+        $object = new WPLokerBJM\Repositories\TaxonomyRepository();
         return $object;
     }
 
     protected function get33()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\DispatchSSGBuild',
+            'WPLokerBJM\Repositories\TaxonomyRepository',
             function () {
                 return $this->get34();
             }
@@ -375,38 +370,48 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
-    protected function get38()
+    protected function get37()
     {
         return $this->delegateContainer->get('WPLokerBJM\\Services\\REST\\RESTData');
     }
 
-    protected function get37()
+    protected function get38()
     {
-        $object = new WPLokerBJM\Controllers\REST\WPThemeData($this->get38());
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Job\\JobSchemaOrg');
     }
 
     protected function get36()
     {
+        $object = new WPLokerBJM\Repositories\JobRepository($this->get37(), $this->get38());
+        return $object;
+    }
+
+    protected function get35()
+    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\WPThemeData',
+            'WPLokerBJM\Repositories\JobRepository',
             function () {
-                return $this->get37();
+                return $this->get36();
             }
         );
         return $object;
     }
 
+    protected function get41()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\BotDetection');
+    }
+
     protected function get40()
     {
-        $object = new WPLokerBJM\Controllers\REST\AutoSuggestionSearch();
+        $object = new WPLokerBJM\Core\Hooks($this->get41());
         return $object;
     }
 
     protected function get39()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\AutoSuggestionSearch',
+            'WPLokerBJM\Core\Hooks',
             function () {
                 return $this->get40();
             }
@@ -414,45 +419,46 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
+    protected function get44()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\BotRangeFetcher');
+    }
+
+    protected function get45()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\DnsResolver');
+    }
+
     protected function get43()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\REST\\RESTData');
+        $object = new WPLokerBJM\Services\Utilities\SSG\BotDetection($this->get44(), $this->get45());
+        return $object;
     }
 
     protected function get42()
     {
-        $object = new WPLokerBJM\Controllers\REST\JobBookmark($this->get43());
-        return $object;
-    }
-
-    protected function get41()
-    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\JobBookmark',
+            'WPLokerBJM\Services\Utilities\SSG\BotDetection',
             function () {
-                return $this->get42();
+                return $this->get43();
             }
         );
         return $object;
     }
 
-    protected function get46()
+    protected function get47()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Presenters\\Components\\JobCarousel');
-    }
-
-    protected function get45()
-    {
-        $object = new WPLokerBJM\Controllers\REST\Carousel($this->get46());
+        $object = new WPLokerBJM\Services\Webhooks\TriggerBuildSSG([
+        ]);
         return $object;
     }
 
-    protected function get44()
+    protected function get46()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\Carousel',
+            'WPLokerBJM\Services\Webhooks\TriggerBuildSSG',
             function () {
-                return $this->get45();
+                return $this->get47();
             }
         );
         return $object;
@@ -460,21 +466,16 @@ class CompiledContainer extends DI\CompiledContainer{
 
     protected function get49()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Presenters\\Components\\JobGrid');
+        $object = new WPLokerBJM\Services\Job\JobCacheInvalidation();
+        return $object;
     }
 
     protected function get48()
     {
-        $object = new WPLokerBJM\Controllers\REST\JobGridController($this->get49());
-        return $object;
-    }
-
-    protected function get47()
-    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\JobGridController',
+            'WPLokerBJM\Services\Job\JobCacheInvalidation',
             function () {
-                return $this->get48();
+                return $this->get49();
             }
         );
         return $object;
@@ -482,24 +483,19 @@ class CompiledContainer extends DI\CompiledContainer{
 
     protected function get52()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Taxonomy\\TaxonomyService');
-    }
-
-    protected function get53()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\TaxonomyRepository');
+        return $this->delegateContainer->get('WPLokerBJM\\Factories\\JobDataFactory');
     }
 
     protected function get51()
     {
-        $object = new WPLokerBJM\Controllers\REST\TaxonomyDepth($this->get52(), $this->get53());
+        $object = new WPLokerBJM\Services\Job\JobSchemaOrg($this->get52());
         return $object;
     }
 
     protected function get50()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\TaxonomyDepth',
+            'WPLokerBJM\Services\Job\JobSchemaOrg',
             function () {
                 return $this->get51();
             }
@@ -507,23 +503,28 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
-    protected function get56()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\JobRepository');
-    }
-
     protected function get55()
     {
-        $object = new WPLokerBJM\Controllers\REST\DynamicSearch($this->get56());
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\BotDetection');
+    }
+
+    protected function get56()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Webhooks\\TriggerBuildSSG');
     }
 
     protected function get54()
     {
+        $object = new WPLokerBJM\Services\PostsManagement\SSG\RedirectToSSG($this->get55(), $this->get56());
+        return $object;
+    }
+
+    protected function get53()
+    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\DynamicSearch',
+            'WPLokerBJM\Services\PostsManagement\SSG\RedirectToSSG',
             function () {
-                return $this->get55();
+                return $this->get54();
             }
         );
         return $object;
@@ -531,19 +532,24 @@ class CompiledContainer extends DI\CompiledContainer{
 
     protected function get59()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\REST\\RESTData');
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Webhooks\\TriggerBuildSSG');
+    }
+
+    protected function get60()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\BotDetection');
     }
 
     protected function get58()
     {
-        $object = new WPLokerBJM\Controllers\REST\SingleOverlay($this->get59());
+        $object = new WPLokerBJM\Services\PostsManagement\SSG\PostsCRUDListener($this->get59(), $this->get60());
         return $object;
     }
 
     protected function get57()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\SingleOverlay',
+            'WPLokerBJM\Services\PostsManagement\SSG\PostsCRUDListener',
             function () {
                 return $this->get58();
             }
@@ -551,128 +557,107 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
-    protected function get62()
+    protected function get63()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\JobRepository');
-    }
-
-    protected function get61()
-    {
-        $object = new WPLokerBJM\Controllers\REST\LoadMore($this->get62());
-        return $object;
-    }
-
-    protected function get60()
-    {
-                $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Controllers\REST\LoadMore',
-            function () {
-                return $this->get61();
-            }
-        );
-        return $object;
-    }
-
-    protected function get65()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\CustomFieldRepository');
-    }
-
-    protected function get66()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\TaxonomyRepository');
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\TaxonomyDepth');
     }
 
     protected function get64()
     {
-        $object = new WPLokerBJM\Factories\JobDataFactory($this->get65(), $this->get66());
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\AutoSuggestionSearch');
     }
 
-    protected function get63()
+    protected function get65()
     {
-                $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Factories\JobDataFactory',
-            function () {
-                return $this->get64();
-            }
-        );
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\LoadMore');
     }
 
-    protected function get69()
+    protected function get66()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\BotDetection');
-    }
-
-    protected function get68()
-    {
-        $object = new WPLokerBJM\Core\Hooks($this->get69());
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\Carousel');
     }
 
     protected function get67()
     {
-                $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Core\Hooks',
-            function () {
-                return $this->get68();
-            }
-        );
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\DynamicSearch');
     }
 
-    protected function get71()
+    protected function get68()
     {
-        $object = new WPLokerBJM\Services\Job\JobCacheInvalidation();
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\SingleOverlay');
+    }
+
+    protected function get69()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\DispatchSSGBuild');
     }
 
     protected function get70()
     {
-                $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\Job\JobCacheInvalidation',
-            function () {
-                return $this->get71();
-            }
-        );
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\JobBookmark');
     }
 
-    protected function get74()
+    protected function get71()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Factories\\JobDataFactory');
-    }
-
-    protected function get73()
-    {
-        $object = new WPLokerBJM\Services\Job\JobSchemaOrg($this->get74());
-        return $object;
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\JobGridController');
     }
 
     protected function get72()
     {
-                $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\Job\JobSchemaOrg',
-            function () {
-                return $this->get73();
-            }
-        );
+        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\WPThemeData');
+    }
+
+    protected function get62()
+    {
+        $object = new WPLokerBJM\Services\REST\RESTRoute($this->get63(), $this->get64(), $this->get65(), $this->get66(), $this->get67(), $this->get68(), $this->get69(), $this->get70(), $this->get71(), $this->get72());
         return $object;
     }
 
-    protected function get76()
+    protected function get61()
     {
-        $object = new WPLokerBJM\Services\Taxonomy\TaxonomyService();
+                $object = $this->proxyFactory->createProxy(
+            'WPLokerBJM\Services\REST\RESTRoute',
+            function () {
+                return $this->get62();
+            }
+        );
         return $object;
     }
 
     protected function get75()
     {
+        return $this->delegateContainer->get('WPLokerBJM\\Factories\\JobDataFactory');
+    }
+
+    protected function get74()
+    {
+        $object = new WPLokerBJM\Services\REST\RESTData($this->get75());
+        return $object;
+    }
+
+    protected function get73()
+    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\Taxonomy\TaxonomyService',
+            'WPLokerBJM\Services\REST\RESTData',
             function () {
-                return $this->get76();
+                return $this->get74();
+            }
+        );
+        return $object;
+    }
+
+    protected function get77()
+    {
+        $object = new WPLokerBJM\Services\Cron\CronService();
+        return $object;
+    }
+
+    protected function get76()
+    {
+                $object = $this->proxyFactory->createProxy(
+            'WPLokerBJM\Services\Cron\CronService',
+            function () {
+                return $this->get77();
             }
         );
         return $object;
@@ -680,26 +665,33 @@ class CompiledContainer extends DI\CompiledContainer{
 
     protected function get79()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Webhooks\\TriggerBuildSSG');
-    }
-
-    protected function get80()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\BotDetection');
+        $object = new WPLokerBJM\Services\Taxonomy\TaxonomyService();
+        return $object;
     }
 
     protected function get78()
     {
-        $object = new WPLokerBJM\Services\PostsManagement\SSG\PostsCRUDListener($this->get79(), $this->get80());
+                $object = $this->proxyFactory->createProxy(
+            'WPLokerBJM\Services\Taxonomy\TaxonomyService',
+            function () {
+                return $this->get79();
+            }
+        );
         return $object;
     }
 
-    protected function get77()
+    protected function get81()
+    {
+        $object = new WPLokerBJM\Models\Schema\PostTypes();
+        return $object;
+    }
+
+    protected function get80()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\PostsManagement\SSG\PostsCRUDListener',
+            'WPLokerBJM\Models\Schema\PostTypes',
             function () {
-                return $this->get78();
+                return $this->get81();
             }
         );
         return $object;
@@ -707,157 +699,102 @@ class CompiledContainer extends DI\CompiledContainer{
 
     protected function get83()
     {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\BotDetection');
-    }
-
-    protected function get84()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Webhooks\\TriggerBuildSSG');
+        $object = new WPLokerBJM\Models\Schema\Taxonomies();
+        return $object;
     }
 
     protected function get82()
     {
-        $object = new WPLokerBJM\Services\PostsManagement\SSG\RedirectToSSG($this->get83(), $this->get84());
-        return $object;
-    }
-
-    protected function get81()
-    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\PostsManagement\SSG\RedirectToSSG',
+            'WPLokerBJM\Models\Schema\Taxonomies',
             function () {
-                return $this->get82();
+                return $this->get83();
             }
         );
-        return $object;
-    }
-
-    protected function get87()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\BotRangeFetcher');
-    }
-
-    protected function get88()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Services\\Utilities\\SSG\\DnsResolver');
-    }
-
-    protected function get86()
-    {
-        $object = new WPLokerBJM\Services\Utilities\SSG\BotDetection($this->get87(), $this->get88());
         return $object;
     }
 
     protected function get85()
     {
+        $object = new WPLokerBJM\Models\Schema\CustomFields();
+        return $object;
+    }
+
+    protected function get84()
+    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\Utilities\SSG\BotDetection',
+            'WPLokerBJM\Models\Schema\CustomFields',
             function () {
-                return $this->get86();
+                return $this->get85();
             }
         );
+        return $object;
+    }
+
+    protected function get88()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\CustomFieldRepository');
+    }
+
+    protected function get89()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\TaxonomyRepository');
+    }
+
+    protected function get87()
+    {
+        $object = new WPLokerBJM\Factories\JobDataFactory($this->get88(), $this->get89());
+        return $object;
+    }
+
+    protected function get86()
+    {
+                $object = $this->proxyFactory->createProxy(
+            'WPLokerBJM\Factories\JobDataFactory',
+            function () {
+                return $this->get87();
+            }
+        );
+        return $object;
+    }
+
+    protected function get92()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Job\\JobSchemaOrg');
+    }
+
+    protected function get93()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\REST\\RESTData');
+    }
+
+    protected function get91()
+    {
+        $object = new WPLokerBJM\Views\Page\SingleView($this->get92(), $this->get93());
         return $object;
     }
 
     protected function get90()
     {
-        $object = new WPLokerBJM\Services\Cron\CronService();
-        return $object;
-    }
-
-    protected function get89()
-    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\Cron\CronService',
+            'WPLokerBJM\Views\Page\SingleView',
             function () {
-                return $this->get90();
+                return $this->get91();
             }
         );
         return $object;
-    }
-
-    protected function get93()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Factories\\JobDataFactory');
-    }
-
-    protected function get92()
-    {
-        $object = new WPLokerBJM\Services\REST\RESTData($this->get93());
-        return $object;
-    }
-
-    protected function get91()
-    {
-                $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\REST\RESTData',
-            function () {
-                return $this->get92();
-            }
-        );
-        return $object;
-    }
-
-    protected function get96()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\TaxonomyDepth');
-    }
-
-    protected function get97()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\AutoSuggestionSearch');
-    }
-
-    protected function get98()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\LoadMore');
-    }
-
-    protected function get99()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\Carousel');
-    }
-
-    protected function get100()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\DynamicSearch');
-    }
-
-    protected function get101()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\SingleOverlay');
-    }
-
-    protected function get102()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\DispatchSSGBuild');
-    }
-
-    protected function get103()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\JobBookmark');
-    }
-
-    protected function get104()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\JobGridController');
-    }
-
-    protected function get105()
-    {
-        return $this->delegateContainer->get('WPLokerBJM\\Controllers\\REST\\WPThemeData');
     }
 
     protected function get95()
     {
-        $object = new WPLokerBJM\Services\REST\RESTRoute($this->get96(), $this->get97(), $this->get98(), $this->get99(), $this->get100(), $this->get101(), $this->get102(), $this->get103(), $this->get104(), $this->get105());
+        $object = new WPLokerBJM\Views\Page\PasangIklanLokerView();
         return $object;
     }
 
     protected function get94()
     {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\REST\RESTRoute',
+            'WPLokerBJM\Views\Page\PasangIklanLokerView',
             function () {
                 return $this->get95();
             }
@@ -865,19 +802,82 @@ class CompiledContainer extends DI\CompiledContainer{
         return $object;
     }
 
-    protected function get107()
+    protected function get98()
     {
-        $object = new WPLokerBJM\Services\Webhooks\TriggerBuildSSG([
-        ]);
+        return $this->delegateContainer->get('WPLokerBJM\\Presenters\\Components\\JobGrid');
+    }
+
+    protected function get99()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Presenters\\Components\\JobCarousel');
+    }
+
+    protected function get100()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\JobRepository');
+    }
+
+    protected function get97()
+    {
+        $object = new WPLokerBJM\Views\Page\HomepageView($this->get98(), $this->get99(), $this->get100());
+        return $object;
+    }
+
+    protected function get96()
+    {
+                $object = $this->proxyFactory->createProxy(
+            'WPLokerBJM\Views\Page\HomepageView',
+            function () {
+                return $this->get97();
+            }
+        );
+        return $object;
+    }
+
+    protected function get103()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\JobRepository');
+    }
+
+    protected function get102()
+    {
+        $object = new WPLokerBJM\Presenters\Components\JobCarousel($this->get103());
+        return $object;
+    }
+
+    protected function get101()
+    {
+                $object = $this->proxyFactory->createProxy(
+            'WPLokerBJM\Presenters\Components\JobCarousel',
+            function () {
+                return $this->get102();
+            }
+        );
         return $object;
     }
 
     protected function get106()
     {
+        return $this->delegateContainer->get('WPLokerBJM\\Services\\Job\\JobSchemaOrg');
+    }
+
+    protected function get107()
+    {
+        return $this->delegateContainer->get('WPLokerBJM\\Repositories\\JobRepository');
+    }
+
+    protected function get105()
+    {
+        $object = new WPLokerBJM\Presenters\Components\JobGrid($this->get106(), $this->get107());
+        return $object;
+    }
+
+    protected function get104()
+    {
                 $object = $this->proxyFactory->createProxy(
-            'WPLokerBJM\Services\Webhooks\TriggerBuildSSG',
+            'WPLokerBJM\Presenters\Components\JobGrid',
             function () {
-                return $this->get107();
+                return $this->get105();
             }
         );
         return $object;

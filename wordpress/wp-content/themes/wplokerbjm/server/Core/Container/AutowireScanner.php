@@ -6,7 +6,7 @@ use ReflectionClass;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
-use WPLokerBJM\Core\TransientCache;
+use WPLokerBJM\Core\Cache;
 
 class AutowireScanner
 {
@@ -84,8 +84,8 @@ class AutowireScanner
             }
         }
 
-        // Fallback to transient cache (redirected to Redis via LiteSpeed Cache)
-        $cached = TransientCache::get($cacheKey);
+        // Fallback to object cache (Redis via LiteSpeed Cache)
+        $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
         }
@@ -97,7 +97,7 @@ class AutowireScanner
         if (function_exists('apcu_enabled') && apcu_enabled()) {
             apcu_store($cacheKey, $definitions, self::CACHE_TTL);
         } else {
-            TransientCache::set($cacheKey, $definitions, self::CACHE_TTL);
+            Cache::set($cacheKey, $definitions, self::CACHE_TTL);
         }
 
         return $definitions;
@@ -150,8 +150,8 @@ class AutowireScanner
             }
         }
 
-        // Fallback to transient cache (redirected to Redis via LiteSpeed Cache)
-        $cached = TransientCache::get($cacheKey);
+        // Fallback to object cache (Redis via LiteSpeed Cache)
+        $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
         }
@@ -163,7 +163,7 @@ class AutowireScanner
         if (function_exists('apcu_enabled') && apcu_enabled()) {
             apcu_store($cacheKey, $implementers, self::CACHE_TTL);
         } else {
-            TransientCache::set($cacheKey, $implementers, self::CACHE_TTL);
+            Cache::set($cacheKey, $implementers, self::CACHE_TTL);
         }
 
         return $implementers;

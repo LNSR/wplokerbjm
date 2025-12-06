@@ -292,6 +292,7 @@ class DebloatWPTheme
         remove_action('wp_footer', 'wp_enqueue_stored_styles', 1);
         remove_action('wp_footer', 'wp_maybe_inline_styles', 1);
         remove_action('wp_footer', array('WP_Duotone', 'output_footer_assets'), 10);
+        remove_action('wp_footer', 'the_block_template_skip_link', 10);
 
         wp_dequeue_style('wc-block-style');
         wp_dequeue_style('global-styles-inline-css');

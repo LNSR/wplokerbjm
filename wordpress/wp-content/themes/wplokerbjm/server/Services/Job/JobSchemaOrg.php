@@ -2,7 +2,7 @@
 
 namespace WPLokerBJM\Services\Job;
 use WPLokerBJM\Factories\JobDataFactory;
-use WPLokerBJM\Core\ObjectCache;
+use WPLokerBJM\Core\Cache;
 
 class JobSchemaOrg
 {
@@ -21,7 +21,7 @@ class JobSchemaOrg
     public function renderJobPostingJsonLd(int $post_id): string
     {
         $cacheKey = self::SCHEMA_JOB_KEY_PREFIX . $post_id;
-        $cached = ObjectCache::get($cacheKey);
+        $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
         }
@@ -158,7 +158,7 @@ class JobSchemaOrg
         // this specific JobPosting JSON-LD (e.g. data-ld-id="jobposting-123").
         $jsonLd = '<script type="application/ld+json" data-ld-type="JobPosting" data-ld-id="jobposting-' . intval($post_id) . '">' . json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>';
 
-        ObjectCache::set($cacheKey, $jsonLd, 86400);
+        Cache::set($cacheKey, $jsonLd, 86400);
 
         return $jsonLd;
     }

@@ -73,10 +73,10 @@ class Container
 
         if ($isProduction && is_file($compiledFile)) {
             $currentHash = @hash_file('sha1', $compiledFile);
-            $storedHash = \WPLokerBJM\Core\ObjectCache::get($objectKey);
+            $storedHash = \WPLokerBJM\Core\Cache::get($objectKey);
             if ($storedHash !== $currentHash) {
                 array_map('unlink', glob("$cacheDir/*"));
-                \WPLokerBJM\Core\ObjectCache::set($objectKey, $currentHash, 0);
+                \WPLokerBJM\Core\Cache::set($objectKey, $currentHash, 0);
             }
         }
 

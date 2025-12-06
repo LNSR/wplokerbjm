@@ -4,7 +4,7 @@ namespace WPLokerBJM\Controllers\REST;
 
 use WPLokerBJM\Services\Utilities\SSG\URLFilterService;
 use WPLokerBJM\Services\Utilities\Utilities;
-use WPLokerBJM\Core\TransientCache;
+use WPLokerBJM\Core\Cache;
 
 /**
  * REST endpoint for manually triggering SSG builds
@@ -51,7 +51,7 @@ class DispatchSSGBuild
             }
 
             // Set rate limit before processing
-            TransientCache::set($cacheKey, time(), 120); // 120 seconds = 2 minutes
+            Cache::set($cacheKey, time(), 120); // 120 seconds = 2 minutes
 
             // Trigger the build
             $result = $this->triggerBuild->trigger($filteredPaths, $reason, $dryRun);
@@ -98,7 +98,7 @@ class DispatchSSGBuild
     {
         $userId = get_current_user_id();
         $cacheKey = "ssg_api_rate_limit_{$userId}";
-        $lastRequest = TransientCache::get($cacheKey);
+        $lastRequest = Cache::get($cacheKey);
 
         if ($lastRequest !== false) {
             return Utilities::failedResponse('Rate limit exceeded. Please wait before making another request.', 429);

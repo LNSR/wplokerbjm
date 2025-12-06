@@ -24,7 +24,7 @@ class Hooks implements HooksInterface
         add_action('wp_head', [Enqueue::class, 'outputPreloadLinks']);
         add_action('wp_head', [ThemeInject::class, 'preloadLogo']);
         add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeWPLibrary'], 1);
-        add_action('litespeed_purged_all', [Litespeed::class, 'clearObjectCacheAndTransient']);
+        add_action('litespeed_purged_all', [Litespeed::class, 'clearObjectCache']);
         add_action('wp_enqueue_scripts', [Enqueue::class, 'enqueueAssets']);
         add_action('template_redirect', [$this, 'oldPost410Redirect'], 0);
         add_action('template_redirect', [$this, 'redirectToHome'], 0);
@@ -158,7 +158,7 @@ class Hooks implements HooksInterface
             return $plugins;
         }
 
-        $pluginsToDisable = array_merge($this->listPluginsToDisable(), ['litespeed-cache/']);
+        $pluginsToDisable = array_merge($this->listPluginsToDisable());
         return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
 

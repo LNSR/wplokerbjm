@@ -1,7 +1,7 @@
 <?php
 
 namespace WPLokerBJM\Core\Hooks\Theme;
-use WPLokerBJM\Core\ObjectCache;
+use WPLokerBJM\Core\Cache;
 
 class Enqueue
 {
@@ -234,13 +234,13 @@ class Vite
         $dist_dir = get_stylesheet_directory() . '/assets/dist';
         $manifest_path = $dist_dir . '/.vite/manifest.json';
 
-        $manifest = ObjectCache::get('vite_manifest');
+        $manifest = Cache::get('vite_manifest');
         if ($manifest === false) {
             if (!file_exists($manifest_path)) {
                 return null;
             }
             $manifest = json_decode(file_get_contents($manifest_path), true);
-            ObjectCache::set('vite_manifest', $manifest, expiration: 81600); // Cache for 1 day
+            Cache::set('vite_manifest', $manifest, expiration: 81600); // Cache for 1 day
         }
         return $manifest;
     }

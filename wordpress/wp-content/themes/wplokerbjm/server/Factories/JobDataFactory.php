@@ -2,7 +2,7 @@
 
 namespace WPLokerBJM\Factories;
 
-use WPLokerBJM\Core\ObjectCache;
+use WPLokerBJM\Core\Cache;
 
 class JobDataFactory
 {
@@ -28,7 +28,7 @@ class JobDataFactory
     public function createJobData(int $post_id): array
     {
         $cacheKey = self::FACTORY_JOB_PREFIX_CACHE . $post_id;
-        $cachedData = ObjectCache::get($cacheKey);
+        $cachedData = Cache::get($cacheKey);
         if ($cachedData !== false) {
             return $cachedData;
         }
@@ -48,7 +48,7 @@ class JobDataFactory
             // Combine meta and taxonomy data
             $combinedData = array_merge($processedCustomFields, $processedTaxonomies);
 
-            ObjectCache::set($cacheKey, $combinedData, self::FACTORY_JOB_TTL_CACHE); // Cache for 1 day
+            Cache::set($cacheKey, $combinedData, self::FACTORY_JOB_TTL_CACHE); // Cache for 1 day
 
             return $combinedData;
         } catch (\Exception $e) {

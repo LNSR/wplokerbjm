@@ -25,16 +25,13 @@ A comprehensive suite of static site generation tools designed for WordPress the
 
 ```text
 tools/SSG/
-├── .ssg.env.example           # Environment variables template
 ├── ssg.ts                     # Single page generator
 ├── ssg-sitemap.ts             # Sitemap-based generator
-├── test-adblock.sh            # AdBlock testing script
 ├── docs/                      # Documentation files
 │   ├── README.md              # This comprehensive documentation
 │   ├── SSG-QUICKSTART.md      # Quick start guide (5 minutes)
 │   ├── SSG-WP-INTEGRATION.md  # WordPress integration guide
 │   ├── ADBLOCK-PROTECTION.md  # AdBlock protection guide
-│   ├── IMPLEMENTATION-SUMMARY.md # Implementation summary
 │   └── Personal-Note.md       # Personal notes
 └── utilities/                 # Shared utility modules
     ├── adblock-utils.ts       # AdBlock & tracking protection
@@ -50,7 +47,7 @@ tools/SSG/
 ├── Services/PostsManagement/SSG/
 │   ├── PostsCRUDListener.php   # WordPress post event listeners
 │   ├── RedirectToSSG.php       # SSG page redirects
-│   └── TriggerBuild.php        # GitHub Actions API integration
+│   └── TriggerBuildSSG.php        # GitHub Actions API integration
 └── Services/Utilities/SSG/
     ├── LiteSpeedIntegration.php # Cache integration
     ├── SSGUtilities.php        # WordPress SSG utilities
@@ -201,7 +198,7 @@ Automatically trigger SSG builds when WordPress content changes, providing seaml
 ```mermaid
 graph TD
     A[WordPress Post CRUD Events] --> B[PostsCRUDListener]
-    B --> C[TriggerBuild Service]
+    B --> C[TriggerBuildSSG Service]
     C --> D[GitHub Actions API]
     D --> E[SSG Workflow]
     E --> F[Static Site Deployment]
@@ -217,7 +214,7 @@ graph TD
 
 #### 2. Dispatcher Services (Selective Generation)
 
-- [**TriggerBuild**](../../../../../../../.github/workflows/ssg.yml): Core service for calling selective GitHub Actions workflow (`ssg.yml`)
+- [**TriggerBuildSSG**](../../../../../../../.github/workflows/ssg.yml): Core service for calling selective GitHub Actions workflow (`ssg.yml`)
 - **PathResolver**: Determines which specific URLs need regeneration
 - **QueueManager**: Handles batching and rate limiting (future enhancement)
 
@@ -242,7 +239,7 @@ $paths = [
 #### 2. GitHub Actions Trigger
 
 ```php
-// TriggerBuild service calls GitHub API
+// TriggerBuildSSG service calls GitHub API
 $response = wp_remote_post("https://api.github.com/repos/{$owner}/{$repo}/actions/workflows/{$workflow}/dispatches", [
     'headers' => [
         'Authorization' => 'token ' . SSG_GITHUB_TOKEN,

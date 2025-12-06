@@ -15,13 +15,13 @@ services:
       FORCE_SSL_ADMIN: "true"
       WP_HOME: ${WORDPRESS_WP_HOME}
       WP_SITEURL: ${WORDPRESS_WP_SITEURL}
-      WP_REDIS_PATH: /var/run/sock/redis.sock
       WORDPRESS_CONFIG_EXTRA: |
         if (!defined('WP_CACHE')) define('WP_CACHE', true);
         define('WP_CACHE_KEY_SALT', '${WORDPRESS_WP_SITEURL}');
+        define('WP_REDIS_SOCK', '${REDIS_SOCK}');
         define('WP_REDIS_HOST', '${REDIS_HOST}');
         define('WP_REDIS_PASSWORD', '${REDIS_PWD}');
-        define('WP_REDIS_DATABASE', ${REDIS_DB});
+        define('WP_REDIS_DATABASE', '${REDIS_DB}');
 
         if (!defined('WP_ENV')) {
           define('WP_ENV', getenv('WP_ENV') ?: 'production');
@@ -119,6 +119,9 @@ services:
             define('WP_ACCESSIBLE_HOSTS', 'api.wordpress.org'); // Allow updates
 
             define('FS_METHOD', 'direct');
+
+            // Enable Query Monitor caps panel for debugging
+            define('QM_ENABLE_CAPS_PANEL', true);
             break;
         }
 
@@ -131,7 +134,7 @@ services:
     depends_on:
       - db
     healthcheck:
-      test: ["CMD", "curl", "-f", "https://localhost"]
+      test: ["CMD-SHELL", "pgrep php-fpm > /dev/null || exit 1"]
       interval: 1m
       timeout: 10s
       retries: 3

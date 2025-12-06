@@ -2,7 +2,7 @@
 
 namespace WPLokerBJM\Services\REST;
 
-use WPLokerBJM\Core\ObjectCache;
+use WPLokerBJM\Core\Cache;
 
 class RESTData
 {
@@ -24,7 +24,7 @@ class RESTData
     public function getCardData(int $post_id): array
     {
         $cacheKey = self::CARD_CACHE_PREFIX . $post_id;
-        $cached = ObjectCache::get($cacheKey);
+        $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
         }
@@ -56,7 +56,7 @@ class RESTData
                 'post_time' => get_post_time('c', false, $post_id),
             ];
 
-            ObjectCache::set($cacheKey, $data, self::CACHE_TTL);
+            Cache::set($cacheKey, $data, self::CACHE_TTL);
             return $data;
         } catch (\Exception $e) {
             error_log('RESTData::getCardData error for post ' . $post_id . ': ' . $e->getMessage());
@@ -73,7 +73,7 @@ class RESTData
     public function getSingleOverlayData(int $post_id): array
     {
         $cacheKey = self::OVERLAY_CACHE_PREFIX . $post_id . (is_user_logged_in() ? '_logged_in' : '_public');
-        $cached = ObjectCache::get($cacheKey);
+        $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
         }
@@ -117,7 +117,7 @@ class RESTData
                 $data['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
             }
 
-            ObjectCache::set($cacheKey, $data, self::CACHE_TTL);
+            Cache::set($cacheKey, $data, self::CACHE_TTL);
             return $data;
         } catch (\Exception $e) {
             error_log('RESTData::getSingleOverlayData error for post ' . $post_id . ': ' . $e->getMessage());
