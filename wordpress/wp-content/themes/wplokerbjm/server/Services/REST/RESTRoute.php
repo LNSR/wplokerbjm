@@ -26,23 +26,11 @@ class RESTRoute implements HooksInterface
     public function registerActions(): void
     {
         add_action('rest_api_init', [$this, 'registerRoutes']);
-        add_action('send_headers', function () {
-            if (!is_user_logged_in()) {
-                return;
-            }
-
-            $nonce = wp_create_nonce('wp_rest');
-            header('X-WP-Nonce: ' . $nonce);
-        });
     }
+
     public function registerFilters(): void
     {
-        add_filter('rest_pre_serve_request', function ($served, $result, $request, $server) {
-            if (!headers_sent()) {
-                header('Access-Control-Expose-Headers: X-WP-Total, X-WP-TotalPages, Link, X-WP-Nonce');
-            }
-            return $served;
-        }, 10, 4);
+        // No filters to register for now
     }
 
     public function registerRoutes(): void

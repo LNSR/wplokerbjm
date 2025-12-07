@@ -1,6 +1,7 @@
 <?php
 namespace WPLokerBJM\Core\Hooks;
 use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Core\Container;
 
 /**
  * LiteSpeed General Hooks
@@ -22,7 +23,7 @@ class Litespeed
 
         // Invalidate OPCache
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
-            $file = get_stylesheet_directory() . '/cache/CompiledContainer.php';
+            $file = Container::$CACHE_FILE;
             wp_opcache_invalidate($file, true);
             wp_opcache_invalidate_directory(get_stylesheet_directory() . '/server');
         }
@@ -30,7 +31,7 @@ class Litespeed
         Cache::flushGroup(Cache::OBJECT_CACHE_PREFIX);
 
         // Clear entire cache folder last
-        $cacheDir = get_stylesheet_directory() . '/cache';
+        $cacheDir = Container::$CACHE_DIR;
         if (is_dir($cacheDir)) {
             array_map('unlink', glob("$cacheDir/*"));
         }

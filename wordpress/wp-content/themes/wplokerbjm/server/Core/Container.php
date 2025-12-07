@@ -8,6 +8,30 @@ use Psr\Container\ContainerInterface;
 class Container
 {
     private static ?ContainerInterface $container = null;
+    public static ?string $CACHE_DIR = null;
+    public static ?string $CACHE_FILE = null;
+
+    private static function initializeCachePaths(): void
+    {
+        if (self::$CACHE_DIR === null) {
+            $loc = self::cacheLocation();
+            self::$CACHE_DIR = $loc['cacheDir'];
+            self::$CACHE_FILE = $loc['cacheFile'];
+        }
+    }
+
+    private static function cacheLocation(): array
+    {
+        $cacheDir = get_stylesheet_directory() . '/cache';
+        $cacheFile = $cacheDir . '/CompiledContainer.php';
+
+        $cache = [
+            'cacheDir' => $cacheDir,
+            'cacheFile' => $cacheFile,
+        ];
+
+        return $cache;
+    }
 
     /**
      * Get the DI container instance.
@@ -21,6 +45,7 @@ class Container
     public static function getContainer(): ContainerInterface
     {
         if (self::$container === null) {
+            self::initializeCachePaths();
             try {
                 $builder = new ContainerBuilder();
 
@@ -59,38 +84,37 @@ class Container
 
     private static function setupCache(ContainerBuilder $builder): void
     {
-        $cacheDir = get_stylesheet_directory() . '/cache';
-        if (!is_dir($cacheDir)) {
-            if (!mkdir($cacheDir, 0755, true)) {
-                error_log("Failed to create cache directory: $cacheDir");
+        if (!is_dir(self::$CACHE_DIR)) {
+            if (!mkdir(self::$CACHE_DIR, 0755, true)) {
+                error_log("Failed to create cache directory: " . self::$CACHE_DIR);
             }
         }
 
         $isProduction = defined('WP_ENV') && WP_ENV === 'production';
 
-        $compiledFile = $cacheDir . '/CompiledContainer.php';
+        $compiledFile = self::$CACHE_FILE;
         $objectKey = 'compiled_container_hash';
 
         if ($isProduction && is_file($compiledFile)) {
             $currentHash = @hash_file('sha1', $compiledFile);
             $storedHash = \WPLokerBJM\Core\Cache::get($objectKey);
             if ($storedHash !== $currentHash) {
-                array_map('unlink', glob("$cacheDir/*"));
+                array_map('unlink', glob(self::$CACHE_DIR . '/*'));
                 \WPLokerBJM\Core\Cache::set($objectKey, $currentHash, 0);
             }
         }
 
-        if (!$isProduction && is_dir($cacheDir)) {
-            array_map('unlink', glob("$cacheDir/*"));
+        if (!$isProduction && is_dir(self::$CACHE_DIR)) {
+            array_map('unlink', glob(self::$CACHE_DIR . '/*'));
         }
 
-        if ($isProduction && $cacheDir && is_dir($cacheDir)) {
-            $builder->enableCompilation($cacheDir);
+        if ($isProduction && self::$CACHE_DIR && is_dir(self::$CACHE_DIR)) {
+            $builder->enableCompilation(self::$CACHE_DIR);
             if (function_exists('apcu_enabled') && apcu_enabled()) {
                 $builder->enableDefinitionCache('wplokerbjm_container_cache');
             }
             // Write proxies to disk for additional performance boost
-            $builder->writeProxiesToFile(true, $cacheDir . '/');
+            $builder->writeProxiesToFile(true, self::$CACHE_DIR . '/');
         }
     }
 }

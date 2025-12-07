@@ -18,6 +18,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 # Development Instructions for WPLokerBJM
 
 ## General
+- Check [wplokerbjm.code-workspace.json](../../wplokerbjm.code-workspace) for workspace settings.
 - Develeper of this project uses:
   - Laptop: FX505DD
     - OS: CachyOS

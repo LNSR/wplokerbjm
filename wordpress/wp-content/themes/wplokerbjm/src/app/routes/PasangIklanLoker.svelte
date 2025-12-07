@@ -47,7 +47,7 @@
       role="note"
     >
       <LightbulbSolid
-        class="text-yellow-500 dark:text-yellow-300 text-xl mt-1"
+        class="flex-shrink-0 text-yellow-500 dark:text-yellow-300 text-xl mt-1"
         aria-hidden="true"
       />
       <span class="text-blue-800 dark:text-blue-200 text-justify">

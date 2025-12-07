@@ -2,6 +2,8 @@
 
 import _ from "lodash";
 
+export const isAppEl: string = "#app"; // Selector for the main application element
+
 export function parseProps(element: Element | Document, propAttr: string): Record<string, unknown> {
     const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`);
     let props: Record<string, unknown> = {};

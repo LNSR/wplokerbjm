@@ -1,4 +1,4 @@
-import type { SearchState } from '@/types'
+import type { SearchState, CarouselState } from '@/types'
 import { removeJobPostingJsonLd } from '$lib/utils/elements.svelte'
 import { SvelteMap, SvelteURL } from 'svelte/reactivity'
 import { scrollY } from 'svelte/reactivity/window'
@@ -36,6 +36,7 @@ export class RouteManager {
 export class RouteStateManager {
   scrollPositions = new SvelteMap<string, number>();
   searchStates = new SvelteMap<string, SearchState>();
+  carouselStates = new SvelteMap<string, CarouselState>();
 
   saveScrollPosition(path: string, scrollY: number) {
     this.scrollPositions.set(path, scrollY);
@@ -118,6 +119,44 @@ export class RouteStateManager {
         sessionStorage.removeItem(`searchState_${path}`);
       } catch (e) {
         console.warn('Failed to clear search state from sessionStorage', e);
+      }
+    }
+  }
+
+  saveCarouselState(path: string, carouselState: CarouselState) {
+    this.carouselStates.set(path, carouselState);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(`carouselState_${path}`, JSON.stringify(carouselState));
+      } catch (e) {
+        console.warn('Failed to save carousel state to sessionStorage', e);
+      }
+    }
+  }
+
+  getCarouselState(path: string): CarouselState | undefined {
+    let state = this.carouselStates.get(path);
+    if (!state && typeof sessionStorage !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem(`carouselState_${path}`);
+        if (stored) {
+          state = JSON.parse(stored) as CarouselState;
+          this.carouselStates.set(path, state); // cache in memory
+        }
+      } catch (e) {
+        console.warn('Failed to load carousel state from sessionStorage', e);
+      }
+    }
+    return state;
+  }
+
+  clearCarouselState(path: string) {
+    this.carouselStates.delete(path);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.removeItem(`carouselState_${path}`);
+      } catch (e) {
+        console.warn('Failed to clear carousel state from sessionStorage', e);
       }
     }
   }

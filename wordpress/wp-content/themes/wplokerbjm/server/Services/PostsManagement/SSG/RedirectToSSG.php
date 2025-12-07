@@ -241,7 +241,6 @@ class RedirectToSSG implements HooksInterface
 					location.replace(location.href);
 				}
 
-				// Listen for human activity events
 				const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
 				events.forEach(event => {
 					document.addEventListener(event, runSelfHeal, { once: true, passive: true });

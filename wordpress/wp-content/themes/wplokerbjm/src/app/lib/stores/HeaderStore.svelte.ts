@@ -1,8 +1,11 @@
+import { isAppEl } from "@/utils/elements";
+
 export class HeaderStore {
 
     public headerHeight = $state(0);
     public headerTop = $state(0);
     public totalOffset = $derived(this.headerHeight + this.headerTop);
+    public appEl = document.querySelector(isAppEl) as HTMLElement | null;
     getWpAdminBarHeight(): number {
         const el = document.getElementById("wpadminbar");
         if (!el) return 0;
@@ -48,7 +51,7 @@ export class HeaderStore {
         const adminBarHeight = this.getWpAdminBarHeight();
         const top = adminBarHeight;
         if (typeof document !== 'undefined') {
-            document.documentElement.style.setProperty('--site-header-top', top + 'px');
+            this.appEl?.style.setProperty('--site-header-top', top + 'px');
         }
 
         let prevPadding: string | null = opts?.previousMainPadding ?? null;
@@ -57,21 +60,21 @@ export class HeaderStore {
             const headerHeight = headerEl.offsetHeight || 0;
 
             if (typeof document !== 'undefined') {
-                document.documentElement.style.setProperty('--site-header-height', headerHeight + 'px');
+                this.appEl?.style.setProperty('--site-header-height', headerHeight + 'px');
             }
 
             // Also set a scroll-padding-top value so browser-native scrolling
             // (including scrollIntoView with block: 'start') respects fixed headers.
             try {
                 const scrollPadding = adminBarHeight + headerHeight;
-                document.documentElement.style.setProperty('--site-scroll-padding-top', scrollPadding + 'px');
+                this.appEl?.style.setProperty('--site-scroll-padding-top', scrollPadding + 'px');
             } catch {
                 // Ignore if browser doesn't support setting this property on the element
             }
         } else {
             if (typeof document !== 'undefined') {
-                document.documentElement.style.setProperty('--site-header-height', '0px');
-                document.documentElement.style.removeProperty('--site-scroll-padding-top');
+                this.appEl?.style.setProperty('--site-header-height', '0px');
+                this.appEl?.style.removeProperty('--site-scroll-padding-top');
             }
         }
 

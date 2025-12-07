@@ -169,13 +169,15 @@
   import Adsense from "@components/ui/Shared/Adsense.svelte";
   import {
     MagnifyingGlassSolid,
-    MapPinSolid,
+    MapMarkerAltSolid,
     VenusMarsSolid,
     GraduationCapSolid,
     FilterSolid,
     XmarkSolid,
     RotateLeftSolid,
     TriangleExclamationSolid,
+    SortAmountUpSolid,
+    SortAmountDownSolid,
   } from "svelte-awesome-icons";
 
   const props = $props();
@@ -421,7 +423,7 @@
 
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div class="relative">
-          <MapPinSolid
+          <MapMarkerAltSolid
             class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10"
             aria-hidden="true"
           />
@@ -558,45 +560,15 @@
 
         <div class="relative">
           {#if sortIsAsc}
-            <!--
-              Source: Font Awesome Free v5.15.4 — sort-amount-up (solid)
-              URL: https://fontawesome.com/v5/icons/sort-amount-up?s=solid
-              License: https://fontawesome.com/license/free
-              Original SVG path copied from Font Awesome and included under
-              the Font Awesome Free license (attribution retained).
-            -->
-            <!-- Terlama (ascending) icon provided by user -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 512 512"
-              aria-hidden="true"
+            <SortAmountUpSolid
               class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10 w-5 h-5 transform transition-transform duration-150"
-              fill="currentColor"
-            >
-              <path
-                d="M304 416h-64a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h64a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zM16 160h48v304a16 16 0 0 0 16 16h32a16 16 0 0 0 16-16V160h48c14.21 0 21.38-17.24 11.31-27.31l-80-96a16 16 0 0 0-22.62 0l-80 96C-5.35 142.74 1.77 160 16 160zm416 0H240a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h192a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm-64 128H240a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zM496 32H240a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h256a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"
-              />
-            </svg>
+              aria-hidden="true"
+            />
           {:else}
-            <!--
-              Source: Font Awesome Free v5.15.4 — sort-amount-down (classic solid)
-              URL: https://fontawesome.com/v5/icons/sort-amount-down?f=classic&s=solid
-              License: https://fontawesome.com/license/free
-              Original SVG path copied from Font Awesome and included under
-              the Font Awesome Free license (attribution retained).
-            -->
-            <!-- Default / Terbaru icon -->
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 512 512"
-              aria-hidden="true"
+            <SortAmountDownSolid
               class="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10 w-5 h-5 transform transition-transform duration-150"
-              fill="currentColor"
-            >
-              <path
-                d="M304 416h-64a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h64a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm-128-64h-48V48a16 16 0 0 0-16-16H80a16 16 0 0 0-16 16v304H16c-14.19 0-21.37 17.24-11.29 27.31l80 96a16 16 0 0 0 22.62 0l80-96C197.35 369.26 190.22 352 176 352zm256-192H240a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h192a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zm-64 128H240a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h128a16 16 0 0 0 16-16v-32a16 16 0 0 0-16-16zM496 32H240a16 16 0 0 0-16 16v32a16 16 0 0 0 16 16h256a16 16 0 0 0 16-16V48a16 16 0 0 0-16-16z"
-              />
-            </svg>
+              aria-hidden="true"
+            />
           {/if}
           <button
             type="button"
@@ -665,7 +637,7 @@
                 class="inline-flex items-center bg-gradient-to-r bg-[var(--wpl-global-color-5)] text-sm font-medium mr-2 px-3 py-1 rounded-full shadow-sm transition-all duration-150"
               >
                 {#if filter.key === TaxonomyType.lokasi}
-                  <MapPinSolid
+                  <MapMarkerAltSolid
                     class="mr-1 text-[var(--wpl-global-color-1)] inline-block"
                     aria-hidden="true"
                   />

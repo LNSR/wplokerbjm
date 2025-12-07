@@ -100,8 +100,8 @@ wait
 # After WordPress setup is complete, ensure correct ownership and permissions
 # This prevents permission issues when container trying to access website files
 
-find /var/www/html \( -type f -o -type d \) \( ! -user wordpress -o ! -group www-data \) -print0 | xargs -0 -r -P $(nproc) chown -v wordpress:www-data
-find /var/www/html \( -type f -o -type d \) ! -perm 775 -print0 | xargs -0 -r -P $(nproc) chmod -v 775
+find /var/www/html \( -type f -o -type d \) \( ! -user wordpress -o ! -group www-data \) -print0 | xargs -0 -r -P $(nproc) chown -v wordpress:www-data || true
+find /var/www/html \( -type f -o -type d \) ! -perm 775 -print0 | xargs -0 -r -P $(nproc) chmod -v 775 || true
 
 # Ensure socket directories exist with correct permissions
 mkdir -p /var/run/sock

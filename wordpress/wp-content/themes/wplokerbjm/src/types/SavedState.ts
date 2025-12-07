@@ -13,3 +13,7 @@ export interface SearchState {
   timestamp?: number
   serverLastJobUpdate?: number
 }
+
+export interface CarouselState {
+  slideIndex: number
+}

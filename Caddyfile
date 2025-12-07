@@ -1,9 +1,34 @@
 :443 {
   tls /var/www/certs/localhost.crt /var/www/certs/localhost.key # ! Use your own certificate
+
+  @vite path_regexp vite ^/(__vite|@vite|@id|@fs|sockjs-node)(/.*)?$
+  handle @vite {
+    # Proxy Vite dev endpoints. Tuned for HMR (websockets) and dev performance.
+    # If you run multiple Vite instances for scaling, add them here as additional upstreams.
+    reverse_proxy host.docker.internal:5173 {
+      # Preserve headers Vite needs for HMR / dev pages
+      header_up Origin {http.request.header.Origin}
+      header_up Host {http.request.host}
+      header_up X-Forwarded-Host {host}
+      header_up X-Forwarded-Proto {scheme}
+      header_up X-Forwarded-For {remote}
+      header_up X-Real-IP {remote_host}
+      header_up Upgrade {http.request.header.Upgrade}
+      header_up Connection {http.request.header.Connection}
+
+      # Improve HMR/streaming responsiveness
+      flush_interval 50ms
+      stream_timeout 0
+      stream_close_delay 1m
+    }
+  }
+
+  # * Rewrite /node_modules/* to the Vite node_modules directory
+  # * Use this to serve local node_modules for development purposes
+  @node_modules_path path_regexp node_modules ^/node_modules/(.*)$
+  rewrite @node_modules_path /__vite/node_modules/{re.node_modules.1}
+
   root * /var/www/html
-  # WordPress: try existing file, then directory, otherwise fall back to index.php
-  # This enables pretty permalinks to be handled by WordPress.
-  try_files {path} {path}/ /index.php?{query}
   # Pass request host/proto headers into PHP-FPM so PHP's $_SERVER sees
   # HTTP_X_FORWARDED_HOST and HTTP_X_FORWARDED_PROTO when using AUTO mode.
   # This preserves the original host/proto coming from the client/proxy
@@ -14,32 +39,27 @@
     env HTTP_HOST {host}
   }
 
-  # * Rewrite /node_modules/* to the {your-theme} node_modules directory
-  # * Use this to serve local node_modules for development purposes
-  # * This assumes the node_modules directory is located at /var/www/html/wp-content/themes/{your-theme}/node_modules
-  @node_modules_path path_regexp node_modules ^/node_modules/(.*)$
-  rewrite @node_modules_path /wp-content/themes/wplokerbjm/node_modules/{re.node_modules.1}
-
   file_server {
     precompressed zstd
   }
 
-  # @production expression {env.WP_ENV} == "production"
-  # encode @production {
-  #   zstd best
-  # }
+  @production expression {env.WP_ENV} == "production"
+  encode @production {
+    zstd best
+  }
 
   # Matchers: static file extensions, fonts, wp static paths and special endpoints
   @static_ext path_regexp staticExt ^/.*\.(css|js|json|xml|pdf|txt|ico|jpg|jpeg|png|webp|avif|svg|htc|ttf|woff|woff2|eot|otf)$
   @fonts path_regexp fonts ^/.*\.(ttf|woff|woff2|eot|otf)$
   @wp_static path /wp-content/* /wp-includes/* /favicon.ico /robots.txt
-  @no_cache path /wp-login.php /wp-admin/* /xmlrpc.php /wp-comments-post.php /wp-cron.php
+  @no_cache path /wp-login.php /wp-admin/* /xmlrpc.php /wp-comments-post.php /wp-cron.php /__vite/*
   @rest_api path /wp-json/*
   @dynamic not path /wp-content/* /wp-includes/* /favicon.ico /robots.txt /wp-admin/* /wp-login.php /wp-json/* /xmlrpc.php /wp-cron.php
   @logged_in header_regexp Cookie wordpress_logged_in_.*
 
   # Default security headers for all responses (keeps site secure while remaining permissive for WordPress plugins)
   header {
+    Content-Security-Policy "Upgrade-Insecure-Requests"
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     Referrer-Policy "strict-origin-when-cross-origin"
     X-Content-Type-Options "nosniff"
@@ -47,6 +67,7 @@
     X-XSS-Protection "1; mode=block"
     Permissions-Policy "geolocation=(), microphone=(), camera=()"
     -X-Powered-By
+    X-Real-IP {remote_host}
   }
 
   header {
@@ -78,7 +99,7 @@
   header @no_cache Cache-Control "private, max-age=120, must-revalidate"
 
   # Dynamic content (pages) — private cache for logged-in users, public cache for anonymous
-  header @dynamic @logged_in Cache-Control "private, max-age=120"
+  header @dynamic @logged_in Cache-Control "private, max-age=360"
   header @dynamic not @logged_in Cache-Control "public, max-age=600, s-maxage=1200, stale-while-revalidate=1200, stale-if-error=86400"
   header @dynamic not @logged_in Vary "Accept-Encoding, Cookie"
 

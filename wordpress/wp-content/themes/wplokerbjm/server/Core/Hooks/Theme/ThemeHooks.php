@@ -191,9 +191,7 @@ class ThemeInject
     {
         $wpThemeData = self::themeData(); // theme data for hydration
         ?>
-        <script type="application/json" id="wp-theme-data">
-                                                                                    <?= json_encode($wpThemeData); ?>
-                                                                                </script>
+        <script type="application/json" id="wp-theme-data"> <?= json_encode($wpThemeData); ?> </script>
         <script id="theme-preferences" data-no-optimize="1">
             (() => {
                 function removeScriptEl() {

@@ -33,12 +33,12 @@ export interface ComponentConfig {
 export interface JobSummary {
   jenis_pekerjaan_taxo?: string | string[] | null;
   pendidikan_taxo?: string | string[] | null;
-  pengalaman?: string | number | null;
+  pengalaman?: number | null;
   gender_taxo?: string | string[] | null;
-  gaji_minimal?: string | number | null;
-  gaji_maksimal?: string | number | null;
-  umur_min?: string | number | null;
-  umur_max?: string | number | null;
+  gaji_minimal?: number | null;
+  gaji_maksimal?: number | null;
+  umur_min?: number | null;
+  umur_max?: number | null;
   lokasi_taxo?: string | string[] | null;
   deadline?: string | null;
 }
@@ -58,7 +58,7 @@ export interface CardJob {
   nama_perusahaan?: string;
   ringkasanPekerjaan?: JobSummary | null;
   deadline?: string | null;
-  statusjob?: number | string | null;
+  statusjob?: (0 | 2 | 3) | undefined; // 0: Normal, 2: Urgent, 3: Pinned
   permalink?: string;
   post_time?: string;
 }
@@ -85,13 +85,6 @@ export interface JobGridProps {
   filters?: Partial<SearchFilters>;
   title?: string;
   totalJobs?: number;
-}
-
-export interface JobCarousel<T = unknown> {
-  initSwiper: (slides: T[], onVirtualUpdate?: () => void) => void;
-  updateSlides: (slides: T[]) => void;
-  mountVirtualSlides: (jobs: CardJob[]) => void;
-  getBatchSize: () => number;
 }
 
 export interface CarouselProps {

@@ -232,7 +232,7 @@
     FileSolid,
     ChevronRightSolid,
     ArrowLeftSolid,
-    TrashSolid,
+    TrashAltSolid,
   } from "svelte-awesome-icons";
 
   let {
@@ -491,7 +491,7 @@
                 class="dropdown-btn hover:underline border rounded-full"
                 onclick={() => CustomDropdownController.clearFilters(update)}
               >
-                <TrashSolid class="mr-2" aria-hidden="true" />Hapus filter
+                <TrashAltSolid class="mr-2" aria-hidden="true" />Hapus filter
               </button>
             {/if}
           </div>
@@ -505,7 +505,7 @@
             class="dropdown-btn hover:underline border rounded-full"
             onclick={() => CustomDropdownController.clearFilters(update)}
           >
-            <TrashSolid class="mr-2" aria-hidden="true" />Hapus filter
+            <TrashAltSolid class="mr-2" aria-hidden="true" />Hapus filter
           </button>
         </div>
       {/if}

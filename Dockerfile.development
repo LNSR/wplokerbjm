@@ -49,7 +49,7 @@ RUN curl -sSLf -o /usr/local/bin/install-php-extensions https://github.com/mloca
     chmod +x /usr/local/bin/install-php-extensions
 
 # Install PHP extensions using PIE
-RUN install-php-extensions redis imagick apcu igbinary msgpack yaml brotli memcached bcmath calendar curl exif gd gettext gmp intl mbstring mysqli pcntl soap sockets sodium sysvmsg sysvsem sysvshm xml zip zstd psr fileinfo
+RUN install-php-extensions redis imagick apcu igbinary msgpack yaml brotli memcached bcmath calendar curl exif gd gettext gmp intl mbstring mysqli pcntl soap sockets sodium sysvmsg sysvsem sysvshm xml zip zstd psr fileinfo inotify xdebug
 
 # Copy any custom PHP ini files to the builder so they are baked in and can be copied to final
 COPY docker.conf.d/dev/*.ini /usr/local/etc/php/conf.d/

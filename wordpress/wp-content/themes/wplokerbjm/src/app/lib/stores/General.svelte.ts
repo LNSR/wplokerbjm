@@ -3,26 +3,26 @@ import { FormattingService } from '@/services/Formatting'
 import { type JobSummary, type JobContactRow, type SocialMediaItem } from "@/types";
 import type { Component } from 'svelte';
 import {
-  ClockSolid,
-  GraduationCapSolid,
-  BriefcaseSolid,
-  VenusMarsSolid,
-  MoneyBillWaveSolid,
-  CakeCandlesSolid,
-  MapPinSolid,
-  CalendarSolid,
-  EnvelopeSolid,
-  PhoneSolid,
-  GlobeSolid,
-  InstagramBrands,
-  WhatsappBrands,
-  TiktokBrands,
-  ThreadsBrands,
-  FacebookBrands,
-  TelegramBrands,
-  LinkedinBrands,
-  YoutubeBrands,
-  TwitterBrands,
+    ClockSolid,
+    GraduationCapSolid,
+    BriefcaseSolid,
+    VenusMarsSolid,
+    MoneyBillWaveSolid,
+    CakeCandlesSolid,
+    CalendarSolid,
+    EnvelopeSolid,
+    PhoneSolid,
+    GlobeSolid,
+    InstagramBrands,
+    WhatsappBrands,
+    TiktokBrands,
+    ThreadsBrands,
+    FacebookBrands,
+    TelegramBrands,
+    LinkedinBrands,
+    YoutubeBrands,
+    TwitterBrands,
+    MapMarkerAltSolid,
 } from "svelte-awesome-icons";
 
 interface SummaryRow {
@@ -39,45 +39,94 @@ interface ContactRow {
     href: string
 }
 export class GeneralStore {
-    static useDeadline(deadline: string | null | undefined): { text: string; style: string } {
-        if (!deadline) {
-            return { text: '', style: '' }
+
+    public useDeadline(deadline: string | null | undefined, now?: SvelteDate): () => { text: string; style: string } {
+        function computeDeadlineInfo(dl?: string | null, nowMs?: number): { text: string; style: string } {
+            if (!dl) {
+                return { text: '', style: '' }
+            }
+            const deadlineDateRaw = new Date(dl)
+            const nowRaw = new Date(nowMs ?? Date.now())
+            const deadlineDate = new Date(
+                deadlineDateRaw.getFullYear(),
+                deadlineDateRaw.getMonth(),
+                deadlineDateRaw.getDate()
+            )
+            const now = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate())
+            const msPerDay = 1000 * 60 * 60 * 24
+            const days_left = Math.floor((deadlineDate.getTime() - now.getTime()) / msPerDay)
+            let text = ''
+            let style = ''
+            if (days_left > 1) {
+                text = `Sisa ${days_left} hari`
+                style = 'bg-blue-600 text-white border border-blue-800'
+            } else if (days_left === 1) {
+                text = 'Sisa 1 hari'
+                style = 'bg-yellow-400 text-black border border-yellow-600'
+            } else if (days_left === 0) {
+                text = 'Hari terakhir'
+                style = 'bg-red-600 text-white border border-red-800'
+            } else if (days_left === -1) {
+                text = 'Berakhir kemarin'
+                style = 'bg-gray-500 text-white border border-gray-700'
+            } else if (days_left < -1) {
+                text = `Berakhir ${Math.abs(days_left)} hari lalu`
+                style = 'bg-gray-400 text-black border border-gray-700'
+            } else {
+                text = 'Berakhir hari ini'
+                style = 'bg-red-600 text-white border border-red-800'
+            }
+            return { text, style }
         }
-        const deadlineDateRaw = new Date(deadline)
-        const nowRaw = new Date()
-        const deadlineDate = new Date(
-            deadlineDateRaw.getFullYear(),
-            deadlineDateRaw.getMonth(),
-            deadlineDateRaw.getDate()
+
+        const deadlineInfo = this.timeReactiveValues<{ text: string; style: string }>(
+            (nowMs) => computeDeadlineInfo(deadline, nowMs),
+            now,
         )
-        const now = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate())
-        const msPerDay = 1000 * 60 * 60 * 24
-        const days_left = Math.floor((deadlineDate.getTime() - now.getTime()) / msPerDay)
-        let text = ''
-        let style = ''
-        if (days_left > 1) {
-            text = `Sisa ${days_left} hari`
-            style = 'bg-blue-600 text-white border border-blue-800'
-        } else if (days_left === 1) {
-            text = 'Sisa 1 hari'
-            style = 'bg-yellow-400 text-black border border-yellow-600'
-        } else if (days_left === 0) {
-            text = 'Hari terakhir'
-            style = 'bg-red-600 text-white border border-red-800'
-        } else if (days_left === -1) {
-            text = 'Berakhir kemarin'
-            style = 'bg-gray-500 text-white border border-gray-700'
-        } else if (days_left < -1) {
-            text = `Berakhir ${Math.abs(days_left)} hari lalu`
-            style = 'bg-gray-400 text-black border border-gray-700'
-        } else {
-            text = 'Berakhir hari ini'
-            style = 'bg-red-600 text-white border border-red-800'
-        }
-        return { text, style }
+
+        return deadlineInfo
     }
 
-    static useStatusJob(status_pekerjaan: number): { label: string; color: string } {
+    public useTimeAgo(postTime?: string, now?: SvelteDate): () => string {
+        function computeTimeText(pt?: string, nowMs?: number): string {
+            if (!pt) return ''
+            const postDate = new Date(pt)
+            if (isNaN(postDate.getTime())) return ''
+            const nowDate = new Date(nowMs ?? Date.now())
+            const diff = Math.floor((nowDate.getTime() - postDate.getTime()) / 1000)
+
+            if (diff < 60) return 'Baru saja diposting'
+            if (diff < 3600) return `${Math.floor(diff / 60)} menit lalu`
+            if (diff < 86400) return `${Math.floor(diff / 3600)} jam lalu`
+            if (diff < 604800) return `${Math.floor(diff / 86400)} hari lalu`
+            if (diff < 2592000) return `${Math.floor(diff / 604800)} minggu lalu`
+            if (diff < 31536000) return `${Math.floor(diff / 2592000)} bulan lalu`
+            return `${Math.floor(diff / 31536000)} tahun lalu`
+        }
+
+        const time = this.timeReactiveValues<string>(
+            (nowMs) => computeTimeText(postTime, nowMs),
+            now,
+        )
+
+        return time
+    }
+
+    private timeReactiveValues<T>(compute: (nowMs: number) => T, now?: SvelteDate,): () => T {
+        const value = $derived.by(() => {
+            // read now so derived recalculates every tick
+            now
+            const nowMs = now ? now.getTime() : Date.now()
+            return compute(nowMs)
+        })
+
+        // Return a thunk so callers read the reactive value lazily. This
+        // avoids the compiler warning about returning a local reactive
+        // variable which would otherwise capture only its initial value.
+        return () => value
+    }
+    
+    public useStatusJob(status_pekerjaan: number): { label: string; color: string } {
         switch (status_pekerjaan) {
             case 2:
                 return {
@@ -97,10 +146,10 @@ export class GeneralStore {
         }
     }
 
-    static useSummaryJob(jobdata: JobSummary | null | undefined): SummaryRow[] {
+    public useSummaryJob(jobdata: JobSummary | null | undefined): SummaryRow[] {
         const rows: SummaryRow[] = []
         const data: JobSummary = (jobdata ?? {}) as JobSummary
-        
+
         /**
          * Format deadline date to Indonesian format
          */
@@ -175,7 +224,7 @@ export class GeneralStore {
         }
         if (data['lokasi_taxo']) {
             rows.push({
-                icon: MapPinSolid,
+                icon: MapMarkerAltSolid,
                 label: 'Lokasi',
                 value: Array.isArray(data['lokasi_taxo'])
                     ? data['lokasi_taxo'].join(', ')
@@ -194,7 +243,7 @@ export class GeneralStore {
         return rows
     }
 
-    static useContactsJob(jobdata: JobContactRow): ContactRow[] {
+    public useContactsJob(jobdata: JobContactRow): ContactRow[] {
         const contacts: ContactRow[] = [];
 
         (jobdata.email_kontak ?? []).forEach((email) => {
@@ -236,50 +285,8 @@ export class GeneralStore {
         return contacts
     }
 
-    static useTimeAgo(postTime?: string): () => string {
-        function computeTimeText(pt?: string, nowMs?: number): string {
-            if (!pt) return ''
-            const postDate = new Date(pt)
-            if (isNaN(postDate.getTime())) return ''
-            const now = new Date(nowMs ?? Date.now())
-            const diff = Math.floor((now.getTime() - postDate.getTime()) / 1000)
-
-            if (diff < 60) return 'Baru saja diposting'
-            if (diff < 3600) return `${Math.floor(diff / 60)} menit lalu`
-            if (diff < 86400) return `${Math.floor(diff / 3600)} jam lalu`
-            if (diff < 604800) return `${Math.floor(diff / 86400)} hari lalu`
-            if (diff < 2592000) return `${Math.floor(diff / 604800)} minggu lalu`
-            if (diff < 31536000) return `${Math.floor(diff / 2592000)} bulan lalu`
-            return `${Math.floor(diff / 31536000)} tahun lalu`
-        }
-
-        // shared clock that ticks every second
-        let _nowClock: SvelteDate | null = null
-        if (typeof window !== 'undefined') {
-            _nowClock = new SvelteDate()
-            $effect(() => {
-                const id = setInterval(() => _nowClock!.setTime(Date.now()), 1000)
-                return () => clearInterval(id)
-            })
-        } else {
-            _nowClock = new SvelteDate(new Date())
-        }
-
-        const time = $derived.by(() => {
-            // read shared clock so derived recalculates every tick
-            _nowClock
-            const nowMs = _nowClock ? _nowClock.getTime() : Date.now()
-            return computeTimeText(postTime, nowMs)
-        })
-
-        // Return a thunk so callers read the reactive value lazily. This
-        // avoids the compiler warning about returning a local reactive
-        // variable which would otherwise capture only its initial value.
-        return () => time
-    }
-
-    static useSocialMedia(): { socialMediaItems: (data: Record<string, string | string[]>) => SocialMediaItem[] } {
-    const platforms: Record<string, { icon: Component; base_url: string }> = {
+    public useSocialMedia(): { socialMediaItems: (data: Record<string, string | string[]>) => SocialMediaItem[] } {
+        const platforms: Record<string, { icon: Component; base_url: string }> = {
             "X / Twitter": {
                 icon: TwitterBrands,
                 base_url: "https://twitter.com/",
@@ -384,5 +391,7 @@ export class GeneralStore {
             return processedItems;
         }
         return { socialMediaItems: createSocialMediaItems };
-     }
- }
+    }
+}
+
+export const generalStore = new GeneralStore();

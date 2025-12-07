@@ -5,33 +5,34 @@ namespace WPLokerBJM\Core\Container;
 use WPLokerBJM\Contracts\HooksInterface;
 
 /**
+ * Initializes core services in the wplokerbjm theme by registering WordPress hooks.
  *
- * Responsible for initializing core services in the wplokerbjm theme.
+ * This class is responsible for bootstrapping the theme's services that implement
+ * HooksInterface. It automatically discovers and initializes these services,
+ * calling their hook registration methods in a centralized way.
  *
  * ## Constructor
- * The constructor accepts an array of service objects. These services are typically
- * responsible for registering WordPress hooks (actions and filters) and should implement
- * the HooksInterface contract.
- *
- * * The array of services is injected (usually via a DI container definition) and stored
- * * as a readonly property, ensuring immutability after construction.
- * @see \WPLokerBJM\Core\Container\Definitions\Core
+ * Accepts an array of service objects injected via the DI container. These services
+ * must implement HooksInterface to have their hooks registered.
  *
  * ## Usage
- * Call the `initialize()` in functions.php method to iterate through all injected services. For each service
- * that implements HooksInterface, it will call `registerActions()` and `registerFilters()`
- * to register the necessary WordPress hooks.
+ * Call the `initialize()` method (typically in functions.php or a bootstrap file)
+ * to register hooks for all injected services. This iterates through the services,
+ * checks if they implement HooksInterface, and calls `registerActions()` and
+ * `registerFilters()` on each.
  *
- * This approach allows you to batch-register hooks for multiple services in a single place,
- * keeping your theme's bootstrap logic organized and maintainable.
- * * @see \WPLokerBJM\Contracts\HooksInterface
+ * This pattern centralizes hook registration, making it easier to manage and debug
+ * WordPress integrations across the theme.
+ *
+ * @see \WPLokerBJM\Core\Container\Definitions\Core
+ * @see \WPLokerBJM\Contracts\HooksInterface
  */
 class Init
 {
     /**
      * @var array<int,object> $services
-     * Array of service objects to be initialized. Each should implement HooksInterface.
-     * This property is readonly and set via constructor injection.
+     * Array of service objects to initialize. Each should implement HooksInterface.
+     * Injected via constructor and stored as readonly for immutability.
      */
     public function __construct(private readonly array $services = [])
     {
@@ -40,8 +41,9 @@ class Init
     /**
      * Initialize all services by registering their WordPress hooks.
      *
-     * Iterates through each service in the $services array. If a service implements
-     * HooksInterface, it will have its registerActions() and registerFilters() methods called.
+     * Loops through the injected services array. For each service that implements
+     * HooksInterface, calls `registerActions()` and `registerFilters()` to set up
+     * WordPress hooks. Errors are logged but don't stop initialization of other services.
      *
      * @return void
      */

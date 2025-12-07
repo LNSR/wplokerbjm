@@ -144,7 +144,7 @@ class Vite
      */
     public static function enqueueForDevelopment(): array
     {
-        $vite_base_url = rtrim(home_url(), '/') . ':5173';
+        $vite_base_url = rtrim(home_url(), '/') . '/__vite';
         $vite_handle = 'vite-entry';
         $client_handle = 'vite-client';
 

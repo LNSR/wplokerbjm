@@ -1,7 +1,7 @@
 <script lang="ts">
   import JobCard from "@components/ui/Homepage/JobCard.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
-  import { navigateTo } from "@/app/lib/stores/Route.svelte";
+  import { navigateTo, routeStateStore } from "$lib/stores/Route.svelte";
   import type { CardJob } from "@/types";
   import { APIService } from "@/services/APIService";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
@@ -9,6 +9,10 @@
   import { onMount, onDestroy, tick } from "svelte";
   import SwiperCore, { type Swiper } from "swiper";
   import { Navigation, Pagination, Autoplay } from "swiper/modules";
+  import {
+    ChevronCircleLeftSolid,
+    ChevronCircleRightSolid,
+  } from "svelte-awesome-icons";
   import "swiper/css";
   import "swiper/css/navigation";
   import "swiper/css/pagination";
@@ -45,7 +49,7 @@
     ) {
       return {
         loop: false,
-        slidesPerView: 1.3,
+        slidesPerView: 1.1,
         spaceBetween: 16,
         autoplay: {
           delay: 5000,
@@ -125,6 +129,20 @@
         };
 
         swiperInstance = new SwiperCore(el, finalCfg);
+
+        // Restore saved slide index
+        const savedState = routeStateStore.getCarouselState(
+          window.location.pathname
+        );
+        // Clear saved state after restoring
+        const deleteState = routeStateStore.clearCarouselState(
+          window.location.pathname
+        );
+        if (savedState) {
+          swiperInstance.slideTo(savedState.slideIndex);
+          deleteState;
+        }
+
         return;
       } catch (err) {
         console.error("Failed to initialize Swiper:", err);
@@ -346,6 +364,9 @@
 
     static destroySwiper(): void {
       if (swiperInstance) {
+        routeStateStore.saveCarouselState(window.location.pathname, {
+          slideIndex: swiperInstance.activeIndex,
+        });
         try {
           swiperInstance.destroy(true, true);
         } catch (err) {
@@ -355,6 +376,37 @@
         swiperContainerEl = null;
         nextButtonEl = null;
         prevButtonEl = null;
+      }
+    }
+  }
+
+  class CarouselNavigationHandler {
+    public static async handleClickNavigateToJob(
+      slug: string,
+      permalink: CardJob["permalink"],
+      job: CardJob
+    ): Promise<void> {
+      this.carouselSaveCurrentSlideState();
+      await this.handlePlatformSpecificNavigation(slug, permalink, job);
+    }
+    private static carouselSaveCurrentSlideState(): void {
+      routeStateStore.saveCarouselState(window.location.pathname, {
+        slideIndex: swiperInstance?.activeIndex ?? 0,
+      });
+    }
+
+    private static async handlePlatformSpecificNavigation(
+      slug: string,
+      permalink: CardJob["permalink"],
+      job: CardJob
+    ): Promise<void> {
+      if (typeof window !== "undefined" && window.innerWidth >= 768) {
+        // Desktop: open overlay
+        await jobOverlay.openOverlay(slug, job);
+      } else {
+        // Mobile: use SPA navigation to SingleLowongan.svelte route
+        const url = new URL(String(permalink), window.location.origin);
+        await navigateTo(url.pathname + url.search + url.hash);
       }
     }
   }
@@ -391,21 +443,7 @@
           disabled={isRefreshing}
           aria-disabled={isRefreshing}
         >
-          <svg
-            class="w-4 h-4"
-            aria-hidden="true"
-            focusable="false"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <path
-              d="M15 19l-7-7 7-7"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <ChevronCircleLeftSolid class="w-6 h-6" aria-hidden="true" />
         </button>
         <button
           type="button"
@@ -415,28 +453,13 @@
           disabled={isRefreshing}
           aria-disabled={isRefreshing}
         >
-          <svg
-            class="w-4 h-4"
-            aria-hidden="true"
-            focusable="false"
-            fill="none"
-            viewBox="0 0 24 24"
-          >
-            <path
-              d="M9 5l7 7-7 7"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            />
-          </svg>
+          <ChevronCircleRightSolid class="w-6 h-6" aria-hidden="true" />
         </button>
       </div>
       {#if swiperFailed}
         <button
           class="btn btn-ghost ml-2"
           onclick={() => {
-            // Clear failure flag and attempt reinit
             swiperFailed = false;
             void SwiperManager.reinitializeSwiper({ forceDestroy: true });
           }}
@@ -484,22 +507,14 @@
           <div class="swiper-slide">
             <JobCard
               jobdata={job}
-              permalink={job.permalink ?? ""}
+              permalink={job.permalink}
               variant="carousel"
-              onClick={async (_slug: string) => {
-                // Handle mobile vs desktop navigation
-                if (typeof window !== "undefined" && window.innerWidth >= 768) {
-                  // Desktop: open overlay
-                  await jobOverlay.openOverlay(_slug, job);
-                } else {
-                  // Mobile: use SPA navigation to SingleLowongan.svelte route
-                  const url = new URL(
-                    job.permalink ?? "",
-                    window.location.origin
-                  );
-                  await navigateTo(url.pathname + url.search + url.hash);
-                }
-              }}
+              onClick={async (slug) =>
+                await CarouselNavigationHandler.handleClickNavigateToJob(
+                  slug,
+                  job.permalink ?? "",
+                  job
+                )}
             />
           </div>
         {/each}
