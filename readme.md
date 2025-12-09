@@ -34,11 +34,15 @@ This repository contains the source code and configuration for **WPLokerBJM**.
 ## 🛠️ Setup Configuration
 
 ```bash
-├── bun.lock                           # Bun lockfile for package management
+├── .env
+├── .env.example
+├── .github/
+├── .gitignore
+├── .vscode/
 ├── caddy.Dockerfile                   # Dockerfile for Caddy web server
 ├── Caddyfile                          # Reverse Proxy. See https://caddyserver.com/docs/
 ├── compose.yml                        # Docker Compose configuration
-├── docker.conf.d                      # Images Docker configurations
+├── docker.conf.d                      # Images Docker configurations (dev/prod)
 │   ├── opcache.ini                    # PHP OPcache settings
 │   ├── php.ini                        # PHP configuration
 │   ├── www.conf                       # PHP-FPM worker settings
@@ -63,6 +67,7 @@ This repository contains the source code and configuration for **WPLokerBJM**.
 | Plugin                 | Description                              | Status      |
 | ---------------------- | ---------------------------------------- | ----------- |
 | 🧩 **MetaBox**         | Dynamic data framework for custom fields | ✅ Required |
+| 🖥️ **Query Monitor**   | Debugging and performance monitoring     | 🔧 Optional |
 | 🔍 **Rank Math SEO**   | Custom Job Posting schema integration    | 🔧 Optional |
 | 💾 **UpdraftPlus**     | Backup and restore functionality         | 🔧 Optional |
 | ⚡ **LiteSpeed Cache** | High-performance caching solution        | 🔧 Optional |
@@ -80,38 +85,21 @@ server/
 │   └── HooksInterface.php
 ├── Controllers/               # Controllers
 │   └── REST/                  # REST API controllers
-│       ├── AutoSuggestionSearch.php
-│       ├── Carousel.php
-│       ├── DispatchSSGBuild.php
-│       ├── DynamicSearch.php
-│       ├── JobBookmark.php
-│       ├── JobGridController.php
-│       ├── LoadMore.php
-│       ├── SingleOverlay.php
-│       └── TaxonomyDepth.php
 ├── Core/                      # Core framework and dependency injection
-│   ├── TransientCache.php              # Centralized cache management for transients
 │   ├── Container/             # Container setup and definitions
 │   │   ├── AutowireScanner.php    # Autowire scanner
 │   │   ├── Definitions/           # Container definitions
 │   │   │   ├── AutoScanned.php    # Auto-scanned definitions
-│   │   │   ├── Core.php           # Core definitions
-│   │   │   ├── Factories.php      # Factory definitions
-│   │   │   └── Repositories.php   # Repository definitions
+│   │   │   ├── Core.php           # Init Array Injection definitions(Used by Init class)
 │   │   └── Init.php               # Container initialization
 │   ├── Container.php          # Main DI container
 │   ├── Enqueue/               # Enqueue management
 │   │   └── Vite.php           # Vite integration for asset management
 │   ├── Enqueue.php            # Registers/enqueues scripts and styles
 │   ├── Hooks/                 # Sub-Hooks
-│   │   ├── Google.php
-│   │   ├── Litespeed.php
-│   │   ├── Nonce.php
-│   │   └── Theme.php
 │   ├── Hooks.php              # Registers custom WP actions and filters
-│   └── ObjectCache.php        # Direct object cache management
+│   └── Cache.php              # Primary object cache management (Redis)
 ├── Factories/                 # Factory classes
-│   └── JobDataFactory.php
 ├── Models/                    # Data models and schema definitions
 │   └── Schema/                # MetaBox fields, post types, taxonomies (reference only)
 │       ├── CustomFields.php
@@ -119,19 +107,8 @@ server/
 │       └── Taxonomies.php
 ├── Presenters/                # Page presenters (migrated to CSR frontend, provide only initial data)
 │   ├── Components/            # PHP UI components (migrated to CSR frontend, provide only initial data)
-│   │   ├── Hero.php
-│   │   ├── JobCarousel.php
-│   │   └── JobGrid.php
 ├── QueryBuilders/             # Query builder classes
-│   ├── AttachmentQuery.php
-│   ├── DBQuery/
-│   │   └── CacheQuery.php
-│   ├── JobQuery.php
-│   └── TaxonomyQuery.php
 ├── Repositories/              # Data repositories
-│   ├── CustomFieldRepository.php
-│   ├── JobRepository.php
-│   └── TaxonomyRepository.php
 ├── Services/                  # Business logic/services
 │   ├── Cron/
 │   │   └── CronService.php
@@ -146,18 +123,17 @@ server/
 │   │   └── SSG/                        # SSG: Post management for static generation
 │   │       ├── PostsCRUDListener.php   # Listens to post CRUD for SSG triggers
 │   │       ├── RedirectToSSG.php       # Handles redirects for SSG pages
-│   │       └── TriggerBuild.php        # Triggers SSG builds on post changes
+│   │       └── TriggerBuildSSG.php     # Triggers SSG builds on post changes
 │   ├── REST/
 │   │   ├── RESTData.php
 │   │   └── RESTRoute.php
 │   ├── Taxonomy/
 │   │   ├── TaxonomyManagement.php
 │   │   └── TaxonomyService.php
+│   ├── Webhooks/                       # Webhook-related services
+│   │   └── TriggerBuildSSG.php
 │   └── Utilities/
-│       ├── SSG/
-│       │   ├── BotDetectionHelper/
-│       │   │   ├── BotRangeFetcher.php
-│       │   │   └── DnsResolver.php
+│       ├── SSG/                        # SSG-related utilities
 │       │   ├── BotDetection.php
 │       │   ├── Integrations/
 │       │   │   ├── LiteSpeedIntegration.php
@@ -165,7 +141,7 @@ server/
 │       │   │   └── SSGIntegration.php
 │       │   ├── SSGUtilities.php
 │       │   └── URLFilterService.php
-│       └── Utilities.php
+│       └── Utilities.php               # General utility functions
 └── Views/                     # PHP view templates (migrated to CSR frontend, provide only initial data)
     └── Page/
         ├── ArchiveView.php
@@ -203,34 +179,19 @@ src/
 │   │           ├── SkeletonHomepage.svelte
 │   │           ├── SkeletonPasangIklanLoker.svelte
 │   │           └── SkeletonSingleLowongan.svelte
-│   └── lib/                   # App libraries and utilities
-│       ├── localizations/     # Localization files
-│       │   └── svelte-lightbox.ts
-│       ├── stores/            # Svelte stores for state management
-│       │   ├── Bookmark.svelte.ts
-│       │   ├── General.svelte.ts
-│       │   ├── HeaderStore.svelte.ts
-│       │   ├── JobOverlay.svelte.ts
-│       │   ├── Nonce.svelte.ts
-│       │   ├── route.svelte.ts
-│       │   ├── Search.svelte.ts
-│       │   └── Taxonomy.svelte.ts
-│       └── utils/             # Utility functions
-│           ├── elements.svelte.ts
-│           └── SEO.svelte.ts
-├── app.svelte                 # Main Svelte app component
+│   ├── lib/                   # App libraries and utilities
+│   │   ├── localizations/     # Localization files
+│   │   │   └── svelte-lightbox.ts
+│   │   ├── stores/            # Svelte stores for state management
+│   │   └── utils/             # Utility functions
+│   └── routes/                # Route components
+├── app.svelte                 # Main Svelte app boot component
 ├── assets/                    # Static assets
 │   ├── css/                   # Stylesheets
 │   │   ├── app.css
-│   │   ├── svelte-lightbox.css
 │   │   └── theme.css
-│   └── svelte.svg             # Svelte logo
 ├── global.d.ts                # Global TypeScript declarations
 ├── main.ts                    # Svelte app entry point
-├── routes/                    # Route components
-│   ├── Homepage.svelte
-│   ├── PasangIklanLoker.svelte
-│   └── SingleLowongan.svelte
 ├── services/                  # Service classes (API, Auth, etc.)
 │   ├── api/                   # API-related services
 │   │   ├── Client.ts          # API client setup/utilities
@@ -244,13 +205,8 @@ src/
 │   ├── AuthService.ts
 │   ├── Formatting.ts
 │   ├── Mounter.ts
-│   └── workers/               # Web workers
 ├── types/                     # TypeScript type definitions
-│   ├── API.ts
-│   ├── Component.ts
-│   ├── index.ts
-│   └── Job.ts
-└── utils/                     # Utility functions
+└── utils/                     # Agnostic utility
     ├── debounce.ts
     ├── elements.ts
     ├── indexedDB.ts

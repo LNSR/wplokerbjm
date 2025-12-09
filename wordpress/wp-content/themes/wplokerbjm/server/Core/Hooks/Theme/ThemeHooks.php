@@ -191,9 +191,7 @@ class ThemeInject
     {
         $wpThemeData = self::themeData(); // theme data for hydration
         ?>
-        <script type="application/json" id="wp-theme-data">
-                                                                                    <?= json_encode($wpThemeData); ?>
-                                                                                </script>
+        <script type="application/json" id="wp-theme-data"> <?= json_encode($wpThemeData); ?> </script>
         <script id="theme-preferences" data-no-optimize="1">
             (() => {
                 function removeScriptEl() {
@@ -292,6 +290,7 @@ class DebloatWPTheme
         remove_action('wp_footer', 'wp_enqueue_stored_styles', 1);
         remove_action('wp_footer', 'wp_maybe_inline_styles', 1);
         remove_action('wp_footer', array('WP_Duotone', 'output_footer_assets'), 10);
+        remove_action('wp_footer', 'the_block_template_skip_link', 10);
 
         wp_dequeue_style('wc-block-style');
         wp_dequeue_style('global-styles-inline-css');

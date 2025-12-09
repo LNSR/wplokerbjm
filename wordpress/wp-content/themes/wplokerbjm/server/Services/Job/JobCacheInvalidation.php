@@ -1,7 +1,7 @@
 <?php
 namespace WPLokerBJM\Services\Job;
 
-use WPLokerBJM\Core\ObjectCache;
+use WPLokerBJM\Core\Cache;
 use WPLokerBJM\Factories\JobDataFactory;
 use WPLokerBJM\Contracts\HooksInterface;
 use WPLokerBJM\Services\REST\RESTData;
@@ -76,12 +76,18 @@ class JobCacheInvalidation implements HooksInterface
         $overlayCacheKeyPublic = RESTData::OVERLAY_CACHE_PREFIX . $post_id . '_public';
         $schemaCacheKey = JobSchemaOrg::SCHEMA_JOB_KEY_PREFIX . $post_id;
 
-        $jobDeleted = ObjectCache::delete($jobDataCacheKey);
-        $cardDeleted = ObjectCache::delete($cardCacheKey);
-        $overlayDeletedLoggedIn = ObjectCache::delete($overlayCacheKeyLoggedIn);
-        $overlayDeletedPublic = ObjectCache::delete($overlayCacheKeyPublic);
-        $schemaDeleted = ObjectCache::delete($schemaCacheKey);
+        // Use deleteMultiple for better performance - single network round trip
+        $cacheKeys = [
+            $jobDataCacheKey,
+            $cardCacheKey,
+            $overlayCacheKeyLoggedIn,
+            $overlayCacheKeyPublic,
+            $schemaCacheKey
+        ];
 
-        return $jobDeleted || $cardDeleted || $overlayDeletedLoggedIn || $overlayDeletedPublic || $schemaDeleted;
+        $deleteResults = Cache::deleteMultiple($cacheKeys);
+
+        // Return true if any cache entry was deleted
+        return !empty(array_filter($deleteResults));
     }
 }

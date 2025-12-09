@@ -12,10 +12,11 @@
 
 <script lang="ts">
   import type Viewer from "viewerjs";
-  import { GeneralStore } from "$lib/stores/General.svelte";
+  import { generalStore } from "$lib/stores/General.svelte";
   import { FormattingService } from "@/services/Formatting";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import Adsense from "@components/ui/Shared/Adsense.svelte";
+  import { SvelteDate } from 'svelte/reactivity';
   import {
     ClockSolid,
     UserTieSolid,
@@ -29,17 +30,20 @@
     AddressBookSolid,
   } from "svelte-awesome-icons";
   import type { SingleOverlayResponse } from "@/types";
+  import { timeEffect } from "@/app/lib/utils/elements.svelte";
 
   let { job }: { job: SingleOverlayResponse } = $props();
 
+  let now = $state(new SvelteDate());
+
   const ringkasanPekerjaan = $derived(
-    GeneralStore.useSummaryJob(job.ringkasanPekerjaan)
+    generalStore.useSummaryJob(job.ringkasanPekerjaan)
   );
-  const contacts = $derived(GeneralStore.useContactsJob(job.contacts));
+  const contacts = $derived(generalStore.useContactsJob(job.contacts));
   const socialMediaItems = $derived(
-    GeneralStore.useSocialMedia().socialMediaItems(job.social_media)
+    generalStore.useSocialMedia().socialMediaItems(job.social_media)
   );
-  const timeAgo = $derived(GeneralStore.useTimeAgo(job.post_time));
+  const timeAgo = $derived.by(() => generalStore.useTimeAgo(job.post_time, now));
 
   const allImages = $derived(
     [
@@ -133,6 +137,10 @@
       viewer!.view(imageIndex);
     }
   }
+
+  $effect(() => {
+    timeEffect(now);
+  });
 
   $effect(() => {
     return () => {

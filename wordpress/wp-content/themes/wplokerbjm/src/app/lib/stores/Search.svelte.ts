@@ -46,7 +46,8 @@ export class SearchManager {
             (typeof f.cari === 'string' && f.cari.trim() !== '') ||
             (Array.isArray(f.lokasi) && f.lokasi.length > 0) ||
             (Array.isArray(f.gender) && f.gender.length > 0) ||
-            (Array.isArray(f.pendidikan) && f.pendidikan.length > 0)
+            (Array.isArray(f.pendidikan) && f.pendidikan.length > 0) ||
+            (f.sort && f.sort.value)
         )
     }
 

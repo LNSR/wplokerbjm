@@ -6,14 +6,14 @@ import { resolve } from "path";
 import liveReload from "vite-plugin-live-reload";
 import { visualizer } from "rollup-plugin-visualizer";
 // import { compression, defineAlgorithm } from 'vite-plugin-compression2'
-import fs from "fs";
-import path from "path";
+// import fs from "fs";
+// import path from "path";
 
 export default defineConfig(({ command }) => ({
   plugins: [
     svelte(),
     tailwindcss(),
-    liveReload(["./**/*.php"]),
+    liveReload(["./vendor/composer/autoload_real.php"]),
     visualizer({ open: true }),
     // compression({
     //   deleteOriginalAssets: true,
@@ -42,22 +42,23 @@ export default defineConfig(({ command }) => ({
     },
   },
   server: (() => {
-    const base = { host: "0.0.0.0", port: 5173, cors: true };
-    if (command !== "serve") return base;
-    try {
-      const key = fs.readFileSync(
-        path.resolve(__dirname, "../../../../localhost-key.pem")
-      );
-      const cert = fs.readFileSync(path.resolve(__dirname, "../../../../localhost.pem"));
-      return { ...base, https: { key, cert } };
-    } catch (err) {
-      console.warn("Local HTTPS certs not available; running dev server without HTTPS:", String(err));
-      return base;
-    }
+    const base = { host: "0.0.0.0", allowedHosts: true as const, port: 5173, cors: true, strictPort: false, hmr: { overlay: true, port: 5173, clientPort: 443 } };
+    return base;
+    // if (command !== "serve") return base;
+    // try {
+    //   const key = fs.readFileSync(
+    //     path.resolve(__dirname, "../../../../certs/localhost-key.pem")
+    //   );
+    //   const cert = fs.readFileSync(path.resolve(__dirname, "../../../../certs/localhost.pem"));
+    //   return { ...base, https: { key, cert } };
+    // } catch (err) {
+    //   console.warn("Local HTTPS certs not available; running dev server without HTTPS:", String(err));
+    //   return base;
+    // }
   })(),
   ...(command === "build"
     ? { base: "/wp-content/themes/wplokerbjm/assets/dist/" }
-    : {}),
+    : { base: "/__vite/" }),
   build: {
     outDir: "./assets/dist",
     emptyOutDir: true,

@@ -1,11 +1,11 @@
 {
   "folders": [
     {
-      "name": "wplokerbjm",
+      "name": "wplokerbjm-root",
       "path": "."
     },
     {
-      "name": "wplokerbjm-svelte",
+      "name": "wplokerbjm-wp-theme",
       "path": "wordpress/wp-content/themes/wplokerbjm"
     }
   ],
@@ -69,7 +69,7 @@
         "request": "launch",
         "port": 9004,
         "pathMappings": {
-          "/var/www/html/": "${workspaceFolder:wplokerbjm}/wordpress/"
+          "/var/www/html/": "${workspaceFolder:wplokerbjm-root}/wordpress/"
         }
       }
     ]
@@ -83,17 +83,27 @@
         "command": "composer run lint:php",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-svelte}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
+        },
+        "problemMatcher": []
+      },
+      {
+        "label": "php-composer-autoload",
+        "type": "shell",
+        "command": "composer run watch:autoload",
+        "group": "build",
+        "options": {
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
         },
         "problemMatcher": []
       },
       {
         "label": "dev",
         "type": "shell",
-        "command": "bun -b run dev",
+        "command": "bun -b run dev --host",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-svelte}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
         },
         "problemMatcher": []
       },
@@ -103,7 +113,7 @@
         "command": "bun -b run build",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-svelte}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
         },
         "problemMatcher": []
       },
@@ -113,7 +123,7 @@
         "command": "bun -b run check",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-svelte}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
         },
         "problemMatcher": []
       }

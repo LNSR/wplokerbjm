@@ -10,8 +10,7 @@
 
 ## 📁 Important Theme Files & Folders
 
-1. 🔧 **`functions.php`** - Main theme functions file.
-2. 🎨 **`style.css`** - Boilerplate WordPress stylesheet for the child theme. Contains theme metadata and custom styles.
+2. 🎨 **`style.css`** - Boilerplate WordPress stylesheet for the theme. Contains theme metadata and custom styles.
 3. ⚙️ **`server/`** - Directory containing backend PHP code, including custom functions, REST APIs, hooks, and filters.
 4. 🖼️ **`src/`** - Directory containing Svelte components and all client-side code that enhances the user interface.
 5. 📦 **`assets/`** - Directory for static assets like images, fonts, static site generation, and compiled CSS/JS files.
@@ -63,9 +62,11 @@ The scanner intelligently skips classes that shouldn't be autowired:
 
 - ❌ **Interfaces** - Cannot be instantiated
 - ❌ **Abstract classes** - Cannot be instantiated
+- ❌ **Final classes** - Cannot be extended or proxied
 - ❌ **Static-only classes** - Don't need instances (utility classes, etc.)
 - ❌ **Traits** - Cannot be instantiated
 - ❌ **Classes with non-public constructors** - Cannot be autowired
+- ❌ **The AutowireScanner class itself** - To avoid circular dependencies
 
 ### Manual Definitions
 
@@ -77,108 +78,6 @@ You can still create manual definitions for special cases:
 4. **Singleton patterns** - When you need specific instantiation logic
 
 Manual definitions are placed in `server/Core/Definitions/` and take precedence over auto-scanned definitions.
-
-### Directory Structure
-
-```bash
-server/
-├── Contracts/
-│   ├── DataProviderInterface.php
-│   └── HooksInterface.php
-├── Controllers/
-│   └── REST/
-│       ├── AutoSuggestionSearch.php
-│       ├── Carousel.php
-│       ├── DispatchSSGBuild.php
-│       ├── DynamicSearch.php
-│       ├── JobBookmark.php
-│       ├── JobGridController.php
-│       ├── LoadMore.php
-│       ├── SingleOverlay.php
-│       └── TaxonomyDepth.php
-├── Core/
-│   ├── Cache.php
-│   ├── Container/
-│   │   ├── AutowireScanner.php
-│   │   ├── Definitions/
-│   │   │   ├── AutoScanned.php
-│   │   │   ├── Core.php
-│   │   │   ├── Factories.php
-│   │   │   └── Repositories.php
-│   │   └── Init.php
-│   ├── Container.php
-│   ├── Enqueue/
-│   │   └── Vite.php
-│   ├── Enqueue.php
-│   ├── Hooks/
-│   │   ├── Google.php
-│   │   ├── Litespeed.php
-│   │   ├── Nonce.php
-│   │   └── Theme.php
-│   ├── Hooks.php
-│   └── ObjectCache.php
-├── Factories/
-│   └── JobDataFactory.php
-├── Models/
-│   └── Schema/
-│       ├── CustomFields.php
-│       ├── PostTypes.php
-│       └── Taxonomies.php
-├── Presenters/
-│   ├── Components/
-│   │   ├── Hero.php
-│   │   ├── JobCarousel.php
-│   │   └── JobGrid.php
-├── QueryBuilders/
-│   ├── AttachmentQuery.php
-│   ├── DBQuery/
-│   │   └── CacheQuery.php
-│   ├── JobQuery.php
-│   └── TaxonomyQuery.php
-├── Repositories/
-│   ├── CustomFieldRepository.php
-│   ├── JobRepository.php
-│   └── TaxonomyRepository.php
-├── Services/
-│   ├── Cron/
-│   │   └── CronService.php
-│   ├── CustomField/
-│   │   └── CustomFieldsService.php
-│   ├── Job/
-│   │   ├── ArchiveServices.php
-│   │   ├── FormatterServices.php
-│   │   └── JobServices.php
-│   ├── PostsManagement/
-│   │   ├── PostsManagement.php
-│   │   └── SSG/
-│   │       ├── PostsCRUDListener.php
-│   │       ├── RedirectToSSG.php
-│   │       └── TriggerBuild.php
-│   ├── REST/
-│   │   ├── RESTData.php
-│   │   └── RESTRoute.php
-│   ├── Taxonomy/
-│   │   ├── TaxonomyManagement.php
-│   │   └── TaxonomyService.php
-│   └── Utilities/
-│       ├── SSG/
-│       │   ├── BotDetection.php
-│       │   ├── BotDetectionHelper/
-│       │   │   ├── BotRangeFetcher.php
-│       │   │   └── DnsResolver.php
-│       │   ├── Integrations/
-│       │   │   ├── LiteSpeedIntegration.php
-│       │   │   ├── RankMathIntegration.php
-│       │   │   └── SSGIntegration.php
-│       │   ├── SSGUtilities.php
-│       │   └── URLFilterService.php
-│       └── Utilities.php
-└── Views/
-    └── Page/
-        ├── ArchiveView.php
-        ├── HomepageView.php
-        └── SingleView.php
-```
 
 ### Usage Examples
 
@@ -223,24 +122,20 @@ $jobService = $container->get(JobService::class);
 - **Production**: Container compilation is enabled with caching for optimal performance
 - **APCu**: When available, definition caching is enabled for additional speed
 
-### Debugging
-
-The `AutowireScanner` includes debug methods to help identify which classes are being registered and why some might be skipped. See the scanner class for debug utilities.
-
 ## 📝 Development Notes
 
 > 💡 **Architecture Tips**
 >
-> - 🔗 See [Init.php](server/Core/Init.php) and [PHP-DI Container](server/Core/Container.php) for WordPress event-driven hooks implementation
+> - 🔗 See [Init.php](server/Core/Container/Init.php) and [PHP-DI Container](server/Core/Container.php) for WordPress event-driven hooks implementation
 > - 🔗 See the **Dependency Injection System** section above for details on automatic class discovery and registration
 > - 🎨 [Assets](assets) are shared between backend and frontend - Tailwind scans both PHP and Svelte source files
 > - ⚡ All frontend rendering happens in `<body>` (CSR) while `<head>` contains server-side data
 
 ## 📋 Mini Kanban Table
 
-| 📥 BACKLOG                                   | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                           |
-| -------------------------------------------- | ------- | -------------- | -------------------------------------- |
-|                                              |         |                | ✅ Migrate to Svelte for most frontend |
-| 🚀 Migrate to SvelteKit and deploy to Vercel |         |                | ✅ Fully CSR `<body>`                  |
-| 🗺️ Add Job Fair Page (map & event details)   |         |                | ✅ Implement SSG via GitHub Actions    |
-|                                              |         |                | ✅ Client side bookmark system         |
+| 📥 BACKLOG                                             | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                           |
+| ------------------------------------------------------ | ------- | -------------- | -------------------------------------- |
+|                                                        |         |                | ✅ Migrate to Svelte for most frontend |
+| 🚀 Migrate to SvelteKit and deploy to Vercel/CF Worker |         |                | ✅ Fully CSR `<body>`                  |
+| 🗺️ Add Job Fair Page (map & event details)             |         |                | ✅ Implement SSG via GitHub Actions    |
+|                                                        |         |                | ✅ Client side bookmark system         |

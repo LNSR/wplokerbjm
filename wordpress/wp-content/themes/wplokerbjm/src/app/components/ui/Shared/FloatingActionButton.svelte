@@ -3,6 +3,7 @@
   import {
     ArrowUpSolid,
     HeadsetSolid,
+    ChevronDownSolid,
     InstagramBrands,
     TiktokBrands,
     FacebookBrands,
@@ -140,21 +141,10 @@
       <!-- Headset icon converted to SVG component -->
       <HeadsetSolid class="text-xl w-5 text-center" aria-hidden="true" />
       <span>Kontak Admin</span>
-      <svg
-        class="w-4 h-4 ml-1 transition-transform"
-        class:rotate-180={dropdownOpen}
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        viewBox="0 0 24 24"
+      <ChevronDownSolid
+        class="w-4 h-4 ml-1 transition-transform {dropdownOpen ? 'rotate-180' : ''}"
         aria-hidden="true"
-      >
-        <path
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          d="M19 9l-7 7-7-7"
-        />
-      </svg>
+      />
     </button>
 
     {#if dropdownOpen}

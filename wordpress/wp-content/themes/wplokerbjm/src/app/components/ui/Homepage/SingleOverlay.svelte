@@ -90,7 +90,7 @@
     class={[
       "min-h-screen flex flex-col pointer-events-auto ml-7",
       slideIn ? "transform translate-x-0" : "transform translate-x-full",
-      "transition-transform duration-600 ease-in-out will-change-[transform]",
+      `transition-transform duration-600 ease-in-out ${visible ? 'will-change-[transform]' : ''}`,
     ].join(" ")}
   >
     <!-- Overlay background (only in JobGrid area) -->

@@ -24,10 +24,11 @@ class Hooks implements HooksInterface
         add_action('wp_head', [Enqueue::class, 'outputPreloadLinks']);
         add_action('wp_head', [ThemeInject::class, 'preloadLogo']);
         add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeWPLibrary'], 1);
-        add_action('litespeed_purged_all', [Litespeed::class, 'clearObjectCacheAndTransient']);
+        add_action('litespeed_purged_all', [Litespeed::class, 'clearObjectCache']);
         add_action('wp_enqueue_scripts', [Enqueue::class, 'enqueueAssets']);
         add_action('template_redirect', [$this, 'oldPost410Redirect'], 0);
         add_action('template_redirect', [$this, 'redirectToHome'], 0);
+        add_action('send_headers', [$this, 'restHeaders']);
     }
 
     /*======================================================================
@@ -41,7 +42,8 @@ class Hooks implements HooksInterface
         add_filter('litespeed_optimize_css_excludes', [LiteSpeedFilters::class, 'lscCssExcludes'], 0);
         add_filter('option_active_plugins', [$this, 'disablePluginsForDev'], -1);
         add_filter('option_active_plugins', [$this, 'disablePluginsforSimulatedProd'], -1);
-        add_filter('wp_robots', [$this, 'noindexLowonganArchive']);
+        add_filter('wp_robots', [$this, 'robotsMeta']);
+        add_filter('rest_pre_serve_request', [$this, 'filterRestHeaders'], accepted_args: 4);
     }
 
     /*======================================================================
@@ -112,6 +114,61 @@ class Hooks implements HooksInterface
     }
 
     /*======================================================================
+     | META TAGS
+     ======================================================================*/
+
+    /**
+     * Adds noindex and nofollow directives to robots meta tag.
+     * - Noindex for lowongan post type archive page.
+     * - Noindex,nofollow for staging/dev subdomains.
+     */
+    public function robotsMeta(array $robots): array
+    {
+        if (is_post_type_archive('lowongan')) {
+            $robots['noindex'] = true;
+        }
+
+        if (defined('WPL_OKERBJM_NO_INDEX') && WPL_OKERBJM_NO_INDEX) {
+            $robots['noindex'] = true;
+            $robots['nofollow'] = true;
+        }
+
+        return $robots;
+    }
+
+    /*======================================================================
+     | HEADERS
+     ======================================================================*/
+
+    /**
+     * Sets X-WP-Nonce header for authenticated users.
+     */
+    public function restHeaders(): void
+    {
+        try {
+            if (!is_user_logged_in()) {
+                return;
+            }
+
+            $nonce = wp_create_nonce('wp_rest');
+            header('X-WP-Nonce: ' . $nonce);
+        } catch (\Exception $e) {
+            error_log('Hooks::restHeaders error: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Exposes specific headers for REST API responses.
+     */
+    public function filterRestHeaders($served, $result, $request, $server)
+    {
+        if (!headers_sent()) {
+            header('Access-Control-Expose-Headers: X-WP-Total, X-WP-TotalPages, Link, X-WP-Nonce');
+        }
+        return $served;
+    }
+
+    /*======================================================================
      | FILTERS
      ======================================================================*/
 
@@ -133,17 +190,6 @@ class Hooks implements HooksInterface
         return $search;
     }
 
-    /**
-     * Adds noindex directive to the lowongan post type archive page.
-     */
-    public function noindexLowonganArchive(array $robots): array
-    {
-        if (is_post_type_archive('lowongan')) {
-            $robots['noindex'] = true;
-        }
-        return $robots;
-    }
-
     /*======================================================================
      | ENVIRONMENT FILTERS
      ======================================================================*/
@@ -157,8 +203,10 @@ class Hooks implements HooksInterface
         if (!$isDev) {
             return $plugins;
         }
+        $extra = [
+        ];
 
-        $pluginsToDisable = array_merge($this->listPluginsToDisable(), ['litespeed-cache/']);
+        $pluginsToDisable = $this->listPluginsToDisable($extra);
         return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
 
@@ -191,14 +239,13 @@ class Hooks implements HooksInterface
         return array_values($filtered);
     }
 
-    private function listPluginsToDisable(): array
+    private function listPluginsToDisable(?array $extra = []): array
     {
-        return [
+        return array_merge([
             'google-site-kit/',
             'seo-by-rank-math/',
             'fast-indexing-api/',
             'wps-hide-login/',
-        ];
+        ], $extra);
     }
-
 }

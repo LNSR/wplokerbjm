@@ -6,8 +6,25 @@ use ReflectionClass;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
-use WPLokerBJM\Core\TransientCache;
+use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Core\Container;
 
+/**
+ * Scans directories for autowirable PHP classes and interface implementers.
+ *
+ * This scanner recursively searches a base directory for PHP files, extracts class names,
+ * and determines which classes are suitable for dependency injection (autowiring). It excludes
+ * interfaces, abstracts, static-only classes, and files in specified directories (e.g., vendor).
+ *
+ * Key features:
+ * - Caches results using APCu (primary) and Redis (fallback) for performance.
+ * - Provides debug methods to inspect scan results and reasons for exclusions.
+ *
+ * Used by the DI container to automatically register services without manual definitions.
+ *
+ * @see \WPLokerBJM\Core\Container\Definitions\AutoScanned
+ * @see \WPLokerBJM\Core\Container\Definitions\Core
+ */
 class AutowireScanner
 {
     private const CACHE_KEY_PREFIX = 'autowire_scanner_';
@@ -28,55 +45,46 @@ class AutowireScanner
      */
     private function getCacheKey(): string
     {
-        $compiledContainerPath = get_stylesheet_directory() . '/cache/CompiledContainer.php';
-        $mtime = file_exists($compiledContainerPath) ? filemtime($compiledContainerPath) : 0;
+        $cachePath = Container::$CACHE_DIR;
+        $mtime = is_dir($cachePath) ? filemtime($cachePath) : 0;
         return self::CACHE_KEY_PREFIX . md5($this->baseDirectory . $this->namespace . $this->getDirectoryHash() . $mtime);
     }
 
     /**
-     * Get a hash of the modification times of all PHP files in the scanned directory.
+     * Get a hash of the modification time of the base directory.
      * Used for cache invalidation when files change.
      */
     private function getDirectoryHash(): string
     {
-        $hash = '';
         try {
-            $iterator = new RecursiveIteratorIterator(
-                new RecursiveDirectoryIterator($this->baseDirectory, RecursiveDirectoryIterator::SKIP_DOTS)
-            );
-            $excludedDirectories = $this->getExcludedDirectories();
-            foreach ($iterator as $file) {
-                if ($file->isFile() && $file->getExtension() === 'php') {
-                    $filePath = $file->getPathname();
-                    if (!$this->isFileInExcludedDirectory($filePath, $excludedDirectories)) {
-                        $hash .= $file->getMTime();
-                    }
-                }
+            $dirMtime = filemtime($this->baseDirectory);
+            if ($dirMtime === false) {
+                error_log('AutowireScanner::getDirectoryHash: Failed to get directory mtime for ' . $this->baseDirectory);
+                return '';
             }
+            return md5((string) $dirMtime);
         } catch (\Exception $e) {
-            // If directory scanning fails, return empty hash to avoid caching issues
             error_log('AutowireScanner::getDirectoryHash error: ' . $e->getMessage());
             return '';
         }
-        return md5($hash);
     }
 
     /**
-     * Scan directories recursively and return definitions for autowirable.
-     * Skips interfaces, abstract classes, and static-only classes.
+     * Scan directories recursively and return DI definitions for autowirable classes.
+     *
+     * Finds all PHP files in the base directory (excluding specified folders), extracts
+     * class names, and creates autowire definitions for suitable classes. Skips interfaces,
+     * abstracts, static-only classes, and those with non-public constructors.
+     *
+     * Uses caching for performance in all environments. APCu is preferred over Redis for speed.
+     *
+     * @return array Associative array of class names to DI autowire definitions
      */
     public function scanForAutowirableClasses(): array
     {
-        $isProduction = defined('WP_ENV') && WP_ENV === 'production';
-        
-        if (!$isProduction) {
-            // Skip caching in development for immediate feedback
-            return $this->performAutowirableScan();
-        }
-
         $cacheKey = $this->getCacheKey();
 
-        // Try APCu first (primary cache for performance)
+        // Check APCu first (fast in-memory cache)
         if (function_exists('apcu_enabled') && apcu_enabled()) {
             $cached = apcu_fetch($cacheKey);
             if ($cached !== false) {
@@ -84,20 +92,20 @@ class AutowireScanner
             }
         }
 
-        // Fallback to transient cache (redirected to Redis via LiteSpeed Cache)
-        $cached = TransientCache::get($cacheKey);
+        // Fallback to Redis-based object cache
+        $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
         }
 
-        // Perform the scan
+        // No cache hit: Perform the actual scan
         $definitions = $this->performAutowirableScan();
 
-        // Cache the result - APCu first, then fallback to Redis
+        // Store result in cache (APCu primary, Redis fallback)
         if (function_exists('apcu_enabled') && apcu_enabled()) {
             apcu_store($cacheKey, $definitions, self::CACHE_TTL);
         } else {
-            TransientCache::set($cacheKey, $definitions, self::CACHE_TTL);
+            Cache::set($cacheKey, $definitions, self::CACHE_TTL);
         }
 
         return $definitions;
@@ -115,7 +123,7 @@ class AutowireScanner
 
         foreach ($phpFiles as $file) {
             $className = $this->getClassNameFromFile($file);
-            
+
             if ($className && $this->isAutowirable($className)) {
                 // Use autowiring for this class
                 $definitions[$className] = \DI\autowire($className)->lazy();
@@ -126,23 +134,21 @@ class AutowireScanner
     }
 
     /**
-     * Get class names of autowirable classes that implement a specific interface.
-     * 
-     * @param string $interface The fully qualified interface name
-     * @return string[] Array of fully qualified class names
+     * Get fully qualified class names of autowirable classes implementing a specific interface.
+     *
+     * Scans for classes that implement the given interface and are autowirable (concrete,
+     * non-static, etc.). Used by the DI container to inject services automatically.
+     *
+     * Caches results similarly to scanForAutowirableClasses for performance.
+     *
+     * @param string $interface Fully qualified interface name (e.g., HooksInterface::class)
+     * @return string[] Array of fully qualified class names that implement the interface
      */
     public function getInterfaceImplementerClassNames(string $interface): array
     {
-        $isProduction = defined('WP_ENV') && WP_ENV === 'production';
-        
-        if (!$isProduction) {
-            // Skip caching in development for immediate feedback
-            return $this->performInterfaceImplementerScan($interface);
-        }
-
         $cacheKey = $this->getCacheKey() . '_interface_names_' . md5($interface);
 
-        // Try APCu first (primary cache for performance)
+        // Check APCu first
         if (function_exists('apcu_enabled') && apcu_enabled()) {
             $cached = apcu_fetch($cacheKey);
             if ($cached !== false) {
@@ -150,8 +156,8 @@ class AutowireScanner
             }
         }
 
-        // Fallback to transient cache (redirected to Redis via LiteSpeed Cache)
-        $cached = TransientCache::get($cacheKey);
+        // Fallback to Redis cache
+        $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
         }
@@ -159,11 +165,11 @@ class AutowireScanner
         // Perform the scan
         $implementers = $this->performInterfaceImplementerScan($interface);
 
-        // Cache the result - APCu first, then fallback to Redis
+        // Cache the result
         if (function_exists('apcu_enabled') && apcu_enabled()) {
             apcu_store($cacheKey, $implementers, self::CACHE_TTL);
         } else {
-            TransientCache::set($cacheKey, $implementers, self::CACHE_TTL);
+            Cache::set($cacheKey, $implementers, self::CACHE_TTL);
         }
 
         return $implementers;
@@ -182,7 +188,7 @@ class AutowireScanner
 
         foreach ($phpFiles as $file) {
             $className = $this->getClassNameFromFile($file);
-            
+
             if ($className && $this->isAutowirable($className)) {
                 // Check if class implements the interface
                 if (is_subclass_of($className, $interface) || in_array($interface, class_implements($className))) {
@@ -206,10 +212,10 @@ class AutowireScanner
     {
         // Create recursive iterator to traverse all directories and files
         $directoryIterator = new RecursiveDirectoryIterator(
-            $this->baseDirectory, 
+            $this->baseDirectory,
             RecursiveDirectoryIterator::SKIP_DOTS
         );
-        
+
         $recursiveIterator = new RecursiveIteratorIterator(
             $directoryIterator,
             RecursiveIteratorIterator::LEAVES_ONLY
@@ -217,17 +223,17 @@ class AutowireScanner
 
         // Filter to only include .php files
         $phpFilesIterator = new RegexIterator($recursiveIterator, '/\.php$/');
-        
+
         $phpFiles = [];
         $excludedDirectories = $this->getExcludedDirectories();
 
         // Process each PHP file found
         foreach ($phpFilesIterator as $file) {
             $filePath = $file->getPathname();
-            
+
             // Check if file is in an excluded directory
             $isInExcludedDirectory = $this->isFileInExcludedDirectory($filePath, $excludedDirectories);
-            
+
             if (!$isInExcludedDirectory) {
                 $phpFiles[] = $filePath;
             }
@@ -251,7 +257,7 @@ class AutowireScanner
                 return true;
             }
         }
-        
+
         return false;
     }
 
@@ -267,7 +273,7 @@ class AutowireScanner
     private function getClassNameFromFile(string $filePath): ?string
     {
         $tokens = token_get_all(file_get_contents($filePath));
-        
+
         if ($tokens === false) {
             return null; // File could not be read
         }
@@ -383,8 +389,8 @@ class AutowireScanner
      */
     private function isConcreteClass(ReflectionClass $reflection): bool
     {
-        return !$reflection->isInterface() 
-            && !$reflection->isAbstract() 
+        return !$reflection->isInterface()
+            && !$reflection->isAbstract()
             && !$reflection->isTrait()
             && !$reflection->isFinal();
     }
@@ -398,7 +404,7 @@ class AutowireScanner
     private function hasAccessibleConstructor(ReflectionClass $reflection): bool
     {
         $constructor = $reflection->getConstructor();
-        
+
         // No constructor is fine (PHP will provide a default)
         if ($constructor === null) {
             return true;
@@ -464,7 +470,7 @@ class AutowireScanner
             'tests',
             'test',
             '.git',
-            'node_modules'
+            'node_modules',
         ];
     }
 
@@ -488,20 +494,20 @@ class AutowireScanner
 
         foreach ($phpFiles as $file) {
             $className = $this->getClassNameFromFile($file);
-            
+
             if ($className) {
                 $isAutowirable = $this->isAutowirable($className);
                 $reason = '';
-                
+
                 if (!$isAutowirable) {
                     $reason = $this->getSkipReason($className);
                 }
-                
+
                 $results[] = [
                     'file' => $file,
                     'class' => $className,
                     'autowirable' => $isAutowirable,
-                    'reason' => $reason
+                    'reason' => $reason,
                 ];
             }
         }

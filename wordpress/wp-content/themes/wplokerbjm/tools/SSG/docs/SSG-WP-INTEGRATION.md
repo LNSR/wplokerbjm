@@ -95,7 +95,7 @@ define('WP_DEBUG_DISPLAY', false);
 ```mermaid
 graph TD
    A[WordPress Post CRUD Events] --> B[PostsCRUDListener]
-   B --> C[TriggerBuild Service]
+   B --> C[TriggerBuildSSG Service]
    C --> D[GitHub Actions API]
    D --> E[SSG Workflow]
    E --> F[Static Site Deployment]
@@ -113,7 +113,7 @@ This section maps the conceptual components to the actual PHP classes and files 
 
 ### 2. Dispatcher Services
 
-- `TriggerBuild` — orchestrates dispatching builds to GitHub Actions (selective or full-site). See `server/Services/PostsManagement/SSG/TriggerBuild.php`.
+- `TriggerBuildSSG` — orchestrates dispatching builds to GitHub Actions (selective or full-site). See `server/Services/Webhooks/TriggerBuildSSG.php`.
 - `PathResolver` — helper that normalizes and deduplicates paths before dispatch (usually part of the services in `server/Services/Utilities/SSG/`).
 
 ### 3. Controllers / REST API
@@ -129,7 +129,7 @@ This section maps the conceptual components to the actual PHP classes and files 
 Quick navigation (click to open the files in your editor):
 
 - `server/Services/PostsManagement/SSG/PostsCRUDListener.php` — post events → path collection
-- `server/Services/PostsManagement/SSG/TriggerBuild.php` — triggers GitHub Actions dispatch
+- `server/Services/Webhooks/TriggerBuildSSG.php` — triggers GitHub Actions dispatch
 - `server/Controllers/REST/DispatchSSGBuild.php` — REST handler (permission/rate-limit/dry-run)
 - `server/Services/REST/RESTRoute.php` — registers REST routes used by SSG tools
 - `server/Services/Utilities/SSG/URLFilterService.php` — path filtering and normalization
@@ -155,7 +155,7 @@ $paths = [
 ### 2. GitHub Actions Trigger
 
 ```php
-// TriggerBuild service calls GitHub API
+// TriggerBuildSSG service calls GitHub API
 $response = wp_remote_post("https://api.github.com/repos/{$owner}/{$repo}/actions/workflows/{$workflow}/dispatches", [
    'headers' => [
       'Authorization' => 'token ' . SSG_GITHUB_TOKEN,
@@ -218,12 +218,12 @@ $normalized = array_map(function ($path) {
 ## Example: Dispatching a Selective Build
 
 ```php
-// Example: TriggerBuild::dispatch($paths, $reason)
+// Example: TriggerBuildSSG::trigger($paths, $reason)
 $paths = ['/','/post/123','/category/lowongan/'];
 $normalized = array_map('home_url', $paths);
 $reason = 'Post updated: 123';
 
-TriggerBuild::dispatch($normalized, $reason);
+TriggerBuildSSG::trigger($normalized, $reason);
 ```
 
 ## Debugging & Observability

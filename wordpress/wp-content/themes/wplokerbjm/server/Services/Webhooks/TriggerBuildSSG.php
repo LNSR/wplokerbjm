@@ -2,7 +2,7 @@
 
 namespace WPLokerBJM\Services\Webhooks;
 
-use WPLokerBJM\Core\TransientCache;
+use WPLokerBJM\Core\Cache;
 use WPLokerBJM\Services\Utilities\SSG\URLFilterService;
 
 /**
@@ -193,7 +193,7 @@ class TriggerBuildSSG
     private function checkDebounceCache(string $key): ?array
     {
         try {
-            $cached = TransientCache::get("ssg_debounce_{$key}");
+            $cached = Cache::get("ssg_debounce_{$key}");
 
             if ($cached !== false) {
                 error_log("SSG Trigger: Found cached result for key: {$key}");
@@ -218,7 +218,7 @@ class TriggerBuildSSG
 
             $cacheKey = "ssg_debounce_{$key}";
 
-            TransientCache::set($cacheKey, $result, $debounceSeconds);
+            Cache::set($cacheKey, $result, $debounceSeconds);
 
             error_log("SSG Trigger: Set debounce cache for key: {$key} (expiration: {$debounceSeconds}s)");
         } catch (\Exception $e) {
@@ -289,7 +289,7 @@ class TriggerBuildSSG
             }
 
             // Check for recent LiteSpeed purge actions using transients
-            $purgeTransient = TransientCache::get('litespeed_recent_purge');
+            $purgeTransient = Cache::get('litespeed_recent_purge');
             if ($purgeTransient !== false) {
                 return true;
             }

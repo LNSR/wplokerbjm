@@ -5,7 +5,7 @@ namespace WPLokerBJM\Services\PostsManagement\SSG;
 use WPLokerBJM\Contracts\HooksInterface;
 use WPLokerBJM\Services\Utilities\SSG\Integrations\{SSGIntegration, LiteSpeedIntegration};
 use WPLokerBJM\Services\Utilities\SSG\SSGUtilities;
-use WPLokerBJM\Core\TransientCache;
+use WPLokerBJM\Core\Cache;
 
 /**
  * SSG Service
@@ -169,7 +169,7 @@ class RedirectToSSG implements HooksInterface
 		try {
 			$visitorType = $isBot ? 'bot' : 'human';
 			$cacheKey = 'ssg_content_' . $post->ID . '_' . $visitorType;
-			$cached = TransientCache::get($cacheKey);
+			$cached = Cache::get($cacheKey);
 			$ssgContent = false;
 
 			$currentMtime = @filemtime($ssgFilePath);
@@ -189,7 +189,7 @@ class RedirectToSSG implements HooksInterface
 			} else {
 				$ssgContent = @file_get_contents($ssgFilePath);
 				if ($ssgContent !== false) {
-					TransientCache::set($cacheKey, ['content' => $ssgContent, 'mtime' => $currentMtime], 0); // No expiration, rely on mtime check
+					Cache::set($cacheKey, ['content' => $ssgContent, 'mtime' => $currentMtime], 0); // No expiration, rely on mtime check
 					SSGIntegration::logCoordination('Serving fresh SSG from disk to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 				} else {
 					SSGIntegration::logCoordination('Failed to read SSG file from disk', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
@@ -241,7 +241,6 @@ class RedirectToSSG implements HooksInterface
 					location.replace(location.href);
 				}
 
-				// Listen for human activity events
 				const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
 				events.forEach(event => {
 					document.addEventListener(event, runSelfHeal, { once: true, passive: true });

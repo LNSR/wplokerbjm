@@ -1,9 +1,12 @@
 <script lang="ts">
-  import { GeneralStore } from "$lib/stores/General.svelte";
+  import { generalStore } from "$lib/stores/General.svelte";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
+  import { timeEffect } from "$lib/utils/elements.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import { navigateTo } from "$lib/stores/Route.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
+import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid } from "svelte-awesome-icons";
+  import { SvelteDate } from "svelte/reactivity";
   import type { CardJob, JobCardProps } from "@/types";
 
   let {
@@ -18,17 +21,25 @@
     onClick?: (slug: string, event: MouseEvent, index: number) => void;
   }>();
 
+  let now = $state(new SvelteDate());
+
+  $effect(() => {
+    timeEffect(now);
+  });
+
   // Derived UI helpers (keeps UI reactive to prop changes)
   const summaryRows = $derived.by(() =>
-    GeneralStore.useSummaryJob(jobdata?.ringkasanPekerjaan)
+    generalStore.useSummaryJob(jobdata?.ringkasanPekerjaan)
   );
   const statusInfo = $derived.by(() =>
-    GeneralStore.useStatusJob(Number(jobdata?.statusjob ?? 0))
+    generalStore.useStatusJob(Number(jobdata?.statusjob ?? 0))
   );
   const deadlineInfo = $derived.by(() =>
-    GeneralStore.useDeadline(jobdata?.deadline)
+    generalStore.useDeadline(jobdata?.deadline, now)()
   );
-  const timeAgo = $derived.by(() => GeneralStore.useTimeAgo(jobdata?.post_time));
+  const timeAgo = $derived.by(() =>
+    generalStore.useTimeAgo(jobdata?.post_time, now)
+  );
 
   const selected = $derived.by(() => {
     try {
@@ -113,23 +124,18 @@
           <div class="divider mt-0"></div>
         {:else}
           <h4 class="font-bold text-lg flex items-center gap-2 mb-6">
-            <svg
+            <UserTieSolid
               class="h-6 w-6 text-[var(--wpl-global-color-1)] inline-block"
-              viewBox="0 0 24 24"
-              fill="currentColor"
               aria-hidden="true"
-              focusable="false"
-            >
-              <path
-                d="M12 12c2.21 0 4-1.79 4-4S14.21 4 12 4 8 5.79 8 8s1.79 4 4 4zm0 2c-3.31 0-6 2.69-6 6h12c0-3.31-2.69-6-6-6z"
-              />
-            </svg>
+            />
             {jobdata?.nama_perusahaan}
           </h4>
           <div class="divider -mt-4"></div>
         {/if}
 
-        <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2 text-[var(--wpl-global-color-1)]">
+        <div
+          class="flex flex-wrap gap-x-4 gap-y-1 mb-2 text-[var(--wpl-global-color-1)]"
+        >
           {#each summaryRows as row (row.label)}
             {#if row.label !== "Deadline"}
               {@const Icon = row.icon}
@@ -159,6 +165,11 @@
               statusInfo.color,
             ].join(" ")}
           >
+            {#if statusInfo.label === 'Urgent'}
+              <ExclamationTriangleSolid class="h-4 w-4" aria-hidden="true" />
+            {:else if statusInfo.label === 'Pinned'}
+              <ThumbTackSolid class="h-4 w-4" aria-hidden="true" />
+            {/if}
             {statusInfo.label}
           </span>
         {/if}
@@ -170,22 +181,7 @@
                 deadlineInfo.style,
               ].join(" ")}
             >
-              <svg
-                class="h-4 w-4"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
+              <CalendarSolid class="h-4 w-4" aria-hidden="true" />
               <span>{deadlineInfo.text}</span>
             </span>
           {/if}

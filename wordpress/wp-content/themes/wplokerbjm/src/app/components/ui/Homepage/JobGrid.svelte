@@ -58,7 +58,7 @@
       };
 
       // Save current search state before navigation (always save for homepage path)
-      routeStateStore.saveSearchState("/", currentSearchState);
+      routeStateStore.saveSearchState(window.location.pathname, currentSearchState);
 
       if (isDesktop) {
         await this.openOverlay(job.slug ?? "");
@@ -432,8 +432,8 @@
     <div class="relative flex">
       <div
         class={[
-          "transition-all duration-600 ease-in-out will-change-auto",
-          overlayOpen ? "w-full lg:w-[calc(100%-420px)]" : "w-full",
+          "transition-all duration-600 ease-in-out",
+          overlayOpen ? "w-full lg:w-[calc(100%-420px)] will-change-[width]" : "w-full",
         ].join(" ")}
       >
         {#if displayJobs.length}
@@ -446,8 +446,9 @@
             ].join(" ")}
           >
             {#each displayJobs as job (job.permalink)}
+              {@const isSelected = jobOverlay.selectedSlug === job.slug}
               <div
-                class="transition-opacity duration-600 ease-in-out will-change-[opacity]"
+                class={`transition-opacity duration-600 ease-in-out ${isSelected ? 'will-change-[opacity]' : ''}`}
                 onkeydown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
@@ -469,27 +470,7 @@
           </div>
         {:else if initialLoading}
           <div class="flex justify-center py-12">
-            <span class="sr-only">Memuat lowongan...</span>
-            <svg
-              class="animate-spin h-8 w-8 text-[var(--wpl-global-color-1)]"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-              ></path>
-            </svg>
+            <LoadingSpinner srLabel="Memuat lowongan..." size="md" />
           </div>
         {:else}
           <div class="text-center py-12">
@@ -515,27 +496,7 @@
 
         {#if loading}
           <div class="flex justify-center mt-8">
-            <span class="sr-only">Memuat...</span>
-            <svg
-              class="animate-spin h-8 w-8 text-[var(--wpl-global-color-1)]"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                class="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                stroke-width="4"
-              ></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-              ></path>
-            </svg>
+            <LoadingSpinner srLabel="Memuat lowongan..." size="md" />
           </div>
         {/if}
 

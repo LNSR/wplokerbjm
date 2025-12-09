@@ -6,7 +6,7 @@
         "-y",
         "@playwright/mcp@latest",
         "--ignore-https-errors",
-        "--browser=chrome-beta",
+        "--browser=chrome",
         "--shared-browser-context",
         "--extension"
       ],

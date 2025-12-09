@@ -19,17 +19,6 @@
     public currentTheme = $state<ThemeName>(ThemeName.Light);
     private _initialized = false;
 
-    private prefersReducedMotion(): boolean {
-      try {
-        return !!(
-          window.matchMedia &&
-          window.matchMedia("(prefers-reduced-motion: reduce)").matches
-        );
-      } catch {
-        return false;
-      }
-    }
-
     private updateMetaThemeColor(dark: boolean): void {
       try {
         const root = document.documentElement;
@@ -61,9 +50,7 @@
       this.currentTheme = newTheme;
 
       window.requestAnimationFrame(() => {
-        if (!this.prefersReducedMotion()) {
-          document.documentElement.classList.add("theme-switching");
-        }
+        document.documentElement.classList.add("theme-switching");
         document.documentElement.setAttribute("data-theme", newTheme);
         if (dark) {
           document.documentElement.classList.add("wplokerbjm-dark-mode-enable");
@@ -77,11 +64,9 @@
         } catch {
           console.error("Failed to save theme preference");
         }
-        if (!this.prefersReducedMotion()) {
-          setTimeout(() => {
-            document.documentElement.classList.remove("theme-switching");
-          }, 30);
-        }
+        setTimeout(() => {
+          document.documentElement.classList.remove("theme-switching");
+        }, 30);
         this.updateMetaThemeColor(dark);
       });
     }
@@ -193,7 +178,7 @@
       } catch (e) {
         // Fallback: ensure at least --site-header-top is set using admin bar height
         const adminBarHeight = headerStore.getWpAdminBarHeight();
-        document.documentElement.style.setProperty(
+        headerStore.appEl?.style.setProperty(
           "--site-header-top",
           adminBarHeight + "px"
         );
@@ -318,6 +303,13 @@
   import { navigateTo } from "$lib/stores/Route.svelte";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
   import { ThemeName } from "@/types";
+  import {
+    SunSolid,
+    MoonSolid,
+    BarsSolid,
+    BookmarkSolid,
+    ExternalLinkSolid,
+  } from "svelte-awesome-icons";
 
   let { logo = "" } = $props();
   let logoSrcset = $state("");
@@ -358,7 +350,7 @@
     }
   }
 
-  if (typeof window !== 'undefined') {
+  if (typeof window !== "undefined") {
     updateLogo();
   }
 
@@ -374,9 +366,9 @@
   });
   onDestroy(() => {
     headerManager?.destroy();
-    document.documentElement.style.removeProperty("--site-header-top");
-    document.documentElement.style.removeProperty("--site-header-height");
-    document.documentElement.style.removeProperty("--site-scroll-padding-top");
+    headerStore.appEl?.style.removeProperty("--site-header-top");
+    headerStore.appEl?.style.removeProperty("--site-header-height");
+    headerStore.appEl?.style.removeProperty("--site-scroll-padding-top");
   });
 
   $effect(() => {
@@ -391,13 +383,7 @@
   style="top:var(--site-header-top, 0)"
 >
   <div class="drawer drawer-end">
-    <input
-      id="header-drawer"
-      type="checkbox"
-      class="drawer-toggle"
-      aria-label="Toggle navigation menu"
-      aria-controls="header-drawer-side"
-    />
+    <input id="header-drawer" type="checkbox" class="drawer-toggle" />
     <div class="drawer-content">
       <div
         class="mr-auto ml-auto pl-4 pr-4 max-w-screen-xl w-full flex items-center justify-between"
@@ -440,56 +426,18 @@
                     ? "translateX(100%)"
                     : "translateX(0)"}
                 ></span>
-                <!-- Sun icon -->
-                <svg
-                  class="absolute left-1 top-1 w-4 h-4 transition-all z-10"
-                  class:opacity-40={themeStore.isDark}
-                  class:grayscale={themeStore.isDark}
-                  class:opacity-100={!themeStore.isDark}
+                <SunSolid
+                  class="absolute left-1 top-1 w-4 h-4 transition-all z-10 {themeStore.isDark
+                    ? 'opacity-40 grayscale'
+                    : 'opacity-100'}"
                   style="color: var(--icon-color);"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <g
-                    stroke-linejoin="round"
-                    stroke-linecap="round"
-                    stroke-width="2"
-                    fill="none"
-                    stroke="currentColor"
-                  >
-                    <circle cx="12" cy="12" r="4"></circle>
-                    <path d="M12 2v2"></path>
-                    <path d="M12 20v2"></path>
-                    <path d="m4.93 4.93 1.41 1.41"></path>
-                    <path d="m17.66 17.66 1.41 1.41"></path>
-                    <path d="M2 12h2"></path>
-                    <path d="M20 12h2"></path>
-                    <path d="m6.34 17.66-1.41 1.41"></path>
-                    <path d="m19.07 4.93-1.41 1.41"></path>
-                  </g>
-                </svg>
-                <!-- Moon icon -->
-                <svg
-                  class="absolute right-1 top-1 w-4 h-4 transition-all z-10"
-                  class:opacity-40={!themeStore.isDark}
-                  class:grayscale={!themeStore.isDark}
-                  class:opacity-100={themeStore.isDark}
+                />
+                <MoonSolid
+                  class="absolute right-1 top-1 w-4 h-4 transition-all z-10 {themeStore.isDark
+                    ? 'opacity-100'
+                    : 'opacity-40 grayscale'}"
                   style="color: var(--icon-color);"
-                  xmlns="http://www.w3.org/2000/svg"
-                  viewBox="0 0 24 24"
-                  aria-hidden="true"
-                >
-                  <g
-                    stroke-linejoin="round"
-                    stroke-linecap="round"
-                    stroke-width="2"
-                    fill="none"
-                    stroke="currentColor"
-                  >
-                    <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"></path>
-                  </g>
-                </svg>
+                />
                 <input
                   type="checkbox"
                   value="dark"
@@ -509,15 +457,11 @@
             aria-label="Lowongan tersimpan"
             title="Lowongan tersimpan"
           >
-            <svg
+            <BookmarkSolid
               class="h-5 w-5 text-[var(--wpl-global-color-1)]"
-              viewBox="0 0 24 24"
-              fill="currentColor"
               aria-hidden="true"
               focusable="false"
-            >
-              <path d="M6 2a2 2 0 00-2 2v17l8-4 8 4V4a2 2 0 00-2-2H6z" />
-            </svg>
+            />
             {#if bookmarkJobs.length > 0}
               <span
                 class="absolute -top-2 -right-1 bg-[var(--wpl-global-color-1)] text-white text-xs rounded-full px-2 py-0.1 z-10"
@@ -528,22 +472,13 @@
           </button>
           <button
             class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)] hidden rounded-full md:inline-flex"
-            onclick={async () => await navigateTo("/pasang-iklan-loker")}
+            onclick={async () => await navigateTo("/pasang-iklan-loker/")}
           >
-            <svg
+            <ExternalLinkSolid
               class="h-6 w-6"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
               aria-hidden="true"
               focusable="false"
-            >
-              <path d="M7 17L17 7" />
-              <path d="M7 7h10v10" />
-            </svg>
+            />
             Pasang Iklan Loker
           </button>
           <!-- Drawer toggle button, shown only on mobile -->
@@ -553,21 +488,7 @@
               class="btn btn-ghost btn-sm md:btn-md"
               aria-label="Open navigation menu"
             >
-              <svg
-                class="h-5 w-5"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
-                aria-hidden="true"
-                focusable="false"
-              >
-                <path d="M3 12h18" />
-                <path d="M3 6h18" />
-                <path d="M3 18h18" />
-              </svg>
+              <BarsSolid class="h-5 w-5" aria-hidden="true" focusable="false" />
             </label>
           {/if}
         </div>
@@ -593,20 +514,11 @@
               onclick={async () => await navigateTo("/pasang-iklan-loker")}
               class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] justify-start"
             >
-              <svg
+              <ExternalLinkSolid
                 class="h-6 w-6 mr-2"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                stroke-linecap="round"
-                stroke-linejoin="round"
                 aria-hidden="true"
                 focusable="false"
-              >
-                <path d="M7 17L17 7" />
-                <path d="M7 7h10v10" />
-              </svg>
+              />
               Pasang Iklan Loker
             </button>
           </li>
@@ -614,9 +526,7 @@
       </div>
     {/if}
   </div>
-  {#if showBookmarkModal}
-    {#if BookmarkModalComponent}
-      <BookmarkModalComponent bind:open={showBookmarkModal} />
-    {:else}{/if}
+  {#if showBookmarkModal && BookmarkModalComponent}
+    <BookmarkModalComponent bind:open={showBookmarkModal} />
   {/if}
 </header>

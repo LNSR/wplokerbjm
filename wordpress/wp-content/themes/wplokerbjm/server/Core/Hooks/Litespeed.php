@@ -1,6 +1,7 @@
 <?php
 namespace WPLokerBJM\Core\Hooks;
-use WPLokerBJM\Core\{TransientCache, ObjectCache};
+use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Core\Container;
 
 /**
  * LiteSpeed General Hooks
@@ -13,7 +14,7 @@ class Litespeed
      * * Useful when deploying new code to ensure no stale cached code is used.
      * @return void
      */
-    public static function clearObjectCacheAndTransient(): void
+    public static function clearObjectCache(): void
     {
         // Clear APCu cache first
         if (function_exists('apcu_clear_cache')) {
@@ -22,17 +23,15 @@ class Litespeed
 
         // Invalidate OPCache
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
-            $file = get_stylesheet_directory() . '/cache/CompiledContainer.php';
+            $file = Container::$CACHE_FILE;
             wp_opcache_invalidate($file, true);
             wp_opcache_invalidate_directory(get_stylesheet_directory() . '/server');
         }
 
-        // Clear transients and object cache
-        TransientCache::deletePattern('%');
-        ObjectCache::flush();
+        Cache::flushGroup(Cache::OBJECT_CACHE_PREFIX);
 
         // Clear entire cache folder last
-        $cacheDir = get_stylesheet_directory() . '/cache';
+        $cacheDir = Container::$CACHE_DIR;
         if (is_dir($cacheDir)) {
             array_map('unlink', glob("$cacheDir/*"));
         }

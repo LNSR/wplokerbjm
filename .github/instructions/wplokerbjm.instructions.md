@@ -18,14 +18,20 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 # Development Instructions for WPLokerBJM
 
 ## General
-
+- Check [wplokerbjm.code-workspace.json](../../wplokerbjm.code-workspace) for workspace settings.
+- Develeper of this project uses:
+  - Laptop: FX505DD
+    - OS: CachyOS
+    - Filesystem: ZFS with all datasets sync=disabled
+    - RAM: 32GB
 - Always use the latest bleeding-edge versions of PHP and JavaScript/TypeScript frameworks and syntaxes.
 - Context mostly related to Wordpress **wplokerbjm** development for Job Platform
 - Style with **Tailwind CSS** and **DaisyUI**.
 - No need to think about backward compatibility, prefer latest.
 - If there errors, immediately fix them.
 - Never run Vite dev and Vite build.
-- Production on shared hosting with 1GB RAM and 1 CPU core, its using Litespeed Server and QUIC Cloud.
+- These repositories are using Docker for development and production(simulated configs only, not resources).
+- Production are on shared hosting with 1GB RAM and 1 CPU core, its using Litespeed Server and QUIC Cloud.
 
 ## Backend(PHP)
 

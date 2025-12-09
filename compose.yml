@@ -9,129 +9,32 @@ services:
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
       WORDPRESS_DB_PASSWORD: ${WORDPRESS_DB_PASSWORD}
       WORDPRESS_DB_NAME: ${WORDPRESS_DB_NAME}
-      WORDPRESS_DEBUG: "true"
+      WORDPRESS_DEBUG: true
       WP_ENV: ${WP_ENV}
       WP_REPAIR: "false"
       FORCE_SSL_ADMIN: "true"
       WP_HOME: ${WORDPRESS_WP_HOME}
       WP_SITEURL: ${WORDPRESS_WP_SITEURL}
-      WP_REDIS_PATH: /var/run/sock/redis.sock
+      ADVMO_CLOUDFLARE_R2_BUCKET: ${ADVMO_CLOUDFLARE_R2_BUCKET}
+      ADVMO_CLOUDFLARE_R2_KEY: ${ADVMO_CLOUDFLARE_R2_KEY}
+      ADVMO_CLOUDFLARE_R2_SECRET: ${ADVMO_CLOUDFLARE_R2_SECRET}
+      ADVMO_CLOUDFLARE_R2_DOMAIN: ${ADVMO_CLOUDFLARE_R2_DOMAIN}
+      ADVMO_CLOUDFLARE_R2_ENDPOINT: ${ADVMO_CLOUDFLARE_R2_ENDPOINT}
+      WP_REDIS_SOCK: ${REDIS_SOCK}
+      WP_REDIS_HOST: ${REDIS_HOST}
+      WP_REDIS_PASSWORD: ${REDIS_PWD}
+      WP_REDIS_DATABASE: ${REDIS_DB}
       WORDPRESS_CONFIG_EXTRA: |
-        if (!defined('WP_CACHE')) define('WP_CACHE', true);
-        define('WP_CACHE_KEY_SALT', '${WORDPRESS_WP_SITEURL}');
-        define('WP_REDIS_HOST', '${REDIS_HOST}');
-        define('WP_REDIS_PASSWORD', '${REDIS_PWD}');
-        define('WP_REDIS_DATABASE', ${REDIS_DB});
-
-        if (!defined('WP_ENV')) {
-          define('WP_ENV', getenv('WP_ENV') ?: 'production');
-        }
-
-        // Auto-discover protocol and hostname from forwarded headers (for all proxies)
-        $$hostname = 'localhost'; // default fallback
-        $$protocol = 'http://'; // default fallback
-
-        // Prioritize forwarded headers over direct headers
-        if (isset($$_SERVER['HTTP_X_FORWARDED_HOST'])) {
-          $$hostname = $$_SERVER['HTTP_X_FORWARDED_HOST'];
-        } elseif (isset($$_SERVER['HTTP_HOST'])) {
-          $$hostname = $$_SERVER['HTTP_HOST'];
-        }
-
-        if (isset($$_SERVER['HTTP_X_FORWARDED_PROTO'])) {
-          $$protocol = (strpos($$_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) ? 'https://' : 'http://';
-          if ($$protocol === 'https://') {
-            $$_SERVER['HTTPS'] = 'on';
-          }
-        } else {
-          $$protocol = (!empty($$_SERVER['HTTPS']) && $$_SERVER['HTTPS'] !== 'off') ? 'https://' : 'http://';
-        }
-
-        define('WP_HOME', $$protocol . $$hostname);
-        define('WP_SITEURL', $$protocol . $$hostname);
-
-        switch (WP_ENV) {
-          case 'development':
-            // Debugging
-            if (!defined('WP_DEBUG')) define('WP_DEBUG', true);
-            if (!defined('WP_DEBUG_LOG')) define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug/debug.log');
-            if (!defined('WP_DEBUG_DISPLAY')) define('WP_DEBUG_DISPLAY', false);
-            if (!defined('SCRIPT_DEBUG')) define('SCRIPT_DEBUG', true);
-
-            // Performance for dev
-            define('WP_POST_REVISIONS', 3);
-            define('AUTOSAVE_INTERVAL', 120);
-            define('EMPTY_TRASH_DAYS', 7);
-
-            // Cron/Updates
-            define('DISABLE_WP_CRON', false);
-            define('WP_AUTO_UPDATE_CORE', true);
-
-            // Memory
-            define('WP_MEMORY_LIMIT', '4096M');
-            define('WP_MAX_MEMORY_LIMIT', '8196M');
-
-            // Dev mode
-            define('DISALLOW_FILE_EDIT', false);
-            define('DISALLOW_FILE_MODS', false);
-            define('WP_ENVIRONMENT_TYPE', 'development');
-            define('WP_DEVELOPMENT_MODE', 'all');
-
-            // Enable Query Monitor caps panel for debugging
-            define('QM_ENABLE_CAPS_PANEL', true);
-
-            // Asset concatenation/compression
-            define('COMPRESS_CSS', false);
-            define('COMPRESS_SCRIPTS', false);
-            define('CONCATENATE_SCRIPTS', false);
-            define('ENFORCE_GZIP', false);
-            define('FS_METHOD', 'direct');
-            break;
-
-          case 'production':
-          default:
-            // Production settings
-            if (!defined('WP_DEBUG')) define('WP_DEBUG', false);
-            if (!defined('WP_DEBUG_DISPLAY')) define('WP_DEBUG_DISPLAY', false);
-            if (!defined('SCRIPT_DEBUG')) define('SCRIPT_DEBUG', false);
-            define('DISALLOW_FILE_EDIT', false);
-            define('DISALLOW_FILE_MODS', false);
-            define('WP_ENVIRONMENT_TYPE', 'production');
-            define('FORCE_SSL_ADMIN', true); // Force SSL for admin
-            define('AUTOSAVE_INTERVAL', 300); // Autosave every 5 minutes
-            define('EMPTY_TRASH_DAYS', 7); // Empty trash every week
-            define('WP_POST_REVISIONS', 10); // Limit post revisions
-            define('WP_MEMORY_LIMIT', '4096M'); // Set memory limit
-            define('WP_MAX_MEMORY_LIMIT', '8196M'); // Set max memory limit
-            define('WP_CRON_LOCK_TIMEOUT', 60); // Cron lock timeout
-            
-            define('WP_AUTO_UPDATE_CORE', true);
-            define('DISABLE_WP_CRON', false);
-
-            // Asset concatenation/compression
-            define('CONCATENATE_SCRIPTS', true); // Combine JS files
-            define('COMPRESS_SCRIPTS', true); // Compress JS
-            define('COMPRESS_CSS', true); // Compress CSS
-
-            // Security hardening
-            define('DISALLOW_UNFILTERED_HTML', true);
-            define('WP_HTTP_BLOCK_EXTERNAL', false);
-            define('WP_ACCESSIBLE_HOSTS', 'api.wordpress.org'); // Allow updates
-
-            define('FS_METHOD', 'direct');
-            break;
-        }
-
-        // Allow DB repair if enabled
-        define('WP_ALLOW_REPAIR', filter_var(getenv('WP_REPAIR'), FILTER_VALIDATE_BOOLEAN) ? true : false);
+        include('/var/www/html/wp-config-extra.php');
     volumes:
       - wordpress:/var/www/html
       - ./wordpress/wp-content:/var/www/html/wp-content
+      - ./configs/wp-config-extra.php:/var/www/html/wp-config-extra.php:ro
       - sock:/var/run/sock
     depends_on:
       - db
     healthcheck:
-      test: ["CMD", "curl", "-f", "https://localhost"]
+      test: ["CMD-SHELL", "pgrep php-fpm > /dev/null || exit 1"]
       interval: 1m
       timeout: 10s
       retries: 3
@@ -157,13 +60,15 @@ services:
       - ./wordpress/wp-content:/var/www/html/wp-content:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       # generate your own SSL via "mkcert"
-      - ./localhost.pem:/var/www/certs/localhost.crt:ro
-      - ./localhost-key.pem:/var/www/certs/localhost.key:ro
+      - ./certs/localhost.pem:/var/www/certs/localhost.crt:ro
+      - ./certs/localhost-key.pem:/var/www/certs/localhost.key:ro
       - type: tmpfs
         target: /data
       - type: tmpfs
         target: /config
       - sock:/var/run/sock:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
   db:
     image: mysql:latest
@@ -211,6 +116,21 @@ services:
       - type: tmpfs
         target: /data
       - sock:/var/run/sock
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN}
+      CLOUDFLARE_RECORD_NAME: ${CLOUDFLARE_RECORD_NAME}
+      TUNNEL_ID: ${CLOUDFLARE_TUNNEL_ID}
+    volumes:
+      - ./configs/cloudflared-config.yml:/etc/cloudflared/config.yml:ro
+    command: tunnel --config /etc/cloudflared/config.yml run
+    depends_on:
+      - caddy
+    profiles:
+      - staging
 
   # ngrok:
   #   image: ngrok/ngrok:latest

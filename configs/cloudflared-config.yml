@@ -1,0 +1,14 @@
+warp-routing:
+  enabled: false  # Disable WARP routing for web tunnels (not needed)
+ingress:
+  - hostname: ${CLOUDFLARE_RECORD_NAME}
+    originRequest:
+      noTLSVerify: true  # Skip cert verification for internal/self-signed certs
+      http2Origin: true  # Enable HTTP/2 to origin for better performance
+      matchSNItoHost: true  # Match SNI to hostname for security
+      connectTimeout: 30s  # Timeout for connecting to origin
+      tlsTimeout: 10s  # Timeout for TLS handshake
+      tcpKeepAlive: 30s  # Keep connections alive
+      disableChunkedEncoding: false  # Allow chunked encoding
+    service: https://caddy:443
+  - service: http_status:404

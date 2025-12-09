@@ -1,6 +1,7 @@
 <script lang="ts">
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import type { JobCardProps } from "@/types";
+  import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
 
   let { jobId, variant = undefined } = $props<{
     jobId: number;
@@ -129,32 +130,15 @@
     aria-pressed={isSaved(jobId)}
   >
     {#if displayedIconSpec.name === "bookmark"}
-      <svg
+      <BookmarkSolid
         class={`${iconSizeClass} ${displayedIconSpec.classes}`}
-        viewBox="0 0 24 24"
-        fill="currentColor"
         aria-hidden="true"
-        focusable="false"
-      >
-        <path d="M6 2a2 2 0 00-2 2v17l8-4 8 4V4a2 2 0 00-2-2H6z" />
-      </svg>
+      />
     {:else}
-      <svg
+      <TrashAltSolid
         class={`${iconSizeClass} ${displayedIconSpec.classes}`}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        stroke-width="2"
-        stroke-linecap="round"
-        stroke-linejoin="round"
         aria-hidden="true"
-        focusable="false"
-      >
-        <polyline points="3 6 5 6 21 6" />
-        <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
-        <path d="M10 11v6" />
-        <path d="M14 11v6" />
-      </svg>
+      />
     {/if}
   </button>
 

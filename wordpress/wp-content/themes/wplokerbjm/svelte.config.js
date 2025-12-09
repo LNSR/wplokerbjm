@@ -6,6 +6,10 @@ export default {
   // for more information about preprocessors
   preprocess: vitePreprocess(),
   compilerOptions: {
-    runes: true
+    runes: true,
+    modernAst: true,
+    hmr: true,
+    discloseVersion: false,
+    dev: true
   }
 }

@@ -4,7 +4,7 @@ namespace WPLokerBJM\Services\PostsManagement\SSG;
 
 use WPLokerBJM\Contracts\HooksInterface;
 use WPLokerBJM\Services\Utilities\SSG\Integrations\{SSGIntegration, LiteSpeedIntegration, RankMathIntegration};
-use WPLokerBJM\Core\TransientCache;
+use WPLokerBJM\Core\Cache;
 use WPLokerBJM\Services\Utilities\SSG\{SSGUtilities, BotDetection};
 use WPLokerBJM\Services\Webhooks\TriggerBuildSSG;
 
@@ -81,7 +81,7 @@ class PostsCRUDListener implements HooksInterface
 	private function shouldDebouncePost(int $post_id): bool
 	{
 		$cacheKey = "ssg_post_debounce_{$post_id}";
-		$lastTrigger = TransientCache::get($cacheKey);
+		$lastTrigger = Cache::get($cacheKey);
 
 		if ($lastTrigger !== false) {
 			error_log("SSG PostsCRUDListener: Skipping duplicate trigger for post {$post_id} within debounce window");
@@ -91,7 +91,7 @@ class PostsCRUDListener implements HooksInterface
 		// Set debounce transient before triggering
 		$debounceTiming = LiteSpeedIntegration::getDebounceTiming();
 		$debounceSeconds = LiteSpeedIntegration::isActive() ? $debounceTiming['litespeed_coordination'] : $debounceTiming['normal_operation'];
-		TransientCache::set($cacheKey, time(), $debounceSeconds);
+		Cache::set($cacheKey, time(), $debounceSeconds);
 
 		return false;
 	}
@@ -208,7 +208,7 @@ class LiteSpeedEventListener implements HooksInterface
 			}
 
 			// Set transient to mark recent LiteSpeed purge activity
-			TransientCache::set('litespeed_recent_purge', time(), 300); // 5 minutes
+			Cache::set('litespeed_recent_purge', time(), 300); // 5 minutes
 
 			SSGIntegration::logCoordination("LiteSpeed purged post, coordinating SSG update", ['post_id' => $post_id]);
 
@@ -231,7 +231,7 @@ class LiteSpeedEventListener implements HooksInterface
 			}
 
 			// Set transient to mark recent LiteSpeed purge activity
-			TransientCache::set('litespeed_recent_purge', time(), 300); // 5 minutes
+			Cache::set('litespeed_recent_purge', time(), 300); // 5 minutes
 
 			SSGIntegration::logCoordination("LiteSpeed purged all cache, triggering full SSG rebuild");
 
