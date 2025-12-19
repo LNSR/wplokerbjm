@@ -11,7 +11,8 @@ define('WP_REDIS_HOST', getenv('REDIS_HOST'));
 define('WP_REDIS_PASSWORD', getenv('REDIS_PWD'));
 define('WP_REDIS_DATABASE', getenv('REDIS_DB'));
 
-if (!defined('WP_CACHE')) define('WP_CACHE', true);
+if (!defined('WP_CACHE'))
+  define('WP_CACHE', true);
 define('WP_CACHE_KEY_SALT', getenv('WORDPRESS_WP_SITEURL'));
 
 if (!defined('WP_ENV')) {
@@ -23,12 +24,12 @@ $hostname = 'localhost'; // default fallback
 $protocol = 'http://'; // default fallback
 
 // Prioritize forwarded headers over direct headers
+//* NOTE: !In Docker development, localhost doesn't work for internal requests(like wp-cron); use 'host.docker.internal' / IP instead.
 if (isset($_SERVER['HTTP_X_FORWARDED_HOST'])) {
   $hostname = $_SERVER['HTTP_X_FORWARDED_HOST'];
 } elseif (isset($_SERVER['HTTP_HOST'])) {
   $hostname = $_SERVER['HTTP_HOST'];
 }
-
 
 if (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
   $protocol = (strpos($_SERVER['HTTP_X_FORWARDED_PROTO'], 'https') !== false) ? 'https://' : 'http://';
@@ -41,19 +42,33 @@ if (isset($_SERVER['HTTP_X_FORWARDED_PROTO'])) {
 
 // Detect staging/dev subdomain for noindex
 if (strpos($hostname, 'staging.') === 0 || strpos($hostname, 'dev.') === 0) {
-    define('WPL_OKERBJM_NO_INDEX', true);
+  define('WP_LOKERBJM_NO_INDEX', true);
 }
 
 define('WP_HOME', $protocol . $hostname);
 define('WP_SITEURL', $protocol . $hostname);
 
+//! LiteSpeed Cache Configuration Flag
+// https://docs.litespeedtech.com/lscache/lscwp/constants/
+define('LITESPEED_CONF', true);
+
+// LiteSpeed Cache Object Cache Configuration
+define('LITESPEED_CONF__OBJECT__HOST', getenv('REDIS_SOCK'));
+define('LITESPEED_CONF__OBJECT__DB_ID', getenv('REDIS_DB'));
+define('LITESPEED_CONF__OBJECT__USER', '');
+define('LITESPEED_CONF__OBJECT__PSWD', getenv('REDIS_PWD'));
+
 switch (WP_ENV) {
   case 'development':
     // Debugging
-    if (!defined('WP_DEBUG')) define('WP_DEBUG', true);
-    if (!defined('WP_DEBUG_LOG')) define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug/debug.log');
-    if (!defined('WP_DEBUG_DISPLAY')) define('WP_DEBUG_DISPLAY', true);
-    if (!defined('SCRIPT_DEBUG')) define('SCRIPT_DEBUG', true);
+    if (!defined('WP_DEBUG'))
+      define('WP_DEBUG', true);
+    if (!defined('WP_DEBUG_LOG'))
+      define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug/debug.log');
+    if (!defined('WP_DEBUG_DISPLAY'))
+      define('WP_DEBUG_DISPLAY', true);
+    if (!defined('SCRIPT_DEBUG'))
+      define('SCRIPT_DEBUG', true);
 
     // Performance for dev
     define('WP_POST_REVISIONS', 3);
@@ -61,7 +76,7 @@ switch (WP_ENV) {
     define('EMPTY_TRASH_DAYS', 7);
 
     // Cron/Updates
-    define('DISABLE_WP_CRON', false);
+    define('DISABLE_WP_CRON', true);
     define('WP_AUTO_UPDATE_CORE', true);
 
     // Memory
@@ -84,13 +99,15 @@ switch (WP_ENV) {
     define('ENFORCE_GZIP', false);
     define('FS_METHOD', 'direct');
     break;
-
   case 'production':
   default:
     // Production settings
-    if (!defined('WP_DEBUG')) define('WP_DEBUG', false);
-    if (!defined('WP_DEBUG_DISPLAY')) define('WP_DEBUG_DISPLAY', false);
-    if (!defined('SCRIPT_DEBUG')) define('SCRIPT_DEBUG', false);
+    if (!defined('WP_DEBUG'))
+      define('WP_DEBUG', false);
+    if (!defined('WP_DEBUG_DISPLAY'))
+      define('WP_DEBUG_DISPLAY', false);
+    if (!defined('SCRIPT_DEBUG'))
+      define('SCRIPT_DEBUG', false);
     define('DISALLOW_FILE_EDIT', false);
     define('DISALLOW_FILE_MODS', false);
     define('WP_ENVIRONMENT_TYPE', 'production');
@@ -101,9 +118,9 @@ switch (WP_ENV) {
     define('WP_MEMORY_LIMIT', '4096M'); // Set memory limit
     define('WP_MAX_MEMORY_LIMIT', '8196M'); // Set max memory limit
     define('WP_CRON_LOCK_TIMEOUT', 60); // Cron lock timeout
-    
+
     define('WP_AUTO_UPDATE_CORE', true);
-    define('DISABLE_WP_CRON', false);
+    define('DISABLE_WP_CRON', true);
 
     // Asset concatenation/compression
     define('CONCATENATE_SCRIPTS', true); // Combine JS files

@@ -6,4 +6,4 @@ const configs: ComponentConfig[] = [
   { selector: isAppEl, component: await import('@/app.svelte') },
 ];
 
-new SvelteMounter().mount(configs);
+await new SvelteMounter().mount(configs);

@@ -9,18 +9,6 @@ export class GoogleServices {
   private static adSenseLoaded = false;
 
   /**
-   * Checks if tracking is enabled (client-side and not logged-in).
-   * @private
-   * @returns boolean True if tracking is enabled, false otherwise.
-   */
-  private static isTrackingEnabled(): boolean {
-    if (typeof window === 'undefined') return false;
-    const themeData = WPThemeDataStore.getThemeData();
-    if (themeData?.disableTracking) return false;
-    return !nonceStore.getNonce();
-  }
-
-  /**
    * Injects the Google Tag Manager script if tracking is enabled and not already loaded.
    * @returns Promise that resolves when GTM is loaded or immediately if disabled/already loaded.
    */
@@ -167,10 +155,20 @@ export class GoogleServices {
       googleIframes.forEach((iframe) => {
         if (iframe.parentNode) iframe.parentNode.removeChild(iframe);
       });
-      console.log(`Purged ${adElements.length} AdSense elements and ${googleIframes.length} Google iframes`);
     } catch (e) {
       console.warn('Failed to purge global elements', e);
     }
   }
 
+  /**
+   * Checks if tracking is enabled (client-side and not logged-in).
+   * @private
+   * @returns boolean True if tracking is enabled, false otherwise.
+   */
+  private static isTrackingEnabled(): boolean {
+    if (typeof window === 'undefined') return false;
+    const themeData = WPThemeDataStore.getThemeData();
+    if (themeData?.disableTracking) return false;
+    return !nonceStore.getNonce();
+  }
 }

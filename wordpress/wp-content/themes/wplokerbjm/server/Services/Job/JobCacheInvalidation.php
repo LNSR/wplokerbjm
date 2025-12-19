@@ -11,11 +11,11 @@ class JobCacheInvalidation implements HooksInterface
 
     public function registerActions(): void
     {
-        add_action('save_post', [$this, 'clearJobDataCache'], 10, 2);
-        add_action('delete_post', [$this, 'clearJobDataCache']);
-        add_action('updated_post_meta', [$this, 'clearJobDataCacheOnMeta'], 10, 4);
-        add_action('set_object_terms', [$this, 'clearJobDataCacheOnTax'], 10, 6);
-        add_action('transition_post_status', [$this, 'clearJobDataCacheOnStatusChange'], 10, 3);
+        add_action('save_post', fn(...$args) => $this->clearJobDataCache(...$args), 10, 2);
+        add_action('delete_post', fn(...$args) => $this->clearJobDataCache(...$args));
+        add_action('updated_post_meta', fn(...$args) => $this->clearJobDataCacheOnMeta(...$args), 10, 4);
+        add_action('set_object_terms', fn(...$args) => $this->clearJobDataCacheOnTax(...$args), 10, 6);
+        add_action('transition_post_status', fn(...$args) => $this->clearJobDataCacheOnStatusChange(...$args), 10, 3);
     }
 
     public function registerFilters(): void

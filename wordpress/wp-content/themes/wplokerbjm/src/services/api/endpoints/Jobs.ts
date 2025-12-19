@@ -117,8 +117,7 @@ export const jobsApi: JobsApiInterface = {
     if (ids.length === 0) {
       return []
     }
-  const idsParam = ids.join(',')
-  return (await apiClient.get<BookmarkedJobsResponse>('/bookmarked-jobs/', { ids: idsParam })).data
+    return (await apiClient.post<BookmarkedJobsResponse>('/bookmarked-jobs/', { ids })).data
   },
 
   /**

@@ -67,6 +67,7 @@ RUN apt-get update --allow-releaseinfo-change && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
     imagemagick \
+    curl \
     jpegoptim \
     optipng \
     pngquant \
@@ -77,6 +78,7 @@ RUN apt-get update --allow-releaseinfo-change && \
     default-jre-headless \
     gosu \
     less \
+    cron \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy WP-CLI from builder (already present there)

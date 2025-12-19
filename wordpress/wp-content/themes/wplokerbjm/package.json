@@ -7,20 +7,24 @@
     "@tsconfig/svelte": "^5.0.6",
     "@types/html-minifier-terser": "^7.0.2",
     "@types/lodash-es": "^4.17.12",
-    "@types/node": "^25.0.2",
+    "@types/node": "^25.0.3",
     "concurrently": "^9.2.1",
     "daisyui": "^5.5.14",
+    "dotenv": "^17.2.3",
     "fast-xml-parser": "^5.3.3",
     "html-minifier-terser": "^7.2.0",
     "playwright": "^1.57.0",
     "rollup-plugin-visualizer": "^6.0.5",
-    "svelte": "^5.46.0",
-    "svelte-check": "^4.3.4",
-    "svelte-language-server": "^0.17.22",
+    "svelte": "^5.46.1",
+    "svelte-check": "^4.3.5",
+    "svelte-language-server": "^0.17.23",
     "typescript": "~5.9.3",
-    "vite": "8.0.0-beta.2",
+    "vite": "8.0.0-beta.5",
     "vite-plugin-compression2": "^2.4.0",
     "vite-plugin-live-reload": "^3.0.5"
+  },
+  "overrides": {
+    "vite": "8.0.0-beta.5"
   },
   "private": true,
   "scripts": {
@@ -39,7 +43,7 @@
   "type": "module",
   "dependencies": {
     "idb": "^8.0.3",
-    "lodash-es": "^4.17.21",
+    "lodash-es": "^4.17.22",
     "svelte-awesome-icons": "^3.0.1",
     "swiper": "^12.0.3",
     "viewerjs": "^1.11.7"

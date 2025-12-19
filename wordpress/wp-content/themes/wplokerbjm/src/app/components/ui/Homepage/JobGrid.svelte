@@ -1,5 +1,6 @@
 <script module lang="ts">
   import type { CardJob, JobGridProps, SearchState } from "@/types";
+  import { SearchContext, SearchTitle } from "@/types";
   import type { SearchManager } from "$lib/stores/Search.svelte";
   import { routeStateStore, navigateTo } from "$lib/stores/Route.svelte";
   import { GoogleServices } from "$lib/utils/Google.svelte";
@@ -57,20 +58,29 @@
         error: this.searchStore.error,
       };
 
-      // Save current search state before navigation (always save for homepage path)
-      routeStateStore.saveSearchState(window.location.pathname, currentSearchState);
+      // Save current search state before navigation (implicitly always save for homepage('/') path)
+      routeStateStore.saveSearchState(
+        window.location.pathname,
+        currentSearchState
+      );
+
+      async function MobileJobClick(): Promise<void> {
+        // Mark as last visited before navigating
+        routeStateStore.MarkVisitedJob(job.slug ?? "");
+        // use SPA navigation to SingleLowongan.svelte route
+        const url = new URL(String(job.permalink), window.location.origin);
+        return navigateTo(
+          url.pathname + url.search + url.hash,
+          currentSearchState
+        );
+      }
 
       if (isDesktop) {
         await this.openOverlay(job.slug ?? "");
         // After opening overlay on desktop, ensure the clicked card is scrolled into view
         this.scrollToCard(job.slug ?? "");
       } else {
-        // For mobile: use SPA navigation to SingleLowongan.svelte route
-        const url = new URL(job.permalink, window.location.origin);
-        await navigateTo(
-          url.pathname + url.search + url.hash,
-          currentSearchState
-        );
+        await MobileJobClick();
       }
     }
 
@@ -168,7 +178,7 @@
       try {
         const response = await APIService.fetchJobGrid({
           paged: 1,
-          context: context || "latest",
+          context: context || SearchContext.Latest,
           title: title || "",
           total_jobs: totalJobs || 0,
           ...filters,
@@ -256,8 +266,8 @@
           // Update search store with fetched data
           searchStore.jobs = gridData.jobs || [];
           searchStore.maxNumPages = gridData.maxNumPages || 1;
-          searchStore.context = gridData.context || "latest";
-          searchStore.title = gridData.title || "Lowongan Terbaru";
+          searchStore.context = gridData.context || SearchContext.Latest;
+          searchStore.title = (gridData.title as SearchTitle) || SearchTitle.Latest;
           searchStore.totalJobs = gridData.totalJobs || 0;
           // Update filters if provided
           if (gridData.filters) {
@@ -267,8 +277,8 @@
           console.error("Failed to fetch job grid:", error);
           searchStore.jobs = [];
           searchStore.maxNumPages = 1;
-          searchStore.context = "latest";
-          searchStore.title = "Lowongan Terbaru";
+          searchStore.context = SearchContext.Latest;
+          searchStore.title = SearchTitle.Latest;
           searchStore.totalJobs = 0;
         } finally {
           initialLoading = false;
@@ -277,7 +287,7 @@
         searchStore.jobs = [...jobs];
         if (maxNumPages) searchStore.maxNumPages = maxNumPages;
         if (context) searchStore.context = context;
-        if (title) searchStore.title = title;
+        if (title) searchStore.title = title as SearchTitle;
         if (totalJobs !== undefined) searchStore.totalJobs = totalJobs;
         if (filters) searchStore.setFilters(filters);
       }
@@ -311,7 +321,7 @@
       if (isRefreshing) return;
       isRefreshing = true;
       try {
-        if (searchStore.context !== "search") {
+        if (searchStore.context !== SearchContext.Search) {
           const response = await APIService.fetchJobGrid({
             paged: 1,
             context: searchStore.context,
@@ -321,8 +331,8 @@
           });
           searchStore.jobs = response.jobs || [];
           searchStore.maxNumPages = response.maxNumPages || 1;
-          searchStore.context = response.context || "latest";
-          searchStore.title = response.title || "Lowongan Terbaru";
+          searchStore.context = response.context || SearchContext.Latest;
+          searchStore.title = (response.title as SearchTitle) || SearchTitle.Latest;
           searchStore.totalJobs = response.totalJobs || 0;
           if (response.filters) {
             searchStore.setFilters(response.filters);
@@ -423,7 +433,7 @@
       <LoadingSpinner srLabel="Memuat grid..." size="md" />
     </div>
   {:else}
-    {#if displayJobs.length && searchStore.context !== "latest"}
+    {#if displayJobs.length && searchStore.context !== SearchContext.Latest}
       <div class="text-base font-medium mb-4">
         {displayTotalJobs} lowongan ditemukan
       </div>
@@ -433,7 +443,9 @@
       <div
         class={[
           "transition-all duration-600 ease-in-out",
-          overlayOpen ? "w-full lg:w-[calc(100%-420px)] will-change-[width]" : "w-full",
+          overlayOpen
+            ? "w-full lg:w-[calc(100%-420px)] will-change-[width]"
+            : "w-full",
         ].join(" ")}
       >
         {#if displayJobs.length}
@@ -448,7 +460,7 @@
             {#each displayJobs as job (job.permalink)}
               {@const isSelected = jobOverlay.selectedSlug === job.slug}
               <div
-                class={`transition-opacity duration-600 ease-in-out ${isSelected ? 'will-change-[opacity]' : ''}`}
+                class={`transition-opacity duration-600 ease-in-out ${isSelected ? "will-change-[opacity]" : ""}`}
                 onkeydown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
@@ -463,6 +475,7 @@
                   jobdata={job}
                   variant="featured"
                   permalink={job.permalink ?? ""}
+                  isVisited={routeStateStore.hasVisitedJob(job.slug ?? "")}
                   onClick={() => overlayManager.handleJobClick(job)}
                 />
               </div>
@@ -489,7 +502,7 @@
               onclick={() => searchStore.loadMore()}
               disabled={loading}
             >
-              {loading ? 'Memuat...' : 'Muat Lebih Banyak'}
+              {loading ? "Memuat..." : "Muat Lebih Banyak"}
             </button>
           </div>
         {/if}

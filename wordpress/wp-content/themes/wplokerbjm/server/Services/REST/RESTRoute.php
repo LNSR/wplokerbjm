@@ -3,6 +3,7 @@
 namespace WPLokerBJM\Services\REST;
 
 use WPLokerBJM\Contracts\HooksInterface;
+use WPLokerBJM\Models\Schema\Taxonomies;
 
 
 class RESTRoute implements HooksInterface
@@ -25,7 +26,7 @@ class RESTRoute implements HooksInterface
 
     public function registerActions(): void
     {
-        add_action('rest_api_init', [$this, 'registerRoutes']);
+        add_action('rest_api_init', fn() => $this->registerRoutes());
     }
 
     public function registerFilters(): void
@@ -35,66 +36,59 @@ class RESTRoute implements HooksInterface
 
     public function registerRoutes(): void
     {
-        /** @see \WPLokerBJM\Controllers\REST\AutoSuggestionSearch::handle() */
         register_rest_route(self::$baseURI, '/auto-suggest/', [
             'methods' => 'GET',
-            'callback' => [$this->autoSuggestionSearch, 'handle'],
+            'callback' => fn(...$args) => $this->autoSuggestionSearch->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
 
-        /** @see \WPLokerBJM\Controllers\REST\LoadMore::handle() */
         register_rest_route(self::$baseURI, '/load-more/', [
             'methods' => 'GET',
-            'callback' => [$this->loadMore, 'handle'],
+            'callback' => fn(...$args) => $this->loadMore->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
 
-        /** @see \WPLokerBJM\Controllers\REST\DynamicSearch::handle() */
         register_rest_route(self::$baseURI, '/search/', [
             'methods' => 'GET',
-            'callback' => [$this->dynamicSearch, 'handle'],
+            'callback' => fn(...$args) => $this->dynamicSearch->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
 
-        /** @see \WPLokerBJM\Controllers\REST\TaxonomyDepth::handle() */
         register_rest_route(self::$baseURI, '/taxonomies/', [
             'methods' => 'GET',
-            'callback' => [$this->taxonomyDepth, 'handle'],
+            'callback' => fn(...$args) => $this->taxonomyDepth->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
 
-        /** @see \WPLokerBJM\Controllers\REST\Carousel::handle() */
         register_rest_route(self::$baseURI, '/carousel/', [
             'methods' => 'GET',
-            'callback' => [$this->carousel, 'handle'],
+            'callback' => fn(...$args) => $this->carousel->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
 
         $taxonomies = [
-            'lokasi',
-            'gender',
-            'pendidikan',
-        ];
-        foreach ($taxonomies as $taxonomy) {
-            /** @see \WPLokerBJM\Controllers\REST\TaxonomyDepth::handle() */
+            Taxonomies::LOKASI_PEKERJAAN => fn(...$args) =>  $this->taxonomyDepth->lokasi(...$args),
+            Taxonomies::GENDER => fn(...$args) =>  $this->taxonomyDepth->gender(...$args),
+            Taxonomies::PENDIDIKAN => fn(...$args) =>  $this->taxonomyDepth->pendidikan(...$args),
+        ]; // explictly define method to ensure IDE can reference properly
+        
+        foreach ($taxonomies as $taxonomy => $callback) {
             register_rest_route(self::$baseURI, "/taxonomies/$taxonomy", [
                 'methods' => 'GET',
-                'callback' => [$this->taxonomyDepth, $taxonomy],
+                'callback' => $callback,
                 'permission_callback' => '__return_true',
             ]);
         }
 
-        /** @see \WPLokerBJM\Controllers\REST\SingleOverlay::handle() */
         register_rest_route(self::$baseURI, '/single-overlay/', [
             'methods' => 'GET',
-            'callback' => [$this->singleOverlay, 'handle'],
+            'callback' => fn(...$args) => $this->singleOverlay->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
 
-        /** @see \WPLokerBJM\Controllers\REST\DispatchSSGBuild::handle() */
         register_rest_route(self::$baseURI, '/dispatch-ssg/', [
             'methods' => 'POST',
-            'callback' => [$this->dispatchSSGBuild, 'handle'],
+            'callback' => fn(...$args) => $this->dispatchSSGBuild->handle(...$args),
             'permission_callback' => function () {
                 return current_user_can('manage_options');
             },
@@ -119,24 +113,24 @@ class RESTRoute implements HooksInterface
             })(),
         ]);
 
-        /** @see \WPLokerBJM\Controllers\REST\JobBookmark::handle() */
+        // POST is used for bookmark sync to avoid URL length limits with many IDs.
+        // GET would put IDs in query string (?ids=1,2,3,...), which can exceed ~2000 chars on mobile.
+        // POST sends IDs in JSON body, allowing unlimited bookmarks without 414 errors.
         register_rest_route(self::$baseURI, '/bookmarked-jobs/', [
-            'methods' => 'GET',
-            'callback' => [$this->jobBookmark, 'handle'],
+            'methods' => 'POST',
+            'callback' => fn(...$args) => $this->jobBookmark->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
 
-        /** @see \WPLokerBJM\Controllers\REST\JobGridController::handle() */
         register_rest_route(self::$baseURI, '/job-grid/', [
             'methods' => 'GET',
-            'callback' => [$this->jobGrid, 'handle'],
+            'callback' => fn(...$args) => $this->jobGrid->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
 
-        /** @see \WPLokerBJM\Controllers\REST\WPThemeData::handle() */
         register_rest_route(self::$baseURI, '/theme-data/', [
             'methods' => 'GET',
-            'callback' => [$this->wpThemeData, 'handle'],
+            'callback' => fn(...$args) => $this->wpThemeData->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
     }

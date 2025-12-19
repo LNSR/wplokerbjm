@@ -6,9 +6,9 @@ use WPLokerBJM\Contracts\HooksInterface;
 use WPLokerBJM\Core\Hooks\Theme\{Enqueue, ThemeInject, DebloatWPTheme, Google};
 use WPLokerBJM\Core\Hooks\{LiteSpeedFilters, Litespeed};
 use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Models\Schema\PostTypes;
 class Hooks implements HooksInterface
 {
-
     public function __construct(private \WPLokerBJM\Services\Utilities\SSG\BotDetection $botDetection)
     {
     }
@@ -19,16 +19,26 @@ class Hooks implements HooksInterface
 
     public function registerActions(): void
     {
-        add_action('after_setup_theme', [ThemeInject::class, 'addThemeSupport']);
-        add_action('wp_head', [ThemeInject::class, 'injectThemeScript']);
-        add_action('wp_head', [Enqueue::class, 'outputPreloadLinks']);
-        add_action('wp_head', [ThemeInject::class, 'preloadLogo']);
-        add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeWPLibrary'], 1);
-        add_action('litespeed_purged_all', [Litespeed::class, 'clearObjectCache']);
-        add_action('wp_enqueue_scripts', [Enqueue::class, 'enqueueAssets']);
-        add_action('template_redirect', [$this, 'oldPost410Redirect'], 0);
-        add_action('template_redirect', [$this, 'redirectToHome'], 0);
-        add_action('send_headers', [$this, 'restHeaders']);
+        add_action('after_setup_theme', fn() => ThemeInject::addThemeSupport());
+        add_action('wp_head', fn() => ThemeInject::injectThemeScript());
+        add_action('wp_head', fn() => Enqueue::outputPreloadLinks());
+        add_action('wp_head', fn() => ThemeInject::preloadLogo());
+        add_action('wp_enqueue_scripts', fn() => DebloatWPTheme::removeWPLibrary(), 0);
+        add_action('litespeed_purged_all', fn() => Litespeed::clearObjectCache());
+        add_action('wp_enqueue_scripts', fn() => Enqueue::enqueueAssets());
+        add_action('template_redirect', fn() => $this->oldPost410Redirect());
+        add_action('template_redirect', fn() => $this->redirectToHome());
+        add_action('template_redirect', fn() => $this->modifyLinkHeaders(), 15);
+        add_action('send_headers', fn() => $this->restHeaders());
+
+        // Cache purging hooks
+        add_action('save_post', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('delete_post', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('trashed_post', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('delete_attachment', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('created_term', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('edited_term', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('delete_term', fn(...$args) => $this->purgeQueryCaches(...$args));
     }
 
     /*======================================================================
@@ -37,13 +47,15 @@ class Hooks implements HooksInterface
 
     public function registerFilters(): void
     {
-        add_filter('posts_search', [$this, 'jobPostsSearchFilter'], 10, 2);
-        add_filter('litespeed_optimize_js_excludes', [LiteSpeedFilters::class, 'lscJsExcludes'], 0);
-        add_filter('litespeed_optimize_css_excludes', [LiteSpeedFilters::class, 'lscCssExcludes'], 0);
-        add_filter('option_active_plugins', [$this, 'disablePluginsForDev'], -1);
-        add_filter('option_active_plugins', [$this, 'disablePluginsforSimulatedProd'], -1);
-        add_filter('wp_robots', [$this, 'robotsMeta']);
-        add_filter('rest_pre_serve_request', [$this, 'filterRestHeaders'], accepted_args: 4);
+        add_filter('wp_robots', fn(...$args) => $this->robotsMeta(...$args));
+        add_filter('rest_pre_serve_request', fn(...$args) => $this->filterRestHeaders(...$args), 10, 4);
+        add_filter('litespeed_optimize_js_excludes', fn(...$args) => LiteSpeedFilters::lscJsExcludes(...$args), 0);
+        add_filter('litespeed_optimize_css_excludes', fn(...$args) => LiteSpeedFilters::lscCssExcludes(...$args), 0);
+        add_filter('option_active_plugins', fn(...$args) => $this->disablePluginsForDev(...$args), 0);
+        add_filter('option_active_plugins', fn(...$args) => $this->disablePluginsforSimulatedProd(...$args), 0);
+        add_filter('posts_search', fn(...$args) => $this->jobPostsSearchFilter(...$args), 10, 2);
+        add_filter('site_icon_meta_tags', fn(...$args) => ThemeInject::addSiteIconMetaTags(...$args));
+        add_filter('site_icon_image_sizes', fn(...$args) => [32, 48, 96, 144, 192, 256, 384, 512]);
     }
 
     /*======================================================================
@@ -62,37 +74,26 @@ class Hooks implements HooksInterface
      */
     public function oldPost410Redirect(): void
     {
-        if (is_404()) {
-            if (is_singular('lowongan') || strpos($_SERVER['REQUEST_URI'] ?? '', '/lowongan/') !== false) {
-                // Check if the post exists in trash (deleted due to age)
-                global $wp_query;
-                $post_name = $wp_query->query_vars['name'] ?? '';
-                if ($post_name) {
-                    $trashed_post = get_posts(\WPLokerBJM\QueryBuilders\JobQuery::getTrashedJobByNameArgs($post_name));
-                    if (!empty($trashed_post)) {
-                        // Only send 410 to bots; redirect humans to home
-                        if ($this->botDetection->isBot()) {
-                            status_header(410);
-                            wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
-                        } else {
-                            wp_safe_redirect(home_url('/'), 302);
-                            exit;
-                        }
-                    }
-                }
-                // If not in trash or no name, but URI has /lowongan/, assume removed, send 410 to bots
-                if ($this->botDetection->isBot()) {
-                    status_header(410);
-                    wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
-                } else {
-                    wp_safe_redirect(home_url('/'), 302);
-                    exit;
-                }
+        if (!is_404()) {
+            return;
+        }
+
+        $handleRemovedJob = function () {
+            if ($this->botDetection->isBot()) {
+                status_header(410);
+                wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
             } else {
-                // Other 404s redirect to home
                 wp_safe_redirect(home_url('/'), 302);
                 exit;
             }
+        };
+
+        if (is_singular('lowongan') || strpos($_SERVER['REQUEST_URI'] ?? '', '/lowongan/') !== false) {
+            $handleRemovedJob();
+        } else {
+            // Other 404s redirect to home
+            wp_safe_redirect(home_url('/'), 302);
+            exit;
         }
     }
 
@@ -128,7 +129,7 @@ class Hooks implements HooksInterface
             $robots['noindex'] = true;
         }
 
-        if (defined('WPL_OKERBJM_NO_INDEX') && WPL_OKERBJM_NO_INDEX) {
+        if (defined('WP_LOKERBJM_NO_INDEX') && WP_LOKERBJM_NO_INDEX) {
             $robots['noindex'] = true;
             $robots['nofollow'] = true;
         }
@@ -158,6 +159,25 @@ class Hooks implements HooksInterface
     }
 
     /**
+     * Modifies HTTP headers to remove unwanted Link headers and add sitemap link.
+     */
+    public function modifyLinkHeaders(): void
+    {
+        if (!headers_sent()) {
+            // Remove all Link headers to prevent API discovery exposure
+            header_remove('Link');
+
+            $this->exposeSitemapHeader();
+        }
+    }
+
+    public function exposeSitemapHeader(): void
+    {
+        $sitemap_url = home_url('/sitemap_index.xml');
+        header('Link: <' . esc_url($sitemap_url) . '>; rel="sitemap"');
+    }
+
+    /**
      * Exposes specific headers for REST API responses.
      */
     public function filterRestHeaders($served, $result, $request, $server)
@@ -173,17 +193,15 @@ class Hooks implements HooksInterface
      ======================================================================*/
 
     /**
-     * Customizes the SQL WHERE clause for WordPress search queries on job posts.
+     * !Customizes the SQL WHERE clause for WordPress search queries on job posts.
+     * this used for SearchForm
      */
     public function jobPostsSearchFilter(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
-        if ($wpdb === null) {
-            return $search;
-        }
 
         $q = $wp_query->query_vars['s'] ?? '';
-        if ($q !== '') {
+        if ($wpdb !== null && $q !== '') {
             $search = \WPLokerBJM\QueryBuilders\JobQuery::buildPostsSearchSql($wpdb, $q);
         }
 
@@ -247,5 +265,45 @@ class Hooks implements HooksInterface
             'fast-indexing-api/',
             'wps-hide-login/',
         ], $extra);
+    }
+
+    /*======================================================================
+     | CACHE
+     ======================================================================*/
+
+    /**
+     * Purge query caches when posts or taxonomies are modified.
+     */
+    private function purgeQueryCaches($post = null): void
+    {
+        // Only purge for lowongan posts if post is provided
+        if ($post && (!is_object($post) || $post->post_type !== PostTypes::POST_TYPE_LOWONGAN)) {
+            return;
+        }
+
+        try {
+            // Purge job last modified cache
+            \WPLokerBJM\Core\Cache::delete('job_last_modified');
+
+            // Purge taxonomy last modified cache
+            \WPLokerBJM\Core\Cache::delete('taxonomy_last_modified');
+
+            // Purge search SQL caches using pattern delete
+            \WPLokerBJM\Core\Cache::deletePattern('search_sql_*');
+
+            // Purge company search caches
+            \WPLokerBJM\Core\Cache::deletePattern('company_search_*');
+
+            // Purge taxonomy repository caches
+            \WPLokerBJM\Core\Cache::delete('all_taxonomy_terms');
+            \WPLokerBJM\Core\Cache::deletePattern('post_taxonomies_*');
+
+            // If specific post, also purge its taxonomy cache
+            if ($post && is_object($post)) {
+                \WPLokerBJM\Core\Cache::delete('post_taxonomies_' . $post->ID);
+            }
+        } catch (\Exception $e) {
+            error_log('Hooks::purgeQueryCaches error: ' . $e->getMessage());
+        }
     }
 }

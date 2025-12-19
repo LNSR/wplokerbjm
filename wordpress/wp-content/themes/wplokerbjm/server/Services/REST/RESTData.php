@@ -3,6 +3,8 @@
 namespace WPLokerBJM\Services\REST;
 
 use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
+use WPLokerBJM\Services\Utilities\Utilities;
 
 class RESTData
 {
@@ -36,25 +38,27 @@ class RESTData
                 'id' => $post_id,
                 'slug' => get_post_field('post_name', $post_id),
                 'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-                'nama_perusahaan' => !empty($jobdata['perusahaan_taxo'])
-                    ? html_entity_decode($jobdata['perusahaan_taxo'], ENT_QUOTES | ENT_HTML5, 'UTF-8')
-                    : (isset($jobdata['nama_perusahaan']) ? html_entity_decode($jobdata['nama_perusahaan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),
+                CustomFields::NAMA_PERUSAHAAN => !empty($jobdata[Taxonomies::PERUSAHAAN])
+                    ? html_entity_decode($jobdata[Taxonomies::PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') // prioritize taxonomy perusahaan first
+                    : (isset($jobdata[CustomFields::NAMA_PERUSAHAAN]) ? html_entity_decode($jobdata[CustomFields::NAMA_PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),
                 'ringkasanPekerjaan' => [
-                    'jenis_pekerjaan_taxo' => $jobdata['jenis_pekerjaan_taxo'] ?? null,
-                    'pendidikan_taxo' => $jobdata['pendidikan_taxo'] ?? null,
-                    'pengalaman' => $jobdata['pengalaman'] ?? null,
-                    'gender_taxo' => $jobdata['gender_taxo'] ?? null,
-                    'gaji_minimal' => $jobdata['gaji_minimal'] ?? null,
-                    'gaji_maksimal' => $jobdata['gaji_maksimal'] ?? null,
-                    'umur_min' => $jobdata['umur_min'] ?? null,
-                    'umur_max' => $jobdata['umur_max'] ?? null,
-                    'lokasi_taxo' => $jobdata['lokasi_taxo'] ?? null,
+                    Taxonomies::JENIS_PEKERJAAN => $jobdata[Taxonomies::JENIS_PEKERJAAN] ?? null,
+                    Taxonomies::PENDIDIKAN => $jobdata[Taxonomies::PENDIDIKAN] ?? null,
+                    Taxonomies::GENDER => $jobdata[Taxonomies::GENDER] ?? null,
+                    Taxonomies::LOKASI_PEKERJAAN => $jobdata[Taxonomies::LOKASI_PEKERJAAN] ?? null,
+                    CustomFields::PENGALAMAN => $jobdata[CustomFields::PENGALAMAN] ?? null,
+                    CustomFields::GAJI_MINIMAL => $jobdata[CustomFields::GAJI_MINIMAL] ?? null,
+                    CustomFields::GAJI_MAKSIMAL => $jobdata[CustomFields::GAJI_MAKSIMAL] ?? null,
+                    CustomFields::UMUR_MIN => $jobdata[CustomFields::UMUR_MIN] ?? null,
+                    CustomFields::UMUR_MAX => $jobdata[CustomFields::UMUR_MAX] ?? null,
                 ],
-                'deadline' => $jobdata['deadline'] ?? null,
-                'statusjob' => $jobdata['status_pekerjaan'] ?? null,
+                CustomFields::DEADLINE => $jobdata[CustomFields::DEADLINE] ?? null,
+                CustomFields::STATUS_PEKERJAAN => $jobdata[CustomFields::STATUS_PEKERJAAN] ?? null,
                 'permalink' => esc_url(get_permalink($post_id)),
                 'post_time' => get_post_time('c', false, $post_id),
             ];
+
+            $data = Utilities::filterEmptyValues($data);
 
             Cache::set($cacheKey, $data, self::CACHE_TTL);
             return $data;
@@ -84,38 +88,40 @@ class RESTData
             $data = [
                 'id' => $post_id,
                 'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-                'namaPerusahaan' => !empty($jobdata['perusahaan_taxo'])
-                    ? html_entity_decode($jobdata['perusahaan_taxo'], ENT_QUOTES | ENT_HTML5, 'UTF-8')
-                    : (isset($jobdata['nama_perusahaan']) ? html_entity_decode($jobdata['nama_perusahaan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),
-                'tentangPerusahaan' => isset($jobdata['tentang_perusahaan']) ? html_entity_decode($jobdata['tentang_perusahaan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '',
+                CustomFields::NAMA_PERUSAHAAN => !empty($jobdata[Taxonomies::PERUSAHAAN])
+                    ? html_entity_decode($jobdata[Taxonomies::PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') // prioritize taxonomy perusahaan first
+                    : (isset($jobdata[CustomFields::NAMA_PERUSAHAAN]) ? html_entity_decode($jobdata[CustomFields::NAMA_PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null),
+                CustomFields::TENTANG_PERUSAHAAN => isset($jobdata[CustomFields::TENTANG_PERUSAHAAN]) ? html_entity_decode($jobdata[CustomFields::TENTANG_PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
                 'ringkasanPekerjaan' => [
-                    'jenis_pekerjaan_taxo' => $jobdata['jenis_pekerjaan_taxo'] ?? null,
-                    'pendidikan_taxo' => $jobdata['pendidikan_taxo'] ?? null,
-                    'pengalaman' => $jobdata['pengalaman'] ?? null,
-                    'gender_taxo' => $jobdata['gender_taxo'] ?? null,
-                    'gaji_minimal' => $jobdata['gaji_minimal'] ?? null,
-                    'gaji_maksimal' => $jobdata['gaji_maksimal'] ?? null,
-                    'umur_min' => $jobdata['umur_min'] ?? null,
-                    'umur_max' => $jobdata['umur_max'] ?? null,
-                    'lokasi_taxo' => $jobdata['lokasi_taxo'] ?? null,
-                    'deadline' => $jobdata['deadline'] ?? null,
+                    Taxonomies::JENIS_PEKERJAAN => $jobdata[Taxonomies::JENIS_PEKERJAAN] ?? null,
+                    Taxonomies::PENDIDIKAN => $jobdata[Taxonomies::PENDIDIKAN] ?? null,
+                    Taxonomies::GENDER => $jobdata[Taxonomies::GENDER] ?? null,
+                    Taxonomies::LOKASI_PEKERJAAN => $jobdata[Taxonomies::LOKASI_PEKERJAAN] ?? null,
+                    CustomFields::PENGALAMAN => $jobdata[CustomFields::PENGALAMAN] ?? null,
+                    CustomFields::GAJI_MINIMAL => $jobdata[CustomFields::GAJI_MINIMAL] ?? null,
+                    CustomFields::GAJI_MAKSIMAL => $jobdata[CustomFields::GAJI_MAKSIMAL] ?? null,
+                    CustomFields::UMUR_MIN => $jobdata[CustomFields::UMUR_MIN] ?? null,
+                    CustomFields::UMUR_MAX => $jobdata[CustomFields::UMUR_MAX] ?? null,
+                    CustomFields::DEADLINE => $jobdata[CustomFields::DEADLINE] ?? null,
                 ],
-                'deskripsiPekerjaan' => isset($jobdata['deskripsi_pekerjaan']) ? html_entity_decode($jobdata['deskripsi_pekerjaan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '',
-                'persyaratan' => isset($jobdata['persyaratan']) ? html_entity_decode($jobdata['persyaratan'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '',
-                'caraMelamar' => isset($jobdata['cara_melamar']) ? html_entity_decode($jobdata['cara_melamar'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '',
-                'benefit' => isset($jobdata['benefit']) ? html_entity_decode($jobdata['benefit'], ENT_QUOTES | ENT_HTML5, 'UTF-8') : '',
+                CustomFields::DESKRIPSI_PEKERJAAN => isset($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) ? html_entity_decode($jobdata[CustomFields::DESKRIPSI_PEKERJAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
+                CustomFields::PERSYARATAN => isset($jobdata[CustomFields::PERSYARATAN]) ? html_entity_decode($jobdata[CustomFields::PERSYARATAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
+                CustomFields::CARA_MELAMAR => isset($jobdata[CustomFields::CARA_MELAMAR]) ? html_entity_decode($jobdata[CustomFields::CARA_MELAMAR], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
+                CustomFields::BENEFIT => isset($jobdata[CustomFields::BENEFIT]) ? html_entity_decode($jobdata[CustomFields::BENEFIT], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
                 'contacts' => [
-                    'email_kontak' => $jobdata['email_kontak'] ?? [],
-                    'nomor_kontak' => $jobdata['nomor_kontak'] ?? [],
-                    'situs_kontak' => $jobdata['situs_kontak'] ?? [],
+                    CustomFields::EMAIL_KONTAK => $jobdata[CustomFields::EMAIL_KONTAK] ?? null,
+                    CustomFields::NOMOR_KONTAK => $jobdata[CustomFields::NOMOR_KONTAK] ?? null,
+                    CustomFields::SITUS_KONTAK => $jobdata[CustomFields::SITUS_KONTAK] ?? null,
                 ],
-                'social_media' => $jobdata['social_media'] ?? [],
+                CustomFields::SOCIAL_MEDIA => $jobdata[CustomFields::SOCIAL_MEDIA] ?? null,
                 'post_time' => get_post_time('c', false, $post_id),
             ];
 
             if (is_user_logged_in()) {
                 $data['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
             }
+
+            $data = Utilities::filterEmptyValues($data);
 
             Cache::set($cacheKey, $data, self::CACHE_TTL);
             return $data;

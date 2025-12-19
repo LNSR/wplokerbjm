@@ -153,8 +153,8 @@
       deadlineInfo: job.deadline
         ? generalStore.useDeadline(job.deadline, now)()
         : { text: "", style: "" },
-      statusInfo: job.statusjob
-        ? generalStore.useStatusJob(Number(job.statusjob))
+      statusInfo: job.status_pekerjaan
+        ? generalStore.useStatusJob(Number(job.status_pekerjaan))
         : { label: "", color: "" },
     }))
   );
@@ -212,7 +212,7 @@
     savedJobs.forEach((job) => {
       if (job.id) removingIds.add(job.id);
     });
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     loading = true;
     try {
       await bookmarkStore.clearAll();
@@ -231,7 +231,7 @@
 
   async function removeBookmark(id: number): Promise<void> {
     removingIds.add(id);
-    await new Promise((resolve) => setTimeout(resolve, 300));
+    await new Promise((resolve) => setTimeout(resolve, 1000));
     await bookmarkStore.removeJob(id);
     removingIds.delete(id);
   }
@@ -267,7 +267,7 @@
     if (open) {
       bookmarkStore.flushSync();
       fetchJobs();
-      modalEl?.showModal();
+      if (!modalEl?.open) modalEl?.showModal();
       if (isMobileValue && modalBox) {
         const vh = window.innerHeight;
         const initialHeight = Math.round(vh * 0.6);
@@ -281,7 +281,7 @@
 
   $effect(() => {
     if (showDeleteConfirm) {
-      deleteConfirmModal?.showModal();
+      if (!deleteConfirmModal?.open) deleteConfirmModal?.showModal();
     } else {
       deleteConfirmModal?.close();
     }
@@ -462,31 +462,45 @@
                       <div class="animate-pulse">
                         <div class="flex items-start justify-between gap-3">
                           <div class="flex-1 min-w-1">
-                            <div class="h-4 bg-base-300 rounded mb-2"></div>
                             <div
-                              class="h-3 bg-base-300 rounded mb-2 w-3/4"
+                              class="h-4 bg-base-content/20 rounded mb-2"
+                            ></div>
+                            <div
+                              class="h-3 bg-base-content/20 rounded mb-2 w-3/4"
                             ></div>
                             <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
-                              <div class="h-3 bg-base-300 rounded w-20"></div>
-                              <div class="h-3 bg-base-300 rounded w-16"></div>
-                              <div class="h-3 bg-base-300 rounded w-24"></div>
+                              <div
+                                class="h-3 bg-base-content/20 rounded w-20"
+                              ></div>
+                              <div
+                                class="h-3 bg-base-content/20 rounded w-16"
+                              ></div>
+                              <div
+                                class="h-3 bg-base-content/20 rounded w-24"
+                              ></div>
                             </div>
                             <div class="mt-2">
                               <div
-                                class="h-3 bg-base-300 rounded w-32 mb-2"
+                                class="h-3 bg-base-content/20 rounded w-32 mb-2"
                               ></div>
-                              <div class="h-3 bg-base-300 rounded w-28"></div>
+                              <div
+                                class="h-3 bg-base-content/20 rounded w-28"
+                              ></div>
                             </div>
                           </div>
                           <div class="flex flex-col gap-1">
-                            <div class="h-8 w-8 bg-base-300 rounded"></div>
+                            <div
+                              class="h-8 w-8 bg-base-content/20 rounded"
+                            ></div>
                           </div>
                         </div>
                       </div>
                     {:else}
                       <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 min-w-0">
-                          <p class="text-md font-bold text-base flex items-center gap-2 mb-1">
+                          <p
+                            class="text-md font-bold text-base flex items-center gap-2 mb-1"
+                          >
                             <button
                               onclick={() => handleJobClick(job)}
                               class="hover:text-[var(--wpl-global-color-1)] transition-colors text-left w-full"
@@ -498,9 +512,11 @@
                           {#if !job.nama_perusahaan}
                             <div class="divider mt-0"></div>
                           {/if}
-                        
+
                           {#if job.nama_perusahaan}
-                            <p class="text-md font-semibold mb-6 flex items-center gap-2">
+                            <p
+                              class="text-md font-semibold mb-6 flex items-center gap-2"
+                            >
                               <UserTieSolid
                                 class="h-4 w-4 text-[var(--wpl-global-color-1)] inline-block"
                                 aria-hidden="true"

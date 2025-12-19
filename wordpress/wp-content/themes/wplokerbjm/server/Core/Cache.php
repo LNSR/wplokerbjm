@@ -343,17 +343,10 @@ class Cache
                 return 0;
             }
 
-            // Remove our prefix from keys for deletion
-            $keysToDelete = array_map(function ($key) {
-                return str_replace(self::OBJECT_CACHE_PREFIX . ':', '', $key);
-            }, $keys);
+            // Use unlink for asynchronous deletion (faster)
+            $deletedCount = $redis->unlink($keys);
 
-            // Delete keys using our bulk delete method
-            $results = self::deleteMultiple($keysToDelete);
-
-            $deletedCount = count(array_filter($results));
-
-            error_log("Cache::deletePattern: Deleted {$deletedCount} keys matching pattern '{$pattern}'");
+            error_log("Cache::deletePattern: Unlinked {$deletedCount} keys matching pattern '{$pattern}'");
 
             return $deletedCount;
 

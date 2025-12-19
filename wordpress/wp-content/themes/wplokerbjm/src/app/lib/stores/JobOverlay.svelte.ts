@@ -1,15 +1,16 @@
-import type { Job, SingleOverlayResponse } from '@/types'
+import type { CardJob, SingleOverlayResponse } from '@/types'
 import { headerStore } from "$lib/stores/HeaderStore.svelte";
 import { APIService } from '@/services/APIService'
 import { SEOService } from "$lib/utils/SEO.svelte";
 import { GoogleServices } from "$lib/utils/Google.svelte";
 import { scrollY } from 'svelte/reactivity/window';
 import { isMobile } from '$lib/utils/elements.svelte';
+import { isDevelopmentMode } from '@/utils';
 
 export class JobOverlayManager {
 	public overlayOpen = $state(false)
 	public selectedSlug = $state<string | null>(null)
-	public selectedJob = $state<Job | null>(null)
+	public selectedJob = $state<CardJob | null>(null)
 
 	// Overlay fetch state
 	public overlayData = $state<SingleOverlayResponse | null>(null)
@@ -25,7 +26,7 @@ export class JobOverlayManager {
 		// No store needed
 	}
 
-	public async openOverlay(slug: string, job?: Job): Promise<void> {
+	public async openOverlay(slug: string, job?: CardJob): Promise<void> {
 		this.selectedSlug = slug
 		this.selectedJob = job ?? null
 		this.overlayOpen = true
@@ -41,7 +42,9 @@ export class JobOverlayManager {
 			GoogleServices.sendPageView(path, 'overlay_page_view');
 
 			try {
-				await SEOService.fetchHeadData(path);
+				if (!isDevelopmentMode()) {
+					await SEOService.fetchHeadData(path);
+				}
 			} catch (e) {
 				// non-fatal
 			}
@@ -61,7 +64,9 @@ export class JobOverlayManager {
 		this.clearOverlayState()
 
 		try {
-			await SEOService.fetchHeadData("/");
+			if (!isDevelopmentMode()) {
+				await SEOService.fetchHeadData("/");
+			}
 		} catch (e) {
 			// non-fatal
 		}

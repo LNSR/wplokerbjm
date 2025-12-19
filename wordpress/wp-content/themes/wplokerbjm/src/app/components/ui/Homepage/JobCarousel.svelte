@@ -131,16 +131,11 @@
         swiperInstance = new SwiperCore(el, finalCfg);
 
         // Restore saved slide index
-        const savedState = routeStateStore.getCarouselState(
-          window.location.pathname
-        );
+        const savedState = routeStateStore.getCarouselState();
         // Clear saved state after restoring
-        const deleteState = routeStateStore.clearCarouselState(
-          window.location.pathname
-        );
+        routeStateStore.clearCarouselState();
         if (savedState) {
           swiperInstance.slideTo(savedState.slideIndex);
-          deleteState;
         }
 
         return;
@@ -364,9 +359,6 @@
 
     static destroySwiper(): void {
       if (swiperInstance) {
-        routeStateStore.saveCarouselState(window.location.pathname, {
-          slideIndex: swiperInstance.activeIndex,
-        });
         try {
           swiperInstance.destroy(true, true);
         } catch (err) {
@@ -390,7 +382,9 @@
       await this.handlePlatformSpecificNavigation(slug, permalink, job);
     }
     private static carouselSaveCurrentSlideState(): void {
-      routeStateStore.saveCarouselState(window.location.pathname, {
+      if (!swiperInstance) return;
+
+      routeStateStore.saveCarouselState({
         slideIndex: swiperInstance?.activeIndex ?? 0,
       });
     }

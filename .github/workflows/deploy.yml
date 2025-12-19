@@ -18,13 +18,13 @@ jobs:
     name: Build and deploy
     runs-on: ubuntu-latest
     env:
-      RCLONE_TRANSFERS: "4"
-      RCLONE_CHECKERS: "2"
+      RCLONE_TRANSFERS: "2"
+      RCLONE_CHECKERS: "1"
       RCLONE_RETRIES: "100"
       RCLONE_LOW_RETRIES: "5"
       RCLONE_LOG_LEVEL: "INFO"
-      RCLONE_BWLIMIT: "100M"
-      RCLONE_TPSLIMIT: "3"
+      RCLONE_BWLIMIT: "50M"
+      RCLONE_TPSLIMIT: "2"
 
     steps:
       - name: Checkout repository

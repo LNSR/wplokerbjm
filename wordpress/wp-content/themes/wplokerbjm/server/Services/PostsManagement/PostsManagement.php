@@ -9,7 +9,7 @@ use WPLokerBJM\QueryBuilders\JobQuery;
  */
 class PostsManagement
 {
-    public static function deleteOldJobs(): void
+    public function deleteOldJobs(): void
     {
         try {
             // Fetch jobs older than 1 month but exclude ones with future deadline via JobQuery::oldJobsArgs
@@ -78,7 +78,7 @@ class PostsManagement
      * - Leave unchanged otherwise
      * @return void
      */
-    public static function updateAllJobStatuses(): void
+    public function updateAllJobStatuses(): void
     {
         try {
             $job_items = get_posts(JobQuery::allJobsIdsArgs());

@@ -1,5 +1,5 @@
 
-export type ApiErrorType = 'network' | 'timeout' | 'http' | 'unknown';
+export type ApiErrorType = 'network' | 'timeout' | 'http' | 'unknown' | 'circuit_breaker';
 
 type ErrorWithCaptureStackTrace = ErrorConstructor & {
   captureStackTrace?: (target: object, constructor?: Function) => void;

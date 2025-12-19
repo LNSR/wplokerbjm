@@ -2,7 +2,6 @@
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
   import { GoogleServices } from "$lib/utils/Google.svelte";
   import { removeJobPostingJsonLd } from "$lib/utils/elements.svelte";
-  import { SEOService } from "$lib/utils/SEO.svelte";
 
   let pathname = $derived(routeStore.currentUrl.pathname);
   let isLoading = $derived(routeStore.isLoading);
@@ -10,7 +9,7 @@
   let componentNamePath = $derived(routeStore.getComponentNamePath(pathname));
   let CurrentComponent: typeof SvelteComponent | null = $state(null);
 
-  class RouteHandler {
+  class AppRouteHandler {
     static async loadRoute(
       importPromise: Promise<any>,
       componentNamePath: string
@@ -29,28 +28,8 @@
       }
     }
     static restoreScrollPosition(pathname: string): void {
-      if (!routeStore.isInitialLoad && pathname !== "/") {
-        const savedScroll = routeStateStore.getScrollPosition(pathname);
-        if (savedScroll !== undefined) {
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setTimeout(
-                () => window.scrollTo({ top: savedScroll, behavior: "smooth" }),
-                50
-              );
-            });
-          });
-        } else {
-          // Scroll to top for new routes
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => {
-              setTimeout(
-                () => window.scrollTo({ top: 0, behavior: "smooth" }),
-                50
-              );
-            });
-          });
-        }
+      if (!routeStore.isInitialLoad) {
+        routeStateStore.restoreScrollForPath(pathname);
       }
     }
     static async handlePopstate(): Promise<void> {
@@ -62,15 +41,8 @@
       // Ensure we only attempt removal once on popstate as well.
       removeJobPostingJsonLd(undefined, "popstate");
 
-      // Destroy AdSense ads before route change for clean navigation
-      GoogleServices.adSenseDestroy();
-
-      // Fetch RankMath head data
-      await SEOService.fetchHeadData(newPath);
-      // GTAG / GTM page view for back/forward SPA navigation after head update
-      GoogleServices.sendPageView(newPath);
-      // Trigger optional AdSense refresh for SPA navigation (back/forward).
-      GoogleServices.adSenseRefresh();
+      // Perform route transition side effects
+      await routeStore.performRouteTransitionSideEffects(newPath);
 
       // Add loading timeout for popstate as well
       setTimeout(() => {
@@ -109,7 +81,7 @@
   $effect(() => {
     const importPromise = mapComponentName(componentNamePath);
     if (importPromise) {
-      RouteHandler.loadRoute(importPromise, componentNamePath);
+      AppRouteHandler.loadRoute(importPromise, componentNamePath);
     } else {
       CurrentComponent = null;
     }
@@ -117,7 +89,7 @@
 
   // Scroll restoration for non-homepage routes (homepage handles its own(job-grid))
   $effect(() => {
-    RouteHandler.restoreScrollPosition(pathname);
+    AppRouteHandler.restoreScrollPosition(pathname);
   });
 
   onMount(() => {
@@ -128,11 +100,11 @@
 
     // Listen to browser back/forward
     if (typeof window !== "undefined") {
-      window.addEventListener("popstate", RouteHandler.handlePopstate);
+      window.addEventListener("popstate", AppRouteHandler.handlePopstate);
 
       // Return cleanup function
       return () => {
-        window.removeEventListener("popstate", RouteHandler.handlePopstate);
+        window.removeEventListener("popstate", AppRouteHandler.handlePopstate);
       };
     }
   });

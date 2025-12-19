@@ -107,4 +107,12 @@ find /var/www/html \( -type f -o -type d \) ! -perm 775 -print0 | xargs -0 -r -P
 mkdir -p /var/run/sock
 chmod 755 /var/run/sock
 
+# Set up system cron for WordPress if DISABLE_WP_CRON is enabled
+if [ -n "$WP_ENV" ]; then
+  # Create crontab for wordpress user to run wp-cron.php every 10 minutes using WP-CLI
+  echo "*/10 * * * * cd /var/www/html && wp cron event run --due-now > /dev/null 2>&1" | crontab -u wordpress -
+  # Start cron daemon in background
+  cron &
+fi
+
 exec "$@"

@@ -5,7 +5,12 @@
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import { navigateTo } from "$lib/stores/Route.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
-import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid } from "svelte-awesome-icons";
+  import {
+    UserTieSolid,
+    CalendarSolid,
+    ExclamationTriangleSolid,
+    ThumbTackSolid,
+  } from "svelte-awesome-icons";
   import { SvelteDate } from "svelte/reactivity";
   import type { CardJob, JobCardProps } from "@/types";
 
@@ -14,11 +19,13 @@ import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid }
     variant = "carousel",
     permalink = "",
     onClick,
+    isVisited = false, // Prop to mark as last visited (e.g., for the last visited job on mobile)
   } = $props<{
     jobdata: CardJob;
     variant: JobCardProps["variant"];
     permalink: string;
     onClick?: (slug: string, event: MouseEvent, index: number) => void;
+    isVisited?: boolean;
   }>();
 
   let now = $state(new SvelteDate());
@@ -32,7 +39,7 @@ import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid }
     generalStore.useSummaryJob(jobdata?.ringkasanPekerjaan)
   );
   const statusInfo = $derived.by(() =>
-    generalStore.useStatusJob(Number(jobdata?.statusjob ?? 0))
+    generalStore.useStatusJob(Number(jobdata?.status_pekerjaan ?? 0))
   );
   const deadlineInfo = $derived.by(() =>
     generalStore.useDeadline(jobdata?.deadline, now)()
@@ -43,7 +50,10 @@ import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid }
 
   const selected = $derived.by(() => {
     try {
-      return (jobOverlay.selectedSlug ?? null) === (jobdata?.slug ?? null);
+      // Only select if there's an active overlay selection OR the job is visited(for mobile)
+      const overlaySelected =
+        jobOverlay.selectedSlug && jobOverlay.selectedSlug === jobdata?.slug;
+      return overlaySelected || isVisited;
     } catch {
       return false;
     }
@@ -165,9 +175,9 @@ import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid }
               statusInfo.color,
             ].join(" ")}
           >
-            {#if statusInfo.label === 'Urgent'}
+            {#if statusInfo.label === "Urgent"}
               <ExclamationTriangleSolid class="h-4 w-4" aria-hidden="true" />
-            {:else if statusInfo.label === 'Pinned'}
+            {:else if statusInfo.label === "Pinned"}
               <ThumbTackSolid class="h-4 w-4" aria-hidden="true" />
             {/if}
             {statusInfo.label}
@@ -201,11 +211,11 @@ import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid }
     scroll-margin-top: var(--site-scroll-padding-top, 0px);
   }
   @utility card-base {
-    @apply card block rounded-xl cursor-pointer border-2 border-blue-500;
+    @apply card block rounded-xl cursor-pointer border-2 border-blue-500 bg-base-200 dark:bg-base-100/50;
   }
 
   .card-base-carousel {
-    @apply card block rounded-xl cursor-pointer border-2 border-blue-500 max-w-full hover:shadow-lg hover:border-blue-400;
+    @apply card-base max-w-full hover:shadow-lg hover:border-blue-400;
   }
 
   .card-selected-carousel {
@@ -213,7 +223,7 @@ import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid }
   }
 
   .card-base-featured {
-    @apply card block rounded-xl cursor-pointer border-2 border-blue-500 w-full h-full hover:shadow-xl hover:border-blue-600 hover:scale-[1.02] hover:border-solid;
+    @apply card-base w-full h-full hover:shadow-xl hover:border-blue-600 hover:scale-[1.02] hover:border-solid;
   }
 
   .card-selected-featured {

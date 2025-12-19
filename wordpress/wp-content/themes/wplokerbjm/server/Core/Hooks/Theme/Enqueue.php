@@ -60,6 +60,12 @@ class Vite
      */
     public static function getPreloadUrls(string $path): array
     {
+        $cacheKey = 'preload_urls_' . md5($path);
+        $urls = Cache::get($cacheKey);
+        if ($urls !== false) {
+            return $urls;
+        }
+
         $manifest = self::getManifest();
         if (!$manifest) {
             return [];
@@ -98,6 +104,7 @@ class Vite
         // Remove duplicates
         $urls = array_unique($urls);
 
+        Cache::set($cacheKey, $urls, 81600); // Cache for 1 day, matching manifest TTL
         return $urls;
     }
 
@@ -110,6 +117,12 @@ class Vite
             return [];
         }
         $visited[] = $key;
+
+        $cacheKey = 'transitive_assets_' . md5($key);
+        $assets = Cache::get($cacheKey);
+        if ($assets !== false) {
+            return $assets;
+        }
 
         $assets = [];
 
@@ -130,6 +143,7 @@ class Vite
             }
         }
 
+        Cache::set($cacheKey, $assets, 81600); // Cache for 1 day, matching manifest TTL
         return $assets;
     }
 

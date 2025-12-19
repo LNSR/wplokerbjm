@@ -16,13 +16,16 @@ use WPLokerBJM\Contracts\HooksInterface;
  * @package WPLokerBJM\Models\Schema
  */
 class PostTypes implements HooksInterface {
+    
+    public const POST_TYPE_LOWONGAN = 'lowongan';
+
     /**
      * Register all custom post types
      * 
      * @return void
      */
     public function registerActions(): void {
-        add_action('init', [$this, 'registerLowonganPostType']);
+        add_action('init', fn() => $this->registerLowonganPostType());
     }
 
     public function registerFilters(): void {
@@ -84,20 +87,20 @@ class PostTypes implements HooksInterface {
             'query_var'           => true,
             'can_export'          => true,
             'delete_with_user'    => true,
-            'has_archive'         => true,
+            'has_archive'         => false,
             'rest_base'           => '',
             'show_in_menu'        => true,
             'menu_position'       => '',
             'menu_icon'           => 'dashicons-admin-users',
             'capability_type'     => 'post',
             'supports'            => ['title', 'editor', 'thumbnail'],
-            'taxonomies'          => ['jenis-pekerjaan', 'lokasi-pekerjaan', 'kategori-lowongan', 'usia', 'gaji', 'pengalaman', 'pendidikan', 'gender'],
+            'taxonomies'          => [Taxonomies::JENIS_PEKERJAAN, Taxonomies::LOKASI_PEKERJAAN, Taxonomies::KATEGORI_LOWONGAN, Taxonomies::PENDIDIKAN, Taxonomies::GENDER],
             'rewrite'             => [
-                'slug'       => 'lowongan',
+                'slug'       => self::POST_TYPE_LOWONGAN,
                 'with_front' => false,
             ],
         ];
 
-        register_post_type('lowongan', $args);
+        register_post_type(self::POST_TYPE_LOWONGAN, $args);
     }
 }

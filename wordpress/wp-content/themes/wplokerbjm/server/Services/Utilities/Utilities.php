@@ -1,6 +1,7 @@
 <?php
 namespace WPLokerBJM\Services\Utilities;
 use WPLokerBJM\Services\REST\RESTRoute;
+use WPLokerBJM\Models\Schema\Taxonomies;
 class Utilities
 {
     public static function parseMulti($param)
@@ -50,9 +51,9 @@ class Utilities
     {
         return [
             'cari' => $request->get_param('cari') ?? '',
-            'lokasi' => self::parseMulti($request->get_param('lokasi')),
-            'gender' => self::parseMulti($request->get_param('gender')),
-            'pendidikan' => self::parseMulti($request->get_param('pendidikan')),
+            Taxonomies::LOKASI_PEKERJAAN => self::parseMulti($request->get_param(Taxonomies::LOKASI_PEKERJAAN)),
+            Taxonomies::GENDER => self::parseMulti($request->get_param(Taxonomies::GENDER)),
+            Taxonomies::PENDIDIKAN => self::parseMulti($request->get_param(Taxonomies::PENDIDIKAN)),
             'sort' => $request->get_param('sort') ?? 'desc',
         ];
     }
@@ -97,5 +98,34 @@ class Utilities
             'success' => false,
             'error' => $message,
         ], $code);
+    }
+
+    /**
+     * Recursively filter out empty values from an array.
+     *! make arrays returned values more compact by removing empty entries 
+     *
+     * @param array $dataArray The input array to filter.
+     * @param bool|null $disable Optional flag to disable filtering in development environment.
+     * @return array The filtered array with empty values removed.
+     */
+    public static function filterEmptyValues(array $dataArray, ?bool $disable = false): array
+    {
+        // In development environment, return data as is for easier debugging
+        if (defined('WP_ENV') && WP_ENV === 'development' && $disable) {
+            return $dataArray;
+        }
+
+        $filtered = [];
+        foreach ($dataArray as $key => $value) {
+            if (is_array($value)) {
+                $filteredValue = self::filterEmptyValues($value);
+                if (!empty($filteredValue)) {
+                    $filtered[$key] = $filteredValue;
+                }
+            } elseif ($value !== null && $value !== '' && $value !== []) {
+                $filtered[$key] = $value;
+            }
+        }
+        return $filtered;
     }
 }

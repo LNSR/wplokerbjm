@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import type { SocialMediaItem } from "@/types";
+  import { type SocialMediaItem, SocialMediaPlatform } from "@/types";
   import {
     ArrowUpSolid,
     HeadsetSolid,
@@ -14,25 +14,25 @@
     {
       url: "https://www.instagram.com/loker_banjarmasin",
       icon: InstagramBrands,
-      platform: "Instagram",
+      platform: SocialMediaPlatform.Instagram,
       color: "text-pink-500 dark:text-pink-400",
     },
     {
       url: "https://www.tiktok.com/@loker_banjarmasin",
       icon: TiktokBrands,
-      platform: "TikTok",
+      platform: SocialMediaPlatform.TikTok,
       color: "text-black dark:text-white",
     },
     {
       url: "https://www.facebook.com/loker.banjarmasin.2025",
       icon: FacebookBrands,
-      platform: "Facebook",
+      platform: SocialMediaPlatform.Facebook,
       color: "text-[var(--wpl-global-color-1)] dark:text-blue-400",
     },
     {
       url: "https://www.threads.net/@loker_banjarmasin",
       icon: ThreadsBrands,
-      platform: "Threads",
+      platform: SocialMediaPlatform.Threads,
       color: "text-black dark:text-white",
     },
   ];

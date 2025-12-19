@@ -4,6 +4,8 @@ services:
       context: .
       dockerfile: Dockerfile.${WP_ENV}
     container_name: wordpress-${WP_ENV}
+    env_file:
+      - ./.env
     environment:
       WORDPRESS_DB_HOST: ${WORDPRESS_DB_HOST}
       WORDPRESS_DB_USER: ${WORDPRESS_DB_USER}
@@ -15,15 +17,6 @@ services:
       FORCE_SSL_ADMIN: "true"
       WP_HOME: ${WORDPRESS_WP_HOME}
       WP_SITEURL: ${WORDPRESS_WP_SITEURL}
-      ADVMO_CLOUDFLARE_R2_BUCKET: ${ADVMO_CLOUDFLARE_R2_BUCKET}
-      ADVMO_CLOUDFLARE_R2_KEY: ${ADVMO_CLOUDFLARE_R2_KEY}
-      ADVMO_CLOUDFLARE_R2_SECRET: ${ADVMO_CLOUDFLARE_R2_SECRET}
-      ADVMO_CLOUDFLARE_R2_DOMAIN: ${ADVMO_CLOUDFLARE_R2_DOMAIN}
-      ADVMO_CLOUDFLARE_R2_ENDPOINT: ${ADVMO_CLOUDFLARE_R2_ENDPOINT}
-      WP_REDIS_SOCK: ${REDIS_SOCK}
-      WP_REDIS_HOST: ${REDIS_HOST}
-      WP_REDIS_PASSWORD: ${REDIS_PWD}
-      WP_REDIS_DATABASE: ${REDIS_DB}
       WORDPRESS_CONFIG_EXTRA: |
         include('/var/www/html/wp-config-extra.php');
     volumes:
@@ -108,6 +101,8 @@ services:
       - db
   redis:
     image: redis:latest
+    env_file:
+      - ./.env
     container_name: wordpress_redis
     command: sh -c "mkdir -p /var/run/sock && chmod 777 /var/run/sock && redis-server --requirepass ${REDIS_PWD} --maxmemory ${REDIS_MAXMEMORY} --maxmemory-policy ${REDIS_MAXMEMORY_POLICY} --port ${REDIS_PORT} --unixsocket /var/run/sock/redis.sock --unixsocketperm 777"
     ports:

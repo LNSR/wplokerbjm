@@ -1,6 +1,6 @@
-import { SvelteDate } from 'svelte/reactivity'
+import { SvelteDate, SvelteSet } from 'svelte/reactivity'
 import { FormattingService } from '@/services/Formatting'
-import { type JobSummary, type JobContactRow, type SocialMediaItem } from "@/types";
+import { type JobSummary, type JobContactRow, type SocialMediaItem, type CustomFields, SocialMediaPlatform } from "@/types";
 import type { Component } from 'svelte';
 import {
     ClockSolid,
@@ -168,22 +168,22 @@ export class GeneralStore {
         }
 
 
-        if (data['jenis_pekerjaan_taxo']) {
+        if (data['jenis-pekerjaan']) {
             rows.push({
                 icon: ClockSolid,
                 label: 'Jenis Pekerjaan',
-                value: Array.isArray(data['jenis_pekerjaan_taxo'])
-                    ? data['jenis_pekerjaan_taxo'].join(', ')
-                    : String(data['jenis_pekerjaan_taxo'] ?? ''),
+                value: Array.isArray(data['jenis-pekerjaan'])
+                    ? data['jenis-pekerjaan'].join(', ')
+                    : String(data['jenis-pekerjaan'] ?? ''),
             })
         }
-        if (data['pendidikan_taxo']) {
+        if (data['pendidikan']) {
             rows.push({
                 icon: GraduationCapSolid,
                 label: 'Pendidikan',
-                value: Array.isArray(data['pendidikan_taxo'])
-                    ? data['pendidikan_taxo'].join(', ')
-                    : String(data['pendidikan_taxo'] ?? ''),
+                value: Array.isArray(data['pendidikan'])
+                    ? data['pendidikan'].join(', ')
+                    : String(data['pendidikan'] ?? ''),
             })
         }
         if (data['pengalaman']) {
@@ -193,13 +193,13 @@ export class GeneralStore {
                 value: `Minimal ${data['pengalaman']} Tahun Pengalaman`,
             })
         }
-        if (data['gender_taxo']) {
+        if (data['gender']) {
             rows.push({
                 icon: VenusMarsSolid,
                 label: 'Gender',
-                value: Array.isArray(data['gender_taxo'])
-                    ? data['gender_taxo'].join(', ')
-                    : String(data['gender_taxo'] ?? ''),
+                value: Array.isArray(data['gender'])
+                    ? data['gender'].join(', ')
+                    : String(data['gender'] ?? ''),
             })
         }
         const gaji_min = data['gaji_minimal'] ? Number(data['gaji_minimal']) : undefined
@@ -222,13 +222,13 @@ export class GeneralStore {
                 value: umur_display,
             })
         }
-        if (data['lokasi_taxo']) {
+        if (data['lokasi-pekerjaan']) {
             rows.push({
                 icon: MapMarkerAltSolid,
                 label: 'Lokasi',
-                value: Array.isArray(data['lokasi_taxo'])
-                    ? data['lokasi_taxo'].join(', ')
-                    : String(data['lokasi_taxo'] ?? ''),
+                value: Array.isArray(data['lokasi-pekerjaan'])
+                    ? data['lokasi-pekerjaan'].join(', ')
+                    : String(data['lokasi-pekerjaan'] ?? ''),
             })
         }
 
@@ -243,7 +243,8 @@ export class GeneralStore {
         return rows
     }
 
-    public useContactsJob(jobdata: JobContactRow): ContactRow[] {
+    public useContactsJob(jobdata: JobContactRow | undefined): ContactRow[] {
+        if (!jobdata) return [];
         const contacts: ContactRow[] = [];
 
         (jobdata.email_kontak ?? []).forEach((email) => {
@@ -285,27 +286,27 @@ export class GeneralStore {
         return contacts
     }
 
-    public useSocialMedia(): { socialMediaItems: (data: Record<string, string | string[]>) => SocialMediaItem[] } {
-        const platforms: Record<string, { icon: Component; base_url: string }> = {
-            "X / Twitter": {
+    public useSocialMedia(): { socialMediaItems: (data: CustomFields['social_media']) => SocialMediaItem[] } {
+        const platforms: Record<SocialMediaPlatform, { icon: Component; base_url: string }> = {
+            [SocialMediaPlatform["X / Twitter"]]: {
                 icon: TwitterBrands,
                 base_url: "https://twitter.com/",
             },
-            Facebook: { icon: FacebookBrands, base_url: "https://facebook.com/" },
-            Instagram: { icon: InstagramBrands, base_url: "https://instagram.com/" },
-            LinkedIn: { icon: LinkedinBrands, base_url: "https://linkedin.com/in/" },
-            Youtube: { icon: YoutubeBrands, base_url: "https://youtube.com/@" },
-            Whatsapp: { icon: WhatsappBrands, base_url: "https://wa.me/" },
-            Tiktok: { icon: TiktokBrands, base_url: "https://tiktok.com/@" },
-            Threads: { icon: ThreadsBrands, base_url: "https://threads.net/@" },
-            Telegram: { icon: TelegramBrands, base_url: "https://t.me/" },
+            [SocialMediaPlatform.Facebook]: { icon: FacebookBrands, base_url: "https://facebook.com/" },
+            [SocialMediaPlatform.Instagram]: { icon: InstagramBrands, base_url: "https://instagram.com/" },
+            [SocialMediaPlatform.LinkedIn]: { icon: LinkedinBrands, base_url: "https://linkedin.com/in/" },
+            [SocialMediaPlatform.Youtube]: { icon: YoutubeBrands, base_url: "https://youtube.com/@" },
+            [SocialMediaPlatform.WhatsApp]: { icon: WhatsappBrands, base_url: "https://wa.me/" },
+            [SocialMediaPlatform.TikTok]: { icon: TiktokBrands, base_url: "https://tiktok.com/@" },
+            [SocialMediaPlatform.Threads]: { icon: ThreadsBrands, base_url: "https://threads.net/@" },
+            [SocialMediaPlatform.Telegram]: { icon: TelegramBrands, base_url: "https://t.me/" },
         };
         function getLinkData(platform: string, username: string): SocialMediaItem | null {
-            const config = platforms[platform];
+            const config = platforms[platform as SocialMediaPlatform];
             if (!config || !username) return null;
-            if (platform === "Whatsapp")
+            if (platform === SocialMediaPlatform.WhatsApp)
                 return getWhatsappLinkData(platform, config, username);
-            if (platform === "LinkedIn")
+            if (platform === SocialMediaPlatform.LinkedIn)
                 return getLinkedInLinkData(platform, config, username);
             return getDefaultLinkData(platform, config, username);
         }
@@ -371,20 +372,25 @@ export class GeneralStore {
             const url = config.base_url + clean_username;
             return { platform, icon: config.icon, url, username };
         }
-
         function createSocialMediaItems(
-            socialMediaData: Record<string, string | string[]>
+            socialMediaData: CustomFields['social_media']
         ): SocialMediaItem[] {
             const processedItems: SocialMediaItem[] = [];
-            for (const platform in socialMediaData) {
-                const usernames = Array.isArray(socialMediaData[platform])
-                    ? socialMediaData[platform]
-                    : [socialMediaData[platform]];
-                for (const username of usernames) {
-                    if (!platform || !username) continue;
-                    const linkData = getLinkData(platform, username);
-                    if (linkData) {
-                        processedItems.push(linkData);
+            const seen = new SvelteSet<string>();
+            if (!socialMediaData) return processedItems;
+            for (const item of [socialMediaData]) {
+                for (const [platform, username] of Object.entries(item)) {
+                    if (!username) continue;
+                    const usernames = Array.isArray(username) ? username : [username];
+                    for (const uname of usernames) {
+                        const linkData = getLinkData(platform, uname);
+                        if (linkData) {
+                            const key = linkData.platform + linkData.username;
+                            if (!seen.has(key)) {
+                                seen.add(key);
+                                processedItems.push(linkData);
+                            }
+                        }
                     }
                 }
             }

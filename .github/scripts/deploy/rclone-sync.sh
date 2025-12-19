@@ -51,14 +51,12 @@ SELECTED=(
   "server"
   "index.php"
   "composer.json"
-  "page-pasang-lowongan.php"
-  "single-lowongan.php"
   "assets"
 )
 
 PIDS=()
 
-RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 5m --contimeout 60s --log-level ${RCLONE_LOG_LEVEL} --bwlimit ${RCLONE_BWLIMIT:-5M} --tpslimit ${RCLONE_TPSLIMIT:-2} --tpslimit-burst 4 --delete-after --fast-list"
+RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 5m --contimeout 60s --log-level ${RCLONE_LOG_LEVEL} --bwlimit ${RCLONE_BWLIMIT:-20M} --tpslimit ${RCLONE_TPSLIMIT:-1} --tpslimit-burst 2 --delete-after --fast-list --checksum"
 
 if [ "${DRY_RUN:-false}" = "true" ]; then
   DRY_FLAG="--dry-run"
@@ -86,7 +84,7 @@ for p in "${SELECTED[@]}"; do
     echo "Starting rclone copy $p -> sftpdeploy:${REMOTE_DIR}/ $DRY_FLAG"
     rclone copy $DRY_FLAG $RCLONE_BASE_OPTS "$p" "sftpdeploy:${REMOTE_DIR}/" 2>&1 || true &
     PIDS+=($!)
-    sleep 3
+    sleep 5
   else
     REMOTE_TARGET="${REMOTE_PATH%/}/$p"
     echo "Starting rclone sync $p -> sftpdeploy:$REMOTE_TARGET $DRY_FLAG"
@@ -95,11 +93,11 @@ for p in "${SELECTED[@]}"; do
     if [ "$p" = "assets" ]; then
       rclone sync $DRY_FLAG $RCLONE_BASE_OPTS --exclude "ssg/**" "$p" "sftpdeploy:$REMOTE_TARGET" 2>&1 || true &
       PIDS+=($!)
-      sleep 3
+      sleep 5
     else
       rclone sync $DRY_FLAG $RCLONE_BASE_OPTS "$p" "sftpdeploy:$REMOTE_TARGET" 2>&1 || true &
       PIDS+=($!)
-      sleep 3
+      sleep 5
     fi
   fi
 done
@@ -111,7 +109,7 @@ if [ -n "${MU_PLUGIN_REMOTE_PATH:-}" ]; then
     echo "Starting syncing wplokerbjm-bootstrap.php to $MU_PLUGIN_REMOTE_PATH"
     rclone copy $DRY_FLAG $RCLONE_BASE_OPTS "$MU_PLUGIN_FILE" "sftpdeploy:$MU_PLUGIN_REMOTE_PATH" 2>&1 || true &
     PIDS+=($!)
-    sleep 0.5
+    sleep 1
   else
     echo "wplokerbjm-bootstrap.php not found at $MU_PLUGIN_FILE"
   fi
@@ -140,7 +138,7 @@ DURATION=$((END_TIME - START_TIME))
 echo "Date: $(date -u)"
 echo "Duration: ${DURATION} seconds"
 echo "Rclone options: $RCLONE_BASE_OPTS"
-echo "Note: Using balanced settings to prevent server overload (BW: ${RCLONE_BWLIMIT:-5M}, TPS: ${RCLONE_TPSLIMIT:-2}, concurrent operations, delete-after for safety)"
+echo "Note: Using conservative settings to prevent server overload (BW: ${RCLONE_BWLIMIT:-20M}, TPS: ${RCLONE_TPSLIMIT:-1}, concurrent operations, delete-after for safety, checksum verification)"
 echo "Check the run logs in Actions for details."
 
 

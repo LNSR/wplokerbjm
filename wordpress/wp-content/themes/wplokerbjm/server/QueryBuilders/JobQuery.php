@@ -3,12 +3,14 @@
 namespace WPLokerBJM\QueryBuilders;
 
 use WPLokerBJM\QueryBuilders\TaxonomyQuery;
+use WPLokerBJM\Models\Schema\{CustomFields, Taxonomies, PostTypes};
+use WPLokerBJM\Core\Cache;
 
 class JobQuery
 {
 
 	const array getBaseArgs = [
-		'post_type' => 'lowongan',
+		'post_type' => PostTypes::POST_TYPE_LOWONGAN,
 		'post_status' => 'publish',
 	];
 
@@ -58,20 +60,20 @@ class JobQuery
 			'posts_per_page' => $per_page,
 			'meta_query' => [
 				[
-					'key' => 'status_pekerjaan',
+					'key' => CustomFields::STATUS_PEKERJAAN,
 					'value' => [2, 3],
 					'compare' => 'IN',
 					'type' => 'NUMERIC',
 				],
 				[
-					'key' => 'deadline',
+					'key' => CustomFields::DEADLINE,
 					'value' => [$today, $seven_days],
 					'compare' => 'BETWEEN',
 					'type' => 'DATE',
 				],
 			],
 			'orderby' => 'meta_value',
-			'meta_key' => 'deadline',
+			'meta_key' => CustomFields::DEADLINE,
 			'order' => 'ASC',
 		]);
 	}
@@ -136,12 +138,12 @@ class JobQuery
 				'relation' => 'OR',
 				// posts without a deadline
 				[
-					'key' => 'deadline',
+					'key' => CustomFields::DEADLINE,
 					'compare' => 'NOT EXISTS',
 				],
 				// posts with deadline less than or equal to today
 				[
-					'key' => 'deadline',
+					'key' => CustomFields::DEADLINE,
 					'value' => $today,
 					'compare' => '<=',
 					'type' => 'DATE',
@@ -172,72 +174,90 @@ class JobQuery
 	 */
 	public static function buildPostsSearchSql(\wpdb $wpdb, string $q): string
 	{
-		try {
-			if ($q === '') {
-				return '';
-			}
+        if ($q === '') {
+            return '';
+        }
 
-			// Safely escape the search term for LIKE queries
-			$q_esc = esc_sql($wpdb->esc_like($q));
-			$q_html = esc_sql($wpdb->esc_like(htmlentities($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+        $cache_key = 'search_sql_' . md5($q);
+        $cached = Cache::get($cache_key);
+        if ($cached !== false) {
+            return $cached;
+        }
 
-			$posts = $wpdb->posts;
-			$postmeta = $wpdb->postmeta;
-			$terms = $wpdb->terms;
-			$term_taxonomy = $wpdb->term_taxonomy;
-			$term_relationships = $wpdb->term_relationships;
+        try {
+            // Safely escape the search term for LIKE queries
+            $q_esc = esc_sql($wpdb->esc_like($q));
+            $q_html = esc_sql($wpdb->esc_like(htmlentities($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
 
-			$sql = " AND (";
-			$sql .= "{$posts}.post_title LIKE '%{$q_esc}%' OR ";
-			$sql .= "{$posts}.post_title LIKE '%{$q_html}%' OR ";
-			$sql .= "{$posts}.ID IN (
-				SELECT post_id FROM {$postmeta}
-				WHERE meta_key = 'nama_perusahaan' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
-			) OR ";
-			$sql .= "{$posts}.ID IN (
-				SELECT object_id FROM {$term_relationships}
-				INNER JOIN {$term_taxonomy} ON {$term_taxonomy}.term_taxonomy_id = {$term_relationships}.term_taxonomy_id
-				INNER JOIN {$terms} ON {$terms}.term_id = {$term_taxonomy}.term_id
-				WHERE {$term_taxonomy}.taxonomy = 'perusahaan'
-				AND {$terms}.name LIKE '%{$q_esc}%'
-			)";
-			$sql .= ")";
+            $posts = $wpdb->posts;
+            $postmeta = $wpdb->postmeta;
+            $terms = $wpdb->terms;
+            $term_taxonomy = $wpdb->term_taxonomy;
+            $term_relationships = $wpdb->term_relationships;
 
-			return $sql;
-		} catch (\Exception $e) {
-			error_log('JobQuery::buildPostsSearchSql error: ' . $e->getMessage());
-			return '';
-		}
-	}
+            $sql = " AND (";
+            $sql .= "{$posts}.post_title LIKE '%{$q_esc}%' OR ";
+            $sql .= "{$posts}.post_title LIKE '%{$q_html}%' OR ";
+            $sql .= "{$posts}.ID IN (
+                SELECT post_id FROM {$postmeta}
+                WHERE meta_key = '" . CustomFields::NAMA_PERUSAHAAN . "' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
+            ) OR ";
+            $sql .= "{$posts}.ID IN (
+                SELECT object_id FROM {$term_relationships}
+                INNER JOIN {$term_taxonomy} ON {$term_taxonomy}.term_taxonomy_id = {$term_relationships}.term_taxonomy_id
+                INNER JOIN {$terms} ON {$terms}.term_id = {$term_taxonomy}.term_id
+                WHERE {$term_taxonomy}.taxonomy = '" . Taxonomies::PERUSAHAAN . "'
+                AND {$terms}.name LIKE '%{$q_esc}%'
+            )";
+            $sql .= ")";
 
-	/**
-	 * Get the last modified date of the latest lowongan post.
-	 *
-	 * This method tracks the most recent modification timestamp for the 'lowongan' post type,
-	 * which can be used to determine if new job postings have been added or updated since
-	 * the page was loaded. Useful for implementing refresh logic or cache invalidation
-	 * based on content changes.
-	 *
-	 * @return string The GMT modified date of the latest lowongan post, or current GMT time if none exist.
-	 */
-	public static function getLastModifiedDate(): string
-	{
-		$latest = get_posts([
-			'post_type' => 'lowongan',
-			'numberposts' => 1,
-			'orderby' => 'modified',
-			'order' => 'DESC',
-		]);
+            Cache::set($cache_key, $sql, 3600); // Cache for 1 hour
+            return $sql;
+        } catch (\Exception $e) {
+            error_log('JobQuery::buildPostsSearchSql error: ' . $e->getMessage());
+            return '';
+        }
+    }
 
-		if (!empty($latest)) {
-			$post = $latest[0];
-			if (is_object($post) && property_exists($post, 'post_modified_gmt')) {
-				return $post->post_modified_gmt;
-			}
-		}
+    /**
+     * Get the last modified date of the latest lowongan post.
+     *
+     * This method tracks the most recent modification timestamp for the 'lowongan' post type,
+     * which can be used to determine if new job postings have been added or updated since
+     * the page was loaded. Useful for implementing refresh logic or cache invalidation
+     * based on content changes.
+     *
+     * @return string The GMT modified date of the latest lowongan post, or current GMT time if none exist.
+     */
+    public static function getLastModifiedDate(): string
+    {
+        $cache_key = 'job_last_modified';
+        $cached = Cache::get($cache_key);
+        if ($cached !== false) {
+            return $cached;
+        }
 
-		return gmdate('c');
-	}
+        $latest = get_posts([
+            'post_type' => PostTypes::POST_TYPE_LOWONGAN,
+            'numberposts' => 1,
+            'orderby' => 'modified',
+            'order' => 'DESC',
+        ]);
+
+        if (!empty($latest)) {
+            $post = $latest[0];
+            if (is_object($post) && property_exists($post, 'post_modified_gmt')) {
+                $result = $post->post_modified_gmt;
+            } else {
+                $result = gmdate('c');
+            }
+        } else {
+            $result = gmdate('c');
+        }
+
+        Cache::set($cache_key, $result, 3600); // Cache for 1 hour
+        return $result;
+    }
 
 	/**
 	 * Return args suitable for `get_posts()` to fetch attachment IDs for a parent post.
@@ -272,7 +292,7 @@ class JobQuery
 	{
 		return [
 			'name' => $post_name,
-			'post_type' => 'lowongan',
+			'post_type' => PostTypes::POST_TYPE_LOWONGAN,
 			'post_status' => 'trash',
 			'numberposts' => 1,
 			'fields' => 'ids',

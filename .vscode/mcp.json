@@ -3,6 +3,7 @@
     "playwright": {
       "command": "bunx",
       "args": [
+        "--bun",
         "-y",
         "@playwright/mcp@latest",
         "--ignore-https-errors",
@@ -15,9 +16,13 @@
       },
       "type": "stdio"
     },
+    "chrome-devtools": {
+      "command": "bunx",
+      "args": ["--bun", "-y", "chrome-devtools-mcp@latest"]
+    },
     "motion": {
       "command": "bunx",
-      "args": ["-y", "motion-ai"]
+      "args": ["--bun", "-y", "motion-ai"]
     },
     "svelte": {
       "type": "http",
@@ -36,7 +41,7 @@
     },
     "memory": {
       "command": "bunx",
-      "args": ["-y", "@modelcontextprotocol/server-memory"],
+      "args": ["--bun", "-y", "@modelcontextprotocol/server-memory"],
       "type": "stdio"
     },
     "redis": {

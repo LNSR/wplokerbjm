@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import { debounce } from "@/utils/debounce";
+  import { debounce } from "@/utils/lodash";
   import { MediaQuery } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
@@ -383,7 +383,7 @@
   style="top:var(--site-header-top, 0)"
 >
   <div class="drawer drawer-end">
-    <input id="header-drawer" type="checkbox" class="drawer-toggle" />
+    <input id="header-drawer" type="checkbox" class="drawer-toggle" aria-hidden="true" tabindex="-1" />
     <div class="drawer-content">
       <div
         class="mr-auto ml-auto pl-4 pr-4 max-w-screen-xl w-full flex items-center justify-between"

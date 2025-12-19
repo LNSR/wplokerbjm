@@ -24,12 +24,12 @@ class DynamicSearch
             $jobs = $result['jobs'] ?? [];
             $query = $result['query'] ?? new \WP_Query();
 
-            $response = new \WP_REST_Response([
+            $response = new \WP_REST_Response(Utilities::filterEmptyValues([
                 'jobs' => $jobs,
                 'context' => 'search',
                 'filters' => $filters,
-            ]);
-
+            ]));
+            
             // Set pagination headers
             $response->header('X-WP-Total', $query->found_posts);
             $response->header('X-WP-TotalPages', $query->max_num_pages);

@@ -16,19 +16,20 @@ class JobBookmark
 
     public function handle(WP_REST_Request $request): WP_REST_Response
     {
-        $ids_param = $request->get_param('ids');
+        $body = $request->get_json_params();
+        $ids_param = $body['ids'] ?? null;
 
         if (empty($ids_param)) {
             return new WP_REST_Response([], 200);
-        } elseif (!is_string($ids_param)) {
-            return Utilities::failedResponse('Parameter "ids" must be a comma-separated string of IDs.', 400);
+        } elseif (!is_array($ids_param)) {
+            return Utilities::failedResponse('Invalid IDs parameter.', 400);
         }
 
-        $ids = $this->parseIds($ids_param);
+        $ids = $this->validateIds($ids_param);
         if (empty($ids)) {
             return new WP_REST_Response([], 200);
-        } elseif (count($ids) > 50) {
-            return Utilities::failedResponse('Maximum of 50 IDs allowed.', 400);
+        } elseif (count($ids) > 10000) {
+            return Utilities::failedResponse('Maximum of 10000 IDs allowed.', 400);
         }
 
         $args = JobQuery::allJobsIdsArgs();
@@ -45,10 +46,9 @@ class JobBookmark
         return new WP_REST_Response($response, 200);
     }
 
-    private function parseIds(string $ids_param): array
+    private function validateIds(array $ids): array
     {
-        $ids = array_map('intval', explode(',', $ids_param));
-        return array_filter($ids, function ($id) {
+        return array_filter(array_map('intval', $ids), function ($id) {
             return $id > 0;
         });
     }

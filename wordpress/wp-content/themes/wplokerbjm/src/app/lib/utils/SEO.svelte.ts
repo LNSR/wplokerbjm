@@ -8,6 +8,13 @@ export class SEOService {
 
 
     static async fetchHeadData(path: string): Promise<HeadData | null> {
+        // Prevent fetch if hostname is localhost or an IP address
+        // RankMath API wont work in these hostnames
+        const hostname = window.location.hostname;
+        if (hostname === 'localhost' || hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+            return null;
+        }
+
         try {
             const fullUrl = `${window.location.origin}${path}`;
             const response = await APIService.getRankMathHead(fullUrl);
@@ -50,8 +57,30 @@ export class SEOService {
                     case 'robots':
                         headData.robots = content
                         break
+                    case 'keywords':
+                        headData.keywords = content
+                        break
                     case 'author':
                         headData.author = content
+                        break
+                    // Webmaster verification tags
+                    case 'google-site-verification':
+                        headData.google_verify = content
+                        break
+                    case 'msvalidate.01':
+                        headData.bing_verify = content
+                        break
+                    case 'baidu-site-verification':
+                        headData.baidu_verify = content
+                        break
+                    case 'yandex-verification':
+                        headData.yandex_verify = content
+                        break
+                    case 'p:domain_verify':
+                        headData.pinterest_verify = content
+                        break
+                    case 'norton-safeweb-site-verification':
+                        headData.norton_verify = content
                         break
                     case 'og:title':
                         headData.og_title = content
@@ -61,6 +90,21 @@ export class SEOService {
                         break
                     case 'og:image':
                         headData.og_image = content
+                        break
+                    case 'og:image:secure_url':
+                        headData.og_image_secure_url = content
+                        break
+                    case 'og:image:width':
+                        headData.og_image_width = content
+                        break
+                    case 'og:image:height':
+                        headData.og_image_height = content
+                        break
+                    case 'og:image:alt':
+                        headData.og_image_alt = content
+                        break
+                    case 'og:image:type':
+                        headData.og_image_type = content
                         break
                     case 'og:locale':
                         headData.og_locale = content
@@ -119,8 +163,61 @@ export class SEOService {
                     case 'twitter:creator':
                         headData.twitter_creator = content
                         break
+                    // Twitter App Card fields
+                    case 'twitter:app:name:iphone':
+                        headData.twitter_app_name_iphone = content
+                        break
+                    case 'twitter:app:id:iphone':
+                        headData.twitter_app_id_iphone = content
+                        break
+                    case 'twitter:app:url:iphone':
+                        headData.twitter_app_url_iphone = content
+                        break
+                    case 'twitter:app:name:ipad':
+                        headData.twitter_app_name_ipad = content
+                        break
+                    case 'twitter:app:id:ipad':
+                        headData.twitter_app_id_ipad = content
+                        break
+                    case 'twitter:app:url:ipad':
+                        headData.twitter_app_url_ipad = content
+                        break
+                    case 'twitter:app:name:googleplay':
+                        headData.twitter_app_name_googleplay = content
+                        break
+                    case 'twitter:app:id:googleplay':
+                        headData.twitter_app_id_googleplay = content
+                        break
+                    case 'twitter:app:url:googleplay':
+                        headData.twitter_app_url_googleplay = content
+                        break
+                    case 'twitter:app:description':
+                        headData.twitter_app_description = content
+                        break
+                    case 'twitter:app:country':
+                        headData.twitter_app_country = content
+                        break
+                    // Twitter Player Card fields
+                    case 'twitter:player':
+                        headData.twitter_player = content
+                        break
+                    case 'twitter:player:width':
+                        headData.twitter_player_width = content
+                        break
+                    case 'twitter:player:height':
+                        headData.twitter_player_height = content
+                        break
+                    case 'twitter:player:stream':
+                        headData.twitter_player_stream = content
+                        break
+                    case 'twitter:player:stream:content_type':
+                        headData.twitter_player_stream_content_type = content
+                        break
                     case 'fb:app_id':
                         headData.fb_app_id = content
+                        break
+                    case 'fb:admins':
+                        headData.fb_admins = content
                         break
                     case 'article:author':
                         headData.article_author = content
@@ -175,8 +272,19 @@ export class SEOService {
         // Update meta description
         this.updateMetaTag('name', 'description', headData.description);
 
+        // Update keywords meta
+        this.updateMetaTag('name', 'keywords', headData.keywords);
+
         // Update author meta
         this.updateMetaTag('name', 'author', headData.author);
+
+        // Update webmaster verification tags
+        this.updateMetaTag('name', 'google-site-verification', headData.google_verify);
+        this.updateMetaTag('name', 'msvalidate.01', headData.bing_verify);
+        this.updateMetaTag('name', 'baidu-site-verification', headData.baidu_verify);
+        this.updateMetaTag('name', 'yandex-verification', headData.yandex_verify);
+        this.updateMetaTag('name', 'p:domain_verify', headData.pinterest_verify);
+        this.updateMetaTag('name', 'norton-safeweb-site-verification', headData.norton_verify);
 
         // Update canonical link
         this.updateCanonicalLink(headData.canonical);
@@ -188,6 +296,11 @@ export class SEOService {
         this.updateMetaTag('property', 'og:title', headData.og_title);
         this.updateMetaTag('property', 'og:description', headData.og_description);
         this.updateMetaTag('property', 'og:image', headData.og_image);
+        this.updateMetaTag('property', 'og:image:secure_url', headData.og_image_secure_url);
+        this.updateMetaTag('property', 'og:image:width', headData.og_image_width);
+        this.updateMetaTag('property', 'og:image:height', headData.og_image_height);
+        this.updateMetaTag('property', 'og:image:alt', headData.og_image_alt);
+        this.updateMetaTag('property', 'og:image:type', headData.og_image_type);
         this.updateMetaTag('property', 'og:locale', headData.og_locale);
         this.updateMetaTag('property', 'og:type', headData.og_type);
         this.updateMetaTag('property', 'og:url', headData.og_url);
@@ -209,9 +322,28 @@ export class SEOService {
         this.updateMetaTag('name', 'twitter:data2', headData.twitter_data2);
         this.updateMetaTag('name', 'twitter:site', headData.twitter_site);
         this.updateMetaTag('name', 'twitter:creator', headData.twitter_creator);
+        // Twitter App Card fields
+        this.updateMetaTag('name', 'twitter:app:name:iphone', headData.twitter_app_name_iphone);
+        this.updateMetaTag('name', 'twitter:app:id:iphone', headData.twitter_app_id_iphone);
+        this.updateMetaTag('name', 'twitter:app:url:iphone', headData.twitter_app_url_iphone);
+        this.updateMetaTag('name', 'twitter:app:name:ipad', headData.twitter_app_name_ipad);
+        this.updateMetaTag('name', 'twitter:app:id:ipad', headData.twitter_app_id_ipad);
+        this.updateMetaTag('name', 'twitter:app:url:ipad', headData.twitter_app_url_ipad);
+        this.updateMetaTag('name', 'twitter:app:name:googleplay', headData.twitter_app_name_googleplay);
+        this.updateMetaTag('name', 'twitter:app:id:googleplay', headData.twitter_app_id_googleplay);
+        this.updateMetaTag('name', 'twitter:app:url:googleplay', headData.twitter_app_url_googleplay);
+        this.updateMetaTag('name', 'twitter:app:description', headData.twitter_app_description);
+        this.updateMetaTag('name', 'twitter:app:country', headData.twitter_app_country);
+        // Twitter Player Card fields
+        this.updateMetaTag('name', 'twitter:player', headData.twitter_player);
+        this.updateMetaTag('name', 'twitter:player:width', headData.twitter_player_width);
+        this.updateMetaTag('name', 'twitter:player:height', headData.twitter_player_height);
+        this.updateMetaTag('name', 'twitter:player:stream', headData.twitter_player_stream);
+        this.updateMetaTag('name', 'twitter:player:stream:content_type', headData.twitter_player_stream_content_type);
 
         // Update Facebook meta tags
         this.updateMetaTag('property', 'fb:app_id', headData.fb_app_id);
+        this.updateMetaTag('property', 'fb:admins', headData.fb_admins);
 
         // Update Article meta tags
         this.updateMetaTag('property', 'article:author', headData.article_author);
