@@ -5,6 +5,7 @@ import { SEOService } from "$lib/utils/SEO.svelte";
 import { GoogleServices } from "$lib/utils/Google.svelte";
 import { scrollY } from 'svelte/reactivity/window';
 import { isMobile } from '$lib/utils/elements.svelte';
+import { isDevelopmentMode } from '@/utils';
 
 export class JobOverlayManager {
 	public overlayOpen = $state(false)
@@ -41,7 +42,9 @@ export class JobOverlayManager {
 			GoogleServices.sendPageView(path, 'overlay_page_view');
 
 			try {
-				await SEOService.fetchHeadData(path);
+				if (!isDevelopmentMode()) {
+					await SEOService.fetchHeadData(path);
+				}
 			} catch (e) {
 				// non-fatal
 			}
@@ -61,7 +64,9 @@ export class JobOverlayManager {
 		this.clearOverlayState()
 
 		try {
-			await SEOService.fetchHeadData("/");
+			if (!isDevelopmentMode()) {
+				await SEOService.fetchHeadData("/");
+			}
 		} catch (e) {
 			// non-fatal
 		}

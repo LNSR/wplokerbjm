@@ -5,7 +5,12 @@
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import { navigateTo } from "$lib/stores/Route.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
-import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid } from "svelte-awesome-icons";
+  import {
+    UserTieSolid,
+    CalendarSolid,
+    ExclamationTriangleSolid,
+    ThumbTackSolid,
+  } from "svelte-awesome-icons";
   import { SvelteDate } from "svelte/reactivity";
   import type { CardJob, JobCardProps } from "@/types";
 
@@ -14,11 +19,13 @@ import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid }
     variant = "carousel",
     permalink = "",
     onClick,
+    isVisited = false, // Prop to mark as last visited (e.g., for the last visited job on mobile)
   } = $props<{
     jobdata: CardJob;
     variant: JobCardProps["variant"];
     permalink: string;
     onClick?: (slug: string, event: MouseEvent, index: number) => void;
+    isVisited?: boolean;
   }>();
 
   let now = $state(new SvelteDate());
@@ -43,7 +50,10 @@ import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid }
 
   const selected = $derived.by(() => {
     try {
-      return (jobOverlay.selectedSlug ?? null) === (jobdata?.slug ?? null);
+      // Only select if there's an active overlay selection OR the job is visited(for mobile)
+      const overlaySelected =
+        jobOverlay.selectedSlug && jobOverlay.selectedSlug === jobdata?.slug;
+      return overlaySelected || isVisited;
     } catch {
       return false;
     }
@@ -165,9 +175,9 @@ import { UserTieSolid, CalendarSolid, ExclamationTriangleSolid, ThumbTackSolid }
               statusInfo.color,
             ].join(" ")}
           >
-            {#if statusInfo.label === 'Urgent'}
+            {#if statusInfo.label === "Urgent"}
               <ExclamationTriangleSolid class="h-4 w-4" aria-hidden="true" />
-            {:else if statusInfo.label === 'Pinned'}
+            {:else if statusInfo.label === "Pinned"}
               <ThumbTackSolid class="h-4 w-4" aria-hidden="true" />
             {/if}
             {statusInfo.label}

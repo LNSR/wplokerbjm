@@ -76,6 +76,7 @@ export interface JobCardProps {
   variant?: 'featured' | 'carousel' | 'detail';
   permalink?: string | undefined;
   onClick?: (slug: string, event: MouseEvent, index: number) => void;
+  isSelected?: boolean;
 }
 
 export interface JobGridProps {

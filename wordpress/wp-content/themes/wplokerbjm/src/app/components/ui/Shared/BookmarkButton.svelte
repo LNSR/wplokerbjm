@@ -16,6 +16,8 @@
   let confirmationState: "saved" | "removed" | null = $state(null);
   let errorState: "save" | "remove" | null = $state(null);
   let isPending = $state(false);
+  let isTouchDevice = $state(false);
+
   let preToggleSaved = $state(false);
   // synchronous lock to prevent same-tick re-entrancy from multiple rapid DOM clicks
   let _clickLock = false;
@@ -44,9 +46,6 @@
       if (wasSaved && !isSaved(jobId)) {
         confirmationState = "removed";
       }
-      if (confirmationState !== null) {
-        setTimeout(() => (confirmationState = null), 1000);
-      }
 
       // small delay to give visual feedback
       await new Promise((r) => setTimeout(r, 1000));
@@ -54,7 +53,6 @@
       isPending = false;
       const wasSaved = preToggleSaved;
       errorState = wasSaved ? "remove" : "save";
-      setTimeout(() => (errorState = null), 3000);
     } finally {
       isLoading = false;
       _clickLock = false;
@@ -64,12 +62,12 @@
   const buttonSizeClass = $derived.by(() => {
     switch (variant) {
       case "carousel":
-        return "!btn-sm";
+        return "btn-sm btn-circle ";
       case "featured":
       case "detail":
-        return "!btn-md";
+        return "btn-md btn-circle ";
       default:
-        return "!btn-md";
+        return "btn-md btn-circle ";
     }
   });
 
@@ -86,30 +84,61 @@
     useBookmarkStyle(isSaved(jobId), confirmationState === "saved")
   );
 
-  // legacy class-based icon variable removed — using displayedIconSpec instead
   // New reactive icon spec: name and optional classes (color override)
   const displayedIconSpec = $derived.by(() => {
     if (isPending) {
       return preToggleSaved
         ? { name: "trash", classes: "text-red-400" }
-        : { name: "bookmark", classes: "text-[var(--wpl-global-color-1)]" };
+        : { name: "bookmark", classes: "text-[var(--wpl-global-color-1)] " };
     }
     const saved = isSaved(jobId);
-    if (confirmationState === "saved") return { name: "bookmark", classes: "" };
     return saved
       ? { name: "trash", classes: "text-red-400" }
-      : { name: "bookmark", classes: "text-[var(--wpl-global-color-1)]" };
+      : { name: "bookmark", classes: "text-[var(--wpl-global-color-1)] " };
+  });
+
+  const borderIconSpec = $derived.by(() => {
+    if (isPending) {
+      return preToggleSaved
+        ? "border-red-400 "
+        : "border-[var(--wpl-global-color-1)] ";
+    }
+
+    const saved = isSaved(jobId);
+    if (saved) {
+      return "border-red-400 ";
+    } else {
+      return "border-[var(--wpl-global-color-1)] ";
+    }
   });
 
   const iconSizeClass = $derived.by(() => {
     switch (variant) {
       case "carousel":
-        return "h-4 w-4";
+        return "h-4 w-4 ";
       case "featured":
       case "detail":
-        return "h-5 w-5";
+        return "h-5 w-5 ";
       default:
-        return "h-5 w-5";
+        return "h-5 w-5 ";
+    }
+  });
+
+  $effect(() => {
+    isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  });
+
+  $effect(() => {
+    if (confirmationState !== null) {
+      const timeout = setTimeout(() => (confirmationState = null), 1000);
+      return () => clearTimeout(timeout);
+    }
+  });
+
+  $effect(() => {
+    if (errorState !== null) {
+      const timeout = setTimeout(() => (errorState = null), 3000);
+      return () => clearTimeout(timeout);
     }
   });
 </script>
@@ -120,9 +149,10 @@
     onclick={handleToggleSave}
     onmouseenter={() => (isHovered = true)}
     onmouseleave={() => (isHovered = false)}
-    class={"rounded-full transition-colors duration-300" +
+    class={"rounded-full flex items-center justify-center border-1 hover:border-2 transition-colors duration-300 " +
       buttonSizeClass +
-      (isLoading ? " !opacity-50 cursor-not-allowed" : "") +
+      borderIconSpec +
+      (isLoading ? " !opacity-50 cursor-not-allowed " : "") +
       bookmarkStyle.style}
     disabled={isLoading}
     title={isSaved(jobId) ? "Hapus bookmark" : "Simpan lowongan"}
@@ -142,12 +172,13 @@
     {/if}
   </button>
 
-  {#if isHovered && !isLoading}
+  {#if !isTouchDevice && isHovered && !isLoading}
+    {@const hapus = isSaved(jobId)}
     <div class="absolute -top-8 right-0 flex items-center pointer-events-none">
       <div
-        class="bg-[var(--wpl-global-color-1)] text-white text-xs font-semibold px-2 py-1 rounded shadow-sm"
+        class={`${hapus ? "bg-red-400 " : "bg-[var(--wpl-global-color-1)] "} text-white text-xs font-semibold px-2 py-1 rounded shadow-sm`}
       >
-        {isSaved(jobId) ? "Hapus?" : "Simpan?"}
+        {hapus ? "Hapus?" : "Simpan?"}
       </div>
     </div>
   {/if}

@@ -1,6 +1,6 @@
 import { MediaQuery, SvelteDate } from 'svelte/reactivity'
 
-let _jobPostingJsonLdRemovalAttempted = $state(false); // Ensure we only attempt removal once.
+let _jobPostingJsonLdRemovalAttempted = false; // Ensure we only attempt removal once.
 
 export function isMobile() {
     const mobileMq = (typeof window !== 'undefined') ? new MediaQuery('(max-width: 767.98px)') : null

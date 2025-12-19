@@ -57,20 +57,29 @@
         error: this.searchStore.error,
       };
 
-      // Save current search state before navigation (always save for homepage path)
-      routeStateStore.saveSearchState(window.location.pathname, currentSearchState);
+      // Save current search state before navigation (implicitly always save for homepage('/') path)
+      routeStateStore.saveSearchState(
+        window.location.pathname,
+        currentSearchState
+      );
+
+      async function MobileJobClick(): Promise<void> {
+        // Mark as last visited before navigating
+        routeStateStore.MarkVisitedJob(job.slug ?? "");
+        // use SPA navigation to SingleLowongan.svelte route
+        const url = new URL(String(job.permalink), window.location.origin);
+        return navigateTo(
+          url.pathname + url.search + url.hash,
+          currentSearchState
+        );
+      }
 
       if (isDesktop) {
         await this.openOverlay(job.slug ?? "");
         // After opening overlay on desktop, ensure the clicked card is scrolled into view
         this.scrollToCard(job.slug ?? "");
       } else {
-        // For mobile: use SPA navigation to SingleLowongan.svelte route
-        const url = new URL(job.permalink, window.location.origin);
-        await navigateTo(
-          url.pathname + url.search + url.hash,
-          currentSearchState
-        );
+        await MobileJobClick();
       }
     }
 
@@ -433,7 +442,9 @@
       <div
         class={[
           "transition-all duration-600 ease-in-out",
-          overlayOpen ? "w-full lg:w-[calc(100%-420px)] will-change-[width]" : "w-full",
+          overlayOpen
+            ? "w-full lg:w-[calc(100%-420px)] will-change-[width]"
+            : "w-full",
         ].join(" ")}
       >
         {#if displayJobs.length}
@@ -448,7 +459,7 @@
             {#each displayJobs as job (job.permalink)}
               {@const isSelected = jobOverlay.selectedSlug === job.slug}
               <div
-                class={`transition-opacity duration-600 ease-in-out ${isSelected ? 'will-change-[opacity]' : ''}`}
+                class={`transition-opacity duration-600 ease-in-out ${isSelected ? "will-change-[opacity]" : ""}`}
                 onkeydown={(event) => {
                   if (event.key === "Enter" || event.key === " ") {
                     event.preventDefault();
@@ -463,6 +474,7 @@
                   jobdata={job}
                   variant="featured"
                   permalink={job.permalink ?? ""}
+                  isVisited={routeStateStore.hasVisitedJob(job.slug ?? "")}
                   onClick={() => overlayManager.handleJobClick(job)}
                 />
               </div>
@@ -489,7 +501,7 @@
               onclick={() => searchStore.loadMore()}
               disabled={loading}
             >
-              {loading ? 'Memuat...' : 'Muat Lebih Banyak'}
+              {loading ? "Memuat..." : "Muat Lebih Banyak"}
             </button>
           </div>
         {/if}

@@ -96,7 +96,7 @@
   header @rest_api not @logged_in Vary "Accept-Encoding, Cookie"
 
   # Privileged paths (wp-login.php, admin, xmlrpc, cron): allow private browser cache only
-  header @no_cache Cache-Control "private, max-age=120, must-revalidate"
+  header @no_cache Cache-Control "private, max-age=60, must-revalidate"
 
   # Dynamic content (pages) — private cache for logged-in users, public cache for anonymous
   header @dynamic @logged_in Cache-Control "private, max-age=360"

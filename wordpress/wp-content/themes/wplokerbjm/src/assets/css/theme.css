@@ -109,22 +109,6 @@ body {
   color-scheme: light;
 }
 
-/* Make center-aligned images on frontend behave like the editor preview */
-figure.wp-caption.aligncenter img,
-img.aligncenter[class*="wp-image-"],
-.wp-block-image.aligncenter img,
-figure.aligncenter img {
-  display: block;
-  margin-left: auto;
-  margin-right: auto;
-  margin-inline: auto; /* RTL-friendly */
-  float: none !important; /* undo floats from other styles */
-  width: auto; /* keep natural size up to max-width */
-  max-width: min(100%, 500px); /* responsive but capped */
-  height: auto;
-  border-radius: 8px;
-}
-
 .search-input {
   background-color: var(--wpl-global-color-5);
   border-color: transparent;
@@ -136,6 +120,25 @@ figure.aligncenter img {
   outline-offset: 2px;
   box-shadow: 0 0 0 4px
     color-mix(in oklab, var(--wpl-global-color-0) 15%, #0000);
+}
+
+/*! WYSIWYG Lines */
+
+/* Center images (frontend & editor). Consolidated for editor preview + frontend consistency */
+figure.wp-caption.aligncenter img,
+img.aligncenter[class*="wp-image-"],
+.wp-block-image.aligncenter img,
+figure.aligncenter img,
+.wysiwyg-content img.aligncenter,
+.wysiwyg-content figure.aligncenter img {
+  display: block;
+  margin: 0 auto; /* centers and is RTL-friendly */
+  margin-inline: auto; /* RTL-friendly */
+  float: none !important; /* undo floats from other styles */
+  max-width: min(100%, 500px); /* responsive but capped */
+  width: 100%; /* keep images responsive */
+  height: auto;
+  border-radius: 8px;
 }
 
 .wysiwyg-content,
@@ -326,26 +329,6 @@ figure.aligncenter img {
   max-width: none;
 }
 
-/* Center WordPress editor images (classic & block editor) */
-.wysiwyg-content img.aligncenter,
-.wysiwyg-content figure.aligncenter img,
-figure.wp-caption.aligncenter img,
-.wp-block-image.aligncenter img {
-  display: block;
-  margin: 0 auto; /* <-- centers the block image */
-  margin-inline: auto; /* better for RTL */
-  float: none !important; /* undo floats if any */
-  max-width: 100%; /* responsive */
-  width: auto; /* let it size naturally up to max-width */
-  height: auto;
-  border-radius: 8px;
-}
-
-/* Optional: constrain large images but keep them responsive */
-.wysiwyg-content img.aligncenter {
-  max-width: 500px; /* limit visual size, but still responsive */
-  width: 100%;
-}
 
 .wysiwyg-content img,
 .editor-styles-wrapper .wysiwyg-content img {
@@ -354,11 +337,14 @@ figure.wp-caption.aligncenter img,
   height: auto; /* maintain aspect ratio */
 }
 
+/* Link styles within WYSIWYG/editor */
 .wysiwyg-content a,
 .editor-styles-wrapper .wysiwyg-content a {
   color: var(--wpl-global-color-1);
   text-decoration: underline;
   text-underline-offset: 2px;
+  word-break: break-word; /* prefer breaking at word boundaries */
+  overflow-wrap: anywhere;
 }
 
 .wysiwyg-content a:hover,
@@ -378,6 +364,14 @@ figure.wp-caption.aligncenter img,
   color: color-mix(in oklab, var(--wpl-global-color-1) 60%, #0000);
 }
 
+/* Ensure WYSIWYG content wraps long words/URLs and links to avoid horizontal overflow */
+.wysiwyg-content,
+.editor-styles-wrapper .wysiwyg-content {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+
 /* WordPress Gallery Block Styles */
 .wysiwyg-content .wp-block-gallery,
 .editor-styles-wrapper .wp-block-gallery {
@@ -385,12 +379,13 @@ figure.wp-caption.aligncenter img,
 }
 
 .wysiwyg-content .wp-block-gallery .blocks-gallery-grid,
-.editor-styles-wrapper .wp-block-gallery .blocks-gallery-grid {
+.editor-styles-wrapper .wp-block-gallery .blocks-gallery-grid,
+.wysiwyg-content .gallery,
+.editor-styles-wrapper .gallery {
   display: grid;
   gap: 1rem;
   list-style: none;
   padding: 0;
-  margin: 0;
 }
 
 .wysiwyg-content .wp-block-gallery.columns-1 .blocks-gallery-grid,
@@ -483,11 +478,7 @@ figure.wp-caption.aligncenter img,
 /* WordPress Classic Gallery Styles */
 .wysiwyg-content .gallery,
 .editor-styles-wrapper .gallery {
-  display: grid;
-  gap: 1rem;
   margin: 0 auto 1em auto;
-  padding: 0;
-  list-style: none;
   width: fit-content;
 
   &.gallery-columns-1 { grid-template-columns: 1fr; }

@@ -5,6 +5,8 @@ import { scrollY } from 'svelte/reactivity/window'
 import { SEOService } from '$lib/utils/SEO.svelte'
 import { GoogleServices } from '$lib/utils/Google.svelte'
 import { WPThemeDataStore } from '$lib/stores/WPThemeData'
+import { isDevelopmentMode } from '@/utils'
+import type { CardJob } from '@/types'
 
 export class RouteManager {
   currentUrl = $state(new SvelteURL(window.location.href));
@@ -13,7 +15,7 @@ export class RouteManager {
   loadingComponent = $state<string | null>(null);
 
   setCurrentPath(path: string) {
-    this.currentUrl.href = new URL(path, window.location.origin).href;
+    this.currentUrl.href = new SvelteURL(path, window.location.origin).href;
   }
 
   setIsInitialLoad(value: boolean) {
@@ -31,12 +33,29 @@ export class RouteManager {
     if (path.startsWith('/lowongan/')) return 'SingleLowongan';
     return 'Unknown';
   }
+
+  async performRouteTransitionSideEffects(path: string): Promise<void> {
+    // Destroy AdSense ads before route change for clean navigation
+    GoogleServices.adSenseDestroy();
+
+    // Fetch RankMath head data
+    if (!isDevelopmentMode()) {
+      await SEOService.fetchHeadData(path);
+    }
+
+    // GTAG / GTM page view
+    GoogleServices.sendPageView(path);
+
+    // Trigger optional AdSense refresh
+    GoogleServices.adSenseRefresh();
+  }
 }
 
 export class RouteStateManager {
   scrollPositions = new SvelteMap<string, number>();
-  searchStates = new SvelteMap<string, SearchState>();
-  carouselStates = new SvelteMap<string, CarouselState>();
+  searchStates = new SvelteMap<string, SearchState>(); // Track search states(include initial JobGrid) and per path
+  lastVisitedJob: CardJob['slug'] | undefined = undefined; // Remember the last visited job slug for mobile navigation
+  carouselState: CarouselState | null = null; // Single carousel state for homepage
 
   saveScrollPosition(path: string, scrollY: number) {
     this.scrollPositions.set(path, scrollY);
@@ -123,41 +142,91 @@ export class RouteStateManager {
     }
   }
 
-  saveCarouselState(path: string, carouselState: CarouselState) {
-    this.carouselStates.set(path, carouselState);
+  saveCarouselState(carouselState: CarouselState) {
+    this.carouselState = carouselState;
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.setItem(`carouselState_${path}`, JSON.stringify(carouselState));
+        sessionStorage.setItem('carouselState', JSON.stringify(carouselState));
       } catch (e) {
         console.warn('Failed to save carousel state to sessionStorage', e);
       }
     }
   }
 
-  getCarouselState(path: string): CarouselState | undefined {
-    let state = this.carouselStates.get(path);
-    if (!state && typeof sessionStorage !== 'undefined') {
+  getCarouselState(): CarouselState | undefined {
+    if (this.carouselState) return this.carouselState;
+    if (typeof sessionStorage !== 'undefined') {
       try {
-        const stored = sessionStorage.getItem(`carouselState_${path}`);
+        const stored = sessionStorage.getItem('carouselState');
         if (stored) {
-          state = JSON.parse(stored) as CarouselState;
-          this.carouselStates.set(path, state); // cache in memory
+          this.carouselState = JSON.parse(stored) as CarouselState;
+          return this.carouselState;
         }
       } catch (e) {
         console.warn('Failed to load carousel state from sessionStorage', e);
       }
     }
-    return state;
+    return undefined;
   }
 
-  clearCarouselState(path: string) {
-    this.carouselStates.delete(path);
+  clearCarouselState() {
+    if (!this.carouselState) return;
+    this.carouselState = null;
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.removeItem(`carouselState_${path}`);
+        sessionStorage.removeItem('carouselState');
       } catch (e) {
         console.warn('Failed to clear carousel state from sessionStorage', e);
       }
+    }
+  }
+
+  // Mark a job slug as the last visited for mobile navigation.
+  MarkVisitedJob(slug: CardJob['slug']) {
+    if (!slug) return;
+    this.lastVisitedJob = slug;
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem('lastVisitedJob', slug);
+      } catch (e) {
+        console.warn('Failed to save last visited job to sessionStorage', e);
+      }
+    }
+  }
+
+  // Check if a job slug is the last visited for mobile navigation.
+  hasVisitedJob(slug: CardJob['slug']): boolean {
+    if (!slug) return false;
+    if (this.lastVisitedJob === slug) return true;
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem('lastVisitedJob');
+        if (stored && stored === slug) {
+          return true;
+        }
+      } catch (e) {
+        console.warn('Failed to load last visited job from sessionStorage', e);
+      }
+    }
+    return false;
+  }
+
+  restoreScrollForPath(path: string): void {
+    if (typeof window === 'undefined') return;
+    const savedScroll = this.getScrollPosition(path);
+    if (savedScroll !== undefined) {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(() => window.scrollTo({ top: savedScroll, behavior: "smooth" }), 50);
+        });
+      });
+    } else if (path !== "/") {
+      // Scroll to top for new routes
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
+        });
+      });
     }
   }
 }
@@ -193,11 +262,7 @@ export async function navigateTo(path: string, searchState?: SearchState) {
 
   // Fetch RankMath head data only for SPA navigation, not initial load
   if (!routeStore.isInitialLoad) {
-    await SEOService.fetchHeadData(path);
-    // Push page_view to gtag / GTM for SPA navigation after head update
-    GoogleServices.sendPageView(path);
-    // Trigger optional AdSense refresh for SPA navigation. Debounced in the handler.
-    GoogleServices.adSenseRefresh();
+    await routeStore.performRouteTransitionSideEffects(path);
   }
 
   // Add loading timeout (1 second max)

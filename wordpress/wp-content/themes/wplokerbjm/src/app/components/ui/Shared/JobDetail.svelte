@@ -9,7 +9,6 @@
       .filter(Boolean);
   }
 </script>
-
 <script lang="ts">
   import type Viewer from "viewerjs";
   import { generalStore } from "$lib/stores/General.svelte";
@@ -161,7 +160,7 @@
       </div>
       {#if job.post_time}
         <div
-          class="text-sm mt-2 flex items-center justify-center gap-2 font-semibold text-center"
+          class="text-md mt-2 flex items-center justify-center gap-2 font-semibold text-center"
         >
           <ClockSolid
             class="text-[var(--wpl-global-color-1)] inline-block min-w-3 min-h-3 w-4 h-4 md:w-5 md:h-5"
@@ -345,7 +344,7 @@
                   href={contact.href}
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="block font-semibold break-all max-w-xs whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
+                  class="block font-semibold break-words max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
                   >{contact.value}</a
                 >
               </div>
@@ -386,7 +385,7 @@
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  class="block font-semibold break-all max-w-xs whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
+                  class="block font-semibold break-words max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
                 >
                   {item.platform === "Whatsapp"
                     ? item.username
