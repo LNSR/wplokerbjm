@@ -1,13 +1,7 @@
-import type { SearchContext, SearchFilters } from '@/types';
+import type { SearchContext, SearchFilters, MetaBox, WPBasePost } from '@/types';
 import type { Component } from 'svelte';
-
 export interface LayoutProps {
   logo: string;
-}
-
-export enum ThemeName {
-  Light = 'light',
-  Dark = 'dark',
 }
 
 export type ComponentModule = { default?: Component };
@@ -30,18 +24,7 @@ export interface ComponentConfig {
   component: ComponentLoader;
 }
 
-export interface JobSummary {
-  jenis_pekerjaan_taxo?: string | string[] | null;
-  pendidikan_taxo?: string | string[] | null;
-  pengalaman?: number | null;
-  gender_taxo?: string | string[] | null;
-  gaji_minimal?: number | null;
-  gaji_maksimal?: number | null;
-  umur_min?: number | null;
-  umur_max?: number | null;
-  lokasi_taxo?: string | string[] | null;
-  deadline?: string | null;
-}
+export type JobSummary = Pick<MetaBox, 'jenis-pekerjaan' | 'pendidikan' | 'lokasi-pekerjaan' | 'gender' | 'pengalaman' | 'gaji_minimal' | 'gaji_maksimal' | 'umur_min' | 'umur_max' | 'deadline'>;
 
 export interface SocialMediaItem {
   platform: string;
@@ -51,23 +34,11 @@ export interface SocialMediaItem {
   color?: string;
 }
 
-export interface CardJob {
-  id?: number;
-  slug?: string;
-  title: string;
-  nama_perusahaan?: string;
+export interface CardJob extends WPBasePost, Pick<MetaBox, 'jenis-pekerjaan' | 'pendidikan' | 'lokasi-pekerjaan' | 'gender' | 'nama_perusahaan' | 'deadline' | 'status_pekerjaan'> {
   ringkasanPekerjaan?: JobSummary | null;
-  deadline?: string | null;
-  statusjob?: (0 | 2 | 3) | undefined; // 0: Normal, 2: Urgent, 3: Pinned
-  permalink?: string;
-  post_time?: string;
 }
 
-export interface JobContactRow {
-  email_kontak?: string[];
-  nomor_kontak?: string[];
-  situs_kontak?: string[];
-};
+export type JobContactRow = Pick<MetaBox, 'email_kontak' | 'nomor_kontak' | 'situs_kontak'>;
 
 
 // Props for the JobCard component (shared type)

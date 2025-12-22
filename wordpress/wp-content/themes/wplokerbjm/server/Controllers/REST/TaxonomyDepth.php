@@ -4,6 +4,7 @@ namespace WPLokerBJM\Controllers\REST;
 use WPLokerBJM\Services\Taxonomy\TaxonomyService;
 use WPLokerBJM\Repositories\TaxonomyRepository;
 use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Models\Schema\Taxonomies;
 class TaxonomyDepth {
     public function __construct(private TaxonomyService $service, private TaxonomyRepository $repository) {
     }
@@ -14,12 +15,12 @@ class TaxonomyDepth {
             $terms = $this->repository->getTaxonomyTerms();
 
             $response = [
-                'lokasiTerms' => $this->service->buildTermsTree($terms['lokasi_terms']),
+                'lokasiTerms' => $this->service->buildTermsTree($terms[Taxonomies::LOKASI_PEKERJAAN]),
                 'genderTerms' => array_values(array_map(fn($term) => [
                     'slug' => $term->slug,
                     'name' => $term->name
-                ], $terms['gender_terms'])),
-                'pendidikanTerms' => $this->service->buildTermsTree($terms['pendidikan_terms']),
+                ], $terms[Taxonomies::GENDER])),
+                'pendidikanTerms' => $this->service->buildTermsTree($terms[Taxonomies::PENDIDIKAN]),
             ];
 
             return rest_ensure_response($response);
@@ -33,7 +34,7 @@ class TaxonomyDepth {
         try {
 
             $terms = $this->repository->getTaxonomyTerms();
-            $response = $this->service->buildTermsTree($terms['lokasi_terms']);
+            $response = $this->service->buildTermsTree($terms[Taxonomies::LOKASI_PEKERJAAN]);
 
             return rest_ensure_response($response);
         } catch (\Exception $e) {
@@ -49,7 +50,7 @@ class TaxonomyDepth {
             $response = array_values(array_map(fn($term) => [
                 'slug' => $term->slug,
                 'name' => $term->name
-            ], $terms['gender_terms']));
+            ], $terms[Taxonomies::GENDER]));
 
             return rest_ensure_response($response);
         } catch (\Exception $e) {
@@ -62,7 +63,7 @@ class TaxonomyDepth {
         try {
 
             $terms = $this->repository->getTaxonomyTerms();
-            $response = $this->service->buildTermsTree($terms['pendidikan_terms']);
+            $response = $this->service->buildTermsTree($terms[Taxonomies::PENDIDIKAN]);
 
             return rest_ensure_response($response);
         } catch (\Exception $e) {

@@ -2,8 +2,20 @@
 
 namespace WPLokerBJM\Repositories;
 
+use WPLokerBJM\Models\Schema\Taxonomies;
+
 class TaxonomyRepository
 {
+
+	public $metaBoxesTaxonomies = [
+		Taxonomies::PERUSAHAAN,
+		Taxonomies::KATEGORI_LOWONGAN,
+		Taxonomies::LOKASI_PEKERJAAN,
+		Taxonomies::JENIS_PEKERJAAN,
+		Taxonomies::GENDER,
+		Taxonomies::PENDIDIKAN,
+	];
+
 	/**
 	 * Get job taxonomies
 	 *
@@ -12,22 +24,13 @@ class TaxonomyRepository
 	 */
 	public function getMetaBoxTaxonomies(int $post_id): array
 	{
-		$map = [
-			'perusahaan_taxo' => 'perusahaan',
-			'kategori_lowongan_taxo' => 'kategori-lowongan',
-			'lokasi_taxo' => 'lokasi-pekerjaan',
-			'jenis_pekerjaan_taxo' => 'jenis-pekerjaan',
-			'gender_taxo' => 'gender',
-			'pendidikan_taxo' => 'pendidikan',
-		];
-
 		$result = [];
-		foreach ($map as $key => $taxonomy) {
+		foreach ($this->metaBoxesTaxonomies as $taxonomy) {
 			$terms = get_the_terms($post_id, $taxonomy);
 			if (is_wp_error($terms) || empty($terms) || $terms === false) {
-				$result[$key] = [];
+				$result[$taxonomy] = [];
 			} else {
-				$result[$key] = is_array($terms) ? $terms : [];
+				$result[$taxonomy] = is_array($terms) ? $terms : [];
 			}
 		}
 
@@ -36,37 +39,13 @@ class TaxonomyRepository
 
 	public function getTaxonomyTerms(): array
 	{
-
-		$terms = [
-			'perusahaan_terms' => get_terms([
-				'taxonomy' => 'perusahaan',
+		$terms = [];
+		foreach ($this->metaBoxesTaxonomies as $taxonomy) {
+			$terms[$taxonomy] = get_terms([
+				'taxonomy' => $taxonomy,
 				'hide_empty' => true,
-			]),
-			'kategori_lowongan_terms' => get_terms([
-				'taxonomy' => 'kategori-lowongan',
-				'hide_empty' => true,
-			]),
-			'lokasi_terms' => get_terms([
-				'taxonomy' => 'lokasi-pekerjaan',
-				'hide_empty' => true,
-			]),
-			'jenis_pekerjaan_terms' => get_terms([
-				'taxonomy' => 'jenis-pekerjaan',
-				'hide_empty' => true,
-			]),
-			'gender_terms' => get_terms([
-				'taxonomy' => 'gender',
-				'hide_empty' => true,
-			]),
-			'pendidikan_terms' => get_terms([
-				'taxonomy' => 'pendidikan',
-				'hide_empty' => true,
-			]),
-			'pengalaman_terms' => get_terms([
-				'taxonomy' => 'pengalaman',
-				'hide_empty' => true,
-			])
-		];
+			]);
+		}
 		return $terms;
 	}
 }

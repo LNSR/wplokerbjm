@@ -5,7 +5,7 @@ import type {
     SearchFilters,
     LoadMoreFilters,
     SearchContext,
-    Job,
+    CardJob,
     LoadMoreResponse,
     SearchResponse,
     TaxonomyTerm,
@@ -18,16 +18,16 @@ export class SearchManager {
     // State
     public filters = $state<SearchFilters>({
         cari: '',
-        lokasi: [],
-        gender: [],
-        pendidikan: [],
+        [TaxonomyType.lokasi]: [],
+        [TaxonomyType.gender]: [],
+        [TaxonomyType.pendidikan]: [],
         sort: { value: 'desc', label: 'Terbaru' } as SortOption,
     })
 
     public searchHistory = $state<string[]>([])
     public suggestions = $state<string[]>([])
     public showSuggestions = $state(false)
-    public jobs = $state<Job[]>([])
+    public jobs = $state<CardJob[]>([])
     public context = $state<SearchContext>('latest')
     public title = $state('Hasil Pencarian')
     public totalJobs = $state(0)
@@ -44,9 +44,9 @@ export class SearchManager {
         const f = this.filters
         return !!(
             (typeof f.cari === 'string' && f.cari.trim() !== '') ||
-            (Array.isArray(f.lokasi) && f.lokasi.length > 0) ||
-            (Array.isArray(f.gender) && f.gender.length > 0) ||
-            (Array.isArray(f.pendidikan) && f.pendidikan.length > 0) ||
+            (Array.isArray(f[TaxonomyType.lokasi]) && f[TaxonomyType.lokasi].length > 0) ||
+            (Array.isArray(f[TaxonomyType.gender]) && f[TaxonomyType.gender].length > 0) ||
+            (Array.isArray(f[TaxonomyType.pendidikan]) && f[TaxonomyType.pendidikan].length > 0) ||
             (f.sort && f.sort.value)
         )
     }
@@ -90,17 +90,17 @@ export class SearchManager {
         if (typeof newFilters.cari === 'string') sanitized.cari = validation.sanitizeString(newFilters.cari)
 
         this.filters.cari = typeof sanitized.cari === 'string' ? sanitized.cari : this.filters.cari
-        this.filters.lokasi = SearchUtils.sanitizeArr(newFilters.lokasi) ?? this.filters.lokasi
-        this.filters.gender = SearchUtils.sanitizeArr(newFilters.gender) ?? this.filters.gender
-        this.filters.pendidikan = SearchUtils.sanitizeArr(newFilters.pendidikan) ?? this.filters.pendidikan
+        this.filters[TaxonomyType.lokasi] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.lokasi]) ?? this.filters[TaxonomyType.lokasi]
+        this.filters[TaxonomyType.gender] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.gender]) ?? this.filters[TaxonomyType.gender]
+        this.filters[TaxonomyType.pendidikan] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.pendidikan]) ?? this.filters[TaxonomyType.pendidikan]
         this.filters.sort = typeof newFilters.sort === 'object' && newFilters.sort !== null ? (newFilters.sort as SortOption) : this.filters.sort
     }
 
     public resetFilters(): void {
         this.filters.cari = ''
-        this.filters.lokasi = []
-        this.filters.gender = []
-        this.filters.pendidikan = []
+        this.filters[TaxonomyType.lokasi] = []
+        this.filters[TaxonomyType.gender] = []
+        this.filters[TaxonomyType.pendidikan] = []
         this.filters.sort = { value: 'desc', label: 'Terbaru' }
     }
 
@@ -207,8 +207,8 @@ export class SearchManager {
             names: string[]
         }[] = []
 
-        if (this.filters.lokasi && this.filters.lokasi.length) {
-            const filtered = this.filters.lokasi.filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
+        if (this.filters[TaxonomyType.lokasi] && this.filters[TaxonomyType.lokasi].length) {
+            const filtered = this.filters[TaxonomyType.lokasi].filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
             if (filtered.length) {
                 filters.push({
                     key: TaxonomyType.lokasi,
@@ -219,8 +219,8 @@ export class SearchManager {
             }
         }
 
-        if (this.filters.gender && this.filters.gender.length) {
-            const filtered = this.filters.gender.filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
+        if (this.filters[TaxonomyType.gender] && this.filters[TaxonomyType.gender].length) {
+            const filtered = this.filters[TaxonomyType.gender].filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
             if (filtered.length) {
                 filters.push({
                     key: TaxonomyType.gender,
@@ -231,8 +231,8 @@ export class SearchManager {
             }
         }
 
-        if (this.filters.pendidikan && this.filters.pendidikan.length) {
-            const filtered = this.filters.pendidikan.filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
+        if (this.filters[TaxonomyType.pendidikan] && this.filters[TaxonomyType.pendidikan].length) {
+            const filtered = this.filters[TaxonomyType.pendidikan].filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
             if (filtered.length) {
                 filters.push({
                     key: TaxonomyType.pendidikan,
@@ -270,21 +270,21 @@ export class SearchUtils {
         return {
             ...f,
             cari: typeof f.cari === 'string' ? validation.sanitizeString(f.cari) : f.cari,
-            lokasi: Array.isArray(f.lokasi)
-                ? f.lokasi
+            [TaxonomyType.lokasi]: Array.isArray(f[TaxonomyType.lokasi])
+                ? f[TaxonomyType.lokasi]
                       .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
                       .filter((s) => String(s).trim() !== '')
-                : f.lokasi,
-            gender: Array.isArray(f.gender)
-                ? f.gender
+                : f[TaxonomyType.lokasi],
+            [TaxonomyType.gender]: Array.isArray(f[TaxonomyType.gender])
+                ? f[TaxonomyType.gender]
                       .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
                       .filter((s) => String(s).trim() !== '')
-                : f.gender,
-            pendidikan: Array.isArray(f.pendidikan)
-                ? f.pendidikan
+                : f[TaxonomyType.gender],
+            [TaxonomyType.pendidikan]: Array.isArray(f[TaxonomyType.pendidikan])
+                ? f[TaxonomyType.pendidikan]
                       .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
                       .filter((s) => String(s).trim() !== '')
-                : f.pendidikan,
+                : f[TaxonomyType.pendidikan],
         }
     }
 

@@ -11,6 +11,7 @@
 </script>
 <script lang="ts">
   import type Viewer from "viewerjs";
+  import { SocialMediaPlatform } from "@/types";
   import { generalStore } from "$lib/stores/General.svelte";
   import { FormattingService } from "@/services/Formatting";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
@@ -46,11 +47,11 @@
 
   const allImages = $derived(
     [
-      ...extractImages(job.tentangPerusahaan),
-      ...extractImages(job.deskripsiPekerjaan),
-      ...extractImages(job.persyaratan),
-      ...extractImages(job.caraMelamar),
-      ...extractImages(job.benefit),
+      ...extractImages(job.tentang_perusahaan || ''),
+      ...extractImages(job.deskripsi_pekerjaan || ''),
+      ...extractImages(job.persyaratan || ''),
+      ...extractImages(job.cara_melamar || ''),
+      ...extractImages(job.benefit || ''),
     ].filter((v, i, a) => a.indexOf(v) === i)
   );
   let galleryRef = $state<HTMLElement>();
@@ -177,21 +178,21 @@
   {/if}
 
   <!-- Nama Perusahaan -->
-  {#if job.namaPerusahaan}
+  {#if job.nama_perusahaan}
     <section>
       <h2 class="text-2xl md:text-3xl flex items-center gap-2 mb-4">
         <UserTieSolid
           class="text-[var(--wpl-global-color-1)] inline-block"
           aria-hidden="true"
         />
-        <span class="font-bold">{job.namaPerusahaan}</span>
+        <span class="font-bold">{job.nama_perusahaan}</span>
       </h2>
       <div class="divider"></div>
     </section>
   {/if}
 
   <!-- Tentang Perusahaan -->
-  {#if job.tentangPerusahaan}
+  {#if job.tentang_perusahaan}
     <section class="wysiwyg-content">
       <h2 class="text-3xl flex items-center gap-2 mb-4">
         <MapPinSolid
@@ -201,7 +202,7 @@
         <span class="font-bold">Tentang Perusahaan</span>
       </h2>
       <div onclick={onWysiwygImgClick} role="none">
-        {@html job.tentangPerusahaan}
+        {@html job.tentang_perusahaan}
       </div>
       <div class="divider"></div>
     </section>
@@ -246,7 +247,7 @@
   {/if}
 
   <!-- Deskripsi Pekerjaan -->
-  {#if job.deskripsiPekerjaan}
+  {#if job.deskripsi_pekerjaan}
     <section class="wysiwyg-content">
       <h2 class="text-xl flex items-center gap-2 mb-4">
         <CircleInfoSolid
@@ -256,7 +257,7 @@
         <span class="font-bold">Deskripsi Pekerjaan</span>
       </h2>
       <div onclick={onWysiwygImgClick} role="none">
-        {@html job.deskripsiPekerjaan}
+        {@html job.deskripsi_pekerjaan}
       </div>
       <div class="divider"></div>
     </section>
@@ -280,7 +281,7 @@
   {/if}
 
   <!-- Cara Melamar -->
-  {#if job.caraMelamar}
+  {#if job.cara_melamar}
     <section class="wysiwyg-content">
       <h2 class="text-2xl flex items-center gap-2 mb-4">
         <FileSignatureSolid
@@ -290,7 +291,7 @@
         <span class="font-bold">Cara Melamar</span>
       </h2>
       <div onclick={onWysiwygImgClick} role="none">
-        {@html job.caraMelamar}
+        {@html job.cara_melamar}
       </div>
       <div class="divider"></div>
     </section>
@@ -387,7 +388,7 @@
                   rel="noopener noreferrer"
                   class="block font-semibold break-words max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
                 >
-                  {item.platform === "Whatsapp"
+                  {item.platform === SocialMediaPlatform.WhatsApp
                     ? item.username
                       ? FormattingService.formatPhone(item.username)
                       : ""

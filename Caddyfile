@@ -1,6 +1,9 @@
 :443 {
   tls /var/www/certs/localhost.crt /var/www/certs/localhost.key # ! Use your own certificate
 
+  @production expression {env.WP_ENV} == "production"
+  @development expression {env.WP_ENV} == "development"
+
   @vite path_regexp vite ^/(__vite|@vite|@id|@fs|sockjs-node)(/.*)?$
   handle @vite {
     # Proxy Vite dev endpoints. Tuned for HMR (websockets) and dev performance.
@@ -34,23 +37,23 @@
   # This preserves the original host/proto coming from the client/proxy
   # and allows WordPress to choose the correct siteurl/home dynamically.
   php_fastcgi unix//var/run/sock/php-fpm.sock {
-    env HTTP_X_FORWARDED_PROTO {scheme}
-    env HTTP_X_FORWARDED_HOST {host}
-    env HTTP_HOST {host}
+      env HTTP_X_FORWARDED_PROTO {scheme}
+      env HTTP_X_FORWARDED_HOST {host}
+      env HTTP_HOST {host}
+      env HTTP_X_FORWARDED_FOR {remote}
+      env HTTP_X_REAL_IP {remote_host}
   }
 
   file_server {
     precompressed zstd
   }
 
-  @production expression {env.WP_ENV} == "production"
   encode @production {
     zstd best
   }
 
   # Matchers: static file extensions, fonts, wp static paths and special endpoints
-  @static_ext path_regexp staticExt ^/.*\.(css|js|json|xml|pdf|txt|ico|jpg|jpeg|png|webp|avif|svg|htc|ttf|woff|woff2|eot|otf)$
-  @fonts path_regexp fonts ^/.*\.(ttf|woff|woff2|eot|otf)$
+  @static_ext path_regexp staticExt ^/.*\.(css|js|json|xml|pdf|txt|ico|jpg|jpeg|png|webp|avif|svg|htc|ttf|woff|woff2|eot|otf|html)$
   @wp_static path /wp-content/* /wp-includes/* /favicon.ico /robots.txt
   @no_cache path /wp-login.php /wp-admin/* /xmlrpc.php /wp-comments-post.php /wp-cron.php /__vite/*
   @rest_api path /wp-json/*
@@ -76,32 +79,43 @@
   }
 
   # Static assets: long-term caching and immutable flag (fingerprinted assets) + caching for CDNs
-  header @static_ext Cache-Control "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=2592000, stale-if-error=604800"
-  header @static_ext Expires "Thu, 31 Dec 2037 23:55:55 GMT"
-  header @static_ext Vary "Accept-Encoding, Cookie"
-  header @static_ext "Last-Modified" {file.modtime}
+  header @production @static_ext Cache-Control "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=2592000, stale-if-error=604800"
+  header @production @static_ext Expires "Thu, 31 Dec 2037 23:55:55 GMT"
+  header @production @static_ext Vary "Accept-Encoding, Cookie"
+  header @production @static_ext "Last-Modified" {file.modtime}
+  header @production @static_ext Access-Control-Allow-Origin "*"  # Added: ensures CORS for fonts and other assets if needed
 
-  # Fonts: allow cross-origin requests (for @font-face), long cache and CORS so web fonts work across domains
-  header @fonts Cache-Control "public, max-age=31536000, immutable, s-maxage=31536000"
-  header @fonts Access-Control-Allow-Origin "*"
+  header @development @static_ext Cache-Control "public, max-age=3600, stale-while-revalidate=1800"
+  header @development @static_ext Expires "Thu, 31 Dec 2036 23:55:55 GMT"
+  header @development @static_ext Vary "Accept-Encoding, Cookie"
+  header @development @static_ext "Last-Modified" {file.modtime}
+  header @development @static_ext Access-Control-Allow-Origin "*"
 
   # wp-content paths (plugins, themes) - long-term for static assets while still allowing some dynamic files
-  header @wp_static Cache-Control "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=2592000"
-  header @wp_static Expires "Thu, 31 Dec 2037 23:55:55 GMT"
-  header @wp_static Vary "Accept-Encoding"
+  header @production @wp_static Cache-Control "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=2592000"
+  header @production @wp_static Expires "Thu, 31 Dec 2036 23:55:55 GMT"
+  header @production @wp_static Vary "Accept-Encoding"
+
+  header @development @wp_static Cache-Control "public, max-age=3600, stale-while-revalidate=1800"
+  header @development @wp_static Expires "Thu, 31 Dec 2036 23:55:55 GMT"
+  header @development @wp_static Vary "Accept-Encoding"
 
   # REST API: private cache for logged-in users, long public cache with background revalidation for anonymous
-  header @rest_api @logged_in Cache-Control "private, max-age=300"
-  header @rest_api not @logged_in Cache-Control "public, max-age=3600, s-maxage=7200, stale-while-revalidate=7200, stale-if-error=86400"
-  header @rest_api not @logged_in Vary "Accept-Encoding, Cookie"
+  header @production @rest_api @logged_in Cache-Control "private, max-age=300, stale-while-revalidate=600, stale-if-error=3600"
+  header @production @rest_api not @logged_in Cache-Control "public, max-age=3600, s-maxage=7200, stale-while-revalidate=7200, stale-if-error=86400"
+  header @production @rest_api not @logged_in Vary "Accept-Encoding, Cookie"
+
+  header @development @rest_api Cache-Control "private, max-age=60, stale-while-revalidate=120"
 
   # Privileged paths (wp-login.php, admin, xmlrpc, cron): allow private browser cache only
-  header @no_cache Cache-Control "private, max-age=60, must-revalidate"
+  header @no_cache Cache-Control "private, max-age=120, s-maxage=120, must-revalidate"
 
   # Dynamic content (pages) — private cache for logged-in users, public cache for anonymous
-  header @dynamic @logged_in Cache-Control "private, max-age=360"
-  header @dynamic not @logged_in Cache-Control "public, max-age=600, s-maxage=1200, stale-while-revalidate=1200, stale-if-error=86400"
-  header @dynamic not @logged_in Vary "Accept-Encoding, Cookie"
+  header @production @dynamic @logged_in Cache-Control "private, max-age=360"
+  header @production @dynamic not @logged_in Cache-Control "public, max-age=600, s-maxage=1200, stale-while-revalidate=1200, stale-if-error=86400"
+  header @production @dynamic not @logged_in Vary "Accept-Encoding, Cookie"
+
+  header @development @dynamic Cache-Control "no-cache"
 
   replace "https://localhost" "https://{host}"
 

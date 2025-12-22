@@ -1,4 +1,5 @@
 import type { SearchState, CarouselState } from '@/types'
+import { WPPostRoute } from '@/types'
 import { removeJobPostingJsonLd } from '$lib/utils/elements.svelte'
 import { SvelteMap, SvelteURL } from 'svelte/reactivity'
 import { scrollY } from 'svelte/reactivity/window'
@@ -29,8 +30,8 @@ export class RouteManager {
 
   getComponentNamePath(path: string): string {
     if (path === '/') return 'Homepage';
-    if (path.startsWith('/pasang-iklan-loker')) return 'PasangIklanLoker';
-    if (path.startsWith('/lowongan/')) return 'SingleLowongan';
+    if (path.startsWith(`/${WPPostRoute.PasangIklanLoker}`)) return 'PasangIklanLoker';
+    if (path.startsWith(`/${WPPostRoute.lowongan}`)) return 'SingleLowongan';
     return 'Unknown';
   }
 

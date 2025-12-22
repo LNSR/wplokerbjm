@@ -104,7 +104,7 @@
 
     <!-- Drawer -->
     <aside
-      class="relative shadow-xl rounded-xl border-2 border-blue-500 w-full max-h-[calc(100vh-var(--site-header-top)-var(--site-header-height))] overflow-y-auto flex flex-col z-50"
+      class="bg-base-200 dark:bg-base-100/50 relative shadow-xl rounded-xl border-2 border-blue-500 w-full max-h-[calc(100vh-var(--site-header-top)-var(--site-header-height))] overflow-y-auto flex flex-col z-50"
     >
       <div
         class="absolute top-5 left-4 right-4 grid grid-cols-3 items-center z-10 gap-4"

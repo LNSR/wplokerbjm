@@ -3,6 +3,7 @@
 namespace WPLokerBJM\Factories;
 
 use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Models\Schema\CustomFields;
 
 class JobDataFactory
 {
@@ -67,7 +68,7 @@ class JobDataFactory
     {
         try {
             // Process WYSIWYG fields
-            $wysiwyg_fields = ['tentang_perusahaan', 'deskripsi_pekerjaan', 'persyaratan', 'cara_melamar', 'benefit'];
+            $wysiwyg_fields = [CustomFields::TENTANG_PERUSAHAAN, CustomFields::DESKRIPSI_PEKERJAAN, CustomFields::PERSYARATAN, CustomFields::CARA_MELAMAR, CustomFields::BENEFIT];
             foreach ($wysiwyg_fields as $field) {
                 if (!empty($customFields[$field])) {
                     // Accept strings only; other types are ignored
@@ -78,7 +79,7 @@ class JobDataFactory
             }
 
             // Process number fields
-            $number_fields = ['umur_min', 'umur_max', 'pengalaman', 'gaji_minimal', 'gaji_maksimal'];
+            $number_fields = [CustomFields::UMUR_MIN, CustomFields::UMUR_MAX, CustomFields::PENGALAMAN, CustomFields::GAJI_MINIMAL, CustomFields::GAJI_MAKSIMAL, CustomFields::STATUS_PEKERJAAN];
             foreach ($number_fields as $field) {
                 if (!empty($customFields[$field]) && is_numeric($customFields[$field])) {
                     // Cast numeric strings or numbers to int
@@ -86,44 +87,30 @@ class JobDataFactory
                 }
             }
 
+            $sanitize_contact_fields = [
+                CustomFields::EMAIL_KONTAK => fn($v) => is_string($v) ? sanitize_email($v) : null,
+                CustomFields::SITUS_KONTAK => fn($v) => is_string($v) ? esc_url($v) : null,
+                CustomFields::NOMOR_KONTAK => fn($v) => is_string($v) ? sanitize_text_field($v) : null,
+            ];
+
             // Process email, URL, and text fields (handle arrays for cloned fields)
-            foreach (['email_kontak', 'situs_kontak', 'nomor_kontak'] as $field) {
-                if (!empty($customFields[$field])) {
-                    if (is_array($customFields[$field])) {
-                        $customFields[$field] = array_map(function ($value) use ($field) {
-                            if ($field === 'email_kontak') {
-                                return is_string($value) ? sanitize_email($value) : '';
-                            }
-                            if ($field === 'situs_kontak') {
-                                return is_string($value) ? esc_url($value) : '';
-                            }
-                            if ($field === 'nomor_kontak') {
-                                return is_string($value) ? sanitize_text_field($value) : '';
-                            }
-                            return $value;
-                        }, $customFields[$field]);
-                    } else {
-                        if ($field === 'email_kontak' && is_string($customFields[$field])) {
-                            $customFields[$field] = sanitize_email($customFields[$field]);
-                        }
-                        if ($field === 'situs_kontak' && is_string($customFields[$field])) {
-                            $customFields[$field] = esc_url($customFields[$field]);
-                        }
-                        if ($field === 'nomor_kontak' && is_string($customFields[$field])) {
-                            $customFields[$field] = sanitize_text_field($customFields[$field]);
-                        }
-                    }
+            foreach ([CustomFields::EMAIL_KONTAK, CustomFields::SITUS_KONTAK, CustomFields::NOMOR_KONTAK] as $field) {
+                $sanitize_callback = $sanitize_contact_fields[$field];
+                if (!empty($customFields[$field]) && is_array($customFields[$field])) {
+                    array_filter(array_map($sanitize_callback, $customFields[$field]));
+                } else {
+                    $customFields[$field] = $sanitize_callback($customFields[$field]);
                 }
             }
 
             // Process date fields
-            if (!empty($customFields['deadline']) && is_string($customFields['deadline'])) {
-                $customFields['deadline'] = date('Y-m-d', strtotime($customFields['deadline']));
+            if (!empty($customFields[CustomFields::DEADLINE]) && is_string($customFields[CustomFields::DEADLINE])) {
+                $customFields[CustomFields::DEADLINE] = date('Y-m-d', strtotime($customFields[CustomFields::DEADLINE]));
             }
 
             // Process fieldset fields (e.g., social media)
-            if (!empty($customFields['social_media'])) {
-                $socialMediaData = $customFields['social_media'];
+            if (!empty($customFields[CustomFields::SOCIAL_MEDIA])) {
+                $socialMediaData = $customFields[CustomFields::SOCIAL_MEDIA];
 
                 // Meta Box sometimes stores serialized arrays; handle string (serialized or json) and arrays
                 if (is_string($socialMediaData)) {
@@ -161,7 +148,7 @@ class JobDataFactory
                     }
                 }
 
-                $customFields['social_media'] = $processedSocialMedia;
+                $customFields[CustomFields::SOCIAL_MEDIA] = $processedSocialMedia;
             }
         } catch (\Exception $e) {
             error_log('CustomFieldsService::processCustomFields error: ' . $e->getMessage());

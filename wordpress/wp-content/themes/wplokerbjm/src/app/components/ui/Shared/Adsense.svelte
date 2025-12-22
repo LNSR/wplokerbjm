@@ -1,6 +1,6 @@
 <script module lang="ts">
   import { isDevelopmentMode } from "@/utils";
-  import { debounce } from "@/utils/debounce";
+  import { debounce } from "@/utils/lodash";
   import { tick } from "svelte";
   import { nonceStore } from "$lib/stores/Nonce.svelte";
   import { GoogleServices } from "$lib/utils/Google.svelte";

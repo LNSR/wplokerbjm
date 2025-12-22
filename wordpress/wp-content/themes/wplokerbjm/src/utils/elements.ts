@@ -1,6 +1,5 @@
 //* Universal utility functions for DOM manipulation not tied to a specific framework.
-
-import _ from "lodash";
+import { isDevelopmentMode } from "@/utils";
 
 export const isAppEl: string = "#app"; // Selector for the main application element
 
@@ -18,11 +17,6 @@ export function parseProps(element: Element | Document, propAttr: string): Recor
     }
 
     return props;
-}
-
-export function isDevelopmentMode(): boolean {
-    type ImportMetaLike = { env?: { DEV?: boolean } };
-    return typeof import.meta !== 'undefined' && Boolean((import.meta as unknown as ImportMetaLike).env?.DEV);
 }
 
 export function removePropsScriptFromElement(element: Element | Document, propAttr?: string): void {

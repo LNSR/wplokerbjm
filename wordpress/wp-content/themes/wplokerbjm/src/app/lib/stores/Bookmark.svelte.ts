@@ -1,10 +1,19 @@
-import { debounce } from '@/utils/debounce'
+import { debounce } from '@/utils/lodash'
 import { SvelteMap, SvelteSet } from 'svelte/reactivity'
-import { saveBookmarks, loadBookmarks, clearBookmarks } from '@/utils'
+import { bookmarkIDB } from '@/utils'
 import { APIService } from '@/services/APIService'
+import { WPThemeDataStore } from '$lib/stores/WPThemeData'
 import type { CardJob } from '@/types'
 
+interface BookmarkBroadcastMessage {
+    type: 'update' | 'sync' | 'reload'
+    deleted?: number[]
+    version?: number
+}
+
 export class BookmarkManager {
+    // Current theme version from server (mtime of composer.json), used for cross-tab version checking
+    private CURRENT_VERSION = WPThemeDataStore.getThemeData()?.themeVersion || 0
     public jobs = $state<CardJob[]>([])
     public isInitialized = $state(false)
     public isSyncing = $state(false)
@@ -15,6 +24,7 @@ export class BookmarkManager {
 
     private channel: BroadcastChannel | null = null
     private debouncedSync: any
+    private pendingSyncIds = new SvelteSet<number>()
     private _debouncedSaveCall: any = null
     private _pendingSavePromise: Promise<void> | null = null
     private _pendingSaveResolve: (() => void) | null = null
@@ -31,18 +41,52 @@ export class BookmarkManager {
 
     constructor() {
 
-        // Debounced sync
-        this.debouncedSync = debounce(this.syncWithAPI.bind(this), 3000)
+        this.initialize()
+        this.crossTabChannel()
+        this.debouncedSync = debounce(() => this.syncPending(), 1000)
+    }
 
-        // Cross-tab sync
-        if (typeof BroadcastChannel !== 'undefined') {
-            this.channel = new BroadcastChannel('bookmark-sync')
-            this.channel.onmessage = (event: MessageEvent): void => {
-                const data = event.data
-                if (data && data.type === 'sync') {
+    /**
+     * Setup cross-tab synchronization using BroadcastChannel.
+     * 
+     * This enables bookmarks to sync across multiple tabs/windows of the same origin.
+     * - Only visible tabs process messages to avoid background interference.
+     * - Version checking ensures only tabs with matching theme versions (from server) sync.
+     * - If a newer version is detected, older tabs are forced to reload to prevent API conflicts.
+     * - Messages include 'update' (for add/remove), 'sync' (for full sync), and 'reload' (force refresh).
+     */
+    public crossTabChannel(): void {
+        if (typeof BroadcastChannel === 'undefined') {
+            return
+        }
+
+        this.channel = new BroadcastChannel('bookmark-sync')
+        this.channel.onmessage = (event: MessageEvent): void => {
+            const data = event.data as BookmarkBroadcastMessage
+
+            // Version mismatch: ignore messages from different versions
+            // If incoming version is newer, force reload to update assets
+            if (data.version !== undefined && data.version !== this.CURRENT_VERSION) {
+                if (data.version > this.CURRENT_VERSION) {
+                    location.replace(location.href) // Reload without history entry
+                }
+                return
+            }
+
+            // Handle different message types using type-safe switch
+            switch (data.type) {
+                case 'sync':
+                    // Full sync: load from storage and update deleted jobs
                     void this.loadFromStorage()
                     this.deletedJobs = data.deleted ?? []
-                } else {
+                    break
+                case 'reload':
+                    // Explicit reload from newer tabs
+                    location.replace(location.href)
+                    break
+                case 'update':
+                default:
+                    // Update message: load from storage and schedule API sync retry
                     void this.loadFromStorage()
                     // schedule a single retry (avoid stacking many scheduled syncs)
                     if (!this._retryTimer) {
@@ -51,29 +95,22 @@ export class BookmarkManager {
                             void this.syncWithAPI()
                         }, 1000)
                     }
-                }
+                    break
             }
-        }
-
-        // Initialize only in browser
-        if (typeof window !== 'undefined') {
-            void this.initialize()
-        } else {
-            // mark initialized on server to avoid hanging consumers
-            this.isInitialized = false
         }
     }
 
     private async loadFromStorage(): Promise<void> {
         try {
             this.cache.clear()
-            const stored = await loadBookmarks()
+            const stored = await bookmarkIDB.loadBookmarks()
             stored.forEach((job) => this.cache.set(job.id!, job))
             this.jobs = Array.from(this.cache.values()).sort((a, b) => (b.id || 0) - (a.id || 0))
         } catch {
             this.jobs = []
         } finally {
-            this.isInitialized = true
+            if (!this.isInitialized)
+                this.isInitialized = true
         }
     }
 
@@ -85,7 +122,8 @@ export class BookmarkManager {
         }
         this._saveInProgress = true
         try {
-            await saveBookmarks(Array.from(this.cache.values()).map((job) => JSON.parse(JSON.stringify(job))))
+            // Avoid deep clone to save memory on mobile; assume jobs are serializable
+            await bookmarkIDB.saveBookmarks(Array.from(this.cache.values()))
         } catch (error) {
             console.error('Failed to save bookmarks to IndexedDB:', error)
             throw error
@@ -133,54 +171,6 @@ export class BookmarkManager {
         return this._pendingSavePromise!
     }
 
-    // Force any queued debounced save to run immediately and return a Promise that
-    // resolves when it's finished.
-    public async flushSave(): Promise<void> {
-        if (this._debouncedSaveCall && typeof this._debouncedSaveCall.flush === 'function') {
-            this._debouncedSaveCall.flush()
-        }
-        return this._pendingSavePromise ?? Promise.resolve()
-    }
-
-    // Cancel any queued save and resolve pending promises so callers don't hang.
-    public cancelSave(): void {
-        if (this._debouncedSaveCall && typeof this._debouncedSaveCall.cancel === 'function') {
-            this._debouncedSaveCall.cancel()
-        }
-        if (this._pendingSaveResolve) {
-            this._pendingSaveResolve()
-            this._pendingSaveResolve = null
-            this._pendingSavePromise = null
-        }
-    }
-
-    /**
-     * Force an immediate save. If a debounced save was scheduled it will be
-     * flushed; otherwise write immediately. Returns a Promise that resolves
-     * when the physical write completes or rejects on error.
-     */
-    public async saveToStorageNow(): Promise<void> {
-        // If a debounced call exists, flush it (this will call saveToStorageImmediate)
-        if (this._debouncedSaveCall && typeof this._debouncedSaveCall.flush === 'function') {
-            try {
-                this._debouncedSaveCall.flush()
-            } catch (e) {
-                // ignore; flush will be handled below
-            }
-            // If flush scheduled a pending promise, return it so callers can await completion
-            if (this._pendingSavePromise) return this._pendingSavePromise
-            // otherwise fallthrough to immediate save
-        }
-
-        // No debounced save scheduled — if another save is currently in
-        // progress wait for it to complete and then perform an immediate
-        // write so callers can be sure the deletion persisted.
-        while (this._saveInProgress) {
-            await new Promise((r) => setTimeout(r, 40))
-        }
-        return this.saveToStorageImmediate()
-    }
-
     public async addJob(id: number): Promise<void> {
         return this.runQueued(async () => {
             try {
@@ -189,8 +179,10 @@ export class BookmarkManager {
                 this.cache.set(clonedJob.id!, clonedJob)
                 this.jobs = Array.from(this.cache.values()).sort((a, b) => (b.id || 0) - (a.id || 0))
                 // Persist sync results immediately to ensure authoritative data is saved
-                await this.saveToStorageNow()
-                if (this.channel) this.channel.postMessage('update')
+                await bookmarkIDB.addBookmark(clonedJob)
+                if (this.channel) this.channel.postMessage({ type: 'update', version: this.CURRENT_VERSION } as BookmarkBroadcastMessage) // Broadcast update with version for cross-tab sync
+                // Sync only the new job to get full data
+                this.pendingSyncIds.add(id)
                 this.debouncedSync()
             } catch (error) {
                 console.error('Failed to add job:', error)
@@ -209,8 +201,8 @@ export class BookmarkManager {
                 this.jobs = Array.from(this.cache.values()).sort((a, b) => (b.id || 0) - (a.id || 0))
                 this.deletedJobs = this.deletedJobs.filter((i) => i !== id)
                 // Persist deletions immediately to avoid accidental reappearance
-                await this.saveToStorageNow()
-                if (this.channel) this.channel.postMessage('update')
+                await bookmarkIDB.removeBookmark(id)
+                if (this.channel) this.channel.postMessage({ type: 'update', version: this.CURRENT_VERSION } as BookmarkBroadcastMessage) // Broadcast update with version for cross-tab sync
             } catch (error) {
                 console.error('Failed to remove job:', error)
                 this.warning = 'Gagal menghapus bookmark. Silakan coba lagi.'
@@ -230,27 +222,15 @@ export class BookmarkManager {
             }
         })
     }
-    public removeBookmark(id: number): Promise<void> {
-        return this.removeJob(id)
-    }
-
-    public clearAllBookmarks(): Promise<void> {
-        return this.clearAll()
-    }
-
-    public sync(): Promise<void> {
-        return this.syncWithAPI()
-    }
 
     public isSaved(id: number): boolean {
         return this.jobs.some((job) => job.id === id)
     }
 
-    public getSavedJobs(): CardJob[] {
-        return this.jobs
-    }
+    public async syncWithAPI(idsToSync?: number[]): Promise<void> {
+        // Only sync when tab is visible to avoid background interference
+        if (document.visibilityState !== 'visible') return
 
-    public async syncWithAPI(): Promise<void> {
         return this.runQueued(async () => {
             if (this.isSyncing) {
                 // if already syncing, set a warning and ensure we only schedule one retry
@@ -258,8 +238,8 @@ export class BookmarkManager {
                 if (!this._retryTimer) {
                     this._retryTimer = setTimeout(() => {
                         this._retryTimer = null
-                        void this.syncWithAPI()
-                    }, 1000)
+                        void this.syncWithAPI(idsToSync)
+                    }, 3000)
                 }
                 return
             }
@@ -269,35 +249,58 @@ export class BookmarkManager {
                 this._retryTimer = null
             }
             this.warning = ''
-            this.isSyncing = true
-            try {
-                const previousIds = new SvelteSet<number>(this.jobs.map((job) => job.id || 0))
-                const ids = this.jobs.map((job) => job.id || 0)
+            // Only set global syncing for full sync, not individual job refresh
+            if (!idsToSync) {
+                this.isSyncing = true
+            }
+
+            const performSync = async () => {
+                const ids = idsToSync || this.jobs.map((job) => job.id || 0)
+                if (ids.length === 0) return
+
                 const fetchedJobs = await APIService.syncBookmark(ids)
                 const plainFetchedJobs: CardJob[] = JSON.parse(JSON.stringify(fetchedJobs))
-                this.cache.clear()
+
+                // Update cache with fetched jobs
                 plainFetchedJobs.forEach((job: CardJob) => this.cache.set(job.id!, job))
                 this.jobs = Array.from(this.cache.values()).sort((a, b) => (b.id || 0) - (a.id || 0))
                 await this.saveToStorage()
-                const currentIds = new SvelteSet<number>(this.jobs.map((job) => job.id || 0))
-                this.deletedJobs = Array.from(previousIds).filter((id) => !currentIds.has(id))
-                this.lastSyncTime = Date.now()
-                if (this.channel)
-                    this.channel.postMessage({ type: 'sync', deleted: JSON.parse(JSON.stringify(this.deletedJobs)) })
+
+                // Handle full sync metadata
+                if (!idsToSync) {
+                    const previousIds = new SvelteSet<number>(this.jobs.map((job) => job.id || 0))
+                    const currentIds = new SvelteSet<number>(this.jobs.map((job) => job.id || 0))
+                    this.deletedJobs = Array.from(previousIds).filter((id) => !currentIds.has(id))
+                    this.lastSyncTime = Date.now()
+                    if (this.channel) {
+                        this.channel.postMessage({ type: 'sync', deleted: JSON.parse(JSON.stringify(this.deletedJobs)), version: this.CURRENT_VERSION } as BookmarkBroadcastMessage) // Broadcast full sync with version
+                    }
+                }
+            }
+
+            try {
+                await performSync()
             } catch (error) {
                 console.error('Failed to sync bookmarks with API:', error)
             } finally {
-                this.isSyncing = false
+                // Only reset global syncing for full sync
+                if (!idsToSync) {
+                    this.isSyncing = false
+                }
             }
         })
     }
 
-    public flushSync(): void {
-        if (this.debouncedSync && typeof this.debouncedSync.flush === 'function') this.debouncedSync.flush()
+    private async syncPending(): Promise<void> {
+        const ids = Array.from(this.pendingSyncIds)
+        this.pendingSyncIds.clear()
+        if (ids.length > 0) {
+            await this.syncWithAPI(ids)
+        }
     }
 
-    public cancelSync(): void {
-        if (this.debouncedSync && typeof this.debouncedSync.cancel === 'function') this.debouncedSync.cancel()
+    public flushSync(): void {
+        if (this.debouncedSync && typeof this.debouncedSync.flush === 'function') this.debouncedSync.flush()
     }
 
     public async clearAll(): Promise<void> {
@@ -306,8 +309,8 @@ export class BookmarkManager {
                 this.jobs = []
                 this.cache.clear()
                 this.deletedJobs = []
-                await clearBookmarks()
-                if (this.channel) this.channel.postMessage('update')
+                await bookmarkIDB.clearBookmarks()
+                if (this.channel) this.channel.postMessage({ type: 'update', version: this.CURRENT_VERSION } as BookmarkBroadcastMessage) // Broadcast clear with version
             } catch (error) {
                 console.error('Failed to clear all bookmarks:', error)
                 this.warning = 'Gagal menghapus semua bookmark. Silakan coba lagi.'
@@ -320,8 +323,19 @@ export class BookmarkManager {
     }
 
     private async initialize(): Promise<void> {
+        if (typeof window === 'undefined') {
+            this.isInitialized = false
+            return
+        }
+
         await this.loadFromStorage()
-        await this.syncWithAPI()
+        // Only sync if data is stale (older than 5 minutes) or no sync has been done
+        const now = Date.now()
+        const isStale = now - this.lastSyncTime > 5 * 60 * 1000 // 5 minutes
+        if (isStale || this.lastSyncTime === 0) {
+            // Run initial sync outside the queue to avoid blocking user interactions
+            void this.syncWithAPI()
+        }
     }
 }
 

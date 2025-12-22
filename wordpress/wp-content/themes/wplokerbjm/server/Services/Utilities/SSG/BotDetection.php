@@ -3,6 +3,97 @@ namespace WPLokerBJM\Services\Utilities\SSG;
 use WPLokerBJM\Core\Cache;
 
 /**
+ * Trait for HTTP fetching functionality
+ */
+trait HttpFetcher
+{
+	protected function getLogPrefix(): string
+	{
+		return '[SSG HttpFetcher]';
+	}
+
+	private function fetchUrl(string $url): ?string
+	{
+		if (!function_exists('curl_init')) {
+			error_log($this->getLogPrefix() . ' cURL not available');
+			return null;
+		}
+
+		$ch = curl_init();
+		curl_setopt($ch, CURLOPT_URL, $url);
+		curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+		curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+		curl_setopt($ch, CURLOPT_USERAGENT, 'WordPress/SSG-BotDetection');
+		curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+		curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+
+		$content = curl_exec($ch);
+		$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+		$error = curl_error($ch);
+
+		if ($content === false || $httpCode !== 200) {
+			error_log($this->getLogPrefix() . ' cURL error for ' . $url . ': ' . ($error ?: 'HTTP ' . $httpCode));
+			return null;
+		}
+
+		return $content;
+	}
+
+	private function fetchMultipleUrls(array $urls): array
+	{
+		if (!function_exists('curl_multi_init')) {
+			error_log($this->getLogPrefix() . ' cURL multi not available, falling back to sequential');
+			$results = [];
+			foreach ($urls as $key => $url) {
+				$results[$key] = $this->fetchUrl($url);
+			}
+			return $results;
+		}
+
+		$mh = curl_multi_init();
+		$handles = [];
+		$results = [];
+
+		foreach ($urls as $key => $url) {
+			$ch = curl_init();
+			curl_setopt($ch, CURLOPT_URL, $url);
+			curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+			curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+			curl_setopt($ch, CURLOPT_USERAGENT, 'WordPress/SSG-BotDetection');
+			curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+			curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+
+			curl_multi_add_handle($mh, $ch);
+			$handles[$key] = $ch;
+		}
+
+		$running = null;
+		do {
+			curl_multi_exec($mh, $running);
+			curl_multi_select($mh);
+		} while ($running > 0);
+
+		foreach ($handles as $key => $ch) {
+			$content = curl_multi_getcontent($ch);
+			$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+			$error = curl_error($ch);
+
+			if ($content === false || $httpCode !== 200) {
+				error_log($this->getLogPrefix() . ' cURL multi error for ' . $urls[$key] . ': ' . ($error ?: 'HTTP ' . $httpCode));
+				$results[$key] = null;
+			} else {
+				$results[$key] = $content;
+			}
+
+			curl_multi_remove_handle($mh, $ch);
+		}
+
+		curl_multi_close($mh);
+		return $results;
+	}
+}
+
+/**
  * BotDetection
  *
  * Conservative bot detection system for WordPress SSG serving.
@@ -22,11 +113,12 @@ class BotDetection
 {
 	public function __construct(
 		private BotRangeFetcher $botRangeFetcher,
-		private DnsResolver $dnsResolver
+		private DnsResolver $dnsResolver,
+		private UserAgentDetector $userAgentDetector
 	) {
 	}
 
-		/**
+	/**
 	 * Check if the current visitor is a bot using enhanced conservative detection.
 	 *
 	 * This method implements an enhanced conservative bot detection strategy that
@@ -105,6 +197,26 @@ class BotDetection
 	}
 
 	/**
+	 * Refresh bot data by clearing caches and fetching fresh data
+	 * Intended to be called via cron job
+	 */
+	public function refreshBotData(): void
+	{
+		try {
+			// Clear caches
+			Cache::delete('ssg_bot_ip_ranges');
+			Cache::delete('ssg_bot_user_agents');
+
+			$this->botRangeFetcher->getBotRanges();
+			$this->userAgentDetector->getBotUserAgentPatterns();
+
+			error_log('[SSG BotRangeFetcher] Successfully refreshed bot IP ranges via cron');
+		} catch (\Exception $e) {
+			error_log('[SSG BotRangeFetcher] Failed to refresh bot IP ranges: ' . $e->getMessage());
+		}
+	}
+
+	/**
 	 * Check if the current visitor is our SSG bot generation
 	 */
 	public static function isSsgBotGeneration(): array
@@ -126,7 +238,7 @@ class BotDetection
 		// https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker
 
 		$userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-		if (!empty($userAgent) && $this->isUserAgentKnownBot($userAgent)) {
+		if (!empty($userAgent) && $this->userAgentDetector->isKnownBot($userAgent)) {
 			Cache::set('ssg_user_agent_bot_' . md5($userAgent), true, 3600);
 			return true;
 		}
@@ -203,36 +315,6 @@ class BotDetection
 		Cache::set($patternKey, false, 3600);
 		return false;
 	}
-
-	/**
-	 * Check whether a User Agent matches known bot UA patterns
-	 * Uses cached UA lists fetched from TXT/JSON sources (see BotRangeFetcher::getBotUserAgentPatterns)
-	 */
-	private function isUserAgentKnownBot(string $userAgent): bool
-	{
-		if (empty($userAgent)) {
-			return false;
-		}
-
-		$patterns = $this->botRangeFetcher->getBotUserAgentPatterns();
-		if (empty($patterns)) {
-			return false;
-		}
-
-		foreach ($patterns as $pattern) {
-			// patterns are prepared as valid PCRE regex strings
-			try {
-				if (@preg_match($pattern, $userAgent)) {
-					return true;
-				}
-			} catch (\Throwable $e) {
-				// ignore invalid regex from external sources; continue
-				continue;
-			}
-		}
-
-		return false;
-	}
 }
 /**
  * Helper class for DNS resolution and PTR record lookups
@@ -284,6 +366,64 @@ class DnsResolver
 
 		Cache::set($cacheKey, 'null', 3600); // Cache null result for 1 day
 		return null;
+	}
+
+	/**
+	 * Check if PTR record matches known bot provider patterns (binary detection)
+	 */
+	public function isKnownBotPtr(?string $ptr): bool
+	{
+		if (empty($ptr)) {
+			return false;
+		}
+
+		// Check cache first
+		$cacheKey = 'dns_is_known_bot_' . md5($ptr);
+		$cachedResult = Cache::get($cacheKey);
+		if ($cachedResult !== false) {
+			return (bool) $cachedResult;
+		}
+
+		// Check against provider PTR suffix patterns
+		$providerPatterns = $this->getProviderPtrPatterns();
+		foreach ($providerPatterns as $provider => $patterns) {
+			if ($this->ptrMatchesProvider($ptr, $patterns)) {
+				Cache::set($cacheKey, true, 3600); // Cache for 24 hours
+				return true;
+			}
+		}
+
+		Cache::set($cacheKey, false, 3600); // Cache for 24 hours
+		return false;
+	}
+
+	/**
+	 * Combined PTR verification for an IP address.
+	 * Performs forward-confirmed reverse DNS and checks whether PTR matches known
+	 * provider suffix patterns. Result is cached for 24 hours.
+	 *
+	 * Source: provider PTR suffix patterns are defined in getProviderPtrPatterns() referencing official provider docs.
+	 */
+	public function isPtrKnownBotForIp(string $ip): bool
+	{
+		if (empty($ip) || !filter_var($ip, FILTER_VALIDATE_IP)) {
+			return false;
+		}
+
+		$cacheKey = 'dns_is_known_bot_ip_' . $ip;
+		$cachedResult = Cache::get($cacheKey);
+		if ($cachedResult !== false) {
+			return (bool) $cachedResult;
+		}
+
+		$ptr = $this->forwardConfirmedReverseDns($ip);
+		if ($this->isKnownBotPtr($ptr)) {
+			Cache::set($cacheKey, true, 3600);
+			return true;
+		}
+
+		Cache::set($cacheKey, false, 3600);
+		return false;
 	}
 
 	/**
@@ -565,69 +705,19 @@ class DnsResolver
 		return false;
 	}
 
-	/**
-	 * Check if PTR record matches known bot provider patterns (binary detection)
-	 */
-	public function isKnownBotPtr(?string $ptr): bool
-	{
-		if (empty($ptr)) {
-			return false;
-		}
-
-		// Check cache first
-		$cacheKey = 'dns_is_known_bot_' . md5($ptr);
-		$cachedResult = Cache::get($cacheKey);
-		if ($cachedResult !== false) {
-			return (bool) $cachedResult;
-		}
-
-		// Check against provider PTR suffix patterns
-		$providerPatterns = $this->getProviderPtrPatterns();
-		foreach ($providerPatterns as $provider => $patterns) {
-			if ($this->ptrMatchesProvider($ptr, $patterns)) {
-				Cache::set($cacheKey, true, 3600); // Cache for 24 hours
-				return true;
-			}
-		}
-
-		Cache::set($cacheKey, false, 3600); // Cache for 24 hours
-		return false;
-	}
-
-	/**
-	 * Combined PTR verification for an IP address.
-	 * Performs forward-confirmed reverse DNS and checks whether PTR matches known
-	 * provider suffix patterns. Result is cached for 24 hours.
-	 *
-	 * Source: provider PTR suffix patterns are defined in getProviderPtrPatterns() referencing official provider docs.
-	 */
-	public function isPtrKnownBotForIp(string $ip): bool
-	{
-		if (empty($ip) || !filter_var($ip, FILTER_VALIDATE_IP)) {
-			return false;
-		}
-
-		$cacheKey = 'dns_is_known_bot_ip_' . $ip;
-		$cachedResult = Cache::get($cacheKey);
-		if ($cachedResult !== false) {
-			return (bool) $cachedResult;
-		}
-
-		$ptr = $this->forwardConfirmedReverseDns($ip);
-		if ($this->isKnownBotPtr($ptr)) {
-			Cache::set($cacheKey, true, 3600);
-			return true;
-		}
-
-		Cache::set($cacheKey, false, 3600);
-		return false;
-	}
 }
 /**
  * Helper class for fetching and caching bot IP ranges
  */
 class BotRangeFetcher
 {
+	use HttpFetcher;
+
+	protected function getLogPrefix(): string
+	{
+		return '[SSG BotRangeFetcher]';
+	}
+
 	/**
 	 * Known bot IP ranges (CIDR notation) - dynamically loaded from official sources
 	 */
@@ -641,8 +731,6 @@ class BotRangeFetcher
 		if (!empty(self::$knownBotRanges)) {
 			return self::$knownBotRanges;
 		}
-
-        
 
 		$cacheKey = 'ssg_bot_ip_ranges';
 
@@ -666,90 +754,6 @@ class BotRangeFetcher
 
 		self::$knownBotRanges = $ranges;
 		return $ranges;
-	}
-
-	/**
-	 * Get known bot user-agent patterns (compiled as PCRE regex strings)
-	 * Fetches from JSON/TXT public sources and caches results.
-	 *
-	 * Sources:
-	 * - Monperrus crawler-user-agents JSON: https://github.com/monperrus/crawler-user-agents
-	 * - MitchellKrogza bad-user-agents list: https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker
-	 *
-	 * Note: This method avoids request-time blocking by using the cached patterns when available.
-	 */
-	public function getBotUserAgentPatterns(): array
-	{
-		$cacheKey = 'ssg_bot_user_agents';
-		$cached = Cache::get($cacheKey);
-		if ($cached !== false && is_array($cached)) {
-			return $cached;
-		}
-
-		$patterns = $this->fetchBotUserAgentLists();
-		$patterns = array_unique($patterns);
-
-		// Cache for 1 day by default
-		Cache::set($cacheKey, $patterns, 3600);
-		return $patterns;
-	}
-
-	/**
-	 * Fetch UA lists from TXT/JSON sources and convert them into PCRE patterns.
-	 */
-	private function fetchBotUserAgentLists(): array
-	{
-		$patterns = [];
-
-		// 1) Monperrus crawler-user-agents JSON
-		try {
-			$json = $this->fetchUrl('https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (is_array($data)) {
-					foreach ($data as $entry) {
-						if (isset($entry['pattern']) && !empty($entry['pattern'])) {
-							$raw = $entry['pattern'];
-							// Normalize pattern into regex; wrap in non-capturing group, case-insensitive.
-							$escaped = preg_quote($raw, '/');
-							$patterns[] = '/(?:' . $escaped . ')/i';
-						}
-						// Instances are full UA strings - turn into exact word regex
-						if (isset($entry['instances']) && is_array($entry['instances'])) {
-							foreach ($entry['instances'] as $instance) {
-								$instance = trim($instance);
-								if ($instance === '') {
-									continue;
-								}
-								$patterns[] = '/\b' . preg_quote($instance, '/') . '\b/i';
-							}
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('[SSG BotRangeFetcher] Failed fetching crawler-user-agents JSON: ' . $e->getMessage());
-		}
-
-		// 2) MitchellKrogza 'bad-user-agents' text list (line-separated)
-		try {
-			$raw = $this->fetchUrl('https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/_generator_lists/bad-user-agents.list');
-			if ($raw) {
-				$lines = explode("\n", $raw);
-				foreach ($lines as $line) {
-					$line = trim($line);
-					if ($line === '' || str_starts_with($line, '#')) {
-						continue;
-					}
-					// Convert to safe regex match on word boundary
-					$patterns[] = '/\b' . preg_quote($line, '/') . '\b/i';
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('[SSG BotRangeFetcher] Failed fetching bad-user-agents list: ' . $e->getMessage());
-		}
-
-		return array_unique(array_filter($patterns));
 	}
 
 	/**
@@ -806,410 +810,338 @@ class BotRangeFetcher
 	{
 		$ranges = [];
 
-		// Googlebot ranges (with retry logic)
-		$googleRanges = $this->fetchWithRetry([$this, 'fetchGoogleBotRanges']);
-		$ranges = array_merge($ranges, $googleRanges);
+		// Define sources with URLs and parsing functions
+		$sources = [
+			// @source https://developers.google.com/search/apis/ipranges/googlebot.json
+			'google' => [
+				'url' => 'https://developers.google.com/search/apis/ipranges/googlebot.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://www.bing.com/toolbox/bingbot.json
+			'bing' => [
+				'url' => 'https://www.bing.com/toolbox/bingbot.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://duckduckgo.com/duckduckbot.json
+			'duckduck' => [
+				'url' => 'https://duckduckgo.com/duckduckbot.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://yandex.com/ips
+			'yandex' => [
+				'url' => 'https://yandex.com/ips',
+				'parser' => function ($html) {
+					$ranges = [];
+					if ($html) {
+						if (preg_match_all('/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2})/', $html, $matches)) {
+							foreach ($matches[1] as $range) {
+								if ($this->isValidCidr($range)) {
+									$ranges[] = $range;
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source http://search.developer.apple.com/applebot.json
+			'apple' => [
+				'url' => 'http://search.developer.apple.com/applebot.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://developers.google.com/static/search/apis/ipranges/special-crawlers.json
+			'google_special' => [
+				'url' => 'https://developers.google.com/static/search/apis/ipranges/special-crawlers.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://developers.google.com/static/search/apis/ipranges/user-triggered-fetchers.json
+			'google_user_fetchers' => [
+				'url' => 'https://developers.google.com/static/search/apis/ipranges/user-triggered-fetchers.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://developers.google.com/static/search/apis/ipranges/user-triggered-fetchers-google.json
+			'google_user_fetchers_google' => [
+				'url' => 'https://developers.google.com/static/search/apis/ipranges/user-triggered-fetchers-google.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://openai.com/gptbot.json
+			'openai_gpt' => [
+				'url' => 'https://openai.com/gptbot.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://openai.com/chatgpt-user.json
+			'openai_chatgpt' => [
+				'url' => 'https://openai.com/chatgpt-user.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://openai.com/searchbot.json
+			'openai_search' => [
+				'url' => 'https://openai.com/searchbot.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://perplexity.ai/perplexitybot.json
+			'perplexity_bot' => [
+				'url' => 'https://perplexity.ai/perplexitybot.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://perplexity.ai/perplexity-user.json
+			'perplexity_user' => [
+				'url' => 'https://perplexity.ai/perplexity-user.json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (isset($data['prefixes'])) {
+							foreach ($data['prefixes'] as $prefix) {
+								if (isset($prefix['ipv4Prefix'])) {
+									$ranges[] = $prefix['ipv4Prefix'];
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://www.quic.cloud/ips-v4?json
+			'quic_cloud' => [
+				'url' => 'https://www.quic.cloud/ips-v4?json',
+				'parser' => function ($json) {
+					$ranges = [];
+					if ($json) {
+						$ips = json_decode($json, true);
+						if (is_array($ips)) {
+							foreach ($ips as $ip) {
+								if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+									$ranges[] = $ip . '/32';
+								}
+							}
+						}
+					}
+					return $ranges;
+				}
+			],
+			// @source https://www.facebook.com/peering/geofeed
+			'facebook' => [
+				'url' => 'https://www.facebook.com/peering/geofeed',
+				'parser' => function ($data) {
+					$ranges = [];
+					if ($data) {
+						if (preg_match_all('/\b(?:\d{1,3}\.){3}\d{1,3}\/\d{1,2}\b/', $data, $matches)) {
+							foreach (array_unique($matches[0]) as $cidr) {
+								if ($this->isValidCidr($cidr)) {
+									$ranges[] = $cidr;
+								}
+							}
+						}
+					}
+					if (empty($ranges)) {
+						$ranges = [
+							'31.13.24.0/21',
+							'31.13.64.0/18',
+							'66.220.144.0/20',
+							'69.63.176.0/21',
+							'69.63.184.0/21',
+							'69.63.176.0/20',
+							'69.171.224.0/20',
+						];
+					}
+					$ranges = array_merge($ranges, [
+						'199.59.148.0/22',
+						'199.16.156.0/22',
+					]);
+					return array_unique($ranges);
+				}
+			],
+			// @source https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/_generator_lists/bad-ip-addresses.list
+			'opensource' => [
+				'url' => 'https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/_generator_lists/bad-ip-addresses.list',
+				'parser' => function ($data) {
+					$ranges = [];
+					if ($data) {
+						$lines = explode("\n", $data);
+						foreach ($lines as $line) {
+							$line = trim($line);
+							if (empty($line) || str_starts_with($line, '#')) {
+								continue;
+							}
+							if (filter_var($line, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
+								$ranges[] = $line . '/32';
+							}
+						}
+					}
+					return array_unique($ranges);
+				}
+			],
+		];
 
-		// Bingbot ranges
-		$bingRanges = $this->fetchWithRetry([$this, 'fetchBingBotRanges']);
-		$ranges = array_merge($ranges, $bingRanges);
+		// Extract URLs for parallel fetching
+		$urls = array_column($sources, 'url', 'key');
 
-		// DuckDuckBot ranges
-		$duckRanges = $this->fetchWithRetry([$this, 'fetchDuckDuckBotRanges']);
-		$ranges = array_merge($ranges, $duckRanges);
+		// Fetch all URLs in parallel
+		$contents = $this->fetchMultipleUrls($urls);
 
-		// Yandex ranges
-		$yandexRanges = $this->fetchWithRetry([$this, 'fetchYandexRanges']);
-		$ranges = array_merge($ranges, $yandexRanges);
+		// Parse each response
+		foreach ($sources as $key => $source) {
+			try {
+				$parsedRanges = $source['parser']($contents[$key] ?? null);
+				$ranges = array_merge($ranges, $parsedRanges);
+			} catch (\Exception $e) {
+				error_log('[SSG BotRangeFetcher] Failed to parse ' . $key . ': ' . $e->getMessage());
+			}
+		}
 
-		// Applebot ranges
-		$appleRanges = $this->fetchWithRetry([$this, 'fetchAppleBotRanges']);
-		$ranges = array_merge($ranges, $appleRanges);
-
-		// Google special crawlers ranges (AdsBot, etc.)
-		$specialRanges = $this->fetchWithRetry([$this, 'fetchGoogleSpecialCrawlersRanges']);
-		$ranges = array_merge($ranges, $specialRanges);
-
-		// Google user triggered fetchers ranges
-		$userFetchersRanges = $this->fetchWithRetry([$this, 'fetchGoogleUserTriggeredFetchersRanges']);
-		$ranges = array_merge($ranges, $userFetchersRanges);
-
-		// Google user triggered fetchers Google ranges
-		$userFetchersGoogleRanges = $this->fetchWithRetry([$this, 'fetchGoogleUserTriggeredFetchersGoogleRanges']);
-		$ranges = array_merge($ranges, $userFetchersGoogleRanges);
-
-		// OpenAI bot ranges
-		$openAiRanges = $this->fetchWithRetry([$this, 'fetchOpenAiBotRanges']);
-		$ranges = array_merge($ranges, $openAiRanges);
-
-		// Perplexity bot ranges
-		$perplexityRanges = $this->fetchWithRetry([$this, 'fetchPerplexityBotRanges']);
-		$ranges = array_merge($ranges, $perplexityRanges);
-
-		// Pinterest bot ranges
-		$pinterestRanges = $this->fetchWithRetry([$this, 'fetchPinterestBotRanges']);
-		$ranges = array_merge($ranges, $pinterestRanges);
-
-		// QUIC.cloud ranges
-		$quicCloudRanges = $this->fetchWithRetry([$this, 'fetchQuicCloudRanges']);
-		$ranges = array_merge($ranges, $quicCloudRanges);
-
-		// Baidu ranges
-		$baiduRanges = $this->fetchBaiduRanges();
-		$ranges = array_merge($ranges, $baiduRanges);
-
-		// Sogou ranges
-		$sogouRanges = $this->fetchSogouRanges();
-		$ranges = array_merge($ranges, $sogouRanges);
-
-		// 360Spider ranges
-		$sp360Ranges = $this->fetch360SpiderRanges();
-		$ranges = array_merge($ranges, $sp360Ranges);
-
-		// SEO tool ranges (Ahrefs, SEMrush, Moz)
-		$seoToolRanges = $this->fetchSeoToolRanges();
-		$ranges = array_merge($ranges, $seoToolRanges);
-
-		// Social preview crawlers (Facebook, Twitter)
-		$socialRanges = $this->fetchWithRetry([$this, 'fetchSocialPreviewRanges']);
-		$ranges = array_merge($ranges, $socialRanges);
-
-		// Monitoring and archive services
-		$monitorRanges = $this->fetchMonitoringAndArchiveRanges();
-		$ranges = array_merge($ranges, $monitorRanges);
-
-		// Additional bot ranges from open-source databases
-		$openSourceRanges = $this->fetchWithRetry([$this, 'fetchOpenSourceBotRanges']);
-		$ranges = array_merge($ranges, $openSourceRanges);
+		// Add hardcoded ranges
+		$ranges = array_merge($ranges, $this->fetchPinterestBotRanges());
+		$ranges = array_merge($ranges, $this->fetchBaiduRanges());
+		$ranges = array_merge($ranges, $this->fetchSogouRanges());
+		$ranges = array_merge($ranges, $this->fetch360SpiderRanges());
+		$ranges = array_merge($ranges, $this->fetchSeoToolRanges());
+		$ranges = array_merge($ranges, $this->fetchMonitoringAndArchiveRanges());
 
 		return array_unique($ranges);
-	}
-
-	/**
-	 * Fetch data with retry logic to handle temporary failures
-	 */
-	private function fetchWithRetry(callable $fetchFunction, int $maxRetries = 2): array
-	{
-		$attempt = 0;
-		while ($attempt < $maxRetries) {
-			try {
-				$result = call_user_func($fetchFunction);
-				if (!empty($result)) {
-					return $result;
-				}
-			} catch (\Exception $e) {
-				error_log('[SSG BotRangeFetcher] Fetch attempt ' . ($attempt + 1) . ' failed: ' . $e->getMessage());
-			}
-			$attempt++;
-			if ($attempt < $maxRetries) {
-				sleep(1); // Brief pause between retries
-			}
-		}
-		return [];
-	}
-
-	/**
-	 * Fetch Googlebot IP ranges from official JSON
-	 */
-	private function fetchGoogleBotRanges(): array
-	{
-		$ranges = [];
-		try {
-			$json = $this->fetchUrl('https://developers.google.com/search/apis/ipranges/googlebot.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-						// Skip IPv6 for now as our matching only handles IPv4
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Googlebot ranges: ' . $e->getMessage());
-		}
-		return $ranges;
-	}
-
-	/**
-	 * Fetch Bingbot IP ranges from official JSON
-	 */
-	private function fetchBingBotRanges(): array
-	{
-		$ranges = [];
-		try {
-			$json = $this->fetchUrl('https://www.bing.com/toolbox/bingbot.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Bingbot ranges: ' . $e->getMessage());
-		}
-		return $ranges;
-	}
-
-	/**
-	 * Fetch DuckDuckBot IP ranges from official JSON
-	 */
-	private function fetchDuckDuckBotRanges(): array
-	{
-		$ranges = [];
-		try {
-			$json = $this->fetchUrl('https://duckduckgo.com/duckduckbot.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch DuckDuckBot ranges: ' . $e->getMessage());
-		}
-		return $ranges;
-	}
-
-	/**
-	 * Fetch Yandex IP ranges (they provide them as text, not JSON)
-	 */
-	private function fetchYandexRanges(): array
-	{
-		$ranges = [];
-		try {
-			$html = $this->fetchUrl('https://yandex.com/ips');
-			if ($html) {
-				// Parse the HTML to extract IPv4 ranges
-				// Yandex lists them as: 5.45.192.0/18 5.255.192.0/18 etc., but sometimes concatenated
-				// Use regex to find all IP/CIDR patterns
-				if (preg_match_all('/(\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\/\d{1,2})/', $html, $matches)) {
-					foreach ($matches[1] as $range) {
-						// Validate the CIDR range
-						if ($this->isValidCidr($range)) {
-							$ranges[] = $range;
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Yandex ranges: ' . $e->getMessage());
-		}
-		return $ranges;
-	}
-
-	/**
-	 * Fetch Applebot IP ranges from official JSON
-	 */
-	private function fetchAppleBotRanges(): array
-	{
-		$ranges = [];
-		try {
-			$json = $this->fetchUrl('http://search.developer.apple.com/applebot.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Applebot ranges: ' . $e->getMessage());
-		}
-		return $ranges;
-	}
-
-	/**
-	 * Fetch Google special crawlers IP ranges from official JSON (AdsBot, etc.)
-	 */
-	private function fetchGoogleSpecialCrawlersRanges(): array
-	{
-		$ranges = [];
-		try {
-			$json = $this->fetchUrl('https://developers.google.com/static/search/apis/ipranges/special-crawlers.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-						// Skip IPv6 for now as our matching only handles IPv4
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Google special crawlers ranges: ' . $e->getMessage());
-		}
-		return $ranges;
-	}
-
-	/**
-	 * Fetch Google user triggered fetchers IP ranges from official JSON
-	 */
-	private function fetchGoogleUserTriggeredFetchersRanges(): array
-	{
-		$ranges = [];
-		try {
-			$json = $this->fetchUrl('https://developers.google.com/static/search/apis/ipranges/user-triggered-fetchers.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-						// Skip IPv6 for now as our matching only handles IPv4
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Google user triggered fetchers ranges: ' . $e->getMessage());
-		}
-		return $ranges;
-	}
-
-	/**
-	 * Fetch Google user triggered fetchers Google IP ranges from official JSON
-	 */
-	private function fetchGoogleUserTriggeredFetchersGoogleRanges(): array
-	{
-		$ranges = [];
-		try {
-			$json = $this->fetchUrl('https://developers.google.com/static/search/apis/ipranges/user-triggered-fetchers-google.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-						// Skip IPv6 for now as our matching only handles IPv4
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Google user triggered fetchers Google ranges: ' . $e->getMessage());
-		}
-		return $ranges;
-	}
-
-	/**
-	 * Fetch OpenAI bot IP ranges from official JSON sources
-	 */
-	private function fetchOpenAiBotRanges(): array
-	{
-		$ranges = [];
-
-		// GPT bot ranges
-		try {
-			$json = $this->fetchUrl('https://openai.com/gptbot.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch OpenAI GPT bot ranges: ' . $e->getMessage());
-		}
-
-		// ChatGPT user ranges
-		try {
-			$json = $this->fetchUrl('https://openai.com/chatgpt-user.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch OpenAI ChatGPT user ranges: ' . $e->getMessage());
-		}
-
-		// Search bot ranges
-		try {
-			$json = $this->fetchUrl('https://openai.com/searchbot.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch OpenAI search bot ranges: ' . $e->getMessage());
-		}
-
-		return $ranges;
-	}
-
-	/**
-	 * Fetch Perplexity bot IP ranges from official JSON sources
-	 */
-	private function fetchPerplexityBotRanges(): array
-	{
-		$ranges = [];
-
-		// Perplexity bot ranges
-		try {
-			$json = $this->fetchUrl('https://perplexity.ai/perplexitybot.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Perplexity bot ranges: ' . $e->getMessage());
-		}
-
-		// Perplexity user ranges
-		try {
-			$json = $this->fetchUrl('https://perplexity.ai/perplexity-user.json');
-			if ($json) {
-				$data = json_decode($json, true);
-				if (isset($data['prefixes'])) {
-					foreach ($data['prefixes'] as $prefix) {
-						if (isset($prefix['ipv4Prefix'])) {
-							$ranges[] = $prefix['ipv4Prefix'];
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Perplexity user ranges: ' . $e->getMessage());
-		}
-
-		return $ranges;
 	}
 
 	/**
@@ -1225,31 +1157,6 @@ class BotRangeFetcher
 		// Pinterest's documented IP range
 		$ranges[] = '54.236.1.0/24';
 
-		return $ranges;
-	}
-
-	/**
-	 * Fetch QUIC.cloud IP ranges from official JSON
-	 * QUIC.cloud provides individual IPs, convert them to /32 CIDR ranges
-	 */
-	private function fetchQuicCloudRanges(): array
-	{
-		$ranges = [];
-		try {
-			$json = $this->fetchUrl('https://www.quic.cloud/ips-v4?json');
-			if ($json) {
-				$ips = json_decode($json, true);
-				if (is_array($ips)) {
-					foreach ($ips as $ip) {
-						if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-							$ranges[] = $ip . '/32';
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch QUIC.cloud ranges: ' . $e->getMessage());
-		}
 		return $ranges;
 	}
 
@@ -1321,55 +1228,6 @@ class BotRangeFetcher
 			'192.69.160.0/24',
 			'192.69.161.0/24',
 		];
-	}    /**
-		 * Fetch social preview crawler IP ranges (Facebook, Twitter samples)
-		 *
-		 * @source https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/ (Meta/Facebook)
-		 * @source https://help.twitter.com/en/rules-and-policies/twitter-crawler (Twitter)
-		 */
-	private function fetchSocialPreviewRanges(): array
-	{
-		$ranges = [];
-
-		// Try to fetch Meta's peering/geofeed which contains authoritative network prefixes.
-		// Docs: https://developers.facebook.com/docs/sharing/webmasters/web-crawlers/
-		try {
-			$data = $this->fetchUrl('https://www.facebook.com/peering/geofeed');
-			if ($data) {
-				// Extract any IPv4 CIDR occurrences from the feed/CSV/HTML
-				if (preg_match_all('/\b(?:\d{1,3}\.){3}\d{1,3}\/\d{1,2}\b/', $data, $matches)) {
-					foreach (array_unique($matches[0]) as $cidr) {
-						if ($this->isValidCidr($cidr)) {
-							$ranges[] = $cidr;
-						}
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch Meta peering geofeed: ' . $e->getMessage());
-		}
-
-		// If fetching/parsing failed or returned nothing, fall back to curated examples
-		if (empty($ranges)) {
-			$ranges = [
-				// Facebook / Meta (curated examples from official docs)
-				'31.13.24.0/21',
-				'31.13.64.0/18',
-				'66.220.144.0/20',
-				'69.63.176.0/21',
-				'69.63.184.0/21',
-				'69.63.176.0/20',
-				'69.171.224.0/20',
-			];
-		}
-
-		// Twitter (examples) - keep existing samples
-		$ranges = array_merge($ranges, [
-			'199.59.148.0/22',
-			'199.16.156.0/22',
-		]);
-
-		return array_unique($ranges);
 	}
 
 	/**
@@ -1387,68 +1245,6 @@ class BotRangeFetcher
 			// Archive.org
 			'207.241.224.0/20',
 		];
-	}
-
-	/**
-	 * Fetch additional bot IP ranges from open-source databases
-	 * These provide coverage for bots that don't have official APIs
-	 */
-	private function fetchOpenSourceBotRanges(): array
-	{
-		$ranges = [];
-
-		// FireHOL abusers list (contains various bot IPs)
-		try {
-			$fireholData = $this->fetchUrl('https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/_generator_lists/bad-ip-addresses.list');
-			if ($fireholData) {
-				$lines = explode("\n", $fireholData);
-				foreach ($lines as $line) {
-					$line = trim($line);
-					// Skip comments and empty lines
-					if (empty($line) || str_starts_with($line, '#')) {
-						continue;
-					}
-					// Convert individual IPs to /32 CIDR ranges
-					if (filter_var($line, FILTER_VALIDATE_IP, FILTER_FLAG_IPV4)) {
-						$ranges[] = $line . '/32';
-					}
-				}
-			}
-		} catch (\Exception $e) {
-			error_log('Failed to fetch FireHOL bot ranges: ' . $e->getMessage());
-		}
-
-		// Additional open-source bot databases can be added here
-		// Example: AbuseIPDB, etc.
-
-		return array_unique($ranges);
-	}
-
-	/**
-	 * Fetch URL content with timeout and better error handling
-	 */
-	private function fetchUrl(string $url): ?string
-	{
-		$context = stream_context_create([
-			'http' => [
-				'timeout' => 15, // Increased timeout
-				'user_agent' => 'WordPress/SSG-BotDetection',
-				'method' => 'GET',
-				'ignore_errors' => true, // Don't fail on HTTP errors
-			],
-		]);
-
-		$content = @file_get_contents($url, false, $context);
-
-		// Check if request was successful
-		if ($content === false && isset($http_response_header)) {
-			$statusLine = $http_response_header[0] ?? '';
-			if (strpos($statusLine, '200') === false) {
-				error_log('[SSG BotRangeFetcher] HTTP error for ' . $url . ': ' . $statusLine);
-			}
-		}
-
-		return $content ?: null;
 	}
 
 	/**
@@ -1474,5 +1270,172 @@ class BotRangeFetcher
 		}
 
 		return true;
+	}
+}
+
+/**
+ * Helper class for fetching and caching bot user-agent patterns
+ */
+class UserAgentDetector
+{
+	use HttpFetcher;
+
+	protected function getLogPrefix(): string
+	{
+		return '[SSG UserAgentDetector]';
+	}
+
+	/**
+	 * Get known bot user-agent patterns (compiled as PCRE regex strings)
+	 * Fetches from JSON/TXT public sources and caches results.
+	 *
+	 * Sources:
+	 * - Monperrus crawler-user-agents JSON: https://github.com/monperrus/crawler-user-agents
+	 * - MitchellKrogza bad-user-agents list: https://github.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker
+	 *
+	 * Note: This method avoids request-time blocking by using the cached patterns when available.
+	 */
+	public function getBotUserAgentPatterns(): array
+	{
+		$cacheKey = 'ssg_bot_user_agents';
+		$cached = Cache::get($cacheKey);
+		if ($cached !== false && is_array($cached)) {
+			return $cached;
+		}
+
+		$patterns = $this->fetchBotUserAgentLists();
+		$patterns = array_unique($patterns);
+
+		// Cache for 1 day by default
+		Cache::set($cacheKey, $patterns, 3600);
+		return $patterns;
+	}
+
+	/**
+	 * Check whether a User Agent matches known bot UA patterns
+	 * Uses cached UA lists fetched from TXT/JSON sources (see getBotUserAgentPatterns)
+	 */
+	public function isKnownBot(string $userAgent): bool
+	{
+		if (empty($userAgent)) {
+			return false;
+		}
+
+		$patterns = $this->getBotUserAgentPatterns();
+		if (empty($patterns)) {
+			return false;
+		}
+
+		foreach ($patterns as $pattern) {
+			// patterns are prepared as valid PCRE regex strings
+			try {
+				if (@preg_match($pattern, $userAgent)) {
+					return true;
+				}
+			} catch (\Throwable $e) {
+				// ignore invalid regex from external sources; continue
+				continue;
+			}
+		}
+
+		return false;
+	}
+
+	/**
+	 * Refresh bot UA data by clearing caches and fetching fresh data
+	 * Intended to be called via cron job
+	 */
+	public function refreshBotData(): void
+	{
+		try {
+			// Clear caches
+			Cache::delete('ssg_bot_user_agents');
+
+			$this->getBotUserAgentPatterns();
+
+			error_log('[SSG UserAgentDetector] Successfully refreshed bot UA patterns via cron');
+		} catch (\Exception $e) {
+			error_log('[SSG UserAgentDetector] Failed to refresh bot UA patterns: ' . $e->getMessage());
+		}
+	}
+
+	/**
+	 * Fetch UA lists from TXT/JSON sources and convert them into PCRE patterns.
+	 */
+	private function fetchBotUserAgentLists(): array
+	{
+		$patterns = [];
+
+		// Define sources with URLs and parsing functions
+		$sources = [
+			// @source https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json
+			'monperrus' => [
+				'url' => 'https://raw.githubusercontent.com/monperrus/crawler-user-agents/master/crawler-user-agents.json',
+				'parser' => function ($json) {
+					$patterns = [];
+					if ($json) {
+						$data = json_decode($json, true);
+						if (is_array($data)) {
+							foreach ($data as $entry) {
+								if (isset($entry['pattern']) && !empty($entry['pattern'])) {
+									$raw = $entry['pattern'];
+									// Normalize pattern into regex; wrap in non-capturing group, case-insensitive.
+									$escaped = preg_quote($raw, '/');
+									$patterns[] = '/(?:' . $escaped . ')/i';
+								}
+								// Instances are full UA strings - turn into exact word regex
+								if (isset($entry['instances']) && is_array($entry['instances'])) {
+									foreach ($entry['instances'] as $instance) {
+										$instance = trim($instance);
+										if ($instance === '') {
+											continue;
+										}
+										$patterns[] = '/\b' . preg_quote($instance, '/') . '\b/i';
+									}
+								}
+							}
+						}
+					}
+					return $patterns;
+				}
+			],
+			// @source https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/_generator_lists/bad-user-agents.list
+			'mitchellkrogza' => [
+				'url' => 'https://raw.githubusercontent.com/mitchellkrogza/nginx-ultimate-bad-bot-blocker/master/_generator_lists/bad-user-agents.list',
+				'parser' => function ($raw) {
+					$patterns = [];
+					if ($raw) {
+						$lines = explode("\n", $raw);
+						foreach ($lines as $line) {
+							$line = trim($line);
+							if ($line === '' || str_starts_with($line, '#')) {
+								continue;
+							}
+							// Convert to safe regex match on word boundary
+							$patterns[] = '/\b' . preg_quote($line, '/') . '\b/i';
+						}
+					}
+					return $patterns;
+				}
+			],
+		];
+
+		// Extract URLs for parallel fetching
+		$urls = array_column($sources, 'url', 'key');
+
+		// Fetch all URLs in parallel
+		$contents = $this->fetchMultipleUrls($urls);
+
+		// Parse each response
+		foreach ($sources as $key => $source) {
+			try {
+				$parsedPatterns = $source['parser']($contents[$key] ?? null);
+				$patterns = array_merge($patterns, $parsedPatterns);
+			} catch (\Exception $e) {
+				error_log('[SSG UserAgentDetector] Failed to parse UA list ' . $key . ': ' . $e->getMessage());
+			}
+		}
+
+		return array_unique(array_filter($patterns));
 	}
 }

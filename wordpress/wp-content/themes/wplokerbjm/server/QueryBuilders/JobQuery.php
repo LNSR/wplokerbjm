@@ -3,12 +3,13 @@
 namespace WPLokerBJM\QueryBuilders;
 
 use WPLokerBJM\QueryBuilders\TaxonomyQuery;
+use WPLokerBJM\Models\Schema\{CustomFields, Taxonomies, PostTypes};
 
 class JobQuery
 {
 
 	const array getBaseArgs = [
-		'post_type' => 'lowongan',
+		'post_type' => PostTypes::POST_TYPE_LOWONGAN,
 		'post_status' => 'publish',
 	];
 
@@ -58,20 +59,20 @@ class JobQuery
 			'posts_per_page' => $per_page,
 			'meta_query' => [
 				[
-					'key' => 'status_pekerjaan',
+					'key' => CustomFields::STATUS_PEKERJAAN,
 					'value' => [2, 3],
 					'compare' => 'IN',
 					'type' => 'NUMERIC',
 				],
 				[
-					'key' => 'deadline',
+					'key' => CustomFields::DEADLINE,
 					'value' => [$today, $seven_days],
 					'compare' => 'BETWEEN',
 					'type' => 'DATE',
 				],
 			],
 			'orderby' => 'meta_value',
-			'meta_key' => 'deadline',
+			'meta_key' => CustomFields::DEADLINE,
 			'order' => 'ASC',
 		]);
 	}
@@ -136,12 +137,12 @@ class JobQuery
 				'relation' => 'OR',
 				// posts without a deadline
 				[
-					'key' => 'deadline',
+					'key' => CustomFields::DEADLINE,
 					'compare' => 'NOT EXISTS',
 				],
 				// posts with deadline less than or equal to today
 				[
-					'key' => 'deadline',
+					'key' => CustomFields::DEADLINE,
 					'value' => $today,
 					'compare' => '<=',
 					'type' => 'DATE',
@@ -192,13 +193,13 @@ class JobQuery
 			$sql .= "{$posts}.post_title LIKE '%{$q_html}%' OR ";
 			$sql .= "{$posts}.ID IN (
 				SELECT post_id FROM {$postmeta}
-				WHERE meta_key = 'nama_perusahaan' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
+				WHERE meta_key = '" . CustomFields::NAMA_PERUSAHAAN . "' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
 			) OR ";
 			$sql .= "{$posts}.ID IN (
 				SELECT object_id FROM {$term_relationships}
 				INNER JOIN {$term_taxonomy} ON {$term_taxonomy}.term_taxonomy_id = {$term_relationships}.term_taxonomy_id
 				INNER JOIN {$terms} ON {$terms}.term_id = {$term_taxonomy}.term_id
-				WHERE {$term_taxonomy}.taxonomy = 'perusahaan'
+				WHERE {$term_taxonomy}.taxonomy = '" . Taxonomies::PERUSAHAAN . "'
 				AND {$terms}.name LIKE '%{$q_esc}%'
 			)";
 			$sql .= ")";
@@ -223,7 +224,7 @@ class JobQuery
 	public static function getLastModifiedDate(): string
 	{
 		$latest = get_posts([
-			'post_type' => 'lowongan',
+			'post_type' => PostTypes::POST_TYPE_LOWONGAN,
 			'numberposts' => 1,
 			'orderby' => 'modified',
 			'order' => 'DESC',
@@ -272,7 +273,7 @@ class JobQuery
 	{
 		return [
 			'name' => $post_name,
-			'post_type' => 'lowongan',
+			'post_type' => PostTypes::POST_TYPE_LOWONGAN,
 			'post_status' => 'trash',
 			'numberposts' => 1,
 			'fields' => 'ids',

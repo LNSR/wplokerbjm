@@ -8,7 +8,6 @@ use WPLokerBJM\Core\Hooks\{LiteSpeedFilters, Litespeed};
 use WPLokerBJM\Services\Utilities\Utilities;
 class Hooks implements HooksInterface
 {
-
     public function __construct(private \WPLokerBJM\Services\Utilities\SSG\BotDetection $botDetection)
     {
     }
@@ -19,16 +18,17 @@ class Hooks implements HooksInterface
 
     public function registerActions(): void
     {
-        add_action('after_setup_theme', [ThemeInject::class, 'addThemeSupport']);
-        add_action('wp_head', [ThemeInject::class, 'injectThemeScript']);
-        add_action('wp_head', [Enqueue::class, 'outputPreloadLinks']);
-        add_action('wp_head', [ThemeInject::class, 'preloadLogo']);
-        add_action('wp_enqueue_scripts', [DebloatWPTheme::class, 'removeWPLibrary'], 1);
-        add_action('litespeed_purged_all', [Litespeed::class, 'clearObjectCache']);
-        add_action('wp_enqueue_scripts', [Enqueue::class, 'enqueueAssets']);
-        add_action('template_redirect', [$this, 'oldPost410Redirect'], 0);
-        add_action('template_redirect', [$this, 'redirectToHome'], 0);
-        add_action('send_headers', [$this, 'restHeaders']);
+        add_action('after_setup_theme', fn() => ThemeInject::addThemeSupport());
+        add_action('wp_head', fn() => ThemeInject::injectThemeScript());
+        add_action('wp_head', fn() => Enqueue::outputPreloadLinks());
+        add_action('wp_head', fn() => ThemeInject::preloadLogo());
+        add_action('wp_enqueue_scripts', fn() => DebloatWPTheme::removeWPLibrary(), 0);
+        add_action('litespeed_purged_all', fn() => Litespeed::clearObjectCache());
+        add_action('wp_enqueue_scripts', fn() => Enqueue::enqueueAssets());
+        add_action('template_redirect', fn() => $this->oldPost410Redirect());
+        add_action('template_redirect', fn() => $this->redirectToHome());
+        add_action('template_redirect', fn() => $this->modifyLinkHeaders(), 15);
+        add_action('send_headers', fn() => $this->restHeaders());
     }
 
     /*======================================================================
@@ -37,13 +37,13 @@ class Hooks implements HooksInterface
 
     public function registerFilters(): void
     {
-        add_filter('posts_search', [$this, 'jobPostsSearchFilter'], 10, 2);
-        add_filter('litespeed_optimize_js_excludes', [LiteSpeedFilters::class, 'lscJsExcludes'], 0);
-        add_filter('litespeed_optimize_css_excludes', [LiteSpeedFilters::class, 'lscCssExcludes'], 0);
-        add_filter('option_active_plugins', [$this, 'disablePluginsForDev'], -1);
-        add_filter('option_active_plugins', [$this, 'disablePluginsforSimulatedProd'], -1);
-        add_filter('wp_robots', [$this, 'robotsMeta']);
-        add_filter('rest_pre_serve_request', [$this, 'filterRestHeaders'], accepted_args: 4);
+        add_filter('wp_robots', fn(...$args) => $this->robotsMeta(...$args));
+        add_filter('rest_pre_serve_request', fn(...$args) => $this->filterRestHeaders(...$args), 10, 4);
+        add_filter('litespeed_optimize_js_excludes', fn(...$args) => LiteSpeedFilters::lscJsExcludes(...$args), 0);
+        add_filter('litespeed_optimize_css_excludes', fn(...$args) => LiteSpeedFilters::lscCssExcludes(...$args), 0);
+        add_filter('option_active_plugins', fn(...$args) => $this->disablePluginsForDev(...$args), 0);
+        add_filter('option_active_plugins', fn(...$args) => $this->disablePluginsforSimulatedProd(...$args), 0);
+        add_filter('posts_search', fn(...$args) => $this->jobPostsSearchFilter(...$args), 10, 2);
     }
 
     /*======================================================================
@@ -128,7 +128,7 @@ class Hooks implements HooksInterface
             $robots['noindex'] = true;
         }
 
-        if (defined('WPL_OKERBJM_NO_INDEX') && WPL_OKERBJM_NO_INDEX) {
+        if (defined('WP_LOKERBJM_NO_INDEX') && WP_LOKERBJM_NO_INDEX) {
             $robots['noindex'] = true;
             $robots['nofollow'] = true;
         }
@@ -158,6 +158,25 @@ class Hooks implements HooksInterface
     }
 
     /**
+     * Modifies HTTP headers to remove unwanted Link headers and add sitemap link.
+     */
+    public function modifyLinkHeaders(): void
+    {
+        if (!headers_sent()) {
+            // Remove all Link headers to prevent API discovery exposure
+            header_remove('Link');
+
+            $this->exposeSitemapHeader();
+        }
+    }
+
+    public function exposeSitemapHeader(): void
+    {
+        $sitemap_url = home_url('/sitemap_index.xml');
+        header('Link: <' . esc_url($sitemap_url) . '>; rel="sitemap"');
+    }
+
+    /**
      * Exposes specific headers for REST API responses.
      */
     public function filterRestHeaders($served, $result, $request, $server)
@@ -173,7 +192,8 @@ class Hooks implements HooksInterface
      ======================================================================*/
 
     /**
-     * Customizes the SQL WHERE clause for WordPress search queries on job posts.
+     * !Customizes the SQL WHERE clause for WordPress search queries on job posts.
+     * this used for SearchForm
      */
     public function jobPostsSearchFilter(string $search, \WP_Query $wp_query): string
     {

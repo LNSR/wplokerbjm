@@ -39,7 +39,7 @@
     generalStore.useSummaryJob(jobdata?.ringkasanPekerjaan)
   );
   const statusInfo = $derived.by(() =>
-    generalStore.useStatusJob(Number(jobdata?.statusjob ?? 0))
+    generalStore.useStatusJob(Number(jobdata?.status_pekerjaan ?? 0))
   );
   const deadlineInfo = $derived.by(() =>
     generalStore.useDeadline(jobdata?.deadline, now)()
@@ -211,11 +211,11 @@
     scroll-margin-top: var(--site-scroll-padding-top, 0px);
   }
   @utility card-base {
-    @apply card block rounded-xl cursor-pointer border-2 border-blue-500;
+    @apply card block rounded-xl cursor-pointer border-2 border-blue-500 bg-base-200 dark:bg-base-100/50;
   }
 
   .card-base-carousel {
-    @apply card block rounded-xl cursor-pointer border-2 border-blue-500 max-w-full hover:shadow-lg hover:border-blue-400;
+    @apply card-base max-w-full hover:shadow-lg hover:border-blue-400;
   }
 
   .card-selected-carousel {
@@ -223,7 +223,7 @@
   }
 
   .card-base-featured {
-    @apply card block rounded-xl cursor-pointer border-2 border-blue-500 w-full h-full hover:shadow-xl hover:border-blue-600 hover:scale-[1.02] hover:border-solid;
+    @apply card-base w-full h-full hover:shadow-xl hover:border-blue-600 hover:scale-[1.02] hover:border-solid;
   }
 
   .card-selected-featured {

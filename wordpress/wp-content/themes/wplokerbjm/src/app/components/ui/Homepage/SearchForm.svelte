@@ -199,44 +199,33 @@
 
   // UI function to remove a filter by key and value
   function removeFilter(key: TaxonomyType | string, value: string) {
-    // accept either TaxonomyType enum value or string key
-    const keyStr =
-      typeof key === "number"
-        ? key === TaxonomyType.lokasi
-          ? "lokasi"
-          : key === TaxonomyType.gender
-            ? "gender"
-            : key === TaxonomyType.pendidikan
-              ? "pendidikan"
-              : String(key)
-        : key;
-    if (keyStr === "lokasi") {
-      const arr = Array.isArray(searchStore.filters.lokasi)
-        ? [...searchStore.filters.lokasi]
+    if (key === TaxonomyType.lokasi) {
+      const arr = Array.isArray(searchStore.filters[TaxonomyType.lokasi])
+        ? [...searchStore.filters[TaxonomyType.lokasi]]
         : [];
       const idx = arr.indexOf(value);
       if (idx !== -1)
-        searchStore.filters.lokasi = arr.filter((_, i) => i !== idx);
+        searchStore.filters[TaxonomyType.lokasi] = arr.filter((_, i) => i !== idx);
       return;
     }
 
-    if (keyStr === "gender") {
-      const arr = Array.isArray(searchStore.filters.gender)
-        ? [...searchStore.filters.gender]
+    if (key === TaxonomyType.gender) {
+      const arr = Array.isArray(searchStore.filters[TaxonomyType.gender])
+        ? [...searchStore.filters[TaxonomyType.gender]]
         : [];
       const idx = arr.indexOf(value);
       if (idx !== -1)
-        searchStore.filters.gender = arr.filter((_, i) => i !== idx);
+        searchStore.filters[TaxonomyType.gender] = arr.filter((_, i) => i !== idx);
       return;
     }
 
-    if (keyStr === "pendidikan") {
-      const arr = Array.isArray(searchStore.filters.pendidikan)
-        ? [...searchStore.filters.pendidikan]
+    if (key === TaxonomyType.pendidikan) {
+      const arr = Array.isArray(searchStore.filters[TaxonomyType.pendidikan])
+        ? [...searchStore.filters[TaxonomyType.pendidikan]]
         : [];
       const idx = arr.indexOf(value);
       if (idx !== -1)
-        searchStore.filters.pendidikan = arr.filter((_, i) => i !== idx);
+        searchStore.filters[TaxonomyType.pendidikan] = arr.filter((_, i) => i !== idx);
       return;
     }
   }
@@ -266,8 +255,8 @@
   }
 
   const lokasiLabel = $derived.by(() => {
-    const arr = Array.isArray(searchStore.filters.lokasi)
-      ? searchStore.filters.lokasi.filter(
+    const arr = Array.isArray(searchStore.filters[TaxonomyType.lokasi])
+      ? searchStore.filters[TaxonomyType.lokasi].filter(
           (s) => typeof s === "string" && String(s).trim() !== ""
         )
       : [];
@@ -278,8 +267,8 @@
   });
 
   const genderLabel = $derived.by(() => {
-    const arr = Array.isArray(searchStore.filters.gender)
-      ? searchStore.filters.gender.filter(
+    const arr = Array.isArray(searchStore.filters[TaxonomyType.gender])
+      ? searchStore.filters[TaxonomyType.gender].filter(
           (s) => typeof s === "string" && String(s).trim() !== ""
         )
       : [];
@@ -290,8 +279,8 @@
   });
 
   const pendidikanLabel = $derived.by(() => {
-    const arr = Array.isArray(searchStore.filters.pendidikan)
-      ? searchStore.filters.pendidikan.filter(
+    const arr = Array.isArray(searchStore.filters[TaxonomyType.pendidikan])
+      ? searchStore.filters[TaxonomyType.pendidikan].filter(
           (s) => typeof s === "string" && String(s).trim() !== ""
         )
       : [];
@@ -319,17 +308,17 @@
   onMount(async () => {
     searchStore.setFilters({
       cari: currentSearch ?? "",
-      lokasi: Array.isArray(currentLokasi)
+      [TaxonomyType.lokasi]: Array.isArray(currentLokasi)
         ? currentLokasi
         : currentLokasi
           ? [currentLokasi]
           : [],
-      gender: Array.isArray(currentGender)
+      [TaxonomyType.gender]: Array.isArray(currentGender)
         ? currentGender
         : currentGender
           ? [currentGender]
           : [],
-      pendidikan: Array.isArray(currentPendidikan)
+      [TaxonomyType.pendidikan]: Array.isArray(currentPendidikan)
         ? currentPendidikan
         : currentPendidikan
           ? [currentPendidikan]
@@ -445,14 +434,14 @@
           {#if isLokasiOpen && CustomDropdown}
             <CustomDropdown
               id="lokasi"
-              value={searchStore.filters.lokasi}
+              value={searchStore.filters[TaxonomyType.lokasi]}
               update={(payload) => {
                 // assign explicitly in a statement to avoid Svelte "assignment_value_stale" warnings
                 if (!Array.isArray(payload) || payload.length === 0) {
-                  searchStore.filters.lokasi = [];
+                  searchStore.filters[TaxonomyType.lokasi] = [];
                   return;
                 }
-                searchStore.filters.lokasi =
+                searchStore.filters[TaxonomyType.lokasi] =
                   SearchUtils.sanitizeArr(payload) ?? [];
               }}
               options={SearchUtils.mapTerms(
@@ -491,13 +480,13 @@
           {#if isGenderOpen && CustomDropdown}
             <CustomDropdown
               id="gender"
-              value={searchStore.filters.gender}
+              value={searchStore.filters[TaxonomyType.gender]}
               update={(payload) => {
                 if (!Array.isArray(payload) || payload.length === 0) {
-                  searchStore.filters.gender = [];
+                  searchStore.filters[TaxonomyType.gender] = [];
                   return;
                 }
-                searchStore.filters.gender =
+                searchStore.filters[TaxonomyType.gender] =
                   SearchUtils.sanitizeArr(payload) ?? [];
               }}
               options={SearchUtils.mapTerms(
@@ -536,13 +525,13 @@
           {#if isPendidikanOpen && CustomDropdown}
             <CustomDropdown
               id="pendidikan"
-              value={searchStore.filters.pendidikan}
+              value={searchStore.filters[TaxonomyType.pendidikan]}
               update={(payload) => {
                 if (!Array.isArray(payload) || payload.length === 0) {
-                  searchStore.filters.pendidikan = [];
+                  searchStore.filters[TaxonomyType.pendidikan] = [];
                   return;
                 }
-                searchStore.filters.pendidikan =
+                searchStore.filters[TaxonomyType.pendidikan] =
                   SearchUtils.sanitizeArr(payload) ?? [];
               }}
               options={SearchUtils.mapTerms(

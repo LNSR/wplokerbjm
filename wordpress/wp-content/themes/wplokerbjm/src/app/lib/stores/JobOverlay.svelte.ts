@@ -1,4 +1,4 @@
-import type { Job, SingleOverlayResponse } from '@/types'
+import type { CardJob, SingleOverlayResponse } from '@/types'
 import { headerStore } from "$lib/stores/HeaderStore.svelte";
 import { APIService } from '@/services/APIService'
 import { SEOService } from "$lib/utils/SEO.svelte";
@@ -10,7 +10,7 @@ import { isDevelopmentMode } from '@/utils';
 export class JobOverlayManager {
 	public overlayOpen = $state(false)
 	public selectedSlug = $state<string | null>(null)
-	public selectedJob = $state<Job | null>(null)
+	public selectedJob = $state<CardJob | null>(null)
 
 	// Overlay fetch state
 	public overlayData = $state<SingleOverlayResponse | null>(null)
@@ -26,7 +26,7 @@ export class JobOverlayManager {
 		// No store needed
 	}
 
-	public async openOverlay(slug: string, job?: Job): Promise<void> {
+	public async openOverlay(slug: string, job?: CardJob): Promise<void> {
 		this.selectedSlug = slug
 		this.selectedJob = job ?? null
 		this.overlayOpen = true

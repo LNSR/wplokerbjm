@@ -1,9 +1,9 @@
-import type { SortOption, Job, JobSummary, JobContactRow } from '@/types';
+import type { SortOption, CardJob, JobSummary, JobContactRow, MetaBox, WPBasePost, WPTaxonomyTerm } from '@/types';
 
 // Base filters for search operations
-export interface SearchFilters {
+export interface SearchFilters extends Pick<MetaBox, 'lokasi-pekerjaan' | 'gender' | 'pendidikan'> {
   cari: string
-  lokasi: string[]
+  'lokasi-pekerjaan': string[]
   gender: string[]
   pendidikan: string[]
   sort: SortOption
@@ -26,21 +26,21 @@ export interface ApiResponse<T> {
 }
 
 // * Base response for SearchResponse and LoadMoreResponse
-export interface BaseJobResponse {
-  jobs: Job[]
+export interface BaseJobSearchResponse {
+  jobs: CardJob[]
   context?: SearchContext
   filters?: SearchFilters
   meta?: ApiMeta
 }
 
 // Extended response for initial search operations
-export interface SearchResponse extends BaseJobResponse {
+export interface SearchResponse extends BaseJobSearchResponse {
   title?: string
   shouldScroll?: boolean
 }
 
 // Response for pagination operations
-export interface LoadMoreResponse extends BaseJobResponse { }
+export interface LoadMoreResponse extends BaseJobSearchResponse { }
 
 // Simplified load more filters - flattened structure
 export interface LoadMoreFilters extends Partial<SearchFilters> {
@@ -48,35 +48,15 @@ export interface LoadMoreFilters extends Partial<SearchFilters> {
   context?: SearchContext
 }
 
-
-export enum TaxonomyType {
-  lokasi = 'lokasi',
-  gender = 'gender',
-  pendidikan = 'pendidikan'
-}
-
-
 // Standardized taxonomy term interface
-export interface TaxonomyTerm {
-  slug: string
-  name: string
-  parent?: number
+export interface TaxonomyTerm extends Pick<WPTaxonomyTerm, 'slug' | 'name' | 'parent'> {
   children?: TaxonomyTerm[]
 }
 
-export interface SingleOverlayResponse {
-  id?: number;
+export interface SingleOverlayResponse extends WPBasePost, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'> {
   duplicateNonce?: string; // Nonce for plugin 'Duplicate post as draft'
-  title: string;
-  namaPerusahaan: string;
-  tentangPerusahaan: string;
   ringkasanPekerjaan: JobSummary;
-  deskripsiPekerjaan: string;
-  persyaratan: string;
-  caraMelamar: string;
-  benefit: string;
   contacts: JobContactRow;
-  social_media: Record<string, string | string[]>;
   post_time: string;
 }
 

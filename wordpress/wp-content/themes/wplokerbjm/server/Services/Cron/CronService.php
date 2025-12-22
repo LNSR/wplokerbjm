@@ -5,6 +5,7 @@ namespace WPLokerBJM\Services\Cron;
 use WPLokerBJM\Contracts\HooksInterface;
 use WPLokerBJM\Services\PostsManagement\PostsManagement;
 use WPLokerBJM\Services\Taxonomy\TaxonomyManagement;
+use WPLokerBJM\Services\Utilities\SSG\BotDetection;
 
 /**
  * Centralizes cron scheduling and mapping of cron hooks to service callbacks.
@@ -14,11 +15,19 @@ use WPLokerBJM\Services\Taxonomy\TaxonomyManagement;
  */
 class CronService implements HooksInterface
 {
+    public function __construct(
+        private readonly BotDetection $botDetection,
+        private readonly PostsManagement $postsManagement,
+        private readonly TaxonomyManagement $taxonomyManagement
+    ) {
+    }
+
     public function registerActions(): void
     {
-        add_action('wplokerbjm_delete_old_jobs', [PostsManagement::class, 'deleteOldJobs']);
-        add_action('wplokerbjm_update_job_statuses', [PostsManagement::class, 'updateAllJobStatuses']);
-        add_action('wplokerbjm_cleanup_taxonomy', [TaxonomyManagement::class, 'deleteUnusedTerms']);
+        add_action('wplokerbjm_delete_old_jobs', fn() => $this->postsManagement->deleteOldJobs());
+        add_action('wplokerbjm_update_job_statuses', fn() => $this->postsManagement->updateAllJobStatuses());
+        add_action('wplokerbjm_cleanup_taxonomy', fn() => $this->taxonomyManagement->deleteUnusedTerms());
+        add_action('wplokerbjm_refresh_bot_data', fn() => $this->botDetection->refreshBotData());
 
         // Ensure scheduled events exist (single place for scheduling)
         if (!wp_next_scheduled('wplokerbjm_delete_old_jobs')) {
@@ -31,6 +40,10 @@ class CronService implements HooksInterface
 
         if (!wp_next_scheduled('wplokerbjm_cleanup_taxonomy')) {
             wp_schedule_event(time(), 'weekly', 'wplokerbjm_cleanup_taxonomy');
+        }
+
+        if (!wp_next_scheduled('wplokerbjm_refresh_bot_data')) {
+            wp_schedule_event(time(), 'hourly', 'wplokerbjm_refresh_bot_data');
         }
     }
 

@@ -1,10 +1,10 @@
 <script lang="ts">
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
-  import type { JobCardProps } from "@/types";
+  import type { JobCardProps, WPBasePost } from "@/types";
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
 
   let { jobId, variant = undefined } = $props<{
-    jobId: number;
+    jobId: WPBasePost["id"];
     variant: JobCardProps["variant"];
   }>();
 
@@ -26,7 +26,7 @@
     // prevent parent handlers
     e.preventDefault();
     e.stopPropagation();
-    if (!jobId) return;
+    if (isNaN(jobId) || jobId == null || jobId < Number(1)) return;
     // protect against both reactive loading state and synchronous re-entry
     if (isLoading || _clickLock) return;
 
@@ -40,15 +40,12 @@
       await toggleSave(jobId);
       isPending = false;
 
-      if (!wasSaved && isSaved(jobId)) {
+      if (!wasSaved) {
         confirmationState = "saved";
-      }
-      if (wasSaved && !isSaved(jobId)) {
+      } else {
         confirmationState = "removed";
       }
 
-      // small delay to give visual feedback
-      await new Promise((r) => setTimeout(r, 1000));
     } catch (err) {
       isPending = false;
       const wasSaved = preToggleSaved;
@@ -219,7 +216,3 @@
     </div>
   {/if}
 </div>
-
-<style>
-  /* relies on Tailwind classes used widely in the project */
-</style>

@@ -5,6 +5,9 @@ import type { ApiResponse, ApiMeta } from "@/types";
 export class ApiClient {
   private readonly baseUrl: string
   private readonly timeout = 15000; // 15 seconds
+  //! Circuit breaker for failed requests
+  private failedRequestCount = 0
+  private readonly maxFailedRequests = 10000
 
   constructor() {
     this.baseUrl = `${window.location.origin}/wp-json/wplokerbjm/v1`
@@ -166,6 +169,21 @@ export class ApiClient {
     endpoint: string,
     { params, data, headers, signal }: { params?: Record<string, string | number>, data?: unknown, headers?: Record<string, string>, signal?: AbortSignal } = {}
   ): Promise<ApiResponse<T>> {
+    // Circuit breaker: stop if too many failed requests
+    if (this.failedRequestCount >= this.maxFailedRequests) {
+      throw new ApiError(
+        'Too many failed requests, circuit breaker activated',
+        0,
+        undefined,
+        undefined,
+        `${this.baseUrl}${endpoint}`,
+        method,
+        data,
+        undefined,
+        'circuit_breaker',
+        'Terlalu banyak permintaan gagal, sirkuit breaker diaktifkan.'
+      );
+    }
     let url = new URL(`${this.baseUrl}${endpoint}`);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
@@ -195,8 +213,12 @@ export class ApiClient {
         body,
       }, signal);
       const { data: responseData, meta } = await this.handleResponse(response, url.toString(), method, data);
+      // Reset failure count on success
+      this.failedRequestCount = 0;
       return { data: responseData as T, meta };
     } catch (error: unknown) {
+      // Increment failure count on error
+      this.failedRequestCount++;
       if (error instanceof ApiError) throw error;
       if (error instanceof TimeoutError) throw error;
       if (error instanceof NetworkError) throw error;

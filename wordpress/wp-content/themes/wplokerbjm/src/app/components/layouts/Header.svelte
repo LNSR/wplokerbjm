@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import { debounce } from "@/utils/debounce";
+  import { debounce } from "@/utils/lodash";
   import { MediaQuery } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";

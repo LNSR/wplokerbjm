@@ -170,6 +170,7 @@ class ThemeInject
             'logoHeight' => intval($logoData['height'] ?? 0),
             'lastJobUpdate' => $last_update_iso,
             'disableTracking' => $disableTracking,
+            'themeVersion' => (int) filemtime(get_stylesheet_directory() . '/composer.json'),
         ];
         return $wpThemeData;
     }
@@ -183,7 +184,6 @@ class ThemeInject
      *   - Stores a WP REST nonce in sessionStorage for logged-in users.
      *   - Applies a preferred color theme (localStorage > system preference) and marks the source
      *     using data-wplokerbjm-theme-sourced attribute on <html>.
-     *   - Removes the <script> element after execution to avoid leaving markup traces.
      *
      * @return void
      */
@@ -192,13 +192,13 @@ class ThemeInject
         $wpThemeData = self::themeData(); // theme data for hydration
         ?>
         <script type="application/json" id="wp-theme-data"> <?= json_encode($wpThemeData); ?> </script>
-        <script id="theme-preferences" data-no-optimize="1">
+        <script id="theme-preferences">
             (() => {
-                function removeScriptEl() {
-                    const scriptEl = document.getElementById('theme-preferences');
+                const removeThisScript = () => {
+                    const scriptElement = document.getElementById('theme-preferences');
                     setTimeout(() => {
-                        scriptEl?.remove();
-                    }, 3000);
+                        scriptElement?.remove();
+                    }, 10000);
                 };
                 try {
                     <?php if (is_user_logged_in()): ?>
@@ -220,7 +220,7 @@ class ThemeInject
                     if (stored === 'dark' || stored === 'light') {
                         apply(stored);
                         root.setAttribute('data-wplokerbjm-theme-sourced', 'local');
-                        removeScriptEl();
+                        removeThisScript();
                         return;
                     }
 
@@ -234,7 +234,7 @@ class ThemeInject
                 } catch (e) {
                     console.log('fail applying theme preferences', e);
                 } finally {
-                    removeScriptEl();
+                    removeThisScript();
                 }
             })();
         </script>
@@ -284,13 +284,26 @@ class DebloatWPTheme
         remove_filter('print_scripts_array', 'wp_prototype_before_jquery', 10);
         remove_action('wp_print_styles', 'print_emoji_styles');
         remove_action('wp_head', 'print_emoji_detection_script', 7);
+        remove_action('wp_head', 'wp_shortlink_wp_head');
+        remove_action('wp_head', 'wp_generator');
+        remove_action('wp_head', 'wp_oembed_add_discovery_links');
+        remove_action('wp_head', 'rsd_link');
+        remove_action('wp_head', 'wlwmanifest_link');
+        remove_action('wp_head', 'feed_links', 2);
+        remove_action('wp_head', 'feed_links_extra', 3);
 
         // Remove actions that enqueue global styles and duotone in WP 6.9+
         remove_action('wp_footer', 'wp_enqueue_global_styles', 1);
         remove_action('wp_footer', 'wp_enqueue_stored_styles', 1);
         remove_action('wp_footer', 'wp_maybe_inline_styles', 1);
-        remove_action('wp_footer', array('WP_Duotone', 'output_footer_assets'), 10);
+        remove_action('wp_footer', ['WP_Duotone', 'output_footer_assets'], 10);
         remove_action('wp_footer', 'the_block_template_skip_link', 10);
+
+        // Remove REST API discovery link
+        remove_action('wp_head', 'rest_output_link_wp_head');
+
+        // Remove JSON alternate link for posts
+        remove_action('wp_head', 'wp_json_output_link_wp_head');
 
         wp_dequeue_style('wc-block-style');
         wp_dequeue_style('global-styles-inline-css');

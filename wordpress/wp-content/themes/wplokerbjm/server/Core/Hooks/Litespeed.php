@@ -44,7 +44,7 @@ class Litespeed
  */
 class LiteSpeedFilters
 {
-    const pattern = '/wp-content/themes/wplokerbjm/';
+    private const pattern = '/wp-content/themes/wplokerbjm/';
     /**
      * Exclude specific JS files from LiteSpeed Cache JS optimization.
      */

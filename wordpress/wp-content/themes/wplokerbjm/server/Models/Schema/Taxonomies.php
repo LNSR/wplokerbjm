@@ -16,6 +16,14 @@ use WPLokerBJM\Contracts\HooksInterface;
  */
 class Taxonomies implements HooksInterface
 {
+
+    public const PERUSAHAAN = 'perusahaan';
+    public const KATEGORI_LOWONGAN = 'kategori-lowongan';
+    public const LOKASI_PEKERJAAN = 'lokasi-pekerjaan';
+    public const JENIS_PEKERJAAN = 'jenis-pekerjaan';
+    public const GENDER = 'gender';
+    public const PENDIDIKAN = 'pendidikan';
+
     /**
      * Register all taxonomies
      * 
@@ -23,12 +31,12 @@ class Taxonomies implements HooksInterface
      */
     public function registerActions(): void
     {
-        add_action('init', [$this, 'registerPerusahaanTaxonomy']);
-        add_action('init', [$this, 'registerKategoriTaxonomy']);
-        add_action('init', [$this, 'registerLokasiTaxonomy']);
-        add_action('init', [$this, 'registerJenisPekerjaanTaxonomy']);
-        add_action('init', [$this, 'registerGenderTaxonomy']);
-        add_action('init', [$this, 'registerPendidikanTaxonomy']);
+        add_action('init', fn() => $this->registerPerusahaanTaxonomy());
+        add_action('init', fn() => $this->registerKategoriTaxonomy());
+        add_action('init', fn() => $this->registerLokasiTaxonomy());
+        add_action('init', fn() => $this->registerJenisPekerjaanTaxonomy());
+        add_action('init', fn() => $this->registerGenderTaxonomy());
+        add_action('init', fn() => $this->registerPendidikanTaxonomy());
     }
     public function registerFilters(): void
     {
@@ -97,7 +105,7 @@ class Taxonomies implements HooksInterface
                 'hierarchical' => true,
             ],
         ];
-        register_taxonomy('perusahaan', ['lowongan'], $args);
+        register_taxonomy(self::PERUSAHAAN, [PostTypes::POST_TYPE_LOWONGAN], $args);
     }
 
     /**
@@ -164,7 +172,7 @@ class Taxonomies implements HooksInterface
             ],
         ];
 
-        register_taxonomy('kategori-lowongan', ['lowongan'], $args);
+        register_taxonomy(self::KATEGORI_LOWONGAN, [PostTypes::POST_TYPE_LOWONGAN], $args);
     }
 
     /**
@@ -231,7 +239,7 @@ class Taxonomies implements HooksInterface
             ],
         ];
 
-        register_taxonomy('lokasi-pekerjaan', ['lowongan'], $args);
+        register_taxonomy(self::LOKASI_PEKERJAAN, [PostTypes::POST_TYPE_LOWONGAN], $args);
     }
 
     /**
@@ -298,7 +306,7 @@ class Taxonomies implements HooksInterface
             ],
         ];
 
-        register_taxonomy('jenis-pekerjaan', ['lowongan'], $args);
+        register_taxonomy(self::JENIS_PEKERJAAN, [PostTypes::POST_TYPE_LOWONGAN], $args);
     }
 
     /**
@@ -365,7 +373,7 @@ class Taxonomies implements HooksInterface
             ],
         ];
 
-        register_taxonomy('gender', ['lowongan'], $args);
+        register_taxonomy(self::GENDER, [PostTypes::POST_TYPE_LOWONGAN], $args);
     }
 
     /**
@@ -432,6 +440,6 @@ class Taxonomies implements HooksInterface
             ],
         ];
 
-        register_taxonomy('pendidikan', ['lowongan'], $args);
+        register_taxonomy(self::PENDIDIKAN, [PostTypes::POST_TYPE_LOWONGAN], $args);
     }
 }

@@ -8,6 +8,13 @@ export class SEOService {
 
 
     static async fetchHeadData(path: string): Promise<HeadData | null> {
+        // Prevent fetch if hostname is localhost or an IP address
+        // RankMath API wont work in these hostnames
+        const hostname = window.location.hostname;
+        if (hostname === 'localhost' || hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+            return null;
+        }
+
         try {
             const fullUrl = `${window.location.origin}${path}`;
             const response = await APIService.getRankMathHead(fullUrl);

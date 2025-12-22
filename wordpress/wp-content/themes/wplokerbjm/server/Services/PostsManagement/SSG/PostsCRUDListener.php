@@ -48,18 +48,26 @@ class PostsCRUDListener implements HooksInterface
 	use BotRequestDetectionTrait;
 	public function __construct(
 		private TriggerBuildSSG $triggerBuildSSG,
-		private BotDetection $botDetection
+		private BotDetection $botDetection,
+		private LiteSpeedEventListener $liteSpeedEventListener
 	) {
 	}
 
 	public function registerActions(): void
 	{
 		// Use priority 10; adjust as needed (LiteSpeed typically uses 10-20)
-		add_action('save_post', [$this, 'onSavePost'], 10, 3);
+		add_action('save_post', fn(...$args) => $this->onSavePost(...$args), 10, 3);
 
 		// Hook into post deletion with high priority to run before other cleanup
-		add_action('before_delete_post', [$this, 'onBeforeDeletePost'], 1, 1);
-		add_action('wp_trash_post', [$this, 'onTrashPost'], 1, 1);
+		add_action('before_delete_post', fn(...$args) => $this->onBeforeDeletePost(...$args), 1, 1);
+		add_action('wp_trash_post', fn(...$args) => $this->onTrashPost(...$args), 1, 1);
+
+		$priorities = LiteSpeedIntegration::getHookPriorities();
+		add_action('litespeed_purge_post', fn(...$args) => $this->liteSpeedEventListener->onLiteSpeedPurgePost(...$args), $priorities['ssg_after_litespeed'], 1);
+		add_action('litespeed_purge_all', fn() => $this->liteSpeedEventListener->onLiteSpeedPurgeAll(), $priorities['ssg_after_litespeed']);
+
+		// Register scheduled event handler
+		add_action('ssg_delayed_post_update', fn(...$args) => $this->liteSpeedEventListener->handleDelayedPostUpdate(...$args), 10, 1);
 	}
 
 	public function registerFilters(): void
@@ -170,7 +178,7 @@ class PostsCRUDListener implements HooksInterface
  * Handles LiteSpeed Cache purge events by triggering delayed SSG rebuilds
  * to ensure cache operations complete before static generation begins.
  */
-class LiteSpeedEventListener implements HooksInterface
+class LiteSpeedEventListener
 {
 	use BotRequestDetectionTrait;
 	public function __construct(
@@ -179,28 +187,16 @@ class LiteSpeedEventListener implements HooksInterface
 	) {
 	}
 
-	public function registerActions(): void
-	{
-		if (LiteSpeedIntegration::isActive()) {
-			$priorities = LiteSpeedIntegration::getHookPriorities();
-			add_action('litespeed_purge_post', [$this, 'onLiteSpeedPurgePost'], $priorities['ssg_after_litespeed'], 1);
-			add_action('litespeed_purge_all', [$this, 'onLiteSpeedPurgeAll'], $priorities['ssg_after_litespeed']);
-		}
-
-		// Register scheduled event handler
-		add_action('ssg_delayed_post_update', [$this, 'handleDelayedPostUpdate'], 10, 1);
-	}
-
-	public function registerFilters(): void
-	{
-		// No filters
-	}
-
 	/**
 	 * Handle LiteSpeed post purge events
 	 */
 	public function onLiteSpeedPurgePost(int $post_id): void
 	{
+
+		if (!LiteSpeedIntegration::isActive()) {
+			return;
+		}
+
 		try {
 			// Skip if this is an SSG bot request
 			if ($this->isSsgBotRequest()) {
@@ -224,6 +220,11 @@ class LiteSpeedEventListener implements HooksInterface
 	 */
 	public function onLiteSpeedPurgeAll(): void
 	{
+
+		if (!LiteSpeedIntegration::isActive()) {
+			return;
+		}
+
 		try {
 			// Skip if this is an SSG bot request
 			if ($this->isSsgBotRequest()) {
