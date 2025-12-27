@@ -4,13 +4,13 @@ import { debounce, validation } from '@/utils'
 import type {
     SearchFilters,
     LoadMoreFilters,
-    SearchContext,
     CardJob,
     LoadMoreResponse,
     SearchResponse,
     TaxonomyTerm,
     SortOption,
 } from '@/types'
+import { SearchContext, SearchTitle } from '@/types'
 import { TaxonomyType } from '@/types'
 import type { DropdownOption } from '@/types'
 
@@ -28,8 +28,8 @@ export class SearchManager {
     public suggestions = $state<string[]>([])
     public showSuggestions = $state(false)
     public jobs = $state<CardJob[]>([])
-    public context = $state<SearchContext>('latest')
-    public title = $state('Hasil Pencarian')
+    public context = $state<SearchContext>(SearchContext.Latest)
+    public title = $state<SearchTitle>(SearchTitle.Search)
     public totalJobs = $state(0)
     public maxNumPages = $state(1)
     public page = $state(1)
@@ -47,7 +47,8 @@ export class SearchManager {
             (Array.isArray(f[TaxonomyType.lokasi]) && f[TaxonomyType.lokasi].length > 0) ||
             (Array.isArray(f[TaxonomyType.gender]) && f[TaxonomyType.gender].length > 0) ||
             (Array.isArray(f[TaxonomyType.pendidikan]) && f[TaxonomyType.pendidikan].length > 0) ||
-            (f.sort && f.sort.value)
+            f.sort.value == 'asc' || f.sort.value == 'desc'
+
         )
     }
 
@@ -138,8 +139,8 @@ export class SearchManager {
             const cleaned = SearchUtils.sanitizeFilters({ ...this.filters })
             const response = await APIService.searchJobs(cleaned)
             this.jobs = [...(response.jobs || [])]
-            this.context = (response.context as SearchContext) || 'search'
-            this.title = response.title || 'Hasil Pencarian'
+            this.context = (response.context as SearchContext) || SearchContext.Search
+            this.title = response.title || SearchTitle.Search
             this.totalJobs = response.meta?.total || 0
             this.maxNumPages = response.meta?.totalPages || 1
             this.page = 1

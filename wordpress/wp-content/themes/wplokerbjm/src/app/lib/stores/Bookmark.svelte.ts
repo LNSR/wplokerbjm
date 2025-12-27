@@ -3,12 +3,12 @@ import { SvelteMap, SvelteSet } from 'svelte/reactivity'
 import { bookmarkIDB } from '@/utils'
 import { APIService } from '@/services/APIService'
 import { WPThemeDataStore } from '$lib/stores/WPThemeData'
-import type { CardJob } from '@/types'
+import type { CardJob, WPLokerBJMThemedData } from '@/types'
 
 interface BookmarkBroadcastMessage {
     type: 'update' | 'sync' | 'reload'
     deleted?: number[]
-    version?: number
+    version?: WPLokerBJMThemedData['themeVersion']
 }
 
 export class BookmarkManager {

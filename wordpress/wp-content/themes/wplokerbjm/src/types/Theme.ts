@@ -9,6 +9,7 @@ export interface WPLokerBJMThemedData {
   logoDecoding: HTMLImageElement["decoding"];
   disableTracking: boolean;
   themeVersion?: number;
+  lastTaxonomyUpdate: string;
 }
 
 export enum ThemeName {

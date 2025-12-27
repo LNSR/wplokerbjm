@@ -4,6 +4,7 @@ namespace WPLokerBJM\Core;
 
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
+use WPLokerBJM\Services\Utilities\Utilities;
 
 class Container
 {
@@ -90,7 +91,7 @@ class Container
             }
         }
 
-        $isProduction = defined('WP_ENV') && WP_ENV === 'production';
+        $isProduction = !Utilities::isDevelopment();
 
         $compiledFile = self::$CACHE_FILE;
         $objectKey = 'compiled_container_hash';

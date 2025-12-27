@@ -3,9 +3,17 @@
 namespace WPLokerBJM\Core;
 
 use WPLokerBJM\Contracts\HooksInterface;
-use WPLokerBJM\Core\Hooks\Theme\{Enqueue, ThemeInject, DebloatWPTheme, Google};
-use WPLokerBJM\Core\Hooks\{LiteSpeedFilters, Litespeed};
+use WPLokerBJM\Core\Hooks\Theme\{Enqueue, ThemeInject, DebloatWPTheme};
+use WPLokerBJM\Core\Hooks\Plugins\{LiteSpeedFilters, Litespeed};
 use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Models\Schema\PostTypes;
+use WPLokerBJM\QueryBuilders\{JobQuery, TaxonomyQuery};
+use WPLokerBJM\Repositories\TaxonomyRepository;
+/**
+ * Global hooks registration for actions and filters.
+ * Registers WordPress actions and filters to modify theme behavior.
+ * * Might dump some temporary hooks here before promoting to dedicated classes.
+ */
 class Hooks implements HooksInterface
 {
     public function __construct(private \WPLokerBJM\Services\Utilities\SSG\BotDetection $botDetection)
@@ -29,6 +37,15 @@ class Hooks implements HooksInterface
         add_action('template_redirect', fn() => $this->redirectToHome());
         add_action('template_redirect', fn() => $this->modifyLinkHeaders(), 15);
         add_action('send_headers', fn() => $this->restHeaders());
+
+        // Cache purging hooks
+        add_action('save_post', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('delete_post', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('trashed_post', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('delete_attachment', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('created_term', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('edited_term', fn(...$args) => $this->purgeQueryCaches(...$args));
+        add_action('delete_term', fn(...$args) => $this->purgeQueryCaches(...$args));
     }
 
     /*======================================================================
@@ -44,6 +61,8 @@ class Hooks implements HooksInterface
         add_filter('option_active_plugins', fn(...$args) => $this->disablePluginsForDev(...$args), 0);
         add_filter('option_active_plugins', fn(...$args) => $this->disablePluginsforSimulatedProd(...$args), 0);
         add_filter('posts_search', fn(...$args) => $this->jobPostsSearchFilter(...$args), 10, 2);
+        add_filter('site_icon_meta_tags', fn(...$args) => ThemeInject::addSiteIconMetaTags(...$args));
+        add_filter('site_icon_image_sizes', fn(...$args) => [32, 48, 96, 144, 192, 256, 384, 512]);
     }
 
     /*======================================================================
@@ -62,37 +81,26 @@ class Hooks implements HooksInterface
      */
     public function oldPost410Redirect(): void
     {
-        if (is_404()) {
-            if (is_singular('lowongan') || strpos($_SERVER['REQUEST_URI'] ?? '', '/lowongan/') !== false) {
-                // Check if the post exists in trash (deleted due to age)
-                global $wp_query;
-                $post_name = $wp_query->query_vars['name'] ?? '';
-                if ($post_name) {
-                    $trashed_post = get_posts(\WPLokerBJM\QueryBuilders\JobQuery::getTrashedJobByNameArgs($post_name));
-                    if (!empty($trashed_post)) {
-                        // Only send 410 to bots; redirect humans to home
-                        if ($this->botDetection->isBot()) {
-                            status_header(410);
-                            wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
-                        } else {
-                            wp_safe_redirect(home_url('/'), 302);
-                            exit;
-                        }
-                    }
-                }
-                // If not in trash or no name, but URI has /lowongan/, assume removed, send 410 to bots
-                if ($this->botDetection->isBot()) {
-                    status_header(410);
-                    wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
-                } else {
-                    wp_safe_redirect(home_url('/'), 302);
-                    exit;
-                }
+        if (!is_404()) {
+            return;
+        }
+
+        $handleRemovedJob = function () {
+            if ($this->botDetection->isBot()) {
+                status_header(410);
+                wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
             } else {
-                // Other 404s redirect to home
                 wp_safe_redirect(home_url('/'), 302);
                 exit;
             }
+        };
+
+        if (is_singular('lowongan') || strpos($_SERVER['REQUEST_URI'] ?? '', '/lowongan/') !== false) {
+            $handleRemovedJob();
+        } else {
+            // Other 404s redirect to home
+            wp_safe_redirect(home_url('/'), 302);
+            exit;
         }
     }
 
@@ -198,13 +206,10 @@ class Hooks implements HooksInterface
     public function jobPostsSearchFilter(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
-        if ($wpdb === null) {
-            return $search;
-        }
 
         $q = $wp_query->query_vars['s'] ?? '';
-        if ($q !== '') {
-            $search = \WPLokerBJM\QueryBuilders\JobQuery::buildPostsSearchSql($wpdb, $q);
+        if ($wpdb !== null && $q !== '') {
+            $search = JobQuery::buildPostsSearchSql($wpdb, $q);
         }
 
         return $search;
@@ -219,7 +224,7 @@ class Hooks implements HooksInterface
      */
     public function disablePluginsForDev(array $plugins): array
     {
-        $isDev = getenv('WP_ENV') === 'development';
+        $isDev = Utilities::isDevelopment();
         if (!$isDev) {
             return $plugins;
         }
@@ -235,7 +240,7 @@ class Hooks implements HooksInterface
      */
     public function disablePluginsforSimulatedProd(array $plugins): array
     {
-        $isProdSimulated = getenv('WP_ENV') === 'production' && Utilities::isLocalhost();
+        $isProdSimulated = !Utilities::isDevelopment() && Utilities::isLocalhost();
         if (!$isProdSimulated) {
             return $plugins;
         }
@@ -267,5 +272,45 @@ class Hooks implements HooksInterface
             'fast-indexing-api/',
             'wps-hide-login/',
         ], $extra);
+    }
+
+    /*======================================================================
+     | CACHE
+     ======================================================================*/
+
+    /**
+     * Purge query caches when posts or taxonomies are modified.
+     */
+    private function purgeQueryCaches($post = null): void
+    {
+        // Only purge for lowongan posts if post is provided
+        if ($post && (!is_object($post) || $post->post_type !== PostTypes::POST_TYPE_LOWONGAN)) {
+            return;
+        }
+
+        try {
+            // Purge job last modified cache
+            \WPLokerBJM\Core\Cache::delete(JobQuery::JOB_LAST_MODIFIED);
+
+            // Purge taxonomy last modified cache
+            \WPLokerBJM\Core\Cache::delete(TaxonomyQuery::TAXONOMY_LAST_MODIFIED);
+
+            // Purge search SQL caches using pattern delete
+            \WPLokerBJM\Core\Cache::deletePattern(JobQuery::SEARCH_SQL_PREFIX . '*');
+
+            // Purge company search caches
+            \WPLokerBJM\Core\Cache::deletePattern(TaxonomyQuery::COMPANY_SEARCH_PREFIX . '*');
+
+            // Purge taxonomy repository caches
+            \WPLokerBJM\Core\Cache::delete(TaxonomyRepository::ALL_TAXONOMY_TERMS);
+            \WPLokerBJM\Core\Cache::deletePattern(TaxonomyRepository::POST_TAXONOMIES_PREFIX . '*');
+
+            // If specific post, also purge its taxonomy cache
+            if ($post && is_object($post)) {
+                \WPLokerBJM\Core\Cache::delete(TaxonomyRepository::POST_TAXONOMIES_PREFIX . $post->ID);
+            }
+        } catch (\Exception $e) {
+            error_log('Hooks::purgeQueryCaches error: ' . $e->getMessage());
+        }
     }
 }

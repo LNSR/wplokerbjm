@@ -243,7 +243,8 @@ export class GeneralStore {
         return rows
     }
 
-    public useContactsJob(jobdata: JobContactRow): ContactRow[] {
+    public useContactsJob(jobdata: JobContactRow | undefined): ContactRow[] {
+        if (!jobdata) return [];
         const contacts: ContactRow[] = [];
 
         (jobdata.email_kontak ?? []).forEach((email) => {

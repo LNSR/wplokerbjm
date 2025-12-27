@@ -23,34 +23,34 @@ export enum SocialMediaPlatform {
 }
 
 export interface Taxonomies {
-  perusahaan?: string | string[] | null;
-  'kategori-lowongan'?: string | string[] | null;
-  'lokasi-pekerjaan'?: string | string[] | null;
-  'jenis-pekerjaan'?: string | string[] | null;
-  gender?: string | string[] | null;
-  pendidikan?: string | string[] | null;
+  perusahaan?: string | string[] | (null | undefined);
+  'kategori-lowongan'?: string | string[] | (null | undefined);
+  'lokasi-pekerjaan'?: string | string[] | (null | undefined);
+  'jenis-pekerjaan'?: string | string[] | (null | undefined);
+  gender?: string | string[] | (null | undefined);
+  pendidikan?: string | string[] | (null | undefined);
 }
 
-export type PostTypes = PostTypesMetabox 
+export type PostTypes = PostTypesMetabox
 
 export interface CustomFields {
-  nama_perusahaan?: string | null;
-  tentang_perusahaan?: string | null;
-  deskripsi_pekerjaan?: string | null;
-  umur_min?: number | null;
-  umur_max?: number | null;
-  pengalaman?: number | null;
-  persyaratan?: string | null;
-  cara_melamar?: string | null;
-  benefit?: string | null;
-  gaji_minimal?: number | null;
-  gaji_maksimal?: number | null;
-  deadline?: string | null;
-  email_kontak?: string[] | null;
-  nomor_kontak?: string[] | null;
-  situs_kontak?: string[] | null;
-  social_media?: Partial<Record<SocialMediaPlatform, string[]>> | null;
-  status_pekerjaan?: (1 | 2 | 3) | null;
+  nama_perusahaan?: string | (null | undefined);
+  tentang_perusahaan?: string | (null | undefined);
+  deskripsi_pekerjaan?: string | (null | undefined);
+  umur_min?: number | (null | undefined);
+  umur_max?: number | (null | undefined);
+  pengalaman?: number | (null | undefined);
+  persyaratan?: string | (null | undefined);
+  cara_melamar?: string | (null | undefined);
+  benefit?: string | (null | undefined);
+  gaji_minimal?: number | (null | undefined);
+  gaji_maksimal?: number | (null | undefined);
+  deadline?: string | (null | undefined);
+  email_kontak?: string[] | (null | undefined);
+  nomor_kontak?: string[] | (null | undefined);
+  situs_kontak?: string[] | (null | undefined);
+  social_media?: Partial<Record<SocialMediaPlatform, string[]>> | (null | undefined);
+  status_pekerjaan?: (1 | 2 | 3) | (null | undefined);
 }
 
-export interface MetaBox extends Taxonomies, CustomFields {}
+export interface MetaBox extends Taxonomies, CustomFields { }

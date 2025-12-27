@@ -1,5 +1,5 @@
 <?php
-namespace WPLokerBJM\Core\Hooks;
+namespace WPLokerBJM\Core\Hooks\Plugins;
 use WPLokerBJM\Core\Cache;
 use WPLokerBJM\Core\Container;
 
@@ -44,13 +44,19 @@ class Litespeed
  */
 class LiteSpeedFilters
 {
-    private const pattern = '/wp-content/themes/wplokerbjm/';
+    private static function pattern(): string
+    {
+        if (defined('ABSPATH')) {
+            return str_replace(ABSPATH, '/', get_stylesheet_directory());
+        }
+        return '/wp-content/themes/' . get_stylesheet() . '/';
+    }
     /**
      * Exclude specific JS files from LiteSpeed Cache JS optimization.
      */
     public static function lscJsExcludes($excludes)
     {
-        $excludes[] = self::pattern;
+        $excludes[] = self::pattern();
         return $excludes;
     }
 
@@ -59,7 +65,7 @@ class LiteSpeedFilters
      */
     public static function lscCssExcludes($excludes)
     {
-        $excludes[] = self::pattern;
+        $excludes[] = self::pattern();
         return $excludes;
     }
 }

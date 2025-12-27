@@ -4,6 +4,7 @@ namespace WPLokerBJM\Services\Job;
 use WPLokerBJM\Factories\JobDataFactory;
 use WPLokerBJM\Core\Cache;
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
+use WPLokerBJM\Services\Utilities\Utilities;
 
 class JobSchemaOrg
 {
@@ -29,15 +30,18 @@ class JobSchemaOrg
 
         $jobdata = $this->jobDataFactory->createJobData($post_id);
 
-        $lokasi = $jobdata[Taxonomies::LOKASI_PEKERJAAN] ?? '';
+        $lokasi = $jobdata[Taxonomies::LOKASI_PEKERJAAN] ?? null;
         if (is_array($lokasi)) {
             $lokasi = array_filter(array_map('trim', $lokasi));
             $lokasi = implode(', ', $lokasi);
         } else {
             $lokasi = trim((string) $lokasi);
         }
+        if (empty($lokasi)) {
+            $lokasi = "To Be Confirmed";
+        }
 
-        $jenis_pekerjaan = $jobdata[Taxonomies::JENIS_PEKERJAAN] ?? '';
+        $jenis_pekerjaan = $jobdata[Taxonomies::JENIS_PEKERJAAN] ?? null;
         if (is_array($jenis_pekerjaan)) {
             $jenis_pekerjaan = array_filter(array_map('trim', $jenis_pekerjaan));
             $jenis_pekerjaan = implode(', ', $jenis_pekerjaan);
@@ -51,7 +55,7 @@ class JobSchemaOrg
             if (count($pendidikan) === 1) {
                 $pendidikan = reset($pendidikan);
             } elseif (count($pendidikan) > 1) {
-                $pendidikan = array_values($pendidikan);
+                $pendidikan = implode(', ', $pendidikan);
             } else {
                 $pendidikan = "no requirements";
             }
@@ -100,14 +104,14 @@ class JobSchemaOrg
             "@context" => "https://schema.org",
             "@type" => "JobPosting",
             "title" => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-            "description" => !empty($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) ? wp_strip_all_tags($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) : '',
-            "aboutCompany" => !empty($jobdata[CustomFields::TENTANG_PERUSAHAAN]) ? wp_strip_all_tags($jobdata[CustomFields::TENTANG_PERUSAHAAN]) : null,
+            "description" => !empty($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) ? wp_strip_all_tags($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) : "No description",
+            "aboutCompany" => !empty($jobdata[CustomFields::TENTANG_PERUSAHAAN]) ? wp_strip_all_tags($jobdata[CustomFields::TENTANG_PERUSAHAAN]) : "No information about the company.",
             "requirements" => !empty($jobdata[CustomFields::PERSYARATAN]) ? wp_strip_all_tags($jobdata[CustomFields::PERSYARATAN]) : null,
             "howToApply" => !empty($jobdata[CustomFields::CARA_MELAMAR]) ? wp_strip_all_tags($jobdata[CustomFields::CARA_MELAMAR]) : null,
             "datePosted" => get_post_time('c', false, $post_id),
             "hiringOrganization" => [
                 "@type" => "Organization",
-                "name" => $jobdata[CustomFields::NAMA_PERUSAHAAN] ?? '',
+                "name" => $jobdata[CustomFields::NAMA_PERUSAHAAN] ?? "Anonymous",
                 "sameAs" => !empty($sameAs) ? array_values(array_unique($sameAs)) : null,
             ],
             "jobLocation" => [
@@ -119,10 +123,10 @@ class JobSchemaOrg
                 ],
             ],
             "employmentType" => $jenis_pekerjaan,
-            "validThrough" => $jobdata[CustomFields::DEADLINE] ?? '',
+            "validThrough" => $jobdata[CustomFields::DEADLINE] ?? null,
             "identifier" => [
                 "@type" => "PropertyValue",
-                "name" => $jobdata[CustomFields::NAMA_PERUSAHAAN] ?? '',
+                "name" => $jobdata[CustomFields::NAMA_PERUSAHAAN] ?? "Anonymous",
                 "value" => $post_id,
             ],
             "educationRequirements" => $pendidikan,
@@ -131,18 +135,19 @@ class JobSchemaOrg
         ];
 
         if (!empty($jobdata[CustomFields::GAJI_MINIMAL])) {
+            $maxValue = $jobdata[CustomFields::GAJI_MAKSIMAL] ?? $jobdata[CustomFields::GAJI_MINIMAL];
             $schema['baseSalary'] = [
                 "@type" => "MonetaryAmount",
                 "currency" => "IDR",
                 "value" => [
                     "@type" => "QuantitativeValue",
                     "minValue" => (int) $jobdata[CustomFields::GAJI_MINIMAL],
-                    "maxValue" => !empty($jobdata[CustomFields::GAJI_MAKSIMAL]) ? (int) $jobdata[CustomFields::GAJI_MAKSIMAL] : (int) $jobdata[CustomFields::GAJI_MINIMAL],
-                    "unitText" => "MONTH"
-                ]
+                    "maxValue" => (int) $maxValue,
+                    "unitText" => "MONTH",
+                ],
             ];
             $gaji_min = (int) $jobdata[CustomFields::GAJI_MINIMAL];
-            $gaji_max = (int) ($jobdata[CustomFields::GAJI_MAKSIMAL]);
+            $gaji_max = (int) $maxValue;
             $schema['gaji_minimal'] = $gaji_min;
             $schema['gaji_maksimal'] = $gaji_max;
         }
@@ -153,7 +158,7 @@ class JobSchemaOrg
         $schema['umur_maksimal'] = $umur_max;
 
         $schema['hiringOrganization'] = array_filter($schema['hiringOrganization'], fn($v) => !is_null($v));
-        $schema = array_filter($schema, fn($v) => !is_null($v));
+        $schema = Utilities::filterEmptyValues($schema);
 
         // Mark the script with data attributes so client-side code can target
         // this specific JobPosting JSON-LD (e.g. data-ld-id="jobposting-123").

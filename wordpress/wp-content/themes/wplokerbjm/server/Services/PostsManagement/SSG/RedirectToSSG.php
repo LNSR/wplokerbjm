@@ -113,25 +113,22 @@ class RedirectToSSG implements HooksInterface
 		// LiteSpeed expects: X-LiteSpeed-Vary: cookie=my_cookie_name or header=...
 		$cookieName = self::COOKIE_NAME;
 
-		if ($visitorType === 'human' || $visitorType === 'ssg_bot') {
-			if (!isset($_COOKIE[$cookieName]) || $_COOKIE[$cookieName] !== $visitorType) {
-				setcookie(
-					$cookieName,
-					$visitorType,
-					[
-						'expires' => time() + 86400, // 1 day
-						'path' => '/',
-						'secure' => is_ssl(),
-						'httponly' => false,
-						'samesite' => 'Lax',
-					]
-				);
-				$_COOKIE[$cookieName] = $visitorType;
-				header('X-LiteSpeed-Vary: cookie=' . $cookieName . ',value=' . $visitorType);
-				SSGIntegration::logCoordination('Visitor cookie set', ['cookie' => $cookieName, 'value' => $visitorType]);
-			}
+		if (!isset($_COOKIE[$cookieName]) || $_COOKIE[$cookieName] !== $visitorType) {
+			setcookie(
+				$cookieName,
+				$visitorType,
+				[
+					'expires' => time() + 86400, // 1 day
+					'path' => '/',
+					'secure' => is_ssl(),
+					'httponly' => false,
+					'samesite' => 'Lax',
+				]
+			);
+			$_COOKIE[$cookieName] = $visitorType;
+			header('X-LiteSpeed-Vary: cookie=' . $cookieName . ',value=' . $visitorType);
+			SSGIntegration::logCoordination('Visitor cookie set', ['cookie' => $cookieName, 'value' => $visitorType]);
 		}
-
 		$isSSGbot ? header('Vary: Cookie,User-Agent,Accept-Encoding') : header('Vary: Cookie,Accept-Encoding');
 	}
 
@@ -224,34 +221,40 @@ class RedirectToSSG implements HooksInterface
 
 		<script id="self-heal-cookie">
 			(() => {
-				const ssgGenerationBot = <?= $isSSGbot ? 'true' : 'false' ?>;
 				const scriptElement = document.getElementById('self-heal-cookie');
 				let hasRun = false;
+				const cookieName = '<?= self::COOKIE_NAME; ?>';
+				const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart', 'click', 'touchmove', 'wheel'];
+
+				const cleanup = () => {
+					events.forEach(event => document.removeEventListener(event, runSelfHeal));
+					scriptElement?.remove();
+				};
 
 				const runSelfHeal = () => {
 					if (hasRun) return;
 					hasRun = true;
 
-					const cookieName = '<?= self::COOKIE_NAME; ?>';
+					if (document.cookie.includes(cookieName + '=ssg_bot')) {
+						console.log('SSG generation bot detected, skipping self-heal to avoid interference');
+						return;
+					}
 					if (document.cookie.includes(cookieName + '=human')) {
-						if (!!ssgGenerationBot) return;
-						scriptElement?.remove();
+						console.log('Cookie already set to human, no action needed');
+						cleanup();
 						return;
 					}
 					document.cookie = cookieName + '=human; path=/; max-age=86400;' + (location.protocol === 'https:' ? ' Secure;' : '') + ' SameSite=Lax';
 					console.log('Set cookie to human for SSG self-healing');
 					location.replace(location.href);
-				}
+				};
 
-				const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-				events.forEach(event => {
-					document.addEventListener(event, runSelfHeal, { once: true, passive: true });
-				});
+				events.forEach(event => document.addEventListener(event, runSelfHeal, { once: true, passive: true }));
 
 				setTimeout(() => {
 					if (!hasRun) {
 						console.log('No activity detected, skipping self-heal');
-						scriptElement?.remove();
+						cleanup();
 					}
 				}, 10000);
 			})()

@@ -41,14 +41,6 @@ class HomepageView
         ];
         $schema = $this->getSchema();
 
-        DocumentHTML::renderHead($schema);
-        ?>
-        <div id="app">
-            <script type="application/json" data-props>
-                <?= wp_json_encode($props, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>
-            </script>
-        </div>
-        <?php
-        DocumentHTML::renderFooter();
+        DocumentHTML::renderDocument($schema, $props);
     }
 }

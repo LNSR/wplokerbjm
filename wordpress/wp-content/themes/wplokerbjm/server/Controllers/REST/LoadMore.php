@@ -15,7 +15,7 @@ class LoadMore
     {
         try {
             $paged = intval($request->get_param('paged') ?? 1);
-            $context = $request->get_param('context') ?? 'archive';
+            $context = $request->get_param('context') ?? 'latest';
 
             if ($paged < 1) {
                 return Utilities::failedResponse('Parameter "paged" must be greater than 0.', 400);
@@ -42,12 +42,11 @@ class LoadMore
                 return Utilities::failedResponse('No jobs found for the given parameters.', 404);
             }
 
-            $response = new \WP_REST_Response([
+            $response = new \WP_REST_Response(Utilities::filterEmptyValues([
                 'jobs' => $jobs,
                 'context' => $context,
                 'filters' => $filters,
-            ]);
-
+            ]));
             // Set pagination headers
             $response->header('X-WP-Total', $query->found_posts);
             $response->header('X-WP-TotalPages', $query->max_num_pages);

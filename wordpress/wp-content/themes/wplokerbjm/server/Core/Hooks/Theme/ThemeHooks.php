@@ -108,6 +108,23 @@ class ThemeInject
     }
 
     /**
+     * Adds additional site icon meta tags for custom sizes.
+     */
+    public static function addSiteIconMetaTags(array $meta_tags): array
+    {
+        $additional_sizes = [48, 96, 144, 256, 384, 512];
+
+        foreach ($additional_sizes as $size) {
+            $url = get_site_icon_url($size);
+            if ($url) {
+                $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
+            }
+        }
+
+        return $meta_tags;
+    }
+
+    /**
      * Output preload <link> for the logo image.
      *
      * If a custom logo is set, this outputs a <link rel="preload" as="image"> tag
@@ -132,7 +149,7 @@ class ThemeInject
             'href' => esc_url($logoData['url']),
             'imagesrcset' => esc_attr($logoData['srcset'] ?: ''),
             'imagesizes' => esc_attr($logoData['sizes'] ?: ''),
-            'fetchpriority' => 'high',  // Matches your img tag
+            'fetchpriority' => 'high',
         ];
 
         $preloadAttrs = array_filter($Attrs, fn($value) => !empty($value));
@@ -169,6 +186,7 @@ class ThemeInject
             'logoWidth' => intval($logoData['width'] ?? 0),
             'logoHeight' => intval($logoData['height'] ?? 0),
             'lastJobUpdate' => $last_update_iso,
+            'lastTaxonomyUpdate' => \WPLokerBJM\QueryBuilders\TaxonomyQuery::getLastModifiedDateForTaxonomies(),
             'disableTracking' => $disableTracking,
             'themeVersion' => (int) filemtime(get_stylesheet_directory() . '/composer.json'),
         ];

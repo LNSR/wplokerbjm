@@ -4,6 +4,7 @@ namespace WPLokerBJM\Services\REST;
 
 use WPLokerBJM\Core\Cache;
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
+use WPLokerBJM\Services\Utilities\Utilities;
 
 class RESTData
 {
@@ -57,6 +58,8 @@ class RESTData
                 'post_time' => get_post_time('c', false, $post_id),
             ];
 
+            $data = Utilities::filterEmptyValues($data);
+
             Cache::set($cacheKey, $data, self::CACHE_TTL);
             return $data;
         } catch (\Exception $e) {
@@ -106,17 +109,19 @@ class RESTData
                 CustomFields::CARA_MELAMAR => isset($jobdata[CustomFields::CARA_MELAMAR]) ? html_entity_decode($jobdata[CustomFields::CARA_MELAMAR], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
                 CustomFields::BENEFIT => isset($jobdata[CustomFields::BENEFIT]) ? html_entity_decode($jobdata[CustomFields::BENEFIT], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
                 'contacts' => [
-                    CustomFields::EMAIL_KONTAK => $jobdata[CustomFields::EMAIL_KONTAK] ?? [],
-                    CustomFields::NOMOR_KONTAK => $jobdata[CustomFields::NOMOR_KONTAK] ?? [],
-                    CustomFields::SITUS_KONTAK => $jobdata[CustomFields::SITUS_KONTAK] ?? [],
+                    CustomFields::EMAIL_KONTAK => $jobdata[CustomFields::EMAIL_KONTAK] ?? null,
+                    CustomFields::NOMOR_KONTAK => $jobdata[CustomFields::NOMOR_KONTAK] ?? null,
+                    CustomFields::SITUS_KONTAK => $jobdata[CustomFields::SITUS_KONTAK] ?? null,
                 ],
-                CustomFields::SOCIAL_MEDIA => $jobdata[CustomFields::SOCIAL_MEDIA] ?? [],
+                CustomFields::SOCIAL_MEDIA => $jobdata[CustomFields::SOCIAL_MEDIA] ?? null,
                 'post_time' => get_post_time('c', false, $post_id),
             ];
 
             if (is_user_logged_in()) {
                 $data['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
             }
+
+            $data = Utilities::filterEmptyValues($data);
 
             Cache::set($cacheKey, $data, self::CACHE_TTL);
             return $data;

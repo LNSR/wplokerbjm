@@ -3,9 +3,13 @@
 namespace WPLokerBJM\Repositories;
 
 use WPLokerBJM\Models\Schema\Taxonomies;
+use WPLokerBJM\Core\Cache;
 
 class TaxonomyRepository
 {
+
+	const ALL_TAXONOMY_TERMS = 'all_taxonomy_terms';
+	const POST_TAXONOMIES_PREFIX = 'post_taxonomies_';
 
 	public $metaBoxesTaxonomies = [
 		Taxonomies::PERUSAHAAN,
@@ -24,6 +28,12 @@ class TaxonomyRepository
 	 */
 	public function getMetaBoxTaxonomies(int $post_id): array
 	{
+		$cache_key = self::POST_TAXONOMIES_PREFIX . $post_id;
+		$cached = Cache::get($cache_key);
+		if ($cached !== false) {
+			return $cached;
+		}
+
 		$result = [];
 		foreach ($this->metaBoxesTaxonomies as $taxonomy) {
 			$terms = get_the_terms($post_id, $taxonomy);
@@ -34,11 +44,18 @@ class TaxonomyRepository
 			}
 		}
 
+		Cache::set($cache_key, $result, 3600); // Cache for 1 hour
 		return $result;
 	}
 
 	public function getTaxonomyTerms(): array
 	{
+		$cache_key = self::ALL_TAXONOMY_TERMS;
+		$cached = Cache::get($cache_key);
+		if ($cached !== false) {
+			return $cached;
+		}
+
 		$terms = [];
 		foreach ($this->metaBoxesTaxonomies as $taxonomy) {
 			$terms[$taxonomy] = get_terms([
@@ -46,6 +63,8 @@ class TaxonomyRepository
 				'hide_empty' => true,
 			]);
 		}
+
+		Cache::set($cache_key, $terms, 3600); // Cache for 1 hour
 		return $terms;
 	}
 }

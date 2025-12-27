@@ -1,6 +1,7 @@
 <script module lang="ts">
   import type { SearchResponse, SortOption } from "@/types";
   import { TaxonomyType } from "@/types";
+  import { SearchTitle, SearchContext } from "@/types";
   import { searchStore, SearchUtils } from "$lib/stores/Search.svelte";
 
   type LocalSearchFormProps = {
@@ -55,7 +56,7 @@
 
   export class SearchFormController {
     static async performSearch(): Promise<SearchResponse> {
-      if (!searchStore.hasFilters) throw new Error("Invalid filters");
+      if (!searchStore.hasFilters) throw new Error("Terjadi kesalahan pada filter");
       if (selectedSuggestionIndex >= 0 && searchStore.hasSuggestions) {
         const suggestion = searchStore.suggestions[selectedSuggestionIndex];
         if (suggestion) {
@@ -69,10 +70,10 @@
     static async performReset(): Promise<SearchResponse> {
       searchStore.resetFilters();
       const response = await searchStore.searchJobs();
-      searchStore.title = "Lowongan Terbaru";
-      searchStore.context = "latest";
-      response.title = "Lowongan Terbaru";
-      response.context = "latest";
+      searchStore.title = SearchTitle.Latest;
+      searchStore.context = SearchContext.Search;
+      response.title = SearchTitle.Latest;
+      response.context = SearchContext.Latest;
       return response;
     }
 
@@ -125,6 +126,7 @@
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "Search failed";
+        searchStore.error = errorMessage;
         SearchFormController.callSearchError(errorMessage, searchError);
       }
     }
@@ -147,6 +149,7 @@
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "Search failed";
+        searchStore.error = errorMessage;
         SearchFormController.callSearchError(errorMessage, searchError);
       }
     }
@@ -205,7 +208,9 @@
         : [];
       const idx = arr.indexOf(value);
       if (idx !== -1)
-        searchStore.filters[TaxonomyType.lokasi] = arr.filter((_, i) => i !== idx);
+        searchStore.filters[TaxonomyType.lokasi] = arr.filter(
+          (_, i) => i !== idx
+        );
       return;
     }
 
@@ -215,7 +220,9 @@
         : [];
       const idx = arr.indexOf(value);
       if (idx !== -1)
-        searchStore.filters[TaxonomyType.gender] = arr.filter((_, i) => i !== idx);
+        searchStore.filters[TaxonomyType.gender] = arr.filter(
+          (_, i) => i !== idx
+        );
       return;
     }
 
@@ -225,9 +232,20 @@
         : [];
       const idx = arr.indexOf(value);
       if (idx !== -1)
-        searchStore.filters[TaxonomyType.pendidikan] = arr.filter((_, i) => i !== idx);
+        searchStore.filters[TaxonomyType.pendidikan] = arr.filter(
+          (_, i) => i !== idx
+        );
       return;
     }
+  }
+
+  // Function to update taxonomy filters
+  function updateTaxonomyFilter(taxonomyType: TaxonomyType, payload: unknown) {
+    if (!Array.isArray(payload) || payload.length === 0) {
+      searchStore.filters[taxonomyType] = [];
+      return;
+    }
+    searchStore.filters[taxonomyType] = SearchUtils.sanitizeArr(payload) ?? [];
   }
 
   // handle keyboard navigation for the main search input
@@ -260,7 +278,7 @@
           (s) => typeof s === "string" && String(s).trim() !== ""
         )
       : [];
-    if (!arr || arr.length === 0) return "Semua Lokasi";
+    if (!arr || arr.length === 0) return "Lokasi Belum Dipilih";
     if (arr.length === 1)
       return taxonomyStore.getTermNameBySlug(TaxonomyType.lokasi, arr[0]);
     return `${arr.length} filter dipilih`;
@@ -272,7 +290,7 @@
           (s) => typeof s === "string" && String(s).trim() !== ""
         )
       : [];
-    if (!arr || arr.length === 0) return "Semua Gender";
+    if (!arr || arr.length === 0) return "Gender Belum Dipilih";
     if (arr.length === 1)
       return taxonomyStore.getTermNameBySlug(TaxonomyType.gender, arr[0]);
     return `${arr.length} filter dipilih`;
@@ -284,7 +302,7 @@
           (s) => typeof s === "string" && String(s).trim() !== ""
         )
       : [];
-    if (!arr || arr.length === 0) return "Semua Pendidikan";
+    if (!arr || arr.length === 0) return "Pendidikan Belum Dipilih";
     if (arr.length === 1)
       return taxonomyStore.getTermNameBySlug(TaxonomyType.pendidikan, arr[0]);
     return `${arr.length} filter dipilih`;
@@ -293,6 +311,27 @@
   const sortIsAsc = $derived.by(
     () => (searchStore.filters.sort?.value ?? "") === "asc"
   );
+
+  const updateSortFilter = (payload: unknown) => {
+    const defaultSort: SortOption = {
+      value: "desc",
+      label: "Terbaru",
+    };
+    if (!payload || Array.isArray(payload)) {
+      searchStore.filters.sort = defaultSort;
+      return;
+    }
+    // payload is the underlying value (string)
+    const valStr = String(payload);
+    if (valStr === "desc" || valStr === "asc") {
+      searchStore.filters.sort = {
+        value: valStr as "desc" | "asc",
+        label: valStr === "desc" ? "Terbaru" : "Terlama",
+      };
+    } else {
+      searchStore.filters.sort = defaultSort;
+    }
+  };
 
   $effect(() => {
     if (
@@ -435,15 +474,8 @@
             <CustomDropdown
               id="lokasi"
               value={searchStore.filters[TaxonomyType.lokasi]}
-              update={(payload) => {
-                // assign explicitly in a statement to avoid Svelte "assignment_value_stale" warnings
-                if (!Array.isArray(payload) || payload.length === 0) {
-                  searchStore.filters[TaxonomyType.lokasi] = [];
-                  return;
-                }
-                searchStore.filters[TaxonomyType.lokasi] =
-                  SearchUtils.sanitizeArr(payload) ?? [];
-              }}
+              update={(payload) =>
+                updateTaxonomyFilter(TaxonomyType.lokasi, payload)}
               options={SearchUtils.mapTerms(
                 taxonomyStore.lokasiTerms,
                 "Semua lokasi"
@@ -481,14 +513,8 @@
             <CustomDropdown
               id="gender"
               value={searchStore.filters[TaxonomyType.gender]}
-              update={(payload) => {
-                if (!Array.isArray(payload) || payload.length === 0) {
-                  searchStore.filters[TaxonomyType.gender] = [];
-                  return;
-                }
-                searchStore.filters[TaxonomyType.gender] =
-                  SearchUtils.sanitizeArr(payload) ?? [];
-              }}
+              update={(payload) =>
+                updateTaxonomyFilter(TaxonomyType.gender, payload)}
               options={SearchUtils.mapTerms(
                 taxonomyStore.genderTerms,
                 "Semua gender"
@@ -526,14 +552,8 @@
             <CustomDropdown
               id="pendidikan"
               value={searchStore.filters[TaxonomyType.pendidikan]}
-              update={(payload) => {
-                if (!Array.isArray(payload) || payload.length === 0) {
-                  searchStore.filters[TaxonomyType.pendidikan] = [];
-                  return;
-                }
-                searchStore.filters[TaxonomyType.pendidikan] =
-                  SearchUtils.sanitizeArr(payload) ?? [];
-              }}
+              update={(payload) =>
+                updateTaxonomyFilter(TaxonomyType.pendidikan, payload)}
               options={SearchUtils.mapTerms(
                 taxonomyStore.pendidikanTerms,
                 "Semua pendidikan"
@@ -582,25 +602,7 @@
               id="sort"
               value={searchStore.filters.sort}
               update={(payload) => {
-                // sort is a single object; fallback to default sort option if payload is falsy
-                const defaultSort: SortOption = {
-                  value: "desc",
-                  label: "Terbaru",
-                };
-                if (!payload || Array.isArray(payload)) {
-                  searchStore.filters.sort = defaultSort;
-                  return;
-                }
-                // payload is the underlying value (string)
-                const valStr = String(payload);
-                if (valStr === "desc" || valStr === "asc") {
-                  searchStore.filters.sort = {
-                    value: valStr as "desc" | "asc",
-                    label: valStr === "desc" ? "Terbaru" : "Terlama",
-                  };
-                } else {
-                  searchStore.filters.sort = defaultSort;
-                }
+                updateSortFilter(payload);
               }}
               options={sortOptions}
               placeholder="Urutkan"

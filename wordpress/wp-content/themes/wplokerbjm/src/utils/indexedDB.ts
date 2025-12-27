@@ -1,10 +1,16 @@
 import { openDB, type IDBPDatabase } from 'idb'
 import type { CardJob } from '@/types'
 
+interface WPLokerIDB { 
+  dbName: string;
+  version: number;
+  storeName: string;
+}
+
 class IDB {
-  protected DB_NAME: string = 'JobBookmarks'
-  protected DB_VERSION: number = 1
-  protected STORE_NAME: string = 'bookmarks'
+  protected DB_NAME: WPLokerIDB['dbName'] = 'wplokerbjm'
+  protected DB_VERSION: WPLokerIDB['version'] = 1
+  protected STORE_NAME: WPLokerIDB['storeName'] = ''
 
   private dbPromise: Promise<IDBPDatabase<CardJob>> | null = null
 
@@ -23,6 +29,14 @@ class IDB {
 }
 
 export class BookmarkIDB extends IDB {
+
+  protected DB_NAME: WPLokerIDB['dbName'] = 'JobBookmarks'
+  protected STORE_NAME: WPLokerIDB['storeName'] = 'bookmarks'
+
+  async getDB(): Promise<IDBPDatabase<CardJob>> {
+    return super.getDB()
+  }
+
   async saveBookmarks(jobs: CardJob[]): Promise<void> {
     try {
       const db = await this.getDB()

@@ -2,13 +2,14 @@
 
 namespace WPLokerBJM\Core\Hooks\Theme;
 use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Services\Utilities\Utilities;
 
 class Enqueue
 {
     public static function enqueueAssets(): void
     {
         try {
-            if (Vite::isDevelopment()) {
+            if (Utilities::isDevelopment()) {
                 Vite::enqueueForDevelopment();
                 return;
             }
@@ -30,7 +31,7 @@ class Enqueue
     public static function outputPreloadLinks(): void
     {
         try {
-            if (Vite::isDevelopment()) {
+            if (Utilities::isDevelopment()) {
                 return;
             }
 
@@ -55,11 +56,22 @@ class Enqueue
  */
 class Vite
 {
+    const CACHE_TTL = 81600; // 1 day in seconds
+    const VITE_MANIFEST_CACHE_KEY = 'vite_manifest';
+    const PRELOAD_URLS_CACHE_PREFIX = 'preload_urls_';
+    const TRANSITIVE_ASSETS_CACHE_PREFIX = 'transitive_assets_';
+
     /**
      * Get preload URLs for the given path.
      */
     public static function getPreloadUrls(string $path): array
     {
+        $cacheKey = self::PRELOAD_URLS_CACHE_PREFIX . md5($path);
+        $urls = Cache::get($cacheKey);
+        if ($urls !== false) {
+            return $urls;
+        }
+
         $manifest = self::getManifest();
         if (!$manifest) {
             return [];
@@ -71,7 +83,7 @@ class Vite
         }
 
         $urls = [];
-        $dist_uri = '/wp-content/themes/' . get_stylesheet() . '/assets/dist';
+        $dist_uri = self::getDistUri();
 
         // Collect all transitive imports for main entry
         $entry_key = self::viteEntry();
@@ -98,44 +110,8 @@ class Vite
         // Remove duplicates
         $urls = array_unique($urls);
 
+        Cache::set($cacheKey, $urls, self::CACHE_TTL); // Cache for 1 day, matching manifest TTL
         return $urls;
-    }
-
-    /**
-     * Get all transitive assets (JS and CSS) for a given manifest key.
-     */
-    private static function getAllTransitiveAssets(array $manifest, string $key, array &$visited = []): array
-    {
-        if (in_array($key, $visited, true)) {
-            return [];
-        }
-        $visited[] = $key;
-
-        $assets = [];
-
-        // Add the main file
-        if (isset($manifest[$key]['file'])) {
-            $assets[] = $manifest[$key]['file'];
-        }
-
-        // Add CSS
-        if (isset($manifest[$key]['css'])) {
-            $assets = array_merge($assets, $manifest[$key]['css']);
-        }
-
-        // Recursively add imports
-        if (isset($manifest[$key]['imports'])) {
-            foreach ($manifest[$key]['imports'] as $import) {
-                $assets = array_merge($assets, self::getAllTransitiveAssets($manifest, $import, $visited));
-            }
-        }
-
-        return $assets;
-    }
-
-    public static function isDevelopment(): bool
-    {
-        return defined('WP_ENV') && WP_ENV === 'development';
     }
 
     /**
@@ -144,7 +120,7 @@ class Vite
      */
     public static function enqueueForDevelopment(): array
     {
-        $vite_base_url = rtrim(home_url(), '/') . '/__vite';
+        $vite_base_url = home_url() . '/__vite';
         $vite_handle = 'vite-entry';
         $client_handle = 'vite-client';
 
@@ -180,7 +156,7 @@ class Vite
      */
     public static function enqueueForProduction(): array
     {
-        $dist_uri = '/wp-content/themes/' . get_stylesheet() . '/assets/dist';
+        $dist_uri = self::getDistUri();
 
         $manifest = self::getManifest();
         if ($manifest === null) {
@@ -206,6 +182,39 @@ class Vite
         );
         return [];
     }
+
+    /**
+     * Get the route key based on the path.
+     */
+    private static function getRouteKey(string $path): ?string
+    {
+        if ($path === '/' || $path === '') {
+            return 'src/app/routes/Homepage.svelte';
+        }
+        if (strpos($path, '/pasang-iklan-loker') === 0) {
+            return 'src/app/routes/PasangIklanLoker.svelte';
+        }
+        if (preg_match('/^\/lowongan\//', $path)) {
+            return 'src/app/routes/SingleLowongan.svelte';
+        }
+        return null;
+    }
+
+
+    private static function getDistUri(): string
+    {
+        if (defined('ABSPATH')) {
+            return str_replace(ABSPATH, '/', self::getDistDir());
+        }
+
+        return '/wp-content/themes/' . get_stylesheet() . '/assets/dist';
+    }
+
+    private static function getDistDir(): string
+    {
+        return get_stylesheet_directory() . '/assets/dist';
+    }
+
     private static function viteEntry(): string
     {
         $entry = null;
@@ -231,34 +240,56 @@ class Vite
      */
     private static function getManifest(): ?array
     {
-        $dist_dir = get_stylesheet_directory() . '/assets/dist';
+        $dist_dir = self::getDistDir();
         $manifest_path = $dist_dir . '/.vite/manifest.json';
 
-        $manifest = Cache::get('vite_manifest');
+        $manifest = Cache::get(self::VITE_MANIFEST_CACHE_KEY);
         if ($manifest === false) {
             if (!file_exists($manifest_path)) {
                 return null;
             }
             $manifest = json_decode(file_get_contents($manifest_path), true);
-            Cache::set('vite_manifest', $manifest, expiration: 81600); // Cache for 1 day
+            Cache::set(self::VITE_MANIFEST_CACHE_KEY, $manifest, self::CACHE_TTL); // Cache for 1 day
         }
         return $manifest;
     }
 
     /**
-     * Get the route key based on the path.
+     * Get all transitive assets (JS and CSS) for a given manifest key.
      */
-    private static function getRouteKey(string $path): ?string
+    private static function getAllTransitiveAssets(array $manifest, string $key, array &$visited = []): array
     {
-        if ($path === '/' || $path === '') {
-            return 'src/app/routes/Homepage.svelte';
+        if (in_array($key, $visited, true)) {
+            return [];
         }
-        if (strpos($path, '/pasang-iklan-loker') === 0) {
-            return 'src/app/routes/PasangIklanLoker.svelte';
+        $visited[] = $key;
+
+        $cacheKey = self::TRANSITIVE_ASSETS_CACHE_PREFIX . md5($key);
+        $assets = Cache::get($cacheKey);
+        if ($assets !== false) {
+            return $assets;
         }
-        if (preg_match('/^\/lowongan\//', $path)) {
-            return 'src/app/routes/SingleLowongan.svelte';
+
+        $assets = [];
+
+        // Add the main file
+        if (isset($manifest[$key]['file'])) {
+            $assets[] = $manifest[$key]['file'];
         }
-        return null;
+
+        // Add CSS
+        if (isset($manifest[$key]['css'])) {
+            $assets = array_merge($assets, $manifest[$key]['css']);
+        }
+
+        // Recursively add imports
+        if (isset($manifest[$key]['imports'])) {
+            foreach ($manifest[$key]['imports'] as $import) {
+                $assets = array_merge($assets, self::getAllTransitiveAssets($manifest, $import, $visited));
+            }
+        }
+
+        Cache::set($cacheKey, $assets, self::CACHE_TTL); // Cache for 1 day, matching manifest TTL
+        return $assets;
     }
 }

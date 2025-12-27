@@ -1,9 +1,9 @@
 // Homepage job grid saved state types
-import type { SearchContext, SearchFilters, CardJob } from '@/types';
+import type { SearchContext, SearchFilters, CardJob, SearchTitle } from '@/types';
 export interface SearchState {
   jobs: CardJob[]
   context: SearchContext
-  title: string
+  title: SearchTitle
   totalJobs: number
   maxNumPages: number
   page: number

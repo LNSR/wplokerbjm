@@ -4,6 +4,7 @@ namespace WPLokerBJM\Factories;
 
 use WPLokerBJM\Core\Cache;
 use WPLokerBJM\Models\Schema\CustomFields;
+use WPLokerBJM\Services\Utilities\Utilities;
 
 class JobDataFactory
 {
@@ -48,6 +49,9 @@ class JobDataFactory
 
             // Combine meta and taxonomy data
             $combinedData = array_merge($processedCustomFields, $processedTaxonomies);
+
+            // Filter out null values to keep responses lean
+            $combinedData = Utilities::filterEmptyValues($combinedData);
 
             Cache::set($cacheKey, $combinedData, self::FACTORY_JOB_TTL_CACHE); // Cache for 1 day
 
