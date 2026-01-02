@@ -2,7 +2,8 @@
 
 namespace WPLokerBJM\Controllers\REST;
 
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Controllers\Utilities\ControllerUtils;
+use WPLokerBJM\Shared\Log\Logger;
 class Carousel
 {
 
@@ -26,13 +27,13 @@ class Carousel
             $response->header('X-WP-Total', $props['totalJobs'] ?? 0);
 
             // Set Link header for pagination (assuming page 1 for carousel)
-            Utilities::setPaginationLinks($response, $request, 1, $props['maxNumPages'] ?? 1, 'carousel', 'paged');
+            ControllerUtils::setPaginationLinks($response, $request, 1, $props['maxNumPages'] ?? 1, 'carousel', 'paged');
 
 
             return rest_ensure_response($response);
         } catch (\Exception $e) {
-            error_log('Carousel::handle error: ' . $e->getMessage());
-            return Utilities::failedResponse('Internal server error', 500);
+            Logger::error('REST', 'Carousel::handle error: ' . $e->getMessage());
+            return ControllerUtils::failedResponse('Internal server error', 500);
         }
     }
 }

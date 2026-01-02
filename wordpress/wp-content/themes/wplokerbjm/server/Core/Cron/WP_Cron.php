@@ -1,10 +1,10 @@
 <?php
 
-namespace WPLokerBJM\Services\Cron;
+namespace WPLokerBJM\Core\Cron;
 
 use WPLokerBJM\Contracts\HooksInterface;
-use WPLokerBJM\Services\PostsManagement\PostsManagement;
-use WPLokerBJM\Services\Taxonomy\TaxonomyManagement;
+use WPLokerBJM\Core\Posts\PostsManagement;
+use WPLokerBJM\Core\Taxonomy\TaxonomyManagement;
 use WPLokerBJM\Services\Utilities\SSG\BotDetection;
 
 /**
@@ -13,7 +13,7 @@ use WPLokerBJM\Services\Utilities\SSG\BotDetection;
  * This keeps scheduling logic in a single place instead of scattering
  * `wp_schedule_event` calls across multiple services.
  */
-class CronService implements HooksInterface
+class WP_Cron implements HooksInterface
 {
     public function __construct(
         private readonly BotDetection $botDetection,

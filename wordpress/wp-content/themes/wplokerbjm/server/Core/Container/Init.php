@@ -3,6 +3,7 @@
 namespace WPLokerBJM\Core\Container;
 
 use WPLokerBJM\Contracts\HooksInterface;
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Initializes core services in the wplokerbjm theme by registering WordPress hooks.
@@ -56,7 +57,7 @@ class Init
                     $service->registerFilters();
                 }
             } catch (\Exception $e) {
-                error_log('Init::initialize error in service ' . get_class($service) . ': ' . $e->getMessage());
+                Logger::error('Init', 'Init::initialize error in service ' . get_class($service) . ': ' . $e->getMessage());
             }
         }
     }

@@ -2,11 +2,10 @@
 
 namespace WPLokerBJM\Services\REST;
 
-use WPLokerBJM\Contracts\HooksInterface;
 use WPLokerBJM\Models\Schema\Taxonomies;
 
 
-class RESTRoute implements HooksInterface
+class RESTRoute
 {
     public static string $baseURI = 'wplokerbjm/v1';
 
@@ -22,16 +21,6 @@ class RESTRoute implements HooksInterface
         private readonly \WPLokerBJM\Controllers\REST\JobGridController $jobGrid,
         private readonly \WPLokerBJM\Controllers\REST\WPThemeData $wpThemeData
     ) {
-    }
-
-    public function registerActions(): void
-    {
-        add_action('rest_api_init', fn() => $this->registerRoutes());
-    }
-
-    public function registerFilters(): void
-    {
-        // No filters to register for now
     }
 
     public function registerRoutes(): void
@@ -67,11 +56,11 @@ class RESTRoute implements HooksInterface
         ]);
 
         $taxonomies = [
-            Taxonomies::LOKASI_PEKERJAAN => fn(...$args) =>  $this->taxonomyDepth->lokasi(...$args),
-            Taxonomies::GENDER => fn(...$args) =>  $this->taxonomyDepth->gender(...$args),
-            Taxonomies::PENDIDIKAN => fn(...$args) =>  $this->taxonomyDepth->pendidikan(...$args),
+            Taxonomies::LOKASI_PEKERJAAN => fn(...$args) => $this->taxonomyDepth->lokasi(...$args),
+            Taxonomies::GENDER => fn(...$args) => $this->taxonomyDepth->gender(...$args),
+            Taxonomies::PENDIDIKAN => fn(...$args) => $this->taxonomyDepth->pendidikan(...$args),
         ]; // explictly define method to ensure IDE can reference properly
-        
+
         foreach ($taxonomies as $taxonomy => $callback) {
             register_rest_route(self::$baseURI, "/taxonomies/$taxonomy", [
                 'methods' => 'GET',

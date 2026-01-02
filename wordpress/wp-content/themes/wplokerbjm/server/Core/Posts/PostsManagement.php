@@ -1,10 +1,12 @@
 <?php
 
-namespace WPLokerBJM\Services\PostsManagement;
+namespace WPLokerBJM\Core\Posts;
 
 use WPLokerBJM\QueryBuilders\JobQuery;
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Models\Schema\CustomFields;
 
-/**
+/**s
  * Handles job-related operations, including deletion and status updates.
  */
 class PostsManagement
@@ -19,17 +21,17 @@ class PostsManagement
 
                 // Skip deletion if the job still has a deadline in the future (guard against accidental deletion)
                 try {
-                    $deadline = get_post_meta($post_id, 'deadline', true);
+                    $deadline = get_post_meta($post_id, CustomFields::DEADLINE);
                     if (!empty($deadline)) {
                         $deadline_ts = strtotime($deadline . ' 23:59:59');
                         if ($deadline_ts !== false && $deadline_ts >= time()) {
-                            error_log('PostsManagement::deleteOldJobs skipping deletion for post ' . $post_id . ' due to future deadline ' . $deadline);
+                            Logger::info('Posts', 'PostsManagement::deleteOldJobs skipping deletion for post ' . $post_id . ' due to future deadline ' . $deadline);
                             continue;
                         }
                     }
                 } catch (\Exception $e) {
                     // Do not block deletion if deadline cannot be read; log and continue
-                    error_log('PostsManagement::deleteOldJobs error checking deadline for post ' . $post_id . ': ' . $e->getMessage());
+                    Logger::error('Posts', 'PostsManagement::deleteOldJobs error checking deadline for post ' . $post_id . ': ' . $e->getMessage());
                 }
 
                 try {
@@ -38,7 +40,7 @@ class PostsManagement
                         wp_delete_attachment($att_id, false);
                     }
                 } catch (\Exception $e) {
-                    error_log('PostsManagement::deleteOldJobs error deleting attachments for post ' . $post_id . ': ' . $e->getMessage());
+                    Logger::error('Posts', 'PostsManagement::deleteOldJobs error deleting attachments for post ' . $post_id . ': ' . $e->getMessage());
                 }
 
                 try {
@@ -47,7 +49,7 @@ class PostsManagement
                         wp_delete_comment($comment->comment_ID, false);
                     }
                 } catch (\Exception $e) {
-                    error_log('PostsManagement::deleteOldJobs error deleting comments for post ' . $post_id . ': ' . $e->getMessage());
+                    Logger::error('Posts', 'PostsManagement::deleteOldJobs error deleting comments for post ' . $post_id . ': ' . $e->getMessage());
                 }
 
                 try {
@@ -57,17 +59,17 @@ class PostsManagement
                         $rm_giapi->send_to_api([get_permalink($post_id)], 'delete', false);
                     }
                 } catch (\Exception $e) {
-                    error_log('PostsManagement::deleteOldJobs error notifying API for post ' . $post_id . ': ' . $e->getMessage());
+                    Logger::error('Posts', 'PostsManagement::deleteOldJobs error notifying API for post ' . $post_id . ': ' . $e->getMessage());
                 }
 
                 try {
                     wp_delete_post($post_id, false);
                 } catch (\Exception $e) {
-                    error_log('PostsManagement::deleteOldJobs error deleting post ' . $post_id . ': ' . $e->getMessage());
+                    Logger::error('Posts', 'PostsManagement::deleteOldJobs error deleting post ' . $post_id . ': ' . $e->getMessage());
                 }
             }
         } catch (\Exception $e) {
-            error_log('PostsManagement::deleteOldJobs error: ' . $e->getMessage());
+            Logger::error('Posts', 'PostsManagement::deleteOldJobs error: ' . $e->getMessage());
         }
     }
 
@@ -86,21 +88,21 @@ class PostsManagement
                 $post_id = is_object($job_item) ? (int) $job_item->ID : (int) $job_item;
 
                 try {
-                    $deadline = get_post_meta($post_id, 'deadline', true);
+                    $deadline = get_post_meta($post_id, CustomFields::DEADLINE, true);
                     if (!$deadline) {
                         continue;
                     }
 
-                    $status = (int) get_post_meta($post_id, 'status_pekerjaan', true);
+                    $status = (int) get_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, true);
 
                     PostsJobStatus::updateJobStatusIfExpired($post_id, $deadline, $status);
                     PostsJobStatus::setJobStatustoUrgent($post_id, $deadline, $status);
                 } catch (\Exception $e) {
-                    error_log('PostsManagement::updateAllJobStatuses error for post ' . $post_id . ': ' . $e->getMessage());
+                    Logger::error('Posts', 'PostsManagement::updateAllJobStatuses error for post ' . $post_id . ': ' . $e->getMessage());
                 }
             }
         } catch (\Exception $e) {
-            error_log('PostsManagement::updateAllJobStatuses error: ' . $e->getMessage());
+            Logger::error('Posts', 'PostsManagement::updateAllJobStatuses error: ' . $e->getMessage());
         }
     }
 }
@@ -122,15 +124,15 @@ class PostsJobStatus
         try {
             $deadline_ts = strtotime($deadline . ' 23:59:59');
             if ($deadline_ts === false) {
-                error_log('PostsManagement::updateJobStatusIfExpired invalid deadline for post ' . $post_id . ': ' . $deadline);
+                Logger::warning('Posts', 'PostsManagement::updateJobStatusIfExpired invalid deadline for post ' . $post_id . ': ' . $deadline);
                 return;
             }
             $now = time();
             if ($now > $deadline_ts && $current_status !== 0) {
-                update_post_meta($post_id, 'status_pekerjaan', 0);
+                update_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, 0);
             }
         } catch (\Exception $e) {
-            error_log('PostsManagement::updateJobStatusIfExpired error for post ' . $post_id . ': ' . $e->getMessage());
+            Logger::error('Posts', 'PostsManagement::updateJobStatusIfExpired error for post ' . $post_id . ': ' . $e->getMessage());
         }
     }
 
@@ -146,16 +148,16 @@ class PostsJobStatus
         try {
             $deadline_ts = strtotime($deadline . ' 23:59:59');
             if ($deadline_ts === false) {
-                error_log('PostsManagement::setJobStatustoUrgent invalid deadline for post ' . $post_id . ': ' . $deadline);
+                Logger::warning('Posts', 'PostsManagement::setJobStatustoUrgent invalid deadline for post ' . $post_id . ': ' . $deadline);
                 return;
             }
             $now = time();
             $seven_days_ahead = strtotime('+7 days 23:59:59', strtotime('today', $now));
             if ($deadline_ts >= $now && $deadline_ts <= $seven_days_ahead && $current_status !== 2) {
-                update_post_meta($post_id, 'status_pekerjaan', 2);
+                update_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, 2);
             }
         } catch (\Exception $e) {
-            error_log('PostsManagement::setJobStatustoUrgent error for post ' . $post_id . ': ' . $e->getMessage());
+            Logger::error('Posts', 'PostsManagement::setJobStatustoUrgent error for post ' . $post_id . ': ' . $e->getMessage());
         }
     }
 }

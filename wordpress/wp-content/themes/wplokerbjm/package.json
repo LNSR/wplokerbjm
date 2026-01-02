@@ -10,7 +10,6 @@
     "@types/node": "^25.0.3",
     "concurrently": "^9.2.1",
     "daisyui": "^5.5.14",
-    "dotenv": "^17.2.3",
     "fast-xml-parser": "^5.3.3",
     "html-minifier-terser": "^7.2.0",
     "playwright": "^1.57.0",
@@ -32,8 +31,8 @@
     "build": "vite build",
     "preview": "vite preview",
     "check": "svelte-check --tsconfig ./tsconfig.app.json && tsc -p tsconfig.node.json",
-    "ssg": "bun tools/SSG/ssg.ts",
-    "ssg:sitemap": "bun tools/SSG/ssg-sitemap.ts",
+    "ssg": "bun -b tools/SSG/ssg.ts",
+    "ssg:sitemap": "bun -b tools/SSG/ssg-sitemap.ts",
     "watch:autoload": "composer run watch:autoload"
   },
   "trustedDependencies": [

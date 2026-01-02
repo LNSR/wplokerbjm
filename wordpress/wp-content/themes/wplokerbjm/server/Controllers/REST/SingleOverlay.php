@@ -4,7 +4,8 @@ namespace WPLokerBJM\Controllers\REST;
 
 use WP_REST_Request;
 use WP_REST_Response;
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Controllers\Utilities\ControllerUtils;
+use WPLokerBJM\Shared\Log\Logger;
 class SingleOverlay
 {
     public function __construct(private \WPLokerBJM\Services\REST\RESTData $restData)
@@ -16,20 +17,20 @@ class SingleOverlay
         try {
             $slug = $request->get_param('slug');
             if (!$slug) {
-                return Utilities::failedResponse('Missing slug parameter', 400);
+                return ControllerUtils::failedResponse('Missing slug parameter', 400);
             }
 
             $post = get_page_by_path($slug, 'OBJECT', 'lowongan');
             if (!$post || !is_object($post)) {
-                return Utilities::failedResponse('Post not found', 404);
+                return ControllerUtils::failedResponse('Post not found', 404);
             }
 
             $data = $this->restData->getSingleOverlayData($post->ID);
 
             return new WP_REST_Response($data, 200);
         } catch (\Exception $e) {
-            error_log('SingleOverlay::handle error: ' . $e->getMessage());
-            return Utilities::failedResponse('Internal server error', 500);
+            Logger::error('REST', 'SingleOverlay::handle error: ' . $e->getMessage());
+            return ControllerUtils::failedResponse('Internal server error', 500);
         }
     }
 }

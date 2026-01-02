@@ -2,7 +2,9 @@
 
 namespace WPLokerBJM\Services\Utilities\SSG\Integrations;
 
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Cache\Cache;
+use WPLokerBJM\Shared\Cache\CacheKey;
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Rank Math Integration Service
@@ -29,7 +31,7 @@ class RankMathIntegration {
 	private static function debounceSitemapRegeneration( string $debounceKey, int $duration, string $skipMessage ): bool {
 		$lastRegeneration = Cache::get( $debounceKey );
 		if ( $lastRegeneration !== false ) {
-			error_log( $skipMessage );
+			Logger::info('SEO', $skipMessage);
 			return false;
 		}
 		Cache::set( $debounceKey, time(), $duration );
@@ -51,7 +53,7 @@ class RankMathIntegration {
 		}
 
 		// Debounce sitemap regeneration to prevent rapid successive calls
-		$debounceKey = "rankmath_sitemap_debounce_{$post_id}";
+		$debounceKey = CacheKey::RANKMATH_SITEMAP_DEBOUNCE_PREFIX . $post_id;
 		if ( ! self::debounceSitemapRegeneration( $debounceKey, 300, "Rank Math sitemap regeneration skipped for post {$post_id} (debounced)" ) ) {
 			return;
 		}
@@ -65,7 +67,7 @@ class RankMathIntegration {
 		do_action( 'rank_math/sitemap/generate_after_update', $post_id );
 
 		// Log the sitemap regeneration
-		error_log( "Rank Math sitemap regeneration triggered for post {$post_id} ({$post->post_title})" );
+		Logger::info('SEO', "Rank Math sitemap regeneration triggered for post {$post_id} ({$post->post_title})");
 	}
 
 	/**
@@ -78,7 +80,7 @@ class RankMathIntegration {
 		}
 
 		// Debounce sitemap regeneration
-		$debounceKey = "rankmath_sitemap_delete_debounce_{$post_id}";
+		$debounceKey = CacheKey::RANKMATH_SITEMAP_DELETE_DEBOUNCE_PREFIX . $post_id;
 		if ( ! self::debounceSitemapRegeneration( $debounceKey, 180, "Rank Math sitemap regeneration skipped for deleted post {$post_id} (debounced)" ) ) {
 			return;
 		}
@@ -92,7 +94,7 @@ class RankMathIntegration {
 		do_action( 'rank_math/sitemap/generate_after_update', $post_id );
 
 		// Log the sitemap regeneration
-		error_log( "Rank Math sitemap regeneration triggered for deleted/trashed post {$post_id}" );
+		Logger::info('SEO', "Rank Math sitemap regeneration triggered for deleted/trashed post {$post_id}");
 	}
 
 	/**
@@ -104,7 +106,7 @@ class RankMathIntegration {
 		}
 
 		// Debounce full sitemap regeneration
-		$debounceKey = "rankmath_full_sitemap_debounce";
+		$debounceKey = CacheKey::RANKMATH_FULL_SITEMAP_DEBOUNCE;
 		if ( ! self::debounceSitemapRegeneration( $debounceKey, 600, "Rank Math full sitemap regeneration skipped (debounced)" ) ) {
 			return;
 		}
@@ -117,7 +119,7 @@ class RankMathIntegration {
 		// Trigger full sitemap regeneration
 		do_action( 'rank_math/sitemap/generate_after_update', 0 );
 
-		error_log( 'Rank Math full sitemap regeneration triggered' );
+		Logger::info('SEO', 'Rank Math full sitemap regeneration triggered');
 	}
 
 	/**
@@ -172,9 +174,9 @@ class RankMathIntegration {
 		self::clearCaches();
 
 		if ($deleted !== false) {
-			error_log("Rank Math integration transients cleared: {$deleted} keys deleted");
+			Logger::info('SEO', "Rank Math integration transients cleared: {$deleted} keys deleted");
 		} else {
-			error_log("Rank Math integration transients cleared: pattern deletion failed or not supported");
+			Logger::warning('SEO', "Rank Math integration transients cleared: pattern deletion failed or not supported");
 		}
 	}
 }

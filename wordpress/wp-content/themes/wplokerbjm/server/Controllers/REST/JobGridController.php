@@ -3,7 +3,8 @@
 namespace WPLokerBJM\Controllers\REST;
 
 use WPLokerBJM\QueryBuilders\JobQuery;
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Controllers\Utilities\ControllerUtils;
+use WPLokerBJM\Shared\Log\Logger;
 
 class JobGridController
 {
@@ -21,10 +22,10 @@ class JobGridController
             $total_jobs = intval($request->get_param('total_jobs') ?? 0);
 
             if ($paged < 1) {
-                return Utilities::failedResponse('Parameter "paged" must be a positive integer.', 400);
+                return ControllerUtils::failedResponse('Parameter "paged" must be a positive integer.', 400);
             }
 
-            $filters = Utilities::parseJobFilters($request);
+            $filters = ControllerUtils::parseJobFilters($request);
 
             $query_args = match ($context) {
                 'search' => JobQuery::searchJobsArgs($filters, $paged, 12),
@@ -46,8 +47,8 @@ class JobGridController
 
             return $response;
         } catch (\Exception $e) {
-            error_log('JobGrid::handle error: ' . $e->getMessage());
-            return Utilities::failedResponse('An error occurred while processing the request.', 500);
+            Logger::error('REST', 'JobGrid::handle error: ' . $e->getMessage());
+            return ControllerUtils::failedResponse('An error occurred while processing the request.', 500);
         }
     }
 }

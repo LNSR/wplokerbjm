@@ -1,5 +1,7 @@
 <?php
-namespace WPLokerBJM\Core;
+namespace WPLokerBJM\Shared\Cache;
+
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Object Cache management
@@ -9,8 +11,6 @@ namespace WPLokerBJM\Core;
  */
 class Cache
 {
-    const OBJECT_CACHE_PREFIX = 'wplokerbjm_obj_';
-
     /**
      * Set a value in object cache.
      *
@@ -25,9 +25,9 @@ class Cache
             if (!function_exists('wp_cache_set')) {
                 return false;
             }
-            return wp_cache_set($key, $value, self::OBJECT_CACHE_PREFIX, $expiration);
+            return wp_cache_set($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
         } catch (\Exception $e) {
-            error_log('Cache::set error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::set error: ' . $e->getMessage());
             return false;
         }
     }
@@ -44,9 +44,9 @@ class Cache
             if (!function_exists('wp_cache_get')) {
                 return false;
             }
-            return wp_cache_get($key, self::OBJECT_CACHE_PREFIX);
+            return wp_cache_get($key, CacheKey::OBJECT_CACHE_PREFIX);
         } catch (\Exception $e) {
-            error_log('Cache::get error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::get error: ' . $e->getMessage());
             return false;
         }
     }
@@ -63,9 +63,9 @@ class Cache
             if (!function_exists('wp_cache_delete')) {
                 return false;
             }
-            return wp_cache_delete($key, self::OBJECT_CACHE_PREFIX);
+            return wp_cache_delete($key, CacheKey::OBJECT_CACHE_PREFIX);
         } catch (\Exception $e) {
-            error_log('Cache::delete error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::delete error: ' . $e->getMessage());
             return false;
         }
     }
@@ -88,9 +88,9 @@ class Cache
                 }
                 return $results;
             }
-            return wp_cache_set_multiple($data, self::OBJECT_CACHE_PREFIX, $expiration);
+            return wp_cache_set_multiple($data, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
         } catch (\Exception $e) {
-            error_log('Cache::setMultiple error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::setMultiple error: ' . $e->getMessage());
             return array_fill_keys(array_keys($data), false);
         }
     }
@@ -112,9 +112,9 @@ class Cache
                 }
                 return $results;
             }
-            return wp_cache_delete_multiple($keys, self::OBJECT_CACHE_PREFIX);
+            return wp_cache_delete_multiple($keys, CacheKey::OBJECT_CACHE_PREFIX);
         } catch (\Exception $e) {
-            error_log('Cache::deleteMultiple error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::deleteMultiple error: ' . $e->getMessage());
             return array_fill_keys($keys, false);
         }
     }
@@ -133,9 +133,9 @@ class Cache
             if (!function_exists('wp_cache_add')) {
                 return false;
             }
-            return wp_cache_add($key, $value, self::OBJECT_CACHE_PREFIX, $expiration);
+            return wp_cache_add($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
         } catch (\Exception $e) {
-            error_log('Cache::add error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::add error: ' . $e->getMessage());
             return false;
         }
     }
@@ -158,9 +158,9 @@ class Cache
                 }
                 return $results;
             }
-            return wp_cache_add_multiple($data, self::OBJECT_CACHE_PREFIX, $expiration);
+            return wp_cache_add_multiple($data, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
         } catch (\Exception $e) {
-            error_log('Cache::addMultiple error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::addMultiple error: ' . $e->getMessage());
             return array_fill_keys(array_keys($data), false);
         }
     }
@@ -186,18 +186,18 @@ class Cache
             if ($current === false) {
                 self::set($key, 0, $expiration);
             }
-            $result = wp_cache_incr($key, $value, self::OBJECT_CACHE_PREFIX);
+            $result = wp_cache_incr($key, $value, CacheKey::OBJECT_CACHE_PREFIX);
             if ($result !== false) {
                 if ($expiration > 0) {
                     self::set($key . '_expires', time() + $expiration, 0);
                 }
                 return $result;
             } else {
-                error_log('Object cache increment failed (returned false)');
+                Logger::error('Cache', 'Object cache increment failed (returned false)');
                 return false;
             }
         } catch (\Exception $e) {
-            error_log('Cache::increment error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::increment error: ' . $e->getMessage());
             return false;
         }
     }
@@ -222,15 +222,15 @@ class Cache
             if ($current === false) {
                 self::set($key, 0, 0);
             }
-            $result = wp_cache_decr($key, $value, self::OBJECT_CACHE_PREFIX);
+            $result = wp_cache_decr($key, $value, CacheKey::OBJECT_CACHE_PREFIX);
             if ($result !== false) {
                 return $result;
             } else {
-                error_log('Object cache decrement failed (returned false)');
+                Logger::error('Cache', 'Object cache decrement failed (returned false)');
                 return false;
             }
         } catch (\Exception $e) {
-            error_log('Cache::decrement error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::decrement error: ' . $e->getMessage());
             return false;
         }
     }
@@ -249,9 +249,9 @@ class Cache
             if (!function_exists('wp_cache_replace')) {
                 return false;
             }
-            return wp_cache_replace($key, $value, self::OBJECT_CACHE_PREFIX, $expiration);
+            return wp_cache_replace($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
         } catch (\Exception $e) {
-            error_log('Cache::replace error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::replace error: ' . $e->getMessage());
             return false;
         }
     }
@@ -273,9 +273,9 @@ class Cache
                 }
                 return $results;
             }
-            return wp_cache_get_multiple($keys, self::OBJECT_CACHE_PREFIX);
+            return wp_cache_get_multiple($keys, CacheKey::OBJECT_CACHE_PREFIX);
         } catch (\Exception $e) {
-            error_log('Cache::getMultiple error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::getMultiple error: ' . $e->getMessage());
             return array_fill_keys($keys, false);
         }
     }
@@ -294,26 +294,25 @@ class Cache
             }
             return wp_cache_flush_group($group);
         } catch (\Exception $e) {
-            error_log('Cache::flushGroup error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::flushGroup error: ' . $e->getMessage());
             return false;
         }
     }
 
     /**
-     * Check if the cache backend supports a specific feature.
+     * Flush all cache entries.
      *
-     * @param string $feature The feature to check for (e.g., 'add_multiple', 'set_multiple').
-     * @return bool True if the feature is supported, false otherwise.
+     * @return bool True if the cache was flushed, false otherwise.
      */
-    public static function supports(string $feature): bool
+    public static function flushAll(): bool
     {
         try {
-            if (!function_exists('wp_cache_supports')) {
+            if (!function_exists('wp_cache_flush')) {
                 return false;
             }
-            return wp_cache_supports($feature);
+            return wp_cache_flush();
         } catch (\Exception $e) {
-            error_log('Cache::supports error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::flushAll error: ' . $e->getMessage());
             return false;
         }
     }
@@ -336,7 +335,7 @@ class Cache
             }
 
             // Build full pattern with our prefix
-            $fullPattern = self::OBJECT_CACHE_PREFIX . ':' . $pattern;
+            $fullPattern = CacheKey::OBJECT_CACHE_PREFIX . ':' . $pattern;
 
             $keys = $redis->keys($fullPattern);
             if (empty($keys)) {
@@ -346,12 +345,12 @@ class Cache
             // Use unlink for asynchronous deletion (faster)
             $deletedCount = $redis->unlink($keys);
 
-            error_log("Cache::deletePattern: Unlinked {$deletedCount} keys matching pattern '{$pattern}'");
+            Logger::info('Cache', "Cache::deletePattern: Unlinked {$deletedCount} keys matching pattern '{$pattern}'");
 
             return $deletedCount;
 
         } catch (\Exception $e) {
-            error_log('Cache::deletePattern error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::deletePattern error: ' . $e->getMessage());
             return false;
         }
     }
@@ -362,12 +361,12 @@ class Cache
      *
      * @return \Redis|false Connected Redis instance or false on failure.
      */
-    private static function getRedisConnection(): \Redis|false
+    public static function getRedisConnection(): \Redis|false
     {
         try {
             // Check if Redis extension is available
             if (!extension_loaded('redis')) {
-                error_log('Cache::getRedisConnection: Redis extension not available');
+                Logger::error('Cache', 'Cache::getRedisConnection: Redis extension not available');
                 return false;
             }
 
@@ -380,36 +379,114 @@ class Cache
 
             if (defined('WP_REDIS_SOCK') && file_exists(WP_REDIS_SOCK)) {
                 $connected = $redis->connect(WP_REDIS_SOCK);
-                error_log('Cache::getRedisConnection: Connecting to Redis via socket ' . WP_REDIS_SOCK);
+                Logger::info('Cache', 'Cache::getRedisConnection: Connecting to Redis via socket ' . WP_REDIS_SOCK);
             } else {
                 $connected = $redis->connect($host, $port);
-                error_log('Cache::getRedisConnection: Connecting to Redis at ' . $host . ':' . $port);
+                Logger::info('Cache', 'Cache::getRedisConnection: Connecting to Redis at ' . $host . ':' . $port);
             }
 
             if (!$connected) {
-                error_log('Cache::getRedisConnection: Failed to connect to Redis');
+                Logger::error('Cache', 'Cache::getRedisConnection: Failed to connect to Redis');
                 return false;
             }
 
             // Authenticate if password is set
             if ($password) {
                 if (!$redis->auth($password)) {
-                    error_log('Cache::getRedisConnection: Redis authentication failed');
+                    Logger::error('Cache', 'Cache::getRedisConnection: Redis authentication failed');
                     return false;
                 }
             }
 
             // Select database
             if (!$redis->select($database)) {
-                error_log('Cache::getRedisConnection: Failed to select Redis database');
+                Logger::error('Cache', 'Cache::getRedisConnection: Failed to select Redis database');
                 return false;
             }
 
             return $redis;
 
         } catch (\Exception $e) {
-            error_log('Cache::getRedisConnection error: ' . $e->getMessage());
+            Logger::error('Cache', 'Cache::getRedisConnection error: ' . $e->getMessage());
             return false;
         }
     }
+}
+
+/**
+ * Cache key definitions
+ *
+ * Centralized definition of all cache keys and prefixes used in the application.
+ * Helps avoid typos and ensures consistency across the codebase.
+ */
+class CacheKey
+{
+    // General cache prefixes and keys
+    const OBJECT_CACHE_PREFIX = 'wplokerbjm_obj_';
+    const COMPILED_CONTAINER_HASH = 'compiled_container_hash';
+    const THEME_DATA = 'theme_data';
+
+    // Job-related
+    const JOB_DATA_PREFIX = 'job_data_';
+    const JOB_SCHEMA_PREFIX = 'job_schema_';
+    const JOB_LAST_MODIFIED = 'job_last_modified';
+
+    // REST API
+    const REST_CARD_PREFIX = 'rest_card_';
+    const REST_OVERLAY_PREFIX = 'rest_overlay_';
+    const AUTO_SUGGESTION_PREFIX = 'auto_suggestion_';
+    const LOAD_MORE_PREFIX = 'load_more_';
+    const DYNAMIC_SEARCH_PREFIX = 'dynamic_search_';
+
+    // Presenters
+    const CAROUSEL_JOBS = 'carousel_jobs';
+    const JOB_GRID_PREFIX = 'job_grid_';
+
+    // Taxonomy
+    const TAXONOMY_LAST_MODIFIED = 'taxonomy_last_modified';
+    const COMPANY_SEARCH_PREFIX = 'company_search_';
+    const ALL_TAXONOMY_TERMS = 'all_taxonomy_terms';
+    const POST_TAXONOMIES_PREFIX = 'post_taxonomies_';
+    const TAXONOMY_DEPTH_HANDLE = 'taxonomy_depth_handle';
+    const TAXONOMY_DEPTH_LOKASI = 'taxonomy_depth_lokasi';
+    const TAXONOMY_DEPTH_GENDER = 'taxonomy_depth_gender';
+    const TAXONOMY_DEPTH_PENDIDIKAN = 'taxonomy_depth_pendidikan';
+
+    // Query Builders
+    const SEARCH_SQL_PREFIX = 'search_sql_';
+
+    // Enqueue/Assets
+    const VITE_MANIFEST = 'vite_manifest';
+    const PRELOAD_URLS_PREFIX = 'preload_urls_';
+    const TRANSITIVE_ASSETS_PREFIX = 'transitive_assets_';
+
+    // Autowire Scanner
+    const AUTOWIRE_SCANNER_PREFIX = 'autowire_scanner_';
+
+    // SSG (Static Site Generation)
+    const SSG_POST_DEBOUNCE_PREFIX = 'ssg_post_debounce_';
+    const SSG_DEBOUNCE_PREFIX = 'ssg_debounce_';
+    const SSG_API_RATE_LIMIT_PREFIX = 'ssg_api_rate_limit_';
+    const SSG_CONTENT_PREFIX = 'ssg_content_';
+    const SSG_IS_BOT_PREFIX = 'ssg_is_bot_';
+    const SSG_USER_AGENT_BOT_PREFIX = 'ssg_user_agent_bot_';
+    const SSG_BOT_IP_RANGES = 'ssg_bot_ip_ranges';
+    const SSG_IP_IN_BOT_RANGES_PREFIX = 'ssg_ip_in_bot_ranges_';
+    const SSG_BOT_USER_AGENTS = 'ssg_bot_user_agents';
+
+    // DNS/Bot Detection
+    const DNS_PTR_PREFIX = 'dns_ptr_';
+    const DNS_IS_KNOWN_BOT_PREFIX = 'dns_is_known_bot_';
+    const DNS_IS_KNOWN_BOT_IP_PREFIX = 'dns_is_known_bot_ip_';
+
+    // Request Pattern Analysis
+    const SSG_REQUEST_PATTERN_PREFIX = 'ssg_request_pattern_';
+
+    // LiteSpeed
+    const LITESPEED_RECENT_PURGE = 'litespeed_recent_purge';
+
+    // RankMath
+    const RANKMATH_SITEMAP_DEBOUNCE_PREFIX = 'rankmath_sitemap_debounce_';
+    const RANKMATH_SITEMAP_DELETE_DEBOUNCE_PREFIX = 'rankmath_sitemap_delete_debounce_';
+    const RANKMATH_FULL_SITEMAP_DEBOUNCE = 'rankmath_full_sitemap_debounce';
 }

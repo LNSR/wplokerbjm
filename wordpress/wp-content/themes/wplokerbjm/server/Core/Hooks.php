@@ -3,21 +3,30 @@
 namespace WPLokerBJM\Core;
 
 use WPLokerBJM\Contracts\HooksInterface;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Hooks\Theme\{Enqueue, ThemeInject, DebloatWPTheme};
 use WPLokerBJM\Core\Hooks\Plugins\{LiteSpeedFilters, Litespeed};
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Services\Utilities\SSG\BotDetection;
 use WPLokerBJM\Models\Schema\PostTypes;
-use WPLokerBJM\QueryBuilders\{JobQuery, TaxonomyQuery};
-use WPLokerBJM\Repositories\TaxonomyRepository;
+use WPLokerBJM\QueryBuilders\JobQuery;
+use WPLokerBJM\Services\REST\RESTRoute;
+use WPLokerBJM\Services\SSG\{PostsCRUDListener, RedirectToSSG};
+use WPLokerBJM\Shared\Log\Logger;
+
 /**
  * Global hooks registration for actions and filters.
  * Registers WordPress actions and filters to modify theme behavior.
- * * Might dump some temporary hooks here before promoting to dedicated classes.
+ * * Might dump some temporary hooks here before promoting to dedicated classes/layer.
  */
 class Hooks implements HooksInterface
 {
-    public function __construct(private \WPLokerBJM\Services\Utilities\SSG\BotDetection $botDetection)
-    {
+    public function __construct(
+        private BotDetection $botDetection,
+        private PostsCRUDListener $postsCRUDListener,
+        private RedirectToSSG $redirectToSSG,
+        private RESTRoute $restRoute
+    ) {
     }
 
     /*======================================================================
@@ -30,13 +39,16 @@ class Hooks implements HooksInterface
         add_action('wp_head', fn() => ThemeInject::injectThemeScript());
         add_action('wp_head', fn() => Enqueue::outputPreloadLinks());
         add_action('wp_head', fn() => ThemeInject::preloadLogo());
-        add_action('wp_enqueue_scripts', fn() => DebloatWPTheme::removeWPLibrary(), 0);
+        add_action('wp_enqueue_scripts', fn() => DebloatWPTheme::removeWPLibrary(), 4);
         add_action('litespeed_purged_all', fn() => Litespeed::clearObjectCache());
         add_action('wp_enqueue_scripts', fn() => Enqueue::enqueueAssets());
-        add_action('template_redirect', fn() => $this->oldPost410Redirect());
-        add_action('template_redirect', fn() => $this->redirectToHome());
-        add_action('template_redirect', fn() => $this->modifyLinkHeaders(), 15);
-        add_action('send_headers', fn() => $this->restHeaders());
+        add_action('template_redirect', fn() => $this->oldPost410Redirect(), 4);
+        add_action('template_redirect', fn() => self::redirectToHome(), 4);
+        add_action('template_redirect', fn() => self::modifyLinkHeaders(), 8);
+        add_action('send_headers', fn() => self::restHeaders());
+
+        // API registerActions
+        add_action('rest_api_init', fn() => $this->restRoute->registerRoutes());
 
         // Cache purging hooks
         add_action('save_post', fn(...$args) => $this->purgeQueryCaches(...$args));
@@ -46,6 +58,21 @@ class Hooks implements HooksInterface
         add_action('created_term', fn(...$args) => $this->purgeQueryCaches(...$args));
         add_action('edited_term', fn(...$args) => $this->purgeQueryCaches(...$args));
         add_action('delete_term', fn(...$args) => $this->purgeQueryCaches(...$args));
+
+        // Job-specific cache invalidation hooks
+        add_action('save_post', fn(...$args) => $this->clearJobDataCache(...$args), 10, 2);
+        add_action('delete_post', fn(...$args) => $this->clearJobDataCache(...$args));
+        add_action('updated_post_meta', fn(...$args) => $this->clearJobDataCacheOnMeta(...$args), 10, 4);
+        add_action('set_object_terms', fn(...$args) => $this->clearJobDataCacheOnTax(...$args), 10, 6);
+        add_action('transition_post_status', fn(...$args) => $this->clearJobDataCacheOnStatusChange(...$args), 10, 3);
+
+        // SSG hooks
+        add_action('save_post', fn(...$args) => $this->postsCRUDListener->onSavePost(...$args), 10, 3);
+        add_action('before_delete_post', fn(...$args) => $this->postsCRUDListener->onBeforeDeletePost(...$args), 1, 1);
+        add_action('wp_trash_post', fn(...$args) => $this->postsCRUDListener->onTrashPost(...$args), 1, 1);
+        add_action('template_redirect', fn() => $this->redirectToSSG->serveSSG(), 0);
+        add_action('send_headers', fn() => $this->redirectToSSG->buildHeaders());
+        add_action('wp_footer', fn() => $this->redirectToSSG->setCookieToHuman());
     }
 
     /*======================================================================
@@ -54,8 +81,8 @@ class Hooks implements HooksInterface
 
     public function registerFilters(): void
     {
-        add_filter('wp_robots', fn(...$args) => $this->robotsMeta(...$args));
-        add_filter('rest_pre_serve_request', fn(...$args) => $this->filterRestHeaders(...$args), 10, 4);
+        add_filter('wp_robots', fn(...$args) => self::robotsMeta(...$args));
+        add_filter('rest_pre_serve_request', fn(...$args) => self::filterRestHeaders(...$args), 10, 4);
         add_filter('litespeed_optimize_js_excludes', fn(...$args) => LiteSpeedFilters::lscJsExcludes(...$args), 0);
         add_filter('litespeed_optimize_css_excludes', fn(...$args) => LiteSpeedFilters::lscCssExcludes(...$args), 0);
         add_filter('option_active_plugins', fn(...$args) => $this->disablePluginsForDev(...$args), 0);
@@ -64,11 +91,6 @@ class Hooks implements HooksInterface
         add_filter('site_icon_meta_tags', fn(...$args) => ThemeInject::addSiteIconMetaTags(...$args));
         add_filter('site_icon_image_sizes', fn(...$args) => [32, 48, 96, 144, 192, 256, 384, 512]);
     }
-
-    /*======================================================================
-     | Actions
-     ======================================================================*/
-
 
     /*======================================================================
      | REDIRECTS
@@ -81,7 +103,14 @@ class Hooks implements HooksInterface
      */
     public function oldPost410Redirect(): void
     {
-        if (!is_404()) {
+        if (
+            !is_404() ||
+            is_preview() ||
+            is_admin() ||
+            (defined('REST_REQUEST') && REST_REQUEST) ||
+            wp_doing_ajax() ||
+            wp_doing_cron()
+        ) {
             return;
         }
 
@@ -107,10 +136,15 @@ class Hooks implements HooksInterface
     /**
      * Redirect to home if accessing the lowongan post type archive.
      */
-    public function redirectToHome(): void
+    public static function redirectToHome(): void
     {
-        // Avoid redirecting during admin, AJAX, REST API, or cron requests
-        if (is_admin() || (defined('REST_REQUEST') && REST_REQUEST) || (function_exists('wp_doing_ajax') && wp_doing_ajax()) || (function_exists('wp_doing_cron') && wp_doing_cron())) {
+        // Avoid redirecting during admin, AJAX, REST API, cron, or preview requests
+        if (
+            (defined('REST_REQUEST') && REST_REQUEST) ||
+            wp_doing_ajax() ||
+            wp_doing_cron() ||
+            is_preview()
+        ) {
             return;
         }
 
@@ -130,7 +164,7 @@ class Hooks implements HooksInterface
      * - Noindex for lowongan post type archive page.
      * - Noindex,nofollow for staging/dev subdomains.
      */
-    public function robotsMeta(array $robots): array
+    public static function robotsMeta(array $robots): array
     {
         if (is_post_type_archive('lowongan')) {
             $robots['noindex'] = true;
@@ -151,7 +185,7 @@ class Hooks implements HooksInterface
     /**
      * Sets X-WP-Nonce header for authenticated users.
      */
-    public function restHeaders(): void
+    public static function restHeaders(): void
     {
         try {
             if (!is_user_logged_in()) {
@@ -161,33 +195,35 @@ class Hooks implements HooksInterface
             $nonce = wp_create_nonce('wp_rest');
             header('X-WP-Nonce: ' . $nonce);
         } catch (\Exception $e) {
-            error_log('Hooks::restHeaders error: ' . $e->getMessage());
+            Logger::error('Hooks', 'Hooks::restHeaders error: ' . $e->getMessage());
         }
     }
 
     /**
      * Modifies HTTP headers to remove unwanted Link headers and add sitemap link.
      */
-    public function modifyLinkHeaders(): void
+    public static function modifyLinkHeaders(): void
     {
         if (!headers_sent()) {
             // Remove all Link headers to prevent API discovery exposure
             header_remove('Link');
 
-            $this->exposeSitemapHeader();
+            self::exposeSitemapHeader();
         }
     }
 
-    public function exposeSitemapHeader(): void
+    public static function exposeSitemapHeader(): void
     {
-        $sitemap_url = home_url('/sitemap_index.xml');
-        header('Link: <' . esc_url($sitemap_url) . '>; rel="sitemap"');
+        if (!headers_sent()) {
+            $sitemap_url = home_url('/sitemap_index.xml');
+            header('Link: <' . esc_url($sitemap_url) . '>; rel="sitemap"');
+        }
     }
 
     /**
      * Exposes specific headers for REST API responses.
      */
-    public function filterRestHeaders($served, $result, $request, $server)
+    public static function filterRestHeaders($served, $result, $request, $server)
     {
         if (!headers_sent()) {
             header('Access-Control-Expose-Headers: X-WP-Total, X-WP-TotalPages, Link, X-WP-Nonce');
@@ -200,15 +236,33 @@ class Hooks implements HooksInterface
      ======================================================================*/
 
     /**
-     * !Customizes the SQL WHERE clause for WordPress search queries on job posts.
-     * this used for SearchForm
+     * Customizes the SQL WHERE clause for WordPress search queries on job posts.
+     *
+     * This filter intercepts the default WordPress search behavior and replaces it with
+     * custom SQL that searches across multiple fields relevant to job listings:
+     * - Post titles
+     * - Company names (stored in post meta)
+     * - Taxonomy terms (e.g., job categories, locations)
+     *
+     * This enables more comprehensive search results for the job platform, allowing users
+     * to find jobs by company name or category even if those terms aren't in the title.
+     *
+     * Used by: SearchForm, DynamicSearch REST endpoint, and any WP_Query with 's' parameter
+     * on 'lowongan' post type.
+     *
+     * @param string $search The current search SQL fragment (may be empty).
+     * @param \WP_Query $wp_query The WP_Query object being executed.
+     * @return string Modified search SQL fragment.
      */
     public function jobPostsSearchFilter(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
 
+        // Get the search query from WP_Query vars
         $q = $wp_query->query_vars['s'] ?? '';
+
         if ($wpdb !== null && $q !== '') {
+            // Delegate to JobQuery for building the custom search SQL
             $search = JobQuery::buildPostsSearchSql($wpdb, $q);
         }
 
@@ -224,7 +278,7 @@ class Hooks implements HooksInterface
      */
     public function disablePluginsForDev(array $plugins): array
     {
-        $isDev = Utilities::isDevelopment();
+        $isDev = SharedUtils::isDevelopment();
         if (!$isDev) {
             return $plugins;
         }
@@ -240,8 +294,8 @@ class Hooks implements HooksInterface
      */
     public function disablePluginsforSimulatedProd(array $plugins): array
     {
-        $isProdSimulated = !Utilities::isDevelopment() && Utilities::isLocalhost();
-        if (!$isProdSimulated) {
+        $isDev = SharedUtils::isDevelopment();
+        if (!$isDev) {
             return $plugins;
         }
 
@@ -290,27 +344,117 @@ class Hooks implements HooksInterface
 
         try {
             // Purge job last modified cache
-            \WPLokerBJM\Core\Cache::delete(JobQuery::JOB_LAST_MODIFIED);
+            Cache::delete(CacheKey::JOB_LAST_MODIFIED);
 
             // Purge taxonomy last modified cache
-            \WPLokerBJM\Core\Cache::delete(TaxonomyQuery::TAXONOMY_LAST_MODIFIED);
+            Cache::delete(CacheKey::TAXONOMY_LAST_MODIFIED);
 
             // Purge search SQL caches using pattern delete
-            \WPLokerBJM\Core\Cache::deletePattern(JobQuery::SEARCH_SQL_PREFIX . '*');
+            Cache::deletePattern(CacheKey::SEARCH_SQL_PREFIX . '*');
 
             // Purge company search caches
-            \WPLokerBJM\Core\Cache::deletePattern(TaxonomyQuery::COMPANY_SEARCH_PREFIX . '*');
+            Cache::deletePattern(CacheKey::COMPANY_SEARCH_PREFIX . '*');
+
+            // Purge auto suggestion caches
+            Cache::deletePattern(CacheKey::AUTO_SUGGESTION_PREFIX . '*');
+
+            // Purge load more caches
+            Cache::deletePattern(CacheKey::LOAD_MORE_PREFIX . '*');
+
+            // Purge dynamic search caches
+            Cache::deletePattern(CacheKey::DYNAMIC_SEARCH_PREFIX . '*');
+
+            // Purge presenter caches
+            Cache::delete(CacheKey::CAROUSEL_JOBS);
+            Cache::deletePattern(CacheKey::JOB_GRID_PREFIX . '*');
 
             // Purge taxonomy repository caches
-            \WPLokerBJM\Core\Cache::delete(TaxonomyRepository::ALL_TAXONOMY_TERMS);
-            \WPLokerBJM\Core\Cache::deletePattern(TaxonomyRepository::POST_TAXONOMIES_PREFIX . '*');
+            Cache::delete(CacheKey::ALL_TAXONOMY_TERMS);
+            Cache::deletePattern(CacheKey::POST_TAXONOMIES_PREFIX . '*');
+
+            // Purge taxonomy depth REST caches
+            Cache::delete(CacheKey::TAXONOMY_DEPTH_HANDLE);
+            Cache::delete(CacheKey::TAXONOMY_DEPTH_LOKASI);
+            Cache::delete(CacheKey::TAXONOMY_DEPTH_GENDER);
+            Cache::delete(CacheKey::TAXONOMY_DEPTH_PENDIDIKAN);
+
+            // Purge theme data cache
+            Cache::delete(CacheKey::THEME_DATA);
 
             // If specific post, also purge its taxonomy cache
             if ($post && is_object($post)) {
-                \WPLokerBJM\Core\Cache::delete(TaxonomyRepository::POST_TAXONOMIES_PREFIX . $post->ID);
+                Cache::delete(CacheKey::POST_TAXONOMIES_PREFIX . $post->ID);
             }
         } catch (\Exception $e) {
-            error_log('Hooks::purgeQueryCaches error: ' . $e->getMessage());
+            Logger::error('Hooks', 'Hooks::purgeQueryCaches error: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Clear job data cache when post is saved or deleted.
+     */
+    public function clearJobDataCache($post_id, $post = null): void
+    {
+        $this->invalidateJobDataCache($post_id);
+    }
+
+    /**
+     * Clear job data cache when post meta is updated.
+     */
+    public function clearJobDataCacheOnMeta($meta_id, $object_id, $meta_key, $_meta_value): void
+    {
+        $this->invalidateJobDataCache($object_id);
+    }
+
+    /**
+     * Clear job data cache when object terms are set.
+     */
+    public function clearJobDataCacheOnTax($object_id, $terms, $tt_ids, $taxonomy, $append, $old_tt_ids): void
+    {
+        $this->invalidateJobDataCache($object_id);
+    }
+
+    /**
+     * Clear job data cache when post status changes.
+     */
+    public function clearJobDataCacheOnStatusChange($new_status, $old_status, $post): void
+    {
+        if ($new_status !== $old_status && $post->post_type === 'lowongan') {
+            $this->invalidateJobDataCache($post->ID);
+        }
+    }
+
+    /**
+     * Invalidate job data cache for a specific post if it's a 'lowongan' post type.
+     *
+     * @param int $post_id The post ID
+     * @return bool True if cache was invalidated, false otherwise
+     */
+    private function invalidateJobDataCache(int $post_id): bool
+    {
+        $post_type = get_post_type($post_id);
+        if ($post_type !== 'lowongan') {
+            return false;
+        }
+
+        $jobDataCacheKey = CacheKey::JOB_DATA_PREFIX . $post_id;
+        $cardCacheKey = CacheKey::REST_CARD_PREFIX . $post_id;
+        $overlayCacheKeyLoggedIn = CacheKey::REST_OVERLAY_PREFIX . $post_id . '_logged_in';
+        $overlayCacheKeyPublic = CacheKey::REST_OVERLAY_PREFIX . $post_id . '_public';
+        $schemaCacheKey = CacheKey::JOB_SCHEMA_PREFIX . $post_id;
+
+        // Use deleteMultiple for better performance - single network round trip
+        $cacheKeys = [
+            $jobDataCacheKey,
+            $cardCacheKey,
+            $overlayCacheKeyLoggedIn,
+            $overlayCacheKeyPublic,
+            $schemaCacheKey,
+        ];
+
+        $deleteResults = Cache::deleteMultiple($cacheKeys);
+
+        // Return true if any cache entry was deleted
+        return !empty(array_filter($deleteResults));
     }
 }

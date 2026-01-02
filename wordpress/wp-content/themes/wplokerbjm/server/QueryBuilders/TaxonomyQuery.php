@@ -3,15 +3,13 @@
 namespace WPLokerBJM\QueryBuilders;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Models\Schema\PostTypes;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 
 /**
  * Encapsulates taxonomy-related query construction.
  */
 class TaxonomyQuery
 {
-    const TAXONOMY_LAST_MODIFIED = 'taxonomy_last_modified';
-    const COMPANY_SEARCH_PREFIX = 'company_search_';
     /**
      * Build tax_query parts for job search based on incoming params.
      * Returns an array of tax_query fragments (not wrapped with relation).
@@ -65,7 +63,7 @@ class TaxonomyQuery
         // perusahaan handled specially when 'cari' (search) is provided - partial match
         if (!empty($params['cari'])) {
             $search_term = sanitize_text_field($params['cari']);
-            $cache_key = self::COMPANY_SEARCH_PREFIX . md5($search_term);
+            $cache_key = CacheKey::COMPANY_SEARCH_PREFIX . md5($search_term);
             $company_terms = Cache::get($cache_key);
             if ($company_terms === false) {
                 $company_terms = get_terms([
@@ -121,7 +119,7 @@ class TaxonomyQuery
      */
     public static function getLastModifiedDateForTaxonomies(): string
     {
-        $cache_key = self::TAXONOMY_LAST_MODIFIED;
+        $cache_key = CacheKey::TAXONOMY_LAST_MODIFIED;
         $cached = Cache::get($cache_key);
         if ($cached !== false) {
             return $cached;

@@ -5,17 +5,10 @@ import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "path";
 import liveReload from "vite-plugin-live-reload";
 import { visualizer } from "rollup-plugin-visualizer";
-import dotenv from "dotenv";
 // import { compression, defineAlgorithm } from 'vite-plugin-compression2'
 // import fs from "fs";
 
-function loadEnvVariables() {
-  // secondary .env from root project
-  dotenv.config({ path: ("../../../.env") });
-}
-
 export default defineConfig(({ command }) => {
-  loadEnvVariables();
   return {
     define: {
       // Only expose WP_ENV in development to avoid bundling it in production

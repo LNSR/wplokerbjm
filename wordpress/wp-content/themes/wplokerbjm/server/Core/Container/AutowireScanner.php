@@ -6,8 +6,9 @@ use ReflectionClass;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container;
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Scans directories for autowirable PHP classes and interface implementers.
@@ -27,9 +28,6 @@ use WPLokerBJM\Core\Container;
  */
 class AutowireScanner
 {
-    private const CACHE_KEY_PREFIX = 'autowire_scanner_';
-    private const CACHE_TTL = 86400; // 1 day
-
     private string $baseDirectory;
     private string $namespace;
 
@@ -47,7 +45,7 @@ class AutowireScanner
     {
         $cachePath = Container::$CACHE_DIR;
         $mtime = is_dir($cachePath) ? filemtime($cachePath) : 0;
-        return self::CACHE_KEY_PREFIX . md5($this->baseDirectory . $this->namespace . $this->getDirectoryHash() . $mtime);
+        return CacheKey::AUTOWIRE_SCANNER_PREFIX . md5($this->baseDirectory . $this->namespace . $this->getDirectoryHash() . $mtime);
     }
 
     /**
@@ -59,12 +57,12 @@ class AutowireScanner
         try {
             $dirMtime = filemtime($this->baseDirectory);
             if ($dirMtime === false) {
-                error_log('AutowireScanner::getDirectoryHash: Failed to get directory mtime for ' . $this->baseDirectory);
+                Logger::warning('AutowireScanner', 'AutowireScanner::getDirectoryHash: Failed to get directory mtime for ' . $this->baseDirectory);
                 return '';
             }
             return md5((string) $dirMtime);
         } catch (\Exception $e) {
-            error_log('AutowireScanner::getDirectoryHash error: ' . $e->getMessage());
+            Logger::error('AutowireScanner', 'AutowireScanner::getDirectoryHash error: ' . $e->getMessage());
             return '';
         }
     }
@@ -103,9 +101,9 @@ class AutowireScanner
 
         // Store result in cache (APCu primary, Redis fallback)
         if (function_exists('apcu_enabled') && apcu_enabled()) {
-            apcu_store($cacheKey, $definitions, self::CACHE_TTL);
+            apcu_store($cacheKey, $definitions, 86400); // Cache for 1 day
         } else {
-            Cache::set($cacheKey, $definitions, self::CACHE_TTL);
+            Cache::set($cacheKey, $definitions, 86400); // Cache for 1 day
         }
 
         return $definitions;
@@ -167,9 +165,9 @@ class AutowireScanner
 
         // Cache the result
         if (function_exists('apcu_enabled') && apcu_enabled()) {
-            apcu_store($cacheKey, $implementers, self::CACHE_TTL);
+            apcu_store($cacheKey, $implementers, 86400); // Cache for 1 day
         } else {
-            Cache::set($cacheKey, $implementers, self::CACHE_TTL);
+            Cache::set($cacheKey, $implementers, 86400); // Cache for 1 day
         }
 
         return $implementers;

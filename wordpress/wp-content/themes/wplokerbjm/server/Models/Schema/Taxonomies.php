@@ -8,9 +8,11 @@ use WPLokerBJM\Contracts\HooksInterface;
  *
  * Defines custom taxonomies for job listings.
  *
- * @note This class serves as a blueprint/template for defining WordPress custom taxonomies.
- *       The actual source of truth for taxonomy configurations is this code. Changes here
- *       directly affect the registered taxonomies in WordPress.
+ * @note  * @note This class serves as a blueprint/template for defining Meta Box taxonomies.
+ *       The actual source of truth for field configurations, data, and behavior is the
+ *       Meta Box GUI builder and the database storage. Code changes here may be overridden
+ *       by GUI/DB settings. Use this as a reference for field structure, but manage fields
+ *       primarily through the Meta Box admin interface.
  *
  * @package WPLokerBJM\Models\Schema
  */
@@ -101,6 +103,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
+                'slug'         => self::PERUSAHAAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],
@@ -166,7 +169,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'kategori-lowongan',
+                'slug'         => self::KATEGORI_LOWONGAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],
@@ -233,7 +236,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_tags_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'lokasi-pekerjaan',
+                'slug'         => self::LOKASI_PEKERJAAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],
@@ -300,7 +303,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'jenis-pekerjaan',
+                'slug'         => self::JENIS_PEKERJAAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],
@@ -367,7 +370,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'gender',
+                'slug'         => self::GENDER,
                 'with_front'   => false,
                 'hierarchical' => false,
             ],
@@ -434,7 +437,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'pendidikan',
+                'slug'         => self::PENDIDIKAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],

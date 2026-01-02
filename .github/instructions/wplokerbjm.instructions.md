@@ -32,6 +32,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - Never run Vite dev and Vite build.
 - These repositories are using Docker for development and production(simulated configs only, not resources).
 - Production are on shared hosting with 1GB RAM and 1 CPU core, its using Litespeed Server and QUIC Cloud.
+- When executing command prefix `nocorrect` to avoid zsh correction interference, example: `nocorrect bun install`
 
 ## Backend(PHP)
 
@@ -41,7 +42,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - For PHP DI structure, refer to file:  
   [Container.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Container.php)
 - Use Cache if it's the best decision.
-  - [Cache.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Cache.php)
+  - [Cache.php](../../wordpress/wp-content/themes/wplokerbjm/server/Shared/Cache/Cache.php)
   - Use APCu if is appropriate.
 
 ## Frontend(Svelte/TypeScript)

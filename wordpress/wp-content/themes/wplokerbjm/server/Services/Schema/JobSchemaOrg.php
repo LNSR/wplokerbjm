@@ -1,15 +1,13 @@
 <?php
 
-namespace WPLokerBJM\Services\Job;
+namespace WPLokerBJM\Services\Schema;
 use WPLokerBJM\Factories\JobDataFactory;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 class JobSchemaOrg
 {
-    const SCHEMA_JOB_KEY_PREFIX = 'job_schema_';
-
     public function __construct(
         private JobDataFactory $jobDataFactory
     ) {
@@ -18,11 +16,11 @@ class JobSchemaOrg
     /**
      * Schema.org JobPosting JSON-LD generator
      * @param int $post_id
-     * @return string
+     * @return array
      */
-    public function renderJobPostingJsonLd(int $post_id): string
+    public function getJobPostingSchema(int $post_id): array
     {
-        $cacheKey = self::SCHEMA_JOB_KEY_PREFIX . $post_id;
+        $cacheKey = CacheKey::JOB_SCHEMA_PREFIX . $post_id;
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -83,7 +81,7 @@ class JobSchemaOrg
                 $experienceEnum = "SeniorLevel";
             }
         }
-        $schema["experienceRequirements"] = $experienceEnum ?? (!empty($pengalaman_str) ? $pengalaman_str : null);
+        $experienceRequirements = $experienceEnum ?? (!empty($pengalaman_str) ? $pengalaman_str : null);
 
         $sameAs = [];
 
@@ -104,6 +102,8 @@ class JobSchemaOrg
             "@context" => "https://schema.org",
             "@type" => "JobPosting",
             "title" => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+            "url" => get_permalink($post_id),
+            "@id" => get_permalink($post_id) . '#jobposting',
             "description" => !empty($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) ? wp_strip_all_tags($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) : "No description",
             "aboutCompany" => !empty($jobdata[CustomFields::TENTANG_PERUSAHAAN]) ? wp_strip_all_tags($jobdata[CustomFields::TENTANG_PERUSAHAAN]) : "No information about the company.",
             "requirements" => !empty($jobdata[CustomFields::PERSYARATAN]) ? wp_strip_all_tags($jobdata[CustomFields::PERSYARATAN]) : null,
@@ -130,7 +130,7 @@ class JobSchemaOrg
                 "value" => $post_id,
             ],
             "educationRequirements" => $pendidikan,
-            "experienceRequirements" => !empty($pengalaman_str) ? $pengalaman_str : null,
+            "experienceRequirements" => $experienceRequirements,
             "jobBenefits" => !empty($jobdata[CustomFields::BENEFIT]) ? wp_strip_all_tags($jobdata[CustomFields::BENEFIT]) : null,
         ];
 
@@ -158,15 +158,10 @@ class JobSchemaOrg
         $schema['umur_maksimal'] = $umur_max;
 
         $schema['hiringOrganization'] = array_filter($schema['hiringOrganization'], fn($v) => !is_null($v));
-        $schema = Utilities::filterEmptyValues($schema);
+        $schema = SharedUtils::filterEmptyValues($schema);
 
-        // Mark the script with data attributes so client-side code can target
-        // this specific JobPosting JSON-LD (e.g. data-ld-id="jobposting-123").
-        $jsonLd = '<script type="application/ld+json" data-ld-type="JobPosting" data-ld-id="jobposting-' . intval($post_id) . '">' . json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . '</script>';
+        Cache::set($cacheKey, $schema, 86400);
 
-        Cache::set($cacheKey, $jsonLd, 86400);
-
-        return $jsonLd;
+        return $schema;
     }
-
 }

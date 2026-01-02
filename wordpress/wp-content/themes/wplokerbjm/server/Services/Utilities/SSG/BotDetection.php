@@ -1,6 +1,8 @@
 <?php
 namespace WPLokerBJM\Services\Utilities\SSG;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Trait for HTTP fetching functionality
@@ -12,10 +14,10 @@ trait HttpFetcher
 		return '[SSG HttpFetcher]';
 	}
 
-	private function fetchUrl(string $url): ?string
+	public function fetchUrl(string $url): ?string
 	{
 		if (!function_exists('curl_init')) {
-			error_log($this->getLogPrefix() . ' cURL not available');
+			Logger::warning('HttpFetcher', $this->getLogPrefix() . ' cURL not available');
 			return null;
 		}
 
@@ -32,17 +34,17 @@ trait HttpFetcher
 		$error = curl_error($ch);
 
 		if ($content === false || $httpCode !== 200) {
-			error_log($this->getLogPrefix() . ' cURL error for ' . $url . ': ' . ($error ?: 'HTTP ' . $httpCode));
+			Logger::warning('HttpFetcher', $this->getLogPrefix() . ' cURL error for ' . $url . ': ' . ($error ?: 'HTTP ' . $httpCode));
 			return null;
 		}
 
 		return $content;
 	}
 
-	private function fetchMultipleUrls(array $urls): array
+	public function fetchMultipleUrls(array $urls): array
 	{
 		if (!function_exists('curl_multi_init')) {
-			error_log($this->getLogPrefix() . ' cURL multi not available, falling back to sequential');
+			Logger::warning('HttpFetcher', $this->getLogPrefix() . ' cURL multi not available, falling back to sequential');
 			$results = [];
 			foreach ($urls as $key => $url) {
 				$results[$key] = $this->fetchUrl($url);
@@ -79,7 +81,7 @@ trait HttpFetcher
 			$error = curl_error($ch);
 
 			if ($content === false || $httpCode !== 200) {
-				error_log($this->getLogPrefix() . ' cURL multi error for ' . $urls[$key] . ': ' . ($error ?: 'HTTP ' . $httpCode));
+				Logger::warning('HttpFetcher', $this->getLogPrefix() . ' cURL multi error for ' . $urls[$key] . ': ' . ($error ?: 'HTTP ' . $httpCode));
 				$results[$key] = null;
 			} else {
 				$results[$key] = $content;
@@ -148,14 +150,15 @@ class BotDetection
 		$remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
 
 		// Create cache key from key request parameters
-		$cacheKey = 'ssg_is_bot_' . md5($userAgent . $acceptLanguage . $acceptHeader . $remoteAddr);
+		$cacheKey = CacheKey::SSG_IS_BOT_PREFIX . md5($userAgent . $acceptLanguage . $acceptHeader . $remoteAddr);
 		$cachedResult = Cache::get($cacheKey);
 		if ($cachedResult !== false) {
 			return (bool) $cachedResult;
 		}
+		
 
 		//! Exclude our own SSG bot from being treated as a bot
-		if (in_array($userAgent, self::isSsgBotGeneration(), true)) {
+		if (SharedUtils::isSsgBotRequest()) {
 			Cache::set($cacheKey, false, 3600); // Cache for 1 day
 			return false;
 		}
@@ -163,7 +166,7 @@ class BotDetection
 
 		// 1. Check if IP is in known bot ranges - IMMEDIATE BOT FLAG (most reliable)
 		if ($this->botRangeFetcher->isIpInBotRanges($remoteAddr)) {
-			error_log('[SSG BotDetection] BOT DETECTED BY IP: ' . $remoteAddr);
+			Logger::info('BotDetection', 'BOT DETECTED BY IP: ' . $remoteAddr);
 			Cache::set($cacheKey, true, 3600); // Cache for 1 day
 			return true;
 		}
@@ -174,7 +177,7 @@ class BotDetection
 
 			// IMMEDIATE BOT FLAG for confirmed known bot PTR patterns
 			if ($this->dnsResolver->isKnownBotPtr($ptr)) {
-				error_log('[SSG BotDetection] BOT DETECTED BY PTR: ' . $remoteAddr . ' PTR: ' . $ptr);
+				Logger::info('BotDetection', 'BOT DETECTED BY PTR: ' . $remoteAddr . ' PTR: ' . $ptr);
 				Cache::set($cacheKey, true, 3600); // Cache for 1 day
 				return true;
 			}
@@ -182,7 +185,7 @@ class BotDetection
 
 		// 3. Request Pattern Analysis (for bots that don't identify themselves properly)
 		if ($this->analyzeRequestPatterns()) {
-			error_log('[SSG BotDetection] BOT DETECTED BY REQUEST PATTERN: IP=' . $remoteAddr . ' Headers=' . json_encode([
+			Logger::info('BotDetection', 'BOT DETECTED BY REQUEST PATTERN: IP=' . $remoteAddr . ' Headers=' . json_encode([
 				'accept' => $_SERVER['HTTP_ACCEPT'] ?? '',
 				'accept_language' => $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '',
 				'accept_encoding' => $_SERVER['HTTP_ACCEPT_ENCODING'] ?? '',
@@ -204,27 +207,16 @@ class BotDetection
 	{
 		try {
 			// Clear caches
-			Cache::delete('ssg_bot_ip_ranges');
-			Cache::delete('ssg_bot_user_agents');
+			Cache::delete(CacheKey::SSG_BOT_IP_RANGES);
+			Cache::delete(CacheKey::SSG_BOT_USER_AGENTS);
 
 			$this->botRangeFetcher->getBotRanges();
 			$this->userAgentDetector->getBotUserAgentPatterns();
 
-			error_log('[SSG BotRangeFetcher] Successfully refreshed bot IP ranges via cron');
+			Logger::info('BotRangeFetcher', 'Successfully refreshed bot IP ranges via cron');
 		} catch (\Exception $e) {
-			error_log('[SSG BotRangeFetcher] Failed to refresh bot IP ranges: ' . $e->getMessage());
+			Logger::error('BotRangeFetcher', 'Failed to refresh bot IP ranges: ' . $e->getMessage());
 		}
-	}
-
-	/**
-	 * Check if the current visitor is our SSG bot generation
-	 */
-	public static function isSsgBotGeneration(): array
-	{
-		return apply_filters('ssg_excluded_user_agents', [
-			'SSG-Bot/1.0',
-			'Mozilla/5.0 (compatible; SSG-Bot/1.0)',
-		]);
 	}
 
 	/**
@@ -239,12 +231,12 @@ class BotDetection
 
 		$userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
 		if (!empty($userAgent) && $this->userAgentDetector->isKnownBot($userAgent)) {
-			Cache::set('ssg_user_agent_bot_' . md5($userAgent), true, 3600);
+			Cache::set(CacheKey::SSG_USER_AGENT_BOT_PREFIX . md5($userAgent), true, 3600); // Cache for 1 hour
 			return true;
 		}
 
 		// Cache pattern analysis
-		$patternKey = 'ssg_request_pattern_' . md5(
+		$patternKey = CacheKey::SSG_REQUEST_PATTERN_PREFIX . md5(
 			($_SERVER['HTTP_ACCEPT'] ?? '') .
 			($_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '') .
 			($_SERVER['HTTP_ACCEPT_ENCODING'] ?? '') .
@@ -332,7 +324,7 @@ class DnsResolver
 		}
 
 		// Check cache first
-		$cacheKey = 'dns_ptr_' . $ip;
+		$cacheKey = CacheKey::DNS_PTR_PREFIX . $ip;
 		$cachedResult = Cache::get($cacheKey);
 		if ($cachedResult !== false) {
 			return $cachedResult === 'null' ? null : $cachedResult;
@@ -378,7 +370,7 @@ class DnsResolver
 		}
 
 		// Check cache first
-		$cacheKey = 'dns_is_known_bot_' . md5($ptr);
+		$cacheKey = CacheKey::DNS_IS_KNOWN_BOT_PREFIX . md5($ptr);
 		$cachedResult = Cache::get($cacheKey);
 		if ($cachedResult !== false) {
 			return (bool) $cachedResult;
@@ -410,7 +402,7 @@ class DnsResolver
 			return false;
 		}
 
-		$cacheKey = 'dns_is_known_bot_ip_' . $ip;
+		$cacheKey = CacheKey::DNS_IS_KNOWN_BOT_IP_PREFIX . $ip;
 		$cachedResult = Cache::get($cacheKey);
 		if ($cachedResult !== false) {
 			return (bool) $cachedResult;
@@ -732,7 +724,7 @@ class BotRangeFetcher
 			return self::$knownBotRanges;
 		}
 
-		$cacheKey = 'ssg_bot_ip_ranges';
+		$cacheKey = CacheKey::SSG_BOT_IP_RANGES;
 
 		// Try to get from cache first
 		$cached = Cache::get($cacheKey);
@@ -766,7 +758,7 @@ class BotRangeFetcher
 		}
 
 		// Check cache first
-		$cacheKey = 'ssg_ip_in_bot_ranges_' . $ip;
+		$cacheKey = CacheKey::SSG_IP_IN_BOT_RANGES_PREFIX . $ip;
 		$cachedResult = Cache::get($cacheKey);
 		if ($cachedResult !== false) {
 			return (bool) $cachedResult;
@@ -1129,7 +1121,7 @@ class BotRangeFetcher
 				$parsedRanges = $source['parser']($contents[$key] ?? null);
 				$ranges = array_merge($ranges, $parsedRanges);
 			} catch (\Exception $e) {
-				error_log('[SSG BotRangeFetcher] Failed to parse ' . $key . ': ' . $e->getMessage());
+				Logger::error('BotRangeFetcher', 'Failed to parse ' . $key . ': ' . $e->getMessage());
 			}
 		}
 
@@ -1150,7 +1142,7 @@ class BotRangeFetcher
 	 *
 	 * @source https://help.pinterest.com/en/business/article/pinterest-crawler
 	 */
-	private function fetchPinterestBotRanges(): array
+	public function fetchPinterestBotRanges(): array
 	{
 		$ranges = [];
 
@@ -1165,7 +1157,7 @@ class BotRangeFetcher
 	 *
 	 * @source https://help.baidu.com/question?prod_id=99&class=0&id=3001
 	 */
-	private function fetchBaiduRanges(): array
+	public function fetchBaiduRanges(): array
 	{
 		return [
 			'123.125.71.0/24',
@@ -1179,7 +1171,7 @@ class BotRangeFetcher
 	 *
 	 * @source https://www.sogou.com/docs/help/webmasters.htm
 	 */
-	private function fetchSogouRanges(): array
+	public function fetchSogouRanges(): array
 	{
 		return [
 			'218.30.103.0/24',
@@ -1192,7 +1184,7 @@ class BotRangeFetcher
 	 *
 	 * @source https://www.so.com/help/help_3_2.html
 	 */
-	private function fetch360SpiderRanges(): array
+	public function fetch360SpiderRanges(): array
 	{
 		return [
 			'42.236.99.0/24',
@@ -1207,7 +1199,7 @@ class BotRangeFetcher
 	 * @source https://ahrefs.com/robot (Ahrefs)
 	 * @source https://moz.com/help/mozbot (Moz)
 	 */
-	private function fetchSeoToolRanges(): array
+	public function fetchSeoToolRanges(): array
 	{
 		return [
 			// SEMrush Bot - Known IP ranges
@@ -1236,7 +1228,7 @@ class BotRangeFetcher
 	 * @source https://uptimerobot.com/faq/#What-are-the-IP-addresses-used-by-UptimeRobot (UptimeRobot)
 	 * @source https://archive.org/details/wayback-machine-crawler (Archive.org)
 	 */
-	private function fetchMonitoringAndArchiveRanges(): array
+	public function fetchMonitoringAndArchiveRanges(): array
 	{
 		return [
 			// UptimeRobot (examples)
@@ -1297,7 +1289,7 @@ class UserAgentDetector
 	 */
 	public function getBotUserAgentPatterns(): array
 	{
-		$cacheKey = 'ssg_bot_user_agents';
+		$cacheKey = CacheKey::SSG_BOT_USER_AGENTS;
 		$cached = Cache::get($cacheKey);
 		if ($cached !== false && is_array($cached)) {
 			return $cached;
@@ -1339,24 +1331,6 @@ class UserAgentDetector
 		}
 
 		return false;
-	}
-
-	/**
-	 * Refresh bot UA data by clearing caches and fetching fresh data
-	 * Intended to be called via cron job
-	 */
-	public function refreshBotData(): void
-	{
-		try {
-			// Clear caches
-			Cache::delete('ssg_bot_user_agents');
-
-			$this->getBotUserAgentPatterns();
-
-			error_log('[SSG UserAgentDetector] Successfully refreshed bot UA patterns via cron');
-		} catch (\Exception $e) {
-			error_log('[SSG UserAgentDetector] Failed to refresh bot UA patterns: ' . $e->getMessage());
-		}
 	}
 
 	/**
@@ -1420,19 +1394,21 @@ class UserAgentDetector
 			],
 		];
 
-		// Extract URLs for parallel fetching
-		$urls = array_column($sources, 'url', 'key');
+		// Extract URLs for parallel fetching (indexed array)
+		$urls = array_values(array_column($sources, 'url'));
 
 		// Fetch all URLs in parallel
 		$contents = $this->fetchMultipleUrls($urls);
 
-		// Parse each response
-		foreach ($sources as $key => $source) {
+		// Parse each response (contents is indexed, sources is associative)
+		$sourceKeys = array_keys($sources);
+		foreach ($sourceKeys as $index => $key) {
 			try {
-				$parsedPatterns = $source['parser']($contents[$key] ?? null);
+				$content = $contents[$index] ?? null;
+				$parsedPatterns = $sources[$key]['parser']($content);
 				$patterns = array_merge($patterns, $parsedPatterns);
 			} catch (\Exception $e) {
-				error_log('[SSG UserAgentDetector] Failed to parse UA list ' . $key . ': ' . $e->getMessage());
+				Logger::error('UserAgentDetector', 'Failed to parse UA list ' . $key . ': ' . $e->getMessage());
 			}
 		}
 

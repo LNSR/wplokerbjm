@@ -2,21 +2,25 @@
 
 namespace WPLokerBJM\Presenters\Components;
 use WPLokerBJM\Repositories\JobRepository;
-use WPLokerBJM\Services\Job\JobSchemaOrg;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 
 class JobGrid
 {
 
     public function __construct(
-        private JobSchemaOrg $jobServices,
         private JobRepository $jobRepository
     ) {
     }
 
     public function getProps(array $query_args, string $title, string $context = 'latest', int $total_jobs = 0): array
     {
+        $cacheKey = CacheKey::JOB_GRID_PREFIX . md5(serialize($query_args));
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
 
-        $result = $this->jobRepository->queryCard($query_args);
+        $result = $this->jobRepository->queryJob($query_args);
 
         $jobs = $result['jobs'] ?? [];
         $jobs_query = $result['query'] ?? new \WP_Query();
@@ -42,8 +46,10 @@ class JobGrid
                 'sort' => $_GET['sort'] ?? 'desc',
             ],
             'title' => $title,
-            'totalJobs' => $jobs_query->found_posts
+            'totalJobs' => $jobs_query->found_posts,
         ];
+
+        Cache::set($cacheKey, $props, 3600);
 
         return $props;
     }

@@ -2,9 +2,9 @@
 
 namespace WPLokerBJM\Services\Webhooks;
 
-use WPLokerBJM\Core\Cache;
-use WPLokerBJM\Services\Utilities\SSG\URLFilterService;
-
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Configs\CredentialConfig;
 /**
  * TriggerBuild
  *
@@ -19,21 +19,61 @@ use WPLokerBJM\Services\Utilities\SSG\URLFilterService;
  */
 class TriggerBuildSSG
 {
+
     private string $token;
     private string $owner;
     private string $repo;
     private string $workflow;
     private string $ref;
 
+
     public function __construct(
-        array $config = []
+        private ValidateSSGCredentials $validator,
+        ?array $config = null,
     ) {
-        // Prefer explicit config, fall back to constants
-        $this->token = $config['token'] ?? (defined('SSG_GITHUB_TOKEN') ? SSG_GITHUB_TOKEN : '');
-        $this->owner = $config['owner'] ?? (defined('SSG_GITHUB_OWNER') ? SSG_GITHUB_OWNER : '');
-        $this->repo = $config['repo'] ?? (defined('SSG_GITHUB_REPO') ? SSG_GITHUB_REPO : '');
-        $this->workflow = $config['workflow'] ?? (defined('SSG_GITHUB_WORKFLOW') ? SSG_GITHUB_WORKFLOW : '');
-        $this->ref = $config['ref'] ?? (defined('SSG_GITHUB_REF') ? SSG_GITHUB_REF : '');
+        $this->loadCredentials($config);
+    }
+
+    /**
+     * Load SSG GitHub credentials from configuration
+     */
+    protected function loadCredentials(?array $config = null): void
+    {
+        $creds = CredentialConfig::SSGGitHubCredential($config);
+        $this->token = $creds['token'];
+        $this->owner = $creds['owner'];
+        $this->repo = $creds['repo'];
+        $this->workflow = $creds['workflow'];
+        $this->ref = $creds['ref'];
+    }
+
+    /**
+     * Validate GitHub credentials and permissions without triggering a workflow run.
+     *
+     * @return array{
+     *   success:bool,
+     *   status:int|null,
+     *   checks:array{auth:array{success:bool,status:int|null,error:?string},workflow:array{success:bool,status:int|null,error:?string}},
+     *   error:?string
+     * }
+     */
+    public function validateCredentials(): array
+    {
+        return $this->validator->validateCredentials($this->token, $this->owner, $this->repo, $this->workflow);
+    }
+
+    /**
+     * Check if the token has workflow dispatch permission.
+     *
+     * This makes a test POST request with invalid inputs to the workflow dispatch endpoint.
+     * - 401: No authentication/permission
+     * - 403/422: Has permission but request is invalid/forbidden
+     *
+     * @return array{success:bool, has_permission:bool, status:int|null, error:string|null}
+     */
+    public function checkDispatchPermission(): array
+    {
+        return $this->validator->checkDispatchPermission($this->token, $this->owner, $this->repo, $this->workflow);
     }
 
     /**
@@ -46,10 +86,10 @@ class TriggerBuildSSG
      */
     public function trigger(array $paths, ?string $reason = null, ?bool $dryRun = null): array
     {
-        error_log("SSG Trigger: Starting build trigger - Paths: " . json_encode($paths) . ", Reason: " . ($reason ?? 'none') . ", Dry Run: " . ($dryRun ? 'true' : 'false') . ", Workflow: {$this->workflow}");
+        Logger::info('SSG', "Starting build trigger - Paths: " . json_encode($paths) . ", Reason: " . ($reason ?? 'none') . ", Dry Run: " . ($dryRun ? 'true' : 'false') . ", Workflow: {$this->workflow}");
 
         if (empty($this->token) || empty($this->owner) || empty($this->repo) || empty($this->workflow)) {
-            error_log("SSG Trigger: ERROR - Missing GitHub Actions configuration - Token: " . (!empty($this->token) ? 'set' : 'missing') . ", Owner: {$this->owner}, Repo: {$this->repo}, Workflow: {$this->workflow}");
+            Logger::error('SSG', "Missing GitHub Actions configuration - Token: " . (!empty($this->token) ? 'set' : 'missing') . ", Owner: {$this->owner}, Repo: {$this->repo}, Workflow: {$this->workflow}");
             return [
                 'success' => false,
                 'status' => null,
@@ -58,32 +98,12 @@ class TriggerBuildSSG
             ];
         }
 
-        // Normalize paths: ensure full URLs and unique
-        $normalized = array_values(array_unique(array_map(function ($p) {
-            $p = trim((string) $p);
-            if ($p === '') {
-                return home_url('/');
-            }
-            // If it's already a full URL, return as-is
-            if (filter_var($p, FILTER_VALIDATE_URL)) {
-                return $p;
-            }
-            // Convert relative path to full URL
-            return home_url($p);
-        }, $paths)));
-
-        // Filter out unwanted paths
-        $filtered = URLFilterService::filterPaths($normalized, 'SSG Trigger');
-
-        error_log("SSG Trigger: Normalized paths: " . json_encode($normalized));
-        error_log("SSG Trigger: Filtered paths: " . json_encode($filtered));
-
         // Check for recent similar requests to prevent double triggers
-        $debounceKey = $this->getDebounceKey($filtered, $reason, $dryRun);
+        $debounceKey = $this->getDebounceKey($paths, $reason, $dryRun);
         $cachedResult = $this->checkDebounceCache($debounceKey);
 
         if ($cachedResult !== null) {
-            error_log("SSG Trigger: Skipping duplicate request within debounce window");
+            Logger::info('SSG', "Skipping duplicate request within debounce window");
             return $cachedResult;
         }
 
@@ -98,7 +118,7 @@ class TriggerBuildSSG
             'ref' => $this->ref,
             // We pass inputs > workflow should define inputs to accept these
             'inputs' => [
-                'paths' => json_encode($filtered, JSON_UNESCAPED_SLASHES),
+                'paths' => json_encode($paths, JSON_UNESCAPED_SLASHES),
                 'reason' => $reason ?? '',
                 'dry_run' => ($dryRun === true) ? 'true' : 'false',
             ],
@@ -116,12 +136,12 @@ class TriggerBuildSSG
             'timeout' => 15,
         ];
 
-        error_log("SSG Trigger: Making request to GitHub Actions - Endpoint: $endpoint, Ref: {$this->ref}");
+        Logger::info('SSG', "Making request to GitHub Actions - Endpoint: $endpoint, Ref: {$this->ref}");
 
         try {
             $response = wp_remote_post($endpoint, $args);
         } catch (\Exception $e) {
-            error_log("SSG Trigger: ERROR - Exception during HTTP request: " . $e->getMessage());
+            Logger::error('SSG', "Exception during HTTP request: " . $e->getMessage());
             return [
                 'success' => false,
                 'status' => null,
@@ -131,7 +151,7 @@ class TriggerBuildSSG
         }
 
         if (is_wp_error($response)) {
-            error_log("SSG Trigger: ERROR - HTTP request failed: " . $response->get_error_message());
+            Logger::error('SSG', "HTTP request failed: " . $response->get_error_message());
             $result = [
                 'success' => false,
                 'status' => null,
@@ -147,17 +167,17 @@ class TriggerBuildSSG
 
             // Log specific errors for credential issues
             if ($status === 401) {
-                error_log("SSG Trigger: ERROR - Authentication failed (401 Unauthorized). Check GitHub token (token is " . (empty($this->token) ? 'empty' : 'set') . ")");
-                error_log("SSG Trigger: GitHub API response body: {$resp_body}");
+                Logger::error('SSG', "Authentication failed (401 Unauthorized). Check GitHub token (token is " . (empty($this->token) ? 'empty' : 'set') . ")");
+                Logger::debug('SSG', "GitHub API response body: {$resp_body}");
             } elseif ($status === 403) {
-                error_log("SSG Trigger: ERROR - Access forbidden (403 Forbidden). Check repository permissions or token scope.");
-                error_log("SSG Trigger: GitHub API response body: {$resp_body}");
+                Logger::error('SSG', "Access forbidden (403 Forbidden). Check repository permissions or token scope.");
+                Logger::debug('SSG', "GitHub API response body: {$resp_body}");
             } elseif ($status === 404) {
-                error_log("SSG Trigger: ERROR - Workflow or repository not found (404 Not Found). Check owner: {$this->owner}, repo: {$this->repo}, workflow: {$this->workflow}");
-                error_log("SSG Trigger: GitHub API response body: {$resp_body}");
+                Logger::error('SSG', "Workflow or repository not found (404 Not Found). Check owner: {$this->owner}, repo: {$this->repo}, workflow: {$this->workflow}");
+                Logger::debug('SSG', "GitHub API response body: {$resp_body}");
             }
 
-            error_log("SSG Trigger: Request completed - Status: $status, Success: " . ($success ? 'true' : 'false'));
+            Logger::info('SSG', "Request completed - Status: $status, Success: " . ($success ? 'true' : 'false'));
 
             $result = [
                 'success' => $success,
@@ -193,14 +213,14 @@ class TriggerBuildSSG
     private function checkDebounceCache(string $key): ?array
     {
         try {
-            $cached = Cache::get("ssg_debounce_{$key}");
+            $cached = Cache::get(CacheKey::SSG_DEBOUNCE_PREFIX . $key);
 
             if ($cached !== false) {
-                error_log("SSG Trigger: Found cached result for key: {$key}");
+                Logger::debug('SSG', "Found cached result for key: {$key}");
                 return $cached;
             }
         } catch (\Exception $e) {
-            error_log("SSG Trigger: ERROR checking debounce cache for key: {$key} - " . $e->getMessage());
+            Logger::error('SSG', "Error checking debounce cache for key: {$key} - " . $e->getMessage());
             return null;
         }
 
@@ -216,13 +236,13 @@ class TriggerBuildSSG
             // Determine debounce timing based on multiple factors
             $debounceSeconds = $this->calculateDynamicDebounceTime($result);
 
-            $cacheKey = "ssg_debounce_{$key}";
+            $cacheKey = CacheKey::SSG_DEBOUNCE_PREFIX . $key;
 
             Cache::set($cacheKey, $result, $debounceSeconds);
 
-            error_log("SSG Trigger: Set debounce cache for key: {$key} (expiration: {$debounceSeconds}s)");
+            Logger::debug('SSG', "Set debounce cache for key: {$key} (expiration: {$debounceSeconds}s)");
         } catch (\Exception $e) {
-            error_log("SSG Trigger: ERROR setting debounce cache for key: {$key} - " . $e->getMessage());
+            Logger::error('SSG', "Error setting debounce cache for key: {$key} - " . $e->getMessage());
             return;
         }
     }
@@ -237,11 +257,6 @@ class TriggerBuildSSG
         // Increase time if this was a failed request (retry sooner)
         if (isset($result['success']) && !$result['success']) {
             $baseTime = 30; // 30 seconds for failures
-        }
-
-        // Use longer debounce for LiteSpeed-coordinated operations
-        if ($this->isLiteSpeedCoordinatedOperation()) {
-            $baseTime = 120; // 2 minutes for coordination
         }
 
         // Check for high-priority rebuild scenarios
@@ -273,31 +288,220 @@ class TriggerBuildSSG
 
         return (int) $baseTime;
     }
+}
+
+/**
+ * Validate whether SSG credentials are correctly set up.
+ */
+class ValidateSSGCredentials
+{
+    /**
+     * Validate GitHub credentials and permissions without triggering a workflow run.
+     *
+     * This performs lightweight GitHub API GET requests:
+     * - GET /user to validate token (expired/revoked -> 401)
+     * - GET /repos/{owner}/{repo}/actions/workflows/{workflow} to validate repo/workflow access
+     *
+     * @return array{
+     *   success:bool,
+     *   status:int|null,
+     *   checks:array{auth:array{success:bool,status:int|null,error:?string},workflow:array{success:bool,status:int|null,error:?string}},
+     *   error:?string
+     * }
+     */
+    public function validateCredentials(string $token, string $owner, string $repo, string $workflow): array
+    {
+        Logger::info('SSG', 'Validating GitHub SSG credentials (no dispatch)');
+
+        if (empty($token) || empty($owner) || empty($repo) || empty($workflow)) {
+            return [
+                'success' => false,
+                'status' => null,
+                'checks' => [
+                    'auth' => ['success' => false, 'status' => null, 'error' => 'Missing token'],
+                    'workflow' => ['success' => false, 'status' => null, 'error' => 'Missing owner/repo/workflow'],
+                ],
+                'error' => 'Missing GitHub Actions configuration (token/owner/repo/workflow).',
+            ];
+        }
+
+        $headers = [
+            'Authorization' => 'Bearer ' . $token,
+            'Accept' => 'application/vnd.github+json',
+            'User-Agent' => 'WPLokerBJM-SSG-Trigger/1.0',
+            'X-GitHub-Api-Version' => '2022-11-28',
+        ];
+
+        $authCheck = $this->githubGet('https://api.github.com/user', [
+            'headers' => $headers,
+            'timeout' => 10,
+        ]);
+
+        if (!$authCheck['success']) {
+            return [
+                'success' => false,
+                'status' => $authCheck['status'],
+                'checks' => [
+                    'auth' => $authCheck,
+                    'workflow' => ['success' => false, 'status' => null, 'error' => 'Skipped due to failed auth check'],
+                ],
+                'error' => $this->humanizeCredentialError($authCheck['status']),
+            ];
+        }
+
+        $workflowEndpoint = sprintf(
+            'https://api.github.com/repos/%s/%s/actions/workflows/%s',
+            rawurlencode($owner),
+            rawurlencode($repo),
+            rawurlencode($workflow)
+        );
+
+        $workflowCheck = $this->githubGet($workflowEndpoint, [
+            'headers' => $headers,
+            'timeout' => 10,
+        ]);
+
+        $ok = $authCheck['success'] && $workflowCheck['success'];
+
+        return [
+            'success' => $ok,
+            'status' => $workflowCheck['status'] ?? $authCheck['status'],
+            'checks' => [
+                'auth' => $authCheck,
+                'workflow' => $workflowCheck,
+            ],
+            'error' => $ok ? null : $this->humanizeCredentialError($workflowCheck['status']),
+        ];
+    }
 
     /**
-     * Check if this is a LiteSpeed-coordinated operation
+     * Check if the token has workflow dispatch permission.
+     *
+     * This makes a test POST request with invalid inputs to the workflow dispatch endpoint.
+     * - 401: No authentication/permission
+     * - 403/422: Has permission but request is invalid/forbidden
+     *
+     * @return array{success:bool, has_permission:bool, status:int|null, error:string|null}
      */
-    private function isLiteSpeedCoordinatedOperation(): bool
+    public function checkDispatchPermission(string $token, string $owner, string $repo, string $workflow): array
+    {
+        Logger::info('SSG', 'Checking GitHub workflow dispatch permission');
+
+        if (empty($token) || empty($owner) || empty($repo) || empty($workflow)) {
+            return [
+                'success' => false,
+                'has_permission' => false,
+                'status' => null,
+                'error' => 'Missing GitHub Actions configuration (token/owner/repo/workflow).',
+            ];
+        }
+
+        $endpoint = sprintf(
+            'https://api.github.com/repos/%s/%s/actions/workflows/%s/dispatches',
+            rawurlencode($owner),
+            rawurlencode($repo),
+            rawurlencode($workflow)
+        );
+
+        // Use invalid inputs to trigger validation error if permission exists
+        $body = [
+            'ref' => 'invalid-ref-that-does-not-exist',
+            'inputs' => [
+                'invalid' => 'input',
+            ],
+        ];
+
+        $args = [
+            'headers' => [
+                'Authorization' => 'Bearer ' . $token,
+                'Accept' => 'application/vnd.github.v3+json',
+                'User-Agent' => 'WPLokerBJM-SSG-Trigger/1.0',
+                'Content-Type' => 'application/json',
+                'X-GitHub-Api-Version' => '2022-11-28',
+            ],
+            'body' => wp_json_encode($body),
+            'timeout' => 10,
+        ];
+
+        try {
+            $response = wp_remote_post($endpoint, $args);
+        } catch (\Exception $e) {
+            return [
+                'success' => false,
+                'has_permission' => false,
+                'status' => null,
+                'error' => 'Exception during HTTP request: ' . $e->getMessage(),
+            ];
+        }
+
+        if (is_wp_error($response)) {
+            return [
+                'success' => false,
+                'has_permission' => false,
+                'status' => null,
+                'error' => $response->get_error_message(),
+            ];
+        }
+
+        $status = wp_remote_retrieve_response_code($response);
+
+        // 401 means no permission (unauthorized)
+        // 403/422 means has permission but request invalid
+        $hasPermission = ($status !== 401);
+
+        Logger::info('SSG', "GitHub dispatch permission check: status={$status}, has_permission=" . ($hasPermission ? 'true' : 'false'));
+
+        return [
+            'success' => true,
+            'has_permission' => $hasPermission,
+            'status' => $status,
+            'error' => null,
+        ];
+    }
+
+    /**
+     * Perform a GitHub API GET with standardized error handling.
+     *
+     * @param string $url
+     * @param array $args
+     * @return array{success:bool,status:int|null,error:?string}
+     */
+    private function githubGet(string $url, array $args = []): array
     {
         try {
-            // Check for LiteSpeed coordination markers
-            if (
-                isset($_REQUEST['litespeed_ssg_coord']) ||
-                (isset($_SERVER['HTTP_USER_AGENT']) && strpos($_SERVER['HTTP_USER_AGENT'], 'LiteSpeed-SSG') !== false)
-            ) {
-                return true;
-            }
-
-            // Check for recent LiteSpeed purge actions using transients
-            $purgeTransient = Cache::get('litespeed_recent_purge');
-            if ($purgeTransient !== false) {
-                return true;
-            }
-
-            return false;
+            $response = wp_remote_get($url, $args);
         } catch (\Exception $e) {
-            error_log('TriggerBuild::isLiteSpeedCoordinatedOperation error: ' . $e->getMessage());
-            return false;
+            return ['success' => false, 'status' => null, 'error' => 'Exception during HTTP request: ' . $e->getMessage()];
         }
+
+        if (is_wp_error($response)) {
+            return ['success' => false, 'status' => null, 'error' => $response->get_error_message()];
+        }
+
+        $status = wp_remote_retrieve_response_code($response);
+        $success = ($status >= 200 && $status < 300);
+        $body = wp_remote_retrieve_body($response);
+
+        if ($success) {
+            Logger::info('SSG', "GitHub GET success: {$url} status={$status}");
+        } else {
+            Logger::debug('SSG', "GitHub GET failed: {$url} status={$status} body=" . substr((string) $body, 0, 500));
+        }
+
+        return [
+            'success' => $success,
+            'status' => $status,
+            'error' => $success ? null : 'Non-2xx response from GitHub API',
+        ];
+    }
+
+    private function humanizeCredentialError(?int $status): string
+    {
+        return match ($status) {
+            401 => 'GitHub token is invalid/expired/revoked (401 Unauthorized).',
+            403 => 'GitHub token is valid but lacks permission (403 Forbidden). Check token scopes/repo access/SSO.',
+            404 => 'Repo/workflow not found or not accessible with this token (404 Not Found).',
+            default => 'GitHub credential validation failed. Check token, scopes, and repo/workflow settings.',
+        };
     }
 }

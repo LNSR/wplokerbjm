@@ -1,5 +1,7 @@
 <?php
 namespace WPLokerBJM\Core\Hooks\Theme;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 class ThemeInject
 {
 
@@ -166,8 +168,15 @@ class ThemeInject
      */
     public static function themeData(): array
     {
-        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        $isSSGBot = in_array($userAgent, \WPLokerBJM\Services\Utilities\SSG\BotDetection::isSsgBotGeneration(), true);
+        $isSSGBot = SharedUtils::isSsgBotRequest();
+
+        $cached = Cache::get(CacheKey::THEME_DATA);
+        if ($cached !== false) {
+            // Add dynamic disableTracking
+            $cached['disableTracking'] = $isSSGBot || !!is_user_logged_in();
+            return $cached;
+        }
+
         $disableTracking = $isSSGBot || !!is_user_logged_in();
 
         $logoData = ThemeInject::getLogoData();
@@ -190,6 +199,12 @@ class ThemeInject
             'disableTracking' => $disableTracking,
             'themeVersion' => (int) filemtime(get_stylesheet_directory() . '/composer.json'),
         ];
+
+        // Cache without disableTracking
+        $cacheData = $wpThemeData;
+        unset($cacheData['disableTracking']);
+        Cache::set(CacheKey::THEME_DATA, $cacheData, 3600);
+
         return $wpThemeData;
     }
 
@@ -315,7 +330,8 @@ class DebloatWPTheme
         remove_action('wp_footer', 'wp_enqueue_stored_styles', 1);
         remove_action('wp_footer', 'wp_maybe_inline_styles', 1);
         remove_action('wp_footer', ['WP_Duotone', 'output_footer_assets'], 10);
-        remove_action('wp_footer', 'the_block_template_skip_link', 10);
+        remove_action('wp_footer', 'the_block_template_skip_link', 10); // !deprecated
+        remove_action('wp_footer', 'wp_enqueue_block_template_skip_link', 10); // this theme are fully custom no need for block features
 
         // Remove REST API discovery link
         remove_action('wp_head', 'rest_output_link_wp_head');
@@ -324,8 +340,10 @@ class DebloatWPTheme
         remove_action('wp_head', 'wp_json_output_link_wp_head');
 
         wp_dequeue_style('wc-block-style');
+        wp_dequeue_style('wp-img-auto-sizes-contain');
         wp_dequeue_style('global-styles-inline-css');
         wp_deregister_style('wc-block-style');
         wp_deregister_style('global-styles-inline-css');
+        wp_deregister_style('wp-img-auto-sizes-contain');
     }
 }

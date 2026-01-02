@@ -1,18 +1,20 @@
-#!/usr/bin/env zsh
-watch_dir=server
+#!/usr/bin/env sh
+watch_dir=(server tests)
 
 if ! command -v inotifywait >/dev/null 2>&1; then
   echo "Error: inotifywait is not installed. Please install inotify-tools." >&2
   exit 1
 fi
 
-if [ ! -d "$watch_dir" ]; then
-  echo "Error: Watch directory '$watch_dir' does not exist." >&2
-  exit 1
-fi
+for dir in $watch_dir; do
+  if [ ! -d "$dir" ]; then
+    echo "Error: Watch directory '$dir' does not exist." >&2
+    exit 1
+  fi
+done
 
 # Continuous monitor with debouncing
-inotifywait -m -r -e modify,create,delete --format '%w%f' "$watch_dir" | while read -r file; do
+inotifywait -m -r -e modify,create,delete --format '%w%f' $watch_dir | while read -r file; do
   if [[ -n "$file" ]]; then
     echo "[$(date +'%H:%M:%S')] Change detected in $file, scheduling autoload dump..."
     # Kill any previous pending composer run

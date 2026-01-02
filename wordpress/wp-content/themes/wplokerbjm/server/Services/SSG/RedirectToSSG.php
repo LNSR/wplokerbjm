@@ -1,48 +1,38 @@
 <?php
 
-namespace WPLokerBJM\Services\PostsManagement\SSG;
+namespace WPLokerBJM\Services\SSG;
 
-use WPLokerBJM\Contracts\HooksInterface;
-use WPLokerBJM\Services\Utilities\SSG\Integrations\{SSGIntegration, LiteSpeedIntegration};
 use WPLokerBJM\Services\Utilities\SSG\SSGUtilities;
-use WPLokerBJM\Core\{Cache, Hooks};
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * SSG Service
  *
  * Serves static SSG versions of posts to non-logged-in users based on bot/human configuration
  */
-class RedirectToSSG implements HooksInterface
+class RedirectToSSG
 {
 	public function __construct(
 		private \WPLokerBJM\Services\Utilities\SSG\BotDetection $botDetection,
 		private \WPLokerBJM\Services\Webhooks\TriggerBuildSSG $triggerBuildSSG,
-		private Hooks $hooks
 	) {
 	}
 
 	const COOKIE_NAME = '_lscache_vary_wplokerbjm_visitor_type';
 
-	public function registerActions(): void
-	{
-		$priorities = LiteSpeedIntegration::getHookPriorities();
-		add_action('template_redirect', fn() => $this->serveSSG(), $priorities['ssg_before_litespeed']);
-		add_action('send_headers', fn() => $this->buildHeaders(), $priorities['ssg_after_litespeed']);
-		add_action('wp_footer', fn() => $this->setCookieToHuman());
-	}
-
-	public function registerFilters(): void
-	{
-		// No filters to register
-	}
-
 	public function serveSSG(): void
 	{
 		try {
-			$serveFor = get_option('ssg_serve_for', 'bot');
 			$isBot = $this->botDetection->isBot();
 
 			if (is_user_logged_in()) {
+				return;
+			}
+
+			// Self-heal from cache poisoning: if cookie indicates human, don't serve SSG
+			if (isset($_COOKIE[self::COOKIE_NAME]) && $_COOKIE[self::COOKIE_NAME] === 'human') {
 				return;
 			}
 
@@ -52,7 +42,7 @@ class RedirectToSSG implements HooksInterface
 			$acceptLanguage = $_SERVER['HTTP_ACCEPT_LANGUAGE'] ?? '';
 			$acceptHeader = $_SERVER['HTTP_ACCEPT'] ?? '';
 			$referer = $_SERVER['HTTP_REFERER'] ?? '';
-			SSGIntegration::logCoordination('Browser info for SSG request', [
+			Logger::info('SSG', 'Browser info for SSG request', [
 				'user_agent' => $userAgent,
 				'ip' => $remoteAddr,
 				'accept_language' => $acceptLanguage,
@@ -61,12 +51,7 @@ class RedirectToSSG implements HooksInterface
 				'is_bot' => $isBot,
 			]);
 
-			// Self-heal from cache poisoning: if cookie indicates human, don't serve SSG
-			if (isset($_COOKIE[self::COOKIE_NAME]) && $_COOKIE[self::COOKIE_NAME] === 'human') {
-				return;
-			}
-
-			if ($serveFor === 'bot' && !$isBot || $serveFor === 'human' && $isBot) {
+			if (!$isBot) {
 				return; // Serve SSG only to bots
 			}
 
@@ -93,7 +78,7 @@ class RedirectToSSG implements HooksInterface
 				$this->triggerBuildSSG->trigger(['/'], 'home_page_missing_ssg', false);
 			}
 		} catch (\Exception $e) {
-			error_log('RedirectToSSG::serveSSG error: ' . $e->getMessage());
+			Logger::error('SSG', 'RedirectToSSG::serveSSG error: ' . $e->getMessage());
 		}
 	}
 
@@ -106,8 +91,7 @@ class RedirectToSSG implements HooksInterface
 
 		$isBot = $this->botDetection->isBot();
 
-		$UserAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-		$isSSGbot = in_array($UserAgent, $this->botDetection::isSsgBotGeneration(), true);
+		$isSSGbot = SharedUtils::isSsgBotRequest();
 		$visitorType = $isSSGbot ? 'ssg_bot' : ($isBot ? 'bot' : 'human');
 
 		// LiteSpeed expects: X-LiteSpeed-Vary: cookie=my_cookie_name or header=...
@@ -127,7 +111,7 @@ class RedirectToSSG implements HooksInterface
 			);
 			$_COOKIE[$cookieName] = $visitorType;
 			header('X-LiteSpeed-Vary: cookie=' . $cookieName . ',value=' . $visitorType);
-			SSGIntegration::logCoordination('Visitor cookie set', ['cookie' => $cookieName, 'value' => $visitorType]);
+			Logger::info('SSG', 'Visitor cookie set', ['cookie' => $cookieName, 'value' => $visitorType]);
 		}
 		$isSSGbot ? header('Vary: Cookie,User-Agent,Accept-Encoding') : header('Vary: Cookie,Accept-Encoding');
 	}
@@ -135,7 +119,7 @@ class RedirectToSSG implements HooksInterface
 	/**
 	 * Set exclusive SSG headers when served
 	 */
-	public function exclusiveSSGHeaders($post, $ssgContent, $contentLength)
+	public function exclusiveSSGHeaders($post, $ssgContent, $contentLength, ?string $extraHeaders = null): void
 	{
 		$ifNoneMatch = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
 		$etag = '"' . md5($post->ID . '-' . $ssgContent) . '"';
@@ -152,7 +136,8 @@ class RedirectToSSG implements HooksInterface
 		header('Content-Length: ' . $contentLength);
 		header('Last-Modified: ' . gmdate('D, d M Y H:i:s T', get_the_modified_time('U', $post->ID)));
 		header('Server-Timing: ssg-serve;dur=' . (microtime(true) - $_SERVER['REQUEST_TIME_FLOAT']) * 1000);
-		$this->hooks->exposeSitemapHeader();
+		$sitemap_url = home_url('/sitemap_index.xml');
+        header('Link: <' . esc_url($sitemap_url) . '>; rel="sitemap"');
 	}
 
 	/**
@@ -167,13 +152,13 @@ class RedirectToSSG implements HooksInterface
 	{
 		try {
 			$visitorType = $isBot ? 'bot' : 'human';
-			$cacheKey = 'ssg_content_' . $post->ID . '_' . $visitorType;
+			$cacheKey = CacheKey::SSG_CONTENT_PREFIX . $post->ID . '_' . $visitorType;
 			$cached = Cache::get($cacheKey);
 			$ssgContent = false;
 
 			$currentMtime = @filemtime($ssgFilePath);
 			if ($currentMtime === false) {
-				SSGIntegration::logCoordination('Unable to read SSG file mtime', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+				Logger::info('SSG', 'Unable to read SSG file mtime', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 				$currentMtime = time(); // fallback to avoid fatal comparisons
 			}
 
@@ -184,20 +169,20 @@ class RedirectToSSG implements HooksInterface
 
 			if ($cached && is_array($cached) && isset($cached['mtime'], $cached['content']) && $cached['mtime'] == $currentMtime) {
 				$ssgContent = $cached['content'];
-				SSGIntegration::logCoordination('Serving cached SSG from cache to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+				Logger::info('SSG', 'Serving cached SSG from cache to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 			} else {
 				$ssgContent = @file_get_contents($ssgFilePath);
 				if ($ssgContent !== false) {
 					Cache::set($cacheKey, ['content' => $ssgContent, 'mtime' => $currentMtime], 0); // No expiration, rely on mtime check
-					SSGIntegration::logCoordination('Serving fresh SSG from disk to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+					Logger::info('SSG', 'Serving fresh SSG from disk to ' . ($isBot ? 'bot' : 'human'), ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 				} else {
-					SSGIntegration::logCoordination('Failed to read SSG file from disk', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
+					Logger::info('SSG', 'Failed to read SSG file from disk', ['post_id' => $post->ID, 'file' => basename($ssgFilePath)]);
 				}
 			}
 
 			return $ssgContent;
 		} catch (\Exception $e) {
-			error_log('RedirectToSSG::getSSGContent error for post ' . $post->ID . ': ' . $e->getMessage());
+			Logger::error('SSG', 'RedirectToSSG::getSSGContent error for post ' . $post->ID . ': ' . $e->getMessage());
 			return false;
 		}
 	}
@@ -210,9 +195,6 @@ class RedirectToSSG implements HooksInterface
 	 */
 	public function setCookieToHuman(): void
 	{
-		$useragent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-		$isSSGbot = in_array($useragent, $this->botDetection::isSsgBotGeneration(), true);
-
 		if (is_user_logged_in()) {
 			return;
 		}

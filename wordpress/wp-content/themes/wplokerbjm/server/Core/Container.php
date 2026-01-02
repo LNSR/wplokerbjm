@@ -4,7 +4,9 @@ namespace WPLokerBJM\Core;
 
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Shared\Log\Logger;
 
 class Container
 {
@@ -55,7 +57,7 @@ class Container
 
                 // Enable autowiring and attributes for automatic dependency injection
                 $builder->useAutowiring(true);
-                $builder->useAttributes(true);
+                $builder->useAttributes(false);
 
                 // Add all service definitions
                 self::setupDefinitions($builder);
@@ -63,7 +65,7 @@ class Container
                 // Build the container
                 self::$container = $builder->build();
             } catch (\Exception $e) {
-                error_log('Container::getContainer error: ' . $e->getMessage());
+                Logger::error('Container', 'Container::getContainer error: ' . $e->getMessage());
                 throw $e; // Re-throw as container is critical for application functionality
             }
         }
@@ -87,21 +89,21 @@ class Container
     {
         if (!is_dir(self::$CACHE_DIR)) {
             if (!mkdir(self::$CACHE_DIR, 0755, true)) {
-                error_log("Failed to create cache directory: " . self::$CACHE_DIR);
+                Logger::error('Container', "Failed to create cache directory: " . self::$CACHE_DIR);
             }
         }
 
-        $isProduction = !Utilities::isDevelopment();
+        $isProduction = !SharedUtils::isDevelopment();
 
         $compiledFile = self::$CACHE_FILE;
-        $objectKey = 'compiled_container_hash';
+        $objectKey = CacheKey::COMPILED_CONTAINER_HASH;
 
         if ($isProduction && is_file($compiledFile)) {
             $currentHash = @hash_file('sha1', $compiledFile);
-            $storedHash = \WPLokerBJM\Core\Cache::get($objectKey);
+            $storedHash = Cache::get($objectKey);
             if ($storedHash !== $currentHash) {
                 array_map('unlink', glob(self::$CACHE_DIR . '/*'));
-                \WPLokerBJM\Core\Cache::set($objectKey, $currentHash, 0);
+                Cache::set($objectKey, $currentHash, 0);
             }
         }
 

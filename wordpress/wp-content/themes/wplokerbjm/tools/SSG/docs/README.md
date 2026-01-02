@@ -49,7 +49,6 @@ tools/SSG/
 │   ├── RedirectToSSG.php       # SSG page redirects
 │   └── TriggerBuildSSG.php        # GitHub Actions API integration
 └── Services/Utilities/SSG/
-    ├── LiteSpeedIntegration.php # Cache integration
     ├── SSGUtilities.php        # WordPress SSG utilities
     └── URLFilterService.php    # URL processing for SSG
 ```

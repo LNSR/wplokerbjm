@@ -2,6 +2,8 @@
 
 namespace WPLokerBJM\Services\Utilities\SSG;
 
+use WPLokerBJM\Shared\Log\Logger;
+
 /**
  * SSG Utilities
  *
@@ -57,7 +59,7 @@ class SSGUtilities
         // Delete the file if it exists
         if (file_exists($ssgFilePath)) {
             if (unlink($ssgFilePath)) {
-                error_log("SSG Delete: Successfully deleted SSG file: $ssgFilePath (Reason: $reason)");
+                Logger::info('SSG', "Successfully deleted SSG file: $ssgFilePath (Reason: $reason)");
 
                 // Purge LiteSpeed cache for this post and SSG tag
                 if (function_exists('do_action')) {
@@ -65,10 +67,10 @@ class SSGUtilities
                     do_action('litespeed_purge_tag', 'ssg');
                 }
             } else {
-                error_log("SSG Delete: Failed to delete SSG file: $ssgFilePath (Reason: $reason)");
+                Logger::warning('SSG', "Failed to delete SSG file: $ssgFilePath (Reason: $reason)");
             }
         } else {
-            error_log("SSG Delete: SSG file not found: $ssgFilePath (Reason: $reason)");
+            Logger::debug('SSG', "SSG file not found: $ssgFilePath (Reason: $reason)");
         }
 
         // Also clean up empty directories
@@ -92,7 +94,7 @@ class SSGUtilities
             $files = array_diff(scandir($dirPath), ['.', '..']);
             if (empty($files)) {
                 rmdir($dirPath);
-                error_log("SSG Delete: Removed empty directory: $dirPath");
+                Logger::debug('SSG', "Removed empty directory: $dirPath");
                 $dirPath = dirname($dirPath);
             } else {
                 break;

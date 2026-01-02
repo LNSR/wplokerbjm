@@ -2,9 +2,10 @@
 
 namespace WPLokerBJM\Controllers\REST;
 
-use WPLokerBJM\Services\Utilities\SSG\URLFilterService;
-use WPLokerBJM\Services\Utilities\Utilities;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Controllers\Utilities\ControllerUtils;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * REST endpoint for manually triggering SSG builds
@@ -44,17 +45,11 @@ class DispatchSSGBuild
             $reason = $inputs['reason'];
             $dryRun = $inputs['dry_run'];
 
-            // Filter paths
-            $filteredPaths = $this->filterPaths($paths);
-            if ($filteredPaths instanceof \WP_REST_Response) {
-                return $filteredPaths;
-            }
-
             // Set rate limit before processing
-            Cache::set($cacheKey, time(), 120); // 120 seconds = 2 minutes
+            Cache::set($cacheKey, time(), 120); // 2 minutes
 
             // Trigger the build
-            $result = $this->triggerBuild->trigger($filteredPaths, $reason, $dryRun);
+            $result = $this->triggerBuild->trigger($paths, $reason, $dryRun);
 
             // Return response
             $statusCode = $result['success'] ? 200 : 500;
@@ -62,14 +57,13 @@ class DispatchSSGBuild
             return new \WP_REST_Response([
                 'success' => $result['success'],
                 'paths' => $paths,
-                'filtered_paths' => $filteredPaths,
                 'reason' => $reason,
                 'dry_run' => $dryRun,
                 'result' => $result,
             ], $statusCode);
         } catch (\Exception $e) {
-            error_log('DispatchSSGBuild::handle error: ' . $e->getMessage());
-            return Utilities::failedResponse('Internal server error', 500);
+            Logger::error('REST', 'DispatchSSGBuild::handle error: ' . $e->getMessage());
+            return ControllerUtils::failedResponse('Internal server error', 500);
         }
     }
 
@@ -80,12 +74,12 @@ class DispatchSSGBuild
     {
         // Check if user has permission (admin only)
         if (!current_user_can('manage_options')) {
-            return Utilities::failedResponse('Insufficient permissions', 403);
+            return ControllerUtils::failedResponse('Insufficient permissions', 403);
         }
 
         // Disable API for localhost
-        if (Utilities::isLocalhost()) {
-            return Utilities::failedResponse('SSG API is disabled for localhost', 403);
+        if (SharedUtils::isLocalhost()) {
+            return ControllerUtils::failedResponse('SSG API is disabled for localhost', 403);
         }
 
         return null; // Access granted
@@ -97,11 +91,11 @@ class DispatchSSGBuild
     private function checkRateLimit(): \WP_REST_Response|string
     {
         $userId = get_current_user_id();
-        $cacheKey = "ssg_api_rate_limit_{$userId}";
+        $cacheKey = CacheKey::SSG_API_RATE_LIMIT_PREFIX . $userId;
         $lastRequest = Cache::get($cacheKey);
 
         if ($lastRequest !== false) {
-            return Utilities::failedResponse('Rate limit exceeded. Please wait before making another request.', 429);
+            return ControllerUtils::failedResponse('Rate limit exceeded. Please wait before making another request.', 429);
         }
 
         return $cacheKey;
@@ -122,7 +116,7 @@ class DispatchSSGBuild
 
         // Validate paths
         if (empty($paths) || !is_array($paths)) {
-            return Utilities::failedResponse('Paths parameter is required and must be an array', 400);
+            return ControllerUtils::failedResponse('Paths parameter is required and must be an array', 400);
         }
 
         return [
@@ -130,21 +124,5 @@ class DispatchSSGBuild
             'reason' => $reason,
             'dry_run' => $dryRun,
         ];
-    }
-
-    /**
-     * Filter paths and check if any remain
-     */
-    private function filterPaths(array $paths): \WP_REST_Response|array
-    {
-        // Filter out unwanted URLs (e.g., od_url_metrics post type)
-        $filteredPaths = URLFilterService::filterPaths($paths, 'SSG API');
-
-        // Check if all paths were filtered out
-        if (empty($filteredPaths)) {
-            return Utilities::failedResponse('All provided paths were filtered out. No valid paths to process.', 400);
-        }
-
-        return $filteredPaths;
     }
 }

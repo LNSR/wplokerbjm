@@ -136,7 +136,6 @@ server/
 │       ├── SSG/                        # SSG-related utilities
 │       │   ├── BotDetection.php
 │       │   ├── Integrations/
-│       │   │   ├── LiteSpeedIntegration.php
 │       │   │   ├── RankMathIntegration.php
 │       │   │   └── SSGIntegration.php
 │       │   ├── SSGUtilities.php

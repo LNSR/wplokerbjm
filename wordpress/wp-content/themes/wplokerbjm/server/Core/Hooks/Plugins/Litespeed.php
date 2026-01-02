@@ -1,6 +1,6 @@
 <?php
 namespace WPLokerBJM\Core\Hooks\Plugins;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container;
 
 /**
@@ -28,7 +28,7 @@ class Litespeed
             wp_opcache_invalidate_directory(get_stylesheet_directory() . '/server');
         }
 
-        Cache::flushGroup(Cache::OBJECT_CACHE_PREFIX);
+        Cache::flushGroup(CacheKey::OBJECT_CACHE_PREFIX);
 
         // Clear entire cache folder last
         $cacheDir = Container::$CACHE_DIR;

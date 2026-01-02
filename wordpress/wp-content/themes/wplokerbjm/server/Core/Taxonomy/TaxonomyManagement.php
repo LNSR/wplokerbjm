@@ -1,5 +1,5 @@
 <?php
-namespace WPLokerBJM\Services\Taxonomy;
+namespace WPLokerBJM\Core\Taxonomy;
 
 use WPLokerBJM\QueryBuilders\TaxonomyQuery;
 

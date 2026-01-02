@@ -1,7 +1,9 @@
 <?php
 
 namespace WPLokerBJM\Controllers\REST;
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Controllers\Utilities\ControllerUtils;
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 
 class AutoSuggestionSearch
 {
@@ -10,9 +12,15 @@ class AutoSuggestionSearch
         try {
             $query = sanitize_text_field($request->get_param('query'));
 
+            $cacheKey = CacheKey::AUTO_SUGGESTION_PREFIX . md5($query);
+            $cached = Cache::get($cacheKey);
+            if ($cached !== false) {
+                return rest_ensure_response($cached);
+            }
+
             $results = [];
 
-            if ($query && strlen($query) >= 2) {
+            if ($query && strlen($query) >= 4) {
                 $args = \WPLokerBJM\QueryBuilders\JobQuery::autoSuggestionArgs($query);
                 $post_ids = get_posts($args);
 
@@ -25,10 +33,12 @@ class AutoSuggestionSearch
 
             $uniqueResults = array_values(array_unique($results));
 
+            Cache::set($cacheKey, $uniqueResults, 3600);
+
             return rest_ensure_response($uniqueResults);
         } catch (\Exception $e) {
-            error_log('AutoSuggestionSearch::handle error: ' . $e->getMessage());
-            return Utilities::failedResponse('Internal server error', 500);
+            Logger::error('REST', 'AutoSuggestionSearch::handle error: ' . $e->getMessage());
+            return ControllerUtils::failedResponse('Internal server error', 500);
         }
     }
 }

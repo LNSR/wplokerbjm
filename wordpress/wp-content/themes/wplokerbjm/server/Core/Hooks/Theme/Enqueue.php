@@ -1,15 +1,16 @@
 <?php
 
 namespace WPLokerBJM\Core\Hooks\Theme;
-use WPLokerBJM\Core\Cache;
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Log\Logger;
 
 class Enqueue
 {
     public static function enqueueAssets(): void
     {
         try {
-            if (Utilities::isDevelopment()) {
+            if (SharedUtils::isDevelopment()) {
                 Vite::enqueueForDevelopment();
                 return;
             }
@@ -20,7 +21,7 @@ class Enqueue
             }
             // No need to merge, just use the static property in filterStyleLoaderTag
         } catch (\Exception $e) {
-            error_log('Enqueue::enqueueAssets error: ' . $e->getMessage());
+            Logger::error('Enqueue', 'Enqueue::enqueueAssets error: ' . $e->getMessage());
         }
     }
 
@@ -31,7 +32,7 @@ class Enqueue
     public static function outputPreloadLinks(): void
     {
         try {
-            if (Utilities::isDevelopment()) {
+            if (SharedUtils::isDevelopment()) {
                 return;
             }
 
@@ -45,7 +46,7 @@ class Enqueue
                 }
             endforeach;
         } catch (\Exception $e) {
-            error_log('Enqueue::outputPreloadLinks error: ' . $e->getMessage());
+            Logger::error('Enqueue', 'Enqueue::outputPreloadLinks error: ' . $e->getMessage());
             return;
         }
     }
@@ -56,17 +57,13 @@ class Enqueue
  */
 class Vite
 {
-    const CACHE_TTL = 81600; // 1 day in seconds
-    const VITE_MANIFEST_CACHE_KEY = 'vite_manifest';
-    const PRELOAD_URLS_CACHE_PREFIX = 'preload_urls_';
-    const TRANSITIVE_ASSETS_CACHE_PREFIX = 'transitive_assets_';
 
     /**
      * Get preload URLs for the given path.
      */
     public static function getPreloadUrls(string $path): array
     {
-        $cacheKey = self::PRELOAD_URLS_CACHE_PREFIX . md5($path);
+        $cacheKey = CacheKey::PRELOAD_URLS_PREFIX . md5($path);
         $urls = Cache::get($cacheKey);
         if ($urls !== false) {
             return $urls;
@@ -110,7 +107,7 @@ class Vite
         // Remove duplicates
         $urls = array_unique($urls);
 
-        Cache::set($cacheKey, $urls, self::CACHE_TTL); // Cache for 1 day, matching manifest TTL
+        Cache::set($cacheKey, $urls, 86400); // Cache for 1 day, matching manifest TTL
         return $urls;
     }
 
@@ -243,13 +240,13 @@ class Vite
         $dist_dir = self::getDistDir();
         $manifest_path = $dist_dir . '/.vite/manifest.json';
 
-        $manifest = Cache::get(self::VITE_MANIFEST_CACHE_KEY);
+        $manifest = Cache::get(CacheKey::VITE_MANIFEST);
         if ($manifest === false) {
             if (!file_exists($manifest_path)) {
                 return null;
             }
             $manifest = json_decode(file_get_contents($manifest_path), true);
-            Cache::set(self::VITE_MANIFEST_CACHE_KEY, $manifest, self::CACHE_TTL); // Cache for 1 day
+            Cache::set(CacheKey::VITE_MANIFEST, $manifest, 86400); // Cache for 1 day
         }
         return $manifest;
     }
@@ -264,7 +261,7 @@ class Vite
         }
         $visited[] = $key;
 
-        $cacheKey = self::TRANSITIVE_ASSETS_CACHE_PREFIX . md5($key);
+        $cacheKey = CacheKey::TRANSITIVE_ASSETS_PREFIX . md5($key);
         $assets = Cache::get($cacheKey);
         if ($assets !== false) {
             return $assets;
@@ -289,7 +286,7 @@ class Vite
             }
         }
 
-        Cache::set($cacheKey, $assets, self::CACHE_TTL); // Cache for 1 day, matching manifest TTL
+        Cache::set($cacheKey, $assets, 86400); // Cache for 1 day, matching manifest TTL
         return $assets;
     }
 }
