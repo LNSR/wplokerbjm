@@ -3,7 +3,7 @@
   import type { JobCardProps, WPBasePost } from "@/types";
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
 
-  let { jobId, variant = undefined } = $props<{
+  const { jobId, variant = undefined } = $props<{
     jobId: WPBasePost["id"];
     variant: JobCardProps["variant"];
   }>();
@@ -26,7 +26,7 @@
     // prevent parent handlers
     e.preventDefault();
     e.stopPropagation();
-    if (isNaN(jobId) || jobId == null || jobId < Number(1)) return;
+    if (isNaN(jobId) || jobId === null || jobId < Number(1)) return;
     // protect against both reactive loading state and synchronous re-entry
     if (isLoading || _clickLock) return;
 
@@ -46,7 +46,7 @@
         confirmationState = "removed";
       }
 
-    } catch (err) {
+    } catch {
       isPending = false;
       const wasSaved = preToggleSaved;
       errorState = wasSaved ? "remove" : "save";

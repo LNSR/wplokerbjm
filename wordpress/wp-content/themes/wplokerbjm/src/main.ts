@@ -1,9 +1,11 @@
-import { SvelteMounter } from '@/services/Mounter';
+import { svelteMounter } from '@/services/Mounter';
 import type { ComponentConfig } from '@/types';
-import { isAppEl } from '@/utils/elements';
+import { isAppEl } from '@/utils';
+import app from '@/app.svelte';
+import "@css/app.css";
 
 const configs: ComponentConfig[] = [
-  { selector: isAppEl, component: await import('@/app.svelte') },
+  { selector: isAppEl, component: app },
 ];
 
-await new SvelteMounter().mount(configs);
+svelteMounter.mount(configs);

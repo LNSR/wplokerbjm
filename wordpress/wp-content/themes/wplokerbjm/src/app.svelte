@@ -1,13 +1,16 @@
 <script module lang="ts">
+  import { onMount, type Component } from "svelte";
+  import { fade } from "svelte/transition";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
-  import { GoogleServices } from "$lib/utils/Google.svelte";
-  import { removeJobPostingJsonLd } from "$lib/utils/elements.svelte";
+  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
+  import { GoogleServices } from "@/services/Google";
 
-  let pathname = $derived(routeStore.currentUrl.pathname);
-  let isLoading = $derived(routeStore.isLoading);
-  let loadingComponent = $derived(routeStore.loadingComponent);
-  let componentNamePath = $derived(routeStore.getComponentNamePath(pathname));
-  let CurrentComponent: typeof SvelteComponent | null = $state(null);
+  const pathname = $derived(routeStore.currentUrl.pathname);
+  const isLoading = $derived(routeStore.isLoading);
+  const isInitialLoad = $derived(routeStore.isInitialLoad);
+  const loadingComponent = $derived(routeStore.loadingComponent);
+  const componentNamePath = $derived(routeStore.getComponentNamePath(pathname));
+  let CurrentComponent: Component | null = $state(null);
 
   class AppRouteHandler {
     static async loadRoute(
@@ -19,7 +22,7 @@
         routeStore.setIsLoading(true, componentNamePath);
         const m = await importPromise;
         if (loadForPath !== pathname) return; // prevent race condition
-        CurrentComponent = m.default;
+        CurrentComponent = m;
       } catch (err) {
         CurrentComponent = null;
         console.error("Error loading route component:", pathname, err);
@@ -27,37 +30,24 @@
         routeStore.setIsLoading(false);
       }
     }
-    static restoreScrollPosition(pathname: string): void {
-      if (!routeStore.isInitialLoad) {
-        routeStateStore.restoreScrollForPath(pathname);
-      }
-    }
-    static async handlePopstate(): Promise<void> {
+    static handlePopstate(): void {
       const newPath = window.location.pathname;
       routeStore.currentUrl.href = window.location.href;
       routeStore.setIsInitialLoad(false);
       routeStore.setIsLoading(true, componentNamePath);
 
-      // Ensure we only attempt removal once on popstate as well.
-      removeJobPostingJsonLd(undefined, "popstate");
-
       // Perform route transition side effects
-      await routeStore.performRouteTransitionSideEffects(newPath);
+      routeStore.performRouteTransitionSideEffects(newPath);
 
       // Add loading timeout for popstate as well
-      setTimeout(() => {
-        if (routeStore.isLoading) {
-          routeStore.setIsLoading(false);
-        }
-      }, 500);
+      if (routeStore.isLoading) {
+        routeStore.setIsLoading(false);
+      }
     }
   }
 </script>
 
 <script lang="ts">
-  import "@css/app.css";
-  import { onMount, type SvelteComponent } from "svelte";
-  import { fade } from "svelte/transition";
   import FloatingActionButton from "@components/ui/Shared/FloatingActionButton.svelte";
   import SkeletonHomepage from "@components/ui/Skeletons/SkeletonHomepage.svelte";
   import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
@@ -65,17 +55,18 @@
   import Header from "@components/layouts/Header.svelte";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
 
-  let props = $props();
+  const props = $props();
 
   const mapComponentName = (name: typeof componentNamePath) => {
     switch (name) {
       case "Homepage":
-        return import("@routes/Homepage.svelte");
+        return dynamicComponentStore.loadHomepage();
       case "PasangIklanLoker":
-        return import("@routes/PasangIklanLoker.svelte");
+        return dynamicComponentStore.loadPasangIklanLoker();
       case "SingleLowongan":
-        return import("@routes/SingleLowongan.svelte");
+        return dynamicComponentStore.loadSingleLowongan();
     }
+    return undefined;
   };
 
   $effect(() => {
@@ -89,14 +80,20 @@
 
   // Scroll restoration for non-homepage routes (homepage handles its own(job-grid))
   $effect(() => {
-    AppRouteHandler.restoreScrollPosition(pathname);
+    if (!isInitialLoad) {
+      routeStateStore.restoreScrollForPath(pathname);
+    }
   });
 
   onMount(() => {
     routeStore.setCurrentPath(window.location.pathname);
-    GoogleServices.injectGTMScript().then(() => {
-      GoogleServices.sendPageView(); // Send initial pageview after GTM loads
-    });
+    GoogleServices.injectGTMScript()
+      .then(() => {
+        GoogleServices.sendPageView(); // Send initial pageview after GTM loads
+      })
+      .catch(() => {
+        console.error("Failed to inject GTM script on initial load");
+      });
 
     // Listen to browser back/forward
     if (typeof window !== "undefined") {
@@ -147,7 +144,7 @@
         in:fade={{ duration: 250 }}
         out:fade={{ duration: 200 }}
       >
-        <CurrentComponent {...routeStore.isInitialLoad ? props : {}} />
+        <CurrentComponent {...isInitialLoad ? props : {}} />
       </div>
     {/if}
   {/key}
@@ -158,6 +155,13 @@
   /* Page transition styles */
   .page-transition {
     transition: opacity 0.3s ease-in-out;
+    content-visibility: auto;
+    contain: layout style paint;
+    /* Reserve viewport space using header CSS vars to avoid layout shifts */
+    contain-intrinsic-size: auto
+      calc(
+        100vh - (var(--site-header-height, 0px) + var(--site-header-top, 0px))
+      );
   }
 
   .page-transition.fade-in {
@@ -167,6 +171,6 @@
   /* Ensure smooth transitions for route changes */
   .route-container {
     min-height: 100vh;
-    transition: all 0.2s ease-in-out;
+    transition: all 0.3s ease-in-out;
   }
 </style>

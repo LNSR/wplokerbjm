@@ -39,7 +39,7 @@ class LoadMore
 
             $args = match ($context) {
                 'search' => JobQuery::searchJobsArgs($filters, $paged, 36),
-                default => JobQuery::latestJobsArgs($paged, 12),
+                default => JobQuery::latestJobsArgs($paged, 36),
             };
 
             $result = $this->jobRepository->queryJob($args);

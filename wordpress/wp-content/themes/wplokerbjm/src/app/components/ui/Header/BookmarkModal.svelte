@@ -8,9 +8,10 @@
   import { isMobile } from "$lib/utils/elements.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import { navigateTo } from "@/app/lib/stores/Route.svelte";
+  import { GlobalNavigateTo } from "@/app/lib/stores/Route.svelte";
   import { SvelteDate } from "svelte/reactivity";
   import { fade } from "svelte/transition";
+  import { Virtualization } from "$lib/utils/Virtualization.svelte";
   import {
     BookmarkSolid,
     XmarkSolid,
@@ -21,6 +22,7 @@
     ExclamationCircleSolid,
     CheckCircleSolid,
     ThumbTackSolid,
+    MagnifyingGlassSolid,
   } from "svelte-awesome-icons";
 
   interface Props {
@@ -29,7 +31,7 @@
 
   let { open = $bindable() }: Props = $props();
 
-  let isMobileValue = $derived.by(() => isMobile());
+  const isMobileValue = $derived.by(() => isMobile());
 
   let modalEl: HTMLDialogElement;
   let deleteConfirmModal: HTMLDialogElement;
@@ -44,7 +46,7 @@
   let startClientY = 0;
   let startHeight = 0;
 
-  let modalStyle = $derived(
+  const modalStyle = $derived(
     `transform: translate(${translateX}px, ${translateY}px); transition: ${isDragging ? "none" : "transform 180ms ease"}; touch-action: ${isMobileValue ? "none" : "auto"};`
   );
 
@@ -128,25 +130,61 @@
   // loading mirrors the central store isSyncing to ensure UI reflects store activity
   let loading = $state(false);
   let error = $state("");
-  let showCopySuccess = $state(false);
+  const showCopySuccess = $state(false);
   let isOffline = $state(false);
   let showDeleteConfirm = $state(false);
-  let removingIds = $state(new SvelteSet<number>());
-  let now = $state(new SvelteDate());
+  const removingIds = $state(new SvelteSet<number>());
+  const now = $state(new SvelteDate());
 
   const STALE_THRESHOLD = 5 * 60 * 1000;
+
+  // Virtualization state for saved jobs list
+  const ITEM_HEIGHT = 240;
+  const GAP = 12;
+
+  let contentEl = $state<HTMLElement | null>(null);
+  let scrollY = $state(0);
+  let innerW = $state(0);
+  let innerH = $state(0);
+  // Search state for filtering saved jobs (title and company)
+  let searchQuery = $state("");
+  let isSearchOpen = $state(false);
+  let searchInput = $state<HTMLInputElement | null>(null);
+
+  let virtualState = $state({
+    itemsPerRow: 1,
+    totalRows: 0,
+    rowHeight: ITEM_HEIGHT + GAP,
+    sectionTop: 0,
+    startRow: 0,
+    endRow: 0,
+    startIndex: 0,
+    endIndex: 0,
+    visibleJobs: [] as CardJob[] &
+      {
+        deadlineInfo: { text: string; style: string };
+        statusInfo: { label: string; color: string };
+        timeAgo: string;
+      }[],
+    totalHeight: 0,
+  });
+
+  function onScroll(): void {
+    if (!contentEl) return;
+    scrollY = contentEl.scrollTop;
+  }
 
   $effect(() => {
     timeEffect(now);
   });
 
   // Store bindings
-  let savedJobs = $derived(bookmarkStore.jobs);
-  let warning = $derived(bookmarkStore.warning);
-  let deletedJobs = $derived(bookmarkStore.deletedJobs);
-  let lastSyncTime = $derived(bookmarkStore.lastSyncTime);
+  const savedJobs = $derived(bookmarkStore.jobs);
+  const warning = $derived(bookmarkStore.warning);
+  const deletedJobs = $derived(bookmarkStore.deletedJobs);
+  const lastSyncTime = $derived(bookmarkStore.lastSyncTime);
 
-  let displayedSavedJobs = $derived(
+  const displayedSavedJobs = $derived(
     savedJobs.map((job) => ({
       ...job,
       timeAgo: generalStore.useTimeAgo(job.post_time, now)(),
@@ -159,7 +197,33 @@
     }))
   );
 
-  let formattedLastSync = $derived(() => {
+  // Filter displayedSavedJobs by searchQuery (title or nama_perusahaan)
+  const filteredDisplayedJobs = $derived(
+    displayedSavedJobs.filter((job) => {
+      const q = String(searchQuery || "")
+        .trim()
+        .toLowerCase();
+      if (!q) return true;
+      const title = String(job.title || "").toLowerCase();
+      const company = String(job.nama_perusahaan || "").toLowerCase();
+      return title.includes(q) || company.includes(q);
+    })
+  );
+
+  // Layout breakpoint derived from modal width: mobile, tablet, desktop
+  const layoutBreakpoint = $derived.by(() => {
+    const w = Number(innerW) || window.innerWidth;
+    if (w < 640) return "mobile";
+    if (w < 1024) return "tablet";
+    return "desktop";
+  });
+
+  // Only collapse action buttons on small (mobile) layouts when search is active
+  const shouldCollapseActions = $derived.by(() => {
+    return isSearchOpen && layoutBreakpoint === "mobile";
+  });
+
+  const formattedLastSync = $derived(() => {
     const val = lastSyncTime;
     const n = Number(val);
     if (!n || Number.isNaN(n)) return "";
@@ -251,7 +315,7 @@
     // Navigate to job detail page
     if (job.permalink) {
       const url = new URL(job.permalink, window.location.origin);
-      await navigateTo(url.pathname + url.search + url.hash);
+      void GlobalNavigateTo(url.pathname + url.search + url.hash);
     }
   }
 
@@ -277,6 +341,29 @@
       modalEl?.close();
       resetPosition();
     }
+
+    if (open && layoutBreakpoint === "desktop" && !isSearchOpen) {
+      isSearchOpen = true;
+      // focus after render
+      setTimeout(() => searchInput?.focus(), 0);
+    }
+  });
+
+  // Recompute virtualization whenever sizes, scroll or data changes
+  $effect(() => {
+    innerW = modalBox ? modalBox.clientWidth : window.innerWidth;
+    innerH = contentEl ? contentEl.clientHeight : window.innerHeight;
+
+    virtualState = Virtualization.computeGrid({
+      displayJobs: filteredDisplayedJobs,
+      innerWidth: innerW,
+      innerHeight: innerH,
+      scrollY,
+      sectionTop: 0,
+      itemHeight: ITEM_HEIGHT,
+      gap: GAP,
+      buffer: 3,
+    });
   });
 
   $effect(() => {
@@ -287,20 +374,61 @@
     }
   });
 
+  // ResizeObserver to detect modal/content size changes (used for virtualization)
+  let resizeObserver: ResizeObserver | null = null;
+  let resizeObserverCallback: (() => void) | null = null;
+
+  function updateSizes(): void {
+    innerW = modalBox ? modalBox.clientWidth : window.innerWidth;
+    innerH = contentEl ? contentEl.clientHeight : window.innerHeight;
+  }
+
   onMount(() => {
     document.addEventListener("keydown", handleKeydown);
+
+    // initial set
+    updateSizes();
+
+    // Throttled update using rAF to avoid layout thrashing
+    resizeObserverCallback = () => requestAnimationFrame(updateSizes);
+
+    if (typeof ResizeObserver !== "undefined") {
+      resizeObserver = new ResizeObserver(resizeObserverCallback);
+      if (modalBox) resizeObserver.observe(modalBox);
+      if (contentEl) resizeObserver.observe(contentEl);
+    } else {
+      // Fallback to window resize if ResizeObserver isn't available
+      window.addEventListener("resize", resizeObserverCallback);
+    }
   });
 
   onDestroy(() => {
     document.removeEventListener("keydown", handleKeydown);
     window.removeEventListener("pointermove", onPointerMove);
     window.removeEventListener("pointerup", onPointerUp);
+
     try {
       if (dragHandle && activePointerId !== null)
         dragHandle.releasePointerCapture(activePointerId);
     } catch (e) {
       void e;
     }
+
+    // Cleanup ResizeObserver / fallback listener
+    try {
+      if (resizeObserver) {
+        if (modalBox) resizeObserver.unobserve(modalBox);
+        if (contentEl) resizeObserver.unobserve(contentEl);
+        resizeObserver.disconnect();
+        resizeObserver = null;
+      } else if (resizeObserverCallback) {
+        window.removeEventListener("resize", resizeObserverCallback);
+      }
+    } catch (e) {
+      void e;
+    }
+
+    resizeObserverCallback = null;
     resetPosition();
   });
 </script>
@@ -312,7 +440,7 @@
 >
   <div
     bind:this={modalBox}
-    class="modal-box p-0 flex flex-col relative max-h-[80vh] rounded-t-xl overflow-hidden md:mx-auto md:!max-w-2xl md:z-60 md:rounded-b-xl"
+    class="modal-box p-0 flex flex-col relative max-h-[80vh] rounded-t-xl overflow-hidden md:mx-auto md:!max-w-3xl md:z-60 md:rounded-b-xl"
     class:mobile-sheet={isMobileValue}
     style={modalStyle}
     onpointerdown={startDrag}
@@ -335,19 +463,21 @@
     >
       <div class="w-full">
         <div class="flex items-center justify-between w-full">
-          <h3 class="font-bold text-lg flex items-center gap-2">
-            <BookmarkSolid
-              class="h-5 w-5 text-[var(--wpl-global-color-1)]"
-              aria-hidden="true"
-            />
-            Lowongan Tersimpan
-            {#if !loading && savedJobs.length > 0}
-              <span
-                class="bg-[var(--wpl-global-color-1)] text-sm rounded-full px-2 py-0.1 z-10"
-                >{savedJobs.length}</span
-              >
-            {/if}
-          </h3>
+          <div class="flex items-center gap-3">
+            <h3 class="font-bold text-lg flex items-center gap-2">
+              <BookmarkSolid
+                class="h-5 w-5 text-[var(--wpl-global-color-1)]"
+                aria-hidden="true"
+              />
+              Lowongan Tersimpan
+              {#if !loading && savedJobs.length > 0}
+                <span
+                  class="bg-[var(--wpl-global-color-1)] text-sm rounded-full px-2 py-0.1 z-10"
+                  >{savedJobs.length}</span
+                >
+              {/if}
+            </h3>
+          </div>
 
           <button
             onclick={closeModal}
@@ -361,36 +491,97 @@
 
         <!-- Second row: action buttons placed under the header -->
         <div
-          class="flex flex-row flex-wrap items-center gap-2 mt-3 w-full justify-end"
+          class="flex flex-row items-center gap-2 mt-3 w-full overflow-hidden"
         >
-          {#if !loading && savedJobs.length > 0}
-            <button
-              onclick={handleDeleteAll}
-              disabled={loading}
-              class="btn btn-ghost btn-sm md:btn-md text-error w-auto whitespace-nowrap"
-              aria-label="hapus semua"
-              title="hapus semua"
-            >
-              <TrashAltSolid class="h-4 w-4 mr-2" aria-hidden="true" />
-              Hapus Semua
-            </button>
-            <button
-              onclick={handleRefresh}
-              disabled={loading}
-              class="btn btn-ghost btn-sm md:btn-md w-auto whitespace-nowrap"
-              aria-label="sync ke server"
-              title="sync ke server"
-            >
-              <RefreshSpinner size="h-4 w-4 mr-2" spin={loading} />
-              Sync/Refresh
-            </button>
-          {/if}
+          <!-- Left: search control that expands; when open, action buttons collapse to the right -->
+          <div class="flex-1 flex items-center min-w-0">
+            {#if !loading}
+              <button
+                onclick={() => {
+                  isSearchOpen = !isSearchOpen;
+                  if (isSearchOpen) setTimeout(() => searchInput?.focus(), 0);
+                }}
+                class="btn btn-ghost btn-sm mr-2"
+                aria-label="Cari dalam simpanan"
+                title="Cari"
+              >
+                <MagnifyingGlassSolid class="h-4 w-4" aria-hidden="true" />
+              </button>
+            {/if}
+
+            {#if !loading && isSearchOpen}
+              <input
+                id="bookmark-search"
+                name="bookmark_search"
+                bind:this={searchInput}
+                bind:value={searchQuery}
+                class="input input-sm w-full md:w-96 min-w-0 flex-grow"
+                placeholder="Cari judul atau perusahaan"
+                onkeydown={(e) => {
+                  if (e.key === "Escape") {
+                    isSearchOpen = false;
+                  }
+                }}
+              />
+            {/if}
+          </div>
+
+          <!-- Right: action buttons or close-search button when search open -->
+          <div class="flex items-center gap-2 flex-shrink-0">
+            {#if !loading && isSearchOpen}
+              <button
+                onclick={() => {
+                  isSearchOpen = false;
+                  searchQuery = "";
+                  try {
+                    searchInput?.blur();
+                  } catch {
+                    // ignore
+                  }
+                }}
+                class="btn btn-ghost btn-sm"
+                aria-label="Tutup pencarian"
+                title="Tutup pencarian"
+              >
+                <XmarkSolid class="h-4 w-4" aria-hidden="true" />
+              </button>
+            {/if}
+
+            {#if !shouldCollapseActions}
+              {#if !loading && savedJobs.length > 0}
+                <button
+                  onclick={handleDeleteAll}
+                  disabled={loading}
+                  class="btn btn-ghost btn-sm md:btn-md text-error w-auto whitespace-nowrap"
+                  aria-label="hapus semua"
+                  title="hapus semua"
+                >
+                  <TrashAltSolid class="h-4 w-4 mr-2" aria-hidden="true" />
+                  Hapus Semua
+                </button>
+                <button
+                  onclick={handleRefresh}
+                  disabled={loading}
+                  class="btn btn-ghost btn-sm md:btn-md w-auto whitespace-nowrap"
+                  aria-label="sync ke server"
+                  title="sync ke server"
+                >
+                  <RefreshSpinner size="h-4 w-4 mr-2" spin={loading} />
+                  Sync/Refresh
+                </button>
+              {/if}
+            {/if}
+          </div>
         </div>
       </div>
     </div>
 
     <!-- Content -->
-    <div class="flex-1 overflow-y-auto max-h-full px-6 py-4">
+    <div
+      bind:this={contentEl}
+      onscroll={onScroll}
+      class="flex-1 overflow-y-auto max-h-full px-6 py-4"
+    >
       <!-- Loading State -->
       {#if loading}
         <div class="flex items-center justify-center py-12">
@@ -434,7 +625,7 @@
       {:else}
         <div>
           {#if savedJobs.length > 0}
-            <div class="space-y-3 mb-6">
+            <div class="mb-6">
               <div
                 class="flex flex-row items-center justify-between break-words whitespace-normal"
               >
@@ -450,160 +641,186 @@
                   </div>
                 {/if}
               </div>
-              {#each displayedSavedJobs as job (job.id)}
+
+              <div class="relative mt-3">
                 <div
-                  class="card bg-base-300 shadow-sm hover:shadow-md transition-all duration-300"
-                  class:scale-95={removingIds.has(job.id || 0)}
-                  out:fade={{ duration: 200 }}
+                  style="height: {virtualState.totalHeight}px; position: relative;"
                 >
-                  <div class="card-body p-4">
-                    <!-- Skeleton for loading job -->
-                    {#if job.title === ""}
-                      <div class="animate-pulse">
-                        <div class="flex items-start justify-between gap-3">
-                          <div class="flex-1 min-w-1">
-                            <div
-                              class="h-4 bg-base-content/20 rounded mb-2"
-                            ></div>
-                            <div
-                              class="h-3 bg-base-content/20 rounded mb-2 w-3/4"
-                            ></div>
-                            <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
+                  <div
+                    style="position: absolute; left:0; right:0; top:0; transform: translateY({virtualState.startRow *
+                      virtualState.rowHeight}px);"
+                  >
+                    {#each virtualState.visibleJobs as job (job.id)}
+                      <div
+                        class="card bg-base-300 shadow-sm hover:shadow-md transition-all duration-300 mb-3"
+                        class:scale-95={removingIds.has(job.id || 0)}
+                        out:fade={{ duration: 200 }}
+                      >
+                        <div class="card-body p-4">
+                          {#if job.title === ""}
+                            <div class="animate-pulse">
                               <div
-                                class="h-3 bg-base-content/20 rounded w-20"
-                              ></div>
-                              <div
-                                class="h-3 bg-base-content/20 rounded w-16"
-                              ></div>
-                              <div
-                                class="h-3 bg-base-content/20 rounded w-24"
-                              ></div>
+                                class="flex items-start justify-between gap-3"
+                              >
+                                <div class="flex-1 min-w-1">
+                                  <div
+                                    class="h-4 bg-base-content/20 rounded mb-2"
+                                  ></div>
+                                  <div
+                                    class="h-3 bg-base-content/20 rounded mb-2 w-3/4"
+                                  ></div>
+                                  <div
+                                    class="flex flex-wrap gap-x-4 gap-y-1 mb-2"
+                                  >
+                                    <div
+                                      class="h-3 bg-base-content/20 rounded w-20"
+                                    ></div>
+                                    <div
+                                      class="h-3 bg-base-content/20 rounded w-16"
+                                    ></div>
+                                    <div
+                                      class="h-3 bg-base-content/20 rounded w-24"
+                                    ></div>
+                                  </div>
+                                  <div class="mt-2">
+                                    <div
+                                      class="h-3 bg-base-content/20 rounded w-32 mb-2"
+                                    ></div>
+                                    <div
+                                      class="h-3 bg-base-content/20 rounded w-28"
+                                    ></div>
+                                  </div>
+                                </div>
+                                <div class="flex flex-col gap-1">
+                                  <div
+                                    class="h-8 w-8 bg-base-content/20 rounded"
+                                  ></div>
+                                </div>
+                              </div>
                             </div>
-                            <div class="mt-2">
-                              <div
-                                class="h-3 bg-base-content/20 rounded w-32 mb-2"
-                              ></div>
-                              <div
-                                class="h-3 bg-base-content/20 rounded w-28"
-                              ></div>
-                            </div>
-                          </div>
-                          <div class="flex flex-col gap-1">
-                            <div
-                              class="h-8 w-8 bg-base-content/20 rounded"
-                            ></div>
-                          </div>
-                        </div>
-                      </div>
-                    {:else}
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="flex-1 min-w-0">
-                          <p
-                            class="text-md font-bold text-base flex items-center gap-2 mb-1"
-                          >
-                            <button
-                              onclick={() => handleJobClick(job)}
-                              class="hover:text-[var(--wpl-global-color-1)] transition-colors text-left w-full"
-                              aria-label={`View job details for ${job.title}`}
-                            >
-                              {job.title}
-                            </button>
-                          </p>
-                          {#if !job.nama_perusahaan}
-                            <div class="divider mt-0"></div>
-                          {/if}
-
-                          {#if job.nama_perusahaan}
-                            <p
-                              class="text-md font-semibold mb-6 flex items-center gap-2"
-                            >
-                              <UserTieSolid
-                                class="h-4 w-4 text-[var(--wpl-global-color-1)] inline-block"
-                                aria-hidden="true"
-                              />
-                              {job.nama_perusahaan}
-                            </p>
-                            <div class="divider -mt-4"></div>
-                          {/if}
-
-                          <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
-                            {#each generalStore.useSummaryJob(job.ringkasanPekerjaan) as row}
-                              {#if row.label !== "Deadline"}
-                                {@const Icon = row.icon}
-                                <span
-                                  class="flex items-center text-base md:text-base font-semibold gap-2 py-1"
+                          {:else}
+                            <div class="flex items-start justify-between gap-3">
+                              <div class="flex-1 min-w-0">
+                                <p
+                                  class="text-md font-bold text-base flex items-center gap-2 mb-1"
                                 >
-                                  {#if Icon}
-                                    <Icon
-                                      class="text-[var(--wpl-global-color-1)] w-4 h-4 shrink-0"
+                                  <button
+                                    onclick={() => handleJobClick(job)}
+                                    class="hover:text-[var(--wpl-global-color-1)] transition-colors text-left w-full"
+                                    aria-label={`View job details for ${job.title}`}
+                                  >
+                                    {job.title}
+                                  </button>
+                                </p>
+                                {#if !job.nama_perusahaan}
+                                  <div class="divider mt-0"></div>
+                                {/if}
+
+                                {#if job.nama_perusahaan}
+                                  <p
+                                    class="text-md font-semibold mb-6 flex items-center gap-2"
+                                  >
+                                    <UserTieSolid
+                                      class="h-4 w-4 text-[var(--wpl-global-color-1)] inline-block"
                                       aria-hidden="true"
                                     />
-                                  {/if}
-                                  <span>{@html row.value}</span>
-                                </span>
-                              {/if}
-                            {/each}
-                          </div>
+                                    {job.nama_perusahaan}
+                                  </p>
+                                  <div class="divider -mt-4"></div>
+                                {/if}
 
-                          {#if job.statusInfo.label || job.deadlineInfo.text}
-                            <div class="divider my-2"></div>
-                            <div class="mt-2 inline-block">
-                              {#if job.statusInfo.label}
-                                <span
-                                  class="px-3 py-1 badge font-bold rounded mr-2 {job
-                                    .statusInfo.color}"
+                                <div
+                                  class="flex flex-wrap gap-x-4 gap-y-1 mb-2"
                                 >
-                                  {#if job.statusInfo.label === "Urgent"}
-                                    <ExclamationTriangleSolid
-                                      class="h-4 w-4"
-                                      aria-hidden="true"
+                                  {#each generalStore.useSummaryJob(job.ringkasanPekerjaan) as row}
+                                    {#if row.label !== "Deadline"}
+                                      {@const Icon = row.icon}
+                                      <span
+                                        class="flex items-center text-base md:text-base font-semibold gap-2 py-1"
+                                      >
+                                        {#if Icon}
+                                          <Icon
+                                            class="text-[var(--wpl-global-color-1)] w-4 h-4 shrink-0"
+                                            aria-hidden="true"
+                                          />
+                                        {/if}
+                                        <span>{@html row.value}</span>
+                                      </span>
+                                    {/if}
+                                  {/each}
+                                </div>
+
+                                {#if job.statusInfo.label || job.deadlineInfo.text}
+                                  <div class="divider my-2"></div>
+                                  <div class="mt-2 inline-block">
+                                    {#if job.statusInfo.label}
+                                      <span
+                                        class="px-3 py-1 badge font-bold rounded mr-2 {job
+                                          .statusInfo.color}"
+                                      >
+                                        {#if job.statusInfo.label === "Urgent"}
+                                          <ExclamationTriangleSolid
+                                            class="h-4 w-4"
+                                            aria-hidden="true"
+                                          />
+                                        {:else if job.statusInfo.label === "Pinned"}
+                                          <ThumbTackSolid
+                                            class="h-4 w-4"
+                                            aria-hidden="true"
+                                          />
+                                        {/if}
+                                        {job.statusInfo.label}
+                                      </span>
+                                    {/if}
+                                    {#if job.deadlineInfo.text}
+                                      <span
+                                        class="px-3 py-1 badge font-bold rounded {job
+                                          .deadlineInfo.style}"
+                                      >
+                                        <CalendarSolid
+                                          class="h-4 w-4"
+                                          aria-hidden="true"
+                                        />
+                                        <span>{job.deadlineInfo.text}</span>
+                                      </span>
+                                    {/if}
+                                  </div>
+                                {/if}
+
+                                {#if loading}
+                                  <div
+                                    class="flex items-center justify-center py-12"
+                                  >
+                                    <LoadingSpinner
+                                      srLabel="Memuat..."
+                                      size="md"
                                     />
-                                  {:else if job.statusInfo.label === "Pinned"}
-                                    <ThumbTackSolid
-                                      class="h-4 w-4"
-                                      aria-hidden="true"
-                                    />
-                                  {/if}
-                                  {job.statusInfo.label}
-                                </span>
-                              {/if}
-                              {#if job.deadlineInfo.text}
-                                <span
-                                  class="px-3 py-1 badge font-bold rounded {job
-                                    .deadlineInfo.style}"
+                                  </div>
+                                {/if}
+                              </div>
+                              <div class="flex flex-col gap-1">
+                                <button
+                                  onclick={() => removeBookmark(job.id || 0)}
+                                  disabled={loading ||
+                                    removingIds.has(job.id || 0)}
+                                  class="btn btn-xs btn-ghost text-error"
+                                  title="Hapus bookmark"
+                                  aria-label="Hapus bookmark untuk {job.title}"
                                 >
-                                  <CalendarSolid
+                                  <TrashAltSolid
                                     class="h-4 w-4"
                                     aria-hidden="true"
                                   />
-                                  <span>{job.deadlineInfo.text}</span>
-                                </span>
-                              {/if}
+                                </button>
+                              </div>
                             </div>
                           {/if}
-
-                          {#if loading}
-                            <div class="flex items-center justify-center py-12">
-                              <LoadingSpinner srLabel="Memuat..." size="md" />
-                            </div>
-                          {/if}
-                        </div>
-                        <div class="flex flex-col gap-1">
-                          <button
-                            onclick={() => removeBookmark(job.id || 0)}
-                            disabled={loading || removingIds.has(job.id || 0)}
-                            class="btn btn-xs btn-ghost text-error"
-                            title="Hapus bookmark"
-                            aria-label="Hapus bookmark untuk {job.title}"
-                          >
-                            <TrashAltSolid class="h-4 w-4" aria-hidden="true" />
-                          </button>
                         </div>
                       </div>
-                    {/if}
+                    {/each}
                   </div>
                 </div>
-              {/each}
+              </div>
             </div>
           {/if}
 

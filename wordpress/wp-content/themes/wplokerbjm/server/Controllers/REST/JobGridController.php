@@ -28,9 +28,8 @@ class JobGridController
             $filters = ControllerUtils::parseJobFilters($request);
 
             $query_args = match ($context) {
-                'search' => JobQuery::searchJobsArgs($filters, $paged, 12),
-                'archive' => JobQuery::latestJobsArgs($paged, 12),
-                default => JobQuery::latestJobsArgs($paged, 12),
+                'search' => JobQuery::searchJobsArgs($filters, $paged, 36),
+                default => JobQuery::latestJobsArgs($paged, 36),
             };
 
             $props = $this->jobGridPresenter->getProps($query_args, $title, $context, $total_jobs);

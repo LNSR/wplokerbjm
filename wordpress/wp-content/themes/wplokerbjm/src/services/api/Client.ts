@@ -4,7 +4,7 @@ import type { ApiResponse, ApiMeta } from "@/types";
 
 export class ApiClient {
   private readonly baseUrl: string
-  private readonly timeout = 15000; // 15 seconds
+  private readonly timeout = 60000; // 60 1 minute timeout
   //! Circuit breaker for failed requests
   private failedRequestCount = 0
   private readonly maxFailedRequests = 10000
@@ -184,7 +184,7 @@ export class ApiClient {
         'Terlalu banyak permintaan gagal, sirkuit breaker diaktifkan.'
       );
     }
-    let url = new URL(`${this.baseUrl}${endpoint}`);
+    const url = new URL(`${this.baseUrl}${endpoint}`);
     if (params) {
       Object.entries(params).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {

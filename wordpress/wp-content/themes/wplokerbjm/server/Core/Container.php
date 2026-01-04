@@ -112,12 +112,21 @@ class Container
         }
 
         if ($isProduction && self::$CACHE_DIR && is_dir(self::$CACHE_DIR)) {
-            $builder->enableCompilation(self::$CACHE_DIR);
-            if (function_exists('apcu_enabled') && apcu_enabled()) {
-                $builder->enableDefinitionCache('wplokerbjm_container_cache');
+            if (!is_writable(self::$CACHE_DIR)) {
+                Logger::warning('Container', "Compilation directory not writable, skipping compilation: " . self::$CACHE_DIR);
+            } else {
+                try {
+                    $builder->enableCompilation(self::$CACHE_DIR);
+                    if (function_exists('apcu_enabled') && apcu_enabled()) {
+                        $builder->enableDefinitionCache('wplokerbjm_container_cache');
+                    }
+                    // Write proxies to disk for additional performance boost
+                    $builder->writeProxiesToFile(true, self::$CACHE_DIR . '/');
+                } catch (\Throwable $e) {
+                    // Log and continue without compilation to keep tests/CI stable
+                    Logger::warning('Container', 'Failed to enable compilation: ' . $e->getMessage());
+                }
             }
-            // Write proxies to disk for additional performance boost
-            $builder->writeProxiesToFile(true, self::$CACHE_DIR . '/');
         }
     }
 }

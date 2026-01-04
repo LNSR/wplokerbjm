@@ -52,6 +52,7 @@ SELECTED=(
   "index.php"
   "composer.json"
   "assets"
+  ".htaccess"
 )
 
 PIDS=()

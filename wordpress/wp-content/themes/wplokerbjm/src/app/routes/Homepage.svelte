@@ -4,7 +4,7 @@
   import JobGrid from "@components/ui/Homepage/JobGrid.svelte";
   import type { CarouselProps, JobGridProps } from "@/types";
 
-  let { carousel, jobGrid } = $props<{
+  const { carousel, jobGrid } = $props<{
     carousel?: CarouselProps;
     jobGrid?: JobGridProps;
   }>();
@@ -12,9 +12,6 @@
 
 <main class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
   <SearchForm />
-  <JobCarousel
-    jobs={carousel?.jobs || []}
-    title={carousel?.title || "Lowongan Darurat"}
-  />
+  <JobCarousel {...carousel} />
   <JobGrid {...jobGrid} />
 </main>

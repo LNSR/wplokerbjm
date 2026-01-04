@@ -4,9 +4,11 @@ import { svelte } from "@sveltejs/vite-plugin-svelte";
 import tailwindcss from "@tailwindcss/vite";
 import { resolve } from "path";
 import liveReload from "vite-plugin-live-reload";
-import { visualizer } from "rollup-plugin-visualizer";
+import { unstableRolldownAdapter } from 'vite-bundle-analyzer'
+import { analyzer } from 'vite-bundle-analyzer'
+import { partytownVite } from "@qwik.dev/partytown/utils";
 // import { compression, defineAlgorithm } from 'vite-plugin-compression2'
-// import fs from "fs";
+// import zlib from 'zlib';
 
 export default defineConfig(({ command }) => {
   return {
@@ -20,21 +22,21 @@ export default defineConfig(({ command }) => {
       svelte(),
       tailwindcss(),
       liveReload(["./vendor/composer/autoload_real.php"]),
-      visualizer({ open: true }),
+      unstableRolldownAdapter(analyzer({ fileName: 'stats', openAnalyzer: false, analyzerMode: 'static' })),
+      partytownVite({
+        dest: resolve(__dirname, "assets", "dist", "~partytown")
+      }),
       // compression({
-      //   deleteOriginalAssets: true,
-      //   exclude: ["**/*.json"],
+      //   deleteOriginalAssets: false,
+      //   exclude: ["**/*.json", "**/*.map", "**/*.xml", "**/*.svg", "**/*.webmanifest", "**/*.txt", "**/*.woff2", "**/*.woff"],
       //   threshold: 0,
       //   skipIfLargerOrEqual: false,
       //   logLevel: 'info',
-      //   algorithms: [defineAlgorithm('zstd', {
+      //   algorithms: [defineAlgorithm('brotliCompress', {
       //     params: {
-      //       [require('zlib').constants.ZSTD_c_compressionLevel]: 22,
-      //       [require('zlib').constants.ZSTD_c_checksumFlag]: 1,
-      //       [require('zlib').constants.ZSTD_c_strategy]: require('zlib').constants.ZSTD_btultra2,
-      //       [require('zlib').constants.ZSTD_c_windowLog]: 27,
-      //     },
-      //   })],
+      //       [zlib.constants.BROTLI_PARAM_QUALITY]: 11
+      //     }
+      //   })]
       // })
     ],
     resolve: {
@@ -74,9 +76,9 @@ export default defineConfig(({ command }) => {
           minify: true,
           inlineDynamicImports: false,
           format: "esm",
-          entryFileNames: "js/[name]-[hash:32].js",
-          chunkFileNames: "js/[name]-[hash:32].js",
-          assetFileNames: (assetInfo): string => {
+          entryFileNames: "js/[name]-[hash:21].js",
+          chunkFileNames: "js/[name]-[hash:21].js",
+          assetFileNames: (assetInfo: any): string => {
             const assetName =
               assetInfo.names && assetInfo.names.length > 0
                 ? assetInfo.names[0]
@@ -89,7 +91,7 @@ export default defineConfig(({ command }) => {
             }
             return "assets/[name]-[hash:32][extname]";
           },
-        }
+        },
       },
     },
   };

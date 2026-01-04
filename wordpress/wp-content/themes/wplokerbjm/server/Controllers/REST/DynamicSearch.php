@@ -17,8 +17,9 @@ class DynamicSearch
     {
         try {
             $filters = ControllerUtils::parseJobFilters($request);
+            $context = $request->get_param('context') ?? 'search';
 
-            $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize($filters));
+            $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize($filters) . $context);
             $cached = Cache::get($cacheKey);
 
             if ($cached !== false) {
@@ -29,16 +30,19 @@ class DynamicSearch
                 return $response;
             }
 
-            $args = \WPLokerBJM\QueryBuilders\JobQuery::searchJobsArgs($filters, 1, 36);
+            $query_args = match ($context) {
+                'search' => \WPLokerBJM\QueryBuilders\JobQuery::searchJobsArgs($filters, 1, 36),
+                default => \WPLokerBJM\QueryBuilders\JobQuery::latestJobsArgs(1, 36),
+            };
 
-            $result = $this->jobRepository->queryJob($args);
+            $result = $this->jobRepository->queryJob($query_args);
 
             $jobs = $result['jobs'] ?? [];
             $query = $result['query'] ?? new \WP_Query();
 
             $data = SharedUtils::filterEmptyValues([
                 'jobs' => $jobs,
-                'context' => 'search',
+                'context' => $context,
                 'filters' => $filters,
             ]);
 

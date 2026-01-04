@@ -1,5 +1,5 @@
-export class SvelteNonceManager {
-    public nonce = $state<string | null>(null);
+export class NonceManager {
+    public nonce: string | null = null;
     private storageKey = 'wp-rest-nonce';
 
     constructor() {
@@ -26,9 +26,9 @@ export class SvelteNonceManager {
         }
     }
 
-    public getNonce(): string | null {
+    public get getNonce(): string | null {
         return this.nonce;
     }
 }
 
-export const nonceStore = new SvelteNonceManager();
+export const nonceStore = new NonceManager();

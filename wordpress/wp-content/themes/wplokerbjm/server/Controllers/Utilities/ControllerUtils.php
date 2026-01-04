@@ -98,25 +98,15 @@ class ControllerUtils
     }
 
     /**
-     * Check and enforce rate limiting for API endpoints
+     * Validate and filter an array of IDs
      *
-     * @param string $cacheKeyPrefix The cache key prefix for rate limiting
-     * @param int $limit Maximum requests allowed in the time window
-     * @param int $windowSeconds Time window in seconds
-     * @param string|null $identifier Optional custom identifier (defaults to client IP)
-     * @return \WP_REST_Response|null Returns error response if rate limit exceeded, null if allowed
+     * @param array $ids Array of IDs to validate
+     * @return array Filtered array of valid positive integer IDs
      */
-    public static function checkRateLimit(string $cacheKeyPrefix, int $limit = 20, int $windowSeconds = 60, ?string $identifier = null): ?\WP_REST_Response
+    public static function validateIds(array $ids): array
     {
-        $clientIP = $identifier ?? ($_SERVER['REMOTE_ADDR'] ?? 'unknown');
-        $rateLimitKey = $cacheKeyPrefix . md5($clientIP);
-        $currentCount = Cache::get($rateLimitKey) ?: 0;
-
-        if ($currentCount >= $limit) {
-            return self::failedResponse('Rate limit exceeded. Please wait before making another request.', 429);
-        }
-
-        Cache::set($rateLimitKey, $currentCount + 1, $windowSeconds);
-        return null;
+        return array_filter(array_map('intval', $ids), function ($id) {
+            return $id > 0;
+        });
     }
 }

@@ -1,8 +1,6 @@
-import { debounce } from '@/utils/lodash'
-import { SvelteMap, SvelteSet } from 'svelte/reactivity'
-import { bookmarkIDB } from '@/utils'
+import { debounce, bookmarkIDB, getThemeData } from '@/utils';
+import { SvelteSet, SvelteMap } from 'svelte/reactivity'
 import { APIService } from '@/services/APIService'
-import { WPThemeDataStore } from '$lib/stores/WPThemeData'
 import type { CardJob, WPLokerBJMThemedData } from '@/types'
 
 interface BookmarkBroadcastMessage {
@@ -13,7 +11,7 @@ interface BookmarkBroadcastMessage {
 
 export class BookmarkManager {
     // Current theme version from server (mtime of composer.json), used for cross-tab version checking
-    private CURRENT_VERSION = WPThemeDataStore.getThemeData()?.themeVersion || 0
+    private CURRENT_VERSION = getThemeData()?.themeVersion || 0
     public jobs = $state<CardJob[]>([])
     public isInitialized = $state(false)
     public isSyncing = $state(false)
@@ -41,7 +39,7 @@ export class BookmarkManager {
 
     constructor() {
 
-        this.initialize()
+        void this.initialize()
         this.crossTabChannel()
         this.debouncedSync = debounce(() => this.syncPending(), 1000)
     }

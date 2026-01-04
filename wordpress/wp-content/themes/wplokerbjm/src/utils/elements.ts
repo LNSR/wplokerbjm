@@ -28,7 +28,7 @@ export function removePropsScriptFromElement(element: Element | Document, propAt
         if (scriptElement)
             setTimeout(() => {
                 scriptElement.remove();
-            }, 1000);
+            }, 2000);
     } catch {
         // Ignore
     }

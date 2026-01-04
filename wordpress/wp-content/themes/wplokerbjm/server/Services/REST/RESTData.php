@@ -10,7 +10,8 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 class RESTData
 {
     public function __construct(
-        public \WPLokerBJM\Factories\JobDataFactory $jobDataFactory
+        private \WPLokerBJM\Factories\JobDataFactory $jobDataFactory,
+        private \WPLokerBJM\Services\Schema\JobSchemaOrg $jobSchema
     ) {
     }
 
@@ -71,9 +72,9 @@ class RESTData
      * @param int $post_id
      * @return array
      */
-    public function getSingleOverlayData(int $post_id): array
+    public function getJobDetailData(int $post_id): array
     {
-        $cacheKey = CacheKey::REST_OVERLAY_PREFIX . $post_id . (is_user_logged_in() ? '_logged_in' : '_public');
+        $cacheKey = CacheKey::REST_JOBDETAIL_PREFIX . $post_id . (is_user_logged_in() ? '_logged_in' : '_public');
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -150,5 +151,14 @@ class RESTData
     public function getThemeData()
     {
         return \WPLokerBJM\Core\Hooks\Theme\ThemeInject::themeData();
+    }
+
+    /**
+     * Get JobSchema data for REST responses
+     * !Useful in future for headless setups
+     * @return array
+     */
+    public function JobSchema(int $post_id) {
+        return $this->jobSchema->getJobPostingSchema($post_id);
     }
 }

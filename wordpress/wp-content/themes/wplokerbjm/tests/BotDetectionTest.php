@@ -379,7 +379,7 @@ class BotDetectionTest extends WplokerbjmTestCase
 
         // Clear any existing cache
         $clearedPattern = 'ssg_*';
-        Cache::deletePattern($clearedPattern);
+        Cache::deletePattern([$clearedPattern]);
         echo "\033[0;36mCache Setup:\033[0m\n";
         echo "  \033[0;33m•\033[0m Cleared cache pattern: \033[0;32m{$clearedPattern}\033[0m\n";
 

@@ -25,7 +25,7 @@ class JobBookmark
             return ControllerUtils::failedResponse('Invalid IDs parameter.', 400);
         }
 
-        $ids = $this->validateIds($ids_param);
+        $ids = ControllerUtils::validateIds($ids_param);
         if (empty($ids)) {
             return new WP_REST_Response([], 200);
         } elseif (count($ids) > 10000) {
@@ -44,12 +44,5 @@ class JobBookmark
         }
 
         return new WP_REST_Response($response, 200);
-    }
-
-    private function validateIds(array $ids): array
-    {
-        return array_filter(array_map('intval', $ids), function ($id) {
-            return $id > 0;
-        });
     }
 }

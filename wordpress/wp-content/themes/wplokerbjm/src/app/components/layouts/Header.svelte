@@ -1,16 +1,14 @@
 <script module lang="ts">
-  import { debounce } from "@/utils/lodash";
+  import { debounce, getThemeData } from "@/utils";
   import { MediaQuery } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
-  import { WPThemeDataStore } from "$lib/stores/WPThemeData";
+  import { dynamicComponentStore, type BookmarkModalComponent } from "$lib/stores/DynamicComponent.svelte";
 
-  let BookmarkModalComponent:
-    | typeof import("@components/ui/Header/BookmarkModal.svelte").default
-    | null = $state(null);
-  let isMobileValue = $derived.by(() => isMobile());
+  let BookmarkModal = $derived<BookmarkModalComponent | null>(dynamicComponentStore.BookmarkModal);
+  const isMobileValue = $derived.by(() => isMobile());
   let showBookmarkModal = $state(false);
-  let bookmarkJobs = $derived(bookmarkStore.jobs);
+  const bookmarkJobs = $derived(bookmarkStore.jobs);
 
   class ThemeManager {
     private mediaQuery: MediaQuery | null = null;
@@ -60,12 +58,39 @@
           );
         }
         try {
-          localStorage.setItem("wplokerbjm-theme", newTheme);
+          // Defer storage write off the critical paint path so it cannot
+          // block rendering or cause forced reflow during theme toggles.
+          const write = () => {
+            try {
+              localStorage.setItem("wplokerbjm-theme", newTheme);
+            } catch {
+              /* best-effort */
+            }
+          };
+          if (typeof (window as any).requestIdleCallback === "function") {
+            (window as any).requestIdleCallback(write);
+          } else {
+            setTimeout(write, 0);
+          }
         } catch {
-          console.error("Failed to save theme preference");
+          console.error("Failed to schedule theme preference save");
         }
         setTimeout(() => {
           document.documentElement.classList.remove("theme-switching");
+          // Give the browser a short moment to paint the theme change, then
+          // trigger a single header measurement. This avoids forcing layout
+          // during the theme toggle which causes long presentation delays.
+          try {
+            setTimeout(() => {
+              requestAnimationFrame(() => {
+                if (typeof headerManager !== "undefined" && headerManager && headerManager.scheduleUpdate) {
+                  headerManager.scheduleUpdate();
+                }
+              });
+            }, 50);
+          } catch {
+            /* best-effort */
+          }
         }, 30);
         this.updateMetaThemeColor(dark);
       });
@@ -146,6 +171,7 @@
 
   class HeaderManager {
     headerEl: HTMLElement | null = null;
+    private _lastOffsetUpdate = 0;
     rafId: number | null = null;
     mutationObserver: MutationObserver | null = null;
     adminBarObserver: MutationObserver | null = null;
@@ -164,6 +190,11 @@
     }
 
     updateOffsets() {
+      // Throttle expensive offset calculations to avoid layout thrash.
+      const now = Date.now();
+      if (this._lastOffsetUpdate && now - this._lastOffsetUpdate < 100) return;
+      this._lastOffsetUpdate = now;
+
       this.headerEl = document.querySelector("header");
       try {
         headerStore.setSiteHeaderVars({
@@ -175,7 +206,7 @@
         const headerHeight = this.headerEl ? this.headerEl.offsetHeight : 0;
         headerStore.headerTop = adminBarHeight;
         headerStore.headerHeight = headerHeight;
-      } catch (e) {
+      } catch {
         // Fallback: ensure at least --site-header-top is set using admin bar height
         const adminBarHeight = headerStore.getWpAdminBarHeight();
         headerStore.appEl?.style.setProperty(
@@ -222,7 +253,12 @@
 
     attachMutationObserver() {
       const htmlEl = document.documentElement;
-      this.mutationObserver = new MutationObserver(this.boundScheduleUpdate);
+      // Ignore mutations triggered by theme switching marker to avoid
+      // forced synchronous layout reads during theme toggles.
+      this.mutationObserver = new MutationObserver(() => {
+        if (document.documentElement.classList.contains("theme-switching")) return;
+        this.boundScheduleUpdate();
+      });
       this.mutationObserver.observe(htmlEl, {
         attributes: true,
         attributeFilter: ["class", "style"],
@@ -231,6 +267,8 @@
 
     attachDomObserver() {
       this.domObserver = new MutationObserver(() => {
+        // Skip reacting while theme switching is in progress
+        if (document.documentElement.classList.contains("theme-switching")) return;
         const found = document.getElementById("wpadminbar");
         if (
           (found && !this.adminBarObserver) ||
@@ -289,18 +327,12 @@
 
   export const themeStore = new ThemeManager();
   export const headerManager = new HeaderManager();
-  async function loadBookmarkModal() {
-    if (!BookmarkModalComponent) {
-      const module = await import("@components/ui/Header/BookmarkModal.svelte");
-      BookmarkModalComponent = module.default;
-    }
-  }
 </script>
 
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
   import type { HTMLImgAttributes } from "svelte/elements";
-  import { navigateTo } from "$lib/stores/Route.svelte";
+  import { GlobalNavigateTo } from "$lib/stores/Route.svelte";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
   import { ThemeName } from "@/types";
   import {
@@ -320,7 +352,7 @@
 
   function updateLogo(): void {
     try {
-      const themeData = WPThemeDataStore.getThemeData();
+      const themeData = getThemeData();
       const runtimeLogo = themeData?.logo;
       const runtimeLogoSrcset = themeData?.logoSrcset;
       const runtimeLogoSizes = themeData?.logoSizes;
@@ -345,8 +377,8 @@
         logoWidth = parseDimension(runtimeLogoWidth);
         logoHeight = parseDimension(runtimeLogoHeight);
       }
-    } catch (e) {
-      console.error("Error updating logo:", e);
+    } catch {
+      console.error("Error updating logo");
     }
   }
 
@@ -357,8 +389,8 @@
   onMount(() => {
     try {
       themeStore.init();
-    } catch (e) {
-      console.error("Theme initialization error:", e);
+    } catch {
+      console.error("Theme initialization error");
     }
 
     // Start header manager after DOM is available
@@ -372,8 +404,10 @@
   });
 
   $effect(() => {
-    if (showBookmarkModal && !BookmarkModalComponent) {
-      loadBookmarkModal();
+    if (showBookmarkModal && !BookmarkModal) {
+      (async () => {
+        BookmarkModal = await dynamicComponentStore.loadBookmarkModal();
+      })();
     }
   });
 </script>
@@ -390,7 +424,7 @@
       >
         <div class="mt-3">
           <button
-            onclick={async () => await navigateTo("/")}
+            onclick={() => GlobalNavigateTo("/")}
             class="focus:outline-none"
           >
             {#if logo}
@@ -410,7 +444,7 @@
         </div>
         <div class="flex items-center gap-1 mt-5">
           <!-- Color/theme switcher -->
-          <div class="backdrop-blur-lg rounded-full shadow-lg p-2">
+          <div class="rounded-full shadow-lg p-2">
             <label class="flex cursor-pointer gap-2 items-center">
               <span
                 class="relative w-12 h-6 flex items-center"
@@ -472,7 +506,7 @@
           </button>
           <button
             class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)] hidden rounded-full md:inline-flex"
-            onclick={async () => await navigateTo("/pasang-iklan-loker/")}
+            onclick={() => GlobalNavigateTo("/pasang-iklan-loker/")}
           >
             <ExternalLinkSolid
               class="h-6 w-6"
@@ -511,7 +545,7 @@
         >
           <li>
             <button
-              onclick={async () => await navigateTo("/pasang-iklan-loker")}
+              onclick={() => GlobalNavigateTo("/pasang-iklan-loker")}
               class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] justify-start"
             >
               <ExternalLinkSolid
@@ -526,7 +560,7 @@
       </div>
     {/if}
   </div>
-  {#if showBookmarkModal && BookmarkModalComponent}
-    <BookmarkModalComponent bind:open={showBookmarkModal} />
+  {#if showBookmarkModal && BookmarkModal}
+    <BookmarkModal bind:open={showBookmarkModal} />
   {/if}
 </header>

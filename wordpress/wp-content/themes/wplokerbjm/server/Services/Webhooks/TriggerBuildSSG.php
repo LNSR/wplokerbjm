@@ -4,6 +4,7 @@ namespace WPLokerBJM\Services\Webhooks;
 
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Configs\CredentialConfig;
 /**
  * TriggerBuild
@@ -87,6 +88,17 @@ class TriggerBuildSSG
     public function trigger(array $paths, ?string $reason = null, ?bool $dryRun = null): array
     {
         Logger::info('SSG', "Starting build trigger - Paths: " . json_encode($paths) . ", Reason: " . ($reason ?? 'none') . ", Dry Run: " . ($dryRun ? 'true' : 'false') . ", Workflow: {$this->workflow}");
+
+        // Disable SSG builds for localhost
+        if (SharedUtils::isLocalhost()) {
+            Logger::info('SSG', "Skipping SSG trigger for localhost");
+            return [
+                'success' => false,
+                'status' => null,
+                'body' => null,
+                'error' => 'SSG builds are disabled for localhost',
+            ];
+        }
 
         if (empty($this->token) || empty($this->owner) || empty($this->repo) || empty($this->workflow)) {
             Logger::error('SSG', "Missing GitHub Actions configuration - Token: " . (!empty($this->token) ? 'set' : 'missing') . ", Owner: {$this->owner}, Repo: {$this->repo}, Workflow: {$this->workflow}");

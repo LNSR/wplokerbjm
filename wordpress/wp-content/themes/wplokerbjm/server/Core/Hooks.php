@@ -21,6 +21,14 @@ use WPLokerBJM\Shared\Log\Logger;
  */
 class Hooks implements HooksInterface
 {
+    /**
+     * Constructor for Hooks class.
+     *
+     * @param BotDetection $botDetection Service for bot detection.
+     * @param PostsCRUDListener $postsCRUDListener Listener for post CRUD operations.
+     * @param RedirectToSSG $redirectToSSG Service for SSG redirects.
+     * @param RESTRoute $restRoute Service for REST API routes.
+     */
     public function __construct(
         private BotDetection $botDetection,
         private PostsCRUDListener $postsCRUDListener,
@@ -33,52 +41,63 @@ class Hooks implements HooksInterface
      | REGISTER HOOKS
      ======================================================================*/
 
+    /**
+     * Registers WordPress action hooks.
+     *
+     * Sets up various action hooks for theme functionality, caching, SSG, and more.
+     *
+     * @return void
+     */
     public function registerActions(): void
     {
-        add_action('after_setup_theme', fn() => ThemeInject::addThemeSupport());
-        add_action('wp_head', fn() => ThemeInject::injectThemeScript());
-        add_action('wp_head', fn() => Enqueue::outputPreloadLinks());
-        add_action('wp_head', fn() => ThemeInject::preloadLogo());
+        add_action('after_setup_theme', fn() => ThemeInject::addThemeSupport(), 0);
+        add_action('wp_footer', fn() => ThemeInject::injectThemeScript(), 0);
+        add_action('wp_head', fn() => Enqueue::outputPreloadLinks(), 0);
+        add_action('wp_head', fn() => ThemeInject::preloadLogo(), 0);
         add_action('wp_enqueue_scripts', fn() => DebloatWPTheme::removeWPLibrary(), 4);
         add_action('litespeed_purged_all', fn() => Litespeed::clearObjectCache());
-        add_action('wp_enqueue_scripts', fn() => Enqueue::enqueueAssets());
+        add_action('wp_enqueue_scripts', fn() => Enqueue::enqueueAssets(), 0);
         add_action('template_redirect', fn() => $this->oldPost410Redirect(), 4);
         add_action('template_redirect', fn() => self::redirectToHome(), 4);
-        add_action('template_redirect', fn() => self::modifyLinkHeaders(), 8);
-        add_action('send_headers', fn() => self::restHeaders());
+        add_action('template_redirect', fn() => self::modifyLinkHeaders(), 12);
+        add_action('send_headers', fn() => self::restHeaders(), 12);
 
         // API registerActions
-        add_action('rest_api_init', fn() => $this->restRoute->registerRoutes());
+        add_action('rest_api_init', fn() => $this->restRoute->registerRoutes(), 0);
 
         // Cache purging hooks
-        add_action('save_post', fn(...$args) => $this->purgeQueryCaches(...$args));
-        add_action('delete_post', fn(...$args) => $this->purgeQueryCaches(...$args));
-        add_action('trashed_post', fn(...$args) => $this->purgeQueryCaches(...$args));
-        add_action('delete_attachment', fn(...$args) => $this->purgeQueryCaches(...$args));
-        add_action('created_term', fn(...$args) => $this->purgeQueryCaches(...$args));
-        add_action('edited_term', fn(...$args) => $this->purgeQueryCaches(...$args));
-        add_action('delete_term', fn(...$args) => $this->purgeQueryCaches(...$args));
-
-        // Job-specific cache invalidation hooks
-        add_action('save_post', fn(...$args) => $this->clearJobDataCache(...$args), 10, 2);
-        add_action('delete_post', fn(...$args) => $this->clearJobDataCache(...$args));
-        add_action('updated_post_meta', fn(...$args) => $this->clearJobDataCacheOnMeta(...$args), 10, 4);
-        add_action('set_object_terms', fn(...$args) => $this->clearJobDataCacheOnTax(...$args), 10, 6);
-        add_action('transition_post_status', fn(...$args) => $this->clearJobDataCacheOnStatusChange(...$args), 10, 3);
+        // Note: we request only the args we need from WP to avoid unused parameter warnings.
+        add_action('save_post', fn($post_id, $post) => $this->purgeCacheOnChange($post_id, $post), 10, 2);
+        add_action('delete_post', fn($post_id) => $this->purgeCacheOnChange($post_id), 10, 1);
+        add_action('trashed_post', fn($post_id) => $this->purgeCacheOnChange($post_id), 10, 1);
+        add_action('delete_attachment', fn($post_id) => $this->purgeCacheOnChange($post_id), 10, 1);
+        add_action('created_term', fn() => $this->purgeCacheOnChange(), 10, 0);
+        add_action('edited_term', fn() => $this->purgeCacheOnChange(), 10, 0);
+        add_action('delete_term', fn() => $this->purgeCacheOnChange(), 10, 0);
+        add_action('updated_post_meta', fn($meta_id, $object_id, $meta_key, $_meta_value) => $this->purgeCacheOnChange($object_id), 10, 4);
+        add_action('set_object_terms', fn($object_id) => $this->purgeCacheOnChange($object_id), 10, 6);
+        add_action('transition_post_status', fn($_new_status, $_old_status, $post) => $this->purgeCacheOnChange($post->ID ?? null, $post), 10, 3);
 
         // SSG hooks
         add_action('save_post', fn(...$args) => $this->postsCRUDListener->onSavePost(...$args), 10, 3);
         add_action('before_delete_post', fn(...$args) => $this->postsCRUDListener->onBeforeDeletePost(...$args), 1, 1);
         add_action('wp_trash_post', fn(...$args) => $this->postsCRUDListener->onTrashPost(...$args), 1, 1);
         add_action('template_redirect', fn() => $this->redirectToSSG->serveSSG(), 0);
-        add_action('send_headers', fn() => $this->redirectToSSG->buildHeaders());
-        add_action('wp_footer', fn() => $this->redirectToSSG->setCookieToHuman());
+        add_action('send_headers', fn() => $this->redirectToSSG->buildHeaders(), 10);
+        add_action('wp_footer', fn() => $this->redirectToSSG->setCookieToHuman(), 10);
     }
 
     /*======================================================================
      | REGISTER FILTERS
      ======================================================================*/
 
+    /**
+     * Registers WordPress filter hooks.
+     *
+     * Sets up various filter hooks for modifying WordPress behavior, SEO, plugins, and search.
+     *
+     * @return void
+     */
     public function registerFilters(): void
     {
         add_filter('wp_robots', fn(...$args) => self::robotsMeta(...$args));
@@ -304,6 +323,13 @@ class Hooks implements HooksInterface
         return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
 
+    /**
+     * Filters the list of active plugins by removing specified plugins.
+     *
+     * @param array $plugins Array of active plugin file paths.
+     * @param array $pluginsToDisable Array of plugin prefixes to disable.
+     * @return array Filtered array of active plugins.
+     */
     private function filteredPlugins(array $plugins, array $pluginsToDisable): array
     {
         $filtered = array_filter($plugins, function (string $plugin) use ($pluginsToDisable): bool {
@@ -318,11 +344,16 @@ class Hooks implements HooksInterface
         return array_values($filtered);
     }
 
+    /**
+     * Returns the list of plugins to disable, optionally merged with extra plugins.
+     *
+     * @param array|null $extra Optional array of additional plugin prefixes to disable.
+     * @return array Array of plugin prefixes to disable.
+     */
     private function listPluginsToDisable(?array $extra = []): array
     {
         return array_merge([
-            'google-site-kit/',
-            'seo-by-rank-math/',
+            // 'google-site-kit/',
             'fast-indexing-api/',
             'wps-hide-login/',
         ], $extra);
@@ -333,102 +364,79 @@ class Hooks implements HooksInterface
      ======================================================================*/
 
     /**
-     * Purge query caches when posts or taxonomies are modified.
+     * Centralized cache purge when posts, meta, terms, or status change.
+     *
+     * Prefer explicit parameters to make intent and types clear when hooked from WP.
+     *
+     * Calling conventions:
+     * - For post hooks (e.g., `save_post`, `delete_post`) we pass `($post_id, $post)` so
+     *   the method can perform both global purges and per-job invalidation when applicable.
+     * - For term hooks (`created_term`, `edited_term`, `delete_term`) we call this method
+     *   without arguments (no post context) and it will only purge global caches.
+     * - For meta/taxonomy hooks we pass the `object_id` (post id) when available.
+     *
+     * @param int|null $post_id Optional post ID when available (null for term-level hooks).
+     * @param \WP_Post|null $post Optional WP_Post object when available.
+     * @return void
      */
-    private function purgeQueryCaches($post = null): void
+    public function purgeCacheOnChange(?int $post_id = null, $post = null): void
     {
-        // Only purge for lowongan posts if post is provided
-        if ($post && (!is_object($post) || $post->post_type !== PostTypes::POST_TYPE_LOWONGAN)) {
-            return;
+        // If a post object is provided, ensure it's the 'lowongan' type; otherwise bail out.
+        if ($post instanceof \WP_Post) {
+            if ($post->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
+                return;
+            }
+            $post_id = $post->ID ?? $post_id;
+        }
+
+        // If only a post_id was provided, resolve it and apply same post type check.
+        if ($post_id !== null && !($post instanceof \WP_Post)) {
+            $resolved = get_post($post_id);
+            if ($resolved !== null && $resolved->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
+                return; // don't purge when a non-lowongan post changed
+            }
+            if ($resolved !== null) {
+                $post = $resolved;
+            }
         }
 
         try {
-            // Purge job last modified cache
-            Cache::delete(CacheKey::JOB_LAST_MODIFIED);
+            // Purge general caches
+            Cache::deleteMultiple([
+                CacheKey::CAROUSEL_JOBS,
+                CacheKey::JOB_LAST_MODIFIED,
+                CacheKey::TAXONOMY_LAST_MODIFIED,
+                CacheKey::ALL_TAXONOMY_TERMS,
 
-            // Purge taxonomy last modified cache
-            Cache::delete(CacheKey::TAXONOMY_LAST_MODIFIED);
+                    // Purge taxonomy depth REST caches
+                CacheKey::TAXONOMY_DEPTH_HANDLE,
+                CacheKey::TAXONOMY_DEPTH_LOKASI,
+                CacheKey::TAXONOMY_DEPTH_GENDER,
+                CacheKey::TAXONOMY_DEPTH_PENDIDIKAN,
+            ]);
 
-            // Purge search SQL caches using pattern delete
-            Cache::deletePattern(CacheKey::SEARCH_SQL_PREFIX . '*');
+            Cache::deletePattern([
+                CacheKey::JOB_GRID_PREFIX . '*',
+                CacheKey::SEARCH_SQL_PREFIX . '*',
+                CacheKey::COMPANY_SEARCH_PREFIX . '*',
+                CacheKey::AUTO_SUGGESTION_PREFIX . '*',
+                CacheKey::POST_TAXONOMIES_PREFIX . '*'
+            ]);
 
-            // Purge company search caches
-            Cache::deletePattern(CacheKey::COMPANY_SEARCH_PREFIX . '*');
-
-            // Purge auto suggestion caches
-            Cache::deletePattern(CacheKey::AUTO_SUGGESTION_PREFIX . '*');
-
-            // Purge load more caches
-            Cache::deletePattern(CacheKey::LOAD_MORE_PREFIX . '*');
-
-            // Purge dynamic search caches
-            Cache::deletePattern(CacheKey::DYNAMIC_SEARCH_PREFIX . '*');
-
-            // Purge presenter caches
-            Cache::delete(CacheKey::CAROUSEL_JOBS);
-            Cache::deletePattern(CacheKey::JOB_GRID_PREFIX . '*');
-
-            // Purge taxonomy repository caches
-            Cache::delete(CacheKey::ALL_TAXONOMY_TERMS);
-            Cache::deletePattern(CacheKey::POST_TAXONOMIES_PREFIX . '*');
-
-            // Purge taxonomy depth REST caches
-            Cache::delete(CacheKey::TAXONOMY_DEPTH_HANDLE);
-            Cache::delete(CacheKey::TAXONOMY_DEPTH_LOKASI);
-            Cache::delete(CacheKey::TAXONOMY_DEPTH_GENDER);
-            Cache::delete(CacheKey::TAXONOMY_DEPTH_PENDIDIKAN);
-
-            // Purge theme data cache
-            Cache::delete(CacheKey::THEME_DATA);
-
-            // If specific post, also purge its taxonomy cache
-            if ($post && is_object($post)) {
-                Cache::delete(CacheKey::POST_TAXONOMIES_PREFIX . $post->ID);
+            // If we detected a post id, also invalidate the per-job caches
+            if ($post_id !== null) {
+                $this->invalidateJobDataCache((int) $post_id);
             }
         } catch (\Exception $e) {
-            Logger::error('Hooks', 'Hooks::purgeQueryCaches error: ' . $e->getMessage());
-        }
-    }
-
-    /**
-     * Clear job data cache when post is saved or deleted.
-     */
-    public function clearJobDataCache($post_id, $post = null): void
-    {
-        $this->invalidateJobDataCache($post_id);
-    }
-
-    /**
-     * Clear job data cache when post meta is updated.
-     */
-    public function clearJobDataCacheOnMeta($meta_id, $object_id, $meta_key, $_meta_value): void
-    {
-        $this->invalidateJobDataCache($object_id);
-    }
-
-    /**
-     * Clear job data cache when object terms are set.
-     */
-    public function clearJobDataCacheOnTax($object_id, $terms, $tt_ids, $taxonomy, $append, $old_tt_ids): void
-    {
-        $this->invalidateJobDataCache($object_id);
-    }
-
-    /**
-     * Clear job data cache when post status changes.
-     */
-    public function clearJobDataCacheOnStatusChange($new_status, $old_status, $post): void
-    {
-        if ($new_status !== $old_status && $post->post_type === 'lowongan') {
-            $this->invalidateJobDataCache($post->ID);
+            Logger::error('Hooks', 'Hooks::purgeCacheOnChange error: ' . $e->getMessage());
         }
     }
 
     /**
      * Invalidate job data cache for a specific post if it's a 'lowongan' post type.
      *
-     * @param int $post_id The post ID
-     * @return bool True if cache was invalidated, false otherwise
+     * @param int $post_id The post ID.
+     * @return bool True if cache was invalidated, false otherwise.
      */
     private function invalidateJobDataCache(int $post_id): bool
     {
@@ -439,8 +447,8 @@ class Hooks implements HooksInterface
 
         $jobDataCacheKey = CacheKey::JOB_DATA_PREFIX . $post_id;
         $cardCacheKey = CacheKey::REST_CARD_PREFIX . $post_id;
-        $overlayCacheKeyLoggedIn = CacheKey::REST_OVERLAY_PREFIX . $post_id . '_logged_in';
-        $overlayCacheKeyPublic = CacheKey::REST_OVERLAY_PREFIX . $post_id . '_public';
+        $overlayCacheKeyLoggedIn = CacheKey::REST_JOBDETAIL_PREFIX . $post_id . '_logged_in';
+        $overlayCacheKeyPublic = CacheKey::REST_JOBDETAIL_PREFIX . $post_id . '_public';
         $schemaCacheKey = CacheKey::JOB_SCHEMA_PREFIX . $post_id;
 
         // Use deleteMultiple for better performance - single network round trip
@@ -453,6 +461,8 @@ class Hooks implements HooksInterface
         ];
 
         $deleteResults = Cache::deleteMultiple($cacheKeys);
+
+        Cache::deletePattern([CacheKey::REST_JOB_SCHEMA_BATCH_PREFIX . '*']);
 
         // Return true if any cache entry was deleted
         return !empty(array_filter($deleteResults));

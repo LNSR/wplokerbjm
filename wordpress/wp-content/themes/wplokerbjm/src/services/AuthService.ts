@@ -1,4 +1,4 @@
-import { nonceStore } from '$lib/stores/Nonce.svelte';
+import { nonceStore } from '@/utils';
 
 export class AuthService {
   /**
@@ -6,7 +6,7 @@ export class AuthService {
    * Use this when making authenticated requests to the WP REST API.
    */
   static getRestNonce(): string | null {
-    return nonceStore.getNonce();
+    return nonceStore.getNonce;
   }
 
   /**

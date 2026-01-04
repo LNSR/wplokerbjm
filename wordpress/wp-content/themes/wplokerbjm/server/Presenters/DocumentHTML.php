@@ -19,7 +19,7 @@ class DocumentHTML
 
         <body <?php body_class(); ?>>
             <?php
-            self::renderApp($props);
+            self::renderAppShell($props);
             wp_footer();
             ?>
         </body>
@@ -31,13 +31,13 @@ class DocumentHTML
     /**
      *  Renders the main app container with optional props as JSON
      */
-    private static function renderApp(?array $props = null): void
+    private static function renderAppShell(?array $props = null): void
     {
         ?>
         <div id="app">
             <?php if ($props): ?>
                 <script type="application/json"
-                    data-props><?= wp_json_encode($props, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
+                    id="__wplokerbjm_data-props"><?= wp_json_encode($props, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?></script>
             <?php endif; ?>
         </div>
         <?php

@@ -54,7 +54,7 @@ export class HeaderStore {
             this.appEl?.style.setProperty('--site-header-top', top + 'px');
         }
 
-        let prevPadding: string | null = opts?.previousMainPadding ?? null;
+        const prevPadding: string | null = opts?.previousMainPadding ?? null;
 
         if (headerEl) {
             const headerHeight = headerEl.offsetHeight || 0;

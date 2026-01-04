@@ -44,7 +44,7 @@
 
     <div class="space-y-6">
       <!-- Form fields -->
-      {#each Array(8) as _}
+      {#each Array(8)}
         <div class="space-y-2">
           <div class="h-4 w-32 bg-gray-300 dark:bg-gray-600 rounded"></div>
           <div class="h-12 bg-gray-300 dark:bg-gray-600 rounded"></div>
@@ -53,7 +53,7 @@
 
       <!-- Checkbox options -->
       <div class="space-y-3">
-        {#each Array(4) as _}
+        {#each Array(4)}
           <div class="flex items-center gap-3">
             <div class="w-4 h-4 bg-gray-300 dark:bg-gray-600 rounded"></div>
             <div class="h-4 w-48 bg-gray-300 dark:bg-gray-600 rounded"></div>
@@ -78,7 +78,7 @@
     </div>
 
     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {#each Array(4) as _}
+      {#each Array(4)}
         <div class="space-y-2">
           <div class="h-4 w-24 bg-gray-300 dark:bg-gray-600 rounded"></div>
           <div class="h-10 bg-gray-300 dark:bg-gray-600 rounded"></div>

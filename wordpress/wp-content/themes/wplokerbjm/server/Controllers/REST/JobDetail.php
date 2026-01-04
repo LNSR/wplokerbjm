@@ -6,9 +6,9 @@ use WP_REST_Request;
 use WP_REST_Response;
 use WPLokerBJM\Controllers\Utilities\ControllerUtils;
 use WPLokerBJM\Shared\Log\Logger;
-class SingleOverlay
+class JobDetail
 {
-    public function __construct(private \WPLokerBJM\Services\REST\RESTData $restData)
+    public function __construct(private \WPLokerBJM\Presenters\Pages\SinglePresenter $singlePresenter)
     {
     }
 
@@ -25,7 +25,7 @@ class SingleOverlay
                 return ControllerUtils::failedResponse('Post not found', 404);
             }
 
-            $data = $this->restData->getSingleOverlayData($post->ID);
+            $data = $this->singlePresenter->getProps($post->ID)['job'];
 
             return new WP_REST_Response($data, 200);
         } catch (\Exception $e) {

@@ -1,7 +1,7 @@
 <script lang="ts">
   import JobCard from "@components/ui/Homepage/JobCard.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
-  import { navigateTo, routeStateStore } from "$lib/stores/Route.svelte";
+  import { GlobalNavigateTo, routeStateStore } from "$lib/stores/Route.svelte";
   import type { CardJob } from "@/types";
   import { APIService } from "@/services/APIService";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
@@ -16,8 +16,9 @@
   import "swiper/css";
   import "swiper/css/navigation";
   import "swiper/css/pagination";
+  import Virtualization from "$lib/utils/Virtualization.svelte";
 
-  let { jobs: propJobs = [], title = "Lowongan Darurat" } = $props<{
+  const { jobs: propJobs = [], title = "Lowongan Darurat" } = $props<{
     jobs?: CardJob[];
     title?: string;
   }>();
@@ -29,8 +30,18 @@
   let error = $state<string | null>(null);
   let isRefreshing = $state(false);
 
-  let jobs = $derived(
+  const jobs = $derived(
     propJobs.length > 0 ? propJobs : (carouselData?.jobs ?? [])
+  );
+
+  const buffer = 3;
+  const virtualization = $derived.by(() =>
+    Virtualization.computeCarousel({
+      jobsLength: jobs.length,
+      activeIndex,
+      innerWidth,
+      buffer,
+    })
   );
 
   let swiperInstance: Swiper | null = null;
@@ -40,6 +51,8 @@
 
   let isInitializing = $state(false);
   let swiperFailed = $state(false);
+  let activeIndex = $state(0);
+  let innerWidth = $state(1024);
 
   class SwiperManager {
     private static createSwiperConfig(
@@ -61,6 +74,11 @@
         navigation: {
           nextEl: nextEl ?? undefined,
           prevEl: prevEl ?? undefined,
+        },
+        on: {
+          slideChange: (swiper: Swiper) => {
+            activeIndex = swiper.activeIndex;
+          },
         },
         breakpoints: {
           640: {
@@ -90,7 +108,7 @@
         if (attempts >= MAX_INIT_ATTEMPTS) {
           try {
             el.classList.remove("invisible");
-          } catch (e) {
+          } catch {
             // ignore
           }
           swiperFailed = !!(
@@ -105,18 +123,18 @@
       }
     }
 
-    private static async initializeSwiperInstance(
+    private static initializeSwiperInstance(
       el: HTMLElement,
       paginationEl: HTMLElement | null,
       nextEl: HTMLElement | null,
       prevEl: HTMLElement | null
-    ): Promise<void> {
+    ): void {
       try {
         try {
           if (SwiperCore && (SwiperCore as typeof SwiperCore).use) {
             SwiperCore.use([Navigation, Pagination, Autoplay]);
           }
-        } catch (e) {}
+        } catch {}
 
         const cfg = SwiperManager.createSwiperConfig(
           paginationEl,
@@ -139,9 +157,9 @@
         }
 
         return;
-      } catch (err) {
-        console.error("Failed to initialize Swiper:", err);
-        throw err;
+      } catch {
+        console.error("Failed to initialize Swiper");
+        throw new Error("Failed to initialize Swiper");
       }
     }
 
@@ -157,7 +175,7 @@
 
       try {
         el.classList.remove("invisible");
-      } catch (e) {}
+      } catch {}
 
       const paginationEl = el.querySelector(
         ".swiper-pagination"
@@ -182,14 +200,14 @@
       if (swiperInstance) {
         try {
           swiperInstance.destroy(true, true);
-        } catch (e) {
+        } catch {
           // ignore
         }
         swiperInstance = null;
       }
 
       try {
-        await SwiperManager.initializeSwiperInstance(
+        SwiperManager.initializeSwiperInstance(
           el,
           paginationEl,
           nextEl,
@@ -199,7 +217,7 @@
         swiperFailed = false;
         try {
           el.classList.remove("no-swiper");
-        } catch (e) {}
+        } catch {}
       } catch (err) {
         console.error("Failed to initialize Swiper:", err);
         console.warn(
@@ -208,11 +226,11 @@
         swiperFailed = true;
         try {
           el.classList.add("no-swiper");
-        } catch (e) {}
+        } catch {}
       } finally {
         try {
           el.classList.remove("invisible");
-        } catch (e) {}
+        } catch {}
         isInitializing = false;
       }
     }
@@ -224,7 +242,7 @@
       if (swiperInstance) {
         try {
           swiperInstance.destroy(forceDestroy, true);
-        } catch (err) {
+        } catch {
           // ignore
         }
         swiperInstance = null;
@@ -256,7 +274,7 @@
             ".job-carousel"
           ) as HTMLElement | null;
           if (possibleNode) possibleNode.classList.remove("invisible");
-        } catch (e) {
+        } catch {
           // ignore
         }
         return;
@@ -273,7 +291,7 @@
       // but in case it returned early elsewhere ensure we remove it here.
       try {
         el.classList.remove("invisible");
-      } catch (e) {
+      } catch {
         // ignore
       }
     }
@@ -287,7 +305,7 @@
         if (swiperInstance) {
           try {
             swiperInstance.destroy(true, true);
-          } catch (err) {
+          } catch {
             // ignore
           }
           swiperInstance = null;
@@ -296,8 +314,8 @@
         const data = await APIService.fetchCarousel();
         carouselData = data ?? null;
         error = null;
-      } catch (err) {
-        console.error("Failed to refresh carousel:", err);
+      } catch {
+        console.error("Failed to refresh carousel");
         error = "Failed to refresh carousel";
       } finally {
         // Ensure the loading state is cleared before attempting to reinitialize
@@ -313,7 +331,7 @@
     }
 
     // Fetch carousel data if no jobs prop from initial load page
-    static async fetchCarouselData(): Promise<void> {
+    static fetchCarouselData(): void {
       if (propJobs.length === 0 && !carouselData && !isLoading) {
         isLoading = true;
         APIService.fetchCarousel()
@@ -321,8 +339,8 @@
             carouselData = data;
             error = null;
           })
-          .catch((err) => {
-            console.error("Failed to fetch carousel:", err);
+          .catch(() => {
+            console.error("Failed to fetch carousel");
             error = "Failed to load carousel data";
           })
           .finally(() => {
@@ -332,7 +350,7 @@
     }
 
     // Keep Swiper in sync when job list updates
-    static async updateSwiperOnJobsChange(): Promise<void> {
+    static updateSwiperOnJobsChange(): void {
       // When job list changes, ensure Swiper exists and is in sync.
       const count = jobs?.length ?? 0;
 
@@ -361,7 +379,7 @@
       if (swiperInstance) {
         try {
           swiperInstance.destroy(true, true);
-        } catch (err) {
+        } catch {
           // ignore
         }
         swiperInstance = null;
@@ -400,7 +418,7 @@
       } else {
         // Mobile: use SPA navigation to SingleLowongan.svelte route
         const url = new URL(String(permalink), window.location.origin);
-        await navigateTo(url.pathname + url.search + url.hash);
+        void GlobalNavigateTo(url.pathname + url.search + url.hash);
       }
     }
   }
@@ -423,6 +441,8 @@
     void SwiperManager.destroySwiper();
   });
 </script>
+
+<svelte:window bind:innerWidth />
 
 <section class="min-h-[450px] md:min-h-[400px] lg:min-h-[500px]">
   <div class="flex items-center justify-between mb-6">
@@ -499,17 +519,25 @@
       <div class="swiper-wrapper">
         {#each jobs as job, idx (job.id ?? job.permalink ?? idx)}
           <div class="swiper-slide">
-            <JobCard
-              jobdata={job}
-              permalink={job.permalink}
-              variant="carousel"
-              onClick={async (slug) =>
-                await CarouselNavigationHandler.handleClickNavigateToJob(
-                  slug,
-                  job.permalink ?? "",
-                  job
-                )}
-            />
+            {#if idx >= virtualization.startIndex && idx < virtualization.endIndex}
+              <JobCard
+                jobdata={job}
+                permalink={job.permalink}
+                variant="carousel"
+                onClick={(slug) =>
+                  CarouselNavigationHandler.handleClickNavigateToJob(
+                    slug,
+                    job.permalink ?? "",
+                    job
+                  )}
+              />
+            {:else}
+              <div
+                class="placeholder h-[300px] bg-[var(--wpl-global-color-5)] rounded-lg flex items-center justify-center"
+              >
+                <LoadingSpinner srLabel="Memuat lowongan..." size="md" />
+              </div>
+            {/if}
           </div>
         {/each}
       </div>
@@ -524,11 +552,19 @@
         >
           {#each jobs as job, idx (job.id ?? job.permalink ?? idx)}
             <div class="fallback-item">
-              <JobCard
-                jobdata={job}
-                permalink={job.permalink ?? ""}
-                variant="carousel"
-              />
+              {#if idx >= virtualization.startIndex && idx < virtualization.endIndex}
+                <JobCard
+                  jobdata={job}
+                  permalink={job.permalink ?? ""}
+                  variant="carousel"
+                />
+              {:else}
+                <div
+                  class="placeholder h-[300px] bg-[var(--wpl-global-color-5)] rounded-lg flex items-center justify-center"
+                >
+                  <LoadingSpinner srLabel="Memuat lowongan..." size="md" />
+                </div>
+              {/if}
             </div>
           {/each}
         </div>

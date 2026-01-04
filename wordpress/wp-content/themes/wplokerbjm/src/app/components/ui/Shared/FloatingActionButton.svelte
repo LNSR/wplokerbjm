@@ -158,7 +158,7 @@
             <a
               href={link.url}
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
               class={gridBtnClass}
               role="menuitem"
               tabindex="0"

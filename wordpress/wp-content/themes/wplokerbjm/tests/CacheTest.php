@@ -5,32 +5,45 @@ namespace WPLokerBJM\Tests;
 use WPLokerBJM\Tests\Support\ProxyContainer;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Shared\Cache\Cache;
+use WPLokerBJM\Shared\Cache\CacheKey;
+use WPLokerBJM\Configs\CredentialConfig;
 
 class CacheTest extends WplokerbjmTestCase
 {
     
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        // Define LSOC_PREFIX for testing (mimics LiteSpeed's behavior)
+        if (!defined('LSOC_PREFIX')) {
+            define('LSOC_PREFIX', 'cf8e0');
+        }
+    }
+    
     public function testGetRedisConnectionWithEnvironmentConfig()
     {
-        // Test Redis connection using environment variables (like WordPress)
         if (!extension_loaded('redis')) {
             $this->fail('Redis extension is not loaded. Install with: pecl install redis && echo "extension=redis.so" >> php.ini');
         }
 
         echo "\n\033[1;35m🔴 Redis Connection Test\033[0m\n";
 
+        $credentials = CredentialConfig::RedisCredential();
+
         // Debug: Show what constants are defined
         echo "\033[0;36mConfiguration:\033[0m\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_SOCK: " . (defined('WP_REDIS_SOCK') ? "\033[0;32m" . WP_REDIS_SOCK . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_HOST: " . (defined('WP_REDIS_HOST') ? "\033[0;32m" . WP_REDIS_HOST . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_PORT: " . (defined('WP_REDIS_PORT') ? "\033[0;32m" . WP_REDIS_PORT . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . (defined('WP_REDIS_PASSWORD') ? "\033[0;32m" . (WP_REDIS_PASSWORD ? '{REDACTED}' : 'empty') . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . (defined('WP_REDIS_DATABASE') ? "\033[0;32m" . WP_REDIS_DATABASE . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_SOCK: " . ($credentials['sock'] ? "\033[0;32m" . $credentials['sock'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_HOST: " . ($credentials['host'] ? "\033[0;32m" . $credentials['host'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_PORT: " . ($credentials['port'] ? "\033[0;32m" . $credentials['port'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . ($credentials['password'] ? "\033[0;32m" . '{REDACTED}' . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . ($credentials['database'] !== null ? "\033[0;32m" . $credentials['database'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
 
         $redis = Cache::getRedisConnection();
 
         if ($redis === false) {
             echo "\033[0;31m❌ Redis connection failed\033[0m\n";
-            $this->fail('Redis connection failed - check Redis server and configuration. Is Redis running on ' . WP_REDIS_HOST . ':' . WP_REDIS_PORT . '?');
+            $this->fail('Redis connection failed - check Redis server and configuration. Is Redis running on ' . ($credentials['host'] ?: 'localhost') . ':' . ($credentials['port'] ?: 6379) . '?');
         }
 
         echo "\033[0;32m✅ Redis connection successful\033[0m\n";
@@ -75,21 +88,23 @@ class CacheTest extends WplokerbjmTestCase
 
         echo "\n\033[1;35m🔴 Redis TCP Connection Test\033[0m\n";
 
+        $credentials = CredentialConfig::RedisCredential();
+
         // Debug: Show TCP configuration
         echo "\033[0;36mTCP Configuration:\033[0m\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_HOST: " . (defined('WP_REDIS_HOST') ? "\033[0;32m" . WP_REDIS_HOST . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_PORT: " . (defined('WP_REDIS_PORT') ? "\033[0;32m" . WP_REDIS_PORT . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . (defined('WP_REDIS_PASSWORD') ? "\033[0;32m" . (WP_REDIS_PASSWORD ? '{REDACTED}' : 'empty') . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . (defined('WP_REDIS_DATABASE') ? "\033[0;32m" . WP_REDIS_DATABASE . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_HOST: " . ($credentials['host'] ? "\033[0;32m" . $credentials['host'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_PORT: " . ($credentials['port'] ? "\033[0;32m" . $credentials['port'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . ($credentials['password'] ? "\033[0;32m" . '{REDACTED}' . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . ($credentials['database'] !== null ? "\033[0;32m" . $credentials['database'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
 
-        $host = defined('WP_REDIS_HOST') ? WP_REDIS_HOST : 'localhost';
-        $port = defined('WP_REDIS_PORT') ? WP_REDIS_PORT : 6379;
+        $host = $credentials['host'] ?: 'localhost';
+        $port = $credentials['port'] ?: 6379;
         // In Docker container environment, use 'redis' service name to reach Redis container
         if ((getenv('WP_ENV') === 'development' || getenv('WP_ENV') === 'production') && file_exists('/.dockerenv')) {
             $host = 'redis';
         }
-        $password = defined('WP_REDIS_PASSWORD') ? WP_REDIS_PASSWORD : null;
-        $database = defined('WP_REDIS_DATABASE') ? WP_REDIS_DATABASE : 0;
+        $password = $credentials['password'];
+        $database = $credentials['database'] ?: 0;
 
         $redis = new \Redis();
 
@@ -145,5 +160,67 @@ class CacheTest extends WplokerbjmTestCase
         $redis->del($testKey);
         echo "  \033[0;32m✓\033[0m TCP Cleanup completed\n";
         echo "\n";
+    }
+
+    public function testDeletePattern()
+    {
+        // Test pattern-based deletion using Cache::deletePattern
+        if (!extension_loaded('redis')) {
+            $this->fail('Redis extension is not loaded. Install with: pecl install redis && echo "extension=redis.so" >> php.ini');
+        }
+
+        echo "\n\033[1;35m🔴 Cache Delete Pattern Test\033[0m\n";
+
+        // Get Redis connection
+        $redis = Cache::getRedisConnection();
+        if ($redis === false) {
+            echo "\033[0;31m❌ Redis connection failed\033[0m\n";
+            $this->fail('Redis connection failed - cannot test deletePattern');
+        }
+
+        // Determine the salt (LSOC_PREFIX or fallback)
+        $wp_content_dir = '/var/www/html/wp-content'; // Hardcoded for test environment
+        $lscwp_dir = (defined('WP_PLUGIN_DIR') ? WP_PLUGIN_DIR : $wp_content_dir . '/plugins') . '/litespeed-cache/';
+        $cls_file = $lscwp_dir . 'src/object-cache-wp.cls.php';
+        $expectedSalt = defined('LSOC_PREFIX') && is_string(LSOC_PREFIX) && !empty(LSOC_PREFIX) ? LSOC_PREFIX : substr(md5($cls_file), -5);
+
+        echo "\033[0;36mPattern Configuration:\033[0m\n";
+        echo "  \033[0;33m•\033[0m Expected Salt: \033[0;32m{$expectedSalt}\033[0m\n";
+        echo "  \033[0;33m•\033[0m Cache Prefix: \033[0;32m" . CacheKey::OBJECT_CACHE_PREFIX . "\033[0m\n";
+
+        // Create test keys directly in Redis with the correct format
+        $testPattern = 'phpunit_test_pattern_' . time() . '_*';
+        $testKeys = [
+            $expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.phpunit_test_pattern_' . time() . '_1',
+            $expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.phpunit_test_pattern_' . time() . '_2',
+            $expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.phpunit_test_pattern_' . time() . '_3',
+        ];
+
+        echo "\n\033[0;36mSetting up test keys:\033[0m\n";
+        foreach ($testKeys as $key) {
+            $redis->set($key, 'test_value', 300); // 5 minute expiry
+            echo "  \033[0;32m✓\033[0m Set key: {$key}\n";
+        }
+
+        // Verify keys exist
+        $existingKeys = $redis->keys($expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.' . $testPattern);
+        echo "\n\033[0;36mKeys before deletion:\033[0m\n";
+        echo "  \033[0;33m•\033[0m Found " . count($existingKeys) . " keys matching pattern\n";
+        $this->assertCount(3, $existingKeys, 'Test keys were not set correctly');
+
+        // Call deletePattern
+        $patternToDelete = 'phpunit_test_pattern_' . time() . '_*';
+        $deletedCount = Cache::deletePattern([$patternToDelete]);
+
+        echo "\n\033[0;36mDelete Pattern Result:\033[0m\n";
+        echo "  \033[0;33m•\033[0m Deleted count: \033[0;32m{$deletedCount}\033[0m\n";
+        $this->assertEquals(3, $deletedCount, 'deletePattern did not delete the expected number of keys');
+
+        // Verify keys are gone
+        $remainingKeys = $redis->keys($expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.' . $testPattern);
+        echo "  \033[0;33m•\033[0m Remaining keys: \033[0;32m" . count($remainingKeys) . "\033[0m\n";
+        $this->assertCount(0, $remainingKeys, 'Keys were not deleted by deletePattern');
+
+        echo "\n\033[0;32m✅ Delete Pattern Test Passed\033[0m\n";
     }
 }

@@ -14,11 +14,16 @@ class SinglePresenter
     ) {
     }
 
+    public function getProps(int $post_id): array
+    {
+        return [
+            'job' => $this->restData->getJobDetailData($post_id)
+        ];
+    }
+
     public function getSingleData(int $post_id): array
     {
-        $props = [
-            'job' => $this->restData->getSingleOverlayData($post_id)
-        ];
+        $props = $this->getProps($post_id);
 
         $schema_data = $this->jobSchema->getJobPostingSchema($post_id);
         $schema = JobPostingSchema::renderSchema($schema_data, $post_id);

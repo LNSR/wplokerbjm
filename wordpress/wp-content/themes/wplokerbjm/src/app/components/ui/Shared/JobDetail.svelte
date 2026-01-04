@@ -9,14 +9,15 @@
       .filter(Boolean);
   }
 </script>
+
 <script lang="ts">
-  import type Viewer from "viewerjs";
+  import Viewer from "viewerjs";
+  import "viewerjs/dist/viewer.min.css";
   import { SocialMediaPlatform } from "@/types";
   import { generalStore } from "$lib/stores/General.svelte";
   import { FormattingService } from "@/services/Formatting";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
-  import Adsense from "@components/ui/Shared/Adsense.svelte";
-  import { SvelteDate } from 'svelte/reactivity';
+  import { SvelteDate } from "svelte/reactivity";
   import {
     ClockSolid,
     UserTieSolid,
@@ -29,12 +30,12 @@
     AddressCardSolid,
     AddressBookSolid,
   } from "svelte-awesome-icons";
-  import type { SingleOverlayResponse } from "@/types";
+  import type { JobDetailResponse } from "@/types";
   import { timeEffect } from "@/app/lib/utils/elements.svelte";
 
-  let { job }: { job: SingleOverlayResponse } = $props();
+  const { job }: { job: JobDetailResponse } = $props();
 
-  let now = $state(new SvelteDate());
+  const now = $state(new SvelteDate());
 
   const ringkasanPekerjaan = $derived(
     generalStore.useSummaryJob(job.ringkasanPekerjaan)
@@ -43,15 +44,17 @@
   const socialMediaItems = $derived(
     generalStore.useSocialMedia().socialMediaItems(job.social_media)
   );
-  const timeAgo = $derived.by(() => generalStore.useTimeAgo(job.post_time, now));
+  const timeAgo = $derived.by(() =>
+    generalStore.useTimeAgo(job.post_time, now)
+  );
 
   const allImages = $derived(
     [
-      ...extractImages(job.tentang_perusahaan || ''),
-      ...extractImages(job.deskripsi_pekerjaan || ''),
-      ...extractImages(job.persyaratan || ''),
-      ...extractImages(job.cara_melamar || ''),
-      ...extractImages(job.benefit || ''),
+      ...extractImages(job.tentang_perusahaan || ""),
+      ...extractImages(job.deskripsi_pekerjaan || ""),
+      ...extractImages(job.persyaratan || ""),
+      ...extractImages(job.cara_melamar || ""),
+      ...extractImages(job.benefit || ""),
     ].filter((v, i, a) => a.indexOf(v) === i)
   );
   let galleryRef = $state<HTMLElement>();
@@ -78,11 +81,7 @@
     },
   };
 
-  async function setupViewer(): Promise<void> {
-    const [{ default: Viewer }] = await Promise.all([
-      import("viewerjs"),
-      import("viewerjs/dist/viewer.min.css"),
-    ]);
+  function setupViewer(): void {
     viewer = new Viewer(galleryRef!, viewerOptions as Viewer.Options);
     /** Aria-hidden issue best-effort fix for now */
     const viewerElement = (viewer as any).element;
@@ -104,7 +103,7 @@
     }
   }
 
-  async function onWysiwygImgClick(e: MouseEvent): Promise<void> {
+  function onWysiwygImgClick(e: MouseEvent): void {
     const target = e.target as HTMLElement;
     if (target.tagName !== "IMG") return;
 
@@ -131,7 +130,7 @@
     const imageIndex = allImages.indexOf(src);
     if (imageIndex >= 0) {
       if (!viewer) {
-        await setupViewer();
+        setupViewer();
       }
       viewer!.show();
       viewer!.view(imageIndex);
@@ -170,7 +169,6 @@
           <span>Diupdate: {timeAgo()}</span>
           <BookmarkButton jobId={job.id || 0} variant="detail" />
         </div>
-        <Adsense adSlot="6531671839" />
       {/if}
     </section>
 
@@ -402,7 +400,6 @@
       <div class="divider"></div>
     </section>
   {/if}
-  <Adsense adSlot="4495507760" />
 </div>
 {#if allImages.length}
   <div bind:this={galleryRef} class="hidden">

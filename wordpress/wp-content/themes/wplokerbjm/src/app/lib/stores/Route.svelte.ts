@@ -1,13 +1,12 @@
 import type { SearchState, CarouselState } from '@/types'
 import { WPPostRoute } from '@/types'
-import { removeJobPostingJsonLd } from '$lib/utils/elements.svelte'
-import { SvelteMap, SvelteURL } from 'svelte/reactivity'
+import { SvelteURL } from 'svelte/reactivity'
 import { scrollY } from 'svelte/reactivity/window'
-import { SEOService } from '$lib/utils/SEO.svelte'
-import { GoogleServices } from '$lib/utils/Google.svelte'
-import { WPThemeDataStore } from '$lib/stores/WPThemeData'
-import { isDevelopmentMode } from '@/utils'
+import { utilsSEO } from '$lib/utils/SEO.svelte'
+import { GoogleServices } from '@/services/Google'
+import { getThemeData } from '@/utils'
 import type { CardJob } from '@/types'
+import { LRUCache } from 'lru-cache'
 
 export class RouteManager {
   currentUrl = $state(new SvelteURL(window.location.href));
@@ -35,28 +34,25 @@ export class RouteManager {
     return 'Unknown';
   }
 
-  async performRouteTransitionSideEffects(path: string): Promise<void> {
-    // Destroy AdSense ads before route change for clean navigation
-    GoogleServices.adSenseDestroy();
-
+  performRouteTransitionSideEffects(path: string): void {
     // Fetch RankMath head data
-    if (!isDevelopmentMode()) {
-      await SEOService.fetchHeadData(path);
-    }
+    utilsSEO.fetchHeadData(path).then(() => {
+      utilsSEO.removeJobPostingJsonLd();
+    }).catch((err) => {
+      console.error('Failed to fetch head data for route transition to', path, err);
+    }).finally(() => {
+      GoogleServices.sendPageView(path);
+    });
 
-    // GTAG / GTM page view
-    GoogleServices.sendPageView(path);
-
-    // Trigger optional AdSense refresh
-    GoogleServices.adSenseRefresh();
   }
 }
 
 export class RouteStateManager {
-  scrollPositions = new SvelteMap<string, number>();
-  searchStates = new SvelteMap<string, SearchState>(); // Track search states(include initial JobGrid) and per path
+  scrollPositions = new LRUCache<string, number>({ max: 50 }); // Limit to 50 most recent scroll positions
+  searchStates = new LRUCache<string, SearchState>({ max: 50 }); // Limit to 50 most recent search states
   lastVisitedJob: CardJob['slug'] | undefined = undefined; // Remember the last visited job slug for mobile navigation
   carouselState: CarouselState | null = null; // Single carousel state for homepage
+  skipScrollRestore = new LRUCache<string, boolean>({ max: 50 }); // Limit to 50 most recent skip flags
 
   saveScrollPosition(path: string, scrollY: number) {
     this.scrollPositions.set(path, scrollY);
@@ -89,12 +85,12 @@ export class RouteStateManager {
     // Capture server-side lastJobUpdate if available (more reliable for freshness checks)
     let serverLast = 0;
     try {
-      const themeData = WPThemeDataStore.getThemeData();
+      const themeData = getThemeData();
       if (themeData?.lastJobUpdate) {
         const parsed = Date.parse(themeData.lastJobUpdate);
         serverLast = isNaN(parsed) ? 0 : parsed;
       }
-    } catch (e) {
+    } catch {
       serverLast = 0;
     }
 
@@ -103,8 +99,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem(`searchState_${path}`, JSON.stringify(stateWithTimestamp));
-      } catch (e) {
-        console.warn('Failed to save search state to sessionStorage', e);
+      } catch {
+        console.warn('Failed to save search state to sessionStorage');
       }
     }
   }
@@ -125,8 +121,8 @@ export class RouteStateManager {
             state = parsed;
           }
         }
-      } catch (e) {
-        console.warn('Failed to load search state from sessionStorage', e);
+      } catch {
+        console.warn('Failed to load search state from sessionStorage');
       }
     }
     return state;
@@ -137,8 +133,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.removeItem(`searchState_${path}`);
-      } catch (e) {
-        console.warn('Failed to clear search state from sessionStorage', e);
+      } catch {
+        console.warn('Failed to clear search state from sessionStorage');
       }
     }
   }
@@ -148,8 +144,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem('carouselState', JSON.stringify(carouselState));
-      } catch (e) {
-        console.warn('Failed to save carousel state to sessionStorage', e);
+      } catch {
+        console.warn('Failed to save carousel state to sessionStorage');
       }
     }
   }
@@ -163,8 +159,8 @@ export class RouteStateManager {
           this.carouselState = JSON.parse(stored) as CarouselState;
           return this.carouselState;
         }
-      } catch (e) {
-        console.warn('Failed to load carousel state from sessionStorage', e);
+      } catch {
+        console.warn('Failed to load carousel state from sessionStorage');
       }
     }
     return undefined;
@@ -176,8 +172,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.removeItem('carouselState');
-      } catch (e) {
-        console.warn('Failed to clear carousel state from sessionStorage', e);
+      } catch {
+        console.warn('Failed to clear carousel state from sessionStorage');
       }
     }
   }
@@ -189,8 +185,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem('lastVisitedJob', slug);
-      } catch (e) {
-        console.warn('Failed to save last visited job to sessionStorage', e);
+      } catch {
+        console.warn('Failed to save last visited job to sessionStorage');
       }
     }
   }
@@ -205,30 +201,62 @@ export class RouteStateManager {
         if (stored && stored === slug) {
           return true;
         }
-      } catch (e) {
-        console.warn('Failed to load last visited job from sessionStorage', e);
+      } catch {
+        console.warn('Failed to load last visited job from sessionStorage');
       }
     }
     return false;
   }
 
+  setSkipScrollRestore(path: string, skip: boolean) {
+    this.skipScrollRestore.set(path, skip);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(`skipScrollRestore_${path}`, skip.toString());
+      } catch (e) {
+        console.warn('Failed to save skipScrollRestore to sessionStorage', e);
+      }
+    }
+  }
+
+  getSkipScrollRestore(path: string): boolean {
+    let skip = this.skipScrollRestore.get(path);
+    if (skip === undefined && typeof sessionStorage !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem(`skipScrollRestore_${path}`);
+        if (stored) {
+          skip = stored === 'true';
+          this.skipScrollRestore.set(path, skip); // cache in memory
+        }
+      } catch (e) {
+        console.warn('Failed to load skipScrollRestore from sessionStorage', e);
+      }
+    }
+    return skip || false;
+  }
+
   restoreScrollForPath(path: string): void {
     if (typeof window === 'undefined') return;
-    const savedScroll = this.getScrollPosition(path);
-    if (savedScroll !== undefined) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => window.scrollTo({ top: savedScroll, behavior: "smooth" }), 50);
-        });
-      });
-    } else if (path !== "/") {
-      // Scroll to top for new routes
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
-        });
-      });
+    if (this.getSkipScrollRestore(path)) {
+      // Skip scroll restoration for this path
+      this.setSkipScrollRestore(path, false); // Reset after skipping
+      return;
     }
+    const savedScroll = this.getScrollPosition(path);
+    // triple RAF to guarantee DOM is fully settled
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          // Extra delay to ensure content is rendered
+          if (savedScroll !== undefined) {
+            window.scrollTo({ top: savedScroll, behavior: "instant" });
+          } else if (path !== "/") {
+            // Scroll to top for new routes
+            window.scrollTo({ top: 0, behavior: "instant" });
+          }
+        });
+      });
+    });
   }
 }
 
@@ -239,37 +267,30 @@ export const routeStateStore = new RouteStateManager();
  * @param path The target path to navigate to.
  * @param searchState Optional search state to save for the current path before navigating away.
  */
-export async function navigateTo(path: string, searchState?: SearchState) {
-  // Save current scroll position
-  routeStateStore.saveScrollPosition(window.location.pathname, scrollY.current ?? 0);
+export function GlobalNavigateTo(path: string, searchState?: SearchState) {
+  // Perform navigation in the next animation frame
+  requestAnimationFrame(() => {
+    // Save current scroll position
+    routeStateStore.saveScrollPosition(window.location.pathname, scrollY.current ?? 0);
 
-  // Save current search state if provided
-  if (searchState) {
-    routeStateStore.saveSearchState(window.location.pathname, searchState);
-  }
+    // Save current search state if provided
+    if (searchState) {
+      routeStateStore.saveSearchState(window.location.pathname, searchState);
+    }
+    // Set loading state
+    routeStore.setIsLoading(true, routeStore.getComponentNamePath(path));
 
-  // Destroy AdSense ads before route change for clean navigation
-  GoogleServices.adSenseDestroy();
+    routeStore.setCurrentPath(path);
+    window.history.pushState(null, '', path);
+    routeStore.setIsInitialLoad(false);
 
-  // Set loading state
-  routeStore.setIsLoading(true, routeStore.getComponentNamePath(path));
+    // Fetch RankMath head data only for SPA navigation, not initial load
+    if (!routeStore.isInitialLoad) {
+      void routeStore.performRouteTransitionSideEffects(path);
+    }
 
-  // Remove any leftover JobPosting JSON-LD once.
-  removeJobPostingJsonLd();
-
-  routeStore.setCurrentPath(path);
-  window.history.pushState(null, '', path);
-  routeStore.setIsInitialLoad(false);
-
-  // Fetch RankMath head data only for SPA navigation, not initial load
-  if (!routeStore.isInitialLoad) {
-    await routeStore.performRouteTransitionSideEffects(path);
-  }
-
-  // Add loading timeout (1 second max)
-  setTimeout(() => {
     if (routeStore.isLoading) {
       routeStore.setIsLoading(false);
     }
-  }, 1000);
+  });
 }

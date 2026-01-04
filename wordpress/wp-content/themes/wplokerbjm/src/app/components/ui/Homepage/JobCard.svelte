@@ -3,7 +3,7 @@
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import { timeEffect } from "$lib/utils/elements.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
-  import { navigateTo } from "$lib/stores/Route.svelte";
+  import { GlobalNavigateTo } from "$lib/stores/Route.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
   import {
     UserTieSolid,
@@ -14,7 +14,7 @@
   import { SvelteDate } from "svelte/reactivity";
   import type { CardJob, JobCardProps } from "@/types";
 
-  let {
+  const {
     jobdata = {},
     variant = "carousel",
     permalink = "",
@@ -28,7 +28,7 @@
     isVisited?: boolean;
   }>();
 
-  let now = $state(new SvelteDate());
+  const now = $state(new SvelteDate());
 
   $effect(() => {
     timeEffect(now);
@@ -82,7 +82,7 @@
     if (isMobile()) {
       event.preventDefault();
       if (permalink)
-        await navigateTo(new URL(permalink, window.location.origin).pathname);
+        void GlobalNavigateTo(new URL(permalink, window.location.origin).pathname);
       return;
     }
 
@@ -103,14 +103,14 @@
       // Otherwise handle opening overlay. Delegate scrolling to the centralized
       // jobOverlay manager so carousel, grid and card all use the same logic.
       await jobOverlay.openOverlay(slug, jobdata);
-      // Let the overlay manager handle scrolling after it opens.
-      jobOverlay.scrollToCard(slug, 220, 12);
+      // Let the overlay manager handle scrolling after it opens. Prefer the carousel card when present.
+      jobOverlay.scrollToCard(slug, 220, true, 'carousel');
       return;
     }
   }
 </script>
 
-<div class={`group ${cardClass}`} data-job-slug={jobdata?.slug}>
+<div class={`group ${cardClass}`} data-job-slug={jobdata?.slug} data-job-source={variant === 'carousel' ? 'carousel' : 'grid'}>
   <a href={permalink} class="contents" onclick={handleClick}>
     <div class={bodyClass}>
       <div class="flex-1 flex flex-col justify-start">

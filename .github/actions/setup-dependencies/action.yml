@@ -14,6 +14,10 @@ inputs:
     description: "Whether to install Playwright browsers"
     required: false
     default: "false"
+  install-brotli:
+    description: "Whether to install brotli for compression"
+    required: false
+    default: "true"
   enable-apt-cache:
     description: "Enable APT caching behavior in this action"
     required: false
@@ -107,6 +111,62 @@ runs:
           done
         else
           echo "✅ jq already installed: $(jq --version)"
+        fi
+      shell: bash
+
+    - name: Setup brotli for compression
+      if: ${{ inputs.install-brotli == 'true' }}
+      run: |
+        # Restore APT cache if available
+        if [ "${{ steps.apt-cache.outputs.cache-hit }}" == "true" ]; then
+          echo "✅ APT cache restored - copying to system locations"
+          # Create user cache directories if they don't exist
+          mkdir -p ~/.apt-cache/lists ~/.apt-cache/archives
+          # Copy cached lists to system location
+          sudo mkdir -p /var/lib/apt/lists
+          sudo cp -a ~/.apt-cache/lists/* /var/lib/apt/lists/ 2>/dev/null || true
+          # Copy cached archives to system location
+          sudo mkdir -p /var/cache/apt/archives
+          sudo cp -a ~/.apt-cache/archives/* /var/cache/apt/archives/ 2>/dev/null || true
+          echo "✅ Using cached APT data - skipping apt-get update"
+        fi
+
+        if ! command -v brotli &> /dev/null; then
+          echo "Installing brotli..."
+          
+          # Create user cache directories if they don't exist
+          mkdir -p ~/.apt-cache/lists ~/.apt-cache/archives
+          
+          # If cache wasn't restored, we need to refresh package lists
+          if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
+            echo "❌ APT cache miss - running apt-get update"
+            # Retry apt-get update a few times to avoid transient network errors
+            n=0
+            until [ $n -ge 3 ]; do
+              sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && break
+              n=$((n+1))
+              echo "apt-get update failed, retrying ($n/3)..."; sleep $((n*2))
+            done
+            # Copy updated lists to user cache for future runs
+            cp -a /var/lib/apt/lists/* ~/.apt-cache/lists/ 2>/dev/null || true
+          else
+            # Validate that restored lists are not empty; if they look empty, do an update
+            if [ -z "$(ls -A /var/lib/apt/lists 2>/dev/null)" ]; then
+              echo "Restored APT lists appear empty; running apt-get update"
+              sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
+            fi
+          fi
+          
+          # Use noninteractive and no-install-recommends to speed and reduce size
+          # Retry apt-get install with backoff for robustness
+          n=0
+          until [ $n -ge 3 ]; do
+            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends brotli && break
+            n=$((n+1))
+            echo "apt-get install failed, retrying ($n/3)..."; sleep $((n*2))
+          done
+        else
+          echo "✅ brotli already installed: $(brotli --version | head -1)"
         fi
       shell: bash
 

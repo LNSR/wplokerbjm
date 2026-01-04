@@ -5,7 +5,6 @@ namespace WPLokerBJM\Controllers\REST;
 use WPLokerBJM\Controllers\Utilities\ControllerUtils;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Log\Logger;
-use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * REST endpoint for manually triggering SSG builds
@@ -75,11 +74,6 @@ class DispatchSSGBuild
         // Check if user has permission (admin only)
         if (!current_user_can('manage_options')) {
             return ControllerUtils::failedResponse('Insufficient permissions', 403);
-        }
-
-        // Disable API for localhost
-        if (SharedUtils::isLocalhost()) {
-            return ControllerUtils::failedResponse('SSG API is disabled for localhost', 403);
         }
 
         return null; // Access granted

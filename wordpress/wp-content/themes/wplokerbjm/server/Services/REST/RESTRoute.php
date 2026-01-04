@@ -15,11 +15,12 @@ class RESTRoute
         private readonly \WPLokerBJM\Controllers\REST\LoadMore $loadMore,
         private readonly \WPLokerBJM\Controllers\REST\Carousel $carousel,
         private readonly \WPLokerBJM\Controllers\REST\DynamicSearch $dynamicSearch,
-        private readonly \WPLokerBJM\Controllers\REST\SingleOverlay $singleOverlay,
+        private readonly \WPLokerBJM\Controllers\REST\JobDetail $singleOverlay,
         private readonly \WPLokerBJM\Controllers\REST\DispatchSSGBuild $dispatchSSGBuild,
         private readonly \WPLokerBJM\Controllers\REST\JobBookmark $jobBookmark,
         private readonly \WPLokerBJM\Controllers\REST\JobGridController $jobGrid,
-        private readonly \WPLokerBJM\Controllers\REST\WPThemeData $wpThemeData
+        private readonly \WPLokerBJM\Controllers\REST\WPThemeData $wpThemeData,
+        private readonly \WPLokerBJM\Controllers\REST\JobSchemaController $jobSchema
     ) {
     }
 
@@ -69,7 +70,7 @@ class RESTRoute
             ]);
         }
 
-        register_rest_route(self::$baseURI, '/single-overlay/', [
+        register_rest_route(self::$baseURI, '/job-detail/', [
             'methods' => 'GET',
             'callback' => fn(...$args) => $this->singleOverlay->handle(...$args),
             'permission_callback' => '__return_true',
@@ -120,6 +121,12 @@ class RESTRoute
         register_rest_route(self::$baseURI, '/theme-data/', [
             'methods' => 'GET',
             'callback' => fn(...$args) => $this->wpThemeData->handle(...$args),
+            'permission_callback' => '__return_true',
+        ]);
+
+        register_rest_route(self::$baseURI, '/job-schema/', [
+            'methods' => 'POST',
+            'callback' => fn(...$args) => $this->jobSchema->handle(...$args),
             'permission_callback' => '__return_true',
         ]);
     }

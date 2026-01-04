@@ -18,7 +18,7 @@ class HomepagePresenter
 
     public function getHomepageData(): array
     {
-        $query_args = JobQuery::latestJobsArgs(1, 12);
+        $query_args = JobQuery::latestJobsArgs(1, 36);
         $query_result = $this->jobRepository->queryJob($query_args);
         $schema_data = $query_result['schema_data'];
 
@@ -27,7 +27,11 @@ class HomepagePresenter
             'jobGrid' => $this->jobGrid->getProps($query_args, 'Lowongan Terbaru', 'latest'),
         ];
 
-        $post_ids = array_map(fn($job) => $job['id'] ?? null, $query_result['jobs']) ?? null;
+        $post_ids = [];
+        foreach ($query_result['jobs'] as $job) {
+            $post_ids[] = $job['id'];
+        }
+        
         $schema = JobPostingSchema::renderMultiple($schema_data, $post_ids);
 
         return [

@@ -2,6 +2,7 @@
 namespace WPLokerBJM\Shared\Cache;
 
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Configs\CredentialConfig;
 
 /**
  * Object Cache management
@@ -25,7 +26,8 @@ class Cache
             if (!function_exists('wp_cache_set')) {
                 return false;
             }
-            return wp_cache_set($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            $result = wp_cache_set($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::set error: ' . $e->getMessage());
             return false;
@@ -44,7 +46,8 @@ class Cache
             if (!function_exists('wp_cache_get')) {
                 return false;
             }
-            return wp_cache_get($key, CacheKey::OBJECT_CACHE_PREFIX);
+            $result = wp_cache_get($key, CacheKey::OBJECT_CACHE_PREFIX);
+            return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::get error: ' . $e->getMessage());
             return false;
@@ -63,7 +66,10 @@ class Cache
             if (!function_exists('wp_cache_delete')) {
                 return false;
             }
-            return wp_cache_delete($key, CacheKey::OBJECT_CACHE_PREFIX);
+            Logger::info('Cache', "Deleting cache key: '{$key}' with group: '" . CacheKey::OBJECT_CACHE_PREFIX . "'");
+            $result = wp_cache_delete($key, CacheKey::OBJECT_CACHE_PREFIX);
+            Logger::info('Cache', "Cache delete result for key '{$key}': " . ($result ? 'success' : 'failure'));
+            return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::delete error: ' . $e->getMessage());
             return false;
@@ -88,7 +94,8 @@ class Cache
                 }
                 return $results;
             }
-            return wp_cache_set_multiple($data, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            $results = wp_cache_set_multiple($data, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            return $results;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::setMultiple error: ' . $e->getMessage());
             return array_fill_keys(array_keys($data), false);
@@ -112,7 +119,10 @@ class Cache
                 }
                 return $results;
             }
-            return wp_cache_delete_multiple($keys, CacheKey::OBJECT_CACHE_PREFIX);
+            Logger::info('Cache', "Deleting multiple cache keys: " . implode(', ', $keys) . " with group: '" . CacheKey::OBJECT_CACHE_PREFIX . "'");
+            $results = wp_cache_delete_multiple($keys, CacheKey::OBJECT_CACHE_PREFIX);
+            Logger::info('Cache', "Cache deleteMultiple results: " . json_encode($results));
+            return $results;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::deleteMultiple error: ' . $e->getMessage());
             return array_fill_keys($keys, false);
@@ -133,7 +143,8 @@ class Cache
             if (!function_exists('wp_cache_add')) {
                 return false;
             }
-            return wp_cache_add($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            $result = wp_cache_add($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::add error: ' . $e->getMessage());
             return false;
@@ -158,7 +169,8 @@ class Cache
                 }
                 return $results;
             }
-            return wp_cache_add_multiple($data, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            $results = wp_cache_add_multiple($data, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            return $results;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::addMultiple error: ' . $e->getMessage());
             return array_fill_keys(array_keys($data), false);
@@ -182,15 +194,13 @@ class Cache
                 self::set($key, $new_value, $expiration);
                 return $new_value;
             }
-            $current = self::get($key);
-            if ($current === false) {
-                self::set($key, 0, $expiration);
-            }
+            Logger::info('Cache', "Incrementing cache key: '{$key}' by {$value} with group: '" . CacheKey::OBJECT_CACHE_PREFIX . "' and expiration: {$expiration}");
             $result = wp_cache_incr($key, $value, CacheKey::OBJECT_CACHE_PREFIX);
             if ($result !== false) {
                 if ($expiration > 0) {
                     self::set($key . '_expires', time() + $expiration, 0);
                 }
+                Logger::info('Cache', "Cache increment result for key '{$key}': {$result}");
                 return $result;
             } else {
                 Logger::error('Cache', 'Object cache increment failed (returned false)');
@@ -218,12 +228,14 @@ class Cache
                 self::set($key, $new_value, 0);
                 return $new_value;
             }
+            Logger::info('Cache', "Decrementing cache key: '{$key}' by {$value} with group: '" . CacheKey::OBJECT_CACHE_PREFIX . "'");
             $current = self::get($key);
             if ($current === false) {
                 self::set($key, 0, 0);
             }
             $result = wp_cache_decr($key, $value, CacheKey::OBJECT_CACHE_PREFIX);
             if ($result !== false) {
+                Logger::info('Cache', "Cache decrement result for key '{$key}': {$result}");
                 return $result;
             } else {
                 Logger::error('Cache', 'Object cache decrement failed (returned false)');
@@ -249,7 +261,10 @@ class Cache
             if (!function_exists('wp_cache_replace')) {
                 return false;
             }
-            return wp_cache_replace($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            Logger::info('Cache', "Replacing cache key: '{$key}' with group: '" . CacheKey::OBJECT_CACHE_PREFIX . "' and expiration: {$expiration}");
+            $result = wp_cache_replace($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            Logger::info('Cache', "Cache replace result for key '{$key}': " . ($result ? 'success' : 'failure'));
+            return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::replace error: ' . $e->getMessage());
             return false;
@@ -273,7 +288,8 @@ class Cache
                 }
                 return $results;
             }
-            return wp_cache_get_multiple($keys, CacheKey::OBJECT_CACHE_PREFIX);
+            $results = wp_cache_get_multiple($keys, CacheKey::OBJECT_CACHE_PREFIX);
+            return $results;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::getMultiple error: ' . $e->getMessage());
             return array_fill_keys($keys, false);
@@ -292,7 +308,8 @@ class Cache
             if (!function_exists('wp_cache_flush_group')) {
                 return false;
             }
-            return wp_cache_flush_group($group);
+            $result = wp_cache_flush_group($group);
+            return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::flushGroup error: ' . $e->getMessage());
             return false;
@@ -310,7 +327,10 @@ class Cache
             if (!function_exists('wp_cache_flush')) {
                 return false;
             }
-            return wp_cache_flush();
+            Logger::info('Cache', "Flushing all cache");
+            $result = wp_cache_flush();
+            Logger::info('Cache', "Cache flushAll result: " . ($result ? 'success' : 'failure'));
+            return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::flushAll error: ' . $e->getMessage());
             return false;
@@ -318,34 +338,54 @@ class Cache
     }
 
     /**
-     * Delete cache keys matching a pattern (Redis-specific).
+     * Delete cache keys matching multiple patterns (Redis-specific).
      * This method provides direct Redis access for pattern-based deletion.
      * Only works when Redis is the cache backend.
      *
-     * @param string $pattern Pattern to match (e.g., 'prefix_*').
+     * @param string[] $patterns Array of patterns to match (e.g., ['prefix1_*', 'prefix2_*']).
      * @return int Number of keys deleted, or false on error.
      */
-    public static function deletePattern(string $pattern): int|false
+    public static function deletePattern(array $patterns): int|false
     {
+        Logger::info('Cache', "Cache::deletePattern called with patterns: " . implode(', ', $patterns));
+
         try {
             // Get Redis connection
             $redis = self::getRedisConnection();
             if (!$redis) {
+                Logger::error('Cache', 'Cache::deletePattern: Redis connection failed');
                 return false;
             }
 
-            // Build full pattern with our prefix
-            $fullPattern = CacheKey::OBJECT_CACHE_PREFIX . ':' . $pattern;
+            // Build full pattern with LSC's prefix (use constant if available, else replicate)
+            $wp_content_dir = defined('WP_CONTENT_DIR') ? WP_CONTENT_DIR : dirname(get_stylesheet_directory()) . '/..';
+            $lscwp_dir = (defined('WP_PLUGIN_DIR') ? WP_PLUGIN_DIR : $wp_content_dir . '/plugins') . '/litespeed-cache/';
+            $cls_file = $lscwp_dir . 'src/object-cache-wp.cls.php';
+            if (defined('LSOC_PREFIX') && is_string(LSOC_PREFIX) && !empty(LSOC_PREFIX)) {
+                $salt = LSOC_PREFIX;
+                Logger::info('Cache', "Using LSOC_PREFIX constant: '{$salt}'");
+            } else {
+                $salt = substr(md5($cls_file), -5);
+                Logger::warning('Cache', "LSOC_PREFIX not defined or invalid, falling back to computed salt: '{$salt}'");
+            }
 
-            $keys = $redis->keys($fullPattern);
-            if (empty($keys)) {
+            $allKeys = [];
+            foreach ($patterns as $pattern) {
+                $fullPattern = $salt . CacheKey::OBJECT_CACHE_PREFIX . '.' . $pattern;
+                $keys = $redis->keys($fullPattern);
+                $allKeys = array_merge($allKeys, $keys);
+            }
+
+            Logger::info('Cache', "Cache::deletePattern: Found " . count($allKeys) . " keys matching patterns: " . implode(', ', $patterns));
+
+            if (empty($allKeys)) {
                 return 0;
             }
 
             // Use unlink for asynchronous deletion (faster)
-            $deletedCount = $redis->unlink($keys);
+            $deletedCount = $redis->unlink($allKeys);
 
-            Logger::info('Cache', "Cache::deletePattern: Unlinked {$deletedCount} keys matching pattern '{$pattern}'");
+            Logger::info('Cache', "Cache::deletePattern: Unlinked {$deletedCount} keys matching patterns: " . implode(', ', $patterns));
 
             return $deletedCount;
 
@@ -366,48 +406,43 @@ class Cache
         try {
             // Check if Redis extension is available
             if (!extension_loaded('redis')) {
-                Logger::error('Cache', 'Cache::getRedisConnection: Redis extension not available');
                 return false;
             }
 
-            $host = defined('WP_REDIS_HOST') ? WP_REDIS_HOST : null;
-            $port = defined('WP_REDIS_PORT') ? WP_REDIS_PORT : null;
-            $password = defined('WP_REDIS_PASSWORD') ? WP_REDIS_PASSWORD : null;
-            $database = defined('WP_REDIS_DATABASE') ? WP_REDIS_DATABASE : null;
+            $credentials = CredentialConfig::RedisCredential();
+            $host = $credentials['host'];
+            $port = $credentials['port'];
+            $password = $credentials['password'];
+            $database = $credentials['database'];
+            $sock = $credentials['sock'];
 
             $redis = new \Redis();
 
-            if (defined('WP_REDIS_SOCK') && file_exists(WP_REDIS_SOCK)) {
-                $connected = $redis->connect(WP_REDIS_SOCK);
-                Logger::info('Cache', 'Cache::getRedisConnection: Connecting to Redis via socket ' . WP_REDIS_SOCK);
+            if ($sock && file_exists($sock)) {
+                $connected = $redis->connect($sock);
             } else {
                 $connected = $redis->connect($host, $port);
-                Logger::info('Cache', 'Cache::getRedisConnection: Connecting to Redis at ' . $host . ':' . $port);
             }
 
             if (!$connected) {
-                Logger::error('Cache', 'Cache::getRedisConnection: Failed to connect to Redis');
                 return false;
             }
 
             // Authenticate if password is set
             if ($password) {
                 if (!$redis->auth($password)) {
-                    Logger::error('Cache', 'Cache::getRedisConnection: Redis authentication failed');
                     return false;
                 }
             }
 
             // Select database
-            if (!$redis->select($database)) {
-                Logger::error('Cache', 'Cache::getRedisConnection: Failed to select Redis database');
+            if ($database !== null && !$redis->select($database)) {
                 return false;
             }
 
             return $redis;
 
         } catch (\Exception $e) {
-            Logger::error('Cache', 'Cache::getRedisConnection error: ' . $e->getMessage());
             return false;
         }
     }
@@ -433,7 +468,8 @@ class CacheKey
 
     // REST API
     const REST_CARD_PREFIX = 'rest_card_';
-    const REST_OVERLAY_PREFIX = 'rest_overlay_';
+    const REST_JOBDETAIL_PREFIX = 'rest_job_detail_';
+    const REST_JOB_SCHEMA_BATCH_PREFIX = 'rest_job_schema_batch_';
     const AUTO_SUGGESTION_PREFIX = 'auto_suggestion_';
     const LOAD_MORE_PREFIX = 'load_more_';
     const DYNAMIC_SEARCH_PREFIX = 'dynamic_search_';

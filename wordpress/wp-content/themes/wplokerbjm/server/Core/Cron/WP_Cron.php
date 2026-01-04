@@ -6,6 +6,7 @@ use WPLokerBJM\Contracts\HooksInterface;
 use WPLokerBJM\Core\Posts\PostsManagement;
 use WPLokerBJM\Core\Taxonomy\TaxonomyManagement;
 use WPLokerBJM\Services\Utilities\SSG\BotDetection;
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Centralizes cron scheduling and mapping of cron hooks to service callbacks.
@@ -49,6 +50,6 @@ class WP_Cron implements HooksInterface
 
     public function registerFilters(): void
     {
-        // No filters for cron service
+        // No custom schedules needed
     }
 }

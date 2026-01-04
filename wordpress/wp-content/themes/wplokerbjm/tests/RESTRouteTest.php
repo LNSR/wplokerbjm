@@ -29,6 +29,7 @@ class RESTRouteTest extends WplokerbjmTestCase
     private $jobBookmarkMock;
     private $jobGridMock;
     private $wpThemeDataMock;
+    private $jobSchemaMock;
 
     private string $baseUrl;
 
@@ -45,11 +46,12 @@ class RESTRouteTest extends WplokerbjmTestCase
         $this->loadMoreMock = $this->createMock(\WPLokerBJM\Controllers\REST\LoadMore::class);
         $this->carouselMock = $this->createMock(\WPLokerBJM\Controllers\REST\Carousel::class);
         $this->dynamicSearchMock = $this->createMock(\WPLokerBJM\Controllers\REST\DynamicSearch::class);
-        $this->singleOverlayMock = $this->createMock(\WPLokerBJM\Controllers\REST\SingleOverlay::class);
+        $this->singleOverlayMock = $this->createMock(\WPLokerBJM\Controllers\REST\JobDetail::class);
         $this->dispatchSSGBuildMock = $this->createMock(\WPLokerBJM\Controllers\REST\DispatchSSGBuild::class);
         $this->jobBookmarkMock = $this->createMock(\WPLokerBJM\Controllers\REST\JobBookmark::class);
         $this->jobGridMock = $this->createMock(\WPLokerBJM\Controllers\REST\JobGridController::class);
         $this->wpThemeDataMock = $this->createMock(\WPLokerBJM\Controllers\REST\WPThemeData::class);
+        $this->jobSchemaMock = $this->createMock(\WPLokerBJM\Controllers\REST\JobSchemaController::class);
 
         // Override the default register_rest_route mock to track registrations
         \Brain\Monkey\Functions\when('register_rest_route')->alias(function ($namespace, $route, $args) {
@@ -72,7 +74,8 @@ class RESTRouteTest extends WplokerbjmTestCase
             $this->dispatchSSGBuildMock,
             $this->jobBookmarkMock,
             $this->jobGridMock,
-            $this->wpThemeDataMock
+            $this->wpThemeDataMock,
+            $this->jobSchemaMock
         );
     }
 
@@ -104,14 +107,15 @@ class RESTRouteTest extends WplokerbjmTestCase
             '/taxonomies/' . Taxonomies::LOKASI_PEKERJAAN,
             '/taxonomies/' . Taxonomies::GENDER,
             '/taxonomies/' . Taxonomies::PENDIDIKAN,
-            '/single-overlay/',
+            '/job-detail/',
             '/dispatch-ssg/',
             '/bookmarked-jobs/',
             '/job-grid/',
             '/theme-data/',
+            '/job-schema/',
         ];
 
-        $this->assertCount(13, $routes, 'Should register exactly 13 routes');
+        $this->assertCount(14, $routes, 'Should register exactly 14 routes');
 
         $registeredRoutes = array_column($routes, 'route');
         foreach ($expectedRoutes as $expectedRoute) {
@@ -159,10 +163,11 @@ class RESTRouteTest extends WplokerbjmTestCase
             '/taxonomies/' . Taxonomies::LOKASI_PEKERJAAN,
             '/taxonomies/' . Taxonomies::GENDER,
             '/taxonomies/' . Taxonomies::PENDIDIKAN,
-            '/single-overlay/',
+            '/job-detail/',
             '/bookmarked-jobs/',
             '/job-grid/',
             '/theme-data/',
+            '/job-schema/',
         ];
 
         foreach ($routes as $route) {
@@ -284,11 +289,11 @@ class RESTRouteTest extends WplokerbjmTestCase
                 'expected_status' => 200,
                 'description' => 'Get education taxonomy terms'
             ],
-            'single-overlay' => [
+            'job-detail' => [
                 'method' => 'GET',
-                'url' => $this->baseUrl . '/single-overlay/?slug=marketing',
+                'url' => $this->baseUrl . '/job-detail/?slug=marketing',
                 'expected_status' => [200, 404], // Can be 200 or 404
-                'description' => 'Get single job overlay'
+                'description' => 'Get job detail'
             ],
             'bookmarked-jobs' => [
                 'method' => 'GET',

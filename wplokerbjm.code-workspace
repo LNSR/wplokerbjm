@@ -32,6 +32,10 @@
       "comments": "on",
       "strings": "on"
     },
+    "eslint.options": {
+      "overrideConfigFile": "eslint.config.js"
+    },
+    "eslint.workingDirectories": ["${workspaceFolder:wplokerbjm-wp-theme}"],
     "php.stubs": ["all"],
     "[php]": {
       "editor.defaultFormatter": "DEVSENSE.phptools-vscode"
