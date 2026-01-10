@@ -1,7 +1,8 @@
 <?php
-namespace WPLokerBJM\Core\Hooks\Plugins;
+namespace WPLokerBJM\Core\Plugins;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Core\Container;
+use WPLokerBJM\Core\Container\Container;
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 
 /**
  * LiteSpeed General Hooks
@@ -14,6 +15,7 @@ class Litespeed
      * * Useful when deploying new code to ensure no stale cached code is used.
      * @return void
      */
+    #[Action('litespeed_purged_all')]
     public static function clearObjectCache(): void
     {
         // Clear APCu cache first
@@ -47,13 +49,14 @@ class LiteSpeedFilters
     private static function pattern(): string
     {
         if (defined('ABSPATH')) {
-            return str_replace(ABSPATH, '/', get_stylesheet_directory());
+            return str_replace(ABSPATH, '/', get_stylesheet_directory() . '/assets/dist/');
         }
-        return '/wp-content/themes/' . get_stylesheet() . '/';
+        return '/wp-content/themes/' . get_stylesheet() . '/assets/dist/';
     }
     /**
      * Exclude specific JS files from LiteSpeed Cache JS optimization.
      */
+    #[Filter('litespeed_optimize_js_excludes', 0)]
     public static function lscJsExcludes($excludes)
     {
         $excludes[] = self::pattern();
@@ -63,6 +66,7 @@ class LiteSpeedFilters
     /**
      * Exclude specific CSS files from LiteSpeed Cache CSS optimization.
      */
+    #[Filter('litespeed_optimize_css_excludes', 0)]
     public static function lscCssExcludes($excludes)
     {
         $excludes[] = self::pattern();

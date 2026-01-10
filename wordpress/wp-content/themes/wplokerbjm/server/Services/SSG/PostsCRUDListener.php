@@ -8,6 +8,7 @@ use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Services\Utilities\SSG\{SSGUtilities, BotDetection};
 use WPLokerBJM\Services\Webhooks\TriggerBuildSSG;
+use WPLokerBJM\Core\Container\Attributes\Action;
 
 /**
  * Listens to post CRUD events and notifies the SSG trigger service.
@@ -51,6 +52,7 @@ class PostsCRUDListener
 		return false;
 	}
 
+	#[Action('save_post', 10, 3)]
 	public function onSavePost(int $post_id, \WP_Post $post, bool $update): void
 	{
 		try {
@@ -95,6 +97,7 @@ class PostsCRUDListener
 	/**
 	 * Handle post deletion before it's actually deleted
 	 */
+	#[Action('before_delete_post', 1, 1)]
 	public function onBeforeDeletePost(int $post_id): void
 	{
 		try {
@@ -108,6 +111,7 @@ class PostsCRUDListener
 	/**
 	 * Handle post trashing
 	 */
+	#[Action('wp_trash_post', 1, 1)]
 	public function onTrashPost(int $post_id): void
 	{
 		try {

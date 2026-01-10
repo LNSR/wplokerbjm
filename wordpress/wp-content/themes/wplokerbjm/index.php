@@ -1,6 +1,6 @@
 <?php
 
-use WPLokerBJM\Core\Container;
+use WPLokerBJM\Core\Container\Container;
 use WPLokerBJM\Views\Page\{HomepageView, SingleLowonganView, PasangIklanLokerView};
 
 $container = Container::getContainer();

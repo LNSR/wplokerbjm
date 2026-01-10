@@ -1,7 +1,8 @@
 <?php
-namespace WPLokerBJM\Core\Hooks\Theme;
+namespace WPLokerBJM\Core\Theme;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 class ThemeInject
 {
 
@@ -21,6 +22,7 @@ class ThemeInject
      *
      * @return void
      */
+    #[Action('after_setup_theme')]
     public static function addThemeSupport(): void
     {
 
@@ -112,6 +114,7 @@ class ThemeInject
     /**
      * Adds additional site icon meta tags for custom sizes.
      */
+    #[Filter('site_icon_meta_tags')]
     public static function addSiteIconMetaTags(array $meta_tags): array
     {
         $additional_sizes = [48, 96, 144, 256, 384, 512];
@@ -126,6 +129,12 @@ class ThemeInject
         return $meta_tags;
     }
 
+    #[Filter('site_icon_image_sizes')]
+    public static function siteIconImageSizes(): array
+    {
+        return [32, 48, 96, 144, 192, 256, 384, 512];
+    }
+
     /**
      * Output preload <link> for the logo image.
      *
@@ -138,6 +147,7 @@ class ThemeInject
      *
      * @return void
      */
+    #[Action('wp_head', 0)]
     public static function preloadLogo(): void
     {
         $logoData = self::getLogoData();
@@ -220,11 +230,13 @@ class ThemeInject
      *
      * @return void
      */
+    #[Action('wp_footer', 0)]
     public static function injectThemeScript(): void
     {
         $wpThemeData = self::themeData(); // theme data for hydration
         ?>
-        <script type="application/json" id="wp-theme-data"> <?= json_encode($wpThemeData); ?> </script>
+        <script type="application/json"
+            id="wp-theme-data"><?= wp_json_encode($wpThemeData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?></script>
         <script id="theme-preferences">
             (() => {
                 const removeThisScript = () => {
@@ -289,6 +301,7 @@ class DebloatWPTheme
      *
      * @return void
      */
+    #[Action('wp_enqueue_scripts', 4)]
     public static function removeWPLibrary(): void
     {
         // Remove jQuery and related scripts

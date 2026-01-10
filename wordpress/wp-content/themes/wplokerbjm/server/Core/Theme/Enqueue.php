@@ -1,12 +1,14 @@
 <?php
 
-namespace WPLokerBJM\Core\Hooks\Theme;
+namespace WPLokerBJM\Core\Theme;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 
 class Enqueue
 {
+    #[Action('wp_enqueue_scripts', 0)]
     public static function enqueueAssets(): void
     {
         try {
@@ -29,6 +31,7 @@ class Enqueue
      * Output preload links for route-specific JS and CSS assets.
      * Production only.
      */
+    #[Action('wp_head', 0)]
     public static function outputPreloadLinks(): void
     {
         try {

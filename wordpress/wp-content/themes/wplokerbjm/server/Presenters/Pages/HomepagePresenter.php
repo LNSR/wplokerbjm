@@ -18,7 +18,7 @@ class HomepagePresenter
 
     public function getHomepageData(): array
     {
-        $query_args = JobQuery::latestJobsArgs(1, 36);
+        $query_args = JobQuery::latestJobsArgs(1, 27);
         $query_result = $this->jobRepository->queryJob($query_args);
         $schema_data = $query_result['schema_data'];
 

@@ -61,7 +61,7 @@ jobs:
         env:
           SSG_MINIFY_HTML: "true"
           # Reduce concurrency to avoid exhausting runner resources and crashing Chromium
-          SSG_CONCURRENCY: "25"
+          SSG_CONCURRENCY: "15"
           # Increase per-page timeout to tolerate slow pages (ms)
           SSG_PAGE_TIMEOUT: "60000"
           # Allow continuing when some pages fail; useful for sitemap runs

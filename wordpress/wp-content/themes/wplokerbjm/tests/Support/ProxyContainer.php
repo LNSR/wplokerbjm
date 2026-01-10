@@ -57,7 +57,7 @@ final class ProxyContainer
         // Ensure runtime is booted before container initialization.
         self::boot();
 
-        self::$container = \WPLokerBJM\Core\Container::getContainer();
+        self::$container = \WPLokerBJM\Core\Container\Container::getContainer();
         return self::$container;
     }
 

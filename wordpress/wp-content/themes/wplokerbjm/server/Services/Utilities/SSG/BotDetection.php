@@ -3,6 +3,8 @@ namespace WPLokerBJM\Services\Utilities\SSG;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Cron\WPCron;
 
 /**
  * Trait for HTTP fetching functionality
@@ -203,6 +205,7 @@ class BotDetection
 	 * Refresh bot data by clearing caches and fetching fresh data
 	 * Intended to be called via cron job
 	 */
+	#[Action(WPCron::REFRESH_BOT_DATA)]
 	public function refreshBotData(): void
 	{
 		try {

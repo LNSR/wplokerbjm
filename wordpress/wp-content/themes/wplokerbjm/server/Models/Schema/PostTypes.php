@@ -1,7 +1,7 @@
 <?php
 namespace WPLokerBJM\Models\Schema;
 
-use WPLokerBJM\Contracts\HooksInterface;
+use WPLokerBJM\Core\Container\Attributes\Action;
 
 /**
  * Post Types Schema
@@ -16,28 +16,16 @@ use WPLokerBJM\Contracts\HooksInterface;
  *
  * @package WPLokerBJM\Models\Schema
  */
-class PostTypes implements HooksInterface {
+class PostTypes {
     
     public const POST_TYPE_LOWONGAN = 'lowongan';
-
-    /**
-     * Register all custom post types
-     * 
-     * @return void
-     */
-    public function registerActions(): void {
-        add_action('init', fn() => $this->registerLowonganPostType());
-    }
-
-    public function registerFilters(): void {
-        // No filters to register in this class
-    }
 
     /**
      * Register the Lowongan post type
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerLowonganPostType(): void {
         $labels = [
             'name'                     => esc_html__('Lowongan Kerja', 'wplokerbjm'),

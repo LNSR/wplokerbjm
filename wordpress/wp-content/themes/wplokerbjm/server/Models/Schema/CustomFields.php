@@ -1,7 +1,7 @@
 <?php
 
 namespace WPLokerBJM\Models\Schema;
-use WPLokerBJM\Contracts\HooksInterface;
+use WPLokerBJM\Core\Container\Attributes\Filter;
 
 /**
  * Custom Fields Schema
@@ -15,7 +15,7 @@ use WPLokerBJM\Contracts\HooksInterface;
  *       primarily through the Meta Box admin interface.
  * @package WPLokerBJM\Models\Schema
  */
-class CustomFields implements HooksInterface
+class CustomFields
 {
 
     public const NAMA_PERUSAHAAN = 'nama_perusahaan';
@@ -36,16 +36,7 @@ class CustomFields implements HooksInterface
     public const SOCIAL_MEDIA = 'social_media';
     public const STATUS_PEKERJAAN = 'status_pekerjaan';
 
-    public function registerActions(): void
-    {
-        // No actions to register in this class
-    }
-
-    public function registerFilters(): void
-    {
-        add_filter('rwmb_meta_boxes', fn(...$args) => $this->lowongan_meta_boxes(...$args)); // ! Removed priority to allow GUI/DB to take precedence
-    }
-
+    #[Filter('rwmb_meta_boxes')]
     public function lowongan_meta_boxes($meta_boxes)
     {
         $prefix = '';

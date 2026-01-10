@@ -5,7 +5,7 @@ namespace WPLokerBJM\Tests;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\AutoScanned;
 use WPLokerBJM\Core\Container\Definitions\Core;
-use WPLokerBJM\Core\Container\AutowireScanner;
+use WPLokerBJM\Core\Container\Support\AutowireScanner;
 
 class ContainerDefinitionsTest extends WplokerbjmTestCase
 {
@@ -41,7 +41,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $this->assertArrayHasKey(\WPLokerBJM\Core\Container\Init::class, $definitions);
     }
 
-    public function testHooksInterfaceImplementersCount()
+    public function testHookAttributesFound()
     {
         // Create scanner like Core.php does
         $scanner = new AutowireScanner(
@@ -49,16 +49,32 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             'WPLokerBJM'
         );
 
-        $hooksImplementers = $scanner->getInterfaceImplementerClassNames(
-            \WPLokerBJM\Contracts\HooksInterface::class
-        );
+        $hookRegistrations = $scanner->getHookRegistrations();
 
-        $count = count($hooksImplementers);
-        echo "\n\033[1;34m🔗 HooksInterface Implementers\033[0m\n";
-        echo "\033[1;32m✓ Found $count classes implementing HooksInterface:\033[0m\n";
-        foreach ($hooksImplementers as $className) {
-            echo "  \033[0;33m•\033[0m $className\n";
+        $count = count($hookRegistrations);
+        echo "\n\033[1;35m🏷️  Hook Attributes\033[0m\n";
+        echo "\033[1;32m✓ Found $count hook attributes:\033[0m\n";
+
+        // Group by type
+        $actions = array_filter($hookRegistrations, fn($reg) => $reg['type'] === 'action');
+        $filters = array_filter($hookRegistrations, fn($reg) => $reg['type'] === 'filter');
+
+        // Display actions
+        if (!empty($actions)) {
+            echo "\033[1;32m🔧 Actions:\033[0m\n";
+            foreach ($actions as $reg) {
+                echo "  \033[0;32m•\033[0m {$reg['hook']} on {$reg['class']}::{$reg['method']} (priority: {$reg['priority']})\n";
+            }
         }
+
+        // Display filters
+        if (!empty($filters)) {
+            echo "\033[1;34m🔍 Filters:\033[0m\n";
+            foreach ($filters as $reg) {
+                echo "  \033[0;34m•\033[0m {$reg['hook']} on {$reg['class']}::{$reg['method']} (priority: {$reg['priority']})\n";
+            }
+        }
+
         echo "\n";
         $this->assertGreaterThan(0, $count);
     }

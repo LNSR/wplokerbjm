@@ -1,6 +1,7 @@
 <script lang="ts">
   import JobCard from "@components/ui/Homepage/JobCard.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import Virtualization from "$lib/utils/Virtualization.svelte";
   import { GlobalNavigateTo, routeStateStore } from "$lib/stores/Route.svelte";
   import type { CardJob } from "@/types";
   import { APIService } from "@/services/APIService";
@@ -8,7 +9,7 @@
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { onMount, onDestroy, tick } from "svelte";
   import SwiperCore, { type Swiper } from "swiper";
-  import { Navigation, Pagination, Autoplay } from "swiper/modules";
+  import { Navigation, Pagination, Autoplay, Virtual } from "swiper/modules";
   import {
     ChevronCircleLeftSolid,
     ChevronCircleRightSolid,
@@ -16,7 +17,7 @@
   import "swiper/css";
   import "swiper/css/navigation";
   import "swiper/css/pagination";
-  import Virtualization from "$lib/utils/Virtualization.svelte";
+  import "swiper/css/virtual";
 
   const { jobs: propJobs = [], title = "Lowongan Darurat" } = $props<{
     jobs?: CardJob[];
@@ -34,7 +35,7 @@
     propJobs.length > 0 ? propJobs : (carouselData?.jobs ?? [])
   );
 
-  const buffer = 3;
+  const buffer = 2;
   const virtualization = $derived.by(() =>
     Virtualization.computeCarousel({
       jobsLength: jobs.length,
@@ -74,6 +75,9 @@
         navigation: {
           nextEl: nextEl ?? undefined,
           prevEl: prevEl ?? undefined,
+        },
+        Virtual: {
+          enabled: true,
         },
         on: {
           slideChange: (swiper: Swiper) => {
@@ -132,7 +136,7 @@
       try {
         try {
           if (SwiperCore && (SwiperCore as typeof SwiperCore).use) {
-            SwiperCore.use([Navigation, Pagination, Autoplay]);
+            SwiperCore.use([Navigation, Pagination, Autoplay, Virtual]);
           }
         } catch {}
 
@@ -143,7 +147,7 @@
         );
         const finalCfg = {
           ...(cfg || {}),
-          modules: [Navigation, Pagination, Autoplay],
+          modules: [Navigation, Pagination, Autoplay, Virtual],
         };
 
         swiperInstance = new SwiperCore(el, finalCfg);

@@ -4,8 +4,8 @@ import { TaxonomyType } from '@/types';
 import { LRUCache } from 'lru-cache';
 
 const cache = new LRUCache<string, any>({
-  max: 100, // Maximum number of items
-  ttl: 120000, // 2 minutes in milliseconds
+  max: 500, // Maximum number of items
+  ttl: 30000, // 30 seconds in milliseconds
 });
 
 export class APIService {

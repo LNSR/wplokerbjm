@@ -4,7 +4,7 @@ import { parseProps, removePropsScriptFromElement } from '@/utils';
 
 class SvelteMounter {
   private mountedElements = new WeakSet<Element>();
-
+  private targetProps = 'id="__wplokerbjm_data-props"';
   mount(configs: ComponentConfig[]): void {
     for (const config of configs) {
       if (config.selector === undefined) {
@@ -14,19 +14,18 @@ class SvelteMounter {
       const elements = document.querySelectorAll(config.selector);
 
       for (const element of elements) {
-        if (this.mountedElements.has(element) || element.hasAttribute('svelte-mounted')) continue;
+        if (this.mountedElements.has(element)) continue;
 
         try {
-          const props = parseProps(element, 'id="__wplokerbjm_data-props"');
+          const props = parseProps(document, this.targetProps);
           const comp = config.component;
 
           const options: any = { target: element, props };
 
           requestAnimationFrame(() => {
+            element.replaceChildren();
             mount(comp, options);
-            setTimeout(() => {
-              removePropsScriptFromElement(element, 'id="__wplokerbjm_data-props"');
-            }, 1000);
+            removePropsScriptFromElement(document, this.targetProps);
             this.mountedElements.add(element);
             element.setAttribute('svelte-mounted', 'true');
           });

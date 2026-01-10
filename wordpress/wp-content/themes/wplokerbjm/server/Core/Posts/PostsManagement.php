@@ -5,12 +5,15 @@ namespace WPLokerBJM\Core\Posts;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Models\Schema\CustomFields;
+use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Cron\WPCron;
 
 /**s
  * Handles job-related operations, including deletion and status updates.
  */
 class PostsManagement
 {
+    #[Action(WPCron::DELETE_OLD_JOBS)]
     public function deleteOldJobs(): void
     {
         try {
@@ -80,6 +83,7 @@ class PostsManagement
      * - Leave unchanged otherwise
      * @return void
      */
+    #[Action(WPCron::UPDATE_JOB_STATUSES)]
     public function updateAllJobStatuses(): void
     {
         try {

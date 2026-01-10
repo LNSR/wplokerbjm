@@ -1,6 +1,6 @@
 <?php
 
-namespace WPLokerBJM\Core;
+namespace WPLokerBJM\Core\Container;
 
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;

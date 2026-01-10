@@ -1,17 +1,17 @@
 <?php
 
-namespace WPLokerBJM\Core\Container;
+namespace WPLokerBJM\Core\Container\Support;
 
 use ReflectionClass;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Core\Container;
+use WPLokerBJM\Core\Container\Container;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
- * Scans directories for autowirable PHP classes and interface implementers.
+ * Scans directories for autowirable PHP classes.
  *
  * This scanner recursively searches a base directory for PHP files, extracts class names,
  * and determines which classes are suitable for dependency injection (autowiring). It excludes
@@ -120,82 +120,17 @@ class AutowireScanner
         $phpFiles = $this->findPhpFiles();
 
         foreach ($phpFiles as $file) {
-            $className = $this->getClassNameFromFile($file);
+            $classNames = $this->getClassNamesFromFile($file);
 
-            if ($className && $this->isAutowirable($className)) {
-                // Use autowiring for this class
-                $definitions[$className] = \DI\autowire($className)->lazy();
-            }
-        }
-
-        return $definitions;
-    }
-
-    /**
-     * Get fully qualified class names of autowirable classes implementing a specific interface.
-     *
-     * Scans for classes that implement the given interface and are autowirable (concrete,
-     * non-static, etc.). Used by the DI container to inject services automatically.
-     *
-     * Caches results similarly to scanForAutowirableClasses for performance.
-     *
-     * @param string $interface Fully qualified interface name (e.g., HooksInterface::class)
-     * @return string[] Array of fully qualified class names that implement the interface
-     */
-    public function getInterfaceImplementerClassNames(string $interface): array
-    {
-        $cacheKey = $this->getCacheKey() . '_interface_names_' . md5($interface);
-
-        // Check APCu first
-        if (function_exists('apcu_enabled') && apcu_enabled()) {
-            $cached = apcu_fetch($cacheKey);
-            if ($cached !== false) {
-                return $cached;
-            }
-        }
-
-        // Fallback to Redis cache
-        $cached = Cache::get($cacheKey);
-        if ($cached !== false) {
-            return $cached;
-        }
-
-        // Perform the scan
-        $implementers = $this->performInterfaceImplementerScan($interface);
-
-        // Cache the result
-        if (function_exists('apcu_enabled') && apcu_enabled()) {
-            apcu_store($cacheKey, $implementers, 86400); // Cache for 1 day
-        } else {
-            Cache::set($cacheKey, $implementers, 86400); // Cache for 1 day
-        }
-
-        return $implementers;
-    }
-
-    /**
-     * Perform the actual interface implementer scanning logic.
-     * 
-     * @param string $interface The fully qualified interface name
-     * @return string[] Array of fully qualified class names
-     */
-    private function performInterfaceImplementerScan(string $interface): array
-    {
-        $implementers = [];
-        $phpFiles = $this->findPhpFiles();
-
-        foreach ($phpFiles as $file) {
-            $className = $this->getClassNameFromFile($file);
-
-            if ($className && $this->isAutowirable($className)) {
-                // Check if class implements the interface
-                if (is_subclass_of($className, $interface) || in_array($interface, class_implements($className))) {
-                    $implementers[] = $className;
+            foreach ($classNames as $className) {
+                if ($this->isAutowirable($className)) {
+                    // Use autowiring for this class
+                    $definitions[$className] = \DI\autowire($className)->lazy();
                 }
             }
         }
 
-        return $implementers;
+        return $definitions;
     }
 
     /**
@@ -260,24 +195,24 @@ class AutowireScanner
     }
 
     /**
-     * Extract the fully qualified class name from a PHP file.
+     * Extract the fully qualified class names from a PHP file.
      * 
-     * This method reads the file content and uses token parsing to extract the namespace
-     * and class name, then combines them into a fully qualified class name.
+     * This method reads the file content and uses token parsing to extract all namespaces
+     * and class names, then combines them into fully qualified class names.
      * 
      * @param string $filePath The absolute path to the PHP file
-     * @return string|null The fully qualified class name, or null if not found
+     * @return string[] Array of fully qualified class names, or empty array if none found
      */
-    private function getClassNameFromFile(string $filePath): ?string
+    private function getClassNamesFromFile(string $filePath): array
     {
         $tokens = token_get_all(file_get_contents($filePath));
 
         if ($tokens === false) {
-            return null; // File could not be read
+            return []; // File could not be read
         }
 
-        $namespace = '';
-        $className = '';
+        $classes = [];
+        $currentNamespace = '';
         $inNamespace = false;
         $inClass = false;
 
@@ -288,26 +223,27 @@ class AutowireScanner
 
                 if ($tokenType === T_NAMESPACE) {
                     $inNamespace = true;
-                    $namespace = '';
-                } elseif ($inNamespace && $tokenType === T_NAME_QUALIFIED) {
-                    $namespace = $tokenValue;
+                    $currentNamespace = '';
+                } elseif ($inNamespace && ($tokenType === T_NAME_QUALIFIED || $tokenType === T_STRING)) {
+                    $currentNamespace = $tokenValue;
+                    $inNamespace = false; // Assume single namespace declaration
                 } elseif ($tokenType === T_CLASS) {
                     $inClass = true;
                 } elseif ($inClass && $tokenType === T_STRING) {
                     $className = $tokenValue;
-                    break;
+                    if (!empty($currentNamespace)) {
+                        $classes[] = $currentNamespace . '\\' . $className;
+                    } else {
+                        $classes[] = $className;
+                    }
+                    $inClass = false; // Reset for next class
                 }
             } elseif ($token === ';') {
                 $inNamespace = false;
             }
         }
 
-        // Validate that both namespace and class name were found
-        if (empty($className) || empty($namespace)) {
-            return null;
-        }
-
-        return $namespace . '\\' . $className;
+        return $classes;
     }
 
     /**
@@ -332,6 +268,11 @@ class AutowireScanner
             }
 
             $reflection = new ReflectionClass($className);
+
+            // Exclude attribute classes
+            if ($this->isAttributeClass($reflection)) {
+                return false;
+            }
 
             // Type checks (interface, abstract, trait)
             if (!$this->isConcreteClass($reflection)) {
@@ -449,6 +390,19 @@ class AutowireScanner
     }
 
     /**
+     * Check if the class is an attribute class.
+     * 
+     * Attribute classes are marked with the #[Attribute] attribute and are not meant to be autowired.
+     * 
+     * @param ReflectionClass $reflection The class reflection
+     * @return bool True if the class is an attribute class
+     */
+    private function isAttributeClass(ReflectionClass $reflection): bool
+    {
+        return !empty($reflection->getAttributes(\Attribute::class));
+    }
+
+    /**
      * Get the list of directories that should be excluded from scanning.
      * 
      * These directories typically contain:
@@ -473,99 +427,94 @@ class AutowireScanner
     }
 
     /**
-     * Debug method to get information about scanned classes.
-     * 
-     * This method scans all PHP files and returns detailed information about each class found,
-     * including whether it's autowirable and the reason if it's not. Useful for debugging
-     * and understanding what classes are being detected and why some are skipped.
-     * 
-     * @return array[] Array of result arrays, each containing:
-     *                 - 'file': Absolute path to the PHP file
-     *                 - 'class': Fully qualified class name
-     *                 - 'autowirable': Boolean indicating if class can be autowired
-     *                 - 'reason': String explaining why class is not autowirable (if applicable)
+     * Get hook registrations from attributes on methods of HooksInterface implementers.
+     *
+     * Scans classes for methods with #[Action] or #[Filter] attributes,
+     * and returns an array of hook registration data.
+     *
+     * @return array Array of hook data: ['class' => FQCN, 'method' => methodName, 'type' => 'action'|'filter', 'hook' => hookName, 'priority' => int, 'accepted_args' => int]
      */
-    public function debugScanResults(): array
+    public function getHookRegistrations(): array
     {
-        $phpFiles = $this->findPhpFiles();
-        $results = [];
+        $cacheKey = $this->getCacheKey() . '_hook_registrations';
 
-        foreach ($phpFiles as $file) {
-            $className = $this->getClassNameFromFile($file);
-
-            if ($className) {
-                $isAutowirable = $this->isAutowirable($className);
-                $reason = '';
-
-                if (!$isAutowirable) {
-                    $reason = $this->getSkipReason($className);
-                }
-
-                $results[] = [
-                    'file' => $file,
-                    'class' => $className,
-                    'autowirable' => $isAutowirable,
-                    'reason' => $reason,
-                ];
+        // Check APCu first
+        if (function_exists('apcu_enabled') && apcu_enabled()) {
+            $cached = apcu_fetch($cacheKey);
+            if ($cached !== false) {
+                return $cached;
             }
         }
 
-        return $results;
+        // Fallback to Redis cache
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        // Perform the scan
+        $registrations = $this->performHookRegistrationScan();
+
+        // Cache the result
+        if (function_exists('apcu_enabled') && apcu_enabled()) {
+            apcu_store($cacheKey, $registrations, 86400); // Cache for 1 day
+        } else {
+            Cache::set($cacheKey, $registrations, 86400);
+        }
+
+        return $registrations;
     }
 
     /**
-     * Get the reason why a class is not autowirable.
-     * 
-     * This method uses the same validation logic as isAutowirable() to ensure consistency
-     * between the two methods.
-     * 
-     * @param string $className The fully qualified class name
-     * @return string The reason why the class is not autowirable
+     * Perform the actual hook registration scanning logic.
+     *
+     * @return array Array of hook registration data
      */
-    private function getSkipReason(string $className): string
+    private function performHookRegistrationScan(): array
     {
-        try {
-            // Use the same basic checks as isAutowirable
-            if (!$this->passesBasicChecks($className)) {
-                if (!class_exists($className)) {
-                    return 'Class does not exist';
+        $registrations = [];
+        $phpFiles = $this->findPhpFiles();
+
+        foreach ($phpFiles as $file) {
+            $classNames = $this->getClassNamesFromFile($file);
+
+            foreach ($classNames as $className) {
+                if (class_exists($className)) {
+                    try {
+                        $reflection = new ReflectionClass($className);
+                        foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+                            foreach ($method->getAttributes(\WPLokerBJM\Core\Container\Attributes\Action::class) as $attribute) {
+                                $action = $attribute->newInstance();
+                                $registrations[] = [
+                                    'class' => $className,
+                                    'method' => $method->getName(),
+                                    'is_static' => $method->isStatic(),
+                                    'type' => 'action',
+                                    'hook' => $action->hook,
+                                    'priority' => $action->priority,
+                                    'accepted_args' => $action->acceptedArgs,
+                                ];
+                            }
+                            foreach ($method->getAttributes(\WPLokerBJM\Core\Container\Attributes\Filter::class) as $attribute) {
+                                $filter = $attribute->newInstance();
+                                $registrations[] = [
+                                    'class' => $className,
+                                    'method' => $method->getName(),
+                                    'is_static' => $method->isStatic(),
+                                    'type' => 'filter',
+                                    'hook' => $filter->hook,
+                                    'priority' => $filter->priority,
+                                    'accepted_args' => $filter->acceptedArgs,
+                                ];
+                            }
+                        }
+                    } catch (\Exception $e) {
+                        Logger::error('AutowireScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());
+                    }
                 }
-                if ($className === self::class) {
-                    return 'AutowireScanner (excluded to avoid circular dependency)';
-                }
-                return 'Basic validation failed';
             }
-
-            $reflection = new ReflectionClass($className);
-
-            // Use the same validation methods as isAutowirable
-            if (!$this->isConcreteClass($reflection)) {
-                if ($reflection->isInterface()) {
-                    return 'Interface';
-                }
-                if ($reflection->isAbstract()) {
-                    return 'Abstract class';
-                }
-                if ($reflection->isTrait()) {
-                    return 'Trait';
-                }
-                if ($reflection->isFinal()) {
-                    return 'Final class (cannot be proxied)';
-                }
-                return 'Not a concrete class';
-            }
-
-            if ($this->isStaticOnlyClass($reflection)) {
-                return 'Static-only class';
-            }
-
-            if (!$this->hasAccessibleConstructor($reflection)) {
-                return 'Non-public constructor';
-            }
-
-            return 'Unknown reason';
-        } catch (\Exception $e) {
-            return 'Exception: ' . $e->getMessage();
         }
+
+        return $registrations;
     }
 }

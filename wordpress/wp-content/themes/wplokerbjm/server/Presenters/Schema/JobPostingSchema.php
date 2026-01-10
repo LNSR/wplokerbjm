@@ -12,7 +12,7 @@ class JobPostingSchema
      */
     public static function renderSchema(array $schema, int $post_id): string
     {
-        $jsonLd = json_encode($schema, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $jsonLd = json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
         return '<script type="application/ld+json" data-ld-type="JobPosting" data-ld-id="jobposting-' . intval($post_id) . '">' . $jsonLd . '</script>';
     }
 

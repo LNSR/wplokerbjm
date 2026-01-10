@@ -1,7 +1,7 @@
 <?php
 
 namespace WPLokerBJM\Models\Schema;
-use WPLokerBJM\Contracts\HooksInterface;
+use WPLokerBJM\Core\Container\Attributes\Action;
 
 /**
  * Taxonomies Schema
@@ -16,7 +16,7 @@ use WPLokerBJM\Contracts\HooksInterface;
  *
  * @package WPLokerBJM\Models\Schema
  */
-class Taxonomies implements HooksInterface
+class Taxonomies
 {
 
     public const PERUSAHAAN = 'perusahaan';
@@ -27,29 +27,11 @@ class Taxonomies implements HooksInterface
     public const PENDIDIKAN = 'pendidikan';
 
     /**
-     * Register all taxonomies
-     * 
-     * @return void
-     */
-    public function registerActions(): void
-    {
-        add_action('init', fn() => $this->registerPerusahaanTaxonomy());
-        add_action('init', fn() => $this->registerKategoriTaxonomy());
-        add_action('init', fn() => $this->registerLokasiTaxonomy());
-        add_action('init', fn() => $this->registerJenisPekerjaanTaxonomy());
-        add_action('init', fn() => $this->registerGenderTaxonomy());
-        add_action('init', fn() => $this->registerPendidikanTaxonomy());
-    }
-    public function registerFilters(): void
-    {
-        // No filters to register in this class
-    }
-
-    /**
      * Register perusahaan taxonomy
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerPerusahaanTaxonomy(): void
     {
         $labels = [
@@ -116,6 +98,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerKategoriTaxonomy(): void
     {
         $labels = [
@@ -183,6 +166,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerLokasiTaxonomy(): void
     {
         $labels = [
@@ -250,6 +234,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerJenisPekerjaanTaxonomy(): void
     {
         $labels = [
@@ -317,6 +302,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerGenderTaxonomy(): void
     {
         $labels = [
@@ -384,6 +370,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerPendidikanTaxonomy(): void
     {
         $labels = [

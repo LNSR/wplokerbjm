@@ -2,113 +2,26 @@
 
 namespace WPLokerBJM\Core;
 
-use WPLokerBJM\Contracts\HooksInterface;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Core\Hooks\Theme\{Enqueue, ThemeInject, DebloatWPTheme};
-use WPLokerBJM\Core\Hooks\Plugins\{LiteSpeedFilters, Litespeed};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-use WPLokerBJM\Services\Utilities\SSG\BotDetection;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
-use WPLokerBJM\Services\REST\RESTRoute;
-use WPLokerBJM\Services\SSG\{PostsCRUDListener, RedirectToSSG};
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 
 /**
  * Global hooks registration for actions and filters.
  * Registers WordPress actions and filters to modify theme behavior.
  * * Might dump some temporary hooks here before promoting to dedicated classes/layer.
  */
-class Hooks implements HooksInterface
+class GlobalHooks
 {
     /**
      * Constructor for Hooks class.
-     *
-     * @param BotDetection $botDetection Service for bot detection.
-     * @param PostsCRUDListener $postsCRUDListener Listener for post CRUD operations.
-     * @param RedirectToSSG $redirectToSSG Service for SSG redirects.
-     * @param RESTRoute $restRoute Service for REST API routes.
      */
     public function __construct(
-        private BotDetection $botDetection,
-        private PostsCRUDListener $postsCRUDListener,
-        private RedirectToSSG $redirectToSSG,
-        private RESTRoute $restRoute
+        private \WPLokerBJM\Services\Utilities\SSG\BotDetection $botDetection,
     ) {
-    }
-
-    /*======================================================================
-     | REGISTER HOOKS
-     ======================================================================*/
-
-    /**
-     * Registers WordPress action hooks.
-     *
-     * Sets up various action hooks for theme functionality, caching, SSG, and more.
-     *
-     * @return void
-     */
-    public function registerActions(): void
-    {
-        add_action('after_setup_theme', fn() => ThemeInject::addThemeSupport(), 0);
-        add_action('wp_footer', fn() => ThemeInject::injectThemeScript(), 0);
-        add_action('wp_head', fn() => Enqueue::outputPreloadLinks(), 0);
-        add_action('wp_head', fn() => ThemeInject::preloadLogo(), 0);
-        add_action('wp_enqueue_scripts', fn() => DebloatWPTheme::removeWPLibrary(), 4);
-        add_action('litespeed_purged_all', fn() => Litespeed::clearObjectCache());
-        add_action('wp_enqueue_scripts', fn() => Enqueue::enqueueAssets(), 0);
-        add_action('template_redirect', fn() => $this->oldPost410Redirect(), 4);
-        add_action('template_redirect', fn() => self::redirectToHome(), 4);
-        add_action('template_redirect', fn() => self::modifyLinkHeaders(), 12);
-        add_action('send_headers', fn() => self::restHeaders(), 12);
-
-        // API registerActions
-        add_action('rest_api_init', fn() => $this->restRoute->registerRoutes(), 0);
-
-        // Cache purging hooks
-        // Note: we request only the args we need from WP to avoid unused parameter warnings.
-        add_action('save_post', fn($post_id, $post) => $this->purgeCacheOnChange($post_id, $post), 10, 2);
-        add_action('delete_post', fn($post_id) => $this->purgeCacheOnChange($post_id), 10, 1);
-        add_action('trashed_post', fn($post_id) => $this->purgeCacheOnChange($post_id), 10, 1);
-        add_action('delete_attachment', fn($post_id) => $this->purgeCacheOnChange($post_id), 10, 1);
-        add_action('created_term', fn() => $this->purgeCacheOnChange(), 10, 0);
-        add_action('edited_term', fn() => $this->purgeCacheOnChange(), 10, 0);
-        add_action('delete_term', fn() => $this->purgeCacheOnChange(), 10, 0);
-        add_action('updated_post_meta', fn($meta_id, $object_id, $meta_key, $_meta_value) => $this->purgeCacheOnChange($object_id), 10, 4);
-        add_action('set_object_terms', fn($object_id) => $this->purgeCacheOnChange($object_id), 10, 6);
-        add_action('transition_post_status', fn($_new_status, $_old_status, $post) => $this->purgeCacheOnChange($post->ID ?? null, $post), 10, 3);
-
-        // SSG hooks
-        add_action('save_post', fn(...$args) => $this->postsCRUDListener->onSavePost(...$args), 10, 3);
-        add_action('before_delete_post', fn(...$args) => $this->postsCRUDListener->onBeforeDeletePost(...$args), 1, 1);
-        add_action('wp_trash_post', fn(...$args) => $this->postsCRUDListener->onTrashPost(...$args), 1, 1);
-        add_action('template_redirect', fn() => $this->redirectToSSG->serveSSG(), 0);
-        add_action('send_headers', fn() => $this->redirectToSSG->buildHeaders(), 10);
-        add_action('wp_footer', fn() => $this->redirectToSSG->setCookieToHuman(), 10);
-    }
-
-    /*======================================================================
-     | REGISTER FILTERS
-     ======================================================================*/
-
-    /**
-     * Registers WordPress filter hooks.
-     *
-     * Sets up various filter hooks for modifying WordPress behavior, SEO, plugins, and search.
-     *
-     * @return void
-     */
-    public function registerFilters(): void
-    {
-        add_filter('wp_robots', fn(...$args) => self::robotsMeta(...$args));
-        add_filter('rest_pre_serve_request', fn(...$args) => self::filterRestHeaders(...$args), 10, 4);
-        add_filter('litespeed_optimize_js_excludes', fn(...$args) => LiteSpeedFilters::lscJsExcludes(...$args), 0);
-        add_filter('litespeed_optimize_css_excludes', fn(...$args) => LiteSpeedFilters::lscCssExcludes(...$args), 0);
-        add_filter('option_active_plugins', fn(...$args) => $this->disablePluginsForDev(...$args), 0);
-        add_filter('option_active_plugins', fn(...$args) => $this->disablePluginsforSimulatedProd(...$args), 0);
-        add_filter('posts_search', fn(...$args) => $this->jobPostsSearchFilter(...$args), 10, 2);
-        add_filter('site_icon_meta_tags', fn(...$args) => ThemeInject::addSiteIconMetaTags(...$args));
-        add_filter('site_icon_image_sizes', fn(...$args) => [32, 48, 96, 144, 192, 256, 384, 512]);
     }
 
     /*======================================================================
@@ -120,6 +33,7 @@ class Hooks implements HooksInterface
      * * For deleted job posts (404 on single lowongan), return 410 Gone.
      * ! Notify search engines with 410 Gone for removed job posts.
      */
+    #[Action('template_redirect', 4)]
     public function oldPost410Redirect(): void
     {
         if (
@@ -155,6 +69,7 @@ class Hooks implements HooksInterface
     /**
      * Redirect to home if accessing the lowongan post type archive.
      */
+    #[Action('template_redirect', 4)]
     public static function redirectToHome(): void
     {
         // Avoid redirecting during admin, AJAX, REST API, cron, or preview requests
@@ -183,7 +98,8 @@ class Hooks implements HooksInterface
      * - Noindex for lowongan post type archive page.
      * - Noindex,nofollow for staging/dev subdomains.
      */
-    public static function robotsMeta(array $robots): array
+    #[Filter('wp_robots')]
+    public static function robotsMetaImpl(array $robots): array
     {
         if (is_post_type_archive('lowongan')) {
             $robots['noindex'] = true;
@@ -204,7 +120,8 @@ class Hooks implements HooksInterface
     /**
      * Sets X-WP-Nonce header for authenticated users.
      */
-    public static function restHeaders(): void
+    #[Action('send_headers', 12)]
+    public static function restHeadersImpl(): void
     {
         try {
             if (!is_user_logged_in()) {
@@ -221,7 +138,8 @@ class Hooks implements HooksInterface
     /**
      * Modifies HTTP headers to remove unwanted Link headers and add sitemap link.
      */
-    public static function modifyLinkHeaders(): void
+    #[Action('template_redirect', 12)]
+    public static function modifyLinkHeadersImpl(): void
     {
         if (!headers_sent()) {
             // Remove all Link headers to prevent API discovery exposure
@@ -242,7 +160,8 @@ class Hooks implements HooksInterface
     /**
      * Exposes specific headers for REST API responses.
      */
-    public static function filterRestHeaders($served, $result, $request, $server)
+    #[Filter('rest_pre_serve_request', 10, 4)]
+    public static function filterRestHeadersImpl($served, $result, $request, $server)
     {
         if (!headers_sent()) {
             header('Access-Control-Expose-Headers: X-WP-Total, X-WP-TotalPages, Link, X-WP-Nonce');
@@ -273,7 +192,8 @@ class Hooks implements HooksInterface
      * @param \WP_Query $wp_query The WP_Query object being executed.
      * @return string Modified search SQL fragment.
      */
-    public function jobPostsSearchFilter(string $search, \WP_Query $wp_query): string
+    #[Filter('posts_search', 10, 2)]
+    public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
 
@@ -295,7 +215,8 @@ class Hooks implements HooksInterface
     /**
      * Temporarily disable specific plugins if in development environment.
      */
-    public function disablePluginsForDev(array $plugins): array
+    #[Filter('option_active_plugins', 0)]
+    public function disablePluginsForDevImpl(array $plugins): array
     {
         $isDev = SharedUtils::isDevelopment();
         if (!$isDev) {
@@ -311,7 +232,8 @@ class Hooks implements HooksInterface
     /**
      * Temporarily disable specific plugins if simulating production environment on local machine.
      */
-    public function disablePluginsforSimulatedProd(array $plugins): array
+    #[Filter('option_active_plugins', 0)]
+    public function disablePluginsforSimulatedProdImpl(array $plugins): array
     {
         $isDev = SharedUtils::isDevelopment();
         if (!$isDev) {
@@ -379,8 +301,40 @@ class Hooks implements HooksInterface
      * @param \WP_Post|null $post Optional WP_Post object when available.
      * @return void
      */
-    public function purgeCacheOnChange(?int $post_id = null, $post = null): void
+    #[Action('save_post', 10, 2)]
+    #[Action('delete_post', 10, 1)]
+    #[Action('trashed_post', 10, 1)]
+    #[Action('delete_attachment', 10, 1)]
+    #[Action('created_term', 10, 0)]
+    #[Action('edited_term', 10, 0)]
+    #[Action('delete_term', 10, 0)]
+    #[Action('updated_post_meta', 10, 4)]
+    #[Action('set_object_terms', 10, 6)]
+    #[Action('transition_post_status', 10, 3)]
+    public function purgeCacheOnChange(...$args): void
     {
+        // Normalize incoming hook args: find first numeric-like value as post_id and any \WP_Post instance as post
+        $post_id = null;
+        $post = null;
+
+        foreach ($args as $arg) {
+            if ($arg instanceof \WP_Post) {
+                $post = $arg;
+                $post_id = $post->ID ?? $post_id;
+                // keep scanning in case a numeric ID also appears elsewhere
+                continue;
+            }
+
+            if (is_int($arg)) {
+                $post_id = $arg;
+                continue;
+            }
+
+            if (is_string($arg) && ctype_digit($arg)) {
+                $post_id = (int) $arg;
+                continue;
+            }
+        }
         // If a post object is provided, ensure it's the 'lowongan' type; otherwise bail out.
         if ($post instanceof \WP_Post) {
             if ($post->post_type !== PostTypes::POST_TYPE_LOWONGAN) {

@@ -3,6 +3,7 @@
 namespace WPLokerBJM\Services\REST;
 
 use WPLokerBJM\Models\Schema\Taxonomies;
+use WPLokerBJM\Core\Container\Attributes\Action;
 
 
 class RESTRoute
@@ -24,6 +25,7 @@ class RESTRoute
     ) {
     }
 
+    #[Action('rest_api_init', 0)]
     public function registerRoutes(): void
     {
         register_rest_route(self::$baseURI, '/auto-suggest/', [

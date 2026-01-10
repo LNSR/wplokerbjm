@@ -362,7 +362,7 @@
       sectionTop: 0,
       itemHeight: ITEM_HEIGHT,
       gap: GAP,
-      buffer: 3,
+      buffer: 2,
     });
   });
 

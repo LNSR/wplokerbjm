@@ -31,8 +31,8 @@ class DynamicSearch
             }
 
             $query_args = match ($context) {
-                'search' => \WPLokerBJM\QueryBuilders\JobQuery::searchJobsArgs($filters, 1, 36),
-                default => \WPLokerBJM\QueryBuilders\JobQuery::latestJobsArgs(1, 36),
+                'search' => \WPLokerBJM\QueryBuilders\JobQuery::searchJobsArgs($filters, 1, 27),
+                default => \WPLokerBJM\QueryBuilders\JobQuery::latestJobsArgs(1, 27),
             };
 
             $result = $this->jobRepository->queryJob($query_args);

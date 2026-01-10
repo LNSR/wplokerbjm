@@ -39,6 +39,7 @@ This repository contains the source code and configuration for **WPLokerBJM**.
 ├── .github/
 ├── .gitignore
 ├── .vscode/
+├── configs/                           # Configuration files for docker compose setups
 ├── caddy.Dockerfile                   # Dockerfile for Caddy web server
 ├── Caddyfile                          # Reverse Proxy. See https://caddyserver.com/docs/
 ├── compose.yml                        # Docker Compose configuration
@@ -54,8 +55,8 @@ This repository contains the source code and configuration for **WPLokerBJM**.
 │   ├── rootCA-key.pem                 # Root CA private key
 │   └── rootCA.pem                     # Root CA certificate
 ├── readme.md                          # This documentation file
-├── scripts                            # Utility scripts
-│   └── entrypoint.sh                  # Docker entrypoint script
+├── scripts                            # Setup scripts
+│   └── entrypoint.sh                  # Wordpress entrypoint script
 ├── wordpress                          # WordPress installation
 │   └── wp-content                     # WordPress content directory
 ├── wpcli.sh                           # Provide alias for "wpcli"(change to your own container)
@@ -80,72 +81,74 @@ The backend code is organized as follows:
 
 ```sh
 server/
-├── Contracts/                 # Interfaces for data providers and hooks
-│   ├── DataProviderInterface.php
-│   └── HooksInterface.php
+├── Configs/                   # Configuration files
+│   └── CredentialConfig.php
 ├── Controllers/               # Controllers
-│   └── REST/                  # REST API controllers
+│   ├── REST/                  # REST API controllers
+│   └── Utilities/             # Utility for controllers
 ├── Core/                      # Core framework and dependency injection
 │   ├── Container/             # Container setup and definitions
-│   │   ├── AutowireScanner.php    # Autowire scanner
-│   │   ├── Definitions/           # Container definitions
-│   │   │   ├── AutoScanned.php    # Auto-scanned definitions
-│   │   │   ├── Core.php           # Init Array Injection definitions(Used by Init class)
-│   │   └── Init.php               # Container initialization
-│   ├── Container.php          # Main DI container
-│   ├── Enqueue/               # Enqueue management
-│   │   └── Vite.php           # Vite integration for asset management
-│   ├── Enqueue.php            # Registers/enqueues scripts and styles
-│   ├── Hooks/                 # Sub-Hooks
-│   ├── Hooks.php              # Registers custom WP actions and filters
-│   └── Cache.php              # Primary object cache management (Redis)
+│   │   ├── Attributes/        # Hook attributes
+│   │   ├── Definitions/       # Container definitions
+│   │   ├── Support/           # Container support utilities
+│   │   ├── Container.php      # Main DI container
+│   │   └── Init.php           # Container initialization
+│   ├── Cron/                  # Cron job management
+│   │   └── WPCron.php
+│   ├── Plugins/               # Plugin integrations
+│   ├── Posts/                 # Post management
+│   │   └── PostsManagement.php
+│   ├── Taxonomy/              # Taxonomy management
+│   │   └── TaxonomyManagement.php
+│   ├── Theme/                 # Theme-specific functionality
+│   │   ├── Enqueue.php        # Asset enqueuing
+│   │   └── ThemeHooks.php     # Theme hooks
+│   └── GlobalHooks.php        # Global WordPress hooks
 ├── Factories/                 # Factory classes
+│   └── JobDataFactory.php
 ├── Models/                    # Data models and schema definitions
-│   └── Schema/                # MetaBox fields, post types, taxonomies (reference only)
+│   └── Schema/                # MetaBox fields, post types, taxonomies
 │       ├── CustomFields.php
 │       ├── PostTypes.php
 │       └── Taxonomies.php
-├── Presenters/                # Page presenters (migrated to CSR frontend, provide only initial data)
-│   ├── Components/            # PHP UI components (migrated to CSR frontend, provide only initial data)
+├── Presenters/                # Page presenters (provide initial data for CSR)
+│   ├── Components/            # PHP UI components
+│   ├── Pages/                 # Page-specific presenters
+│   ├── Schema/                # Schema.org presenters
+│   │   └── JobPostingSchema.php
+│   └── DocumentHTML.php       # HTML document presenter
 ├── QueryBuilders/             # Query builder classes
+│   ├── JobQuery.php
+│   └── TaxonomyQuery.php
 ├── Repositories/              # Data repositories
+│   ├── CustomFieldRepository.php
+│   ├── JobRepository.php
+│   └── TaxonomyRepository.php
 ├── Services/                  # Business logic/services
-│   ├── Cron/
-│   │   └── CronService.php
-│   ├── CustomField/
-│   │   └── CustomFieldsService.php
-│   ├── Job/
-│   │   ├── ArchiveServices.php
-│   │   ├── FormatterServices.php
-│   │   └── JobServices.php
-│   ├── PostsManagement/
-│   │   ├── PostsManagement.php
-│   │   └── SSG/                        # SSG: Post management for static generation
-│   │       ├── PostsCRUDListener.php   # Listens to post CRUD for SSG triggers
-│   │       ├── RedirectToSSG.php       # Handles redirects for SSG pages
-│   │       └── TriggerBuildSSG.php     # Triggers SSG builds on post changes
-│   ├── REST/
-│   │   ├── RESTData.php
-│   │   └── RESTRoute.php
-│   ├── Taxonomy/
-│   │   ├── TaxonomyManagement.php
-│   │   └── TaxonomyService.php
-│   ├── Webhooks/                       # Webhook-related services
-│   │   └── TriggerBuildSSG.php
-│   └── Utilities/
-│       ├── SSG/                        # SSG-related utilities
-│       │   ├── BotDetection.php
-│       │   ├── Integrations/
-│       │   │   ├── RankMathIntegration.php
-│       │   │   └── SSGIntegration.php
-│       │   ├── SSGUtilities.php
-│       │   └── URLFilterService.php
-│       └── Utilities.php               # General utility functions
-└── Views/                     # PHP view templates (migrated to CSR frontend, provide only initial data)
+│   ├── Log/                   # Logging services
+│   ├── REST/                  # REST API services
+│   ├── Schema/                # Schema services
+│   ├── SSG/                   # Static Site Generation services
+│   ├── Utilities/             # Utility services
+│   │   └── SSG/               # SSG utilities
+│   │       ├── Integrations/  # Third-party integrations
+│   │       │   └── RankMathIntegration.php
+│   │       ├── BotDetection.php
+│   │       └── SSGUtilities.php
+│   └── Webhooks/              # Webhook services
+│       └── TriggerBuildSSG.php
+├── Shared/                    # Shared utilities and services
+│   ├── Cache/                 # Caching utilities
+│   │   └── Cache.php
+│   ├── Log/                   # Logging utilities
+│   │   └── Logger.php
+│   └── Utilities/             # General utilities
+│       └── SharedUtils.php
+└── Views/                     # PHP view templates (provide initial data for CSR)
     └── Page/
-        ├── ArchiveView.php
         ├── HomepageView.php
-        └── SingleView.php
+        ├── PasangIklanLokerView.php
+        └── SingleLowonganView.php
 ```
 
 ---
@@ -159,58 +162,39 @@ src/
 │   │   ├── layouts/           # Layout components
 │   │   │   └── Header.svelte
 │   │   └── ui/                # UI component groups
-│   │       ├── Header/        # Header-specific components
-│   │       │   └── BookmarkModal.svelte
-│   │       ├── Homepage/      # Homepage-specific components
-│   │       │   ├── CustomDropdown.svelte
-│   │       │   ├── JobCard.svelte
-│   │       │   ├── JobCarousel.svelte
-│   │       │   ├── JobGrid.svelte
-│   │       │   ├── SearchForm.svelte
-│   │       │   └── SingleOverlay.svelte
-│   │       ├── Shared/        # Shared inter-components
-│   │       │   ├── BookmarkButton.svelte
-│   │       │   ├── FloatingActionButton.svelte
-│   │       │   ├── JobDetail.svelte
-│   │       │   ├── LoadingSpinner.svelte
-│   │       │   └── RefreshSpinner.svelte
-│   │       └── Skeletons/     # Loading skeleton components
-│   │           ├── SkeletonHomepage.svelte
-│   │           ├── SkeletonPasangIklanLoker.svelte
-│   │           └── SkeletonSingleLowongan.svelte
 │   ├── lib/                   # App libraries and utilities
-│   │   ├── localizations/     # Localization files
-│   │   │   └── svelte-lightbox.ts
 │   │   ├── stores/            # Svelte stores for state management
-│   │   └── utils/             # Utility functions
+│   │   └── utils/             # Library utilities
 │   └── routes/                # Route components
+│       ├── Homepage.svelte
+│       ├── PasangIklanLoker.svelte
+│       └── SingleLowongan.svelte
 ├── app.svelte                 # Main Svelte app boot component
 ├── assets/                    # Static assets
 │   ├── css/                   # Stylesheets
 │   │   ├── app.css
 │   │   └── theme.css
+│   └── svelte.svg
 ├── global.d.ts                # Global TypeScript declarations
 ├── main.ts                    # Svelte app entry point
 ├── services/                  # Service classes (API, Auth, etc.)
 │   ├── api/                   # API-related services
-│   │   ├── Client.ts          # API client setup/utilities
 │   │   ├── endpoints/         # API endpoint logic
+│   │   │   ├── WP-Plugins/    # WordPress plugin integrations
+│   │   │   │   └── RankMath.ts
 │   │   │   ├── Jobs.ts        # Jobs-related API calls
-│   │   │   ├── RankMath.ts
-│   │   │   └── Taxonomy.ts    # Taxonomy-related API calls
+│   │   │   ├── Taxonomy.ts    # Taxonomy-related API calls
+│   │   │   └── WPThemeData.ts
+│   │   ├── Client.ts          # API client setup/utilities
 │   │   ├── Error.ts           # API error handling
 │   │   └── index.ts           # API module entry
 │   ├── APIService.ts
 │   ├── AuthService.ts
 │   ├── Formatting.ts
-│   ├── Mounter.ts
+│   ├── Google.ts
+│   └── Mounter.ts
 ├── types/                     # TypeScript type definitions
-└── utils/                     # Agnostic utility
-    ├── debounce.ts
-    ├── elements.ts
-    ├── indexedDB.ts
-    ├── index.ts
-    └── validation.ts
+└── utils/                     # Agnostic utility functions
 ```
 
 ---
