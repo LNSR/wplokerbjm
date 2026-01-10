@@ -28,7 +28,7 @@ on:
         type: string
 
 jobs:
-  cleanup-ssg-workflows:
+  cleanup-workflows:
     name: Clean up workflow runs and artifacts
     runs-on: ubuntu-latest
     permissions:

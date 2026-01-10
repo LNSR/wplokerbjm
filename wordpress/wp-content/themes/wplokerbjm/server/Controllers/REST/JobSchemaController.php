@@ -24,11 +24,15 @@ class JobSchemaController
     public function handle(WP_REST_Request $request): WP_REST_Response
     {
         try {
-            $body = $request->get_json_params();
-            $ids_param = $body['post_ids'] ?? null;
+            $ids_param = $request->get_param('post_ids');
 
             if (empty($ids_param)) {
                 return ControllerUtils::failedResponse('post_ids parameter is required', 400);
+            }
+
+            // Handle comma-separated string or array
+            if (is_string($ids_param)) {
+                $ids_param = explode(',', $ids_param);
             } elseif (!is_array($ids_param)) {
                 return ControllerUtils::failedResponse('Invalid post_ids parameter.', 400);
             }

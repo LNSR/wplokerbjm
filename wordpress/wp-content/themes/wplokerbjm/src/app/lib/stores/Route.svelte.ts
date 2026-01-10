@@ -1,21 +1,32 @@
 import type { SearchState, CarouselState } from '@/types'
 import { WPPostRoute } from '@/types'
+import { type Component } from 'svelte'
 import { SvelteURL } from 'svelte/reactivity'
-import { scrollY } from 'svelte/reactivity/window'
 import { utilsSEO } from '$lib/utils/SEO.svelte'
 import { GoogleServices } from '@/services/Google'
+import { scrollY } from 'svelte/reactivity/window';
 import { getThemeData } from '@/utils'
 import type { CardJob } from '@/types'
 import { LRUCache } from 'lru-cache'
 
 export class RouteManager {
   currentUrl = $state(new SvelteURL(window.location.href));
-  isInitialLoad = $state(true);
+  isInitialLoad = $state(true); // Indicates if the page result from SSR
   isLoading = $state(false);
   loadingComponent = $state<string | null>(null);
+  CurrentComponent: Component | null = $state(null);
+  isTransitioningRoute = $state(false); // Indicates if a route transition is in progress
+  elRouteContainer: HTMLElement | null = null; // `.route-container` element reference
+  setTimeoutWillChange: number | undefined = undefined; // Timeout ID for removing will-change styles
+  currentViewTransition: ViewTransition | null = $state(null); // prevent duplicate transitions
+  lockViewTransition: boolean = $state(false); // prevent multiple View Transitions
 
   setCurrentPath(path: string) {
-    this.currentUrl.href = new SvelteURL(path, window.location.origin).href;
+    this.currentUrl.href = new SvelteURL(path, this.currentUrl.origin).href;
+  }
+
+  get getOrigin(): string {
+    return this.currentUrl.origin;
   }
 
   setIsInitialLoad(value: boolean) {
@@ -35,15 +46,112 @@ export class RouteManager {
   }
 
   performRouteTransitionSideEffects(path: string): void {
+    utilsSEO.clearPendingJobSchemas();
+
     // Fetch RankMath head data
     utilsSEO.fetchHeadData(path).then(() => {
       utilsSEO.removeJobPostingJsonLd();
+      // Head data updated
     }).catch((err) => {
       console.error('Failed to fetch head data for route transition to', path, err);
     }).finally(() => {
       GoogleServices.sendPageView(path);
     });
 
+  }
+
+  navigateTo(path: string, searchState?: SearchState, componentName?: string) {
+
+    this.addContainerWillChange();
+
+    requestAnimationFrame(() => {
+      // Save current scroll position
+      try {
+        const y = (typeof scrollY !== 'undefined' && scrollY.current !== undefined)
+          ? scrollY.current
+          : (typeof window !== 'undefined' && 'scrollY' in window ? (window as any).scrollY : 0);
+        routeStateStore.saveScrollPosition(window.location.pathname, Number(y) || 0);
+      } catch { }
+
+      if (searchState) {
+        routeStateStore.saveSearchState(window.location.pathname, searchState);
+      }
+
+      this.setCurrentPath(path);
+      routeStateStore.setSkipScrollRestore(path, false);
+      if (typeof window !== 'undefined') {
+        window.history.pushState(null, '', path);
+      }
+
+      this.setIsInitialLoad(false);
+      if (componentName) this.setIsLoading(true, componentName);
+
+      // perform side effects (analytics/head updates)
+      void this.performRouteTransitionSideEffects(path);
+
+      this.removeContainerWillChange();
+    });
+  }
+
+  get handlePopstateEvent() {
+    if (typeof window === 'undefined') return;
+    const newPath = window.location.pathname;
+    requestAnimationFrame(() => {
+      this.addContainerWillChange();
+      this.currentUrl.href = window.location.href;
+      this.setIsInitialLoad(false);
+      this.setIsLoading(true);
+      this.isTransitioningRoute = true;
+      this.performRouteTransitionSideEffects(newPath);
+      this.removeContainerWillChange();
+    });
+  }
+
+  private addContainerWillChange() {
+    if (!this.elRouteContainer) {
+      this.elRouteContainer = document.querySelector('.route-container');
+      if (!this.elRouteContainer) return;
+    }
+    // Skip will-change if View Transition API is supported, as it handles performance optimizations
+    if (typeof document !== "undefined" && document.startViewTransition) {
+      return;
+    }
+    const willChangeProps = "transform, opacity, scroll-position, contents";
+    try {
+      this.elRouteContainer.style.setProperty('will-change', willChangeProps);
+    } catch {
+      console.warn('Failed to set will-change styles on route container');
+    }
+  }
+
+  private removeContainerWillChange() {
+    if (this.setTimeoutWillChange) {
+      clearTimeout(this.setTimeoutWillChange);
+      this.setTimeoutWillChange = undefined;
+    }
+
+    this.setTimeoutWillChange = window.setTimeout(() => {
+      if (!this.elRouteContainer) return;
+      this.elRouteContainer.style.removeProperty('will-change');
+
+      // Remove style attribute only if there are no other inline styles
+      if (!this.elRouteContainer.getAttribute('style') ||
+        this.elRouteContainer.style.cssText.trim() === '' ||
+        this.elRouteContainer.style.length === 0) {
+        this.elRouteContainer.removeAttribute('style');
+      }
+    }, 5000);
+  }
+
+  loadStart(componentName?: string) {
+    this.setIsLoading(true, componentName);
+    this.isTransitioningRoute = true;
+    // this.CurrentComponent = null;
+  }
+
+  loadEnd() {
+    this.setIsLoading(false);
+    // this.loadingComponent = null;
   }
 }
 
@@ -242,21 +350,51 @@ export class RouteStateManager {
       this.setSkipScrollRestore(path, false); // Reset after skipping
       return;
     }
-    const savedScroll = this.getScrollPosition(path);
-    // triple RAF to guarantee DOM is fully settled
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
+
+    let attempts = Number(0);
+    let restoring = false;
+    const maxAttempts = Number(100);
+
+    const isReady = () => !routeStore.isInitialLoad && !routeStore.isLoading && routeStore.CurrentComponent && !routeStore.isTransitioningRoute;
+
+    const attemptRestore = () => {
+      const savedScroll = this.getScrollPosition(path);
+
+      restoring = true;
+
+      if (savedScroll !== undefined) {
+        window.scrollTo({ top: savedScroll, behavior: 'instant' });
+        // Check if scrollY is less than saved, and retry if attempts allow
         requestAnimationFrame(() => {
-          // Extra delay to ensure content is rendered
-          if (savedScroll !== undefined) {
-            window.scrollTo({ top: savedScroll, behavior: "instant" });
-          } else if (path !== "/") {
-            // Scroll to top for new routes
-            window.scrollTo({ top: 0, behavior: "instant" });
+          if (window.scrollY < savedScroll && attempts < maxAttempts) {
+            attempts++;
+            requestAnimationFrame(tryRestore);
+            restoring = false;
+            return;
           }
         });
-      });
-    });
+      } else if (path !== "/") {
+        // Scroll to top for new routes
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    };
+
+    const tryRestore = () => {
+      if (isReady()) {
+        requestAnimationFrame(attemptRestore);
+        restoring = false;
+        return;
+      }
+
+      // To be safe, initial restore doesn't restore somehow
+      if (attempts < maxAttempts && !restoring && isReady()) {
+        attempts++;
+        requestAnimationFrame(tryRestore);
+        restoring = false;
+      }
+    };
+
+    requestAnimationFrame(tryRestore);
   }
 }
 
@@ -268,29 +406,7 @@ export const routeStateStore = new RouteStateManager();
  * @param searchState Optional search state to save for the current path before navigating away.
  */
 export function GlobalNavigateTo(path: string, searchState?: SearchState) {
-  // Perform navigation in the next animation frame
   requestAnimationFrame(() => {
-    // Save current scroll position
-    routeStateStore.saveScrollPosition(window.location.pathname, scrollY.current ?? 0);
-
-    // Save current search state if provided
-    if (searchState) {
-      routeStateStore.saveSearchState(window.location.pathname, searchState);
-    }
-    // Set loading state
-    routeStore.setIsLoading(true, routeStore.getComponentNamePath(path));
-
-    routeStore.setCurrentPath(path);
-    window.history.pushState(null, '', path);
-    routeStore.setIsInitialLoad(false);
-
-    // Fetch RankMath head data only for SPA navigation, not initial load
-    if (!routeStore.isInitialLoad) {
-      void routeStore.performRouteTransitionSideEffects(path);
-    }
-
-    if (routeStore.isLoading) {
-      routeStore.setIsLoading(false);
-    }
+    routeStore.navigateTo(path, searchState);
   });
 }

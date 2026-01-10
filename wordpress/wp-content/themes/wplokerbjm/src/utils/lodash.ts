@@ -2,6 +2,18 @@ import lodashDebounce from 'lodash-es/debounce'
 import lodashThrottle from 'lodash-es/throttle'
 
 /**
+ * Debounced function type (matches lodash.debounce's returned function)
+ * - call signature for scheduling
+ * - `.flush()` to immediately invoke pending call
+ * - `.cancel()` to cancel any pending invocation
+ */
+export type DebouncedFunction = {
+  (...args: any[]): void;
+  flush: () => void;
+  cancel: () => void;
+};
+
+/**
  * Custom debounce wrapper for lodash.debounce.
  *
  */

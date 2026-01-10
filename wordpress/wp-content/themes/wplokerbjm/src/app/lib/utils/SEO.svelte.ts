@@ -1,6 +1,6 @@
 import { APIService } from '@/services/APIService'
+import { routeStore } from '$lib/stores/Route.svelte'
 import type { HeadData } from '@/types'
-import { routeStore } from '$lib/stores/Route.svelte';
 import { SvelteSet, SvelteMap, SvelteDate } from 'svelte/reactivity'
 
 /**
@@ -9,6 +9,7 @@ import { SvelteSet, SvelteMap, SvelteDate } from 'svelte/reactivity'
 export class SEOUtils {
     private headDataCache = $state(new SvelteMap<string, { data: HeadData; timestamp: number }>());
     private addedJobPostingIds = $state(new SvelteSet<number>());
+    public initialSchemaSSR: boolean = true;
     private pendingJobIds = $state(new SvelteSet<number>());
     private processTimeout: number | null = null;
 
@@ -21,7 +22,7 @@ export class SEOUtils {
         }
 
         try {
-            const fullUrl = `${window.location.origin}${path}`;
+            const fullUrl = `${routeStore.currentUrl.origin}${path}`;
             const response = await APIService.getRankMathHead(fullUrl);
             const head = this.parseHeadHtml(response.head);
             this.headDataCache.set(path, { data: head, timestamp: SvelteDate.now() });
@@ -423,9 +424,7 @@ export class SEOUtils {
     public addJobPostingJsonLd(jobIds: number[]): void {
         jobIds.forEach(id => this.pendingJobIds.add(id));
 
-        if (this.processTimeout) {
-            clearTimeout(this.processTimeout);
-        }
+        if (this.processTimeout) clearTimeout(this.processTimeout);
 
         this.processTimeout = setTimeout(async () => {
             const ids = [...this.pendingJobIds];
@@ -436,17 +435,20 @@ export class SEOUtils {
         const processJobSchemas = async (jobIds: number[]): Promise<void> => {
             if (jobIds.length === 0) return;
 
-            // Remove duplicates to ensure accurate counting and avoid redundant operations
             // Filter out jobIds that already have JobPosting scripts to avoid fetching duplicates
-            jobIds = [...new SvelteSet(jobIds)];
             jobIds = jobIds.filter(id => !this.addedJobPostingIds.has(id));
+
+            // Limit to maximum 27 JobPosting scripts on DOM
+            const maxAllowed = 27;
+            const remainingSlots = maxAllowed - this.addedJobPostingIds.size;
+            jobIds = jobIds.slice(0, remainingSlots);
 
             if (jobIds.length === 0) return;
 
             let schemas: Record<string, any>[] = [];
 
             try {
-                if (!routeStore.isInitialLoad) {
+                if (!this.initialSchemaSSR) {
                     schemas = await APIService.fetchJobSchemas(jobIds);
                 }
 
@@ -477,27 +479,13 @@ export class SEOUtils {
     }
 
     /**
-     * Attempt to remove JobPosting JSON-LD, but only on the first attempt.
-     * Subsequent calls become no-ops.
+     * Remove custom JobPosting JSON-LD.
      */
-    public removeJobPostingJsonLd(postId?: number | string): number {
+    public removeJobPostingJsonLd(): number {
         try {
             let removed = 0;
 
             if (typeof document === 'undefined') return removed;
-
-            if (typeof postId !== 'undefined') {
-                const selector = `script[type="application/ld+json"][data-ld-id="jobposting-${postId}"]`;
-                const found = document.querySelectorAll(selector);
-                found.forEach(el => {
-                    el.remove();
-                    this.addedJobPostingIds.delete(Number(postId));
-                    removed++;
-                });
-                if (removed > 0) {
-                    return removed;
-                }
-            }
 
             const explicit = Array.from(document.querySelectorAll('script[type="application/ld+json"][data-ld-type="JobPosting"]'));
             explicit.forEach(s => {
@@ -512,11 +500,24 @@ export class SEOUtils {
                 removed++;
             });
 
+            this.initialSchemaSSR = false;
+
             return removed;
         } catch (e) {
             console.warn(`Failed to remove JobPosting JSON-LD`, e);
             return 0;
         }
+    }
+
+    /**
+     * Clear pending job schema requests.
+     */
+    public clearPendingJobSchemas(): void {
+        if (this.processTimeout) {
+            clearTimeout(this.processTimeout);
+            this.processTimeout = null;
+        }
+        this.pendingJobIds.clear();
     }
 }
 

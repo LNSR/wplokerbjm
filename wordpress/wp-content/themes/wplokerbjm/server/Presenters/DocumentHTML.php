@@ -35,11 +35,11 @@ class DocumentHTML
     {
         ?>
         <div id="app">
+            <?php if ($props): ?>
+                <script type="application/json"
+                    id="__wplokerbjm_data-props"><?= wp_json_encode($props, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
+            <?php endif; ?>
         </div>
-        <?php if ($props): ?>
-            <script type="application/json"
-                id="__wplokerbjm_data-props"><?= wp_json_encode($props, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
-        <?php endif; ?>
-                <?php
+        <?php
     }
 }

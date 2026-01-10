@@ -25,7 +25,6 @@ class RESTRouteTest extends WplokerbjmTestCase
     private $carouselMock;
     private $dynamicSearchMock;
     private $singleOverlayMock;
-    private $dispatchSSGBuildMock;
     private $jobBookmarkMock;
     private $jobGridMock;
     private $wpThemeDataMock;
@@ -47,7 +46,6 @@ class RESTRouteTest extends WplokerbjmTestCase
         $this->carouselMock = $this->createMock(\WPLokerBJM\Controllers\REST\Carousel::class);
         $this->dynamicSearchMock = $this->createMock(\WPLokerBJM\Controllers\REST\DynamicSearch::class);
         $this->singleOverlayMock = $this->createMock(\WPLokerBJM\Controllers\REST\JobDetail::class);
-        $this->dispatchSSGBuildMock = $this->createMock(\WPLokerBJM\Controllers\REST\DispatchSSGBuild::class);
         $this->jobBookmarkMock = $this->createMock(\WPLokerBJM\Controllers\REST\JobBookmark::class);
         $this->jobGridMock = $this->createMock(\WPLokerBJM\Controllers\REST\JobGridController::class);
         $this->wpThemeDataMock = $this->createMock(\WPLokerBJM\Controllers\REST\WPThemeData::class);
@@ -71,7 +69,6 @@ class RESTRouteTest extends WplokerbjmTestCase
             $this->carouselMock,
             $this->dynamicSearchMock,
             $this->singleOverlayMock,
-            $this->dispatchSSGBuildMock,
             $this->jobBookmarkMock,
             $this->jobGridMock,
             $this->wpThemeDataMock,
@@ -108,14 +105,13 @@ class RESTRouteTest extends WplokerbjmTestCase
             '/taxonomies/' . Taxonomies::GENDER,
             '/taxonomies/' . Taxonomies::PENDIDIKAN,
             '/job-detail/',
-            '/dispatch-ssg/',
             '/bookmarked-jobs/',
             '/job-grid/',
             '/theme-data/',
             '/job-schema/',
         ];
 
-        $this->assertCount(14, $routes, 'Should register exactly 14 routes');
+        $this->assertCount(13, $routes, 'Should register exactly 13 routes');
 
         $registeredRoutes = array_column($routes, 'route');
         foreach ($expectedRoutes as $expectedRoute) {
@@ -178,58 +174,10 @@ class RESTRouteTest extends WplokerbjmTestCase
                 $this->assertEquals('__return_true', $permissionCallback,
                     "Public endpoint {$routePath} should have __return_true permission callback");
                 echo "  \033[0;32m✓\033[0m Public endpoint: {$routePath}\n";
-            } elseif ($routePath === '/dispatch-ssg/') {
-                // Dispatch SSG has custom permission check
-                $this->assertIsCallable($permissionCallback,
-                    "Dispatch SSG endpoint should have custom permission callback");
-                echo "  \033[0;32m✓\033[0m Protected endpoint: {$routePath}\n";
             }
         }
 
         echo "  \033[0;32m✅ All endpoints have appropriate permission callbacks\033[0m\n";
-    }
-
-    /**
-     * Test dispatch-ssg endpoint validation
-     */
-    public function testDispatchSSGValidation(): void
-    {
-        echo "\n\033[1;31m✅ Testing Dispatch SSG Input Validation\033[0m\n";
-
-        // Clear previous registrations
-        $GLOBALS['__wplokerbjm_registered_routes'] = [];
-
-        // Register routes
-        $this->restRoute->registerRoutes();
-
-        $routes = $GLOBALS['__wplokerbjm_registered_routes'];
-
-        // Find dispatch-ssg route
-        $dispatchRoute = null;
-        foreach ($routes as $route) {
-            if ($route['route'] === '/dispatch-ssg/') {
-                $dispatchRoute = $route;
-                break;
-            }
-        }
-
-        $this->assertNotNull($dispatchRoute, 'Dispatch SSG route should be registered');
-
-        $args = $dispatchRoute['args'];
-
-        // Check validation callbacks
-        $this->assertArrayHasKey('args', $args);
-        $this->assertArrayHasKey('paths', $args['args']);
-        $this->assertArrayHasKey('validate_callback', $args['args']['paths']);
-        $this->assertIsCallable($args['args']['paths']['validate_callback']);
-
-        // Test validation callback
-        $validationCallback = $args['args']['paths']['validate_callback'];
-        $this->assertTrue($validationCallback(['path1', 'path2']), 'Valid array should pass validation');
-        $this->assertFalse($validationCallback([]), 'Empty array should fail validation');
-        $this->assertFalse($validationCallback('not_array'), 'Non-array should fail validation');
-
-        echo "  \033[0;32m✅ Dispatch SSG endpoint has proper input validation\033[0m\n";
     }
 
     /**
@@ -296,8 +244,9 @@ class RESTRouteTest extends WplokerbjmTestCase
                 'description' => 'Get job detail'
             ],
             'bookmarked-jobs' => [
-                'method' => 'GET',
-                'url' => $this->baseUrl . '/bookmarked-jobs/?ids=1,2,3',
+                'method' => 'POST',
+                'url' => $this->baseUrl . '/bookmarked-jobs/',
+                'args' => ['ids' => [1,2,3]],
                 'expected_status' => [200, 404], // Can be 200 or 404
                 'description' => 'Get bookmarked jobs'
             ],
@@ -313,21 +262,11 @@ class RESTRouteTest extends WplokerbjmTestCase
                 'expected_status' => 200,
                 'description' => 'Get theme data'
             ],
-            'dispatch-ssg' => [
-                'method' => 'POST',
-                'url' => $this->baseUrl . '/dispatch-ssg/',
-                'args' => [
-                    'body' => json_encode([
-                        'paths' => ['/marketing', '/lowongan/marketing'],
-                        'reason' => 'test marketing pages',
-                        'dry_run' => true
-                    ]),
-                    'headers' => [
-                        'Content-Type' => 'application/json',
-                    ],
-                ],
-                'expected_status' => 200, // Valid request with proper auth and data
-                'description' => 'Dispatch SSG (valid request)'
+            'job-schema' => [
+                'method' => 'GET',
+                'url' => $this->baseUrl . '/job-schema/?post_ids=1,2,3',
+                'expected_status' => 200,
+                'description' => 'Get job schemas'
             ],
         ];
 

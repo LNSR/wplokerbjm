@@ -16,14 +16,6 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  */
 class GlobalHooks
 {
-    /**
-     * Constructor for Hooks class.
-     */
-    public function __construct(
-        private \WPLokerBJM\Services\Utilities\SSG\BotDetection $botDetection,
-    ) {
-    }
-
     /*======================================================================
      | REDIRECTS
      ======================================================================*/
@@ -33,7 +25,7 @@ class GlobalHooks
      * * For deleted job posts (404 on single lowongan), return 410 Gone.
      * ! Notify search engines with 410 Gone for removed job posts.
      */
-    #[Action('template_redirect', 4)]
+    #[Action('template_redirect', 3)]
     public function oldPost410Redirect(): void
     {
         if (
@@ -48,7 +40,7 @@ class GlobalHooks
         }
 
         $handleRemovedJob = function () {
-            if ($this->botDetection->isBot()) {
+            if (is_404()) {
                 status_header(410);
                 wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
             } else {
@@ -69,7 +61,7 @@ class GlobalHooks
     /**
      * Redirect to home if accessing the lowongan post type archive.
      */
-    #[Action('template_redirect', 4)]
+    #[Action('template_redirect', 3)]
     public static function redirectToHome(): void
     {
         // Avoid redirecting during admin, AJAX, REST API, cron, or preview requests

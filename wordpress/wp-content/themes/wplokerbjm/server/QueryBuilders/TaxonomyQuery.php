@@ -73,7 +73,7 @@ class TaxonomyQuery
                     'hide_empty' => false,
                 ]);
                 if (!is_wp_error($company_terms)) {
-                    Cache::set($cache_key, $company_terms, 3600); // Cache for 1 hour
+                    Cache::set($cache_key, $company_terms, 86400); // Cache for 1 day
                 } else {
                     $company_terms = [];
                 }
@@ -141,7 +141,7 @@ class TaxonomyQuery
         $result = $wpdb->get_var($query);
         $final_result = $result ?: gmdate('c');
 
-        Cache::set($cache_key, $final_result, 3600); // Cache for 1 hour
+        Cache::set($cache_key, $final_result, 86400); // Cache for 1 day
         return $final_result;
     }
 }

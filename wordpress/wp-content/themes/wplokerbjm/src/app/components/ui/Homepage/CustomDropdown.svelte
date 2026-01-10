@@ -1,5 +1,7 @@
 <script module lang="ts">
   import type { DropdownOption } from "@/types";
+  import { tick } from "svelte";
+  import { Virtualization } from "$lib/utils/Virtualization.svelte";
   type ValueProp =
     | string
     | string[]
@@ -19,6 +21,60 @@
     open?: boolean;
     update?: (payload: UpdatePayload) => void;
     close?: () => void;
+  }
+
+  class VirtualizationManager {
+    static computeVirtualState(
+      filteredNonEmpty: DropdownOption[],
+      scrollTop: number,
+      itemHeight: number,
+      containerHeight: number
+    ) {
+      const jobsWithId = filteredNonEmpty.map((job, i) => ({ ...job, id: i }));
+      const cardHeights = new Map(jobsWithId.map((job) => [job.id, itemHeight]));
+      const opts = {
+        displayJobs: jobsWithId,
+        scrollY: scrollTop,
+        containerHeight: containerHeight,
+        cardHeights,
+        fallbackHeight: itemHeight,
+        gap: 0,
+        buffer: 2,
+      };
+      return Virtualization.computeList(opts);
+    }
+
+    static updateContainerHeight(scrollContainer: HTMLElement | null): number {
+      return scrollContainer?.clientHeight ?? 384;
+    }
+
+    static async measureItemHeight(
+      listboxEl: HTMLElement | null,
+      currentItemHeight: number
+    ): Promise<number> {
+      await tick();
+      try {
+        const lis = listboxEl?.querySelectorAll("li");
+        if (!lis || lis.length === 0) return currentItemHeight;
+        let maxH = 0;
+        const originals: string[] = [];
+        lis.forEach((li) => {
+          originals.push((li as HTMLElement).style.height || "");
+          (li as HTMLElement).style.height = "auto";
+        });
+        for (const li of Array.from(lis)) {
+          if (!(li instanceof HTMLElement)) continue;
+          const h = Math.ceil(li.getBoundingClientRect().height);
+          if (h > maxH) maxH = h;
+        }
+        lis.forEach((li, idx) => {
+          if (li instanceof HTMLElement) li.style.height = originals[idx] || "";
+        });
+        return maxH > 0 && maxH !== currentItemHeight ? maxH : currentItemHeight;
+      } catch {
+        return currentItemHeight;
+      }
+    }
   }
 
   class CustomDropdownHelpers {
@@ -46,7 +102,7 @@
 
     static flattenOptions(
       optionsList: DropdownOption[],
-      breadcrumbs: string[] = []
+      breadcrumbs: string[] = [],
     ): DropdownOption[] {
       return (optionsList ?? []).flatMap((opt): DropdownOption[] => {
         if (!opt) return [];
@@ -73,7 +129,7 @@
         return incoming.map((it) =>
           typeof it === "object" && it !== null && "value" in it
             ? String((it as DropdownOption).value)
-            : String(it)
+            : String(it),
         );
       }
       if (typeof incoming === "object" && "value" in incoming) {
@@ -89,7 +145,7 @@
     static toggleValueLocal(
       v: string,
       value: ValueProp,
-      multiple: boolean
+      multiple: boolean,
     ): string[] {
       const arr = CustomDropdownHelpers.normalizeToStringArray(value);
       const exists = arr.includes(v);
@@ -100,12 +156,12 @@
 
   class CustomDropdownBreadcrumbController {
     static async navigateChildren(
-        children: DropdownOption[] | undefined,
-        label: string | undefined,
-        parentOption: DropdownOption | undefined,
-        stack: DropdownOption[][],
-        breadcrumbLabels: string[],
-      ): Promise<void> {
+      children: DropdownOption[] | undefined,
+      label: string | undefined,
+      parentOption: DropdownOption | undefined,
+      stack: DropdownOption[][],
+      breadcrumbLabels: string[],
+    ): Promise<void> {
       if (parentOption?.loadChildren && (!children || !children.length)) {
         parentOption.isLoading = true;
         try {
@@ -120,10 +176,7 @@
       if (label) breadcrumbLabels.push(label);
     }
 
-    static goBack(
-      stack: DropdownOption[][],
-      breadcrumbLabels: string[],
-    ): void {
+    static goBack(stack: DropdownOption[][], breadcrumbLabels: string[]): void {
       if (stack.length) {
         stack.pop();
         breadcrumbLabels.pop();
@@ -151,7 +204,7 @@
   class CustomDropdownController {
     static callUpdate(
       payload: UpdatePayload,
-      update?: (payload: UpdatePayload) => void
+      update?: (payload: UpdatePayload) => void,
     ) {
       try {
         if (typeof update === "function") {
@@ -179,12 +232,12 @@
       value: ValueProp,
       update?: (payload: UpdatePayload) => void,
       close?: () => void,
-      resetBreadcrumb?: () => void
+      resetBreadcrumb?: () => void,
     ): void {
       if (multiple) {
         CustomDropdownController.callUpdate(
           CustomDropdownHelpers.toggleValueLocal(option.value, value, multiple),
-          update
+          update,
         );
       } else {
         CustomDropdownController.callUpdate(String(option.value), update);
@@ -200,7 +253,7 @@
     static handleClickOutside(
       e: MouseEvent,
       dropdownRef: HTMLElement | null,
-      close?: () => void
+      close?: () => void,
     ): void {
       if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
         CustomDropdownController.callClose(close);
@@ -210,7 +263,7 @@
     static handleFocusOut(
       e: FocusEvent,
       dropdownRef: HTMLElement | null,
-      close?: () => void
+      close?: () => void,
     ): void {
       const related = e.relatedTarget as Node | null;
       if (!dropdownRef) return;
@@ -222,9 +275,8 @@
 </script>
 
 <script lang="ts">
-  import { onMount, onDestroy, tick } from "svelte";
-  import { Virtualization } from '$lib/utils/Virtualization.svelte';
-  import { taxonomyStore } from "$lib/stores/Taxonomy.svelte"; 
+  import { onMount, onDestroy } from "svelte";
+  import { taxonomyStore } from "$lib/stores/Taxonomy.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import {
     SitemapSolid,
@@ -253,6 +305,9 @@
   let scrollTop = $state(0);
   let itemHeight = $state(40);
   let scrollContainer = $state<HTMLElement | null>(null);
+  let containerHeight = $state(384);
+  let isKeyboard = $state(false);
+  let scrollUpdateTimeout: number | null = null;
 
   // DOM ref
   let dropdownRef: HTMLElement | null = null;
@@ -260,14 +315,14 @@
   const listboxId = $derived(String(id ?? "custom-dropdown") + "-listbox");
 
   const currentOptions = $derived.by(() =>
-    stack.length > 0 ? stack[stack.length - 1] : (options ?? [])
+    stack.length > 0 ? stack[stack.length - 1] : (options ?? []),
   );
 
   const filteredOptions = $derived.by((): DropdownOption[] => {
     if (String(search).trim()) {
       const q = String(search).trim().toLowerCase();
       return CustomDropdownHelpers.flattenOptions(options ?? []).filter(
-        (opt: DropdownOption) => opt.label.toLowerCase().includes(q)
+        (opt: DropdownOption) => opt.label.toLowerCase().includes(q),
       );
     }
     return (currentOptions ?? []).map((opt: DropdownOption) => ({
@@ -278,13 +333,13 @@
 
   const filteredNonEmpty = $derived.by((): DropdownOption[] =>
     (filteredOptions ?? []).filter(
-      (opt: DropdownOption) => String(opt.value).trim() !== ""
-    )
+      (opt: DropdownOption) => String(opt.value).trim() !== "",
+    ),
   );
 
   const selectedValues = $derived.by((): SelectedItem[] => {
     const valArr = CustomDropdownHelpers.normalizeToStringArray(
-      value as ValueProp
+      value as ValueProp,
     ).filter((v) => String(v).trim() !== "");
     const flat = CustomDropdownHelpers.flattenOptions(options ?? []);
     return valArr.map((v) => {
@@ -297,22 +352,17 @@
     });
   });
 
-  const virtualState = $derived.by(() => {
-    const opts = {
-      displayJobs: filteredNonEmpty,
-      innerWidth: 0, // force itemsPerRow=1
-      innerHeight: 384, // approx max-h-96
-      scrollY: scrollTop,
-      sectionTop: 0,
-      itemHeight: itemHeight,
-      gap: 0,
-      buffer: 3,
-    };
-    return Virtualization.computeGrid(opts);
-  });
+  const virtualState = $derived.by(() =>
+    VirtualizationManager.computeVirtualState(filteredNonEmpty, scrollTop, itemHeight, containerHeight)
+  );
+
+  function updateContainerHeight() {
+    containerHeight = VirtualizationManager.updateContainerHeight(scrollContainer);
+  }
 
   const onKeyDown = (e: KeyboardEvent): void => {
     if (!open) return;
+    isKeyboard = true;
     const list = (filteredNonEmpty ?? []) as DropdownOption[];
 
     const keyHandlers = {
@@ -336,7 +386,7 @@
             opt.label,
             opt,
             stack,
-            breadcrumbLabels
+            breadcrumbLabels,
           );
           activeIndex = 0;
         }
@@ -361,11 +411,11 @@
             () => {
               CustomDropdownBreadcrumbController.resetBreadcrumb(
                 stack,
-                breadcrumbLabels
+                breadcrumbLabels,
               );
               activeIndex = 0;
               search = "";
-            }
+            },
           );
       },
       Escape: () => CustomDropdownController.callClose(close),
@@ -377,40 +427,12 @@
   let ro: ResizeObserver | null = null;
 
   async function measureItemHeight() {
-    await tick();
-    try {
-      const lis = listboxEl?.querySelectorAll("li");
-      if (!lis || lis.length === 0) return;
-      let maxH = 0;
-      // Temporarily clear forced heights to measure natural heights
-      const originals: string[] = [];
-      lis.forEach((li) => {
-        originals.push((li as HTMLElement).style.height || "");
-        (li as HTMLElement).style.height = "auto";
-      });
-
-      for (const li of Array.from(lis)) {
-        if (!(li instanceof HTMLElement)) continue;
-        const h = Math.ceil(li.getBoundingClientRect().height);
-        if (h > maxH) maxH = h;
-      }
-
-      // restore original inline heights
-      lis.forEach((li, idx) => {
-        if (li instanceof HTMLElement) li.style.height = originals[idx] || "";
-      });
-
-      if (maxH > 0 && maxH !== itemHeight) {
-        itemHeight = maxH;
-      }
-    } catch {
-      // ignore
-    }
+    itemHeight = await VirtualizationManager.measureItemHeight(listboxEl, itemHeight);
   }
 
   onMount(() => {
     document.addEventListener("mousedown", (e) =>
-      CustomDropdownController.handleClickOutside(e, dropdownRef, close)
+      CustomDropdownController.handleClickOutside(e, dropdownRef, close),
     );
     // reference listboxEl to satisfy TS/linter (it's bound in template)
     if (listboxEl) {
@@ -429,19 +451,26 @@
 
     // initial measurement
     void measureItemHeight();
+    // initial container height measurement
+    setTimeout(() => updateContainerHeight(), 0);
+    window.addEventListener('resize', updateContainerHeight);
   });
 
   onDestroy(() => {
     document.removeEventListener("mousedown", (e) =>
-      CustomDropdownController.handleClickOutside(e, dropdownRef, close)
+      CustomDropdownController.handleClickOutside(e, dropdownRef, close),
     );
     if (ro) ro.disconnect();
+    if (scrollUpdateTimeout) clearTimeout(scrollUpdateTimeout);
+    window.removeEventListener('resize', updateContainerHeight);
   });
 
   $effect(() => {
     filteredNonEmpty;
     scrollTop = 0;
     void measureItemHeight();
+    // content changed, re-measure viewport height
+    requestAnimationFrame(() => updateContainerHeight());
     if (ro && listboxEl) {
       try {
         ro.disconnect();
@@ -460,11 +489,12 @@
   $effect(() => {
     activeIndex;
     itemHeight;
+    if (!isKeyboard) return;
     const sc = scrollContainer;
     if (!sc) return;
     const vh = sc.clientHeight;
+    const targetTop = virtualState.itemPositions[activeIndex] ?? 0;
     const row = itemHeight || 40;
-    const targetTop = (activeIndex ?? 0) * row;
     if (targetTop < sc.scrollTop) sc.scrollTop = targetTop;
     else if (targetTop + row > sc.scrollTop + vh)
       sc.scrollTop = targetTop + row - vh;
@@ -534,7 +564,7 @@
                       CustomDropdownBreadcrumbController.goToBreadcrumb(
                         idx,
                         stack,
-                        breadcrumbLabels
+                        breadcrumbLabels,
                       );
                       activeIndex = 0;
                     }}
@@ -573,7 +603,7 @@
                 e.stopPropagation();
                 CustomDropdownBreadcrumbController.goBack(
                   stack,
-                  breadcrumbLabels
+                  breadcrumbLabels,
                 );
                 activeIndex = 0;
               }}
@@ -612,7 +642,17 @@
       {/if}
 
       <!-- Options list (scrollable) -->
-      <div class="max-h-96 overflow-auto pt-2" bind:this={scrollContainer} onscroll={(e) => scrollTop = (e.currentTarget as HTMLElement).scrollTop}>
+      <div
+        class="max-h-96 overflow-y-auto pt-2"
+        bind:this={scrollContainer}
+        onscroll={(e) => {
+          const target = e.currentTarget as HTMLElement;
+          if (scrollUpdateTimeout) clearTimeout(scrollUpdateTimeout);
+          scrollUpdateTimeout = setTimeout(() => {
+            scrollTop = target.scrollTop;
+          }, 50);
+        }}
+      >
         <ul
           id={listboxId}
           role="listbox"
@@ -620,130 +660,143 @@
           style="height: {virtualState.totalHeight}px; position: relative;"
           class="!pt-0 !pb-2"
         >
-        {#each virtualState.visibleJobs as option, index (option.__key)}
-          <li
-            style="position: absolute; top: {(virtualState.startIndex + index) * virtualState.rowHeight}px; width: 100%; height: {virtualState.rowHeight}px;"
-            class={[
-              "flex items-center px-5 py-2 cursor-pointer select-none transition rounded text-left",
-              (virtualState.startIndex + index) === activeIndex ? "bg-[var(--wpl-global-color-1)]/15" : "",
-              CustomDropdownHelpers.isSelected(option.value, selectedValues)
-                ? "font-bold"
-                : "",
-            ].join(" ")}
-          >
-            <button
-              type="button"
-              class="flex-1 text-left flex items-center min-w-0 pr-12 break-words whitespace-normal"
-              onmouseenter={() => (activeIndex = virtualState.startIndex + index)}
-              onclick={() =>
-                !multiple &&
-                CustomDropdownController.select(
-                  option,
-                  multiple,
-                  value,
-                  update,
-                  close,
-                  () => {
-                    CustomDropdownBreadcrumbController.resetBreadcrumb(
+          {#each virtualState.visibleJobs as option, index (option.__key)}
+            <li
+              style="position: absolute; transform: translate3d(0, {virtualState
+                .itemPositions[
+                virtualState.startIndex + index
+              ]}px, 0); width: 100%; height: {itemHeight}px;"
+              class={[
+                "flex items-center px-5 py-2 cursor-pointer select-none transition rounded text-left",
+                virtualState.startIndex + index === activeIndex
+                  ? "bg-[var(--wpl-global-color-1)]/15"
+                  : "",
+                CustomDropdownHelpers.isSelected(option.value, selectedValues)
+                  ? "font-bold"
+                  : "",
+              ].join(" ")}
+            >
+              <button
+                type="button"
+                class="flex-1 text-left flex items-center min-w-0 pr-12 break-words whitespace-normal"
+                onmouseenter={() => {
+                  isKeyboard = false;
+                  activeIndex = virtualState.startIndex + index;
+                }}
+                onclick={() =>
+                  !multiple &&
+                  CustomDropdownController.select(
+                    option,
+                    multiple,
+                    value,
+                    update,
+                    close,
+                    () => {
+                      CustomDropdownBreadcrumbController.resetBreadcrumb(
+                        stack,
+                        breadcrumbLabels,
+                      );
+                      activeIndex = 0;
+                      search = "";
+                    },
+                  )}
+              >
+                {#if multiple}
+                  <label class="flex items-center cursor-pointer"
+                    ><input
+                      type="checkbox"
+                      class="mr-3 w-6 h-6 accent-blue-500"
+                      checked={CustomDropdownHelpers.isSelected(
+                        option.value,
+                        selectedValues,
+                      )}
+                      onchange={() =>
+                        CustomDropdownController.callUpdate(
+                          CustomDropdownHelpers.toggleValueLocal(
+                            option.value,
+                            value,
+                            multiple,
+                          ),
+                          update,
+                        )}
+                      tabindex="-1"
+                    /></label
+                  >
+                {/if}
+                {#if option.children?.length}
+                  <FolderSolid
+                    class="mr-2 flex-shrink-0 text-yellow-400"
+                    aria-hidden="true"
+                  />
+                {:else}
+                  <FileSolid
+                    class="mr-2 flex-shrink-0 text-gray-400"
+                    aria-hidden="true"
+                  />
+                {/if}
+                {#if search && String(search).trim()}
+                  {#each CustomDropdownHelpers.highlightParts(option.label, String(search)) as part}
+                    {#if part.match}
+                      <span
+                        class="bg-[var(--wpl-global-color-5)] font-bold rounded px-1"
+                        >{part.text}</span
+                      >
+                    {:else}
+                      {part.text}
+                    {/if}
+                  {/each}
+                {:else}
+                  {option.label}
+                {/if}
+                {#if option.__breadcrumbs && search}
+                  <span class="ml-2 text-xs text-gray-400 italic"
+                    >({option.__breadcrumbs.join(" / ")})</span
+                  >
+                {/if}
+                {#if option.isLoading}
+                  <span
+                    class="ml-2 text-xs text-gray-400 italic flex items-center"
+                  >
+                    <LoadingSpinner size="sm" srLabel="Memuat..." />
+                    <span class="ml-2">Memuat...</span>
+                  </span>
+                {/if}
+              </button>
+              {#if option.children?.length && !search}
+                <button
+                  class="ml-2 flex items-center justify-center w-10 h-10 rounded relative transition"
+                  onclick={(e) => {
+                    // stop propagation so the parent row's click/select handler does not run
+                    e.stopPropagation();
+                    CustomDropdownBreadcrumbController.navigateChildren(
+                      option.children,
+                      option.label,
+                      option,
                       stack,
-                      breadcrumbLabels
+                      breadcrumbLabels,
                     );
                     activeIndex = 0;
-                    search = "";
-                  }
-                )}
-            >
-              {#if multiple}
-                <label class="flex items-center cursor-pointer"
-                  ><input
-                    type="checkbox"
-                    class="mr-3 w-6 h-6 accent-blue-500"
-                    checked={CustomDropdownHelpers.isSelected(
-                      option.value,
-                      selectedValues
-                    )}
-                    onchange={() =>
-                      CustomDropdownController.callUpdate(
-                        CustomDropdownHelpers.toggleValueLocal(
-                          option.value,
-                          value,
-                          multiple
-                        ),
-                        update
-                      )}
-                    tabindex="-1"
-                  /></label
+                  }}
+                  onmousedown={(e) => {
+                    // prevent mousedown from triggering click outside handler
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
+                  tabindex="-1"
+                  aria-label="Lihat sub"
                 >
+                  <span
+                    class="absolute left-6 -top-1 translate-y-1 bg-[var(--wpl-global-color-1)]/80 text-xs rounded-full px-1.5 py-0.1 z-20"
+                    >{option.children.length}</span
+                  >
+                  <ChevronRightSolid
+                    class="border border-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] rounded-full text-2xl p-1 h-10 w-10"
+                    aria-hidden="true"
+                  />
+                </button>
               {/if}
-              {#if option.children?.length}
-                <FolderSolid class="mr-2 flex-shrink-0 text-yellow-400" aria-hidden="true" />
-              {:else}
-                <FileSolid class="mr-2 flex-shrink-0 text-gray-400" aria-hidden="true" />
-              {/if}
-              {#if search && String(search).trim()}
-                {#each CustomDropdownHelpers.highlightParts(option.label, String(search)) as part}
-                  {#if part.match}
-                    <span
-                      class="bg-[var(--wpl-global-color-5)] font-bold rounded px-1"
-                      >{part.text}</span
-                    >
-                  {:else}
-                    {part.text}
-                  {/if}
-                {/each}
-              {:else}
-                {option.label}
-              {/if}
-              {#if option.__breadcrumbs && search}
-                <span class="ml-2 text-xs text-gray-400 italic"
-                  >({option.__breadcrumbs.join(" / ")})</span
-                >
-              {/if}
-              {#if option.isLoading}
-                <span
-                  class="ml-2 text-xs text-gray-400 italic flex items-center"
-                >
-                  <LoadingSpinner size="sm" srLabel="Memuat..." />
-                  <span class="ml-2">Memuat...</span>
-                </span>
-              {/if}
-            </button>
-            {#if option.children?.length && !search}
-              <button
-                class="ml-2 flex items-center justify-center w-10 h-10 rounded relative transition"
-                onclick={(e) => {
-                  // stop propagation so the parent row's click/select handler does not run
-                  e.stopPropagation();
-                  CustomDropdownBreadcrumbController.navigateChildren(
-                    option.children,
-                    option.label,
-                    option,
-                    stack,
-                    breadcrumbLabels
-                  );
-                  activeIndex = 0;
-                }}
-                onmousedown={(e) => {
-                  // prevent mousedown from triggering click outside handler
-                  e.preventDefault();
-                  e.stopPropagation();
-                }}
-                tabindex="-1"
-                aria-label="Lihat sub"
-              >
-                <span
-                  class="absolute left-6 -top-1 translate-y-1 bg-[var(--wpl-global-color-1)]/80 text-xs rounded-full px-1.5 py-0.1 z-20"
-                  >{option.children.length}</span
-                >
-                <ChevronRightSolid
-                  class="border border-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] rounded-full text-2xl p-1 h-10 w-10"
-                  aria-hidden="true"
-                />
-              </button>
-            {/if}
-          </li>
-        {/each}
-
+            </li>
+          {/each}
         </ul>
         {#if filteredNonEmpty.length === 0 && !taxonomyStore.loading}
           <div class="px-5 py-2 text-gray-400 text-center">Tidak ada hasil</div>

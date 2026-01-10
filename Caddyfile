@@ -104,14 +104,18 @@
   header @development @static_ext "Last-Modified" {file.modtime}
   header @development @static_ext Access-Control-Allow-Origin "*"
 
-  # wp-content paths (plugins, themes) - long-term for static assets while still allowing some dynamic files
-  header @production @wp_static Cache-Control "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=2592000"
-  header @production @wp_static Expires "Thu, 31 Dec 2036 23:55:55 GMT"
-  header @production @wp_static Vary "Accept-Encoding"
+  # wp-content paths (plugins, themes) - long-term caching for static assets, shorter for potentially dynamic files
+  header @production @wp_static not @static_ext Cache-Control "public, max-age=86400, s-maxage=86400, stale-while-revalidate=2592000, stale-if-error=604800"
+  header @production @wp_static not @static_ext Expires "Thu, 31 Dec 2036 23:55:55 GMT"
+  header @production @wp_static not @static_ext Vary "Accept-Encoding"
+  header @production @wp_static not @static_ext "Last-Modified" {file.modtime}
+  header @production @wp_static not @static_ext Access-Control-Allow-Origin "*"
 
-  header @development @wp_static Cache-Control "public, max-age=3600, stale-while-revalidate=1800"
-  header @development @wp_static Expires "Thu, 31 Dec 2036 23:55:55 GMT"
-  header @development @wp_static Vary "Accept-Encoding"
+  header @development @wp_static not @static_ext Cache-Control "public, max-age=1800, stale-while-revalidate=1800, stale-if-error=3600"
+  header @development @wp_static not @static_ext Expires "Thu, 31 Dec 2036 23:55:55 GMT"
+  header @development @wp_static not @static_ext Vary "Accept-Encoding"
+  header @development @wp_static not @static_ext "Last-Modified" {file.modtime}
+  header @development @wp_static not @static_ext Access-Control-Allow-Origin "*"
 
   # REST API: private cache for logged-in users, long public cache with background revalidation for anonymous
   header @production @rest_api @logged_in Cache-Control "private, max-age=300, stale-while-revalidate=600, stale-if-error=3600"
@@ -121,14 +125,12 @@
   header @development @rest_api Cache-Control "private, max-age=60, stale-while-revalidate=120"
 
   # Privileged paths (wp-login.php, admin, xmlrpc, cron): allow private browser cache only
-  header @no_cache Cache-Control "private, max-age=120, s-maxage=120, must-revalidate"
+  header @no_cache Cache-Control "private, no-cache, must-revalidate, max-age=0"
 
   # Dynamic content (pages) — private cache for logged-in users, public cache for anonymous
   header @production @dynamic @logged_in Cache-Control "private, max-age=360"
   header @production @dynamic not @logged_in Cache-Control "public, max-age=600, s-maxage=1200, stale-while-revalidate=1200, stale-if-error=86400"
   header @production @dynamic not @logged_in Vary "Accept-Encoding, Cookie"
-
-  header @development @dynamic Cache-Control "no-cache"
 
   replace "https://localhost" "https://{host}"
 

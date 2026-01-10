@@ -68,7 +68,7 @@ class LoadMore
                 'totalPages' => $query->max_num_pages,
             ];
 
-            Cache::set($cacheKey, $cacheData, 3600); // Cache for 1 hour
+            Cache::set($cacheKey, $cacheData, 86400); // Cache for 1 day
 
             $response = new \WP_REST_Response($data);
             // Set pagination headers

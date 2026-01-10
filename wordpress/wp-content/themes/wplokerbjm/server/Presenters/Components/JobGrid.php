@@ -48,7 +48,7 @@ class JobGrid
             'totalJobs' => $jobs_query->found_posts,
         ];
 
-        Cache::set($cacheKey, $props, 3600);
+        Cache::set($cacheKey, $props, 86400); // Cache for 1 day
 
         return $props;
     }

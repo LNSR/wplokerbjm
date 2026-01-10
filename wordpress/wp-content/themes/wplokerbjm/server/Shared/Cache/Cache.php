@@ -499,24 +499,10 @@ class CacheKey
     // Autowire Scanner
     const AUTOWIRE_SCANNER_PREFIX = 'autowire_scanner_';
 
-    // SSG (Static Site Generation)
-    const SSG_POST_DEBOUNCE_PREFIX = 'ssg_post_debounce_';
-    const SSG_DEBOUNCE_PREFIX = 'ssg_debounce_';
-    const SSG_API_RATE_LIMIT_PREFIX = 'ssg_api_rate_limit_';
-    const SSG_CONTENT_PREFIX = 'ssg_content_';
-    const SSG_IS_BOT_PREFIX = 'ssg_is_bot_';
-    const SSG_USER_AGENT_BOT_PREFIX = 'ssg_user_agent_bot_';
-    const SSG_BOT_IP_RANGES = 'ssg_bot_ip_ranges';
-    const SSG_IP_IN_BOT_RANGES_PREFIX = 'ssg_ip_in_bot_ranges_';
-    const SSG_BOT_USER_AGENTS = 'ssg_bot_user_agents';
-
     // DNS/Bot Detection
     const DNS_PTR_PREFIX = 'dns_ptr_';
     const DNS_IS_KNOWN_BOT_PREFIX = 'dns_is_known_bot_';
     const DNS_IS_KNOWN_BOT_IP_PREFIX = 'dns_is_known_bot_ip_';
-
-    // Request Pattern Analysis
-    const SSG_REQUEST_PATTERN_PREFIX = 'ssg_request_pattern_';
 
     // LiteSpeed
     const LITESPEED_RECENT_PURGE = 'litespeed_recent_purge';

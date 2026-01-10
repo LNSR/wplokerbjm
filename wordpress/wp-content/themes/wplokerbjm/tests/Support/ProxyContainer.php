@@ -165,22 +165,5 @@ final class ProxyContainer
         if (!defined('WP_REDIS_DATABASE')) {
             define('WP_REDIS_DATABASE', getenv('REDIS_DB') ?: 0);
         }
-
-        // SSG constants (hardcoded defaults for tests)
-        if (!defined('SSG_GITHUB_TOKEN')) {
-            define('SSG_GITHUB_TOKEN', getenv('SSG_GITHUB_TOKEN'));
-        }
-        if (!defined('SSG_GITHUB_OWNER')) {
-            define('SSG_GITHUB_OWNER', getenv('SSG_GITHUB_OWNER'));
-        }
-        if (!defined('SSG_GITHUB_REPO')) {
-            define('SSG_GITHUB_REPO', getenv('SSG_GITHUB_REPO'));
-        }
-        if (!defined('SSG_GITHUB_WORKFLOW')) {
-            define('SSG_GITHUB_WORKFLOW', getenv('SSG_GITHUB_WORKFLOW'));
-        }
-        if (!defined('SSG_GITHUB_REF')) {
-            define('SSG_GITHUB_REF', getenv('SSG_GITHUB_REF'));
-        }
     }
 }

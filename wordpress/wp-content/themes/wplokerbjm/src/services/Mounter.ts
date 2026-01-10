@@ -1,11 +1,10 @@
-import { mount } from 'svelte';
+import { mount, type Component } from 'svelte';
 import type { ComponentConfig } from '@/types';
 import { parseProps, removePropsScriptFromElement } from '@/utils';
 
-class SvelteMounter {
-  private mountedElements = new WeakSet<Element>();
-  private targetProps = 'id="__wplokerbjm_data-props"';
-  mount(configs: ComponentConfig[]): void {
+export class SvelteMounter {
+  private static targetProps = 'id="__wplokerbjm_data-props"';
+  static mount(configs: ComponentConfig[]): void {
     for (const config of configs) {
       if (config.selector === undefined) {
         console.error('selector is undefined for SvelteMounter config', config);
@@ -14,27 +13,22 @@ class SvelteMounter {
       const elements = document.querySelectorAll(config.selector);
 
       for (const element of elements) {
-        if (this.mountedElements.has(element)) continue;
-
         try {
-          const props = parseProps(document, this.targetProps);
-          const comp = config.component;
+          const props = parseProps(element, SvelteMounter.targetProps);
+          const comp = config.component as Component;
 
-          const options: any = { target: element, props };
-
+          const options: { target: Element; props: Record<string, unknown> } = { target: element, props };
           requestAnimationFrame(() => {
-            element.replaceChildren();
             mount(comp, options);
-            removePropsScriptFromElement(document, this.targetProps);
-            this.mountedElements.add(element);
-            element.setAttribute('svelte-mounted', 'true');
           });
         } catch {
           console.error(`SvelteMounter: failed to mount ${config.selector}`);
+        } finally {
+          setTimeout(() => {
+            removePropsScriptFromElement(element, SvelteMounter.targetProps);
+          }, 200);
         }
       }
     }
   }
 }
-
-export const svelteMounter = new SvelteMounter();

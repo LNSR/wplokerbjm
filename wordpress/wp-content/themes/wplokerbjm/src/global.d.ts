@@ -3,6 +3,18 @@ import { type PartytownConfig } from "@qwik.dev/partytown/integration";
 type DataLayerItem = Record<string, unknown> | unknown[];
 
 declare global {
+  interface ViewTransition {
+    readonly finished: Promise<void>;
+    readonly ready: Promise<void>;
+    readonly updateCallbackDone: Promise<void>;
+    skipTransition(): void;
+  }
+
+  interface Document {
+    startViewTransition?(callback: () => void | Promise<void>): ViewTransition;
+    viewTransition?: ViewTransition | null;
+  }
+
   interface Window {
     adsbygoogle?: unknown[];
     // Google Analytics / GTM helpers used by the frontend

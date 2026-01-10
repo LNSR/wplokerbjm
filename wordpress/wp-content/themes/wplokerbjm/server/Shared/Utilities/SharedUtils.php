@@ -36,23 +36,6 @@ class SharedUtils
         return false;
     }
 
-    public static function isSsgBotRequest(): bool
-    {
-        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
-
-        $ssgBotUAs = apply_filters('ssg_excluded_user_agents', [
-            'SSG-Bot/1.0',
-            'Mozilla/5.0 (compatible; SSG-Bot/1.0)',
-        ]);
-
-        foreach ($ssgBotUAs as $ua) {
-            if (stripos($userAgent, $ua) !== false) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     public static function isDevelopment(): bool
     {
         return defined('WP_ENV') && WP_ENV === 'development';

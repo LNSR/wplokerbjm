@@ -5,8 +5,8 @@ import { LRUCache } from 'lru-cache';
 
 const cache = new LRUCache<string, any>({
   max: 500, // Maximum number of items
-  ttl: 30000, // 30 seconds in milliseconds
-});
+  ttl: 15000, // 15 seconds in milliseconds
+}); // prevent excessive API calls
 
 export class APIService {
   //* Jobs related

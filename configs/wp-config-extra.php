@@ -11,12 +11,6 @@ define('WP_REDIS_HOST', getenv('REDIS_HOST'));
 define('WP_REDIS_PASSWORD', getenv('REDIS_PWD'));
 define('WP_REDIS_DATABASE', getenv('REDIS_DB'));
 
-define('SSG_GITHUB_TOKEN', getenv('SSG_GITHUB_TOKEN'));
-define('SSG_GITHUB_OWNER', getenv('SSG_GITHUB_OWNER'));
-define('SSG_GITHUB_REPO', getenv('SSG_GITHUB_REPO'));
-define('SSG_GITHUB_WORKFLOW', getenv('SSG_GITHUB_WORKFLOW'));
-define('SSG_GITHUB_REF', getenv('SSG_GITHUB_REF'));
-
 if (!defined('WP_CACHE'))
   define('WP_CACHE', true);
 define('WP_CACHE_KEY_SALT', getenv('WORDPRESS_WP_SITEURL'));

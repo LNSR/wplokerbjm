@@ -1,17 +1,18 @@
-<script lang="ts">
+<script module lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { SvelteSet } from "svelte/reactivity";
+  import { SvelteSet, SvelteMap } from "svelte/reactivity";
   import { timeEffect } from "$lib/utils/elements.svelte";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { generalStore } from "$lib/stores/General.svelte";
+  import Virtualization from "$lib/utils/Virtualization.svelte";
+  import { isAppEl } from "@/utils";
   import type { CardJob } from "@/types";
   import { isMobile } from "$lib/utils/elements.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import { GlobalNavigateTo } from "@/app/lib/stores/Route.svelte";
+  import { GlobalNavigateTo, routeStore } from "@/app/lib/stores/Route.svelte";
   import { SvelteDate } from "svelte/reactivity";
   import { fade } from "svelte/transition";
-  import { Virtualization } from "$lib/utils/Virtualization.svelte";
   import {
     BookmarkSolid,
     XmarkSolid,
@@ -24,111 +25,30 @@
     ThumbTackSolid,
     MagnifyingGlassSolid,
   } from "svelte-awesome-icons";
-
-  interface Props {
-    open: boolean;
-  }
-
-  let { open = $bindable() }: Props = $props();
-
-  const isMobileValue = $derived.by(() => isMobile());
+  import type { Attachment } from "svelte/attachments";
 
   let modalEl: HTMLDialogElement;
   let deleteConfirmModal: HTMLDialogElement;
   let modalBox: HTMLElement;
   let dragHandle = $state<HTMLElement | undefined>();
+  let contentContainer = $state<HTMLDivElement | undefined>();
+
+  // Virtualization state
+  let containerScrollY = $state(0);
+  let containerHeight = $state(0);
+  let cardHeights = new SvelteMap<number, number>();
 
   // Dragging state
   let translateX = $state(0);
   let translateY = $state(0);
   let isDragging = $state(false);
   let activePointerId: number | null = null;
-  let startClientY = 0;
-  let startHeight = 0;
-
-  const modalStyle = $derived(
-    `transform: translate(${translateX}px, ${translateY}px); transition: ${isDragging ? "none" : "transform 180ms ease"}; touch-action: ${isMobileValue ? "none" : "auto"};`
-  );
-
-  function clamp(n: number, min: number, max: number): number {
-    return Math.max(min, Math.min(max, n));
-  }
-
-  function startDrag(e: PointerEvent): void {
-    if (e.button && e.button !== 0) return;
-    if (!modalBox || !dragHandle) return;
-    if (!dragHandle.contains(e.target as Node)) return;
-    try {
-      dragHandle.setPointerCapture(e.pointerId);
-    } catch {
-      // ignore
-    }
-    activePointerId = e.pointerId;
-    isDragging = true;
-    startClientY = e.clientY;
-    if (isMobile()) {
-      startHeight = modalBox?.clientHeight || 0;
-    }
-    window.addEventListener("pointermove", onPointerMove);
-    window.addEventListener("pointerup", onPointerUp);
-    e.preventDefault();
-  }
-
-  function onPointerMove(e: PointerEvent): void {
-    if (!isDragging) return;
-    if (activePointerId !== null && e.pointerId !== activePointerId) return;
-    if (!modalBox) return;
-    if (isMobile()) {
-      const vh = window.innerHeight;
-      const minH = Math.round(vh * 0.25);
-      const maxH = Math.round(vh * 0.95);
-      const dy = e.clientY - startClientY;
-      let newH = startHeight - dy;
-      newH = clamp(newH, minH, maxH);
-      translateX = 0;
-      translateY = 0;
-      try {
-        modalBox.style.setProperty("height", `${newH}px`, "important");
-      } catch {
-        modalBox.style.height = `${newH}px`;
-      }
-      return;
-    }
-  }
-
-  function onPointerUp(e: PointerEvent): void {
-    if (!isDragging) return;
-    try {
-      if (typeof e.pointerId !== "undefined")
-        dragHandle?.releasePointerCapture(e.pointerId);
-    } catch (err) {
-      void err;
-    }
-    isDragging = false;
-    activePointerId = null;
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
-    if (isMobile()) {
-      const releaseDy = e.clientY - startClientY;
-      if (releaseDy > 150) {
-        closeModal();
-        if (modalBox) modalBox.style.removeProperty("height");
-      }
-    }
-  }
-
-  function resetPosition(): void {
-    translateX = 0;
-    translateY = 0;
-    try {
-      if (modalBox) modalBox.style.removeProperty("height");
-    } catch {
-      // ignore
-    }
-  }
+  let startClientX = $state(0);
+  let startClientY = $state(0);
+  let startHeight = $state(0);
 
   // loading mirrors the central store isSyncing to ensure UI reflects store activity
-  let loading = $state(false);
+  let loading = $derived(bookmarkStore.isSyncing);
   let error = $state("");
   const showCopySuccess = $state(false);
   let isOffline = $state(false);
@@ -136,201 +56,400 @@
   const removingIds = $state(new SvelteSet<number>());
   const now = $state(new SvelteDate());
 
-  const STALE_THRESHOLD = 5 * 60 * 1000;
-
-  // Virtualization state for saved jobs list
-  const ITEM_HEIGHT = 240;
-  const GAP = 12;
-
-  let contentEl = $state<HTMLElement | null>(null);
-  let scrollY = $state(0);
-  let innerW = $state(0);
-  let innerH = $state(0);
-  // Search state for filtering saved jobs (title and company)
-  let searchQuery = $state("");
-  let isSearchOpen = $state(false);
-  let searchInput = $state<HTMLInputElement | null>(null);
-
-  let virtualState = $state({
-    itemsPerRow: 1,
-    totalRows: 0,
-    rowHeight: ITEM_HEIGHT + GAP,
-    sectionTop: 0,
-    startRow: 0,
-    endRow: 0,
-    startIndex: 0,
-    endIndex: 0,
-    visibleJobs: [] as CardJob[] &
-      {
-        deadlineInfo: { text: string; style: string };
-        statusInfo: { label: string; color: string };
-        timeAgo: string;
-      }[],
-    totalHeight: 0,
-  });
-
-  function onScroll(): void {
-    if (!contentEl) return;
-    scrollY = contentEl.scrollTop;
-  }
-
-  $effect(() => {
-    timeEffect(now);
-  });
-
   // Store bindings
   const savedJobs = $derived(bookmarkStore.jobs);
   const warning = $derived(bookmarkStore.warning);
   const deletedJobs = $derived(bookmarkStore.deletedJobs);
   const lastSyncTime = $derived(bookmarkStore.lastSyncTime);
 
-  const displayedSavedJobs = $derived(
-    savedJobs.map((job) => ({
-      ...job,
-      timeAgo: generalStore.useTimeAgo(job.post_time, now)(),
-      deadlineInfo: job.deadline
-        ? generalStore.useDeadline(job.deadline, now)()
-        : { text: "", style: "" },
-      statusInfo: job.status_pekerjaan
-        ? generalStore.useStatusJob(Number(job.status_pekerjaan))
-        : { label: "", color: "" },
-    }))
-  );
+  const STALE_THRESHOLD = 5 * 60 * 1000;
 
-  // Filter displayedSavedJobs by searchQuery (title or nama_perusahaan)
-  const filteredDisplayedJobs = $derived(
-    displayedSavedJobs.filter((job) => {
+  // Search state for filtering saved jobs (title and company)
+  let searchQuery = $state("");
+  let isSearchOpen = $state(false);
+  let searchInput = $state<HTMLInputElement | null>(null);
+
+  // Bookmark for medium-heavy data operations
+  class BookmarkHandler {
+    async fetchJobs(forceRefresh = false): Promise<void> {
+      if (!forceRefresh && savedJobs.length === 0) {
+        return;
+      }
+      const now = Date.now();
+      const isStale = now - lastSyncTime > STALE_THRESHOLD;
+      if (!forceRefresh && !isStale && savedJobs.length > 0) return;
+      if (loading) return;
+      loading = true;
+      error = "";
+      isOffline = false;
+      try {
+        await bookmarkStore.syncWithAPI();
+      } catch {
+        error = "Gagal memuat data. Silakan coba lagi.";
+        isOffline = !navigator.onLine;
+      } finally {
+        loading = false;
+      }
+    }
+
+    async removeBookmark(id: number): Promise<void> {
+      removingIds.add(id);
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await bookmarkStore.removeJob(id);
+      removingIds.delete(id);
+    }
+
+    handleDeleteAll(): void {
+      showDeleteConfirm = true;
+    }
+
+    async confirmDeleteAll(): Promise<void> {
+      showDeleteConfirm = false;
+      savedJobs.forEach((job) => {
+        if (job.id) removingIds.add(job.id);
+      });
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      loading = true;
+      try {
+        await bookmarkStore.clearAll();
+        removingIds.clear();
+      } catch {
+        error = "Gagal menghapus semua bookmark. Silakan coba lagi.";
+        removingIds.clear();
+      } finally {
+        loading = false;
+      }
+    }
+
+    cancelDeleteAll(): void {
+      showDeleteConfirm = false;
+    }
+
+    handleClearDeleted(): void {
+      bookmarkStore.clearDeleted();
+    }
+
+    handleRefresh(): Promise<void> {
+      return bookmarkHandler.fetchJobs(true);
+    }
+
+    displayedSavedJobs = $derived.by(() => {
+      return savedJobs.map((job) => ({
+        ...job,
+        timeAgo: generalStore.useTimeAgo(job.post_time, now)(),
+        deadlineInfo: job.deadline
+          ? generalStore.useDeadline(job.deadline, now)()
+          : { text: "", style: "" },
+        statusInfo: job.status_pekerjaan
+          ? generalStore.useStatusJob(Number(job.status_pekerjaan))
+          : { label: "", color: "" },
+      }));
+    });
+
+    filteredDisplayedJobs = $derived.by(() => {
       const q = String(searchQuery || "")
         .trim()
         .toLowerCase();
-      if (!q) return true;
-      const title = String(job.title || "").toLowerCase();
-      const company = String(job.nama_perusahaan || "").toLowerCase();
-      return title.includes(q) || company.includes(q);
-    })
+      if (!q) return this.displayedSavedJobs;
+      return this.displayedSavedJobs.filter((job) => {
+        const title = String(job.title || "").toLowerCase();
+        const company = String(job.nama_perusahaan || "").toLowerCase();
+        return title.includes(q) || company.includes(q);
+      });
+    });
+  }
+
+  class VirtualizationManager {
+    // Virtualized jobs computation
+    virtualizedJobs = $derived.by(() => {
+      return Virtualization.computeList({
+        displayJobs: bookmarkHandler.filteredDisplayedJobs,
+        scrollY: containerScrollY,
+        containerHeight: containerHeight,
+        cardHeights: cardHeights,
+        fallbackHeight: 200,
+        gap: 12,
+        buffer: 2,
+      });
+    });
+
+    // measure card height and update top-level cardHeights (lazy: only measures visible cards)
+    measureHeight =
+      (jobId: number): Attachment<HTMLElement> =>
+      (node: HTMLElement) => {
+        const updateHeight = () => {
+          const height = node.offsetHeight;
+          if (height > 0 && cardHeights.get(jobId) !== height) {
+            cardHeights.set(jobId, height);
+            // Trigger reactivity update
+            cardHeights = new SvelteMap(cardHeights);
+          }
+        };
+
+        updateHeight();
+
+        const timeoutId = setTimeout(updateHeight, 100);
+
+        return () => {
+          clearTimeout(timeoutId);
+        };
+      };
+
+    // Update container dimensions
+    updateContainerDimensions() {
+      if (!contentContainer) return;
+
+      // Measure on next animation frame to ensure layout is complete (dialog might be animating)
+      requestAnimationFrame(() => {
+        try {
+          const height =
+            contentContainer?.clientHeight ||
+            contentContainer?.getBoundingClientRect().height ||
+            0;
+          if (height !== containerHeight) {
+            containerHeight = height;
+          }
+
+          // Also capture current scroll position so virtualization can compute visible items immediately
+          const scrollTop = contentContainer?.scrollTop || 0;
+          if (scrollTop !== containerScrollY) {
+            containerScrollY = scrollTop;
+          }
+        } catch (e) {
+          void e;
+        }
+      });
+    }
+
+    // Clear card heights that are no longer displayed
+    get clearCardHeights(): SvelteMap<number, number> {
+      const currentJobIds = new SvelteSet(
+        bookmarkHandler.filteredDisplayedJobs.map(
+          (job: CardJob) => job.id || 0,
+        ),
+      );
+      const heightsToKeep = new SvelteMap<number, number>();
+      for (const [jobId, height] of cardHeights) {
+        if (currentJobIds.has(jobId)) {
+          heightsToKeep.set(jobId, height);
+        }
+      }
+      if (heightsToKeep.size !== cardHeights.size) {
+        $inspect("VirtualizationManager.clearCardHeights", {
+          before: cardHeights,
+          after: heightsToKeep,
+        });
+        cardHeights = heightsToKeep;
+      }
+      return cardHeights;
+    }
+  }
+
+  class BookmarkUtilities {
+    static get formattedLastSync() {
+      const val = lastSyncTime;
+      const n = Number(val);
+      if (!n || Number.isNaN(n)) return "";
+      try {
+        return new Date(n).toLocaleString("en-GB", {
+          year: "numeric",
+          month: "numeric",
+          day: "numeric",
+          hour: "numeric",
+          minute: "numeric",
+          hour12: true,
+        });
+      } catch {
+        return "";
+      }
+    }
+  }
+
+  export const bookmarkHandler = new BookmarkHandler();
+  export const virtualizationManager = new VirtualizationManager();
+</script>
+
+<script lang="ts">
+  let { open = $bindable() } = $props<{ open: boolean }>();
+
+  /**
+   * UI Specific Modal Handler
+   */
+  class ModalHandler {
+    startDrag = (e: PointerEvent): void => {
+      if (e.button && e.button !== 0) return;
+      if (!modalBox || !dragHandle) return;
+      if (!dragHandle.contains(e.target as Node)) return;
+      try {
+        dragHandle.setPointerCapture(e.pointerId);
+      } catch {
+        // ignore
+      }
+      activePointerId = e.pointerId;
+      isDragging = true;
+      startClientX = e.clientX;
+      startClientY = e.clientY;
+      if (isMobile()) {
+        startHeight = modalBox?.clientHeight || 0;
+      }
+      window.addEventListener("pointermove", this.onPointerMove);
+      window.addEventListener("pointerup", this.onPointerUp);
+      e.preventDefault();
+    };
+
+    onPointerMove = (e: PointerEvent): void => {
+      if (!isDragging) return;
+      if (activePointerId !== null && e.pointerId !== activePointerId) return;
+      if (!modalBox) return;
+      if (isMobile()) {
+        const dy = e.clientY - startClientY;
+        const newH = startHeight - dy;
+        translateX = 0;
+        translateY = 0;
+        try {
+          modalBox.style.setProperty("height", `${newH}px`, "important");
+        } catch {
+          modalBox.style.height = `${newH}px`;
+        }
+        return;
+      } else {
+        translateX = e.clientX - startClientX;
+        translateY = e.clientY - startClientY;
+      }
+    };
+
+    onPointerUp = (e: PointerEvent): void => {
+      if (!isDragging) return;
+      try {
+        if (typeof e.pointerId !== "undefined")
+          dragHandle?.releasePointerCapture(e.pointerId);
+      } catch (err) {
+        void err;
+      }
+      isDragging = false;
+      activePointerId = null;
+      window.removeEventListener("pointermove", this.onPointerMove);
+      window.removeEventListener("pointerup", this.onPointerUp);
+    };
+    resetPosition(): void {
+      translateX = 0;
+      translateY = 0;
+      try {
+        if (modalBox) modalBox.style.removeProperty("height");
+      } catch {
+        // ignore
+      }
+    }
+
+    handleKeydown = (e: KeyboardEvent): void => {
+      if (e.key === "Escape" && open) this.closeModal();
+    };
+
+    async handleJobClick(job: CardJob): Promise<void> {
+      this.closeModal();
+
+      // Navigate to job detail page
+      if (job.permalink) {
+        const url = new URL(job.permalink, routeStore.currentUrl.origin);
+        void GlobalNavigateTo(url.pathname + url.search + url.hash);
+      }
+    }
+
+    closeModal(): void {
+      open = false;
+    }
+
+    portalDialog(append: boolean = true): void {
+      if (typeof document === "undefined") return;
+      const appContainer = document.querySelector(isAppEl) ?? document.body;
+      switch (append) {
+        case true:
+          if (modalEl && modalEl.parentElement !== appContainer) {
+            appContainer.appendChild(modalEl);
+          }
+          if (
+            deleteConfirmModal &&
+            deleteConfirmModal.parentElement !== appContainer
+          ) {
+            appContainer.appendChild(deleteConfirmModal);
+          }
+          break;
+        case false:
+          if (modalEl && modalEl.parentElement === appContainer) {
+            appContainer.removeChild(modalEl);
+          }
+          if (
+            deleteConfirmModal &&
+            deleteConfirmModal.parentElement === appContainer
+          ) {
+            appContainer.removeChild(deleteConfirmModal);
+          }
+      }
+    }
+    get layoutBreakpoint() {
+      const w = window.innerWidth;
+      if (w < 640) return "mobile";
+      if (w < 1024) return "tablet";
+      return "desktop";
+    }
+
+    // Handle scroll events on the content container
+    handleContentScroll = (e: Event): void => {
+      const target = e.target as HTMLDivElement;
+      containerScrollY = target.scrollTop;
+    };
+  }
+
+  const modalHandler = new ModalHandler();
+
+  const isMobileValue = $derived.by(() => isMobile());
+
+  const modalStyle = $derived(
+    `transform: translate(${translateX}px, ${translateY}px); touch-action: ${isMobileValue ? "none" : "auto"};`,
   );
 
-  // Layout breakpoint derived from modal width: mobile, tablet, desktop
-  const layoutBreakpoint = $derived.by(() => {
-    const w = Number(innerW) || window.innerWidth;
-    if (w < 640) return "mobile";
-    if (w < 1024) return "tablet";
-    return "desktop";
-  });
+  // Virtualized jobs for rendering
+  const virtualizedJobs = $derived(virtualizationManager.virtualizedJobs);
 
   // Only collapse action buttons on small (mobile) layouts when search is active
   const shouldCollapseActions = $derived.by(() => {
-    return isSearchOpen && layoutBreakpoint === "mobile";
+    return isSearchOpen && modalHandler.layoutBreakpoint === "mobile";
   });
 
-  const formattedLastSync = $derived(() => {
-    const val = lastSyncTime;
-    const n = Number(val);
-    if (!n || Number.isNaN(n)) return "";
-    try {
-      return new Date(n).toLocaleString("en-GB", {
-        year: "numeric",
-        month: "numeric",
-        day: "numeric",
-        hour: "numeric",
-        minute: "numeric",
-        hour12: true,
-      });
-    } catch {
-      return "";
-    }
+  // Ensure we re-measure when the modal is opened so virtualization has correct container size
+  $effect(() => {
+    if (!open) return;
+
+    // Small delay to allow dialog show animation / placement into DOM, then measure
+    setTimeout(() => {
+      virtualizationManager.updateContainerDimensions();
+      // Double-check on next frame as layout may still settle
+      requestAnimationFrame(virtualizationManager.updateContainerDimensions);
+      // Force read of scrollTop to trigger reactivity if needed
+      containerScrollY = contentContainer?.scrollTop ?? 0;
+    }, 50);
   });
 
-  async function fetchJobs(forceRefresh = false): Promise<void> {
-    if (!forceRefresh && savedJobs.length === 0) {
-      return;
-    }
-    const now = Date.now();
-    const isStale = now - lastSyncTime > STALE_THRESHOLD;
-    if (!forceRefresh && !isStale && savedJobs.length > 0) return;
-    // do not start a new sync if one is already in progress
-    if (loading) return;
-    loading = true;
-    error = "";
-    isOffline = false;
-    try {
-      await bookmarkStore.syncWithAPI();
-    } catch {
-      error = "Gagal memuat data. Silakan coba lagi.";
-      isOffline = !navigator.onLine;
-    } finally {
-      loading = false;
-    }
-  }
-
-  function handleRefresh(): Promise<void> {
-    return fetchJobs(true);
-  }
-
-  function handleDeleteAll(): void {
-    showDeleteConfirm = true;
-  }
-
-  async function confirmDeleteAll(): Promise<void> {
-    showDeleteConfirm = false;
-    savedJobs.forEach((job) => {
-      if (job.id) removingIds.add(job.id);
+  $effect(() => {
+    requestAnimationFrame(() => {
+      virtualizationManager.clearCardHeights;
     });
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    loading = true;
-    try {
-      await bookmarkStore.clearAll();
-      removingIds.clear();
-    } catch {
-      error = "Gagal menghapus semua bookmark. Silakan coba lagi.";
-      removingIds.clear();
-    } finally {
-      loading = false;
-    }
-  }
-
-  function cancelDeleteAll(): void {
-    showDeleteConfirm = false;
-  }
-
-  async function removeBookmark(id: number): Promise<void> {
-    removingIds.add(id);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    await bookmarkStore.removeJob(id);
-    removingIds.delete(id);
-  }
-
-  function handleClearDeleted(): void {
-    bookmarkStore.clearDeleted();
-  }
-
-  function closeModal(): void {
-    open = false;
-  }
-
-  async function handleJobClick(job: CardJob): Promise<void> {
-    // Close modal first
-    closeModal();
-
-    // Navigate to job detail page
-    if (job.permalink) {
-      const url = new URL(job.permalink, window.location.origin);
-      void GlobalNavigateTo(url.pathname + url.search + url.hash);
-    }
-  }
-
-  function handleKeydown(e: KeyboardEvent): void {
-    if (e.key === "Escape" && open) closeModal();
-  }
-
-  $effect(() => {
-    loading = bookmarkStore.isSyncing;
   });
 
   $effect(() => {
+    timeEffect() //;
+    // React to showDeleteConfirm changes to control the delete confirmation modal
+    if (showDeleteConfirm) {
+      if (!deleteConfirmModal?.open) deleteConfirmModal?.showModal();
+    } else {
+      deleteConfirmModal?.close();
+    }
+  });
+
+  onMount(() => {
     if (open) {
       bookmarkStore.flushSync();
-      fetchJobs();
+      bookmarkHandler.fetchJobs();
       if (!modalEl?.open) modalEl?.showModal();
       if (isMobileValue && modalBox) {
         const vh = window.innerHeight;
@@ -339,73 +458,36 @@
       }
     } else {
       modalEl?.close();
-      resetPosition();
+      modalHandler.resetPosition();
     }
 
-    if (open && layoutBreakpoint === "desktop" && !isSearchOpen) {
+    if (open && modalHandler.layoutBreakpoint === "desktop" && !isSearchOpen) {
       isSearchOpen = true;
-      // focus after render
-      setTimeout(() => searchInput?.focus(), 0);
+      searchInput?.focus();
     }
-  });
 
-  // Recompute virtualization whenever sizes, scroll or data changes
-  $effect(() => {
-    innerW = modalBox ? modalBox.clientWidth : window.innerWidth;
-    innerH = contentEl ? contentEl.clientHeight : window.innerHeight;
-
-    virtualState = Virtualization.computeGrid({
-      displayJobs: filteredDisplayedJobs,
-      innerWidth: innerW,
-      innerHeight: innerH,
-      scrollY,
-      sectionTop: 0,
-      itemHeight: ITEM_HEIGHT,
-      gap: GAP,
-      buffer: 2,
-    });
-  });
-
-  $effect(() => {
-    if (showDeleteConfirm) {
-      if (!deleteConfirmModal?.open) deleteConfirmModal?.showModal();
-    } else {
-      deleteConfirmModal?.close();
+    document.addEventListener("keydown", modalHandler.handleKeydown);
+    window.addEventListener(
+      "resize",
+      virtualizationManager.updateContainerDimensions,
+    );
+    if (open) {
+      open = true;
+      // Update dimensions after mount
+      setTimeout(() => virtualizationManager.updateContainerDimensions(), 0);
     }
-  });
 
-  // ResizeObserver to detect modal/content size changes (used for virtualization)
-  let resizeObserver: ResizeObserver | null = null;
-  let resizeObserverCallback: (() => void) | null = null;
-
-  function updateSizes(): void {
-    innerW = modalBox ? modalBox.clientWidth : window.innerWidth;
-    innerH = contentEl ? contentEl.clientHeight : window.innerHeight;
-  }
-
-  onMount(() => {
-    document.addEventListener("keydown", handleKeydown);
-
-    // initial set
-    updateSizes();
-
-    // Throttled update using rAF to avoid layout thrashing
-    resizeObserverCallback = () => requestAnimationFrame(updateSizes);
-
-    if (typeof ResizeObserver !== "undefined") {
-      resizeObserver = new ResizeObserver(resizeObserverCallback);
-      if (modalBox) resizeObserver.observe(modalBox);
-      if (contentEl) resizeObserver.observe(contentEl);
-    } else {
-      // Fallback to window resize if ResizeObserver isn't available
-      window.addEventListener("resize", resizeObserverCallback);
-    }
+    modalHandler.portalDialog(true);
   });
 
   onDestroy(() => {
-    document.removeEventListener("keydown", handleKeydown);
-    window.removeEventListener("pointermove", onPointerMove);
-    window.removeEventListener("pointerup", onPointerUp);
+    document.removeEventListener("keydown", modalHandler.handleKeydown);
+    window.removeEventListener(
+      "resize",
+      virtualizationManager.updateContainerDimensions,
+    );
+    window.removeEventListener("pointermove", modalHandler.onPointerMove);
+    window.removeEventListener("pointerup", modalHandler.onPointerUp);
 
     try {
       if (dragHandle && activePointerId !== null)
@@ -414,22 +496,9 @@
       void e;
     }
 
-    // Cleanup ResizeObserver / fallback listener
-    try {
-      if (resizeObserver) {
-        if (modalBox) resizeObserver.unobserve(modalBox);
-        if (contentEl) resizeObserver.unobserve(contentEl);
-        resizeObserver.disconnect();
-        resizeObserver = null;
-      } else if (resizeObserverCallback) {
-        window.removeEventListener("resize", resizeObserverCallback);
-      }
-    } catch (e) {
-      void e;
-    }
+    modalHandler.resetPosition();
 
-    resizeObserverCallback = null;
-    resetPosition();
+    modalHandler.portalDialog(false);
   });
 </script>
 
@@ -443,14 +512,14 @@
     class="modal-box p-0 flex flex-col relative max-h-[80vh] rounded-t-xl overflow-hidden md:mx-auto md:!max-w-3xl md:z-60 md:rounded-b-xl"
     class:mobile-sheet={isMobileValue}
     style={modalStyle}
-    onpointerdown={startDrag}
+    onpointerdown={modalHandler.startDrag}
   >
     <!-- Drag Handle -->
     {#if isMobileValue}
       <div
         bind:this={dragHandle}
         class="drag-handle !w-12 !h-2 bg-base-content/20 rounded-full mx-auto mt-3 mb-2 cursor-grab active:cursor-grabbing touch-none select-none transition-colors duration-200 hover:bg-base-content/30 active:bg-base-content/40 md:bg-base-content/15 md:hover:bg-base-content/25 md:active:bg-base-content/35"
-        onpointerdown={startDrag}
+        onpointerdown={modalHandler.startDrag}
         aria-label="Drag to resize modal"
         role="button"
         tabindex="0"
@@ -480,7 +549,7 @@
           </div>
 
           <button
-            onclick={closeModal}
+            onclick={() => modalHandler.closeModal()}
             class="btn btn-xs btn-info rounded-full w-auto whitespace-nowrap"
             aria-label="Tutup dialog"
             title="close modal"
@@ -550,7 +619,7 @@
             {#if !shouldCollapseActions}
               {#if !loading && savedJobs.length > 0}
                 <button
-                  onclick={handleDeleteAll}
+                  onclick={bookmarkHandler.handleDeleteAll}
                   disabled={loading}
                   class="btn btn-ghost btn-sm md:btn-md text-error w-auto whitespace-nowrap"
                   aria-label="hapus semua"
@@ -560,7 +629,7 @@
                   Hapus Semua
                 </button>
                 <button
-                  onclick={handleRefresh}
+                  onclick={bookmarkHandler.handleRefresh}
                   disabled={loading}
                   class="btn btn-ghost btn-sm md:btn-md w-auto whitespace-nowrap"
                   aria-label="sync ke server"
@@ -578,9 +647,9 @@
 
     <!-- Content -->
     <div
-      bind:this={contentEl}
-      onscroll={onScroll}
+      bind:this={contentContainer}
       class="flex-1 overflow-y-auto max-h-full px-6 py-4"
+      onscroll={modalHandler.handleContentScroll}
     >
       <!-- Loading State -->
       {#if loading}
@@ -623,277 +692,260 @@
 
         <!-- Saved Jobs -->
       {:else}
-        <div>
-          {#if savedJobs.length > 0}
-            <div class="mb-6">
-              <div
-                class="flex flex-row items-center justify-between break-words whitespace-normal"
-              >
-                <h4 class="font-semibold text-md">
-                  Tersedia ({savedJobs.length})
-                </h4>
-                {#if lastSyncTime > 0 && !loading}
-                  <div class="text-xs font-semibold flex flex-col">
-                    <span class="mb-1 flex items-center gap-1"
-                      >Terakhir sync:</span
-                    >
-                    <span>{formattedLastSync()}</span>
-                  </div>
-                {/if}
-              </div>
-
-              <div class="relative mt-3">
-                <div
-                  style="height: {virtualState.totalHeight}px; position: relative;"
-                >
-                  <div
-                    style="position: absolute; left:0; right:0; top:0; transform: translateY({virtualState.startRow *
-                      virtualState.rowHeight}px);"
+        {#if savedJobs.length > 0}
+          <div class="mb-6">
+            <div
+              class="flex flex-row items-center justify-between break-words whitespace-normal mb-2"
+            >
+              <h4 class="font-semibold text-md">
+                Tersedia ({savedJobs.length})
+              </h4>
+              {#if lastSyncTime > 0 && !loading}
+                <div class="text-xs font-semibold flex flex-col">
+                  <span class="mb-1 flex items-center gap-1"
+                    >Terakhir sync:</span
                   >
-                    {#each virtualState.visibleJobs as job (job.id)}
-                      <div
-                        class="card bg-base-300 shadow-sm hover:shadow-md transition-all duration-300 mb-3"
-                        class:scale-95={removingIds.has(job.id || 0)}
-                        out:fade={{ duration: 200 }}
-                      >
-                        <div class="card-body p-4">
-                          {#if job.title === ""}
-                            <div class="animate-pulse">
-                              <div
-                                class="flex items-start justify-between gap-3"
-                              >
-                                <div class="flex-1 min-w-1">
-                                  <div
-                                    class="h-4 bg-base-content/20 rounded mb-2"
-                                  ></div>
-                                  <div
-                                    class="h-3 bg-base-content/20 rounded mb-2 w-3/4"
-                                  ></div>
-                                  <div
-                                    class="flex flex-wrap gap-x-4 gap-y-1 mb-2"
-                                  >
-                                    <div
-                                      class="h-3 bg-base-content/20 rounded w-20"
-                                    ></div>
-                                    <div
-                                      class="h-3 bg-base-content/20 rounded w-16"
-                                    ></div>
-                                    <div
-                                      class="h-3 bg-base-content/20 rounded w-24"
-                                    ></div>
-                                  </div>
-                                  <div class="mt-2">
-                                    <div
-                                      class="h-3 bg-base-content/20 rounded w-32 mb-2"
-                                    ></div>
-                                    <div
-                                      class="h-3 bg-base-content/20 rounded w-28"
-                                    ></div>
-                                  </div>
-                                </div>
-                                <div class="flex flex-col gap-1">
-                                  <div
-                                    class="h-8 w-8 bg-base-content/20 rounded"
-                                  ></div>
-                                </div>
-                              </div>
-                            </div>
-                          {:else}
-                            <div class="flex items-start justify-between gap-3">
-                              <div class="flex-1 min-w-0">
-                                <p
-                                  class="text-md font-bold text-base flex items-center gap-2 mb-1"
-                                >
-                                  <button
-                                    onclick={() => handleJobClick(job)}
-                                    class="hover:text-[var(--wpl-global-color-1)] transition-colors text-left w-full"
-                                    aria-label={`View job details for ${job.title}`}
-                                  >
-                                    {job.title}
-                                  </button>
-                                </p>
-                                {#if !job.nama_perusahaan}
-                                  <div class="divider mt-0"></div>
-                                {/if}
+                  <span>{BookmarkUtilities.formattedLastSync}</span>
+                </div>
+              {/if}
+            </div>
 
-                                {#if job.nama_perusahaan}
-                                  <p
-                                    class="text-md font-semibold mb-6 flex items-center gap-2"
-                                  >
-                                    <UserTieSolid
-                                      class="h-4 w-4 text-[var(--wpl-global-color-1)] inline-block"
+            <div
+              class="relative"
+              style="height: {virtualizedJobs.totalHeight}px;"
+            >
+              {#each virtualizedJobs.visibleJobs as job, idx (job.id)}
+                {@const absoluteIndex = virtualizedJobs.startIndex + idx}
+                {@const topPosition =
+                  virtualizedJobs.itemPositions[absoluteIndex] || 0}
+                <div
+                  class="card bg-base-300 shadow-sm hover:shadow-md transition-all duration-300 absolute left-0 right-0"
+                  class:scale-95={removingIds.has(job.id || 0)}
+                  style="transform: translate3d(0, {topPosition}px, 0);"
+                  out:fade={{ duration: 200 }}
+                  {@attach virtualizationManager.measureHeight(job.id || 0)}
+                >
+                  <div class="card-body p-4">
+                    {#if job.title === ""}
+                      <div class="animate-pulse">
+                        <div class="flex items-start justify-between gap-3">
+                          <div class="flex-1 min-w-1">
+                            <div
+                              class="h-4 bg-base-content/20 rounded mb-2"
+                            ></div>
+                            <div
+                              class="h-3 bg-base-content/20 rounded mb-2 w-3/4"
+                            ></div>
+                            <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
+                              <div
+                                class="h-3 bg-base-content/20 rounded w-20"
+                              ></div>
+                              <div
+                                class="h-3 bg-base-content/20 rounded w-16"
+                              ></div>
+                              <div
+                                class="h-3 bg-base-content/20 rounded w-24"
+                              ></div>
+                            </div>
+                            <div class="mt-2">
+                              <div
+                                class="h-3 bg-base-content/20 rounded w-32 mb-2"
+                              ></div>
+                              <div
+                                class="h-3 bg-base-content/20 rounded w-28"
+                              ></div>
+                            </div>
+                          </div>
+                          <div class="flex flex-col gap-1">
+                            <div
+                              class="h-8 w-8 bg-base-content/20 rounded"
+                            ></div>
+                          </div>
+                        </div>
+                      </div>
+                    {:else}
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-0">
+                          <p
+                            class="font-bold text-base flex items-center gap-2 mb-1"
+                          >
+                            <button
+                              onclick={() => modalHandler.handleJobClick(job)}
+                              class="hover:text-[var(--wpl-global-color-1)] transition-colors text-left w-full"
+                              aria-label={`View job details for ${job.title}`}
+                            >
+                              {job.title}
+                            </button>
+                          </p>
+                          {#if !job.nama_perusahaan}
+                            <div class="divider mt-0"></div>
+                          {/if}
+
+                          {#if job.nama_perusahaan}
+                            <p
+                              class="text-base font-semibold mb-6 flex items-center gap-2"
+                            >
+                              <UserTieSolid
+                                class="h-4 w-4 text-[var(--wpl-global-color-1)] inline-block"
+                                aria-hidden="true"
+                              />
+                              {job.nama_perusahaan}
+                            </p>
+                            <div class="divider -mt-4"></div>
+                          {/if}
+
+                          <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
+                            {#each generalStore.useSummaryJob(job.ringkasanPekerjaan) as row}
+                              {#if row.label !== "Deadline"}
+                                {@const Icon = row.icon}
+                                <span
+                                  class="flex items-center text-base md:text-base font-semibold gap-2 py-1"
+                                >
+                                  {#if Icon}
+                                    <Icon
+                                      class="text-[var(--wpl-global-color-1)] w-4 h-4 shrink-0"
                                       aria-hidden="true"
                                     />
-                                    {job.nama_perusahaan}
-                                  </p>
-                                  <div class="divider -mt-4"></div>
-                                {/if}
+                                  {/if}
+                                  <span>{@html row.value}</span>
+                                </span>
+                              {/if}
+                            {/each}
+                          </div>
 
-                                <div
-                                  class="flex flex-wrap gap-x-4 gap-y-1 mb-2"
+                          {#if job.statusInfo.label || job.deadlineInfo.text}
+                            <div class="divider my-2"></div>
+                            <div class="mt-2 inline-block">
+                              {#if job.statusInfo.label}
+                                <span
+                                  class="px-3 py-1 badge font-bold rounded mr-2 {job
+                                    .statusInfo.color}"
                                 >
-                                  {#each generalStore.useSummaryJob(job.ringkasanPekerjaan) as row}
-                                    {#if row.label !== "Deadline"}
-                                      {@const Icon = row.icon}
-                                      <span
-                                        class="flex items-center text-base md:text-base font-semibold gap-2 py-1"
-                                      >
-                                        {#if Icon}
-                                          <Icon
-                                            class="text-[var(--wpl-global-color-1)] w-4 h-4 shrink-0"
-                                            aria-hidden="true"
-                                          />
-                                        {/if}
-                                        <span>{@html row.value}</span>
-                                      </span>
-                                    {/if}
-                                  {/each}
-                                </div>
-
-                                {#if job.statusInfo.label || job.deadlineInfo.text}
-                                  <div class="divider my-2"></div>
-                                  <div class="mt-2 inline-block">
-                                    {#if job.statusInfo.label}
-                                      <span
-                                        class="px-3 py-1 badge font-bold rounded mr-2 {job
-                                          .statusInfo.color}"
-                                      >
-                                        {#if job.statusInfo.label === "Urgent"}
-                                          <ExclamationTriangleSolid
-                                            class="h-4 w-4"
-                                            aria-hidden="true"
-                                          />
-                                        {:else if job.statusInfo.label === "Pinned"}
-                                          <ThumbTackSolid
-                                            class="h-4 w-4"
-                                            aria-hidden="true"
-                                          />
-                                        {/if}
-                                        {job.statusInfo.label}
-                                      </span>
-                                    {/if}
-                                    {#if job.deadlineInfo.text}
-                                      <span
-                                        class="px-3 py-1 badge font-bold rounded {job
-                                          .deadlineInfo.style}"
-                                      >
-                                        <CalendarSolid
-                                          class="h-4 w-4"
-                                          aria-hidden="true"
-                                        />
-                                        <span>{job.deadlineInfo.text}</span>
-                                      </span>
-                                    {/if}
-                                  </div>
-                                {/if}
-
-                                {#if loading}
-                                  <div
-                                    class="flex items-center justify-center py-12"
-                                  >
-                                    <LoadingSpinner
-                                      srLabel="Memuat..."
-                                      size="md"
+                                  {#if job.statusInfo.label === "Urgent"}
+                                    <ExclamationTriangleSolid
+                                      class="h-4 w-4"
+                                      aria-hidden="true"
                                     />
-                                  </div>
-                                {/if}
-                              </div>
-                              <div class="flex flex-col gap-1">
-                                <button
-                                  onclick={() => removeBookmark(job.id || 0)}
-                                  disabled={loading ||
-                                    removingIds.has(job.id || 0)}
-                                  class="btn btn-xs btn-ghost text-error"
-                                  title="Hapus bookmark"
-                                  aria-label="Hapus bookmark untuk {job.title}"
+                                  {:else if job.statusInfo.label === "Pinned"}
+                                    <ThumbTackSolid
+                                      class="h-4 w-4"
+                                      aria-hidden="true"
+                                    />
+                                  {/if}
+                                  {job.statusInfo.label}
+                                </span>
+                              {/if}
+                              {#if job.deadlineInfo.text}
+                                <span
+                                  class="px-3 py-1 badge font-bold rounded {job
+                                    .deadlineInfo.style}"
                                 >
-                                  <TrashAltSolid
+                                  <CalendarSolid
                                     class="h-4 w-4"
                                     aria-hidden="true"
                                   />
-                                </button>
-                              </div>
+                                  <span>{job.deadlineInfo.text}</span>
+                                </span>
+                              {/if}
+                            </div>
+                          {/if}
+
+                          {#if loading}
+                            <div class="flex items-center justify-center py-12">
+                              <LoadingSpinner srLabel="Memuat..." size="md" />
                             </div>
                           {/if}
                         </div>
+                        <div class="flex flex-col gap-1">
+                          <button
+                            onclick={() =>
+                              bookmarkHandler.removeBookmark(job.id || 0)}
+                            disabled={loading || removingIds.has(job.id || 0)}
+                            class="btn btn-xs btn-ghost text-error"
+                            title="Hapus bookmark"
+                            aria-label="Hapus bookmark untuk {job.title}"
+                          >
+                            <TrashAltSolid class="h-4 w-4" aria-hidden="true" />
+                          </button>
+                        </div>
                       </div>
-                    {/each}
-                  </div>
-                </div>
-              </div>
-            </div>
-          {/if}
-
-          <!-- Deleted Jobs -->
-          {#if deletedJobs.length > 0}
-            <div class="space-y-3">
-              <div class="flex items-center justify-between">
-                <h4 class="font-semibold text-sm text-base-content/70">
-                  Tidak Tersedia ({deletedJobs.length})
-                </h4>
-                <button
-                  onclick={handleClearDeleted}
-                  class="btn btn-xs btn-ghost text-error"
-                  aria-label="Clear all deleted jobs"
-                >
-                  Hapus Semua
-                </button>
-              </div>
-              {#each deletedJobs as id (id)}
-                <div
-                  class="card bg-base-300 opacity-60"
-                  out:fade={{ duration: 200 }}
-                >
-                  <div class="card-body p-4">
-                    <div class="flex items-center justify-between">
-                      <div class="flex items-center gap-2">
-                        <ExclamationCircleSolid
-                          class="h-5 w-5 text-error"
-                          aria-hidden="true"
-                        />
-                        <span class="text-sm"
-                          >Lowongan ID #{id} tidak tersedia</span
-                        >
-                      </div>
-                      <button
-                        onclick={() => removeBookmark(id)}
-                        class="btn btn-xs btn-ghost"
-                        title="Hapus dari daftar"
-                        aria-label="Remove from deleted list"
-                      >
-                        <TrashAltSolid class="h-4 w-4" aria-hidden="true" />
-                      </button>
-                    </div>
+                    {/if}
                   </div>
                 </div>
               {/each}
             </div>
-          {/if}
+          </div>
+        {/if}
 
-          <!-- Copy Success Toast -->
-          {#if showCopySuccess}
-            <div class="toast toast-top toast-center z-50">
-              <div class="alert alert-success">
-                <CheckCircleSolid
-                  class="h-6 w-6 stroke-current shrink-0"
-                  aria-hidden="true"
-                />
-                <span>Link berhasil disalin!</span>
-              </div>
+        <!-- Deleted Jobs -->
+        {#if deletedJobs.length > 0}
+          <div class="space-y-3">
+            <div class="flex items-center justify-between">
+              <h4 class="font-semibold text-sm text-base-content/70">
+                Tidak Tersedia ({deletedJobs.length})
+              </h4>
+              <button
+                onclick={bookmarkHandler.handleClearDeleted}
+                class="btn btn-xs btn-ghost text-error"
+                aria-label="Clear all deleted jobs"
+              >
+                Hapus Semua
+              </button>
             </div>
-          {/if}
+            {#each deletedJobs as id (id)}
+              <div
+                class="card bg-base-300 opacity-60"
+                out:fade={{ duration: 200 }}
+              >
+                <div class="card-body p-4">
+                  <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                      <ExclamationCircleSolid
+                        class="h-5 w-5 text-error"
+                        aria-hidden="true"
+                      />
+                      <span class="text-sm"
+                        >Lowongan ID #{id} tidak tersedia</span
+                      >
+                    </div>
+                    <button
+                      onclick={() => bookmarkHandler.removeBookmark(id)}
+                      class="btn btn-xs btn-ghost"
+                      title="Hapus dari daftar"
+                      aria-label="Remove from deleted list"
+                    >
+                      <TrashAltSolid class="h-4 w-4" aria-hidden="true" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
 
-          <!-- Offline Notice -->
-          {#if isOffline}
-            <div class="alert alert-warning mt-4">
-              <ExclamationTriangleSolid
-                class="h-6 w-6 stroke-current shrink-0 text-warning"
+        <!-- Copy Success Toast -->
+        {#if showCopySuccess}
+          <div class="toast toast-top toast-center z-50">
+            <div class="alert alert-success">
+              <CheckCircleSolid
+                class="h-6 w-6 stroke-current shrink-0"
                 aria-hidden="true"
               />
-              <span>Mode offline - menampilkan data tersimpan</span>
+              <span>Link berhasil disalin!</span>
             </div>
-          {/if}
-        </div>
+          </div>
+        {/if}
+
+        <!-- Offline Notice -->
+        {#if isOffline}
+          <div class="alert alert-warning mt-4">
+            <ExclamationTriangleSolid
+              class="h-6 w-6 stroke-current shrink-0 text-warning"
+              aria-hidden="true"
+            />
+            <span>Mode offline - menampilkan data tersimpan</span>
+          </div>
+        {/if}
       {/if}
     </div>
   </div>
@@ -901,9 +953,9 @@
     role="button"
     tabindex="0"
     class="modal-backdrop"
-    onclick={closeModal}
+    onclick={() => modalHandler.closeModal()}
     onkeydown={(e) => {
-      if (e.key === "Enter" || e.key === " ") closeModal();
+      if (e.key === "Enter" || e.key === " ") modalHandler.closeModal();
     }}
   ></div>
 </dialog>
@@ -925,14 +977,14 @@
     </p>
     <div class="modal-action">
       <button
-        onclick={cancelDeleteAll}
+        onclick={bookmarkHandler.cancelDeleteAll}
         class="btn btn-ghost"
         disabled={loading}
       >
         Batal
       </button>
       <button
-        onclick={confirmDeleteAll}
+        onclick={bookmarkHandler.confirmDeleteAll}
         class="btn btn-error"
         disabled={loading}
       >
@@ -947,9 +999,9 @@
     role="button"
     tabindex="0"
     class="modal-backdrop"
-    onclick={cancelDeleteAll}
+    onclick={bookmarkHandler.cancelDeleteAll}
     onkeydown={(e) => {
-      if (e.key === "Enter" || e.key === " ") cancelDeleteAll();
+      if (e.key === "Enter" || e.key === " ") bookmarkHandler.cancelDeleteAll();
     }}
   ></div>
 </dialog>

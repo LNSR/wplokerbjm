@@ -5,15 +5,15 @@ import { routeStore } from '$lib/stores/Route.svelte';
 import { APIService } from '@/services/APIService'
 import { GoogleServices } from "@/services/Google";
 /**
-	 * JobOverlayManager
-	 *
-	 * Central manager for the job overlay UI state and behavior.
-	 * Responsibilities:
-	 * - Track overlay open/close state and currently selected job
-	 * - Fetch job detail data with debounce, timeout and abort handling
-	 * - Provide consistent scrolling to the associated job card
-	 * - Integrate with browser history and SEO updates for desktop
-	 */
+ * JobOverlayManager
+ *
+ * Central manager for the job overlay UI state and behavior.
+ * Responsibilities:
+ * - Track overlay open/close state and currently selected job
+ * - Fetch job detail data with debounce, timeout and abort handling
+ * - Provide consistent scrolling to the associated job card
+ * - Integrate with browser history and SEO updates for desktop
+ */
 export class JobOverlayManager {
 	public overlayOpen = $state(false)
 	public selectedSlug = $state<string | null>(null)
@@ -42,11 +42,11 @@ export class JobOverlayManager {
 		 */
 	constructor() {
 		if (typeof window !== "undefined") {
-			window.addEventListener('scroll', this.handleScroll.bind(this), { passive: true })
+			window.addEventListener('scroll', this.handleScroll, { passive: true })
 		}
 	}
 
-	private handleScroll(): void {
+	private handleScroll = (): void => {
 		this.isScrolling = true
 		if (this.scrollTimeout) clearTimeout(this.scrollTimeout)
 		this.scrollTimeout = setTimeout(() => {
@@ -55,16 +55,29 @@ export class JobOverlayManager {
 	}
 
 	/**
-		 * Open the overlay for a job.
-		 *
-		 * @param slug - The job slug to open
-		 * @param job - Optional job object to set as the selected job immediately
-		 *
-		 * Notes:
-		 * - On desktop this will replace the current history entry with the
-		 *   job permalink path and trigger SEO/head updates.
-		 * - The job detail fetch is started in a debounced manner.
-		 */
+	 * Remove any listeners/timeouts when this manager is no longer needed.
+	 */
+	public destroy = (): void => {
+		if (typeof window !== "undefined") {
+			window.removeEventListener('scroll', this.handleScroll)
+		}
+		if (this.scrollTimeout) {
+			clearTimeout(this.scrollTimeout)
+			this.scrollTimeout = null
+		}
+	}
+
+	/**
+	 * Open the overlay for a job.
+	 *
+	 * @param slug - The job slug to open
+	 * @param job - Optional job object to set as the selected job immediately
+	 *
+	 * Notes:
+	 * - On desktop this will replace the current history entry with the
+	 *   job permalink path and trigger SEO/head updates.
+	 * - The job detail fetch is started in a debounced manner.
+	 */
 	public openOverlay(slug: string, job?: CardJob): void {
 		this.selectedSlug = slug
 		this.selectedJob = job ?? null
@@ -76,19 +89,31 @@ export class JobOverlayManager {
 			const isDesktop = !isMobile();
 
 			if (job && job.permalink && isDesktop) {
-				const url = new URL(job.permalink, window.location.origin);
+				const url = new URL(job.permalink, routeStore.currentUrl.origin);
 				const path = url.pathname + url.search + url.hash;
-				window.history.replaceState({}, "", path);
 
-				routeStore.setIsInitialLoad(false); // Mark that initial load is done
+			// Temporarily opt-out the route container from view-transition so
+			// changing history here (replaceState) does not trigger a document
+			// transition animation unintended for overlays.
+			const routeContainer = typeof document !== 'undefined' ? document.querySelector('.route-container') as HTMLElement | null : null;
+			if (routeContainer) routeContainer.setAttribute('data-no-view-transition', 'true');
 
+			window.history.replaceState({}, "", path);
+
+			// Remove the flag after a couple of frames to be safe
+			requestAnimationFrame(() => {
+				requestAnimationFrame(() => {
+					if (routeContainer) routeContainer.removeAttribute('data-no-view-transition');
+				});
+			});
 				utilsSEO.fetchHeadData(path).then(() => {
+					void utilsSEO.clearPendingJobSchemas();
 					void utilsSEO.removeJobPostingJsonLd();
-					GoogleServices.sendPageView(path, 'overlay_page_view');
+					void utilsSEO.addJobPostingJsonLd([job.id] as number[]);
 				}).catch(() => {
 					console.error('Failed to fetch head data for overlay open to', path);
 				}).finally(() => {
-					void utilsSEO.addJobPostingJsonLd([job.id] as number[]);
+					GoogleServices.sendPageView(path, 'overlay_page_view');
 				});
 			}
 
@@ -98,13 +123,13 @@ export class JobOverlayManager {
 	}
 
 	/**
-		 * Close the overlay and reset internal state.
-		 *
-		 * @param ids - Optional list of job IDs to re-add to JSON-LD when closing
-		 *
-		 * This method aborts any pending fetch, clears cached overlay state and
-		 * restores the canonical site URL on desktop.
-		 */
+	 * Close the overlay and reset internal state.
+	 *
+	 * @param ids - Optional list of job IDs to re-add to JSON-LD when closing
+	 *
+	 * This method aborts any pending fetch, clears cached overlay state and
+	 * restores the canonical site URL on desktop.
+	 */
 	public closeOverlay(ids?: number[]): void {
 		requestAnimationFrame(() => {
 			this.overlayOpen = false
@@ -117,17 +142,43 @@ export class JobOverlayManager {
 
 			utilsSEO.fetchHeadData("/").then(() => {
 				if (!isMobile()) {
+					void utilsSEO.clearPendingJobSchemas();
 					void utilsSEO.removeJobPostingJsonLd();
-					void utilsSEO.addJobPostingJsonLd(ids ?? []);
+					utilsSEO.addJobPostingJsonLd(ids ?? []);
+
+					// Temporarily opt-out the route container from view-transition when restoring path
+					const routeContainer = typeof document !== 'undefined' ? document.querySelector('.route-container') as HTMLElement | null : null;
+					if (routeContainer) routeContainer.setAttribute('data-no-view-transition', 'true');
 					window.history.replaceState({}, "", "/");
-					GoogleServices.sendPageView("/", 'overlay_page_view');
+					requestAnimationFrame(() => {
+						requestAnimationFrame(() => {
+							if (routeContainer) routeContainer.removeAttribute('data-no-view-transition');
+						});
+					});
 				}
 			}).catch((err) => {
 				console.error('Failed to fetch head data for overlay close to' + " /" + err);
+			}).finally(() => {
+				GoogleServices.sendPageView("/", 'overlay_page_view');
 			});
 		})
 	}
 
+	/**
+	 * Smoothly scroll to the job card for the given slug.
+	 *
+	 * @param slug - The job slug to scroll to; defaults to `this.selectedSlug`
+	 * @param delay - Optional delay in milliseconds before scrolling (default: 220ms)
+	 * @param skipIfScrolling - If true, skip scrolling if user is actively scrolling (default: true)
+	 * @param preferredSource - Preferred source of the card ("carousel" or "grid") when multiple matches exist
+	 *
+	 * Notes:
+	 * - If no slug is provided and `this.selectedSlug` is null, no action is taken.
+	 * - The method attempts to find the closest visible card element matching
+	 *   the slug, preferring the specified source if provided.
+	 * - If no matching element is found, no scrolling occurs to avoid jumping
+	 *   to unrelated sections.
+	 */
 	public scrollToCard(
 		slug?: string,
 		delay = 220,
@@ -207,11 +258,11 @@ export class JobOverlayManager {
 	}
 
 	/**
-		 * Clear overlay fetch state and timers.
-		 *
-		 * Resets any stored overlay response/error flags and clears the debounce timer
-		 * to prevent stale fetches from occurring after the overlay is closed.
-		 */
+	 * Clear overlay fetch state and timers.
+	 *
+	 * Resets any stored overlay response/error flags and clears the debounce timer
+	 * to prevent stale fetches from occurring after the overlay is closed.
+	 */
 	private clearOverlayState(): void {
 		this.overlayData = null
 		this.overlayError = null
@@ -223,14 +274,14 @@ export class JobOverlayManager {
 	}
 
 	/**
-		 * Fetch detailed job data for the provided slug.
-		 *
-		 * Uses a 60 second timeout and treats aborts as non-errors when
-		 * `this.deliberateAbort` is set (e.g., when closing the overlay).
-		 *
-		 * @param slug - The job slug to fetch details for
-		 * @param signal - Optional AbortSignal to cancel the request
-		 */
+	 * Fetch detailed job data for the provided slug.
+	 *
+	 * Uses a 60 second timeout and treats aborts as non-errors when
+	 * `this.deliberateAbort` is set (e.g., when closing the overlay).
+	 *
+	 * @param slug - The job slug to fetch details for
+	 * @param signal - Optional AbortSignal to cancel the request
+	 */
 	private async fetchOverlayData(slug: string, signal?: AbortSignal): Promise<void> {
 		this.overlayLoading = true
 		this.overlayError = null
@@ -263,13 +314,13 @@ export class JobOverlayManager {
 	}
 
 	/**
-		 * Debounce starting a fetch for job detail.
-		 *
-		 * Cancels any previous pending fetch by aborting its controller, resets
-		 * overlay fetch state, and schedules `fetchOverlayData` after 600ms.
-		 *
-		 * @param jobSlug - Slug of the job to fetch
-		 */
+	 * Debounce starting a fetch for job detail.
+	 *
+	 * Cancels any previous pending fetch by aborting its controller, resets
+	 * overlay fetch state, and schedules `fetchOverlayData` after 600ms.
+	 *
+	 * @param jobSlug - Slug of the job to fetch
+	 */
 	private debouncedFetch(jobSlug: string): void {
 		if (!jobSlug) return
 
@@ -290,12 +341,12 @@ export class JobOverlayManager {
 	}
 
 	/**
-		 * Register a popstate listener that closes the overlay on back/forward.
-		 *
-		 * Returns an unsubscribe function that removes the listener.
-		 *
-		 * @returns cleanup function to remove the popstate listener
-		 */
+	 * Register a popstate listener that closes the overlay on back/forward.
+	 *
+	 * Returns an unsubscribe function that removes the listener.
+	 *
+	 * @returns cleanup function to remove the popstate listener
+	 */
 	public setupPopstateListener(): () => void {
 		const handlePopState = () => {
 			if (this.overlayOpen) {
@@ -307,18 +358,17 @@ export class JobOverlayManager {
 	}
 
 	/**
-		 * Close the overlay if it is currently open.
-		 *
-		 * Convenience wrapper that avoids a call to `closeOverlay` when the overlay
-		 * is already closed.
-		 */
+	 * Close the overlay if it is currently open.
+	 *
+	 * Convenience wrapper that avoids a call to `closeOverlay` when the overlay
+	 * is already closed.
+	 */
 	public closeIfOpen(): void {
 		if (this.overlayOpen) {
 			void this.closeOverlay()
 		}
 	}
 
-	// No subscribe needed, use properties directly
 }
 
 export const jobOverlay = new JobOverlayManager()

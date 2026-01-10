@@ -8,7 +8,6 @@ wordpress/wp-content/mu-plugins/*
 !wordpress/wp-content/themes
 wordpress/wp-content/themes/*
 !wordpress/wp-content/themes/wplokerbjm
-wordpress/wp-content/themes/wplokerbjm/assets/ssg
 **/dist
 **/deploy-manual.sh
 **/.playwright-mcp

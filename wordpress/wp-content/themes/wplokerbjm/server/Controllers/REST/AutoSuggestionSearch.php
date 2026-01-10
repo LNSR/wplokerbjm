@@ -33,7 +33,7 @@ class AutoSuggestionSearch
 
             $uniqueResults = array_values(array_unique($results));
 
-            Cache::set($cacheKey, $uniqueResults, 3600);
+            Cache::set($cacheKey, $uniqueResults, 86400); // Cache for 1 day
 
             return rest_ensure_response($uniqueResults);
         } catch (\Exception $e) {

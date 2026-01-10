@@ -178,16 +178,14 @@ class ThemeInject
      */
     public static function themeData(): array
     {
-        $isSSGBot = SharedUtils::isSsgBotRequest();
-
         $cached = Cache::get(CacheKey::THEME_DATA);
         if ($cached !== false) {
             // Add dynamic disableTracking
-            $cached['disableTracking'] = $isSSGBot || !!is_user_logged_in();
+            $cached['disableTracking'] = !!is_user_logged_in();
             return $cached;
         }
 
-        $disableTracking = $isSSGBot || !!is_user_logged_in();
+        $disableTracking = !!is_user_logged_in();
 
         $logoData = ThemeInject::getLogoData();
         if (empty($logoData['sizes'])) {
@@ -213,7 +211,7 @@ class ThemeInject
         // Cache without disableTracking
         $cacheData = $wpThemeData;
         unset($cacheData['disableTracking']);
-        Cache::set(CacheKey::THEME_DATA, $cacheData, 3600);
+        Cache::set(CacheKey::THEME_DATA, $cacheData, 86400); // Cache for 1 day
 
         return $wpThemeData;
     }
@@ -230,7 +228,7 @@ class ThemeInject
      *
      * @return void
      */
-    #[Action('wp_footer', 0)]
+    #[Action('wp_head', 0)]
     public static function injectThemeScript(): void
     {
         $wpThemeData = self::themeData(); // theme data for hydration
@@ -241,9 +239,7 @@ class ThemeInject
             (() => {
                 const removeThisScript = () => {
                     const scriptElement = document.getElementById('theme-preferences');
-                    setTimeout(() => {
-                        scriptElement?.remove();
-                    }, 10000);
+                    scriptElement?.remove();
                 };
                 try {
                     <?php if (is_user_logged_in()): ?>

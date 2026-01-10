@@ -7,8 +7,6 @@ import liveReload from "vite-plugin-live-reload";
 import { unstableRolldownAdapter } from 'vite-bundle-analyzer'
 import { analyzer } from 'vite-bundle-analyzer'
 import { partytownVite } from "@qwik.dev/partytown/utils";
-// import { compression, defineAlgorithm } from 'vite-plugin-compression2'
-// import zlib from 'zlib';
 
 export default defineConfig(({ command }) => {
   return {
@@ -26,18 +24,6 @@ export default defineConfig(({ command }) => {
       partytownVite({
         dest: resolve(__dirname, "assets", "dist", "~partytown")
       }),
-      // compression({
-      //   deleteOriginalAssets: false,
-      //   exclude: ["**/*.json", "**/*.map", "**/*.xml", "**/*.svg", "**/*.webmanifest", "**/*.txt", "**/*.woff2", "**/*.woff"],
-      //   threshold: 0,
-      //   skipIfLargerOrEqual: false,
-      //   logLevel: 'info',
-      //   algorithms: [defineAlgorithm('brotliCompress', {
-      //     params: {
-      //       [zlib.constants.BROTLI_PARAM_QUALITY]: 11
-      //     }
-      //   })]
-      // })
     ],
     resolve: {
       alias: {

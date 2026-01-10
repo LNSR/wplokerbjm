@@ -4,7 +4,7 @@
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
-  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
+  import JobDetail from "@components/ui/Shared/JobDetail.svelte";
 
   let slideIn = $state(false);
 
@@ -156,9 +156,7 @@
         <div class="p-4 text-red-500 pt-16 flex-1">{error}</div>
       {:else if data}
         <div class="p-6 space-y-8 pt-16 flex-1 flex flex-col">
-          {#await dynamicComponentStore.loadJobDetail() then JobDetail}
-            <JobDetail job={data} />
-          {/await}
+          <JobDetail job={data} />
         </div>
       {/if}
     </aside>

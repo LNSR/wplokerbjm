@@ -38,14 +38,14 @@
   const now = $state(new SvelteDate());
 
   const ringkasanPekerjaan = $derived(
-    generalStore.useSummaryJob(job.ringkasanPekerjaan)
+    generalStore.useSummaryJob(job.ringkasanPekerjaan),
   );
   const contacts = $derived(generalStore.useContactsJob(job.contacts));
   const socialMediaItems = $derived(
-    generalStore.useSocialMedia().socialMediaItems(job.social_media)
+    generalStore.useSocialMedia().socialMediaItems(job.social_media),
   );
   const timeAgo = $derived.by(() =>
-    generalStore.useTimeAgo(job.post_time, now)
+    generalStore.useTimeAgo(job.post_time, now),
   );
 
   const allImages = $derived(
@@ -55,13 +55,14 @@
       ...extractImages(job.persyaratan || ""),
       ...extractImages(job.cara_melamar || ""),
       ...extractImages(job.benefit || ""),
-    ].filter((v, i, a) => a.indexOf(v) === i)
+    ].filter((v, i, a) => a.indexOf(v) === i),
   );
   let galleryRef = $state<HTMLElement>();
   let viewer = $state<Viewer>();
 
   const viewerOptions: unknown = {
     hidden: true,
+    container: document.getElementById("app") ?? document.body,
     focus: true,
     toolbar: {
       zoomIn: false,
@@ -86,20 +87,25 @@
     /** Aria-hidden issue best-effort fix for now */
     const viewerElement = (viewer as any).element;
     if (viewerElement) {
-      viewerElement.addEventListener("shown", () => {
+      const onShown = () => {
         viewerElement.removeAttribute("aria-hidden");
         viewerElement.removeAttribute("inert");
-      });
-      viewerElement.addEventListener("hide", () => {
+      };
+      const onHide = () => {
         const focused = document.activeElement as HTMLElement | null;
         if (focused && viewerElement.contains(focused)) {
           focused.blur();
         }
-      });
-      viewerElement.addEventListener("hidden", () => {
+      };
+      const onHidden = () => {
         viewerElement.removeAttribute("aria-hidden");
         viewerElement.setAttribute("inert", "true");
-      });
+      };
+      viewerElement.addEventListener("shown", onShown);
+      viewerElement.addEventListener("hide", onHide);
+      viewerElement.addEventListener("hidden", onHidden);
+      // Store references for cleanup
+      (viewer as any)._eventHandlers = { onShown, onHide, onHidden };
     }
   }
 
@@ -144,6 +150,13 @@
   $effect(() => {
     return () => {
       if (viewer) {
+        const viewerElement = (viewer as any).element;
+        if (viewerElement && (viewer as any)._eventHandlers) {
+          const { onShown, onHide, onHidden } = (viewer as any)._eventHandlers;
+          viewerElement.removeEventListener("shown", onShown);
+          viewerElement.removeEventListener("hide", onHide);
+          viewerElement.removeEventListener("hidden", onHidden);
+        }
         viewer.destroy();
         viewer = undefined;
       }
@@ -154,7 +167,7 @@
 <div class="space-y-8">
   <!-- Job Title -->
   {#if job.title}
-    <section class="top-0 backdrop-blur text-center">
+    <section class="top-0 text-center">
       <div class="flex items-center justify-center gap-4">
         <h1 class="text-3xl font-bold">{job.title}</h1>
       </div>

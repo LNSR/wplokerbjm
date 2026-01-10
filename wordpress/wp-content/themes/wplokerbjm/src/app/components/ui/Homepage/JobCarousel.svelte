@@ -1,13 +1,72 @@
+<script module lang="ts">
+  let swiperInstance: Swiper | null = null;
+  let swiperContainerEl = $state<HTMLElement | null>(null);
+  let nextButtonEl = $state<HTMLElement | null>(null);
+  let prevButtonEl = $state<HTMLElement | null>(null);
+  let isInitializing = $state(false);
+  let swiperFailed = $state(false);
+  let activeIndex = $state(0);
+  let carouselData = $state<{ jobs: CardJob[]; totalJobs?: number } | null>(
+    null
+  );
+  let isLoading = $state(false);
+  let error = $state<string | null>(null);
+  let isRefreshing = $state(false);
+  let resizeTimer: ReturnType<typeof setTimeout> | null = null;
+  let lastBreakpoint = $state("");
+  let pendingVirtualOffset: number | null = null;
+  let reappliedSavedOffset = false;
+
+  type SwiperVirtualExternalData = {
+    from: number;
+    to: number;
+    offset: number;
+  };
+
+  let virtualData = $state<SwiperVirtualExternalData>({
+    from: 0,
+    to: -1,
+    offset: 0,
+  });
+
+  function equalizeCardHeights() {
+    if (!swiperContainerEl) return;
+    const slides = swiperContainerEl.querySelectorAll(".swiper-slide");
+    let maxHeight = 0;
+    slides.forEach((slide) => {
+      const card = slide.querySelector(
+        ".card-base-carousel"
+      ) as HTMLElement | null;
+      if (card) {
+        card.style.height = "auto";
+        maxHeight = Math.max(maxHeight, card.offsetHeight);
+      }
+    });
+    slides.forEach((slide) => {
+      const card = slide.querySelector(
+        ".card-base-carousel"
+      ) as HTMLElement | null;
+      if (card) {
+        card.style.height = maxHeight + "px";
+      }
+    });
+  }
+</script>
+
 <script lang="ts">
   import JobCard from "@components/ui/Homepage/JobCard.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
-  import Virtualization from "$lib/utils/Virtualization.svelte";
-  import { GlobalNavigateTo, routeStateStore } from "$lib/stores/Route.svelte";
+  import {
+    GlobalNavigateTo,
+    routeStateStore,
+    routeStore,
+  } from "$lib/stores/Route.svelte";
   import type { CardJob } from "@/types";
   import { APIService } from "@/services/APIService";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { onMount, onDestroy, tick } from "svelte";
+  import { innerWidth } from "svelte/reactivity/window";
   import SwiperCore, { type Swiper } from "swiper";
   import { Navigation, Pagination, Autoplay, Virtual } from "swiper/modules";
   import {
@@ -19,41 +78,59 @@
   import "swiper/css/pagination";
   import "swiper/css/virtual";
 
-  const { jobs: propJobs = [], title = "Lowongan Darurat" } = $props<{
+  /*
+    JobCarousel uses Swiper's Virtual module (renderExternal) to efficiently
+    render very large lists (100+ items). Implementation notes and reasoning:
+
+    - Swiper Virtual is configured with an index array (0..n-1) and calls
+      `renderExternal` with { from, to, offset } when it needs DOM updates.
+      We store that in `virtualData` and render only `jobs[from..to]`.
+
+    - We apply `style="transform: translate3d(${virtualData.offset}px, 0, 0)"` on each rendered
+      `.swiper-slide` so Swiper's expected positioning matches Svelte's DOM.
+      This avoids the common "blank slides" issue where Swiper expects slides
+      at certain positions but the framework hasn't applied offsets yet.
+
+    - After Svelte paints (tick), we call a few Swiper update helpers to let
+      Swiper recompute sizes/classes. Keep these minimal to avoid thrashing.
+
+    - The previous `Virtualization.computeCarousel` helper was removed from
+      this component in favor of Swiper Virtual. See
+      `src/app/lib/utils/Virtualization.svelte.ts` for a deprecation note.
+
+    TODOs for future maintainers:
+    - If you change how Swiper Virtual is configured (breakpoints / slidesPerView),
+      ensure `addSlidesBefore`/`addSlidesAfter` are sufficient to prevent
+      visible white-space during fast swipes.
+    - If switching to a different virtual strategy, preserve `data-swiper-slide-index`
+      so Swiper internals map indexes correctly.
+  */
+  const { jobs: initialpropJobs = [], title = "Lowongan Darurat" } = $props<{
     jobs?: CardJob[];
     title?: string;
   }>();
 
-  let carouselData = $state<{ jobs: CardJob[]; totalJobs?: number } | null>(
-    null
-  );
-  let isLoading = $state(false);
-  let error = $state<string | null>(null);
-  let isRefreshing = $state(false);
-
   const jobs = $derived(
-    propJobs.length > 0 ? propJobs : (carouselData?.jobs ?? [])
+    initialpropJobs.length > 0 ? initialpropJobs : (carouselData?.jobs ?? [])
   );
 
-  const buffer = 2;
-  const virtualization = $derived.by(() =>
-    Virtualization.computeCarousel({
-      jobsLength: jobs.length,
-      activeIndex,
-      innerWidth,
-      buffer,
-    })
-  );
+  const breakpoint = $derived.by(() => {
+    const w = innerWidth.current ?? 0;
+    return w >= 1024 ? "lg" : w >= 640 ? "md" : "sm";
+  });
 
-  let swiperInstance: Swiper | null = null;
-  let swiperContainerEl = $state<HTMLElement | null>(null);
-  let nextButtonEl = $state<HTMLElement | null>(null);
-  let prevButtonEl = $state<HTMLElement | null>(null);
+  const virtualIndexes = $derived.by(() => {
+    const total = jobs?.length ?? 0;
+    if (total <= 0) return [] as number[];
 
-  let isInitializing = $state(false);
-  let swiperFailed = $state(false);
-  let activeIndex = $state(0);
-  let innerWidth = $state(1024);
+    const from = Math.max(0, Math.min(total - 1, virtualData.from ?? 0));
+    const to = Math.max(from - 1, Math.min(total - 1, virtualData.to ?? -1));
+    if (to < from) return [] as number[];
+
+    const idxs: number[] = [];
+    for (let i = from; i <= to; i += 1) idxs.push(i);
+    return idxs;
+  });
 
   class SwiperManager {
     private static createSwiperConfig(
@@ -70,14 +147,96 @@
           disableOnInteraction: false,
         },
         pagination: paginationEl
-          ? { el: paginationEl, clickable: true }
-          : { clickable: true },
+          ? {
+              el: paginationEl,
+              clickable: true,
+              dynamicBullets: true,
+              dynamicMainBullets: 4,
+            }
+          : { clickable: true, dynamicBullets: true, dynamicMainBullets: 4 },
         navigation: {
           nextEl: nextEl ?? undefined,
           prevEl: prevEl ?? undefined,
         },
-        Virtual: {
+        watchslidesProgress: true,
+        virtual: {
           enabled: true,
+          slides: Array.from({ length: jobs.length }, (_, i) => i),
+          addSlidesBefore: 1,
+          addSlidesAfter: 1,
+          renderExternalUpdate: false,
+          renderExternal: (data: any) => {
+            const next = {
+              from: Number(data?.from ?? 0),
+              to: Number(data?.to ?? -1),
+              offset: Number(data?.offset ?? 0),
+            } satisfies SwiperVirtualExternalData;
+
+            // If we have a pendingVirtualOffset (from saved state) prefer it
+            // for the first renderExternal call so Svelte's virtual slides are
+            // positioned exactly where the user left them. Clear it after use.
+            if (pendingVirtualOffset !== null) {
+              next.offset = pendingVirtualOffset;
+              pendingVirtualOffset = null;
+            }
+
+            // Avoid excessive state writes during Swiper's internal loops.
+            if (
+              virtualData.from === next.from &&
+              virtualData.to === next.to &&
+              virtualData.offset === next.offset
+            ) {
+              return;
+            }
+            virtualData = next;
+
+            // If we have a previously saved state with an offset, reapply its
+            // translate after Swiper has provided its own virtual offsets. This
+            // helps keep visual position stable when Swiper updates virtualData
+            // after initialization. Only do this once per init to avoid thrash.
+            try {
+              const savedStateNow = routeStateStore.getCarouselState();
+              if (
+                savedStateNow &&
+                typeof (savedStateNow as any).offset === "number" &&
+                !reappliedSavedOffset
+              ) {
+                const savedOffsetNow = (savedStateNow as any).offset;
+                // Schedule re-apply on next RAFs to let Swiper finish its work.
+                // Ensure Svelte has flushed DOM updates for virtual slides before
+                // reapplying the wrapper translate.
+                try {
+                  tick().then(() => {
+                    requestAnimationFrame(() => {
+                      try {
+                        const wrapper = (
+                          swiperContainerEl as HTMLElement | null
+                        )?.querySelector(
+                          ".swiper-wrapper"
+                        ) as HTMLElement | null;
+                        if (
+                          swiperInstance &&
+                          typeof (swiperInstance as any)?.setTranslate ===
+                            "function"
+                        ) {
+                          try {
+                            (swiperInstance as any).setTranslate(
+                              savedOffsetNow
+                            );
+                          } catch {}
+                        } else if (wrapper) {
+                          try {
+                            wrapper.style.transform = `translate3d(${savedOffsetNow}px, 0, 0)`;
+                          } catch {}
+                        }
+                      } catch {}
+                    });
+                  });
+                } catch {}
+                reappliedSavedOffset = true;
+              }
+            } catch {}
+          },
         },
         on: {
           slideChange: (swiper: Swiper) => {
@@ -105,9 +264,10 @@
       let attempts = 0;
       while (true) {
         await tick();
-        const slidesCount = el.querySelectorAll(".swiper-slide").length;
         const width = el.getBoundingClientRect().width;
-        if (slidesCount > 0 && width > 0) return true;
+        // With Swiper Virtual + renderExternal we may have 0 slides in DOM until
+        // Swiper calls renderExternal; width is the primary readiness signal.
+        if (width > 0) return true;
         attempts += 1;
         if (attempts >= MAX_INIT_ATTEMPTS) {
           try {
@@ -115,30 +275,48 @@
           } catch {
             // ignore
           }
-          swiperFailed = !!(
-            el &&
-            el.querySelectorAll &&
-            el.querySelectorAll(".swiper-slide").length > 0
-          );
+          // If we timed out, mark swiper as failed to fall back to a static grid.
+          swiperFailed = true;
           return false;
         }
 
-        await new Promise((res) => setTimeout(res, 80));
+        await new Promise((res) => setTimeout(res, 120));
       }
     }
 
-    private static initializeSwiperInstance(
+    private static async initializeSwiperInstance(
       el: HTMLElement,
       paginationEl: HTMLElement | null,
       nextEl: HTMLElement | null,
       prevEl: HTMLElement | null
-    ): void {
+    ): Promise<void> {
       try {
         try {
           if (SwiperCore && (SwiperCore as typeof SwiperCore).use) {
             SwiperCore.use([Navigation, Pagination, Autoplay, Virtual]);
           }
         } catch {}
+
+        // If there is a saved carousel state, set `virtualData` first so
+        // Svelte renders slides with the saved offset before Swiper measures
+        // layout. This avoids having to forcibly set per-slide transforms
+        // after initialization (which would overwrite Swiper's own values).
+        const savedState = routeStateStore.getCarouselState();
+        if (savedState && typeof savedState.offset === "number") {
+          try {
+            // Debug: log saved state before applying (snapshot reactive proxies to avoid Svelte proxy warnings)
+            // debug info removed
+
+            virtualData = {
+              from: virtualData?.from ?? 0,
+              to: virtualData?.to ?? -1,
+              offset: savedState.offset,
+            } as typeof virtualData;
+            // Apply pending offset so Swiper's first renderExternal uses it.
+            pendingVirtualOffset = savedState.offset;
+            // debug info removed
+          } catch {}
+        }
 
         const cfg = SwiperManager.createSwiperConfig(
           paginationEl,
@@ -152,17 +330,66 @@
 
         swiperInstance = new SwiperCore(el, finalCfg);
 
-        // Restore saved slide index
-        const savedState = routeStateStore.getCarouselState();
-        // Clear saved state after restoring
-        routeStateStore.clearCarouselState();
+        // Give Svelte a tick so any virtual slides / inline transforms from
+        // `virtualData` are painted before we attempt to call Swiper APIs that
+        // rely on DOM measurements. This prevents fighting Swiper's internal
+        // layout updates and makes our applyTranslate more deterministic.
+        try {
+          await tick();
+        } catch {}
+
+        // After creating Swiper, navigate to the saved slide index (if any)
+        // and then clear the stored state so we don't reapply it later.
         if (savedState) {
-          swiperInstance.slideTo(savedState.slideIndex);
+          try {
+            swiperInstance.slideTo(savedState.slideIndex);
+          } catch {}
+          try {
+            // If we saved the wrapper translate previously, set Swiper's
+            // translate directly after slideTo so the visual position matches
+            // exactly. Use the Swiper API where available; fall back to
+            // writing the wrapper style if necessary.
+            const savedOffset = (savedState as any).offset;
+            if (typeof savedOffset === "number") {
+              // Re-apply translate across multiple RAFs to avoid being stomped by
+              // Swiper's internal layout steps. We do not clear the saved state
+              // yet — keep it for debugging.
+              const applyTranslate = () => {
+                try {
+                  if (typeof swiperInstance?.setTranslate === "function") {
+                    try {
+                      swiperInstance.setTranslate(savedOffset);
+                      swiperInstance?.update?.();
+                      swiperInstance?.updateProgress?.();
+                      swiperInstance?.updateSlidesClasses?.();
+                    } catch {}
+                  } else {
+                    const wrapper = el.querySelector(
+                      ".swiper-wrapper"
+                    ) as HTMLElement | null;
+                    if (wrapper)
+                      wrapper.style.transform = `translate3d(${savedOffset}px, 0, 0)`;
+                  }
+                } catch {}
+              };
+
+              try {
+                requestAnimationFrame(() => {
+                  applyTranslate();
+                  requestAnimationFrame(() => {
+                    applyTranslate();
+                    // Final attempt after a short delay in case Swiper triggers async updates
+                    setTimeout(() => applyTranslate(), 40);
+                  });
+                });
+              } catch {}
+            }
+          } catch {}
         }
 
+        await tick();
         return;
       } catch {
-        console.error("Failed to initialize Swiper");
         throw new Error("Failed to initialize Swiper");
       }
     }
@@ -211,7 +438,7 @@
       }
 
       try {
-        SwiperManager.initializeSwiperInstance(
+        await SwiperManager.initializeSwiperInstance(
           el,
           paginationEl,
           nextEl,
@@ -222,11 +449,8 @@
         try {
           el.classList.remove("no-swiper");
         } catch {}
-      } catch (err) {
-        console.error("Failed to initialize Swiper:", err);
-        console.warn(
-          "Carousel will display as static list due to Swiper failure"
-        );
+        equalizeCardHeights();
+      } catch {
         swiperFailed = true;
         try {
           el.classList.add("no-swiper");
@@ -289,6 +513,7 @@
 
       // Recreate the instance (this function lazy-loads Swiper JS)
       await SwiperManager.createSwiper();
+      equalizeCardHeights();
 
       // After attempting to initialize, ensure the carousel is visible even if
       // initialization failed. createSwiper removes "invisible" on success/failure
@@ -319,7 +544,6 @@
         carouselData = data ?? null;
         error = null;
       } catch {
-        console.error("Failed to refresh carousel");
         error = "Failed to refresh carousel";
       } finally {
         // Ensure the loading state is cleared before attempting to reinitialize
@@ -336,7 +560,7 @@
 
     // Fetch carousel data if no jobs prop from initial load page
     static fetchCarouselData(): void {
-      if (propJobs.length === 0 && !carouselData && !isLoading) {
+      if (initialpropJobs.length === 0 && !carouselData && !isLoading) {
         isLoading = true;
         APIService.fetchCarousel()
           .then((data) => {
@@ -344,7 +568,6 @@
             error = null;
           })
           .catch(() => {
-            console.error("Failed to fetch carousel");
             error = "Failed to load carousel data";
           })
           .finally(() => {
@@ -374,9 +597,20 @@
         return;
       }
 
-      // Otherwise destroy and re-init the instance so layout and slides are
-      // measured cleanly (we no longer rely on mutation/resize observers).
-      requestAnimationFrame(() => SwiperManager.reinitializeSwiper());
+      // Update Swiper Virtual slides in-place (much cheaper than re-init for 100+ items).
+      try {
+        if (swiperInstance.virtual) {
+          swiperInstance.virtual.slides = Array.from(
+            { length: count },
+            (_, i) => i
+          );
+          swiperInstance.virtual.update(true);
+        }
+        swiperInstance.update();
+      } catch {
+        // As a safe fallback, try a full re-init.
+        requestAnimationFrame(() => SwiperManager.reinitializeSwiper());
+      }
     }
 
     static destroySwiper(): void {
@@ -406,8 +640,42 @@
     private static carouselSaveCurrentSlideState(): void {
       if (!swiperInstance) return;
 
+      // Try to capture the current wrapper translateX so virtual positioning
+      // can be restored exactly after navigation. Falls back to 0 on errors.
+      let offset = 0;
+      try {
+        const wrapper = swiperContainerEl?.querySelector(
+          ".swiper-wrapper"
+        ) as HTMLElement | null;
+        if (wrapper) {
+          const transform =
+            wrapper.style.transform ||
+            getComputedStyle(wrapper).transform ||
+            "";
+          // translate3d(xpx, ypx, zpx)
+          const t3 = transform.match(
+            /translate3d\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\)/
+          );
+          if (t3) {
+            offset = Number(t3[1]);
+          } else {
+            // matrix(a,b,c,d,tx,ty) -> tx is index 4
+            const m = transform.match(/matrix\(([^)]+)\)/);
+            if (m) {
+              const parts = m[1].split(",").map((s) => s.trim());
+              if (parts.length >= 6) {
+                offset = Number(parts[4]) || 0;
+              }
+            }
+          }
+        }
+      } catch {
+        offset = 0;
+      }
+
       routeStateStore.saveCarouselState({
         slideIndex: swiperInstance?.activeIndex ?? 0,
+        offset: offset,
       });
     }
 
@@ -421,7 +689,7 @@
         await jobOverlay.openOverlay(slug, job);
       } else {
         // Mobile: use SPA navigation to SingleLowongan.svelte route
-        const url = new URL(String(permalink), window.location.origin);
+        const url = new URL(String(permalink), routeStore.currentUrl.origin);
         void GlobalNavigateTo(url.pathname + url.search + url.hash);
       }
     }
@@ -429,24 +697,71 @@
 
   onMount(() => {
     requestAnimationFrame(() => void SwiperManager.createSwiper());
-  });
-
-  // Fetch carousel data if no jobs prop provided
-  $effect(() => {
+    // Fetch carousel data on mount instead of using a global $effect
     void SwiperManager.fetchCarouselData();
   });
 
-  // Keep Swiper in sync when job list updates
+  // Derive a simple jobs count to drive updates without reacting to every
+  // internal jobs change. This lets us limit side-effectful $effect usage.
+  const jobsCount = $derived.by(() => jobs?.length ?? 0);
+
+  // Keep Swiper in sync when job list updates — react to `jobsCount` only.
   $effect(() => {
+    jobsCount;
     void SwiperManager.updateSwiperOnJobsChange();
   });
 
+  // When Swiper Virtual asks us to render a new range, wait for Svelte to paint
+  // those slides, then notify Swiper so it can correctly measure/update classes.
+  $effect(() => {
+    virtualData;
+    if (!swiperInstance) return;
+    void tick().then(() => {
+      try {
+        swiperInstance?.updateSlides();
+        swiperInstance?.updateProgress();
+        swiperInstance?.updateSlidesClasses();
+      } catch {
+        // ignore
+      }
+    });
+  });
+
+  // Equalize card heights when active slide changes (for virtualization updates)
+  $effect(() => {
+    activeIndex;
+    tick().then(() => equalizeCardHeights());
+  });
+
+  $effect(() => {
+    breakpoint;
+    const bp = breakpoint as string;
+    if (bp !== lastBreakpoint) {
+      lastBreakpoint = bp;
+      if (resizeTimer) clearTimeout(resizeTimer);
+      resizeTimer = setTimeout(() => {
+        void SwiperManager.reinitializeSwiper({ forceDestroy: true });
+        equalizeCardHeights();
+      }, 120);
+    }
+  });
+  // On mount, if initialpropJobs provided, use them as carouselData; if empty fetch from api
+  onMount(() => {
+    if (initialpropJobs && initialpropJobs.length > 0) {
+      if (!carouselData || (carouselData.jobs ?? []).length === 0) {
+        carouselData = {
+          jobs: initialpropJobs,
+          totalJobs: initialpropJobs.length,
+        };
+      }
+    }
+  });
+
   onDestroy(() => {
+    if (resizeTimer) clearTimeout(resizeTimer);
     void SwiperManager.destroySwiper();
   });
 </script>
-
-<svelte:window bind:innerWidth />
 
 <section class="min-h-[450px] md:min-h-[400px] lg:min-h-[500px]">
   <div class="flex items-center justify-between mb-6">
@@ -521,27 +836,24 @@
       aria-live="polite"
     >
       <div class="swiper-wrapper">
-        {#each jobs as job, idx (job.id ?? job.permalink ?? idx)}
-          <div class="swiper-slide">
-            {#if idx >= virtualization.startIndex && idx < virtualization.endIndex}
-              <JobCard
-                jobdata={job}
-                permalink={job.permalink}
-                variant="carousel"
-                onClick={(slug) =>
-                  CarouselNavigationHandler.handleClickNavigateToJob(
-                    slug,
-                    job.permalink ?? "",
-                    job
-                  )}
-              />
-            {:else}
-              <div
-                class="placeholder h-[300px] bg-[var(--wpl-global-color-5)] rounded-lg flex items-center justify-center"
-              >
-                <LoadingSpinner srLabel="Memuat lowongan..." size="md" />
-              </div>
-            {/if}
+        {#each virtualIndexes as idx (jobs[idx]?.id ?? jobs[idx]?.permalink ?? idx)}
+          {@const job = jobs[idx]}
+          <div
+            class="swiper-slide"
+            data-swiper-slide-index={idx}
+            style={`transform: translate3d(${virtualData.offset ?? 0}px, 0, 0); `}
+          >
+            <JobCard
+              jobdata={job}
+              permalink={job.permalink}
+              variant="carousel"
+              onClick={(slug) =>
+                CarouselNavigationHandler.handleClickNavigateToJob(
+                  slug,
+                  job.permalink ?? "",
+                  job
+                )}
+            />
           </div>
         {/each}
       </div>
@@ -556,19 +868,11 @@
         >
           {#each jobs as job, idx (job.id ?? job.permalink ?? idx)}
             <div class="fallback-item">
-              {#if idx >= virtualization.startIndex && idx < virtualization.endIndex}
-                <JobCard
-                  jobdata={job}
-                  permalink={job.permalink ?? ""}
-                  variant="carousel"
-                />
-              {:else}
-                <div
-                  class="placeholder h-[300px] bg-[var(--wpl-global-color-5)] rounded-lg flex items-center justify-center"
-                >
-                  <LoadingSpinner srLabel="Memuat lowongan..." size="md" />
-                </div>
-              {/if}
+              <JobCard
+                jobdata={job}
+                permalink={job.permalink ?? ""}
+                variant="carousel"
+              />
             </div>
           {/each}
         </div>

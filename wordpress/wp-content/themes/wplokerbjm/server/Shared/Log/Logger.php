@@ -41,7 +41,7 @@ class Logger
      * Log a message with context
      *
      * @param string $level Log level (DEBUG, INFO, WARNING, ERROR)
-     * @param string $category Log category (e.g., 'SSG', 'Cache', 'API')
+     * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
      * @param string $message Log message
      * @param array $context Additional context data
      */

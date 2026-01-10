@@ -211,7 +211,7 @@ class JobQuery
             )";
             $sql .= ")";
 
-            Cache::set($cache_key, $sql, 3600); // Cache for 1 hour
+            Cache::set($cache_key, $sql, 86400); // Cache for 1 day
             return $sql;
         } catch (\Exception $e) {
             Logger::error('Query', 'JobQuery::buildPostsSearchSql error: ' . $e->getMessage());
@@ -255,7 +255,7 @@ class JobQuery
             $result = gmdate('c');
         }
 
-        Cache::set($cache_key, $result, 3600); // Cache for 1 hour
+        Cache::set($cache_key, $result, 86400); // Cache for 1 day
         return $result;
     }
 

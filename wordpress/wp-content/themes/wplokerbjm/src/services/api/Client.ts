@@ -29,11 +29,14 @@ export class ApiClient {
     
     // Combine external signal with timeout signal
     let combinedSignal: AbortSignal | undefined;
+    let abortListener: (() => void) | undefined;
+    
     if (externalSignal && controller) {
       if (externalSignal.aborted) {
         controller.abort();
       } else {
-        externalSignal.addEventListener('abort', () => controller?.abort());
+        abortListener = () => controller?.abort();
+        externalSignal.addEventListener('abort', abortListener);
         combinedSignal = controller.signal;
       }
     } else if (controller) {
@@ -75,6 +78,11 @@ export class ApiClient {
         'unknown',
         'Terjadi kesalahan tak terduga.'
       );
+    } finally {
+      // Clean up the event listener
+      if (abortListener && externalSignal) {
+        externalSignal.removeEventListener('abort', abortListener);
+      }
     }
   }
 

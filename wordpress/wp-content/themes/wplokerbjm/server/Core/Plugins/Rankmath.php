@@ -1,6 +1,6 @@
 <?php
 
-namespace WPLokerBJM\Services\Utilities\SSG\Integrations;
+namespace WPLokerBJM\Core\Plugins;
 
 use WPLokerBJM\Shared\Cache\Cache;
 use WPLokerBJM\Shared\Cache\CacheKey;
@@ -11,7 +11,7 @@ use WPLokerBJM\Shared\Log\Logger;
  *
  * Handles Rank Math SEO plugin integrations including sitemap regeneration
  */
-class RankMathIntegration {
+class Rankmath {
 	private static ?bool $isActiveCache = null;
 	private static ?array $sitemapUrlsCache = null;
 
@@ -169,7 +169,7 @@ class RankMathIntegration {
 	 */
 	public static function clearAllTransients(): void {
 		// Use pattern deletion for Rank Math related cache keys
-		$deleted = Cache::deletePattern('rankmath_*');
+		$deleted = Cache::deletePattern(['rankmath_*']);
 
 		self::clearCaches();
 

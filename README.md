@@ -128,15 +128,8 @@ server/
 │   ├── Log/                   # Logging services
 │   ├── REST/                  # REST API services
 │   ├── Schema/                # Schema services
-│   ├── SSG/                   # Static Site Generation services
 │   ├── Utilities/             # Utility services
-│   │   └── SSG/               # SSG utilities
-│   │       ├── Integrations/  # Third-party integrations
-│   │       │   └── RankMathIntegration.php
-│   │       ├── BotDetection.php
-│   │       └── SSGUtilities.php
 │   └── Webhooks/              # Webhook services
-│       └── TriggerBuildSSG.php
 ├── Shared/                    # Shared utilities and services
 │   ├── Cache/                 # Caching utilities
 │   │   └── Cache.php
@@ -274,6 +267,5 @@ Your development environment should now be running at `https://localhost`
 ## 📚 Additional Resources
 
 - 📋 [**Project Notes & Architecture**](wordpress/wp-content/themes/wplokerbjm/README.md)
-- 🛠️ [**SSG Tools Documentation**](wordpress/wp-content/themes/wplokerbjm/tools/SSG/docs/README.md)
 
 ---

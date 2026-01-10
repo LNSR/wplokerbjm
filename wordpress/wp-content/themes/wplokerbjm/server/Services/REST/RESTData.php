@@ -150,7 +150,7 @@ class RESTData
      */
     public function getThemeData()
     {
-        return \WPLokerBJM\Core\Hooks\Theme\ThemeInject::themeData();
+        return \WPLokerBJM\Core\Theme\ThemeInject::themeData();
     }
 
     /**

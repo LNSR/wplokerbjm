@@ -162,6 +162,6 @@ export const jobsApi: JobsApiInterface = {
     if (ids.length === 0) {
       return []
     }
-    return (await apiClient.post<JobSchemaResponse>('/job-schema/', { post_ids: ids })).data
+    return (await apiClient.get<JobSchemaResponse>('/job-schema/', { post_ids: ids.join(',') })).data
   }
 }

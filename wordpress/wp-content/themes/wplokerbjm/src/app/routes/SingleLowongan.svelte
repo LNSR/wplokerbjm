@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
+  import JobDetail from "@components/ui/Shared/JobDetail.svelte";
   import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
   import { APIService } from "@/services/APIService";
   import { type JobDetailResponse as SingleJob } from "@/types";
@@ -66,6 +66,7 @@
     }
   }
 
+  // server props take priority on initial load, else fetch from API
   onMount(() => {
     if (initialJob) {
       job = initialJob;
@@ -93,7 +94,7 @@
       debouncedFetch(slug);
     }
     if (job && job.id && !routeStore.isInitialLoad) {
-      // Ensure SEO JSON-LD is up to date
+      void utilsSEO.clearPendingJobSchemas();
       void utilsSEO.removeJobPostingJsonLd();
       void utilsSEO.addJobPostingJsonLd([job.id]);
     }
@@ -101,13 +102,9 @@
 </script>
 
 {#if isLoading}
-  <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8">
-    <SkeletonSingleLowongan />
-  </main>
+  <SkeletonSingleLowongan />
 {:else if job}
   <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12">
-    {#await dynamicComponentStore.loadJobDetail() then JobDetail}
-      <JobDetail job={job} />
-    {/await}
+    <JobDetail {job} />
   </main>
 {/if}

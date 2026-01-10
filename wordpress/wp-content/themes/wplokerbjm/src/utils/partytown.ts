@@ -10,6 +10,8 @@ class PartytownManager {
     lib: "/wp-content/themes/wplokerbjm/assets/dist/~partytown/",
   };
 
+  private static interactionDetected = false;
+
   /**
    * Ensure globals used by tracking are present on window.
    * This method is intentionally agnostic of GTM/GA and only ensures
@@ -47,6 +49,38 @@ class PartytownManager {
     document.head.appendChild(script);
 
     return true;
+  }
+
+  /**
+   * Ensures Partytown is booted only after detecting human interaction.
+   * Listens for user events like mouse, keyboard, touch, and scroll.
+   * Once interaction is detected, boots Partytown and removes listeners.
+   * @param config Optional Partytown configuration.
+   * @returns Promise that resolves to true when Partytown is ready.
+   */
+  public static async ensureBootOnInteraction(config?: PartytownConfig): Promise<boolean> {
+    if (typeof window === "undefined") return false;
+
+    // If already booted or interaction detected, ensure boot immediately
+    if (this.interactionDetected || document.querySelector("script[partytown-boot]")) {
+      return this.ensureBoot(config);
+    }
+
+    return new Promise((resolve) => {
+      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+
+      const handler = () => {
+        this.interactionDetected = true;
+        // Remove all listeners
+        events.forEach(event => window.removeEventListener(event, handler));
+        // Boot Partytown
+        const booted = this.ensureBoot(config);
+        resolve(booted);
+      };
+
+      // Add listeners with once: true for efficiency
+      events.forEach(event => window.addEventListener(event, handler, { once: true }));
+    });
   }
 }
 

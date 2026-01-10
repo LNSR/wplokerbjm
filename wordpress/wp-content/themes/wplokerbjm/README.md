@@ -37,10 +37,7 @@ The theme uses a single router file [`index.php`](index.php) that routes request
 
 ## 🔧 Automation Tools
 
-- 🏗️ **[SSG](tools/SSG/docs/README.md)** — Static Site Generation via GitHub Actions pipeline
-  - ⚡ Automated builds on content changes
-  - 🚀 Performance optimization
-  - 📊 SEO improvements
+- 🚀 Performance optimization
 
 ## 🔗 Dependency Injection System
 
@@ -165,5 +162,4 @@ This approach keeps hook registration declarative and centralized.
 | ------------------------------------------------------ | ------- | -------------- | -------------------------------------- |
 |                                                        |         |                | ✅ Migrate to Svelte for most frontend |
 | 🚀 Migrate to SvelteKit and deploy to Vercel/CF Worker |         |                | ✅ Fully CSR `<body>`                  |
-| 🗺️ Add Job Fair Page (map & event details)             |         |                | ✅ Implement SSG via GitHub Actions    |
-|                                                        |         |                | ✅ Client side bookmark system         |
+| 🗺️ Add Job Fair Page (map & event details)             |         |                | ✅ Client side bookmark system         |

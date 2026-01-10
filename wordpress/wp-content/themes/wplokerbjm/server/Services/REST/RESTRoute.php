@@ -17,7 +17,6 @@ class RESTRoute
         private readonly \WPLokerBJM\Controllers\REST\Carousel $carousel,
         private readonly \WPLokerBJM\Controllers\REST\DynamicSearch $dynamicSearch,
         private readonly \WPLokerBJM\Controllers\REST\JobDetail $singleOverlay,
-        private readonly \WPLokerBJM\Controllers\REST\DispatchSSGBuild $dispatchSSGBuild,
         private readonly \WPLokerBJM\Controllers\REST\JobBookmark $jobBookmark,
         private readonly \WPLokerBJM\Controllers\REST\JobGridController $jobGrid,
         private readonly \WPLokerBJM\Controllers\REST\WPThemeData $wpThemeData,
@@ -78,33 +77,6 @@ class RESTRoute
             'permission_callback' => '__return_true',
         ]);
 
-        register_rest_route(self::$baseURI, '/dispatch-ssg/', [
-            'methods' => 'POST',
-            'callback' => fn(...$args) => $this->dispatchSSGBuild->handle(...$args),
-            'permission_callback' => function () {
-                return current_user_can('manage_options');
-            },
-            'args' => (function () {
-                return [
-                    'paths' => [
-                        'required' => true,
-                        'validate_callback' => function ($value) {
-                            return is_array($value) && !empty($value);
-                        },
-                    ],
-                    'reason' => [
-                        'required' => false,
-                        'default' => 'manual_trigger',
-                    ],
-                    'dry_run' => [
-                        'required' => false,
-                        'default' => false,
-                        'type' => 'boolean',
-                    ],
-                ];
-            })(),
-        ]);
-
         // POST is used for bookmark sync to avoid URL length limits with many IDs.
         // GET would put IDs in query string (?ids=1,2,3,...), which can exceed ~2000 chars on mobile.
         // POST sends IDs in JSON body, allowing unlimited bookmarks without 414 errors.
@@ -127,7 +99,7 @@ class RESTRoute
         ]);
 
         register_rest_route(self::$baseURI, '/job-schema/', [
-            'methods' => 'POST',
+            'methods' => 'GET',
             'callback' => fn(...$args) => $this->jobSchema->handle(...$args),
             'permission_callback' => '__return_true',
         ]);

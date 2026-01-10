@@ -40,7 +40,7 @@ class TaxonomyRepository
 			}
 		}
 
-		Cache::set($cache_key, $result, 3600); // Cache for 1 hour
+		Cache::set($cache_key, $result, 86400); // Cache for 1 day
 		return $result;
 	}
 
@@ -60,7 +60,7 @@ class TaxonomyRepository
 			]);
 		}
 
-		Cache::set($cache_key, $terms, 3600); // Cache for 1 hour
+		Cache::set($cache_key, $terms, 86400); // Cache for 1 day
 		return $terms;
 	}
 }

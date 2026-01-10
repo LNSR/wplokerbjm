@@ -10,10 +10,6 @@ inputs:
     description: "Whether to install jq"
     required: false
     default: "false"
-  install-playwright:
-    description: "Whether to install Playwright browsers"
-    required: false
-    default: "false"
   install-brotli:
     description: "Whether to install brotli for compression"
     required: false

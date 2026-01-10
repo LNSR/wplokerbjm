@@ -3,7 +3,7 @@
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import { timeEffect } from "$lib/utils/elements.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
-  import { GlobalNavigateTo } from "$lib/stores/Route.svelte";
+  import { GlobalNavigateTo, routeStore } from "$lib/stores/Route.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
   import {
     UserTieSolid,
@@ -82,7 +82,7 @@
     if (isMobile()) {
       event.preventDefault();
       if (permalink)
-        void GlobalNavigateTo(new URL(permalink, window.location.origin).pathname);
+        void GlobalNavigateTo(new URL(permalink, routeStore.currentUrl.origin).pathname);
       return;
     }
 

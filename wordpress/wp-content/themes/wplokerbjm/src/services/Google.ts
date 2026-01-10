@@ -20,14 +20,14 @@ export class GoogleServices {
   }
 
   /**
-   * Ensure Partytown is initialized and ready for use.
+   * Ensure Partytown is initialized and ready for use after human interaction.
    * Delegates to shared utilities in src/utils/partytown.ts.
    * @private
    */
   private static async waitForPartytown(): Promise<boolean> {
     if (typeof window === 'undefined') return false;
 
-    return await Partytown.ensureBoot();
+    return await Partytown.ensureBootOnInteraction();
   }
 
   /**

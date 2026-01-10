@@ -1,7 +1,11 @@
 <script module lang="ts">
   import type { CardJob, JobGridProps, SearchState } from "@/types";
   import { SearchContext, SearchTitle } from "@/types";
-  import { routeStateStore, GlobalNavigateTo } from "$lib/stores/Route.svelte";
+  import {
+    routeStore,
+    routeStateStore,
+    GlobalNavigateTo,
+  } from "$lib/stores/Route.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
   import Virtualization from "$lib/utils/Virtualization.svelte";
@@ -50,17 +54,20 @@
       // Save current search state before navigation (implicitly always save for homepage('/') path)
       routeStateStore.saveSearchState(
         window.location.pathname,
-        currentSearchState
+        currentSearchState,
       );
 
       async function MobileJobClick(): Promise<void> {
         // Mark as last visited before navigating
         routeStateStore.MarkVisitedJob(job.slug ?? "");
         // use SPA navigation to SingleLowongan.svelte route
-        const url = new URL(String(job.permalink), window.location.origin);
+        const url = new URL(
+          String(job.permalink),
+          routeStore.currentUrl.origin,
+        );
         return void GlobalNavigateTo(
           url.pathname + url.search + url.hash,
-          currentSearchState
+          currentSearchState,
         );
       }
 
@@ -90,11 +97,31 @@
     }
 
     scrollToCard(slug: string, delay = 200): void {
-      jobOverlay.scrollToCard(slug, delay, false, 'grid');
+      jobOverlay.scrollToCard(slug, delay, false, "grid");
     }
   }
 
   export const overlayManager = new OverlayController();
+
+  class VirtualizationManager {
+    static computeGridVirtualization(
+      displayJobs: CardJob[],
+      overlayOpen: boolean,
+      sectionTop: number | undefined,
+      itemHeight: number,
+      gap: number,
+      buffer: number
+    ) {
+      return Virtualization.computeGrid({
+        displayJobs,
+        overlayOpen,
+        sectionTop,
+        itemHeight,
+        gap,
+        buffer,
+      });
+    }
+  }
 </script>
 
 <script lang="ts">
@@ -112,9 +139,6 @@
   let initialLoading = $state(false);
   let hasRestoredState = $state(false);
   let isRefreshing = $state(false);
-  let scrollY = $state(0);
-  let innerWidth = $state(1024);
-  let innerHeight = $state(768);
   let sectionElement = $state<HTMLElement | null>(null);
 
   const props: JobGridProps = $props();
@@ -125,17 +149,14 @@
   const gap = 24;
   const buffer = 3;
   const virtualization = $derived.by(() =>
-    Virtualization.computeGrid({
+    VirtualizationManager.computeGridVirtualization(
       displayJobs,
-      innerWidth,
       overlayOpen,
-      innerHeight,
-      scrollY,
-      sectionTop: sectionElement?.offsetTop,
+      sectionElement?.offsetTop,
       itemHeight,
       gap,
       buffer,
-    })
+    ),
   );
 
   class JobGridHandler {
@@ -159,7 +180,7 @@
      * Check if saved search state is valid based on last job update timestamp
      */
     private isValidState(
-      savedSearchState: SearchState | undefined
+      savedSearchState: SearchState | undefined,
     ): boolean | undefined {
       let lastJobUpdateMs = 0;
       const themeData = getThemeData();
@@ -189,7 +210,7 @@
       if (!savedSearchState) return;
       const uniqueJobs = savedSearchState.jobs.filter(
         (job, index, self) =>
-          index === self.findIndex((j) => j.permalink === job.permalink)
+          index === self.findIndex((j) => j.permalink === job.permalink),
       );
       searchStore.jobs = [...uniqueJobs];
       searchStore.context = savedSearchState.context;
@@ -202,10 +223,6 @@
       searchStore.error = savedSearchState.error;
 
       hasRestoredState = true;
-
-      if (!routeStateStore.getSkipScrollRestore(window.location.pathname)) {
-        routeStateStore.restoreScrollForPath(window.location.pathname);
-      }
     }
 
     private async initializeFreshData(): Promise<void> {
@@ -235,6 +252,7 @@
           initialLoading = false;
         }
       } else {
+        // Use server-provided jobs to initialize search store
         searchStore.jobs = [...jobs];
         if (maxNumPages) searchStore.maxNumPages = maxNumPages;
         if (context) searchStore.context = context;
@@ -248,14 +266,14 @@
       // If we've already restored state for this component instance, don't do it again
       if (hasRestoredState) {
         console.log(
-          "JobGrid: Already restored state for this component instance, skipping"
+          "JobGrid: Already restored state for this component instance, skipping",
         );
         return;
       }
 
       // Check if there's a saved search state for this path
       const savedSearchState = routeStateStore.getSearchState(
-        window.location.pathname
+        window.location.pathname,
       ) as SearchState | undefined;
 
       if (this.isValidState(savedSearchState)) {
@@ -348,22 +366,30 @@
 
   // Add JobPosting JSON-LD for jobs in the grid
   $effect(() => {
-    refreshJobSchema();
+    if (routeStore.currentUrl.pathname === "/" && !jobOverlay.overlayOpen) {
+      refreshJobSchema();
+    } else {
+      utilsSEO.clearPendingJobSchemas();
+    }
   });
 
   // Auto load more when nearing the end
   $effect(() => {
+    const margin = 600; // Load more when within 600px of the bottom
     if (
-      virtualization.endRow >= virtualization.totalRows - 1 &&
+      scrollY + innerHeight >=
+        (sectionElement?.offsetTop || 0) +
+          virtualization.totalHeight -
+          margin &&
       hasMore &&
       !loading
     ) {
       untrack(() => searchStore.loadMore());
+      utilsSEO.initialSchemaSSR = false;
+      utilsSEO.clearPendingJobSchemas();
     }
   });
 </script>
-
-<svelte:window bind:scrollY bind:innerWidth bind:innerHeight />
 
 <section class="relative mt-8" id="job-grid" bind:this={sectionElement}>
   <div class="flex items-center justify-between mb-6">
@@ -416,8 +442,8 @@
             style="height: {virtualization.totalHeight}px; position: relative;"
           >
             <div
-              style="position: absolute; top: {virtualization.startRow *
-                virtualization.rowHeight}px; width: 100%;"
+              style="position: absolute; width: 100%; transform: translate3d(0, {(virtualization.startRow ?? 0) *
+                (virtualization.rowHeight ?? 0)}px, 0);"
             >
               <div
                 class={`grid gap-6 ${virtualization.itemsPerRow === 1 ? "grid-cols-1" : virtualization.itemsPerRow === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}

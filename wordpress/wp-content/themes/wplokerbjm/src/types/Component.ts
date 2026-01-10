@@ -6,7 +6,7 @@ export interface LayoutProps {
 
 export interface ComponentConfig {
   selector: string;
-  component: Component;
+  component: Component | Promise<Component>;
 }
 
 export type JobSummary = Pick<MetaBox, 'jenis-pekerjaan' | 'pendidikan' | 'lokasi-pekerjaan' | 'gender' | 'pengalaman' | 'gaji_minimal' | 'gaji_maksimal' | 'umur_min' | 'umur_max' | 'deadline'>;
