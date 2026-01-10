@@ -2,15 +2,13 @@
 
 namespace WPLokerBJM\Factories;
 
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\CustomFields;
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 class JobDataFactory
 {
-    const FACTORY_JOB_PREFIX_CACHE = 'job_data_';
-    const FACTORY_JOB_TTL_CACHE = 86400; // 1 day
-
     public function __construct(
         private \WPLokerBJM\Repositories\CustomFieldRepository $customFieldRepository,
         private \WPLokerBJM\Repositories\TaxonomyRepository $taxonomyRepository
@@ -29,7 +27,7 @@ class JobDataFactory
      */
     public function createJobData(int $post_id): array
     {
-        $cacheKey = self::FACTORY_JOB_PREFIX_CACHE . $post_id;
+        $cacheKey = CacheKey::JOB_DATA_PREFIX . $post_id;
         $cachedData = Cache::get($cacheKey);
         if ($cachedData !== false) {
             return $cachedData;
@@ -51,13 +49,13 @@ class JobDataFactory
             $combinedData = array_merge($processedCustomFields, $processedTaxonomies);
 
             // Filter out null values to keep responses lean
-            $combinedData = Utilities::filterEmptyValues($combinedData);
+            $combinedData = SharedUtils::filterEmptyValues($combinedData);
 
-            Cache::set($cacheKey, $combinedData, self::FACTORY_JOB_TTL_CACHE); // Cache for 1 day
+            Cache::set($cacheKey, $combinedData, 86400); // Cache for 1 day
 
             return $combinedData;
         } catch (\Exception $e) {
-            error_log('JobDataFactory::createJobData error for post ' . $post_id . ': ' . $e->getMessage());
+            Logger::error('Factory', 'JobDataFactory::createJobData error for post ' . $post_id . ': ' . $e->getMessage());
             return []; // Return empty array on error
         }
     }
@@ -155,7 +153,7 @@ class JobDataFactory
                 $customFields[CustomFields::SOCIAL_MEDIA] = $processedSocialMedia;
             }
         } catch (\Exception $e) {
-            error_log('CustomFieldsService::processCustomFields error: ' . $e->getMessage());
+            Logger::error('Factory', 'CustomFieldsService::processCustomFields error: ' . $e->getMessage());
         } finally {
             return $customFields;
         }

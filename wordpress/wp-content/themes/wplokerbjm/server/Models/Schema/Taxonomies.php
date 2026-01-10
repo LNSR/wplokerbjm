@@ -1,20 +1,22 @@
 <?php
 
 namespace WPLokerBJM\Models\Schema;
-use WPLokerBJM\Contracts\HooksInterface;
+use WPLokerBJM\Core\Container\Attributes\Action;
 
 /**
  * Taxonomies Schema
  *
  * Defines custom taxonomies for job listings.
  *
- * @note This class serves as a blueprint/template for defining WordPress custom taxonomies.
- *       The actual source of truth for taxonomy configurations is this code. Changes here
- *       directly affect the registered taxonomies in WordPress.
+ * @note  * @note This class serves as a blueprint/template for defining Meta Box taxonomies.
+ *       The actual source of truth for field configurations, data, and behavior is the
+ *       Meta Box GUI builder and the database storage. Code changes here may be overridden
+ *       by GUI/DB settings. Use this as a reference for field structure, but manage fields
+ *       primarily through the Meta Box admin interface.
  *
  * @package WPLokerBJM\Models\Schema
  */
-class Taxonomies implements HooksInterface
+class Taxonomies
 {
 
     public const PERUSAHAAN = 'perusahaan';
@@ -25,29 +27,11 @@ class Taxonomies implements HooksInterface
     public const PENDIDIKAN = 'pendidikan';
 
     /**
-     * Register all taxonomies
-     * 
-     * @return void
-     */
-    public function registerActions(): void
-    {
-        add_action('init', fn() => $this->registerPerusahaanTaxonomy());
-        add_action('init', fn() => $this->registerKategoriTaxonomy());
-        add_action('init', fn() => $this->registerLokasiTaxonomy());
-        add_action('init', fn() => $this->registerJenisPekerjaanTaxonomy());
-        add_action('init', fn() => $this->registerGenderTaxonomy());
-        add_action('init', fn() => $this->registerPendidikanTaxonomy());
-    }
-    public function registerFilters(): void
-    {
-        // No filters to register in this class
-    }
-
-    /**
      * Register perusahaan taxonomy
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerPerusahaanTaxonomy(): void
     {
         $labels = [
@@ -101,6 +85,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
+                'slug'         => self::PERUSAHAAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],
@@ -113,6 +98,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerKategoriTaxonomy(): void
     {
         $labels = [
@@ -166,7 +152,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'kategori-lowongan',
+                'slug'         => self::KATEGORI_LOWONGAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],
@@ -180,6 +166,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerLokasiTaxonomy(): void
     {
         $labels = [
@@ -233,7 +220,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_tags_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'lokasi-pekerjaan',
+                'slug'         => self::LOKASI_PEKERJAAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],
@@ -247,6 +234,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerJenisPekerjaanTaxonomy(): void
     {
         $labels = [
@@ -300,7 +288,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'jenis-pekerjaan',
+                'slug'         => self::JENIS_PEKERJAAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],
@@ -314,6 +302,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerGenderTaxonomy(): void
     {
         $labels = [
@@ -367,7 +356,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'gender',
+                'slug'         => self::GENDER,
                 'with_front'   => false,
                 'hierarchical' => false,
             ],
@@ -381,6 +370,7 @@ class Taxonomies implements HooksInterface
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerPendidikanTaxonomy(): void
     {
         $labels = [
@@ -434,7 +424,7 @@ class Taxonomies implements HooksInterface
             'meta_box_cb'        => 'post_categories_meta_box',
             'rest_base'          => '',
             'rewrite'            => [
-                'slug'         => 'pendidikan',
+                'slug'         => self::PENDIDIKAN,
                 'with_front'   => false,
                 'hierarchical' => true,
             ],

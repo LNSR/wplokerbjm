@@ -1,5 +1,15 @@
 import type { SortOption, CardJob, JobSummary, JobContactRow, MetaBox, WPBasePost, WPTaxonomyTerm } from '@/types';
 
+// Base optional job filters
+type OptionalJobFilters = {
+  cari?: string
+  'lokasi-pekerjaan'?: string[]
+  gender?: string[]
+  pendidikan?: string[]
+  sort?: SortOption
+  context?: SearchContext
+}
+
 // Base filters for search operations
 export interface SearchFilters extends Pick<MetaBox, 'lokasi-pekerjaan' | 'gender' | 'pendidikan'> {
   cari: string
@@ -7,6 +17,7 @@ export interface SearchFilters extends Pick<MetaBox, 'lokasi-pekerjaan' | 'gende
   gender?: string[]
   pendidikan?: string[]
   sort: SortOption
+  context?: SearchContext
 }
 
 // Context type for search and loadMore operations
@@ -51,9 +62,15 @@ export enum SearchTitle {
 export interface LoadMoreResponse extends BaseJobSearchResponse { }
 
 // Simplified load more filters - flattened structure
-export interface LoadMoreFilters extends Partial<SearchFilters> {
+export interface LoadMoreFilters extends OptionalJobFilters {
   paged: number
-  context?: SearchContext
+}
+
+// Filters for fetching job grid data
+export interface JobGridFilters extends OptionalJobFilters {
+  paged?: number
+  title?: string
+  total_jobs?: number
 }
 
 // Standardized taxonomy term interface
@@ -61,7 +78,7 @@ export interface TaxonomyTerm extends Pick<WPTaxonomyTerm, 'slug' | 'name' | 'pa
   children?: TaxonomyTerm[]
 }
 
-export interface SingleOverlayResponse extends Pick<WPBasePost, 'id' | 'title' | 'post_time'>, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'> {
+export interface JobDetailResponse extends Pick<WPBasePost, 'id' | 'title' | 'post_time'>, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'> {
   duplicateNonce?: string; // Nonce for plugin 'Duplicate post as draft'
   ringkasanPekerjaan: JobSummary;
   contacts?: JobContactRow;

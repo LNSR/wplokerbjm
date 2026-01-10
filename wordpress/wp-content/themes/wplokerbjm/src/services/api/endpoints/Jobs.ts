@@ -5,7 +5,7 @@ import type {
   SearchResponse, 
   LoadMoreFilters,
   LoadMoreResponse,
-  SingleOverlayResponse,
+  JobDetailResponse,
   SortOption,
   CarouselProps,
   JobGridProps,
@@ -16,6 +16,7 @@ import type {
 // they are easy to evolve without affecting the global shared types.
 type AutoSuggestResponse = string[]
 type BookmarkedJobsResponse = CardJob[]
+type JobSchemaResponse = Record<string, any>[]
 
 // Type guard to check if a value is a SortOption
 function isSortOption(value: unknown): value is SortOption {
@@ -33,10 +34,11 @@ export interface JobsApiInterface {
   getAutoSuggestions(query: string): Promise<AutoSuggestResponse>
   searchJobs(filters: SearchFilters): Promise<SearchResponse>
   loadMore(filters: LoadMoreFilters): Promise<LoadMoreResponse>
-  fetchSingleOverlay(slug: string, options?: { signal?: AbortSignal }): Promise<SingleOverlayResponse>
+  fetchJobDetail(slug: string, options?: { signal?: AbortSignal }): Promise<JobDetailResponse>
   syncBookmark(ids: number[]): Promise<BookmarkedJobsResponse>
   fetchCarousel(): Promise<CarouselProps>
   fetchJobGrid(filters: Partial<SearchFilters & { paged?: number; context?: string; title?: string; total_jobs?: number }>): Promise<JobGridProps>
+  fetchJobSchemas(ids: number[]): Promise<JobSchemaResponse>
 }
 
 export const jobsApi: JobsApiInterface = {
@@ -106,8 +108,8 @@ export const jobsApi: JobsApiInterface = {
   /**
    * Fetch single job overlay by slug
    */
-  async fetchSingleOverlay(slug: string, options?: { signal?: AbortSignal }): Promise<SingleOverlayResponse> {
-  return (await apiClient.get<SingleOverlayResponse>('/single-overlay/', { slug }, {}, options?.signal)).data
+  async fetchJobDetail(slug: string, options?: { signal?: AbortSignal }): Promise<JobDetailResponse> {
+  return (await apiClient.get<JobDetailResponse>('/job-detail/', { slug }, {}, options?.signal)).data
   },
 
   /**
@@ -151,5 +153,15 @@ export const jobsApi: JobsApiInterface = {
     })
 
     return (await apiClient.get<JobGridProps>('/job-grid/', params)).data
+  },
+
+  /**
+   * Fetch job schemas for multiple job IDs
+   */
+  async fetchJobSchemas(ids: number[]): Promise<JobSchemaResponse> {
+    if (ids.length === 0) {
+      return []
+    }
+    return (await apiClient.get<JobSchemaResponse>('/job-schema/', { post_ids: ids.join(',') })).data
   }
 }

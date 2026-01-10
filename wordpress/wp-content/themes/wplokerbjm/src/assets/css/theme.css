@@ -562,3 +562,6 @@ figure.aligncenter img,
   float: right;
   margin-left: 1rem;
 }
+
+/* WordPress auto sizes contain intrinsic size */
+img:is([sizes=auto i],[sizes^="auto," i]){contain-intrinsic-size:3000px 1500px}

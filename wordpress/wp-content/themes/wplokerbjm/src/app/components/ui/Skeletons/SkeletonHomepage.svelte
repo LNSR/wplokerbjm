@@ -40,7 +40,7 @@
 
     <div class="swiper job-carousel invisible">
       <div class="swiper-wrapper">
-        {#each Array(4) as _}
+        {#each Array(4)}
           <div class="swiper-slide">
             <div
               class="block group rounded-xl transition-all duration-300 cursor-pointer carousel-card max-w-full border-2 border-gray-300 dark:border-gray-600 shadow-md animate-pulse"
@@ -119,7 +119,7 @@
     ></div>
 
     <div class="grid gap-6 grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
-      {#each Array(6) as _}
+      {#each Array(6)}
         <div
           class="block group rounded-xl transition-all duration-300 cursor-pointer w-full h-full max-w border-2 border-gray-300 dark:border-gray-600 shadow-lg animate-pulse"
         >

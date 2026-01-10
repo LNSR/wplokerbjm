@@ -1,24 +1,19 @@
 <script module lang="ts">
-  import { nonceStore } from "$lib/stores/Nonce.svelte";
-  import type { SingleOverlayResponse } from "@/types";
+  import { nonceStore } from "@/utils";
+  import type { JobDetailResponse } from "@/types";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import JobDetail from "@components/ui/Shared/JobDetail.svelte";
 
   let slideIn = $state(false);
 
-  const data = $derived(jobOverlay.overlayData) as SingleOverlayResponse | null;
+  const data = $derived(jobOverlay.overlayData) as JobDetailResponse | null;
   const loading = $derived(jobOverlay.overlayLoading);
   const error = $derived(jobOverlay.overlayError);
 
   let isLoggedIn = $state(false);
   let editPostId = $state<number | null>(null);
-
-  async function LoadJobDetail(): Promise<
-    typeof import("@components/ui/Shared/JobDetail.svelte").default
-  > {
-    return (await import("@components/ui/Shared/JobDetail.svelte")).default;
-  }
 
   function getCloneHref(postId?: number | null): string {
     if (!postId) return "#";
@@ -47,13 +42,13 @@
 <script lang="ts">
   import { onMount, tick } from "svelte";
 
-  let { visible, close } = $props<{
+  const { visible, close } = $props<{
     visible: boolean;
     close: () => void;
   }>();
 
   onMount(() => {
-    isLoggedIn = !!nonceStore.getNonce();
+    isLoggedIn = !!nonceStore.getNonce;
     document.addEventListener("keydown", (event) =>
       OverlayKeyboardHandler.handleKeydown(event, close)
     );
@@ -90,7 +85,7 @@
     class={[
       "min-h-screen flex flex-col pointer-events-auto ml-7",
       slideIn ? "transform translate-x-0" : "transform translate-x-full",
-      `transition-transform duration-600 ease-in-out ${visible ? 'will-change-[transform]' : ''}`,
+      `transition-transform duration-600 ease-in-out ${visible ? "will-change-[transform]" : ""}`,
     ].join(" ")}
   >
     <!-- Overlay background (only in JobGrid area) -->
@@ -116,7 +111,7 @@
             <a
               href={`/wp-admin/post.php?post=${editPostId}&action=edit`}
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
               class="btn btn-sm btn-outline btn-warning flex items-center gap-1"
             >
               <PenToSquareSolid class="mr-1" aria-hidden="true" />
@@ -130,7 +125,7 @@
             <a
               href={getCloneHref(editPostId)}
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
               class="btn btn-sm btn-outline btn-success flex items-center gap-1"
             >
               <CopySolid class="mr-1" aria-hidden="true" />
@@ -161,13 +156,7 @@
         <div class="p-4 text-red-500 pt-16 flex-1">{error}</div>
       {:else if data}
         <div class="p-6 space-y-8 pt-16 flex-1 flex flex-col">
-          {#await LoadJobDetail() then JobDetail}
-            <JobDetail job={data} />
-          {:catch}
-            <div class="text-red-500">
-              Failed to load job details component.
-            </div>
-          {/await}
+          <JobDetail job={data} />
         </div>
       {/if}
     </aside>

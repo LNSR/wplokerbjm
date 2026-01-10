@@ -52,6 +52,7 @@ SELECTED=(
   "index.php"
   "composer.json"
   "assets"
+  ".htaccess"
 )
 
 PIDS=()
@@ -88,17 +89,6 @@ for p in "${SELECTED[@]}"; do
   else
     REMOTE_TARGET="${REMOTE_PATH%/}/$p"
     echo "Starting rclone sync $p -> sftpdeploy:$REMOTE_TARGET $DRY_FLAG"
-    
-    # Exclude ssg/ directory when syncing assets
-    if [ "$p" = "assets" ]; then
-      rclone sync $DRY_FLAG $RCLONE_BASE_OPTS --exclude "ssg/**" "$p" "sftpdeploy:$REMOTE_TARGET" 2>&1 || true &
-      PIDS+=($!)
-      sleep 5
-    else
-      rclone sync $DRY_FLAG $RCLONE_BASE_OPTS "$p" "sftpdeploy:$REMOTE_TARGET" 2>&1 || true &
-      PIDS+=($!)
-      sleep 5
-    fi
   fi
 done
 

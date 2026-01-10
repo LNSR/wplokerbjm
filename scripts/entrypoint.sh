@@ -109,8 +109,8 @@ chmod 755 /var/run/sock
 
 # Set up system cron for WordPress if DISABLE_WP_CRON is enabled
 if [ -n "$WP_ENV" ]; then
-  # Create crontab for wordpress user to run wp-cron.php every 10 minutes using WP-CLI
-  echo "*/10 * * * * cd /var/www/html && wp cron event run --due-now > /dev/null 2>&1" | crontab -u wordpress -
+  # Create crontab for wordpress user to run wp-cron.php every 2 minutes using WP-CLI
+  echo "*/2 * * * * cd /var/www/html && wp cron event run --due-now > /dev/null 2>&1" | crontab -u wordpress -
   # Start cron daemon in background
   cron &
 fi

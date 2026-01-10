@@ -2,7 +2,7 @@
 
 namespace WPLokerBJM\Core\Container\Definitions;
 
-use WPLokerBJM\Core\Container\AutowireScanner;
+use WPLokerBJM\Core\Container\Support\AutowireScanner;
 
 /**
  * Auto-scanned definitions for autowiring.

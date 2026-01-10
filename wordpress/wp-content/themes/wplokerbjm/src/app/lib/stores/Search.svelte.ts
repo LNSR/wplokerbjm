@@ -16,20 +16,12 @@ import type { DropdownOption } from '@/types'
 
 export class SearchManager {
     // State
-    public filters = $state<SearchFilters>({
-        cari: '',
-        [TaxonomyType.lokasi]: [],
-        [TaxonomyType.gender]: [],
-        [TaxonomyType.pendidikan]: [],
-        sort: { value: 'desc', label: 'Terbaru' } as SortOption,
-    })
-
     public searchHistory = $state<string[]>([])
     public suggestions = $state<string[]>([])
     public showSuggestions = $state(false)
     public jobs = $state<CardJob[]>([])
-    public context = $state<SearchContext>(SearchContext.Latest)
-    public title = $state<SearchTitle>(SearchTitle.Search)
+    public context = $state<SearchContext>(SearchContext.Latest) // default context at initial load for jobgrid
+    public title = $state<SearchTitle>(SearchTitle.Latest) // default context at initial load for jobgrid
     public totalJobs = $state(0)
     public maxNumPages = $state(1)
     public page = $state(1)
@@ -39,6 +31,15 @@ export class SearchManager {
     public suggestionsLoading = $state(false)
     public selectedSuggestionIndex = $state(-1)
 
+    public filters = $state<SearchFilters>({
+        cari: '',
+        [TaxonomyType.lokasi]: [],
+        [TaxonomyType.gender]: [],
+        [TaxonomyType.pendidikan]: [],
+        sort: { value: 'desc', label: 'Terbaru' } as SortOption,
+        context: this.context,
+    })
+
     // Computed helpers
     public get hasFilters(): boolean {
         const f = this.filters
@@ -47,8 +48,7 @@ export class SearchManager {
             (Array.isArray(f[TaxonomyType.lokasi]) && f[TaxonomyType.lokasi].length > 0) ||
             (Array.isArray(f[TaxonomyType.gender]) && f[TaxonomyType.gender].length > 0) ||
             (Array.isArray(f[TaxonomyType.pendidikan]) && f[TaxonomyType.pendidikan].length > 0) ||
-            f.sort.value == 'asc' || f.sort.value == 'desc'
-
+            f.sort.value === 'asc' || f.sort.value === 'desc'
         )
     }
 
@@ -95,6 +95,7 @@ export class SearchManager {
         this.filters[TaxonomyType.gender] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.gender]) ?? this.filters[TaxonomyType.gender]
         this.filters[TaxonomyType.pendidikan] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.pendidikan]) ?? this.filters[TaxonomyType.pendidikan]
         this.filters.sort = typeof newFilters.sort === 'object' && newFilters.sort !== null ? (newFilters.sort as SortOption) : this.filters.sort
+        this.filters.context = newFilters.context ?? this.filters.context
     }
 
     public resetFilters(): void {
@@ -103,6 +104,7 @@ export class SearchManager {
         this.filters[TaxonomyType.gender] = []
         this.filters[TaxonomyType.pendidikan] = []
         this.filters.sort = { value: 'desc', label: 'Terbaru' }
+        this.filters.context = SearchContext.Latest
     }
 
     public addToHistory(query: string): void {
@@ -173,7 +175,7 @@ export class SearchManager {
             if (Array.isArray(response.jobs) && response.jobs.length) {
                 // Filter out jobs that already exist (by permalink) to prevent duplicates
                 const newJobs = response.jobs.filter(newJob =>
-                  !this.jobs.some(existingJob => existingJob.permalink === newJob.permalink)
+                    !this.jobs.some(existingJob => existingJob.permalink === newJob.permalink)
                 );
                 this.jobs.push(...newJobs)
                 this.page = loadMoreFilters.paged
@@ -185,14 +187,14 @@ export class SearchManager {
         } catch (err) {
             console.error('SearchStore: Load more failed:', err);
             this.error = err instanceof Error ? err.message : 'Load more failed'
-            
+
             // Retry logic
             if (retries > 0) {
                 console.log(`Retrying loadMore, attempts left: ${retries}`)
                 await new Promise(resolve => setTimeout(resolve, 1000))  // Simple delay
                 return this.loadMore(retries - 1)
             }
-            
+
             throw err
         } finally {
             this.loading = false
@@ -273,19 +275,20 @@ export class SearchUtils {
             cari: typeof f.cari === 'string' ? validation.sanitizeString(f.cari) : f.cari,
             [TaxonomyType.lokasi]: Array.isArray(f[TaxonomyType.lokasi])
                 ? f[TaxonomyType.lokasi]
-                      .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
-                      .filter((s) => String(s).trim() !== '')
+                    .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
+                    .filter((s) => String(s).trim() !== '')
                 : f[TaxonomyType.lokasi],
             [TaxonomyType.gender]: Array.isArray(f[TaxonomyType.gender])
                 ? f[TaxonomyType.gender]
-                      .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
-                      .filter((s) => String(s).trim() !== '')
+                    .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
+                    .filter((s) => String(s).trim() !== '')
                 : f[TaxonomyType.gender],
             [TaxonomyType.pendidikan]: Array.isArray(f[TaxonomyType.pendidikan])
                 ? f[TaxonomyType.pendidikan]
-                      .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
-                      .filter((s) => String(s).trim() !== '')
+                    .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
+                    .filter((s) => String(s).trim() !== '')
                 : f[TaxonomyType.pendidikan],
+            context: f.context,
         }
     }
 

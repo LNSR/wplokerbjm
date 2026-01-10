@@ -4,11 +4,11 @@ namespace WPLokerBJM\QueryBuilders;
 
 use WPLokerBJM\QueryBuilders\TaxonomyQuery;
 use WPLokerBJM\Models\Schema\{CustomFields, Taxonomies, PostTypes};
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Shared\Log\Logger;
 
 class JobQuery
 {
-
 	const array getBaseArgs = [
 		'post_type' => PostTypes::POST_TYPE_LOWONGAN,
 		'post_status' => 'publish',
@@ -178,7 +178,7 @@ class JobQuery
             return '';
         }
 
-        $cache_key = 'search_sql_' . md5($q);
+        $cache_key = CacheKey::SEARCH_SQL_PREFIX . md5($q);
         $cached = Cache::get($cache_key);
         if ($cached !== false) {
             return $cached;
@@ -211,10 +211,10 @@ class JobQuery
             )";
             $sql .= ")";
 
-            Cache::set($cache_key, $sql, 3600); // Cache for 1 hour
+            Cache::set($cache_key, $sql, 86400); // Cache for 1 day
             return $sql;
         } catch (\Exception $e) {
-            error_log('JobQuery::buildPostsSearchSql error: ' . $e->getMessage());
+            Logger::error('Query', 'JobQuery::buildPostsSearchSql error: ' . $e->getMessage());
             return '';
         }
     }
@@ -231,7 +231,7 @@ class JobQuery
      */
     public static function getLastModifiedDate(): string
     {
-        $cache_key = 'job_last_modified';
+        $cache_key = CacheKey::JOB_LAST_MODIFIED;
         $cached = Cache::get($cache_key);
         if ($cached !== false) {
             return $cached;
@@ -255,7 +255,7 @@ class JobQuery
             $result = gmdate('c');
         }
 
-        Cache::set($cache_key, $result, 3600); // Cache for 1 hour
+        Cache::set($cache_key, $result, 86400); // Cache for 1 day
         return $result;
     }
 

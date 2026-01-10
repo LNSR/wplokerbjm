@@ -35,7 +35,6 @@ jobs:
         with:
           theme-dir: ${{ env.THEME_DIR }}
           install-jq: false
-          install-playwright: false
 
       - name: Build (theme)
         working-directory: ${{ env.THEME_DIR }}

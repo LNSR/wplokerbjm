@@ -9,6 +9,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - Cache plugin used: **LiteSpeed Cache** with object caching redis.
 
 ## Dynamic Data Framework
+
 - Dynamic data framework: **Metabox Lite**
 
 ## SEO
@@ -18,6 +19,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 # Development Instructions for WPLokerBJM
 
 ## General
+
 - Check [wplokerbjm.code-workspace.json](../../wplokerbjm.code-workspace) for workspace settings.
 - Develeper of this project uses:
   - Laptop: FX505DD
@@ -39,9 +41,9 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - bootstrap: [wplokerbjm-bootstrap.php](../../wordpress/wp-content/mu-plugins/wplokerbjm-bootstrap.php)
 - Use **Composer** for PHP dependencies, ensuring the latest PHP version is used.
 - For PHP DI structure, refer to file:  
-  [Container.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Container.php)
+  [Container.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Container//Container.php)
 - Use Cache if it's the best decision.
-  - [Cache.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Cache.php)
+  - [Cache.php](../../wordpress/wp-content/themes/wplokerbjm/server/Shared/Cache/Cache.php)
   - Use APCu if is appropriate.
 
 ## Frontend(Svelte/TypeScript)
@@ -49,4 +51,4 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - Use **Bun** for JavaScript/TypeScript package management, always using the latest versions of JavaScript/TypeScript frameworks and syntaxes.
 - Frontend tooling is using Vite.
 - Svelte 5 Runes mode.
-- Deprecated API are not allowed.
+- Tailwind CSS with DaisyUI for styling.

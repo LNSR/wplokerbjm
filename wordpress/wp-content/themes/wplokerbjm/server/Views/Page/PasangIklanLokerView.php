@@ -6,10 +6,6 @@ class PasangIklanLokerView
 {
     public function render(): void
     {
-        DocumentHTML::renderHead(); ?>
-        <div id="app">
-        </div>
-        <?php
-        DocumentHTML::renderFooter();
+        DocumentHTML::renderDocument(null, null);
     }
 }

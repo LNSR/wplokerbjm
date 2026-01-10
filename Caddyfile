@@ -4,9 +4,9 @@
   @production expression {env.WP_ENV} == "production"
   @development expression {env.WP_ENV} == "development"
 
-  @vite path_regexp vite ^/(__vite|@vite|@id|@fs|sockjs-node)(/.*)?$
+  @vite path_regexp vite ^/(__vite|@vite|@id|@fs|sockjs-node|~partytown)(/.*)?$
   handle @vite {
-    # Proxy Vite dev endpoints. Tuned for HMR (websockets) and dev performance.
+    # Proxy Vite dev endpoints including Partytown dev assets. Tuned for HMR (websockets) and dev performance.
     # If you run multiple Vite instances for scaling, add them here as additional upstreams.
     reverse_proxy host.docker.internal:5173 {
       # Preserve headers Vite needs for HMR / dev pages
@@ -26,10 +26,22 @@
     }
   }
 
+  # Ensure Partytown dev assets can register service workers by setting Service-Worker-Allowed
+  @partytown_dev path_regexp partytownDev ^/~partytown(/.*)?$
+  header @partytown_dev Service-Worker-Allowed "/"
+
   # * Rewrite /node_modules/* to the Vite node_modules directory
   # * Use this to serve local node_modules for development purposes
   @node_modules_path path_regexp node_modules ^/node_modules/(.*)$
   rewrite @node_modules_path /__vite/node_modules/{re.node_modules.1}
+
+  @partytown_assets path_regexp partytownAssets ^/wp-content/themes/wplokerbjm/assets/dist/~partytown(/.*)?$
+  header @partytown_assets Service-Worker-Allowed "/"
+
+  @partytown_sw path_regexp partytownSW ^/wp-content/themes/wplokerbjm/assets/dist/~partytown/.*partytown-sw.*$
+  header @partytown_sw Cache-Control "no-cache, no-store, must-revalidate"
+  header @partytown_sw Pragma "no-cache"
+  header @partytown_sw Expires "0"
 
   root * /var/www/html
   # Pass request host/proto headers into PHP-FPM so PHP's $_SERVER sees
@@ -45,7 +57,7 @@
   }
 
   file_server {
-    precompressed zstd
+    precompressed br
   }
 
   encode @production {
@@ -68,6 +80,8 @@
     X-Content-Type-Options "nosniff"
     X-Frame-Options "SAMEORIGIN"
     Permissions-Policy "microphone=(), camera=(), payment=()"
+    Cross-Origin-Embedder-Policy "credentialless"
+    Cross-Origin-Opener-Policy "same-origin"
     -X-Powered-By
     X-Real-IP {remote_host}
   }
@@ -107,7 +121,7 @@
   header @development @rest_api Cache-Control "private, max-age=60, stale-while-revalidate=120"
 
   # Privileged paths (wp-login.php, admin, xmlrpc, cron): allow private browser cache only
-  header @no_cache Cache-Control "private, max-age=120, s-maxage=120, must-revalidate"
+  header @no_cache Cache-Control "private, no-cache, must-revalidate, max-age=0"
 
   # Dynamic content (pages) — private cache for logged-in users, public cache for anonymous
   header @production @dynamic @logged_in Cache-Control "private, max-age=360"
@@ -117,7 +131,6 @@
   header @development @dynamic Cache-Control "no-cache"
 
   replace "https://localhost" "https://{host}"
-  replace "http://localhost" "http://{host}"
 
   log {
     output stdout

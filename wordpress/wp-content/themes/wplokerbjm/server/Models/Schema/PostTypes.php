@@ -1,42 +1,31 @@
 <?php
 namespace WPLokerBJM\Models\Schema;
 
-use WPLokerBJM\Contracts\HooksInterface;
+use WPLokerBJM\Core\Container\Attributes\Action;
 
 /**
  * Post Types Schema
  *
  * Defines custom post types for the application.
  *
- * @note This class serves as a blueprint/template for defining WordPress custom post types.
- *       The actual source of truth for post type configurations is this code. Changes here
- *       directly affect the registered post types in WordPress. Post types are registered
- *       in-memory and not stored in the database by default.
+ * @note This class serves as a blueprint/template for defining Meta Box post types.
+ *       The actual source of truth for field configurations, data, and behavior is the
+ *       Meta Box GUI builder and the database storage. Code changes here may be overridden
+ *       by GUI/DB settings. Use this as a reference for field structure, but manage fields
+ *       primarily through the Meta Box admin interface.
  *
  * @package WPLokerBJM\Models\Schema
  */
-class PostTypes implements HooksInterface {
+class PostTypes {
     
     public const POST_TYPE_LOWONGAN = 'lowongan';
-
-    /**
-     * Register all custom post types
-     * 
-     * @return void
-     */
-    public function registerActions(): void {
-        add_action('init', fn() => $this->registerLowonganPostType());
-    }
-
-    public function registerFilters(): void {
-        // No filters to register in this class
-    }
 
     /**
      * Register the Lowongan post type
      * 
      * @return void
      */
+    #[Action('init')]
     public function registerLowonganPostType(): void {
         $labels = [
             'name'                     => esc_html__('Lowongan Kerja', 'wplokerbjm'),

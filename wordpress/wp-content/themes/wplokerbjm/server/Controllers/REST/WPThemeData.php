@@ -4,7 +4,8 @@ namespace WPLokerBJM\Controllers\REST;
 
 use WP_REST_Request;
 use WP_REST_Response;
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Controllers\Utilities\ControllerUtils;
+use WPLokerBJM\Shared\Log\Logger;
 
 class WPThemeData
 {
@@ -24,13 +25,13 @@ class WPThemeData
             $themeData = $this->restData->getThemeData();
 
             if (empty($themeData)) {
-                return Utilities::failedResponse('Theme data not available', 404);
+                return ControllerUtils::failedResponse('Theme data not available', 404);
             }
 
             return new WP_REST_Response($themeData, 200);
         } catch (\Exception $e) {
-            error_log('WPThemeData::handle error: ' . $e->getMessage());
-            return Utilities::failedResponse('Internal server error', 500);
+            Logger::error('REST', 'WPThemeData::handle error: ' . $e->getMessage());
+            return ControllerUtils::failedResponse('Internal server error', 500);
         }
     }
 }

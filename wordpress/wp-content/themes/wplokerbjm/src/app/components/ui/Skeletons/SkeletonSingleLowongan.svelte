@@ -48,7 +48,7 @@
     </div>
     <div class="gap-4 mt-4">
       <div class="gap-x-6 gap-y-4 text-lg ml-2">
-        {#each Array(5) as _}
+        {#each Array(5)}
           <div class="flex items-start lg:space-x-2 space-x-1 mb-2">
             <div
               class="w-3 h-3 bg-gray-300 dark:bg-gray-600 rounded mt-2"
@@ -135,7 +135,7 @@
       <div
         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
       >
-        {#each Array(6) as _}
+        {#each Array(6)}
           <div class="flex items-center">
             <div
               class="w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded mr-2"
@@ -163,7 +163,7 @@
       <div
         class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
       >
-        {#each Array(3) as _}
+        {#each Array(3)}
           <div class="flex items-center">
             <div
               class="w-6 h-6 bg-gray-300 dark:bg-gray-600 rounded mr-2"

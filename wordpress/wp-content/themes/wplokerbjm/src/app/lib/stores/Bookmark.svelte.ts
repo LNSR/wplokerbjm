@@ -1,8 +1,6 @@
-import { debounce } from '@/utils/lodash'
-import { SvelteMap, SvelteSet } from 'svelte/reactivity'
-import { bookmarkIDB } from '@/utils'
+import { debounce, bookmarkIDB, getThemeData, type DebouncedFunction } from '@/utils';
+import { SvelteSet, SvelteMap } from 'svelte/reactivity'
 import { APIService } from '@/services/APIService'
-import { WPThemeDataStore } from '$lib/stores/WPThemeData'
 import type { CardJob, WPLokerBJMThemedData } from '@/types'
 
 interface BookmarkBroadcastMessage {
@@ -10,10 +8,9 @@ interface BookmarkBroadcastMessage {
     deleted?: number[]
     version?: WPLokerBJMThemedData['themeVersion']
 }
-
 export class BookmarkManager {
     // Current theme version from server (mtime of composer.json), used for cross-tab version checking
-    private CURRENT_VERSION = WPThemeDataStore.getThemeData()?.themeVersion || 0
+    private CURRENT_VERSION = getThemeData()?.themeVersion || 0
     public jobs = $state<CardJob[]>([])
     public isInitialized = $state(false)
     public isSyncing = $state(false)
@@ -23,7 +20,7 @@ export class BookmarkManager {
     public lastSyncTime = $state<number>(0)
 
     private channel: BroadcastChannel | null = null
-    private debouncedSync: any
+    private debouncedSync: DebouncedFunction | null = null
     private pendingSyncIds = new SvelteSet<number>()
     private _debouncedSaveCall: any = null
     private _pendingSavePromise: Promise<void> | null = null
@@ -33,17 +30,17 @@ export class BookmarkManager {
     private _retryTimer: ReturnType<typeof setTimeout> | null = null
     private operationQueue: Promise<any> = Promise.resolve()
 
+    constructor() {
+
+        void this.initialize()
+        this.crossTabChannel()
+        this.debouncedSync = debounce(() => this.syncPending(), 1000)
+    }
+
     private async runQueued<T>(operation: () => Promise<T>): Promise<T> {
         await this.operationQueue
         this.operationQueue = operation()
         return this.operationQueue
-    }
-
-    constructor() {
-
-        this.initialize()
-        this.crossTabChannel()
-        this.debouncedSync = debounce(() => this.syncPending(), 1000)
     }
 
     /**
@@ -183,7 +180,7 @@ export class BookmarkManager {
                 if (this.channel) this.channel.postMessage({ type: 'update', version: this.CURRENT_VERSION } as BookmarkBroadcastMessage) // Broadcast update with version for cross-tab sync
                 // Sync only the new job to get full data
                 this.pendingSyncIds.add(id)
-                this.debouncedSync()
+                this.debouncedSync?.()
             } catch (error) {
                 console.error('Failed to add job:', error)
                 this.warning = 'Gagal menambahkan bookmark. Silakan coba lagi.'
@@ -300,7 +297,14 @@ export class BookmarkManager {
     }
 
     public flushSync(): void {
-        if (this.debouncedSync && typeof this.debouncedSync.flush === 'function') this.debouncedSync.flush()
+        if (this.debouncedSync) this.debouncedSync.flush()
+    }
+
+    /**
+     * Cancel any pending scheduled sync.
+     */
+    public cancelSync(): void {
+        if (this.debouncedSync) this.debouncedSync.cancel()
     }
 
     public async clearAll(): Promise<void> {

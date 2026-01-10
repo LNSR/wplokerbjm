@@ -8,7 +8,7 @@
     extraClass?: string;
   }
 
-  let { size = "h-5 w-5", spin = false, title = null, extraClass = "" }: Props = $props();
+  const { size = "h-5 w-5", spin = false, title = null, extraClass = "" }: Props = $props();
 </script>
 
 <RefreshSolid

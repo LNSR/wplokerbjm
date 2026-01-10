@@ -1,7 +1,7 @@
 <?php
 
-use WPLokerBJM\Core\Container;
-use WPLokerBJM\Views\Page\{HomepageView, SingleView, PasangIklanLokerView};
+use WPLokerBJM\Core\Container\Container;
+use WPLokerBJM\Views\Page\{HomepageView, SingleLowonganView, PasangIklanLokerView};
 
 $container = Container::getContainer();
 
@@ -10,7 +10,7 @@ switch (true) {
         $viewClass = PasangIklanLokerView::class;
         break;
     case is_single() && get_post_type() === 'lowongan':
-        $viewClass = SingleView::class;
+        $viewClass = SingleLowonganView::class;
         break;
     case is_front_page() || is_page(146):
         $viewClass = HomepageView::class;

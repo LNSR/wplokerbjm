@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Controllers\REST;
 
 use WPLokerBJM\QueryBuilders\JobQuery;
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Controllers\Utilities\ControllerUtils;
 use WP_REST_Request;
 use WP_REST_Response;
 
@@ -22,14 +22,14 @@ class JobBookmark
         if (empty($ids_param)) {
             return new WP_REST_Response([], 200);
         } elseif (!is_array($ids_param)) {
-            return Utilities::failedResponse('Invalid IDs parameter.', 400);
+            return ControllerUtils::failedResponse('Invalid IDs parameter.', 400);
         }
 
-        $ids = $this->validateIds($ids_param);
+        $ids = ControllerUtils::validateIds($ids_param);
         if (empty($ids)) {
             return new WP_REST_Response([], 200);
         } elseif (count($ids) > 10000) {
-            return Utilities::failedResponse('Maximum of 10000 IDs allowed.', 400);
+            return ControllerUtils::failedResponse('Maximum of 10000 IDs allowed.', 400);
         }
 
         $args = JobQuery::allJobsIdsArgs();
@@ -44,12 +44,5 @@ class JobBookmark
         }
 
         return new WP_REST_Response($response, 200);
-    }
-
-    private function validateIds(array $ids): array
-    {
-        return array_filter(array_map('intval', $ids), function ($id) {
-            return $id > 0;
-        });
     }
 }

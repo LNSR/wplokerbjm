@@ -103,7 +103,7 @@
                   <a
                     href="https://instagram.com/loker_banjarmasin"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     class={linkClass}
                   >
                     @loker_banjarmasin
@@ -125,7 +125,7 @@
                   <a
                     href="https://wa.me/6283862447271"
                     target="_blank"
-                    rel="noopener"
+                    rel="noopener noreferrer"
                     class={linkClass}
                   >
                     +62 838-6244-7271

@@ -222,8 +222,9 @@
 </script>
 
 <script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import { taxonomyStore } from "$lib/stores/Taxonomy.svelte";
+  import { onMount, onDestroy, tick } from "svelte";
+  import { Virtualization } from '$lib/utils/Virtualization.svelte';
+  import { taxonomyStore } from "$lib/stores/Taxonomy.svelte"; 
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import {
     SitemapSolid,
@@ -235,7 +236,7 @@
     TrashAltSolid,
   } from "svelte-awesome-icons";
 
-  let {
+  const {
     id,
     value = undefined,
     options = [],
@@ -246,14 +247,17 @@
   }: Props = $props();
 
   let search = $state("");
-  let breadcrumbLabels = $state<string[]>([]);
-  let stack = $state<DropdownOption[][]>([]);
+  const breadcrumbLabels = $state<string[]>([]);
+  const stack = $state<DropdownOption[][]>([]);
   let activeIndex = $state(0);
+  let scrollTop = $state(0);
+  let itemHeight = $state(40);
+  let scrollContainer = $state<HTMLElement | null>(null);
 
   // DOM ref
   let dropdownRef: HTMLElement | null = null;
   let listboxEl = $state<HTMLElement | null>(null);
-  let listboxId = $derived(String(id ?? "custom-dropdown") + "-listbox");
+  const listboxId = $derived(String(id ?? "custom-dropdown") + "-listbox");
 
   const currentOptions = $derived.by(() =>
     stack.length > 0 ? stack[stack.length - 1] : (options ?? [])
@@ -291,6 +295,20 @@
         ? { value: String(found.value), label: String(found.label) }
         : { value: v, label: v };
     });
+  });
+
+  const virtualState = $derived.by(() => {
+    const opts = {
+      displayJobs: filteredNonEmpty,
+      innerWidth: 0, // force itemsPerRow=1
+      innerHeight: 384, // approx max-h-96
+      scrollY: scrollTop,
+      sectionTop: 0,
+      itemHeight: itemHeight,
+      gap: 0,
+      buffer: 3,
+    };
+    return Virtualization.computeGrid(opts);
   });
 
   const onKeyDown = (e: KeyboardEvent): void => {
@@ -356,6 +374,40 @@
     keyHandlers[e.key as keyof typeof keyHandlers]?.();
   };
 
+  let ro: ResizeObserver | null = null;
+
+  async function measureItemHeight() {
+    await tick();
+    try {
+      const lis = listboxEl?.querySelectorAll("li");
+      if (!lis || lis.length === 0) return;
+      let maxH = 0;
+      // Temporarily clear forced heights to measure natural heights
+      const originals: string[] = [];
+      lis.forEach((li) => {
+        originals.push((li as HTMLElement).style.height || "");
+        (li as HTMLElement).style.height = "auto";
+      });
+
+      for (const li of Array.from(lis)) {
+        if (!(li instanceof HTMLElement)) continue;
+        const h = Math.ceil(li.getBoundingClientRect().height);
+        if (h > maxH) maxH = h;
+      }
+
+      // restore original inline heights
+      lis.forEach((li, idx) => {
+        if (li instanceof HTMLElement) li.style.height = originals[idx] || "";
+      });
+
+      if (maxH > 0 && maxH !== itemHeight) {
+        itemHeight = maxH;
+      }
+    } catch {
+      // ignore
+    }
+  }
+
   onMount(() => {
     document.addEventListener("mousedown", (e) =>
       CustomDropdownController.handleClickOutside(e, dropdownRef, close)
@@ -364,12 +416,58 @@
     if (listboxEl) {
       void listboxEl;
     }
+
+    // setup resize observer to detect dynamic changes
+    try {
+      ro = new ResizeObserver(() => {
+        void measureItemHeight();
+      });
+      if (listboxEl) ro.observe(listboxEl);
+    } catch {
+      // ResizeObserver unavailable
+    }
+
+    // initial measurement
+    void measureItemHeight();
   });
 
   onDestroy(() => {
     document.removeEventListener("mousedown", (e) =>
       CustomDropdownController.handleClickOutside(e, dropdownRef, close)
     );
+    if (ro) ro.disconnect();
+  });
+
+  $effect(() => {
+    filteredNonEmpty;
+    scrollTop = 0;
+    void measureItemHeight();
+    if (ro && listboxEl) {
+      try {
+        ro.disconnect();
+        ro.observe(listboxEl);
+      } catch {}
+    }
+  });
+
+  $effect(() => {
+    breadcrumbLabels;
+    stack;
+    scrollTop = 0;
+    void measureItemHeight();
+  });
+
+  $effect(() => {
+    activeIndex;
+    itemHeight;
+    const sc = scrollContainer;
+    if (!sc) return;
+    const vh = sc.clientHeight;
+    const row = itemHeight || 40;
+    const targetTop = (activeIndex ?? 0) * row;
+    if (targetTop < sc.scrollTop) sc.scrollTop = targetTop;
+    else if (targetTop + row > sc.scrollTop + vh)
+      sc.scrollTop = targetTop + row - vh;
   });
 </script>
 
@@ -397,7 +495,10 @@
           class="w-full search-input border rounded px-3 py-2 text-sm ring-1 ring-[var(--wpl-global-color-1)]"
           placeholder="Cari..."
           onkeydown={(e) => e.stopPropagation()}
-          oninput={() => (activeIndex = 0)}
+          oninput={() => {
+            activeIndex = 0;
+            scrollTop = 0;
+          }}
         />
       </div>
 
@@ -461,7 +562,7 @@
 
           <!-- controls (static below breadcrumb) -->
           <div
-            class="flex justify-between items-center px-5 py-2 z-40 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)] bg-opacity-100 border-t"
+            class="flex justify-between items-center px-5 py-2 z-10 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)] bg-opacity-100 border-t"
           >
             <!-- Back button (always available when breadcrumb is present) -->
             <button
@@ -511,17 +612,20 @@
       {/if}
 
       <!-- Options list (scrollable) -->
-      <ul
-        id={listboxId}
-        role="listbox"
-        bind:this={listboxEl}
-        class="max-h-96 overflow-auto pt-0 pb-2"
-      >
-        {#each filteredNonEmpty as option, idx (option.__key)}
+      <div class="max-h-96 overflow-auto pt-2" bind:this={scrollContainer} onscroll={(e) => scrollTop = (e.currentTarget as HTMLElement).scrollTop}>
+        <ul
+          id={listboxId}
+          role="listbox"
+          bind:this={listboxEl}
+          style="height: {virtualState.totalHeight}px; position: relative;"
+          class="!pt-0 !pb-2"
+        >
+        {#each virtualState.visibleJobs as option, index (option.__key)}
           <li
+            style="position: absolute; transform: translateY({(virtualState.startIndex + index) * virtualState.rowHeight}px); width: 100%; height: {virtualState.rowHeight}px;"
             class={[
               "flex items-center px-5 py-2 cursor-pointer select-none transition rounded text-left",
-              idx === activeIndex ? "bg-[var(--wpl-global-color-1)]/15" : "",
+              (virtualState.startIndex + index) === activeIndex ? "bg-[var(--wpl-global-color-1)]/15" : "",
               CustomDropdownHelpers.isSelected(option.value, selectedValues)
                 ? "font-bold"
                 : "",
@@ -529,8 +633,8 @@
           >
             <button
               type="button"
-              class="flex-1 text-left flex items-center"
-              onmouseenter={() => (activeIndex = idx)}
+              class="flex-1 text-left flex items-center min-w-0 pr-12 break-words whitespace-normal"
+              onmouseenter={() => (activeIndex = virtualState.startIndex + index)}
               onclick={() =>
                 !multiple &&
                 CustomDropdownController.select(
@@ -572,9 +676,9 @@
                 >
               {/if}
               {#if option.children?.length}
-                <FolderSolid class="mr-2 text-yellow-400" aria-hidden="true" />
+                <FolderSolid class="mr-2 flex-shrink-0 text-yellow-400" aria-hidden="true" />
               {:else}
-                <FileSolid class="mr-2 text-gray-400" aria-hidden="true" />
+                <FileSolid class="mr-2 flex-shrink-0 text-gray-400" aria-hidden="true" />
               {/if}
               {#if search && String(search).trim()}
                 {#each CustomDropdownHelpers.highlightParts(option.label, String(search)) as part}
@@ -628,7 +732,7 @@
                 aria-label="Lihat sub"
               >
                 <span
-                  class="absolute -top-2 -right-1 bg-[var(--wpl-global-color-1)] text-xs rounded-full px-2 py-0.1 z-10"
+                  class="absolute left-6 -top-1 translate-y-1 bg-[var(--wpl-global-color-1)]/80 text-xs rounded-full px-1.5 py-0.1 z-20"
                   >{option.children.length}</span
                 >
                 <ChevronRightSolid
@@ -640,10 +744,11 @@
           </li>
         {/each}
 
+        </ul>
         {#if filteredNonEmpty.length === 0 && !taxonomyStore.loading}
-          <li class="px-5 py-2 text-gray-400 text-center">Tidak ada hasil</li>
+          <div class="px-5 py-2 text-gray-400 text-center">Tidak ada hasil</div>
         {/if}
-      </ul>
+      </div>
     </div>
   {/if}
 </div>

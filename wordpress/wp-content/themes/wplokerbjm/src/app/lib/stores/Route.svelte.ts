@@ -1,22 +1,33 @@
 import type { SearchState, CarouselState } from '@/types'
 import { WPPostRoute } from '@/types'
-import { removeJobPostingJsonLd } from '$lib/utils/elements.svelte'
-import { SvelteMap, SvelteURL } from 'svelte/reactivity'
-import { scrollY } from 'svelte/reactivity/window'
-import { SEOService } from '$lib/utils/SEO.svelte'
-import { GoogleServices } from '$lib/utils/Google.svelte'
-import { WPThemeDataStore } from '$lib/stores/WPThemeData'
-import { isDevelopmentMode } from '@/utils'
+import { type Component } from 'svelte'
+import { SvelteURL } from 'svelte/reactivity'
+import { utilsSEO } from '$lib/utils/SEO.svelte'
+import { GoogleServices } from '@/services/Google'
+import { scrollY } from 'svelte/reactivity/window';
+import { getThemeData } from '@/utils'
 import type { CardJob } from '@/types'
+import { LRUCache } from 'lru-cache'
 
 export class RouteManager {
   currentUrl = $state(new SvelteURL(window.location.href));
-  isInitialLoad = $state(true);
+  isInitialLoad = $state(true); // Indicates if the page result from SSR
   isLoading = $state(false);
   loadingComponent = $state<string | null>(null);
+  CurrentComponent: Component | null = $state(null);
+  SkeletonComponent: Component | null = $state(null);
+  isTransitioningRoute = $state(false); // Indicates if a route transition is in progress
+  elRouteContainer: HTMLElement | null = null; // `.route-container` element reference
+  setTimeoutWillChange: number | undefined = undefined; // Timeout ID for removing will-change styles
+  currentViewTransition: any = $state(null); // prevent duplicate transitions
+  lockViewTransition: boolean = $state(false); // prevent multiple View Transitions
 
   setCurrentPath(path: string) {
-    this.currentUrl.href = new SvelteURL(path, window.location.origin).href;
+    this.currentUrl.href = new SvelteURL(path, this.currentUrl.origin).href;
+  }
+
+  get getOrigin(): string {
+    return this.currentUrl.origin;
   }
 
   setIsInitialLoad(value: boolean) {
@@ -35,28 +46,122 @@ export class RouteManager {
     return 'Unknown';
   }
 
-  async performRouteTransitionSideEffects(path: string): Promise<void> {
-    // Destroy AdSense ads before route change for clean navigation
-    GoogleServices.adSenseDestroy();
+  performRouteTransitionSideEffects(path: string): void {
+    utilsSEO.clearPendingJobSchemas();
 
     // Fetch RankMath head data
-    if (!isDevelopmentMode()) {
-      await SEOService.fetchHeadData(path);
+    utilsSEO.fetchHeadData(path).then(() => {
+      utilsSEO.removeJobPostingJsonLd();
+      // Head data updated
+    }).catch((err) => {
+      console.error('Failed to fetch head data for route transition to', path, err);
+    }).finally(() => {
+      GoogleServices.sendPageView(path);
+    });
+
+  }
+
+  navigateTo(path: string, searchState?: SearchState, componentName?: string) {
+
+    this.addContainerWillChange();
+
+    requestAnimationFrame(() => {
+      // Save current scroll position
+      try {
+        const y = (typeof scrollY !== 'undefined' && scrollY.current !== undefined)
+          ? scrollY.current
+          : (typeof window !== 'undefined' && 'scrollY' in window ? (window as any).scrollY : 0);
+        routeStateStore.saveScrollPosition(window.location.pathname, Number(y) || 0);
+      } catch { }
+
+      if (searchState) {
+        routeStateStore.saveSearchState(window.location.pathname, searchState);
+      }
+
+      this.setCurrentPath(path);
+      routeStateStore.setSkipScrollRestore(path, false);
+      if (typeof window !== 'undefined') {
+        window.history.pushState(null, '', path);
+      }
+
+      this.setIsInitialLoad(false);
+      if (componentName) this.setIsLoading(true, componentName);
+
+      // perform side effects (analytics/head updates)
+      void this.performRouteTransitionSideEffects(path);
+
+      this.removeContainerWillChange();
+    });
+  }
+
+  get handlePopstateEvent() {
+    if (typeof window === 'undefined') return;
+    const newPath = window.location.pathname;
+    requestAnimationFrame(() => {
+      this.addContainerWillChange();
+      this.currentUrl.href = window.location.href;
+      this.setIsInitialLoad(false);
+      this.setIsLoading(true);
+      this.isTransitioningRoute = true;
+      this.performRouteTransitionSideEffects(newPath);
+      this.removeContainerWillChange();
+    });
+  }
+
+  private addContainerWillChange() {
+    if (!this.elRouteContainer) {
+      this.elRouteContainer = document.querySelector('.route-container');
+      if (!this.elRouteContainer) return;
+    }
+    // Skip will-change if View Transition API is supported, as it handles performance optimizations
+    if (typeof document !== "undefined" && (document as any).startViewTransition) {
+      return;
+    }
+    const willChangeProps = "transform, opacity, scroll-position, contents";
+    try {
+      this.elRouteContainer.style.setProperty('will-change', willChangeProps);
+    } catch {
+      console.warn('Failed to set will-change styles on route container');
+    }
+  }
+
+  private removeContainerWillChange() {
+    if (this.setTimeoutWillChange) {
+      clearTimeout(this.setTimeoutWillChange);
+      this.setTimeoutWillChange = undefined;
     }
 
-    // GTAG / GTM page view
-    GoogleServices.sendPageView(path);
+    this.setTimeoutWillChange = window.setTimeout(() => {
+      if (!this.elRouteContainer) return;
+      this.elRouteContainer.style.removeProperty('will-change');
 
-    // Trigger optional AdSense refresh
-    GoogleServices.adSenseRefresh();
+      // Remove style attribute only if there are no other inline styles
+      if (!this.elRouteContainer.getAttribute('style') ||
+        this.elRouteContainer.style.cssText.trim() === '' ||
+        this.elRouteContainer.style.length === 0) {
+        this.elRouteContainer.removeAttribute('style');
+      }
+    }, 5000);
+  }
+
+  loadStart(componentName?: string) {
+    this.setIsLoading(true, componentName);
+    this.isTransitioningRoute = true;
+    // this.CurrentComponent = null;
+  }
+
+  loadEnd() {
+    this.setIsLoading(false);
+    // this.loadingComponent = null;
   }
 }
 
 export class RouteStateManager {
-  scrollPositions = new SvelteMap<string, number>();
-  searchStates = new SvelteMap<string, SearchState>(); // Track search states(include initial JobGrid) and per path
+  scrollPositions = new LRUCache<string, number>({ max: 50 }); // Limit to 50 most recent scroll positions
+  searchStates = new LRUCache<string, SearchState>({ max: 50 }); // Limit to 50 most recent search states
   lastVisitedJob: CardJob['slug'] | undefined = undefined; // Remember the last visited job slug for mobile navigation
   carouselState: CarouselState | null = null; // Single carousel state for homepage
+  skipScrollRestore = new LRUCache<string, boolean>({ max: 50 }); // Limit to 50 most recent skip flags
 
   saveScrollPosition(path: string, scrollY: number) {
     this.scrollPositions.set(path, scrollY);
@@ -89,12 +194,12 @@ export class RouteStateManager {
     // Capture server-side lastJobUpdate if available (more reliable for freshness checks)
     let serverLast = 0;
     try {
-      const themeData = WPThemeDataStore.getThemeData();
+      const themeData = getThemeData();
       if (themeData?.lastJobUpdate) {
         const parsed = Date.parse(themeData.lastJobUpdate);
         serverLast = isNaN(parsed) ? 0 : parsed;
       }
-    } catch (e) {
+    } catch {
       serverLast = 0;
     }
 
@@ -103,8 +208,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem(`searchState_${path}`, JSON.stringify(stateWithTimestamp));
-      } catch (e) {
-        console.warn('Failed to save search state to sessionStorage', e);
+      } catch {
+        console.warn('Failed to save search state to sessionStorage');
       }
     }
   }
@@ -125,8 +230,8 @@ export class RouteStateManager {
             state = parsed;
           }
         }
-      } catch (e) {
-        console.warn('Failed to load search state from sessionStorage', e);
+      } catch {
+        console.warn('Failed to load search state from sessionStorage');
       }
     }
     return state;
@@ -137,8 +242,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.removeItem(`searchState_${path}`);
-      } catch (e) {
-        console.warn('Failed to clear search state from sessionStorage', e);
+      } catch {
+        console.warn('Failed to clear search state from sessionStorage');
       }
     }
   }
@@ -148,8 +253,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem('carouselState', JSON.stringify(carouselState));
-      } catch (e) {
-        console.warn('Failed to save carousel state to sessionStorage', e);
+      } catch {
+        console.warn('Failed to save carousel state to sessionStorage');
       }
     }
   }
@@ -163,8 +268,8 @@ export class RouteStateManager {
           this.carouselState = JSON.parse(stored) as CarouselState;
           return this.carouselState;
         }
-      } catch (e) {
-        console.warn('Failed to load carousel state from sessionStorage', e);
+      } catch {
+        console.warn('Failed to load carousel state from sessionStorage');
       }
     }
     return undefined;
@@ -176,8 +281,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.removeItem('carouselState');
-      } catch (e) {
-        console.warn('Failed to clear carousel state from sessionStorage', e);
+      } catch {
+        console.warn('Failed to clear carousel state from sessionStorage');
       }
     }
   }
@@ -189,8 +294,8 @@ export class RouteStateManager {
     if (typeof sessionStorage !== 'undefined') {
       try {
         sessionStorage.setItem('lastVisitedJob', slug);
-      } catch (e) {
-        console.warn('Failed to save last visited job to sessionStorage', e);
+      } catch {
+        console.warn('Failed to save last visited job to sessionStorage');
       }
     }
   }
@@ -205,30 +310,96 @@ export class RouteStateManager {
         if (stored && stored === slug) {
           return true;
         }
-      } catch (e) {
-        console.warn('Failed to load last visited job from sessionStorage', e);
+      } catch {
+        console.warn('Failed to load last visited job from sessionStorage');
       }
     }
     return false;
   }
 
+  setSkipScrollRestore(path: string, skip: boolean) {
+    this.skipScrollRestore.set(path, skip);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(`skipScrollRestore_${path}`, skip.toString());
+      } catch (e) {
+        console.warn('Failed to save skipScrollRestore to sessionStorage', e);
+      }
+    }
+  }
+
+  getSkipScrollRestore(path: string): boolean {
+    let skip = this.skipScrollRestore.get(path);
+    if (skip === undefined && typeof sessionStorage !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem(`skipScrollRestore_${path}`);
+        if (stored) {
+          skip = stored === 'true';
+          this.skipScrollRestore.set(path, skip); // cache in memory
+        }
+      } catch (e) {
+        console.warn('Failed to load skipScrollRestore from sessionStorage', e);
+      }
+    }
+    return skip || false;
+  }
+
   restoreScrollForPath(path: string): void {
     if (typeof window === 'undefined') return;
-    const savedScroll = this.getScrollPosition(path);
-    if (savedScroll !== undefined) {
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => window.scrollTo({ top: savedScroll, behavior: "smooth" }), 50);
-        });
-      });
-    } else if (path !== "/") {
-      // Scroll to top for new routes
-      requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
-        });
-      });
+    if (this.getSkipScrollRestore(path)) {
+      // Skip scroll restoration for this path
+      this.setSkipScrollRestore(path, false); // Reset after skipping
+      return;
     }
+
+    let attempts = Number(0);
+    let restoring = false;
+    const maxAttempts = Number(10);
+
+    const attemptRestore = () => {
+      const savedScroll = this.getScrollPosition(path);
+
+      restoring = true;
+
+      if (savedScroll !== undefined) {
+        window.scrollTo({ top: savedScroll, behavior: 'instant' });
+        // Check if scrollY is less than saved, and retry if attempts allow
+        requestAnimationFrame(() => {
+          if (window.scrollY < savedScroll && attempts < maxAttempts) {
+            attempts++;
+            requestAnimationFrame(tryRestore);
+            restoring = false;
+            return;
+          }
+        });
+      } else if (path !== "/") {
+        // Scroll to top for new routes
+        window.scrollTo({ top: 0, behavior: 'instant' });
+      }
+    };
+
+    const tryRestore = () => {
+      if (!routeStore.isLoading && routeStore.CurrentComponent && !routeStore.isTransitioningRoute) {
+        requestAnimationFrame((attemptRestore));
+        restoring = false;
+        return;
+      }
+
+      // To be safe, inital restore doesnt restore somehow
+      if (attempts < maxAttempts && !restoring) {
+        attempts++;
+        requestAnimationFrame(tryRestore);
+        restoring = false;
+      } else {
+        // Fallback: attempt a final restore even if component didn't signal readiness
+        attemptRestore();
+        restoring = false;
+        return;
+      }
+    };
+
+    // Kick off the restore attempts
+    requestAnimationFrame(tryRestore);
   }
 }
 
@@ -239,37 +410,8 @@ export const routeStateStore = new RouteStateManager();
  * @param path The target path to navigate to.
  * @param searchState Optional search state to save for the current path before navigating away.
  */
-export async function navigateTo(path: string, searchState?: SearchState) {
-  // Save current scroll position
-  routeStateStore.saveScrollPosition(window.location.pathname, scrollY.current ?? 0);
-
-  // Save current search state if provided
-  if (searchState) {
-    routeStateStore.saveSearchState(window.location.pathname, searchState);
-  }
-
-  // Destroy AdSense ads before route change for clean navigation
-  GoogleServices.adSenseDestroy();
-
-  // Set loading state
-  routeStore.setIsLoading(true, routeStore.getComponentNamePath(path));
-
-  // Remove any leftover JobPosting JSON-LD once.
-  removeJobPostingJsonLd();
-
-  routeStore.setCurrentPath(path);
-  window.history.pushState(null, '', path);
-  routeStore.setIsInitialLoad(false);
-
-  // Fetch RankMath head data only for SPA navigation, not initial load
-  if (!routeStore.isInitialLoad) {
-    await routeStore.performRouteTransitionSideEffects(path);
-  }
-
-  // Add loading timeout (1 second max)
-  setTimeout(() => {
-    if (routeStore.isLoading) {
-      routeStore.setIsLoading(false);
-    }
-  }, 1000);
+export function GlobalNavigateTo(path: string, searchState?: SearchState) {
+  requestAnimationFrame(() => {
+    routeStore.navigateTo(path, searchState);
+  });
 }

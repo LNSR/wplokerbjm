@@ -2,18 +2,16 @@
 
 namespace WPLokerBJM\Services\REST;
 
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
-use WPLokerBJM\Services\Utilities\Utilities;
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 class RESTData
 {
-    public const CARD_CACHE_PREFIX = 'rest_card_';
-    public const OVERLAY_CACHE_PREFIX = 'rest_overlay_';
-    public const CACHE_TTL = 86400; // 1 day
-
     public function __construct(
-        public \WPLokerBJM\Factories\JobDataFactory $jobDataFactory
+        private \WPLokerBJM\Factories\JobDataFactory $jobDataFactory,
+        private \WPLokerBJM\Services\Schema\JobSchemaOrg $jobSchema
     ) {
     }
 
@@ -25,7 +23,7 @@ class RESTData
      */
     public function getCardData(int $post_id): array
     {
-        $cacheKey = self::CARD_CACHE_PREFIX . $post_id;
+        $cacheKey = CacheKey::REST_CARD_PREFIX . $post_id;
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -58,12 +56,12 @@ class RESTData
                 'post_time' => get_post_time('c', false, $post_id),
             ];
 
-            $data = Utilities::filterEmptyValues($data);
+            $data = SharedUtils::filterEmptyValues($data);
 
-            Cache::set($cacheKey, $data, self::CACHE_TTL);
+            Cache::set($cacheKey, $data, 86400); // Cache for 1 day
             return $data;
         } catch (\Exception $e) {
-            error_log('RESTData::getCardData error for post ' . $post_id . ': ' . $e->getMessage());
+            Logger::error('REST', 'RESTData::getCardData error for post ' . $post_id . ': ' . $e->getMessage());
             return [];
         }
     }
@@ -74,9 +72,9 @@ class RESTData
      * @param int $post_id
      * @return array
      */
-    public function getSingleOverlayData(int $post_id): array
+    public function getJobDetailData(int $post_id): array
     {
-        $cacheKey = self::OVERLAY_CACHE_PREFIX . $post_id . (is_user_logged_in() ? '_logged_in' : '_public');
+        $cacheKey = CacheKey::REST_JOBDETAIL_PREFIX . $post_id . (is_user_logged_in() ? '_logged_in' : '_public');
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -121,12 +119,12 @@ class RESTData
                 $data['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
             }
 
-            $data = Utilities::filterEmptyValues($data);
+            $data = SharedUtils::filterEmptyValues($data);
 
-            Cache::set($cacheKey, $data, self::CACHE_TTL);
+            Cache::set($cacheKey, $data, 86400); // Cache for 1 day
             return $data;
         } catch (\Exception $e) {
-            error_log('RESTData::getSingleOverlayData error for post ' . $post_id . ': ' . $e->getMessage());
+            Logger::error('REST', 'RESTData::getSingleOverlayData error for post ' . $post_id . ': ' . $e->getMessage());
             return [];
         }
     }
@@ -152,6 +150,15 @@ class RESTData
      */
     public function getThemeData()
     {
-        return \WPLokerBJM\Core\Hooks\Theme\ThemeInject::themeData();
+        return \WPLokerBJM\Core\Theme\ThemeInject::themeData();
+    }
+
+    /**
+     * Get JobSchema data for REST responses
+     * !Useful in future for headless setups
+     * @return array
+     */
+    public function JobSchema(int $post_id) {
+        return $this->jobSchema->getJobPostingSchema($post_id);
     }
 }

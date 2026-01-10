@@ -4,24 +4,9 @@ export interface LayoutProps {
   logo: string;
 }
 
-export type ComponentModule = { default?: Component };
-
-export type ComponentFactory = () => Promise<ComponentModule>;
-
-/**
- * * Component loader accepted by the mounter:
- *  - a factory: () => import('...')                 (lazy)
- *  - an import() Promise: import('...')             (lazy)
- *  - a module object from top-level await: await import('...') (eager, but not a raw constructor)
- *
- * Do NOT pass a raw/static component constructor (e.g. `MyComponent`) directly.
- * ! This is no longer supported to avoid many edge-cases and errors.
- */
-export type ComponentLoader = ComponentFactory | Promise<ComponentModule> | ComponentModule;
-
 export interface ComponentConfig {
   selector: string;
-  component: ComponentLoader;
+  component: Component | Promise<Component>;
 }
 
 export type JobSummary = Pick<MetaBox, 'jenis-pekerjaan' | 'pendidikan' | 'lokasi-pekerjaan' | 'gender' | 'pengalaman' | 'gaji_minimal' | 'gaji_maksimal' | 'umur_min' | 'umur_max' | 'deadline'>;

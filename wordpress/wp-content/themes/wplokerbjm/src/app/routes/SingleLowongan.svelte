@@ -3,11 +3,12 @@
   import JobDetail from "@components/ui/Shared/JobDetail.svelte";
   import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
   import { APIService } from "@/services/APIService";
-  import { type SingleOverlayResponse as SingleJob } from "@/types";
+  import { type JobDetailResponse as SingleJob } from "@/types";
+  import { utilsSEO } from "$lib/utils/SEO.svelte";
+  import { routeStore } from "$lib/stores/Route.svelte";
 
-  let { job: initialJob, slug: passedSlug } = $props<{
-    job?: SingleJob;
-    slug?: string;
+  const { job: initialJob } = $props<{
+    job: SingleJob;
   }>();
 
   let job = $state<SingleJob | null>(null);
@@ -15,6 +16,11 @@
   let currentRequestId = $state(0);
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
   let abortController: AbortController | null = null;
+
+  function getSlugFromUrl(): string | null {
+    if (typeof window === "undefined") return null;
+    return window.location.pathname.split("/").filter(Boolean).pop() || null;
+  }
 
   function debouncedFetch(jobSlug: string): void {
     if (debounceTimer) clearTimeout(debounceTimer);
@@ -35,7 +41,7 @@
     job = null; // Reset job state for new fetch
 
     try {
-      const fetchedJob = await APIService.fetchSingleOverlay(slug, {
+      const fetchedJob = await APIService.fetchJobDetail(slug, {
         signal: abortController.signal,
       });
       // Only update if this is still the latest request and not aborted
@@ -60,15 +66,14 @@
     }
   }
 
+  // server props take priority on initial load, else fetch from API
   onMount(() => {
     if (initialJob) {
       job = initialJob;
       isLoading = false;
     } else {
-      // Fallback to API
-      const slug =
-        passedSlug || window.location.pathname.split("/").filter(Boolean).pop();
-
+      // Always parse slug from URL
+      const slug = getSlugFromUrl();
       if (slug) {
         debouncedFetch(slug);
       } else {
@@ -82,15 +87,16 @@
     };
   });
 
-  // Watch for slug changes (in case component is reused)
+  // Watch for slug changes (in case component is reused or URL changes)
   $effect(() => {
-    const slug =
-      passedSlug ||
-      (typeof window !== "undefined"
-        ? window.location.pathname.split("/").filter(Boolean).pop()
-        : null);
+    const slug = getSlugFromUrl();
     if (slug && !job) {
       debouncedFetch(slug);
+    }
+    if (job && job.id && !routeStore.isInitialLoad) {
+      void utilsSEO.clearPendingJobSchemas();
+      void utilsSEO.removeJobPostingJsonLd();
+      void utilsSEO.addJobPostingJsonLd([job.id]);
     }
   });
 </script>

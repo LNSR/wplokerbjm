@@ -1,7 +1,7 @@
 import { APIService } from '@/services/APIService'
 import type { TaxonomyTerm, WPLokerBJMThemedData } from '@/types'
 import { TaxonomyType } from '@/types'
-import { WPThemeDataStore } from '$lib/stores/WPThemeData'
+import { getThemeData } from '@/utils';
 import { SvelteMap } from 'svelte/reactivity'
 
 interface CachedTaxonomyData {
@@ -53,7 +53,7 @@ class TaxonomyManager {
 
 	private getCachedTerms(type: TaxonomyType): TaxonomyTerm[] | null {
 		if (typeof sessionStorage === 'undefined') return null
-		const themeData = WPThemeDataStore.getThemeData()
+		const themeData = getThemeData()
 		if (!themeData?.themeVersion || !themeData?.lastTaxonomyUpdate) return null
 		const key: TaxonomyCacheKey = `wplokerbjm_taxonomy_${type}`
 		try {
@@ -71,7 +71,7 @@ class TaxonomyManager {
 
 	private setCachedTerms(type: TaxonomyType, data: TaxonomyTerm[]): void {
 		if (typeof sessionStorage === 'undefined') return
-		const themeData = WPThemeDataStore.getThemeData()
+		const themeData = getThemeData()
 		if (!themeData?.themeVersion || !themeData?.lastTaxonomyUpdate) return
 		const key: TaxonomyCacheKey = `wplokerbjm_taxonomy_${type}`
 		try {
@@ -100,7 +100,7 @@ class TaxonomyManager {
 	}
 
 	private getNameFromStorage(type: TaxonomyType, slug: string): string {
-		const themeData = WPThemeDataStore.getThemeData()
+		const themeData = getThemeData()
 		if (!themeData?.themeVersion || !themeData?.lastTaxonomyUpdate) return slug
 		const key: TaxonomyCacheKey = `wplokerbjm_taxonomy_${type}`
 		try {

@@ -1,24 +1,31 @@
 import { APIService } from '@/services/APIService'
+import { routeStore } from '$lib/stores/Route.svelte'
 import type { HeadData } from '@/types'
+import { SvelteSet, SvelteMap, SvelteDate } from 'svelte/reactivity'
 
 /**
  * SEO Service to manage RankMath head data
  */
-export class SEOService {
+export class SEOUtils {
+    private headDataCache = $state(new SvelteMap<string, { data: HeadData; timestamp: number }>());
+    private addedJobPostingIds = $state(new SvelteSet<number>());
+    public initialSchemaSSR: boolean = true;
+    private pendingJobIds = $state(new SvelteSet<number>());
+    private processTimeout: number | null = null;
 
-
-    static async fetchHeadData(path: string): Promise<HeadData | null> {
-        // Prevent fetch if hostname is localhost or an IP address
-        // RankMath API wont work in these hostnames
-        const hostname = window.location.hostname;
-        if (hostname === 'localhost' || hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
-            return null;
+    async fetchHeadData(path: string): Promise<HeadData | null> {
+        // Check cache first
+        const cached = this.headDataCache.get(path);
+        if (cached && (SvelteDate.now() - cached.timestamp) < 1 * 60 * 2000) { // 2 minutes cache
+            this.updateHead(cached.data);
+            return cached.data;
         }
 
         try {
-            const fullUrl = `${window.location.origin}${path}`;
+            const fullUrl = `${routeStore.currentUrl.origin}${path}`;
             const response = await APIService.getRankMathHead(fullUrl);
             const head = this.parseHeadHtml(response.head);
+            this.headDataCache.set(path, { data: head, timestamp: SvelteDate.now() });
             this.updateHead(head);
             return head;
         } catch (error) {
@@ -30,7 +37,7 @@ export class SEOService {
     /**
      * Parse RankMath HTML head string into structured data
      */
-    private static parseHeadHtml(headHtml: string): HeadData {
+    private parseHeadHtml(headHtml: string): HeadData {
         const headData: HeadData = {}
 
         // Create a temporary DOM element to parse the HTML
@@ -261,7 +268,7 @@ export class SEOService {
         return headData
     }
 
-    static updateHead(headData: HeadData) {
+    private updateHead(headData: HeadData) {
         if (!headData) return;
 
         // Update title
@@ -361,7 +368,7 @@ export class SEOService {
         }
     }
 
-    private static updateMetaTag(attrName: string, attrValue: string, content?: string) {
+    private updateMetaTag(attrName: string, attrValue: string, content?: string) {
         if (!content) {
             const existingMeta = document.querySelector(`meta[${attrName}="${attrValue}"]`);
             if (existingMeta) existingMeta.remove();
@@ -379,7 +386,7 @@ export class SEOService {
         }
     }
 
-    private static updateCanonicalLink(href?: string) {
+    private updateCanonicalLink(href?: string) {
         if (!href) {
             const existingLink = document.querySelector('link[rel="canonical"]');
             if (existingLink) existingLink.remove();
@@ -397,7 +404,7 @@ export class SEOService {
         }
     }
 
-    private static updateSchemaMarkup(schema: any) {
+    private updateSchemaMarkup(schema: any) {
         const existingSchemas = document.querySelectorAll('script[type="application/ld+json"]:not([data-ld-type="JobPosting"]):not([data-ld-id^="jobposting-"])');
         existingSchemas.forEach(script => script.remove());
 
@@ -409,4 +416,109 @@ export class SEOService {
             document.head.appendChild(script);
         }
     }
+
+    /**
+     * Custom madeup schema for JobPosting JSON-LD
+     * Add JobPosting JSON-LD script tags without duplicating
+     */
+    public addJobPostingJsonLd(jobIds: number[]): void {
+        jobIds.forEach(id => this.pendingJobIds.add(id));
+
+        if (this.processTimeout) clearTimeout(this.processTimeout);
+
+        this.processTimeout = setTimeout(async () => {
+            const ids = [...this.pendingJobIds];
+            this.pendingJobIds.clear();
+            await processJobSchemas(ids);
+        }, 1000);
+
+        const processJobSchemas = async (jobIds: number[]): Promise<void> => {
+            if (jobIds.length === 0) return;
+
+            // Filter out jobIds that already have JobPosting scripts to avoid fetching duplicates
+            jobIds = jobIds.filter(id => !this.addedJobPostingIds.has(id));
+
+            // Limit to maximum 27 JobPosting scripts on DOM
+            const maxAllowed = 27;
+            const remainingSlots = maxAllowed - this.addedJobPostingIds.size;
+            jobIds = jobIds.slice(0, remainingSlots);
+
+            if (jobIds.length === 0) return;
+
+            let schemas: Record<string, any>[] = [];
+
+            try {
+                if (!this.initialSchemaSSR) {
+                    schemas = await APIService.fetchJobSchemas(jobIds);
+                }
+
+                if (schemas.length === 0) return;
+
+                // Create script elements, but only if not already present
+                schemas.forEach((schema, index) => {
+                    const postId = jobIds[index];
+                    if (!postId || !schema) return;
+
+                    // Check if script already exists (additional safeguard)
+                    const existingScript = document.querySelector(`script[data-ld-id="jobposting-${postId}"]`);
+                    if (existingScript) return;
+
+                    const script = document.createElement('script');
+                    script.type = 'application/ld+json';
+                    script.setAttribute('data-ld-type', 'JobPosting');
+                    script.setAttribute('data-ld-id', `jobposting-${postId}`);
+                    script.textContent = JSON.stringify(schema);
+
+                    document.head.appendChild(script);
+                    this.addedJobPostingIds.add(postId);
+                });
+            } catch (e) {
+                console.warn('Failed to add JobPosting JSON-LD', e);
+            }
+        };
+    }
+
+    /**
+     * Remove custom JobPosting JSON-LD.
+     */
+    public removeJobPostingJsonLd(): number {
+        try {
+            let removed = 0;
+
+            if (typeof document === 'undefined') return removed;
+
+            const explicit = Array.from(document.querySelectorAll('script[type="application/ld+json"][data-ld-type="JobPosting"]'));
+            explicit.forEach(s => {
+                const idAttr = s.getAttribute('data-ld-id');
+                if (idAttr && idAttr.startsWith('jobposting-')) {
+                    const id = parseInt(idAttr.replace('jobposting-', ''), 10);
+                    if (!isNaN(id)) {
+                        this.addedJobPostingIds.delete(id);
+                    }
+                }
+                s.remove();
+                removed++;
+            });
+
+            this.initialSchemaSSR = false;
+
+            return removed;
+        } catch (e) {
+            console.warn(`Failed to remove JobPosting JSON-LD`, e);
+            return 0;
+        }
+    }
+
+    /**
+     * Clear pending job schema requests.
+     */
+    public clearPendingJobSchemas(): void {
+        if (this.processTimeout) {
+            clearTimeout(this.processTimeout);
+            this.processTimeout = null;
+        }
+        this.pendingJobIds.clear();
+    }
 }
+
+export const utilsSEO = new SEOUtils();

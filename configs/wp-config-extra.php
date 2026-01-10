@@ -58,6 +58,11 @@ define('LITESPEED_CONF__OBJECT__DB_ID', getenv('REDIS_DB'));
 define('LITESPEED_CONF__OBJECT__USER', '');
 define('LITESPEED_CONF__OBJECT__PSWD', getenv('REDIS_PWD'));
 
+if (defined('WP_ENV') && WP_ENV === 'development') {
+  define('LITESPEED_DISABLE_ALL', false);
+  define('LITESPEED_DEV', false);
+}
+
 switch (WP_ENV) {
   case 'development':
     // Debugging

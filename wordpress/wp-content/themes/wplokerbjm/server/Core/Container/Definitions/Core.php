@@ -8,19 +8,21 @@ namespace WPLokerBJM\Core\Container\Definitions;
  * ## Init Service Array Injection
  *
  * This class provides manual definitions for key services that require special handling,
- * such as the Init service. The Init service automatically discovers and injects all
- * autowirable classes that implement HooksInterface using the AutowireScanner.
+ * such as the Init service. The Init service automatically discovers and registers hooks
+ * from #[Action] and #[Filter] attributes on methods across all autowirable classes.
  *
  * How it works:
- * 1. The AutowireScanner scans the server/ directory for classes implementing HooksInterface.
- * 2. These class names are retrieved and resolved into service instances via the container.
- * 3. The Init class receives an array of these services and registers their WordPress hooks.
+ * 1. The AutowireScanner scans the server/ directory for all autowirable classes.
+ * 2. Hook registrations are scanned from #[Action] and #[Filter] attributes on methods.
+ * 3. The Init class receives hook registrations and a container reference, registering
+ *    hooks automatically by resolving services from the container as needed.
  *
- * This eliminates manual service registration, keeping the bootstrap logic clean and automatic.
+ * This eliminates manual hook registration, keeping the bootstrap logic clean and declarative.
  *
  * @see \WPLokerBJM\Core\Container\Init
- * @see \WPLokerBJM\Contracts\HooksInterface
  * @see \WPLokerBJM\Core\Container\AutowireScanner
+ * @see \WPLokerBJM\Core\Container\Attributes\Action
+ * @see \WPLokerBJM\Core\Container\Attributes\Filter
  */
 class Core
 {
@@ -29,23 +31,17 @@ class Core
         return [
             // Define the Init service: It handles automatic hook registration for all services.
             \WPLokerBJM\Core\Container\Init::class => function ($c) {
-                // Step 1: Create the scanner to find HooksInterface implementers in the server/ directory.
-                $scanner = new \WPLokerBJM\Core\Container\AutowireScanner(
+                // Step 1: Create the scanner to find hook registrations from attributes.
+                $scanner = new \WPLokerBJM\Core\Container\Support\AutowireScanner(
                     get_stylesheet_directory() . '/server', // Path to the server/ directory containing services.
                     'WPLokerBJM' // Base namespace for the theme.
                 );
 
-                // Step 2: Get the fully qualified class names of all classes implementing HooksInterface.
-                $hooksImplementers = $scanner->getInterfaceImplementerClassNames(
-                    \WPLokerBJM\Contracts\HooksInterface::class
-                );
+                // Step 2: Get hook registrations from attributes.
+                $hookRegistrations = $scanner->getHookRegistrations();
 
-                // Step 3: Resolve each class name into an actual service instance using the container.
-                $services = array_map(fn($className) => $c->get($className), $hooksImplementers);
-
-                // Step 4: Return a new Init instance with the array of resolved services.
-                // Init will call registerActions() and registerFilters() on each service.
-                return new \WPLokerBJM\Core\Container\Init($services);
+                // Init will register hooks from attributes automatically, resolving services from container as needed.
+                return new \WPLokerBJM\Core\Container\Init([], $hookRegistrations, $c);
             },
         ];
     }

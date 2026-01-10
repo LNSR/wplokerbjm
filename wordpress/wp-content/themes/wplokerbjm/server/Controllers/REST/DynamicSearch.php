@@ -2,8 +2,10 @@
 
 namespace WPLokerBJM\Controllers\REST;
 
-use WPLokerBJM\Services\Utilities\Utilities;
-
+use WPLokerBJM\Controllers\Utilities\ControllerUtils;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 class DynamicSearch
 {
     public function __construct(
@@ -14,33 +16,57 @@ class DynamicSearch
     public function handle(\WP_REST_Request $request)
     {
         try {
-            $filters = Utilities::parseJobFilters($request);
+            $filters = ControllerUtils::parseJobFilters($request);
+            $context = $request->get_param('context') ?? 'search';
 
+            $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize($filters) . $context);
+            $cached = Cache::get($cacheKey);
 
-            $args = \WPLokerBJM\QueryBuilders\JobQuery::searchJobsArgs($filters, 1, 36);
+            if ($cached !== false) {
+                $response = new \WP_REST_Response($cached['data']);
+                $response->header('X-WP-Total', $cached['total']);
+                $response->header('X-WP-TotalPages', $cached['totalPages']);
+                ControllerUtils::setPaginationLinks($response, $request, 1, $cached['totalPages'], 'dynamic-search', 'page');
+                return $response;
+            }
 
-            $result = $this->jobRepository->queryCard($args);
+            $query_args = match ($context) {
+                'search' => \WPLokerBJM\QueryBuilders\JobQuery::searchJobsArgs($filters, 1, 27),
+                default => \WPLokerBJM\QueryBuilders\JobQuery::latestJobsArgs(1, 27),
+            };
+
+            $result = $this->jobRepository->queryJob($query_args);
 
             $jobs = $result['jobs'] ?? [];
             $query = $result['query'] ?? new \WP_Query();
 
-            $response = new \WP_REST_Response(Utilities::filterEmptyValues([
+            $data = SharedUtils::filterEmptyValues([
                 'jobs' => $jobs,
-                'context' => 'search',
+                'context' => $context,
                 'filters' => $filters,
-            ]));
+            ]);
+
+            $cacheData = [
+                'data' => $data,
+                'total' => $query->found_posts,
+                'totalPages' => $query->max_num_pages,
+            ];
+
+            Cache::set($cacheKey, $cacheData, 86400); // Cache for 1 day
+
+            $response = new \WP_REST_Response($data);
             
             // Set pagination headers
             $response->header('X-WP-Total', $query->found_posts);
             $response->header('X-WP-TotalPages', $query->max_num_pages);
 
             // Set Link header for pagination
-            Utilities::setPaginationLinks($response, $request, 1, $query->max_num_pages, 'dynamic-search', 'page');
+            ControllerUtils::setPaginationLinks($response, $request, 1, $query->max_num_pages, 'dynamic-search', 'page');
 
             return $response;
         } catch (\Exception $e) {
-            error_log('DynamicSearch::handle error: ' . $e->getMessage());
-            return Utilities::failedResponse('An error occurred while processing the request.', 500);
+            Logger::error('REST', 'DynamicSearch::handle error: ' . $e->getMessage());
+            return ControllerUtils::failedResponse('An error occurred while processing the request.', 500);
         }
     }
 }

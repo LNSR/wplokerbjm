@@ -26,9 +26,7 @@ export function removePropsScriptFromElement(element: Element | Document, propAt
     try {
         const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`) as HTMLScriptElement | null;
         if (scriptElement)
-            setTimeout(() => {
-                scriptElement.remove();
-            }, 1000);
+            scriptElement.remove();
     } catch {
         // Ignore
     }

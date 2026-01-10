@@ -25,20 +25,19 @@
 
 This MU plugin is crucial for the theme's architecture, as it bootstraps the dependency injection system and custom hooks that power the job portal functionality.
 
-## 📄 Theme Pages
+## 📄 Theme Routing
 
-| Page                                    | Template                   | Description                         | Status    |
-| --------------------------------------- | -------------------------- | ----------------------------------- | --------- |
-| 🏠 [Homepage](index.php)                | `index.php`                | Main landing page with job listings | ✅ Active |
-| 💼 [Job Detail](single-lowongan.php)    | `single-lowongan.php`      | Individual job posting page         | ✅ Active |
-| 📝 [Post Job](page-pasang-lowongan.php) | `page-pasang-lowongan.php` | Job posting submission form         | ✅ Active |
+The theme uses a single router file [`index.php`](index.php) that routes requests to appropriate view classes based on WordPress conditions.
+
+| Page          | View Class             | Description                         | Status    |
+| ------------- | ---------------------- | ----------------------------------- | --------- |
+| 🏠 Homepage   | `HomepageView`         | Main landing page with job listings | ✅ Active |
+| 💼 Job Detail | `SingleLowonganView`   | Individual job posting page         | ✅ Active |
+| 📝 Post Job   | `PasangIklanLokerView` | Job posting submission form         | ✅ Active |
 
 ## 🔧 Automation Tools
 
-- 🏗️ **[SSG](tools/SSG/docs/README.md)** — Static Site Generation via GitHub Actions pipeline
-  - ⚡ Automated builds on content changes
-  - 🚀 Performance optimization
-  - 📊 SEO improvements
+- 🚀 Performance optimization
 
 ## 🔗 Dependency Injection System
 
@@ -97,15 +96,6 @@ class JobService
 }
 ```
 
-#### Interface Binding (Manual definition)
-
-```php
-// In Definitions/Repositories.php
-return [
-    DataProviderInterface::class => get(CustomFieldRepository::class),
-];
-```
-
 #### Using Services
 
 ```php
@@ -122,7 +112,42 @@ $jobService = $container->get(JobService::class);
 - **Production**: Container compilation is enabled with caching for optimal performance
 - **APCu**: When available, definition caching is enabled for additional speed
 
-## 📝 Development Notes
+## � Hook Registration
+
+The theme uses attribute-based hook registration for WordPress actions and filters. Instead of manually calling `add_action` or `add_filter`, you can use PHP attributes on your service methods.
+
+### Using Attributes
+
+```php
+use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Container\Attributes\Filter;
+
+class MyService
+{
+    #[Action('wp_enqueue_scripts')]
+    public function enqueueScripts(): void
+    {
+        // Your code here
+    }
+
+    #[Filter('the_content', priority: 10, acceptedArgs: 1)]
+    public function filterContent(string $content): string
+    {
+        return $content;
+    }
+}
+```
+
+### How It Works
+
+- The `AutowireScanner` scans all autowirable classes for methods with `#[Action]` or `#[Filter]` attributes.
+- The `Init` service automatically registers these hooks when the container is initialized.
+- Supports both static and instance methods.
+- Parameters like priority and accepted_args are configurable via the attribute.
+
+This approach keeps hook registration declarative and centralized.
+
+## �📝 Development Notes
 
 > 💡 **Architecture Tips**
 >
@@ -137,5 +162,4 @@ $jobService = $container->get(JobService::class);
 | ------------------------------------------------------ | ------- | -------------- | -------------------------------------- |
 |                                                        |         |                | ✅ Migrate to Svelte for most frontend |
 | 🚀 Migrate to SvelteKit and deploy to Vercel/CF Worker |         |                | ✅ Fully CSR `<body>`                  |
-| 🗺️ Add Job Fair Page (map & event details)             |         |                | ✅ Implement SSG via GitHub Actions    |
-|                                                        |         |                | ✅ Client side bookmark system         |
+| 🗺️ Add Job Fair Page (map & event details)             |         |                | ✅ Client side bookmark system         |

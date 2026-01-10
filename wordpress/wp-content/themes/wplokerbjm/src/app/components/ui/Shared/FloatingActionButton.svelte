@@ -110,7 +110,7 @@
   });
 </script>
 
-<div class="fixed bottom-3 right-3 z-100 flex flex-col items-end gap-4">
+<aside class="fixed bottom-3 right-3 z-100 flex flex-col items-end gap-4" style="view-transition-name: fab;">
   {#if show}
     <!-- Scroll to Top Button -->
     <button
@@ -158,7 +158,7 @@
             <a
               href={link.url}
               target="_blank"
-              rel="noopener"
+              rel="noopener noreferrer"
               class={gridBtnClass}
               role="menuitem"
               tabindex="0"
@@ -176,4 +176,4 @@
       </div>
     {/if}
   </div>
-</div>
+</aside>

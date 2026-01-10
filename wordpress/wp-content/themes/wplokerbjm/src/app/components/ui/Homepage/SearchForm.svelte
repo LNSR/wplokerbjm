@@ -3,6 +3,7 @@
   import { TaxonomyType } from "@/types";
   import { SearchTitle, SearchContext } from "@/types";
   import { searchStore, SearchUtils } from "$lib/stores/Search.svelte";
+  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
 
   type LocalSearchFormProps = {
     currentSearch?: string;
@@ -56,7 +57,9 @@
 
   export class SearchFormController {
     static async performSearch(): Promise<SearchResponse> {
-      if (!searchStore.hasFilters) throw new Error("Terjadi kesalahan pada filter");
+      if (!searchStore.hasFilters)
+        throw new Error("Terjadi kesalahan pada filter");
+      searchStore.filters.context = SearchContext.Search;
       if (selectedSuggestionIndex >= 0 && searchStore.hasSuggestions) {
         const suggestion = searchStore.suggestions[selectedSuggestionIndex];
         if (suggestion) {
@@ -71,7 +74,7 @@
       searchStore.resetFilters();
       const response = await searchStore.searchJobs();
       searchStore.title = SearchTitle.Latest;
-      searchStore.context = SearchContext.Search;
+      searchStore.context = SearchContext.Latest;
       response.title = SearchTitle.Latest;
       response.context = SearchContext.Latest;
       return response;
@@ -157,19 +160,12 @@
 
   let CustomDropdown: typeof import("./CustomDropdown.svelte").default | null =
     $state(null);
-  async function loadCustomDropdown(): Promise<typeof CustomDropdown> {
-    if (!CustomDropdown) {
-      CustomDropdown = (await import("./CustomDropdown.svelte")).default;
-    }
-    return CustomDropdown;
-  }
 </script>
 
 <script lang="ts">
   import { onMount } from "svelte";
   import { taxonomyStore } from "$lib/stores/Taxonomy.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import Adsense from "@components/ui/Shared/Adsense.svelte";
   import {
     MagnifyingGlassSolid,
     MapMarkerAltSolid,
@@ -184,7 +180,7 @@
   } from "svelte-awesome-icons";
 
   const props = $props();
-  let {
+  const {
     currentSearch,
     currentLokasi,
     currentGender,
@@ -340,7 +336,9 @@
       isPendidikanOpen ||
       (isSortOpen && !CustomDropdown)
     ) {
-      loadCustomDropdown();
+      (async () => {
+        CustomDropdown = await dynamicComponentStore.loadCustomDropdown();
+      })();
     }
   });
 
@@ -374,7 +372,6 @@
   <p class="mb-8 text-lg text-semibold">
     Update setiap hari, mudah diakses, dan gratis!
   </p>
-  <Adsense adSlot="8092165517" />
   <div
     class="border-2 border-blue-500 mt-4 rounded-xl p-4 md:p-6 min-h-[220px] sm:min-h-[306px] md:min-h-[204px]"
   >
@@ -585,7 +582,9 @@
             aria-expanded={isSortOpen}
             aria-controls="sort-listbox"
             onclick={() => {
-              loadCustomDropdown();
+              (async () => {
+                CustomDropdown = await dynamicComponentStore.loadCustomDropdown();
+              })();
               isSortOpen = !isSortOpen;
               if (isSortOpen) {
                 isLokasiOpen = false;

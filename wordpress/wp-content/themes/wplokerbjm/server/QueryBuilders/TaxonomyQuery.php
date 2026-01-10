@@ -3,7 +3,7 @@
 namespace WPLokerBJM\QueryBuilders;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Models\Schema\PostTypes;
-use WPLokerBJM\Core\Cache;
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 
 /**
  * Encapsulates taxonomy-related query construction.
@@ -63,7 +63,7 @@ class TaxonomyQuery
         // perusahaan handled specially when 'cari' (search) is provided - partial match
         if (!empty($params['cari'])) {
             $search_term = sanitize_text_field($params['cari']);
-            $cache_key = 'company_search_' . md5($search_term);
+            $cache_key = CacheKey::COMPANY_SEARCH_PREFIX . md5($search_term);
             $company_terms = Cache::get($cache_key);
             if ($company_terms === false) {
                 $company_terms = get_terms([
@@ -73,7 +73,7 @@ class TaxonomyQuery
                     'hide_empty' => false,
                 ]);
                 if (!is_wp_error($company_terms)) {
-                    Cache::set($cache_key, $company_terms, 3600); // Cache for 1 hour
+                    Cache::set($cache_key, $company_terms, 86400); // Cache for 1 day
                 } else {
                     $company_terms = [];
                 }
@@ -119,7 +119,7 @@ class TaxonomyQuery
      */
     public static function getLastModifiedDateForTaxonomies(): string
     {
-        $cache_key = 'taxonomy_last_modified';
+        $cache_key = CacheKey::TAXONOMY_LAST_MODIFIED;
         $cached = Cache::get($cache_key);
         if ($cached !== false) {
             return $cached;
@@ -141,7 +141,7 @@ class TaxonomyQuery
         $result = $wpdb->get_var($query);
         $final_result = $result ?: gmdate('c');
 
-        Cache::set($cache_key, $final_result, 3600); // Cache for 1 hour
+        Cache::set($cache_key, $final_result, 86400); // Cache for 1 day
         return $final_result;
     }
 }
