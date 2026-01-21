@@ -5,7 +5,6 @@
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { generalStore } from "$lib/stores/General.svelte";
   import Virtualization from "$lib/utils/Virtualization.svelte";
-  import { isAppEl } from "@/utils";
   import type { CardJob } from "@/types";
   import { isMobile } from "$lib/utils/elements.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
@@ -361,7 +360,8 @@
 
     portalDialog(append: boolean = true): void {
       if (typeof document === "undefined") return;
-      const appContainer = document.querySelector(isAppEl) ?? document.body;
+      const appContainer =
+        document.querySelector(".route-container") ?? document.body;
       switch (append) {
         case true:
           if (modalEl && modalEl.parentElement !== appContainer) {
@@ -437,7 +437,7 @@
   });
 
   $effect(() => {
-    timeEffect() //;
+    timeEffect(); //;
     // React to showDeleteConfirm changes to control the delete confirmation modal
     if (showDeleteConfirm) {
       if (!deleteConfirmModal?.open) deleteConfirmModal?.showModal();
@@ -719,8 +719,8 @@
                 {@const topPosition =
                   virtualizedJobs.itemPositions[absoluteIndex] || 0}
                 <div
-                  class="card bg-base-300 shadow-sm hover:shadow-md transition-all duration-300 absolute left-0 right-0"
-                  class:scale-95={removingIds.has(job.id || 0)}
+                  class="card bg-base-300 shadow-sm hover:shadow-md transition-transform duration-400 absolute left-0 right-0"
+                  class:scale-0={removingIds.has(job.id || 0)}
                   style="transform: translate3d(0, {topPosition}px, 0);"
                   out:fade={{ duration: 200 }}
                   {@attach virtualizationManager.measureHeight(job.id || 0)}

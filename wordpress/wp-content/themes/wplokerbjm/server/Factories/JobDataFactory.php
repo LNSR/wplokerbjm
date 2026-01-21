@@ -99,7 +99,7 @@ class JobDataFactory
             foreach ([CustomFields::EMAIL_KONTAK, CustomFields::SITUS_KONTAK, CustomFields::NOMOR_KONTAK] as $field) {
                 $sanitize_callback = $sanitize_contact_fields[$field];
                 if (!empty($customFields[$field]) && is_array($customFields[$field])) {
-                    array_filter(array_map($sanitize_callback, $customFields[$field]));
+                    $customFields[$field] = implode(', ', array_filter(array_map($sanitize_callback, $customFields[$field])));
                 } else {
                     $customFields[$field] = $sanitize_callback($customFields[$field]);
                 }
@@ -150,7 +150,11 @@ class JobDataFactory
                     }
                 }
 
-                $customFields[CustomFields::SOCIAL_MEDIA] = $processedSocialMedia;
+                $customFields[CustomFields::SOCIAL_MEDIA] = implode('; ', array_map(
+                    fn($platform, $usernames) => $platform . ': ' . implode(', ', $usernames),
+                    array_keys($processedSocialMedia),
+                    $processedSocialMedia
+                ));
             }
         } catch (\Exception $e) {
             Logger::error('Factory', 'CustomFieldsService::processCustomFields error: ' . $e->getMessage());

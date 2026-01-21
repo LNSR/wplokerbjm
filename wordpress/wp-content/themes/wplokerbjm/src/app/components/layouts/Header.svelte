@@ -4,9 +4,9 @@
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
-  import { nonceStore } from "@/utils/Nonce";
+  import { NonceManager } from "@/utils/Nonce";
   const isMobileValue = $derived.by(() => isMobile());
-  const isLoggedIn = $derived(nonceStore.getNonce !== null);
+  const isHasNonce = $derived(NonceManager.getNonce !== null);
   let showBookmarkModal = $state(false);
   const bookmarkJobs = $derived(bookmarkStore.jobs);
 
@@ -523,7 +523,7 @@
       this.scheduleUpdate();
 
       // Move admin bar into header early so offsets are simpler
-      if (isLoggedIn) {
+      if (isHasNonce) {
         try {
           this.moveAdminBarIntoHeader();
         } catch {

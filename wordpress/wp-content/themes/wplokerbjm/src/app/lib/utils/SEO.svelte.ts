@@ -12,8 +12,16 @@ export class SEOUtils {
     public initialSchemaSSR: boolean = true;
     private pendingJobIds = $state(new SvelteSet<number>());
     private processTimeout: number | null = null;
+    private headAbortController: AbortController | null = null;
+    private schemaAbortController: AbortController | null = null;
 
     async fetchHeadData(path: string): Promise<HeadData | null> {
+        // Abort any previous head data fetch
+        if (this.headAbortController) {
+            this.headAbortController.abort();
+        }
+        this.headAbortController = new AbortController();
+
         // Check cache first
         const cached = this.headDataCache.get(path);
         if (cached && (SvelteDate.now() - cached.timestamp) < 1 * 60 * 2000) { // 2 minutes cache
@@ -23,12 +31,16 @@ export class SEOUtils {
 
         try {
             const fullUrl = `${routeStore.currentUrl.origin}${path}`;
-            const response = await APIService.getRankMathHead(fullUrl);
-            const head = this.parseHeadHtml(response.head);
+            const response = await APIService.getRankMathHeadGraphQL(fullUrl, this.headAbortController.signal);
+            const head = this.parseHeadHtml(response);
             this.headDataCache.set(path, { data: head, timestamp: SvelteDate.now() });
             this.updateHead(head);
             return head;
         } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+                // Request was aborted, ignore
+                return null;
+            }
             console.warn('Failed to fetch RankMath head data:', error);
             return null;
         }
@@ -435,6 +447,12 @@ export class SEOUtils {
         const processJobSchemas = async (jobIds: number[]): Promise<void> => {
             if (jobIds.length === 0) return;
 
+            // Abort any previous schema fetch
+            if (this.schemaAbortController) {
+                this.schemaAbortController.abort();
+            }
+            this.schemaAbortController = new AbortController();
+
             // Filter out jobIds that already have JobPosting scripts to avoid fetching duplicates
             jobIds = jobIds.filter(id => !this.addedJobPostingIds.has(id));
 
@@ -449,7 +467,7 @@ export class SEOUtils {
 
             try {
                 if (!this.initialSchemaSSR) {
-                    schemas = await APIService.fetchJobSchemas(jobIds);
+                    schemas = await APIService.fetchJobSchemasGraphQL(jobIds, this.schemaAbortController.signal);
                 }
 
                 if (schemas.length === 0) return;
@@ -473,6 +491,10 @@ export class SEOUtils {
                     this.addedJobPostingIds.add(postId);
                 });
             } catch (e) {
+                if (e instanceof Error && e.name === 'AbortError') {
+                    // Request was aborted, ignore
+                    return;
+                }
                 console.warn('Failed to add JobPosting JSON-LD', e);
             }
         };
@@ -516,6 +538,9 @@ export class SEOUtils {
         if (this.processTimeout) {
             clearTimeout(this.processTimeout);
             this.processTimeout = null;
+        }
+        if (this.schemaAbortController) {
+            this.schemaAbortController.abort();
         }
         this.pendingJobIds.clear();
     }

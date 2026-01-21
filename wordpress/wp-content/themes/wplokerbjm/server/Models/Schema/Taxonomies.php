@@ -20,9 +20,9 @@ class Taxonomies
 {
 
     public const PERUSAHAAN = 'perusahaan';
-    public const KATEGORI_LOWONGAN = 'kategori-lowongan';
-    public const LOKASI_PEKERJAAN = 'lokasi-pekerjaan';
-    public const JENIS_PEKERJAAN = 'jenis-pekerjaan';
+    public const KATEGORI_LOWONGAN = 'kategori_lowongan';
+    public const LOKASI_PEKERJAAN = 'lokasi_pekerjaan';
+    public const JENIS_PEKERJAAN = 'jenis_pekerjaan';
     public const GENDER = 'gender';
     public const PENDIDIKAN = 'pendidikan';
 

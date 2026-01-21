@@ -70,7 +70,7 @@ export class SearchManager {
         if (validation.isValidQuery(cleanQuery)) {
             this.suggestionsLoading = true
             try {
-                const data = await APIService.getAutoSuggestions(cleanQuery)
+                const data = await APIService.getAutoSuggestionsGraphQL(cleanQuery)
                 this.suggestions = data || []
                 this.showSuggestions = this.suggestions.length > 0
             } catch {
@@ -139,12 +139,12 @@ export class SearchManager {
         this.error = null
         try {
             const cleaned = SearchUtils.sanitizeFilters({ ...this.filters })
-            const response = await APIService.searchJobs(cleaned)
+            const response = await APIService.searchJobsGraphQL(cleaned)
             this.jobs = [...(response.jobs || [])]
             this.context = (response.context as SearchContext) || SearchContext.Search
             this.title = response.title || SearchTitle.Search
-            this.totalJobs = response.meta?.total || 0
-            this.maxNumPages = response.meta?.totalPages || 1
+            this.totalJobs = response.total || 0
+            this.maxNumPages = response.maxNumPages || 1
             this.page = 1
             if (cleaned.cari) this.addToHistory(String(cleaned.cari))
             return response
@@ -170,7 +170,7 @@ export class SearchManager {
                 ...SearchUtils.sanitizeFilters({ ...this.filters }),
             }
 
-            const response = await APIService.loadMoreJobs(loadMoreFilters)
+            const response = await APIService.loadMoreJobsGraphQL(loadMoreFilters)
 
             if (Array.isArray(response.jobs) && response.jobs.length) {
                 // Filter out jobs that already exist (by permalink) to prevent duplicates
@@ -179,7 +179,7 @@ export class SearchManager {
                 );
                 this.jobs.push(...newJobs)
                 this.page = loadMoreFilters.paged
-                this.maxNumPages = response.meta?.totalPages || this.maxNumPages
+                this.maxNumPages = response.maxNumPages || this.maxNumPages
             } else {
                 this.page = this.maxNumPages
             }

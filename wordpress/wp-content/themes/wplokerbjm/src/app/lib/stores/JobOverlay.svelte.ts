@@ -109,7 +109,7 @@ export class JobOverlayManager {
 				utilsSEO.fetchHeadData(path).then(() => {
 					void utilsSEO.clearPendingJobSchemas();
 					void utilsSEO.removeJobPostingJsonLd();
-					void utilsSEO.addJobPostingJsonLd([job.id] as number[]);
+					void utilsSEO.addJobPostingJsonLd([Number(job.id)] as number[]);
 				}).catch(() => {
 					console.error('Failed to fetch head data for overlay open to', path);
 				}).finally(() => {
@@ -289,7 +289,7 @@ export class JobOverlayManager {
 			const timeoutPromise = new Promise<never>((_, reject) => {
 				setTimeout(() => reject(new Error('Timeout')), 60000)
 			})
-			const fetchPromise = await APIService.fetchJobDetail(slug, { signal })
+			const fetchPromise = APIService.fetchJobDetailGraphQL(slug, signal)
 			const data = await Promise.race([fetchPromise, timeoutPromise])
 			this.overlayData = data as JobDetailResponse
 		} catch (err: any) {

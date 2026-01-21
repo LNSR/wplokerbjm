@@ -101,8 +101,8 @@ export class BookmarkManager {
         try {
             this.cache.clear()
             const stored = await bookmarkIDB.loadBookmarks()
-            stored.forEach((job) => this.cache.set(job.id!, job))
-            this.jobs = Array.from(this.cache.values()).sort((a, b) => (b.id || 0) - (a.id || 0))
+            stored.forEach((job) => this.cache.set(Number(job.id)!, job))
+            this.jobs = Array.from(this.cache.values()).sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0))
         } catch {
             this.jobs = []
         } finally {
@@ -252,21 +252,31 @@ export class BookmarkManager {
             }
 
             const performSync = async () => {
-                const ids = idsToSync || this.jobs.map((job) => job.id || 0)
+                const ids = idsToSync || this.jobs.map((job) => (Number(job.id) || 0))
                 if (ids.length === 0) return
 
-                const fetchedJobs = await APIService.syncBookmark(ids)
+                const fetchedJobs = await APIService.syncBookmarkGraphQL(ids)
                 const plainFetchedJobs: CardJob[] = JSON.parse(JSON.stringify(fetchedJobs))
 
                 // Update cache with fetched jobs
-                plainFetchedJobs.forEach((job: CardJob) => this.cache.set(job.id!, job))
-                this.jobs = Array.from(this.cache.values()).sort((a, b) => (b.id || 0) - (a.id || 0))
+                plainFetchedJobs.forEach((job: CardJob) => this.cache.set(Number(job.id)!, job))
+
+                // Remove jobs that were requested but not returned to prevent stuck skeletons
+                const returnedIds = new Set(plainFetchedJobs.map(j => Number(j.id)))
+                const requestedIds = idsToSync || this.jobs.map(j => Number(j.id) || 0)
+                requestedIds.forEach(id => {
+                    if (!returnedIds.has(id)) {
+                        this.cache.delete(id)
+                    }
+                })
+
+                this.jobs = Array.from(this.cache.values()).sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0))
                 await this.saveToStorage()
 
                 // Handle full sync metadata
                 if (!idsToSync) {
-                    const previousIds = new SvelteSet<number>(this.jobs.map((job) => job.id || 0))
-                    const currentIds = new SvelteSet<number>(this.jobs.map((job) => job.id || 0))
+                    const previousIds = new SvelteSet<number>(this.jobs.map((job) => Number(job.id) || 0))
+                    const currentIds = new SvelteSet<number>(this.jobs.map((job) => Number(job.id) || 0))
                     this.deletedJobs = Array.from(previousIds).filter((id) => !currentIds.has(id))
                     this.lastSyncTime = Date.now()
                     if (this.channel) {
@@ -279,6 +289,11 @@ export class BookmarkManager {
                 await performSync()
             } catch (error) {
                 console.error('Failed to sync bookmarks with API:', error)
+                // If syncing specific ids failed, remove the placeholders to prevent stuck skeletons
+                if (idsToSync) {
+                    idsToSync.forEach(id => this.cache.delete(id))
+                    this.jobs = Array.from(this.cache.values()).sort((a, b) => (b.id || 0) - (a.id || 0))
+                }
             } finally {
                 // Only reset global syncing for full sync
                 if (!idsToSync) {

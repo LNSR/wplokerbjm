@@ -1,9 +1,9 @@
-import type { SortOption, CardJob, JobSummary, JobContactRow, MetaBox, WPBasePost, WPTaxonomyTerm } from '@/types';
+import type { SortOption, CardJob, JobSummary, JobContactRow, MetaBox, WPBasePost, WPTaxonomyTerm, TaxonomyType } from '@/types';
 
 // Base optional job filters
 type OptionalJobFilters = {
   cari?: string
-  'lokasi-pekerjaan'?: string[]
+  'lokasi_pekerjaan'?: string[]
   gender?: string[]
   pendidikan?: string[]
   sort?: SortOption
@@ -11,9 +11,9 @@ type OptionalJobFilters = {
 }
 
 // Base filters for search operations
-export interface SearchFilters extends Pick<MetaBox, 'lokasi-pekerjaan' | 'gender' | 'pendidikan'> {
+export interface SearchFilters extends Pick<MetaBox, 'lokasi_pekerjaan' | 'gender' | 'pendidikan'> {
   cari: string
-  'lokasi-pekerjaan'?: string[]
+  'lokasi_pekerjaan'?: string[]
   gender?: string[]
   pendidikan?: string[]
   sort: SortOption
@@ -28,30 +28,24 @@ export enum SearchContext {
 
 // API response metadata from headers
 export interface ApiMeta {
-  total?: number
-  totalPages?: number
   links?: Record<string, string>
-}
-
-// Generic API response wrapper
-export interface ApiResponse<T> {
-  data: T
-  meta: ApiMeta
 }
 
 // * Base response for SearchResponse and LoadMoreResponse
 export interface BaseJobSearchResponse {
   jobs: CardJob[]
+  maxNumPages?: number
+  total?: number
   context?: SearchContext
   filters?: SearchFilters
-  meta?: ApiMeta
 }
 
 // Extended response for initial search operations
 export interface SearchResponse extends BaseJobSearchResponse {
   title?: SearchTitle
   shouldScroll?: boolean
-}
+  total: number
+} 
 
 export enum SearchTitle {
   Latest = 'Lowongan Terbaru',
@@ -76,6 +70,18 @@ export interface JobGridFilters extends OptionalJobFilters {
 // Standardized taxonomy term interface
 export interface TaxonomyTerm extends Pick<WPTaxonomyTerm, 'slug' | 'name' | 'parent'> {
   children?: TaxonomyTerm[]
+}
+
+type TaxonomyTermsResponse = {
+  lokasiTerms: TaxonomyTerm[]
+  genderTerms: TaxonomyTerm[]
+  pendidikanTerms: TaxonomyTerm[]
+}
+
+
+export interface TaxonomyApiInterface {
+  getAllTerms(): Promise<TaxonomyTermsResponse>
+  getTermsByType(type: TaxonomyType): Promise<TaxonomyTerm[]>
 }
 
 export interface JobDetailResponse extends Pick<WPBasePost, 'id' | 'title' | 'post_time'>, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'> {

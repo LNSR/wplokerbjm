@@ -168,13 +168,13 @@ export class GeneralStore {
         }
 
 
-        if (data['jenis-pekerjaan']) {
+        if (data['jenis_pekerjaan']) {
             rows.push({
                 icon: ClockSolid,
                 label: 'Jenis Pekerjaan',
-                value: Array.isArray(data['jenis-pekerjaan'])
-                    ? data['jenis-pekerjaan'].join(', ')
-                    : String(data['jenis-pekerjaan'] ?? ''),
+                value: Array.isArray(data['jenis_pekerjaan'])
+                    ? data['jenis_pekerjaan'].join(', ')
+                    : String(data['jenis_pekerjaan'] ?? ''),
             })
         }
         if (data['pendidikan']) {
@@ -222,13 +222,13 @@ export class GeneralStore {
                 value: umur_display,
             })
         }
-        if (data['lokasi-pekerjaan']) {
+        if (data['lokasi_pekerjaan']) {
             rows.push({
                 icon: MapMarkerAltSolid,
                 label: 'Lokasi',
-                value: Array.isArray(data['lokasi-pekerjaan'])
-                    ? data['lokasi-pekerjaan'].join(', ')
-                    : String(data['lokasi-pekerjaan'] ?? ''),
+                value: Array.isArray(data['lokasi_pekerjaan'])
+                    ? data['lokasi_pekerjaan'].join(', ')
+                    : String(data['lokasi_pekerjaan'] ?? ''),
             })
         }
 
@@ -247,7 +247,9 @@ export class GeneralStore {
         if (!jobdata) return [];
         const contacts: ContactRow[] = [];
 
-        (jobdata.email_kontak ?? []).forEach((email) => {
+        // email_kontak is now a comma-separated string
+        const emails = jobdata.email_kontak ? jobdata.email_kontak.split(',').map((e: string) => e.trim()) : [];
+        emails.forEach((email: string) => {
             if (email) {
                 contacts.push({
                     type: 'email',
@@ -259,7 +261,9 @@ export class GeneralStore {
             }
         });
 
-        (jobdata.nomor_kontak ?? []).forEach((phone) => {
+        // nomor_kontak is now a comma-separated string
+        const phones = jobdata.nomor_kontak ? jobdata.nomor_kontak.split(',').map((p: string) => p.trim()) : [];
+        phones.forEach((phone: string) => {
             if (phone) {
                 contacts.push({
                     type: 'phone',
@@ -271,7 +275,9 @@ export class GeneralStore {
             }
         });
 
-        (jobdata.situs_kontak ?? []).forEach((site) => {
+        // situs_kontak is now a comma-separated string
+        const sites = jobdata.situs_kontak ? jobdata.situs_kontak.split(',').map((s: string) => s.trim()) : [];
+        sites.forEach((site: string) => {
             if (site) {
                 contacts.push({
                     type: 'website',
@@ -378,18 +384,21 @@ export class GeneralStore {
             const processedItems: SocialMediaItem[] = [];
             const seen = new SvelteSet<string>();
             if (!socialMediaData) return processedItems;
-            for (const item of [socialMediaData]) {
-                for (const [platform, username] of Object.entries(item)) {
-                    if (!username) continue;
-                    const usernames = Array.isArray(username) ? username : [username];
-                    for (const uname of usernames) {
-                        const linkData = getLinkData(platform, uname);
-                        if (linkData) {
-                            const key = linkData.platform + linkData.username;
-                            if (!seen.has(key)) {
-                                seen.add(key);
-                                processedItems.push(linkData);
-                            }
+
+            // socialMediaData is now a semicolon-separated string like "Instagram: value; WhatsApp: value"
+            const items = socialMediaData.split(';').map((s: string) => s.trim());
+
+            for (const item of items) {
+                const [platform, usernames] = item.split(':').map((s: string) => s.trim());
+                if (!platform || !usernames) continue;
+                const usernameList = usernames.split(',').map((u: string) => u.trim()).filter(u => u);
+                for (const username of usernameList) {
+                    const linkData = getLinkData(platform, username);
+                    if (linkData) {
+                        const key = linkData.platform + linkData.username;
+                        if (!seen.has(key)) {
+                            seen.add(key);
+                            processedItems.push(linkData);
                         }
                     }
                 }

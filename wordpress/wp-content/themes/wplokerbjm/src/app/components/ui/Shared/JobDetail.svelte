@@ -62,7 +62,7 @@
 
   const viewerOptions: unknown = {
     hidden: true,
-    container: document.getElementById("app") ?? document.body,
+    container: document.querySelector(".route-container") ?? document.body,
     focus: true,
     toolbar: {
       zoomIn: false,
@@ -180,7 +180,7 @@
             aria-hidden="true"
           />
           <span>Diupdate: {timeAgo()}</span>
-          <BookmarkButton jobId={job.id || 0} variant="detail" />
+          <BookmarkButton jobId={Number(job.id) || 0} variant="detail" />
         </div>
       {/if}
     </section>

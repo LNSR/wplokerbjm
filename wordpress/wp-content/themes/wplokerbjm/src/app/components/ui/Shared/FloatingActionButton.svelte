@@ -110,7 +110,7 @@
   });
 </script>
 
-<aside class="fixed bottom-3 right-3 z-100 flex flex-col items-end gap-4" style="view-transition-name: fab;">
+<aside class="fixed bottom-3 right-3 z-30 flex flex-col items-end gap-4" style="view-transition-name: fab;">
   {#if show}
     <!-- Scroll to Top Button -->
     <button

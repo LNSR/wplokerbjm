@@ -1,34 +1,23 @@
+import { getThemeData } from "./environment";
+
 export class NonceManager {
-    public nonce: string | null = null;
-    private storageKey = 'wp-rest-nonce';
+    private static nonce: string | null = null;
 
-    constructor() {
-        this.nonce = this.readStorage;
-    }
-
-    private get readStorage(): string | null {
-        if (typeof sessionStorage === 'undefined') return null;
-        try {
-            return sessionStorage.getItem(this.storageKey) || null;
-        } catch {
-            return null;
+    /**
+     * Synchronously reads any available nonce from inline theme dataprops.
+     */
+    private static readStorage(): string | null {
+        const themeNonce = getThemeData()?.wpRestNonce;
+        if (themeNonce && themeNonce.length > 0) {
+            NonceManager.nonce = themeNonce;
+            return NonceManager.nonce;
         }
+
+        return null;
     }
 
-    public setNonce(nonce: string): void {
-        this.nonce = nonce;
-        if (typeof sessionStorage !== 'undefined') {
-            try {
-                sessionStorage.setItem(this.storageKey, nonce);
-            } catch {
-                console.error('Failed to save nonce to sessionStorage');
-            }
-        }
-    }
-
-    public get getNonce(): string | null {
-        return this.nonce;
+    public static get getNonce(): string | null {
+        if (NonceManager.nonce !== null && NonceManager.nonce.length > 0) return NonceManager.nonce;
+        return NonceManager.readStorage();
     }
 }
-
-export const nonceStore = new NonceManager();

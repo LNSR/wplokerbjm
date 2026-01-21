@@ -8,7 +8,7 @@
     variant: JobCardProps["variant"];
   }>();
 
-  const isSaved = (id: number) => bookmarkStore.isSaved(id);
+  const isJobSaved = $derived(bookmarkStore.jobs.some(job => (Number(job.id) === jobId)));
   const toggleSave = (id: number) => bookmarkStore.toggleSave(id);
 
   let isLoading = $state(false);
@@ -26,17 +26,17 @@
     // prevent parent handlers
     e.preventDefault();
     e.stopPropagation();
-    if (isNaN(jobId) || jobId === null || jobId < Number(1)) return;
+    if (isNaN(jobId) || jobId < 1) return;
     // protect against both reactive loading state and synchronous re-entry
     if (isLoading || _clickLock) return;
 
     _clickLock = true;
 
     isLoading = true;
-    preToggleSaved = isSaved(jobId);
+    preToggleSaved = isJobSaved;
     isPending = true;
     try {
-      const wasSaved = isSaved(jobId);
+      const wasSaved = isJobSaved;
       await toggleSave(jobId);
       isPending = false;
 
@@ -78,7 +78,7 @@
   }
 
   const bookmarkStyle = $derived.by(() =>
-    useBookmarkStyle(isSaved(jobId), confirmationState === "saved")
+    useBookmarkStyle(isJobSaved, confirmationState === "saved")
   );
 
   // New reactive icon spec: name and optional classes (color override)
@@ -88,7 +88,7 @@
         ? { name: "trash", classes: "text-red-400" }
         : { name: "bookmark", classes: "text-[var(--wpl-global-color-1)] " };
     }
-    const saved = isSaved(jobId);
+    const saved = isJobSaved;
     return saved
       ? { name: "trash", classes: "text-red-400" }
       : { name: "bookmark", classes: "text-[var(--wpl-global-color-1)] " };
@@ -101,7 +101,7 @@
         : "border-[var(--wpl-global-color-1)] ";
     }
 
-    const saved = isSaved(jobId);
+    const saved = isJobSaved;
     if (saved) {
       return "border-red-400 ";
     } else {
@@ -152,9 +152,9 @@
       (isLoading ? " !opacity-50 cursor-not-allowed " : "") +
       bookmarkStyle.style}
     disabled={isLoading}
-    title={isSaved(jobId) ? "Hapus bookmark" : "Simpan lowongan"}
+    title={isJobSaved ? "Hapus bookmark" : "Simpan lowongan"}
     aria-label="Bookmark job"
-    aria-pressed={isSaved(jobId)}
+    aria-pressed={isJobSaved}
   >
     {#if displayedIconSpec.name === "bookmark"}
       <BookmarkSolid
@@ -170,7 +170,7 @@
   </button>
 
   {#if !isTouchDevice && isHovered && !isLoading}
-    {@const hapus = isSaved(jobId)}
+    {@const hapus = isJobSaved}
     <div class="absolute -top-8 right-0 flex items-center pointer-events-none">
       <div
         class={`${hapus ? "bg-red-400 " : "bg-[var(--wpl-global-color-1)] "} text-white text-xs font-semibold px-2 py-1 rounded shadow-sm`}

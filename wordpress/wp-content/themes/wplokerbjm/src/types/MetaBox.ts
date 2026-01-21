@@ -1,6 +1,6 @@
 // SearchForm filters taxonomy types
 export enum TaxonomyType {
-  lokasi = 'lokasi-pekerjaan',
+  lokasi = 'lokasi_pekerjaan',
   gender = 'gender',
   pendidikan = 'pendidikan'
 }
@@ -24,9 +24,9 @@ export enum SocialMediaPlatform {
 
 export interface Taxonomies {
   perusahaan?: string | string[] | (null | undefined);
-  'kategori-lowongan'?: string | string[] | (null | undefined);
-  'lokasi-pekerjaan'?: string | string[] | (null | undefined);
-  'jenis-pekerjaan'?: string | string[] | (null | undefined);
+  'kategori_lowongan'?: string | string[] | (null | undefined);
+  'lokasi_pekerjaan'?: string | string[] | (null | undefined);
+  'jenis_pekerjaan'?: string | string[] | (null | undefined);
   gender?: string | string[] | (null | undefined);
   pendidikan?: string | string[] | (null | undefined);
 }
@@ -46,10 +46,10 @@ export interface CustomFields {
   gaji_minimal?: number | (null | undefined);
   gaji_maksimal?: number | (null | undefined);
   deadline?: string | (null | undefined);
-  email_kontak?: string[] | (null | undefined);
-  nomor_kontak?: string[] | (null | undefined);
-  situs_kontak?: string[] | (null | undefined);
-  social_media?: Partial<Record<SocialMediaPlatform, string[]>> | (null | undefined);
+  email_kontak?: string | (null | undefined);
+  nomor_kontak?: string | (null | undefined);
+  situs_kontak?: string | (null | undefined);
+  social_media?: string | (null | undefined);
   status_pekerjaan?: (1 | 2 | 3) | (null | undefined);
 }
 

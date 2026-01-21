@@ -3,14 +3,14 @@
 namespace WPLokerBJM\Presenters\Pages;
 
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
-use WPLokerBJM\Services\REST\RESTData;
+use WPLokerBJM\Services\GraphQL\GraphQLData;
 use WPLokerBJM\Presenters\Schema\JobPostingSchema;
 
 class SinglePresenter
 {
     public function __construct(
         private JobSchemaOrg $jobSchema,
-        private RESTData $restData
+        private GraphQLData $restData
     ) {
     }
 

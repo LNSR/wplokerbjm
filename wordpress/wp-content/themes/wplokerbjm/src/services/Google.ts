@@ -1,4 +1,4 @@
-import { nonceStore } from '@/utils';
+import { NonceManager } from '@/utils';
 import { getThemeData, Partytown } from '@/utils';
 
 /**
@@ -16,7 +16,7 @@ export class GoogleServices {
     if (typeof window === 'undefined') return false;
     const themeData = getThemeData();
     if (themeData?.disableTracking) return false;
-    return !nonceStore.getNonce;
+    return !NonceManager.getNonce;
   }
 
   /**

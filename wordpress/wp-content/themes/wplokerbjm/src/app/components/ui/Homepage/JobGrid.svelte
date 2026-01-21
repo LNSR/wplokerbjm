@@ -110,7 +110,7 @@
       sectionTop: number | undefined,
       itemHeight: number,
       gap: number,
-      buffer: number
+      buffer: number,
     ) {
       return Virtualization.computeGrid({
         displayJobs,
@@ -162,7 +162,7 @@
   class JobGridHandler {
     private async fetchJobGrid(): Promise<JobGridProps> {
       try {
-        const response = await APIService.fetchJobGrid({
+        const response = await APIService.fetchJobGridGraphQL({
           paged: 1,
           context: context || SearchContext.Latest,
           title: title || searchStore.title,
@@ -254,7 +254,10 @@
       } else {
         // Use server-provided jobs to initialize search store
         searchStore.jobs = [...jobs];
-        if (maxNumPages) searchStore.maxNumPages = maxNumPages;
+        // Use provided `maxNumPages` (SSR or GraphQL)
+        if (typeof maxNumPages === "number" && maxNumPages > 0) {
+          searchStore.maxNumPages = maxNumPages;
+        }
         if (context) searchStore.context = context;
         if (title) searchStore.title = title as SearchTitle;
         if (totalJobs !== undefined) searchStore.totalJobs = totalJobs;
@@ -291,7 +294,7 @@
       isRefreshing = true;
       try {
         if (searchStore.context !== SearchContext.Search) {
-          const response = await APIService.fetchJobGrid({
+          const response = await APIService.fetchJobGridGraphQL({
             paged: 1,
             context: searchStore.context,
             title: searchStore.title,
@@ -299,6 +302,7 @@
             ...searchStore.filters,
           });
           searchStore.jobs = response.jobs || [];
+          // API returns `maxNumPages` for pagination metadata
           searchStore.maxNumPages = response.maxNumPages || 1;
           searchStore.context = response.context || SearchContext.Latest;
           searchStore.title =
@@ -328,7 +332,7 @@
 
   const refreshJobSchema = () => {
     const jobIds = virtualization.visibleJobs
-      .map((job) => job.id)
+      .map((job) => Number(job.id))
       .filter((id) => id !== undefined) as number[];
     if (jobIds.length > 0) void utilsSEO.addJobPostingJsonLd(jobIds);
   };
@@ -376,18 +380,24 @@
   // Auto load more when nearing the end
   $effect(() => {
     const margin = 600; // Load more when within 600px of the bottom
-    if (
-      scrollY + innerHeight >=
-        (sectionElement?.offsetTop || 0) +
-          virtualization.totalHeight -
-          margin &&
-      hasMore &&
-      !loading
-    ) {
-      untrack(() => searchStore.loadMore());
-      utilsSEO.initialSchemaSSR = false;
-      utilsSEO.clearPendingJobSchemas();
-    }
+
+    const handleScroll = () => {
+      if (
+        window.scrollY + window.innerHeight >=
+          (sectionElement?.offsetTop || 0) +
+            virtualization.totalHeight -
+            margin &&
+        hasMore &&
+        !loading
+      ) {
+        untrack(() => searchStore.loadMore());
+        utilsSEO.initialSchemaSSR = false;
+        utilsSEO.clearPendingJobSchemas();
+      }
+    };
+
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   });
 </script>
 
@@ -442,8 +452,8 @@
             style="height: {virtualization.totalHeight}px; position: relative;"
           >
             <div
-              style="position: absolute; width: 100%; transform: translate3d(0, {(virtualization.startRow ?? 0) *
-                (virtualization.rowHeight ?? 0)}px, 0);"
+              style="position: absolute; width: 100%; transform: translate3d(0, {(virtualization.startRow ??
+                0) * (virtualization.rowHeight ?? 0)}px, 0);"
             >
               <div
                 class={`grid gap-6 ${virtualization.itemsPerRow === 1 ? "grid-cols-1" : virtualization.itemsPerRow === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}

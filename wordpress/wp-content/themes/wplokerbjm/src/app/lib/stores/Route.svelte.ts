@@ -353,7 +353,7 @@ export class RouteStateManager {
 
     let attempts = Number(0);
     let restoring = false;
-    const maxAttempts = Number(100);
+    const maxAttempts = Number(5);
 
     const isReady = () => !routeStore.isInitialLoad && !routeStore.isLoading && routeStore.CurrentComponent && !routeStore.isTransitioningRoute;
 

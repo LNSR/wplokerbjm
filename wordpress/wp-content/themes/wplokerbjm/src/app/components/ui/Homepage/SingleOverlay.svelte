@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import { nonceStore } from "@/utils";
+  import { NonceManager } from "@/utils";
   import type { JobDetailResponse } from "@/types";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
@@ -48,7 +48,7 @@
   }>();
 
   onMount(() => {
-    isLoggedIn = !!nonceStore.getNonce;
+    isLoggedIn = !!NonceManager.getNonce;
     document.addEventListener("keydown", (event) =>
       OverlayKeyboardHandler.handleKeydown(event, close)
     );

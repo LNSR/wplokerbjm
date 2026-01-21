@@ -1,51 +1,62 @@
 <?php
-namespace WPLokerBJM\Controllers\REST;
+namespace WPLokerBJM\Controllers\GraphQL\Resolvers;
 
 use WPLokerBJM\Repositories\TaxonomyRepository;
 use WPLokerBJM\Controllers\Utilities\ControllerUtils;
 use WPLokerBJM\Models\Schema\Taxonomies;
-use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-class TaxonomyDepth
-{
-    public function __construct(private TaxonomyRepository $repository)
-    {
-    }
+use WPLokerBJM\Shared\Log\Logger;
 
-    public function handle(\WP_REST_Request $request): \WP_REST_Response
+class TaxonomyResolver
+{
+    public function __construct(
+        private TaxonomyRepository $repository
+    ) {}
+
+    const LOKASI_TERMS = 'lokasiTerms';
+    const GENDER_TERMS = 'genderTerms';
+    const PENDIDIKAN_TERMS = 'pendidikanTerms';
+
+    public function resolveAllTerms(): array
     {
         try {
             $cached = Cache::get(CacheKey::TAXONOMY_DEPTH_HANDLE);
             if ($cached !== false) {
-                return rest_ensure_response($cached);
+                return $cached;
             }
 
             $terms = $this->repository->getTaxonomyTerms();
 
             $response = [
-                'lokasiTerms' => ControllerUtils::buildTermsTree($terms[Taxonomies::LOKASI_PEKERJAAN]),
-                'genderTerms' => array_values(array_map(fn($term) => [
+                self::LOKASI_TERMS => ControllerUtils::buildTermsTree($terms[Taxonomies::LOKASI_PEKERJAAN]),
+                self::GENDER_TERMS => array_values(array_map(fn($term) => [
                     'slug' => $term->slug,
                     'name' => $term->name,
+                    'parent' => $term->parent,
+                    'children' => [],
                 ], $terms[Taxonomies::GENDER])),
-                'pendidikanTerms' => ControllerUtils::buildTermsTree($terms[Taxonomies::PENDIDIKAN]),
+                self::PENDIDIKAN_TERMS => ControllerUtils::buildTermsTree($terms[Taxonomies::PENDIDIKAN]),
             ];
 
             Cache::set(CacheKey::TAXONOMY_DEPTH_HANDLE, $response);
 
-            return rest_ensure_response($response);
+            return $response;
         } catch (\Exception $e) {
-            Logger::error('REST', 'TaxonomyDepth::handle error: ' . $e->getMessage());
-            return ControllerUtils::failedResponse('Internal server error', 500);
+            Logger::error('GraphQL', 'TaxonomyResolver::resolveAllTerms error: ' . $e->getMessage());
+            return [
+                'lokasiTerms' => [],
+                'genderTerms' => [],
+                'pendidikanTerms' => [],
+            ];
         }
     }
 
-    public function lokasi(\WP_REST_Request $request): \WP_REST_Response
+    public function resolveLokasiTerms(): array
     {
         try {
             $cached = Cache::get(CacheKey::TAXONOMY_DEPTH_LOKASI);
             if ($cached !== false) {
-                return rest_ensure_response($cached);
+                return $cached;
             }
 
             $terms = $this->repository->getTaxonomyTerms();
@@ -53,42 +64,44 @@ class TaxonomyDepth
 
             Cache::set(CacheKey::TAXONOMY_DEPTH_LOKASI, $response);
 
-            return rest_ensure_response($response);
+            return $response;
         } catch (\Exception $e) {
-            Logger::error('REST', 'TaxonomyDepth::lokasi error: ' . $e->getMessage());
-            return ControllerUtils::failedResponse('Internal server error', 500);
+            Logger::error('GraphQL', 'TaxonomyResolver::resolveLokasiTerms error: ' . $e->getMessage());
+            return [];
         }
     }
 
-    public function gender(\WP_REST_Request $request): \WP_REST_Response
+    public function resolveGenderTerms(): array
     {
         try {
             $cached = Cache::get(CacheKey::TAXONOMY_DEPTH_GENDER);
             if ($cached !== false) {
-                return rest_ensure_response($cached);
+                return $cached;
             }
 
             $terms = $this->repository->getTaxonomyTerms();
             $response = array_values(array_map(fn($term) => [
                 'slug' => $term->slug,
                 'name' => $term->name,
+                'parent' => $term->parent,
+                'children' => [],
             ], $terms[Taxonomies::GENDER]));
 
             Cache::set(CacheKey::TAXONOMY_DEPTH_GENDER, $response);
 
-            return rest_ensure_response($response);
+            return $response;
         } catch (\Exception $e) {
-            Logger::error('REST', 'TaxonomyDepth::gender error: ' . $e->getMessage());
-            return ControllerUtils::failedResponse('Internal server error', 500);
+            Logger::error('GraphQL', 'TaxonomyResolver::resolveGenderTerms error: ' . $e->getMessage());
+            return [];
         }
     }
 
-    public function pendidikan(\WP_REST_Request $request)
+    public function resolvePendidikanTerms(): array
     {
         try {
             $cached = Cache::get(CacheKey::TAXONOMY_DEPTH_PENDIDIKAN);
             if ($cached !== false) {
-                return rest_ensure_response($cached);
+                return $cached;
             }
 
             $terms = $this->repository->getTaxonomyTerms();
@@ -96,10 +109,10 @@ class TaxonomyDepth
 
             Cache::set(CacheKey::TAXONOMY_DEPTH_PENDIDIKAN, $response);
 
-            return rest_ensure_response($response);
+            return $response;
         } catch (\Exception $e) {
-            Logger::error('REST', 'TaxonomyDepth::pendidikan error: ' . $e->getMessage());
-            return ControllerUtils::failedResponse('Internal server error', 500);
+            Logger::error('GraphQL', 'TaxonomyResolver::resolvePendidikanTerms error: ' . $e->getMessage());
+            return [];
         }
     }
 }

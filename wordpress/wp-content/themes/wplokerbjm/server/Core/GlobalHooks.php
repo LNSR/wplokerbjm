@@ -112,10 +112,29 @@ class GlobalHooks
     /**
      * Sets X-WP-Nonce header for authenticated users.
      */
-    #[Action('send_headers', 12)]
+    #[Action('send_headers')]
     public static function restHeadersImpl(): void
     {
         try {
+            // If a user is not already set for this request, attempt to validate
+            // the WordPress "logged in" cookie so we can emit the X-WP-Nonce
+            if (!is_user_logged_in()) {
+                if (function_exists('wp_validate_auth_cookie') && defined('LOGGED_IN_COOKIE') && isset($_COOKIE[LOGGED_IN_COOKIE])) {
+                    $cookie = $_COOKIE[LOGGED_IN_COOKIE];
+                    $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
+                    if ($user_id) {
+                        // Ensure current user is populated for downstream is_user_logged_in()/nonce creation
+                        wp_set_current_user((int) $user_id);
+                    } else {
+                        // No valid cookie -> nothing to expose
+                        return;
+                    }
+                } else {
+                    return;
+                }
+            }
+
+            // Still require authenticated user before creating nonce
             if (!is_user_logged_in()) {
                 return;
             }
@@ -150,15 +169,26 @@ class GlobalHooks
     }
 
     /**
-     * Exposes specific headers for REST API responses.
+     * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
-    #[Filter('rest_pre_serve_request', 10, 4)]
-    public static function filterRestHeadersImpl($served, $result, $request, $server)
+    #[Filter('graphql_response_headers_to_send')]
+    public static function restrictGraphQLCors(array $headers): array
     {
-        if (!headers_sent()) {
-            header('Access-Control-Expose-Headers: X-WP-Total, X-WP-TotalPages, Link, X-WP-Nonce');
+        // Get the site's origin
+        $site_url = home_url();
+        $parsed = wp_parse_url($site_url);
+        $site_origin = $parsed['scheme'] . '://' . $parsed['host'];
+        if (isset($parsed['port']) && $parsed['port'] !== '80' && $parsed['port'] !== '443') {
+            $site_origin .= ':' . $parsed['port'];
         }
-        return $served;
+
+        // Set CORS to same origin only
+        $headers['Access-Control-Allow-Origin'] = $site_origin;
+        $headers['Access-Control-Allow-Credentials'] = 'true'; // Required for cookies/nonces
+        $headers['Access-Control-Allow-Headers'] .= ', X-WP-Nonce';
+        $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce';
+
+        return $headers;
     }
 
     /*======================================================================
@@ -366,7 +396,14 @@ class GlobalHooks
                 CacheKey::SEARCH_SQL_PREFIX . '*',
                 CacheKey::COMPANY_SEARCH_PREFIX . '*',
                 CacheKey::AUTO_SUGGESTION_PREFIX . '*',
-                CacheKey::POST_TAXONOMIES_PREFIX . '*'
+                CacheKey::POST_TAXONOMIES_PREFIX . '*',
+                CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . '*',
+                CacheKey::GRAPHQL_JOB_CARD_PREFIX . '*',
+                CacheKey::DYNAMIC_SEARCH_PREFIX . '*',
+                CacheKey::SYNC_BOOKMARK_PREFIX . '*',
+                CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . '*',
+                CacheKey::RANKMATH_HEAD_PREFIX . '*',
+                CacheKey::THEME_DATA . '*'
             ]);
 
             // If we detected a post id, also invalidate the per-job caches
@@ -392,23 +429,19 @@ class GlobalHooks
         }
 
         $jobDataCacheKey = CacheKey::JOB_DATA_PREFIX . $post_id;
-        $cardCacheKey = CacheKey::REST_CARD_PREFIX . $post_id;
-        $overlayCacheKeyLoggedIn = CacheKey::REST_JOBDETAIL_PREFIX . $post_id . '_logged_in';
-        $overlayCacheKeyPublic = CacheKey::REST_JOBDETAIL_PREFIX . $post_id . '_public';
+        $cardCacheKey = CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id;
+        // overlay caches may be per-user or public; we'll invalidate by pattern below
         $schemaCacheKey = CacheKey::JOB_SCHEMA_PREFIX . $post_id;
 
         // Use deleteMultiple for better performance - single network round trip
         $cacheKeys = [
             $jobDataCacheKey,
             $cardCacheKey,
-            $overlayCacheKeyLoggedIn,
-            $overlayCacheKeyPublic,
+            $schemaCacheKey,
             $schemaCacheKey,
         ];
 
         $deleteResults = Cache::deleteMultiple($cacheKeys);
-
-        Cache::deletePattern([CacheKey::REST_JOB_SCHEMA_BATCH_PREFIX . '*']);
 
         // Return true if any cache entry was deleted
         return !empty(array_filter($deleteResults));

@@ -466,13 +466,15 @@ class CacheKey
     const JOB_SCHEMA_PREFIX = 'job_schema_';
     const JOB_LAST_MODIFIED = 'job_last_modified';
 
-    // REST API
-    const REST_CARD_PREFIX = 'rest_card_';
-    const REST_JOBDETAIL_PREFIX = 'rest_job_detail_';
-    const REST_JOB_SCHEMA_BATCH_PREFIX = 'rest_job_schema_batch_';
+    // GraphQL API
+    const GRAPHQL_JOB_CARD_PREFIX = 'graphql_job_card_';
+    const GRAPHQL_JOB_DETAIL_PREFIX = 'graphql_job_detail_';
+    const GRAPHQL_JOB_SCHEMA_BATCH_PREFIX = 'graphql_job_schema_batch_';
     const AUTO_SUGGESTION_PREFIX = 'auto_suggestion_';
     const LOAD_MORE_PREFIX = 'load_more_';
     const DYNAMIC_SEARCH_PREFIX = 'dynamic_search_';
+    const SYNC_BOOKMARK_PREFIX = 'sync_bookmark_';
+    const RANKMATH_HEAD_PREFIX = 'rankmath_head_';
 
     // Presenters
     const CAROUSEL_JOBS = 'carousel_jobs';
@@ -498,14 +500,6 @@ class CacheKey
 
     // Autowire Scanner
     const AUTOWIRE_SCANNER_PREFIX = 'autowire_scanner_';
-
-    // DNS/Bot Detection
-    const DNS_PTR_PREFIX = 'dns_ptr_';
-    const DNS_IS_KNOWN_BOT_PREFIX = 'dns_is_known_bot_';
-    const DNS_IS_KNOWN_BOT_IP_PREFIX = 'dns_is_known_bot_ip_';
-
-    // LiteSpeed
-    const LITESPEED_RECENT_PURGE = 'litespeed_recent_purge';
 
     // RankMath
     const RANKMATH_SITEMAP_DEBOUNCE_PREFIX = 'rankmath_sitemap_debounce_';

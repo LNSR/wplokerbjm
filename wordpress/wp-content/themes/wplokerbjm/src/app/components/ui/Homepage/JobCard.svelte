@@ -197,7 +197,7 @@
           {/if}
 
           <!-- Bookmark button migrated to Svelte component -->
-          <BookmarkButton jobId={jobdata?.id} {variant} />
+          <BookmarkButton jobId={Number(jobdata.id)} {variant} />
         </div>
       </div>
     </div>

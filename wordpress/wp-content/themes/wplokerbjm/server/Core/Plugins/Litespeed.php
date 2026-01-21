@@ -73,3 +73,47 @@ class LiteSpeedFilters
         return $excludes;
     }
 }
+
+/**
+ * LiteSpeed GraphQL Integration
+ */
+class LiteSpeedGraphQL
+{
+    /**
+     * Force GraphQL Queries returned via HTTP GET requests to be cacheable
+     */
+    #[Action('graphql_process_http_request_response', 0)]
+    public static function forceCacheable(): void
+    {
+        if ('GET' !== $_SERVER['REQUEST_METHOD']) {
+            return;
+        }
+
+        do_action('litespeed_control_force_cacheable');
+    }
+
+    /**
+     * Add LiteSpeed tags, unset the x-graphql-keys
+     */
+    #[Filter('graphql_response_headers_to_send', 10, 1)]
+    public static function tagResponses(array $headers = []): array
+    {
+        if (isset($headers['X-GraphQL-Keys'])) {
+            do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
+            
+            // Unset the x-graphql-keys headers so that we don't overpopulate the headers
+            // as there are header size limitations
+            unset($headers['X-GraphQL-Keys']);
+        }
+        return $headers;
+    }
+
+    /**
+     * Call litespeed_purge when graphql_purge is called
+     */
+    #[Action('graphql_purge', 0)]
+    public static function purgeCache($keys): void
+    {
+        do_action('litespeed_purge', $keys);
+    }
+}

@@ -41,9 +41,7 @@
     job = null; // Reset job state for new fetch
 
     try {
-      const fetchedJob = await APIService.fetchJobDetail(slug, {
-        signal: abortController.signal,
-      });
+      const fetchedJob = await APIService.fetchJobDetailGraphQL(slug, abortController.signal);
       // Only update if this is still the latest request and not aborted
       if (requestId === currentRequestId && !abortController.signal.aborted) {
         job = fetchedJob;
@@ -96,7 +94,7 @@
     if (job && job.id && !routeStore.isInitialLoad) {
       void utilsSEO.clearPendingJobSchemas();
       void utilsSEO.removeJobPostingJsonLd();
-      void utilsSEO.addJobPostingJsonLd([job.id]);
+      void utilsSEO.addJobPostingJsonLd([Number(job.id)]);
     }
   });
 </script>

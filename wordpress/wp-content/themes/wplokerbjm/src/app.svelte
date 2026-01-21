@@ -161,8 +161,8 @@
   });
 </script>
 
-<Header />
 <div class="route-container">
+  <Header />
   <!-- {#key pathname} -->
   {#if CurrentComponent && !isTransitioningRoute}
     <div
@@ -173,8 +173,8 @@
     </div>
   {/if}
   <!-- {/key} -->
+  <FloatingActionButton />
 </div>
-<FloatingActionButton />
 
 <style lang="postcss">
   /* Page transition styles */
