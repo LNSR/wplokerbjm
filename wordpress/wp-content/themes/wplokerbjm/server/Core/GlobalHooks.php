@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Core;
 
+use WPLokerBJM\Core\Theme\Enqueue;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
@@ -149,23 +150,21 @@ class GlobalHooks
     /**
      * Modifies HTTP headers to remove unwanted Link headers and add sitemap link.
      */
-    #[Action('template_redirect', 12)]
+    #[Action('template_redirect', 11)]
     public static function modifyLinkHeadersImpl(): void
     {
         if (!headers_sent()) {
             // Remove all Link headers to prevent API discovery exposure
             header_remove('Link');
-
-            self::exposeSitemapHeader();
+            Enqueue::outputPreloadLinksResponse();
         }
     }
 
+    #[Action('wp_head')]
     public static function exposeSitemapHeader(): void
     {
-        if (!headers_sent()) {
-            $sitemap_url = home_url('/sitemap_index.xml');
-            header('Link: <' . esc_url($sitemap_url) . '>; rel="sitemap"');
-        }
+        $sitemap_url = home_url('/sitemap_index.xml');
+        echo '<link rel="sitemap" type="application/xml" title="Sitemap" href="' . esc_url($sitemap_url) . '" />' . "\n";
     }
 
     /**

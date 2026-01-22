@@ -132,8 +132,8 @@ class PostsJobStatus
                 return;
             }
             $now = time();
-            if ($now > $deadline_ts && $current_status !== 0) {
-                update_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, 0);
+            if ($now > $deadline_ts && $current_status !== CustomFields::STATUS_PEKERJAAN_NORMAL) {
+                update_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, CustomFields::STATUS_PEKERJAAN_NORMAL);
             }
         } catch (\Exception $e) {
             Logger::error('Posts', 'PostsManagement::updateJobStatusIfExpired error for post ' . $post_id . ': ' . $e->getMessage());
@@ -157,8 +157,8 @@ class PostsJobStatus
             }
             $now = time();
             $seven_days_ahead = strtotime('+7 days 23:59:59', strtotime('today', $now));
-            if ($deadline_ts >= $now && $deadline_ts <= $seven_days_ahead && $current_status !== 2) {
-                update_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, 2);
+            if ($deadline_ts >= $now && $deadline_ts <= $seven_days_ahead && $current_status !== CustomFields::STATUS_PEKERJAAN_URGENT) {
+                update_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, CustomFields::STATUS_PEKERJAAN_URGENT);
             }
         } catch (\Exception $e) {
             Logger::error('Posts', 'PostsManagement::setJobStatustoUrgent error for post ' . $post_id . ': ' . $e->getMessage());

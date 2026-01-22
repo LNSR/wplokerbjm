@@ -59,22 +59,31 @@ class JobQuery
 		return array_merge(self::getBaseArgs, [
 			'posts_per_page' => $per_page,
 			'meta_query' => [
+				'relation' => 'OR',
+				// Pinned jobs (status 3) - always show
 				[
 					'key' => CustomFields::STATUS_PEKERJAAN,
-					'value' => [2, 3],
-					'compare' => 'IN',
+					'value' => CustomFields::STATUS_PEKERJAAN_PINNED,
+					'compare' => '=',
 					'type' => 'NUMERIC',
 				],
+				// Urgent jobs (status 2) with upcoming deadlines
 				[
-					'key' => CustomFields::DEADLINE,
-					'value' => [$today, $seven_days],
-					'compare' => 'BETWEEN',
-					'type' => 'DATE',
+					'relation' => 'AND',
+					[
+						'key' => CustomFields::STATUS_PEKERJAAN,
+						'value' => CustomFields::STATUS_PEKERJAAN_URGENT,
+						'compare' => '=',
+						'type' => 'NUMERIC',
+					],
+					[
+						'key' => CustomFields::DEADLINE,
+						'value' => [$today, $seven_days],
+						'compare' => 'BETWEEN',
+						'type' => 'DATE',
+					],
 				],
 			],
-			'orderby' => 'meta_value',
-			'meta_key' => CustomFields::DEADLINE,
-			'order' => 'ASC',
 		]);
 	}
 

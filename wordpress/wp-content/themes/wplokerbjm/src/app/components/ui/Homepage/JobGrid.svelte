@@ -126,6 +126,7 @@
 
 <script lang="ts">
   import { onMount, untrack } from "svelte";
+  import { SvelteMap } from "svelte/reactivity";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
   import { getThemeData } from "@/utils";
   import { searchStore } from "$lib/stores/Search.svelte";
@@ -135,17 +136,23 @@
   import SingleOverlay from "@components/ui/Homepage/SingleOverlay.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
+  import type { Attachment } from "svelte/attachments";
 
   let initialLoading = $state(false);
   let hasRestoredState = $state(false);
   let isRefreshing = $state(false);
+  let loadMoreSentinel = $state<HTMLElement | null>(null);
+  let loadMoreDebounce = $state<number | null>(null);
+  let cardHeights = new SvelteMap<number, number>();
+  let measuredItemHeight = $state<number | null>(null);
   let sectionElement = $state<HTMLElement | null>(null);
 
   const props: JobGridProps = $props();
 
   const { jobs = [], maxNumPages, context, filters, title, totalJobs } = props;
 
-  const itemHeight = 320;
+  // fallback height used until measurements are available
+  const FALLBACK_ITEM_HEIGHT = 420;
   const gap = 24;
   const buffer = 3;
   const virtualization = $derived.by(() =>
@@ -153,11 +160,45 @@
       displayJobs,
       overlayOpen,
       sectionElement?.offsetTop,
-      itemHeight,
+      measuredItemHeight ?? FALLBACK_ITEM_HEIGHT,
       gap,
       buffer,
     ),
   );
+
+  // Action to measure card height and store into cardHeights map
+  function measureHeight(jobId?: number): Attachment<HTMLElement> {
+    return (node: HTMLElement) => {
+      const updateHeight = () => {
+        const height = node.offsetHeight;
+        if (
+          typeof jobId === "number" &&
+          height > 0 &&
+          cardHeights.get(jobId) !== height
+        ) {
+          cardHeights.set(jobId, height);
+          // Trigger reactivity
+          cardHeights = new SvelteMap(cardHeights);
+          // update measuredItemHeight to be the max of known heights
+          const values = Array.from(cardHeights.values());
+          if (values.length > 0) {
+            measuredItemHeight = Math.max(...values);
+          }
+        }
+      };
+
+      updateHeight();
+
+      const ro = new ResizeObserver(updateHeight);
+      ro.observe(node);
+      const timeoutId = setTimeout(updateHeight, 100);
+
+      return () => {
+        ro.disconnect();
+        clearTimeout(timeoutId);
+      };
+    };
+  }
 
   class JobGridHandler {
     private async fetchJobGrid(): Promise<JobGridProps> {
@@ -377,27 +418,35 @@
     }
   });
 
-  // Auto load more when nearing the end
+  // Auto load more using IntersectionObserver sentinel to avoid CLS/scroll snap
   $effect(() => {
-    const margin = 600; // Load more when within 600px of the bottom
+    if (!loadMoreSentinel) return;
 
-    const handleScroll = () => {
-      if (
-        window.scrollY + window.innerHeight >=
-          (sectionElement?.offsetTop || 0) +
-            virtualization.totalHeight -
-            margin &&
-        hasMore &&
-        !loading
-      ) {
-        untrack(() => searchStore.loadMore());
-        utilsSEO.initialSchemaSSR = false;
-        utilsSEO.clearPendingJobSchemas();
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && hasMore && !loading) {
+            if (loadMoreDebounce) window.clearTimeout(loadMoreDebounce);
+            loadMoreDebounce = window.setTimeout(() => {
+              untrack(() => searchStore.loadMore());
+              utilsSEO.initialSchemaSSR = false;
+              utilsSEO.clearPendingJobSchemas();
+            }, 150);
+          }
+        }
+      },
+      { root: null, rootMargin: "900px" },
+    );
+
+    observer.observe(loadMoreSentinel);
+
+    return () => {
+      observer.disconnect();
+      if (loadMoreDebounce) {
+        window.clearTimeout(loadMoreDebounce);
+        loadMoreDebounce = null;
       }
     };
-
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
   });
 </script>
 
@@ -461,6 +510,7 @@
                 {#each virtualization.visibleJobs as job (job.permalink)}
                   {@const isSelected = jobOverlay.selectedSlug === job.slug}
                   <div
+                    {@attach measureHeight(job.id)}
                     class={`transition-opacity duration-600 ease-in-out ${isSelected ? "will-change-[opacity]" : ""}`}
                     onkeydown={(event) => {
                       if (event.key === "Enter" || event.key === " ") {
@@ -483,6 +533,15 @@
                 {/each}
               </div>
             </div>
+            <!-- load-more sentinel placed at the end of the virtualization spacer -->
+            <div
+              bind:this={loadMoreSentinel}
+              style="position: absolute; left:0; width:1px; height:1px; top: {Math.max(
+                0,
+                (virtualization.totalHeight || 0) - 1,
+              )}px; pointer-events:none; opacity:0;"
+              aria-hidden="true"
+            ></div>
           </div>
         {:else if initialLoading}
           <div class="flex justify-center py-12">

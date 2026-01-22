@@ -22,6 +22,7 @@ class GraphQLTest extends WplokerbjmTestCase
     private $taxonomyResolverMock;
     private $autoSuggestionResolverMock;
     private $jobsDataResolverMock;
+    private $themeDataResolverMock;
 
     private string $baseUrl;
 
@@ -35,6 +36,7 @@ class GraphQLTest extends WplokerbjmTestCase
         // Create mocks for all resolver dependencies (still needed for registration tests)
         $this->taxonomyResolverMock = $this->createMock(\WPLokerBJM\Controllers\GraphQL\Resolvers\TaxonomyResolver::class);
         $this->jobsDataResolverMock = $this->createMock(\WPLokerBJM\Controllers\GraphQL\Resolvers\JobsDataResolver::class);
+        $this->themeDataResolverMock = $this->createMock(\WPLokerBJM\Controllers\GraphQL\Resolvers\ThemeDataResolver::class);
 
         // Override the default register_graphql_field mock to track registrations
         \Brain\Monkey\Functions\when('register_graphql_field')->alias(function ($type, $field, $config) {
@@ -77,6 +79,7 @@ class GraphQLTest extends WplokerbjmTestCase
         $this->graphQLRegistration = new GraphQLRegistration(
             $this->taxonomyResolverMock,
             $this->jobsDataResolverMock,
+            $this->themeDataResolverMock,
         );
     }
 

@@ -62,20 +62,20 @@ export default defineConfig(({ command }) => {
           minify: true,
           inlineDynamicImports: false,
           format: "esm",
-          entryFileNames: "js/[name]-[hash:21].js",
-          chunkFileNames: "js/[name]-[hash:21].js",
+          entryFileNames: "js/[name]-[hash:6].js",
+          chunkFileNames: "js/[name]-[hash:6].js",
           assetFileNames: (assetInfo: any): string => {
             const assetName =
               assetInfo.names && assetInfo.names.length > 0
                 ? assetInfo.names[0]
                 : "";
             if (assetName.endsWith(".css")) {
-              return "css/[name]-[hash:32][extname]";
+              return "css/[name]-[hash:6][extname]";
             }
             if (assetName && /\.(woff2?|ttf|otf|eot)$/.test(assetName)) {
-              return "webfonts/[name]-[hash:32][extname]";
+              return "webfonts/[name]-[hash:6][extname]";
             }
-            return "assets/[name]-[hash:32][extname]";
+            return "assets/[name]-[hash:6][extname]";
           },
         },
       },

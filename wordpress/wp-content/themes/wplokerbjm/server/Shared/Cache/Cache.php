@@ -496,6 +496,7 @@ class CacheKey
     // Enqueue/Assets
     const VITE_MANIFEST = 'vite_manifest';
     const PRELOAD_URLS_PREFIX = 'preload_urls_';
+    const PRELOAD_LINK_HEADER_PREFIX = 'preload_link_header_';
     const TRANSITIVE_ASSETS_PREFIX = 'transitive_assets_';
 
     // Autowire Scanner

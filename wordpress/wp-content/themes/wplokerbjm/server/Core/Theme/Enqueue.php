@@ -31,7 +31,7 @@ class Enqueue
      * Output preload links for route-specific JS and CSS assets.
      * Production only.
      */
-    #[Action('wp_head', 0)]
+    #[Action('wp_head', 100)]
     public static function outputPreloadLinks(): void
     {
         try {
@@ -50,6 +50,57 @@ class Enqueue
             endforeach;
         } catch (\Exception $e) {
             Logger::error('Enqueue', 'Enqueue::outputPreloadLinks error: ' . $e->getMessage());
+            return;
+        }
+    }
+
+    /**
+     * Send HTTP Link headers for route-specific JS and CSS assets.
+     */
+    public static function outputPreloadLinksResponse(): void
+    {
+        try {
+            if (SharedUtils::isDevelopment()) {
+                return;
+            }
+
+            // Only send headers if not already sent
+            if (headers_sent()) {
+                Logger::warning('Enqueue', 'Headers already sent, skipping preload Link headers');
+                return;
+            }
+
+            $path = $_SERVER['REQUEST_URI'] ?? '/';
+
+            // Try to serve cached consolidated Link header first. TTL matches manifest/urls cache.
+            $cacheKey = CacheKey::PRELOAD_LINK_HEADER_PREFIX . md5($path);
+            $cachedHeader = Cache::get($cacheKey);
+            if ($cachedHeader !== false) {
+                header("Link: {$cachedHeader}", false);
+                return;
+            }
+
+            $urls = Vite::getPreloadUrls($path);
+
+            $linkParts = [];
+            foreach ($urls as $url) {
+                // Use raw escaping for header values
+                $safe = esc_url_raw($url);
+                if (str_ends_with($url, '.js')) {
+                    $linkParts[] = "<{$safe}>; rel=modulepreload; as=script; crossorigin";
+                } elseif (str_ends_with($url, '.css')) {
+                    $linkParts[] = "<{$safe}>; rel=preload; as=style; crossorigin";
+                }
+            }
+
+            if (!empty($linkParts)) {
+                $header = implode(', ', $linkParts);
+                // Cache the consolidated header for 1 day to match manifest TTL
+                Cache::set($cacheKey, $header, 86400);
+                header("Link: {$header}", false);
+            }
+        } catch (\Exception $e) {
+            Logger::error('Enqueue', 'Enqueue::outputPreloadLinksResponse error: ' . $e->getMessage());
             return;
         }
     }
