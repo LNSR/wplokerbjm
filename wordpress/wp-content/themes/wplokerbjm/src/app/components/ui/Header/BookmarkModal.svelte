@@ -4,7 +4,7 @@
   import { timeEffect } from "$lib/utils/elements.svelte";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { generalStore } from "$lib/stores/General.svelte";
-  import Virtualization from "$lib/utils/Virtualization.svelte";
+  import { Virtualization } from "$lib/utils/Virtualization.svelte";
   import type { CardJob } from "@/types";
   import { isMobile } from "$lib/utils/elements.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
@@ -172,27 +172,9 @@
       });
     });
 
-    // measure card height and update top-level cardHeights (lazy: only measures visible cards)
-    measureHeight =
-      (jobId: number): Attachment<HTMLElement> =>
-      (node: HTMLElement) => {
-        const updateHeight = () => {
-          const height = node.offsetHeight;
-          if (height > 0 && cardHeights.get(jobId) !== height) {
-            cardHeights.set(jobId, height);
-            // Trigger reactivity update
-            cardHeights = new SvelteMap(cardHeights);
-          }
-        };
-
-        updateHeight();
-
-        const timeoutId = setTimeout(updateHeight, 100);
-
-        return () => {
-          clearTimeout(timeoutId);
-        };
-      };
+    measureHeight(jobId: number): Attachment<HTMLElement> {
+      return Virtualization.createMeasureHeight(cardHeights, jobId);
+    }
 
     // Update container dimensions
     updateContainerDimensions() {

@@ -23,6 +23,16 @@ class GraphQLRegistration
         $this->registerInputTypes();
         $this->registerFields();
     }
+    private function sharedSortFields($description)
+    {
+        return [
+            'description' => $description,
+            'fields' => [
+                'value' => ['type' => 'String'],
+                'label' => ['type' => 'String'],
+            ],
+        ];
+    }
 
     private function registerScalars(): void
     {
@@ -45,6 +55,12 @@ class GraphQLRegistration
 
     private function registerObjectTypes(): void
     {
+
+        register_graphql_object_type(
+            'SortOption',
+            $this->sharedSortFields('Sort option object')
+        );
+
         // TaxonomyTermsResponse for grouped terms
         register_graphql_object_type('TaxonomyTermsResponse', [
             'description' => 'Response containing taxonomy terms',
@@ -130,7 +146,7 @@ class GraphQLRegistration
                 Taxonomies::LOKASI_PEKERJAAN => ['type' => ['list_of' => 'String']],
                 Taxonomies::GENDER => ['type' => ['list_of' => 'String']],
                 Taxonomies::PENDIDIKAN => ['type' => ['list_of' => 'String']],
-                'sort' => ['type' => 'SortOptionInput'],
+                'sort' => ['type' => 'SortOption'],
                 'context' => ['type' => 'String'],
             ],
         ]);
@@ -141,6 +157,7 @@ class GraphQLRegistration
                 'jobs' => ['type' => ['list_of' => 'Job']],
                 'total' => ['type' => 'Int'],
                 'maxNumPages' => ['type' => 'Int'],
+                'filters' => ['type' => 'JobFilters'],
             ],
         ]);
 
@@ -206,13 +223,7 @@ class GraphQLRegistration
 
     private function registerInputTypes(): void
     {
-        register_graphql_input_type('SortOptionInput', [
-            'description' => 'Input for sort option',
-            'fields' => [
-                'value' => ['type' => 'String'],
-                'label' => ['type' => 'String'],
-            ],
-        ]);
+        register_graphql_input_type('SortOptionInput', $this->sharedSortFields('Input for sort option'));
 
         register_graphql_input_type('JobFiltersInput', [
             'description' => 'Input for job filters',

@@ -52,7 +52,7 @@ class JobsDataResolver
             $cached = Cache::get($cacheKey);
 
             if ($cached !== false) {
-                return $cached['data'] + [
+                return ($cached['data'] + ['filters' => $filters]) + [
                     'total' => $cached['total'],
                     'maxNumPages' => $cached['maxNumPages'],
                 ];
@@ -75,10 +75,11 @@ class JobsDataResolver
             $data = SharedUtils::filterEmptyValues([
                 'jobs' => $jobs,
                 'context' => $context,
-                'filters' => $filters,
                 'total' => $query->found_posts,
                 'maxNumPages' => $query->max_num_pages,
             ]);
+
+            $data['filters'] = $filters; // Preserve original filters with all keys, including empty ones
 
             $cacheData = [
                 'data' => $data,
@@ -127,6 +128,7 @@ class JobsDataResolver
                 'jobs' => $props['jobs'] ?? [],
                 'total' => $props['totalJobs'] ?? 0,
                 'maxNumPages' => $props['maxNumPages'] ?? 0,
+                'filters' => $filters,
             ];
 
             Cache::set($cacheKey, $result, 86400); // Cache for 1 day
@@ -209,7 +211,7 @@ class JobsDataResolver
         }
     }
 
-    
+
 
     public function resolveSearchJobs($root, $args): array
     {
@@ -221,6 +223,7 @@ class JobsDataResolver
                 Taxonomies::LOKASI_PEKERJAAN => $filters[Taxonomies::LOKASI_PEKERJAAN] ?? [],
                 Taxonomies::GENDER => $filters[Taxonomies::GENDER] ?? [],
                 Taxonomies::PENDIDIKAN => $filters[Taxonomies::PENDIDIKAN] ?? [],
+                'sort' => $filters['sort']['value'] ?? 'desc',
             ];
 
             $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize($searchFilters));
@@ -239,7 +242,7 @@ class JobsDataResolver
             $data = SharedUtils::filterEmptyValues([
                 'jobs' => $jobs,
                 'context' => 'search',
-                'filters' => $searchFilters,
+                'filters' => $filters,
                 'title' => 'Hasil Pencarian',
                 'total' => $query->found_posts,
                 'maxNumPages' => $query->max_num_pages,
@@ -252,6 +255,9 @@ class JobsDataResolver
             Logger::error('GraphQL', 'JobsDataResolver::resolveSearchJobs error: ' . $e->getMessage());
             return [
                 'jobs' => [],
+                'context' => 'search',
+                'filters' => $args['filters'] ?? [],
+                'title' => 'Hasil Pencarian',
                 'total' => 0,
                 'maxNumPages' => 0,
             ];

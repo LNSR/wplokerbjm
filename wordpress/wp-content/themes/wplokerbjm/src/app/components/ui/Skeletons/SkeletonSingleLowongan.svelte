@@ -1,6 +1,6 @@
 <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12">
   <!-- Job Title Skeleton -->
-  <section class="top-0 backdrop-blur">
+  <section class="top-0">
     <div class="flex items-center justify-center gap-4 animate-pulse">
       <div class="h-8 w-64 bg-gray-300 dark:bg-gray-600 rounded"></div>
     </div>

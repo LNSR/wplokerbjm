@@ -8,28 +8,21 @@
   } from "$lib/stores/Route.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
-  import Virtualization from "$lib/utils/Virtualization.svelte";
+  import { Virtualization } from "$lib/utils/Virtualization.svelte";
+  import { scrollY, innerHeight } from "svelte/reactivity/window";
 
   const displayJobs = $derived(searchStore.jobs);
   const loading = $derived(searchStore.loading);
   const hasMore = $derived(searchStore.hasMore);
-  const overlayOpen = $derived(jobOverlay.overlayOpen);
+  const isDesktop = $derived.by(() => !isMobile());
   const selectedSlug = $derived(jobOverlay.selectedSlug);
   const displayTotalJobs = $derived(searchStore.totalJobs);
   const displayTitle = $derived(searchStore.title);
-  const isDesktop = $derived.by(() => !isMobile());
 
   class OverlayController {
-    openOverlay(slug: string): void {
+    openJobDetailOverlay(slug: string): void {
       const job = displayJobs.find((j: CardJob) => j.slug === slug);
       jobOverlay.openOverlay(slug, job);
-    }
-
-    handleOverlayClose(): void {
-      const ids = displayJobs
-        .map((j) => j.id)
-        .filter((id?: number) => id !== undefined); // get current job IDs to get JSON-LD schema after closing overlay
-      jobOverlay.closeOverlay(ids);
     }
 
     async handleJobClick(job: CardJob): Promise<void> {
@@ -72,8 +65,8 @@
       }
 
       if (isDesktop) {
-        this.openOverlay(job.slug ?? "");
-        // After opening overlay on desktop, ensure the clicked card is scrolled into view
+        jobOverlay.openOverlay(job.slug ?? "", job);
+        // After updating overlay on desktop, ensure the clicked card is scrolled into view
         this.scrollToCard(job.slug ?? "");
       } else {
         await MobileJobClick();
@@ -83,6 +76,7 @@
     /**
      *  Check URL for overlay slug on mount and
      *  handle opening overlay if present/scroll skipping.
+     *  If no slug, open overlay in placeholder mode for desktop.
      */
     checkUrlForOverlay() {
       if (typeof window !== "undefined") {
@@ -90,43 +84,24 @@
         const match = path.match(/\/lowongan\/([^/]+)\/?$/);
         if (match && match[1] && isDesktop) {
           const slug = match[1];
-          void overlayManager.openOverlay(slug);
+          void overlayManager.openJobDetailOverlay(slug);
           routeStateStore.setSkipScrollRestore(path, true);
         }
       }
     }
 
-    scrollToCard(slug: string, delay = 200): void {
-      jobOverlay.scrollToCard(slug, delay, false, "grid");
+    scrollToCard(slug: string): void {
+      jobOverlay.scrollToCard(slug, false, "grid");
     }
   }
 
   export const overlayManager = new OverlayController();
-
-  class VirtualizationManager {
-    static computeGridVirtualization(
-      displayJobs: CardJob[],
-      overlayOpen: boolean,
-      sectionTop: number | undefined,
-      itemHeight: number,
-      gap: number,
-      buffer: number,
-    ) {
-      return Virtualization.computeGrid({
-        displayJobs,
-        overlayOpen,
-        sectionTop,
-        itemHeight,
-        gap,
-        buffer,
-      });
-    }
-  }
 </script>
 
 <script lang="ts">
   import { onMount, untrack } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
+  import type { Attachment } from "svelte/attachments";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
   import { getThemeData } from "@/utils";
   import { searchStore } from "$lib/stores/Search.svelte";
@@ -136,69 +111,59 @@
   import SingleOverlay from "@components/ui/Homepage/SingleOverlay.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import type { Attachment } from "svelte/attachments";
 
   let initialLoading = $state(false);
   let hasRestoredState = $state(false);
   let isRefreshing = $state(false);
   let loadMoreSentinel = $state<HTMLElement | null>(null);
   let loadMoreDebounce = $state<number | null>(null);
-  let cardHeights = new SvelteMap<number, number>();
-  let measuredItemHeight = $state<number | null>(null);
-  let sectionElement = $state<HTMLElement | null>(null);
+  const cardHeights = new SvelteMap<number, number>();
 
   const props: JobGridProps = $props();
 
   const { jobs = [], maxNumPages, context, filters, title, totalJobs } = props;
 
+  class VirtualizationManager {
+    static computeListVirtualization(
+      displayJobs: CardJob[],
+      scrollY: number,
+      containerHeight: number,
+      cardHeights: Map<number, number>,
+      fallbackHeight: number,
+      gap: number,
+      buffer: number,
+    ) {
+      return Virtualization.computeList({
+        displayJobs,
+        scrollY,
+        containerHeight,
+        cardHeights,
+        fallbackHeight,
+        gap,
+        buffer,
+      });
+    }
+
+    static measureHeight = (jobId?: number): Attachment<HTMLElement> => {
+      return Virtualization.createMeasureHeight(cardHeights, jobId);
+    };
+  }
+
   // fallback height used until measurements are available
   const FALLBACK_ITEM_HEIGHT = 420;
   const gap = 24;
-  const buffer = 3;
+  const buffer = isDesktop ? 9 : 3;
   const virtualization = $derived.by(() =>
-    VirtualizationManager.computeGridVirtualization(
+    VirtualizationManager.computeListVirtualization(
       displayJobs,
-      overlayOpen,
-      sectionElement?.offsetTop,
-      measuredItemHeight ?? FALLBACK_ITEM_HEIGHT,
+      scrollY.current ?? 0,
+      innerHeight.current ?? 800,
+      new Map(cardHeights),
+      FALLBACK_ITEM_HEIGHT,
       gap,
       buffer,
     ),
   );
-
-  // Action to measure card height and store into cardHeights map
-  function measureHeight(jobId?: number): Attachment<HTMLElement> {
-    return (node: HTMLElement) => {
-      const updateHeight = () => {
-        const height = node.offsetHeight;
-        if (
-          typeof jobId === "number" &&
-          height > 0 &&
-          cardHeights.get(jobId) !== height
-        ) {
-          cardHeights.set(jobId, height);
-          // Trigger reactivity
-          cardHeights = new SvelteMap(cardHeights);
-          // update measuredItemHeight to be the max of known heights
-          const values = Array.from(cardHeights.values());
-          if (values.length > 0) {
-            measuredItemHeight = Math.max(...values);
-          }
-        }
-      };
-
-      updateHeight();
-
-      const ro = new ResizeObserver(updateHeight);
-      ro.observe(node);
-      const timeoutId = setTimeout(updateHeight, 100);
-
-      return () => {
-        ro.disconnect();
-        clearTimeout(timeoutId);
-      };
-    };
-  }
 
   class JobGridHandler {
     private async fetchJobGrid(): Promise<JobGridProps> {
@@ -358,10 +323,6 @@
           // In search mode, re-run search
           await searchStore.searchJobs();
         }
-        // If overlay was open, close it properly
-        if (overlayOpen) {
-          await jobOverlay.closeIfOpen();
-        }
       } catch (err) {
         console.error("Failed to refresh job grid:", err);
         searchStore.error = "Failed to refresh job grid";
@@ -383,26 +344,21 @@
   onMount(() => {
     overlayManager.checkUrlForOverlay();
     void jobGridHandler.initializeJobs();
-    const cleanupPopstate = jobOverlay.setupPopstateListener();
-
-    return () => {
-      cleanupPopstate();
-    };
   });
 
   // Watch for jobs changes and close overlay
-  $effect(() => {
-    searchStore.jobs;
-
-    // Close overlay when jobs change (untrack to avoid circular dependencies)
-    untrack(() => {
-      void jobOverlay.closeIfOpen();
-    });
-  });
+  // Removed: keep overlay open always
+  // $effect(() => {
+  //   searchStore.jobs;
+  //   // Close overlay when jobs change (untrack to avoid circular dependencies)
+  //   untrack(() => {
+  //     void jobOverlay.closeIfOpen();
+  //   });
+  // });
 
   // When an overlay opens (including from URL) ensure the selected card scrolls into view
   $effect(() => {
-    if (overlayOpen && selectedSlug) {
+    if (isDesktop && selectedSlug) {
       setTimeout(() => {
         overlayManager.scrollToCard(selectedSlug);
       }, 300);
@@ -411,7 +367,7 @@
 
   // Add JobPosting JSON-LD for jobs in the grid
   $effect(() => {
-    if (routeStore.currentUrl.pathname === "/" && !jobOverlay.overlayOpen) {
+    if (routeStore.currentUrl.pathname === "/" && !isDesktop) {
       refreshJobSchema();
     } else {
       utilsSEO.clearPendingJobSchemas();
@@ -450,7 +406,7 @@
   });
 </script>
 
-<section class="relative mt-8" id="job-grid" bind:this={sectionElement}>
+<section class="relative mt-8" id="job-grid">
   <div class="flex items-center justify-between mb-6">
     {#if displayJobs.length}
       <h2 class="text-xl md:text-2xl font-semibold">{displayTitle}</h2>
@@ -488,51 +444,37 @@
     {/if}
 
     <div class="relative flex">
-      <div
-        class={[
-          "transition-all duration-600 ease-in-out",
-          overlayOpen
-            ? "w-full lg:w-[calc(100%-420px)] will-change-[width]"
-            : "w-full",
-        ].join(" ")}
-      >
+      <div class="w-full lg:w-[calc(100%-420px)]">
         {#if displayJobs.length}
           <div
             style="height: {virtualization.totalHeight}px; position: relative;"
           >
-            <div
-              style="position: absolute; width: 100%; transform: translate3d(0, {(virtualization.startRow ??
-                0) * (virtualization.rowHeight ?? 0)}px, 0);"
-            >
+            {#each virtualization.visibleJobs as job, index (job.permalink)}
+              {@const absoluteTop =
+                virtualization.itemPositions[virtualization.startIndex + index]}
               <div
-                class={`grid gap-6 ${virtualization.itemsPerRow === 1 ? "grid-cols-1" : virtualization.itemsPerRow === 2 ? "grid-cols-1 md:grid-cols-2" : "grid-cols-1 md:grid-cols-2 lg:grid-cols-3"}`}
+                style="position: absolute; transform: translate3d(0, {absoluteTop}px, 0); width: 100%;"
+                {@attach VirtualizationManager.measureHeight(job.id)}
+                class="transition-opacity duration-600 ease-in-out"
+                onkeydown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    void overlayManager.handleJobClick(job);
+                  }
+                }}
+                role="button"
+                tabindex="0"
+                aria-label={`View job details for ${job.title}`}
               >
-                {#each virtualization.visibleJobs as job (job.permalink)}
-                  {@const isSelected = jobOverlay.selectedSlug === job.slug}
-                  <div
-                    {@attach measureHeight(job.id)}
-                    class={`transition-opacity duration-600 ease-in-out ${isSelected ? "will-change-[opacity]" : ""}`}
-                    onkeydown={(event) => {
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        void overlayManager.handleJobClick(job);
-                      }
-                    }}
-                    role="button"
-                    tabindex="0"
-                    aria-label={`View job details for ${job.title}`}
-                  >
-                    <JobCard
-                      jobdata={job}
-                      variant="featured"
-                      permalink={job.permalink ?? ""}
-                      isVisited={routeStateStore.hasVisitedJob(job.slug ?? "")}
-                      onClick={() => overlayManager.handleJobClick(job)}
-                    />
-                  </div>
-                {/each}
+                <JobCard
+                  jobdata={job}
+                  variant="featured"
+                  permalink={job.permalink ?? ""}
+                  isVisited={routeStateStore.hasVisitedJob(job.slug ?? "")}
+                  onClick={() => overlayManager.handleJobClick(job)}
+                />
               </div>
-            </div>
+            {/each}
             <!-- load-more sentinel placed at the end of the virtualization spacer -->
             <div
               bind:this={loadMoreSentinel}
@@ -576,18 +518,12 @@
         {/if}
       </div>
 
-      {#if overlayOpen && selectedSlug}
+      {#if isDesktop}
         <div
-          class={[
-            "hidden md:block w-full",
-            overlayOpen ? "sticky self-start" : "relative",
-          ].join(" ")}
-          style:top={overlayOpen ? headerStore.totalOffset + "px" : undefined}
+          class="sticky self-start w-full"
+          style:top={headerStore.totalOffset + "px"}
         >
-          <SingleOverlay
-            visible={overlayOpen}
-            close={() => void overlayManager.handleOverlayClose()}
-          />
+          <SingleOverlay visible={true} />
         </div>
       {/if}
     </div>

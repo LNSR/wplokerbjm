@@ -5,6 +5,7 @@
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import JobDetail from "@components/ui/Shared/JobDetail.svelte";
+  import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
 
   let slideIn = $state(false);
 
@@ -30,33 +31,28 @@
     return base;
   }
 
-  class OverlayKeyboardHandler {
-    static handleKeydown(event: KeyboardEvent, closeFn: () => void): void {
-      if (event.key === "Escape") {
-        closeFn();
-      }
-    }
-  }
+  // Removed: OverlayKeyboardHandler not needed
 </script>
 
 <script lang="ts">
   import { onMount, tick } from "svelte";
 
-  const { visible, close } = $props<{
+  const { visible } = $props<{
     visible: boolean;
-    close: () => void;
   }>();
 
   onMount(() => {
     isLoggedIn = !!NonceManager.getNonce;
-    document.addEventListener("keydown", (event) =>
-      OverlayKeyboardHandler.handleKeydown(event, close)
-    );
+    // Removed: no close functionality
+    // document.addEventListener("keydown", (event) =>
+    //   OverlayKeyboardHandler.handleKeydown(event, close)
+    // );
 
     return () => {
-      document.removeEventListener("keydown", (event) =>
-        OverlayKeyboardHandler.handleKeydown(event, close)
-      );
+      // Removed: no close functionality
+      // document.removeEventListener("keydown", (event) =>
+      //   OverlayKeyboardHandler.handleKeydown(event, close)
+      // );
     };
   });
 
@@ -89,24 +85,18 @@
     ].join(" ")}
   >
     <!-- Overlay background (only in JobGrid area) -->
-    <div
-      class="absolute top-0 left-0 right-0 bottom-0"
-      onclick={close}
-      role="button"
-      tabindex="0"
-      onkeydown={(e) => e.key === "Enter" && close()}
-    ></div>
+    <div class="absolute top-0 left-0 right-0 bottom-0"></div>
 
     <!-- Drawer -->
     <aside
       class="bg-base-200 dark:bg-base-100/50 relative shadow-xl rounded-xl border-2 border-blue-500 w-full max-h-[calc(100vh-var(--site-header-top)-var(--site-header-height))] overflow-y-auto flex flex-col z-50"
     >
       <div
-        class="absolute top-5 left-4 right-4 grid grid-cols-3 items-center z-10 gap-4"
+        class="flex absolute top-5 left-4 right-4 justify-between items-center z-10 gap-4"
         role="toolbar"
         aria-label="Overlay controls"
       >
-        <div class="flex items-center gap-2 justify-start">
+        <div class="flex items-center gap-2">
           {#if !loading && data && isLoggedIn && editPostId}
             <a
               href={`/wp-admin/post.php?post=${editPostId}&action=edit`}
@@ -120,7 +110,7 @@
           {/if}
         </div>
 
-        <div class="flex items-center gap-2 justify-center">
+        <div class="flex items-center gap-2">
           {#if !loading && data && isLoggedIn && editPostId}
             <a
               href={getCloneHref(editPostId)}
@@ -133,24 +123,23 @@
             </a>
           {/if}
         </div>
-
-        <div class="flex items-center gap-2 justify-end">
-          <button
-            class="btn font-semibold bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] border border-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)]"
-            onclick={close}
-            aria-label="Close overlay"
-          >
-            Tutup
-          </button>
-        </div>
       </div>
 
       {#if loading}
         <div
           class="p-4 text-center pt-16 flex-1 flex flex-col items-center justify-center"
         >
+          <span class="mt-4 mb-4 text-2xl font-bold">Memuat Lowongan...</span>
           <LoadingSpinner srLabel="Memuat..." size="md" />
-          <div class="mt-4">Memuat Lowongan...</div>
+          <SkeletonSingleLowongan />
+        </div>
+      {:else if !data && !loading && !error}
+        <!-- Placeholder skeleton when no job selected -->
+        <div class="p-6 space-y-8 pt-16 flex-1 flex flex-col">
+          <span class="text-lg font-bold mb-4 text-center"
+            >Silahkan pilih lowongan untuk melihat detailnya.</span
+          >
+          <SkeletonSingleLowongan />
         </div>
       {:else if error}
         <div class="p-4 text-red-500 pt-16 flex-1">{error}</div>

@@ -7,6 +7,7 @@ import liveReload from "vite-plugin-live-reload";
 import { unstableRolldownAdapter } from 'vite-bundle-analyzer'
 import { analyzer } from 'vite-bundle-analyzer'
 import { partytownVite } from "@qwik.dev/partytown/utils";
+import { generateCaddyEarlyHints } from "./vite-plugins/generate-caddy-early-hints";
 
 export default defineConfig(({ command }) => {
   return {
@@ -24,6 +25,7 @@ export default defineConfig(({ command }) => {
       partytownVite({
         dest: resolve(__dirname, "assets", "dist", "~partytown")
       }),
+      generateCaddyEarlyHints()
     ],
     resolve: {
       alias: {
@@ -60,7 +62,7 @@ export default defineConfig(({ command }) => {
           exports: "auto",
           hashCharacters: "base64",
           minify: true,
-          inlineDynamicImports: false,
+          codeSplitting: true,
           format: "esm",
           entryFileNames: "js/[name]-[hash:6].js",
           chunkFileNames: "js/[name]-[hash:6].js",

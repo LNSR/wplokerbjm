@@ -31,7 +31,7 @@ class Enqueue
      * Output preload links for route-specific JS and CSS assets.
      * Production only.
      */
-    #[Action('wp_head', 100)]
+    #[Action('wp_head', 0)]
     public static function outputPreloadLinks(): void
     {
         try {

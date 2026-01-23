@@ -662,6 +662,31 @@
 
     // Start header manager after DOM is available
     headerManager.start();
+
+    // Handle will-change for drawer animation
+    const drawerInput = document.getElementById(
+      "header-drawer",
+    ) as HTMLInputElement;
+    const drawerSide = document.getElementById("header-drawer-side");
+    if (drawerInput && drawerSide) {
+      const handleDrawerChange = () => {
+        if (drawerInput.checked) {
+          drawerSide.style.willChange = "transform";
+        } else {
+          // Remove after transition
+          drawerSide.addEventListener(
+            "transitionend",
+            () => {
+              drawerSide.style.willChange = "";
+            },
+            { once: true },
+          );
+        }
+      };
+      drawerInput.addEventListener("change", handleDrawerChange);
+      // Store for cleanup
+      (drawerInput as any)._drawerListener = handleDrawerChange;
+    }
   });
   onDestroy(() => {
     // headerManager.destroy will attempt to restore wpadminbar as a best-effort
@@ -670,6 +695,17 @@
     headerStore.appEl?.style.removeProperty("--site-header-top");
     headerStore.appEl?.style.removeProperty("--site-header-height");
     headerStore.appEl?.style.removeProperty("--site-scroll-padding-top");
+
+    // Remove drawer event listener
+    const drawerInput = document.getElementById(
+      "header-drawer",
+    ) as HTMLInputElement;
+    if (drawerInput && (drawerInput as any)._drawerListener) {
+      drawerInput.removeEventListener(
+        "change",
+        (drawerInput as any)._drawerListener,
+      );
+    }
   });
 
   $effect(() => {

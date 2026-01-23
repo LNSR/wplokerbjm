@@ -67,7 +67,7 @@
     return `card-body-${variant}`;
   });
 
-  async function handleClick(event: MouseEvent) {
+  function handleClick(event: MouseEvent) {
     const { ctrlKey, metaKey, shiftKey, button } = event as MouseEvent;
     if (ctrlKey || metaKey || shiftKey || button === 1) return;
 
@@ -102,9 +102,9 @@
 
       // Otherwise handle opening overlay. Delegate scrolling to the centralized
       // jobOverlay manager so carousel, grid and card all use the same logic.
-      await jobOverlay.openOverlay(slug, jobdata);
+      jobOverlay.openOverlay(slug, jobdata);
       // Let the overlay manager handle scrolling after it opens. Prefer the carousel card when present.
-      jobOverlay.scrollToCard(slug, 220, true, 'carousel');
+      jobOverlay.scrollToCard(slug, true, 'carousel');
       return;
     }
   }

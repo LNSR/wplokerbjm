@@ -23,6 +23,7 @@ class GraphQLData
      */
     public function getCardData(int $post_id): array
     {
+        $post_id = (int) $post_id; // Explicit coercion for type safety
         $cacheKey = CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id;
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
@@ -74,6 +75,7 @@ class GraphQLData
      */
     public function getJobDetailData(int $post_id): array
     {
+        $post_id = (int) $post_id; // Explicit coercion for type safety
         // Use per-user cache for logged-in users to avoid leaking user-specific nonces
         $cacheKey = is_user_logged_in()
             ? CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . $post_id . '_user_' . (int) get_current_user_id()
@@ -173,6 +175,7 @@ class GraphQLData
      */
     public function JobSchema(int $post_id)
     {
+        $post_id = (int) $post_id; // Explicit coercion for type safety
         return $this->jobSchema->getJobPostingSchema($post_id);
     }
 }

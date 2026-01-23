@@ -26,7 +26,7 @@ class JobQuery
 		return array_merge(self::getBaseArgs, [
 			'posts_per_page' => $posts_per_page,
 			'paged' => $paged,
-			'orderby' => 'date',
+			'orderby' => 'post_date',
 			'order' => 'DESC',
 		]);
 	}
@@ -97,12 +97,13 @@ class JobQuery
 	 */
 	public static function searchJobsArgs(array $params, int $paged, int $per_page): array
 	{
-		$order = (isset($params['sort']) && strtolower($params['sort']) === 'asc') ? 'ASC' : 'DESC';
+		$sortValue = isset($params['sort']) ? (is_array($params['sort']) ? ($params['sort']['value'] ?? 'desc') : $params['sort']) : 'desc';
+		$order = (strtolower($sortValue) === 'asc') ? 'ASC' : 'DESC';
 
 		$args = array_merge(self::getBaseArgs, [
 			'posts_per_page' => $per_page,
 			'paged' => $paged,
-			'orderby' => 'date',
+			'orderby' => 'post_date',
 			'order' => $order,
 		]);
 

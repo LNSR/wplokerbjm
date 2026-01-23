@@ -1,35 +1,11 @@
-/**
- * Singleton Virtualization helper for common virtualization calculations
- * Used by JobCarousel and JobGrid to keep logic DRY and testable
- */
-
 import { LRUCache } from 'lru-cache';
-import { innerWidth, innerHeight, scrollY } from 'svelte/reactivity/window';
+import type { Attachment } from "svelte/attachments";
+import { SvelteMap } from "svelte/reactivity";
 
-
-export interface GridVirtualizationState<T = any> {
-    /** Number of items displayed per row in the grid */
-    itemsPerRow: number;
-    /** Total number of rows in the grid */
-    totalRows: number;
-    /** Height of each row, including item height and gap */
-    rowHeight: number;
-    /** Top position offset of the grid section */
-    sectionTop: number;
-    /** Starting row index of visible rows */
-    startRow: number;
-    /** Ending row index of visible rows */
-    endRow: number;
-    /** Starting index of visible items in the flat array */
-    startIndex: number;
-    /** Ending index of visible items in the flat array */
-    endIndex: number;
-    /** Array of jobs that are currently visible */
-    visibleJobs: T[];
-    /** Total height of the entire grid */
-    totalHeight: number;
-}
-
+/**
+ * Represents the state of a virtualized list, including visible items and positioning data.
+ * This interface is used to manage the rendering of large lists efficiently by only showing items in view.
+ */
 export interface ListVirtualizationState<T = any> {
     /** Array of jobs that are currently visible */
     visibleJobs: T[];
@@ -43,6 +19,10 @@ export interface ListVirtualizationState<T = any> {
     itemPositions: number[];
 }
 
+/**
+ * Options for configuring the list virtualization computation.
+ * These parameters control how the virtualized list behaves, including scroll position, container size, and item measurements.
+ */
 export type ListOptions<T = any> = {
     /** Array of jobs to be displayed in the list */
     displayJobs: T[];
@@ -60,34 +40,23 @@ export type ListOptions<T = any> = {
     buffer?: number;
 };
 
-export type GridOptions<T = any> = {
-    /** Array of jobs to be displayed in the grid */
-    displayJobs: T[];
-    /** Width of the container (viewport or element) */
-    innerWidth?: number;
-    /** Whether an overlay is currently open, affecting layout */
-    overlayOpen?: boolean;
-    /** Height of the container (viewport or element) */
-    innerHeight?: number;
-    /** Current vertical scroll position */
-    scrollY?: number;
-    /** Top position of the grid section relative to the page */
-    sectionTop?: number | null;
-    /** Height of each individual item in the grid */
-    itemHeight?: number;
-    /** Gap between items in the grid */
-    gap?: number;
-    /** Number of extra rows/columns to render outside visible area for smooth scrolling */
-    buffer?: number;
-};
-
+/**
+ * Service for handling list virtualization logic.
+ * This class computes which items should be visible based on scroll position and container size,
+ * using caching and binary search for performance. Note: Window-based virtualization with infinite scroll
+ * inherently contributes to Cumulative Layout Shift (CLS) due to dynamic content loading, which is a limitation
+ * of the web model and not addressed here.
+ */
 class VirtualizationService {
-    /** LRU cache for storing computed grid virtualization states to avoid recalculations */
-    private gridCache = new LRUCache<string, Omit<GridVirtualizationState, 'visibleJobs'>>({ max: 100 });
-    /** LRU cache for storing computed list virtualization states to avoid recalculations */
     private listCache = new LRUCache<string, Omit<ListVirtualizationState, 'visibleJobs'>>({ max: 100 });
 
-    // Binary search helper for finding insertion point in sorted array
+    /**
+     * Binary search helper for finding the insertion point in a sorted array.
+     * Used to efficiently locate the starting and ending indices of visible items based on scroll position.
+     * @param arr - The sorted array of cumulative positions
+     * @param target - The target position to find
+     * @returns The index where the target would be inserted
+     */
     private binarySearch(arr: number[], target: number): number {
         let low = 0;
         let high = arr.length - 1;
@@ -102,59 +71,12 @@ class VirtualizationService {
         return low;
     }
 
-    computeGrid<T = any>(opts: GridOptions<T>): GridVirtualizationState<T> {
-        const {
-            displayJobs,
-            innerWidth: innerWidthParam = innerWidth.current,
-            overlayOpen = false,
-            innerHeight: innerHeightParam = innerHeight.current,
-            scrollY: scrollYParam = scrollY.current,
-            sectionTop = 0,
-            itemHeight = 320,
-            gap = 24,
-            buffer = 3,
-        } = opts;
-
-        const roundedScrollY = Math.round((scrollYParam || 0) / 50) * 50;
-        const roundedInnerWidth = Math.round((innerWidthParam || 0) / 100) * 100;
-        const roundedInnerHeight = Math.round((innerHeightParam || 0) / 100) * 100;
-
-        const key = `${roundedInnerWidth}-${overlayOpen}-${roundedInnerHeight}-${roundedScrollY}-${sectionTop}-${itemHeight}-${gap}-${buffer}-${displayJobs.length}`;
-
-        const cached = this.gridCache.get(key);
-        if (cached) {
-            const vj = displayJobs.slice(cached.startIndex, cached.endIndex);
-            return { ...cached, visibleJobs: vj };
-        }
-
-        const ipr = innerWidthParam! >= 1024 ? (overlayOpen ? 1 : 3) : innerWidthParam! >= 768 ? (overlayOpen ? 1 : 2) : 1;
-        const tr = Math.ceil(displayJobs.length / ipr);
-        const rh = itemHeight + gap;
-        const st = sectionTop || 0;
-        const sr = Math.max(0, Math.floor((scrollYParam! - st) / rh) - buffer);
-        const er = Math.min(tr, sr + Math.ceil(innerHeightParam! / rh) + buffer * 2);
-        const si = sr * ipr;
-        const ei = Math.min(displayJobs.length, er * ipr);
-        const th = tr * rh;
-
-        const state: Omit<GridVirtualizationState<T>, 'visibleJobs'> = {
-            itemsPerRow: ipr,
-            totalRows: tr,
-            rowHeight: rh,
-            sectionTop: st,
-            startRow: sr,
-            endRow: er,
-            startIndex: si,
-            endIndex: ei,
-            totalHeight: th,
-        };
-
-        this.gridCache.set(key, state);
-
-        const vj = displayJobs.slice(si, ei);
-        return { ...state, visibleJobs: vj };
-    }
-
+    /**
+     * Computes the virtualization state for a list based on the provided options.
+     * This method determines which items are visible, their positions, and caches results for performance.
+     * @param opts - The options for virtualization computation
+     * @returns The computed virtualization state
+     */
     computeList<T = any>(opts: ListOptions<T>): ListVirtualizationState<T> {
         const {
             displayJobs,
@@ -166,6 +88,7 @@ class VirtualizationService {
             buffer = 2,
         } = opts;
 
+        // Round values for caching to reduce cache misses due to minor variations
         const roundedScrollY = Math.round(scrollY / 50) * 50;
         const roundedContainerHeight = Math.round(containerHeight / 100) * 100;
         const heightsString = Array.from(cardHeights.entries()).sort().map(([id, h]) => `${id}:${h}`).join(',');
@@ -230,6 +153,38 @@ class VirtualizationService {
         this.listCache.set(key, state);
 
         return { ...state, visibleJobs };
+    }
+
+    /**
+     * Creates a height measurement attachment for virtualized items.
+     * This function measures the height of DOM elements and updates the cardHeights map,
+     * triggering reactivity for virtualization calculations.
+     * @param cardHeights - The SvelteMap to store measured heights
+     * @param jobId - The optional job ID to associate with the height
+     * @returns An attachment function for measuring element height
+     */
+    createMeasureHeight(cardHeights: SvelteMap<number, number>, jobId?: number): Attachment<HTMLElement> {
+        return (node: HTMLElement) => {
+            const updateHeight = () => {
+                const height = node.offsetHeight;
+                if (typeof jobId === "number" && height > 0 && cardHeights.get(jobId) !== height) {
+                    cardHeights.set(jobId, height);
+                    // Trigger reactivity
+                    cardHeights = new SvelteMap(cardHeights);
+                }
+            };
+
+            updateHeight();
+
+            const ro = new ResizeObserver(updateHeight);
+            ro.observe(node);
+            const timeoutId = setTimeout(updateHeight, 1000);
+
+            return () => {
+                ro.disconnect();
+                clearTimeout(timeoutId);
+            };
+        };
     }
 }
 

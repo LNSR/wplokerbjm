@@ -6,7 +6,7 @@ import { NonceManager } from '@/utils';
 
 const cache = new LRUCache<string, any>({
   max: 500, // Maximum number of items
-  ttl: 30000, // 30 seconds in milliseconds
+  ttl: 10000, // 10 seconds in milliseconds
 }); // prevent excessive API calls
 
 // Create urql client for GraphQL queries
@@ -142,7 +142,8 @@ export class APIService {
     if (cache.has(key)) {
       return cache.get(key);
     }
-    const result = await graphqlClient.query(GET_LOAD_MORE, filters).toPromise();
+    const { paged, context, ...filterFields } = filters;
+    const result = await graphqlClient.query(GET_LOAD_MORE, { paged, context, filters: filterFields }).toPromise();
     if (result.error) {
       throw result.error;
     }
@@ -156,7 +157,8 @@ export class APIService {
     if (cache.has(key)) {
       return cache.get(key);
     }
-    const result = await graphqlClient.query(GET_JOB_GRID, filters).toPromise();
+    const { paged, context, title, total_jobs, ...filterFields } = filters;
+    const result = await graphqlClient.query(GET_JOB_GRID, { paged, context, title, total_jobs, filters: filterFields }).toPromise();
     if (result.error) {
       throw result.error;
     }

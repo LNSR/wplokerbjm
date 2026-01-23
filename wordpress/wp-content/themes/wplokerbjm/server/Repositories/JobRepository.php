@@ -33,7 +33,7 @@ class JobRepository
         if ($jobs_query->have_posts()) {
             while ($jobs_query->have_posts()) {
                 $jobs_query->the_post();
-                $post_id = get_the_ID();
+                (int) $post_id = get_the_ID();
                 $jobs[] = $this->restData->getCardData($post_id);
                 $schema_data[] = $this->jobSchema->getJobPostingSchema($post_id);
             }

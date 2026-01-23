@@ -21,6 +21,8 @@ export default [
       "eslint.config.js",
       "eslint.config.cjs",
       ".eslintrc.cjs",
+      "vite-plugins/**/*.d.ts",
+      "vite-plugins/**/*.js",
     ],
   },
   {

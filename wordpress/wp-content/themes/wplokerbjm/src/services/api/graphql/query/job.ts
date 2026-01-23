@@ -106,6 +106,17 @@ export const GET_JOB_GRID = gql`
       }
       total
       maxNumPages
+      filters {
+        cari
+        lokasi_pekerjaan
+        gender
+        pendidikan
+        sort {
+          value
+          label
+        }
+        context
+      }
     }
   }
 `;

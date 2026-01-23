@@ -680,14 +680,14 @@
       });
     }
 
-    private static async handlePlatformSpecificNavigation(
+    private static handlePlatformSpecificNavigation(
       slug: string,
       permalink: CardJob["permalink"],
       job: CardJob,
-    ): Promise<void> {
+    ): void {
       if (typeof window !== "undefined" && window.innerWidth >= 768) {
         // Desktop: open overlay
-        await jobOverlay.openOverlay(slug, job);
+        jobOverlay.openOverlay(slug, job);
       } else {
         // Mobile: use SPA navigation to SingleLowongan.svelte route
         const url = new URL(String(permalink), routeStore.currentUrl.origin);

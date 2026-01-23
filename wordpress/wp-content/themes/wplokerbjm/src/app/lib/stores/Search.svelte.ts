@@ -3,7 +3,6 @@ import { taxonomyStore } from './Taxonomy.svelte'
 import { debounce, validation } from '@/utils'
 import type {
     SearchFilters,
-    LoadMoreFilters,
     CardJob,
     LoadMoreResponse,
     SearchResponse,
@@ -94,7 +93,9 @@ export class SearchManager {
         this.filters[TaxonomyType.lokasi] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.lokasi]) ?? this.filters[TaxonomyType.lokasi]
         this.filters[TaxonomyType.gender] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.gender]) ?? this.filters[TaxonomyType.gender]
         this.filters[TaxonomyType.pendidikan] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.pendidikan]) ?? this.filters[TaxonomyType.pendidikan]
-        this.filters.sort = typeof newFilters.sort === 'object' && newFilters.sort !== null ? (newFilters.sort as SortOption) : this.filters.sort
+        if (newFilters.sort && typeof newFilters.sort === 'object') {
+            this.filters.sort = { value: newFilters.sort.value, label: newFilters.sort.label }
+        }
         this.filters.context = newFilters.context ?? this.filters.context
     }
 
@@ -164,10 +165,14 @@ export class SearchManager {
         this.loading = true
         this.error = null
         try {
-            const loadMoreFilters: LoadMoreFilters = {
-                paged: this.page + 1,
-                context: this.context,
-                ...SearchUtils.sanitizeFilters({ ...this.filters }),
+            const paged = this.page + 1
+            const context = this.context
+            const filters = SearchUtils.sanitizeFilters({ ...this.filters })
+
+            const loadMoreFilters = {
+                paged,
+                context,
+                ...filters,
             }
 
             const response = await APIService.loadMoreJobsGraphQL(loadMoreFilters)
@@ -178,7 +183,7 @@ export class SearchManager {
                     !this.jobs.some(existingJob => existingJob.permalink === newJob.permalink)
                 );
                 this.jobs.push(...newJobs)
-                this.page = loadMoreFilters.paged
+                this.page = paged
                 this.maxNumPages = response.maxNumPages || this.maxNumPages
             } else {
                 this.page = this.maxNumPages
@@ -288,6 +293,7 @@ export class SearchUtils {
                     .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
                     .filter((s) => String(s).trim() !== '')
                 : f[TaxonomyType.pendidikan],
+            sort: f.sort ? { value: f.sort.value, label: f.sort.label } : f.sort,
             context: f.context,
         }
     }
