@@ -186,7 +186,7 @@ class GraphQLTest extends WplokerbjmTestCase
     {
         echo "\n\033[1;36m🚀 Testing Multiple GraphQL Queries with Multi-Curl (Parallel)\033[0m\n";
 
-        // Define all GraphQL queries to test in parallel
+        // Define all GraphQL queries to test in parallel (use POST bodies for complex inputs)
         $queries = [
             'taxonomyTerms' => [
                 'query' => 'query { taxonomyTerms { lokasiTerms { slug name } genderTerms { slug name } pendidikanTerms { slug name } } }',
@@ -224,9 +224,9 @@ class GraphQLTest extends WplokerbjmTestCase
                 'description' => 'Load more jobs (page 2)'
             ],
             'jobGrid' => [
-                'query' => 'query { jobGrid(search: "marketing") { jobs { id title } maxNumPages } }',
+                'query' => 'query { jobGrid(filters: { cari: "marketing" }) { jobs { id title } maxNumPages } }',
                 'expected_status' => 200,
-                'description' => 'Get job grid with marketing search'
+                'description' => 'Get job grid with marketing search (use filters input)'
             ],
             'jobDetail' => [
                 'query' => 'query { jobDetail(slug: "marketing") { job { id title } } }',
@@ -234,19 +234,19 @@ class GraphQLTest extends WplokerbjmTestCase
                 'description' => 'Get job detail'
             ],
             'jobSchema' => [
-                'query' => 'query { jobSchema(postIds: "1,2,3") { schemas } }',
+                'query' => 'query { jobSchema(ids: [1,2,3]) { schemas } }',
                 'expected_status' => 200,
-                'description' => 'Get job schemas'
+                'description' => 'Get job schemas (ids as list of Ints)'
             ],
             'themeData' => [
-                'query' => 'query { themeData { data { siteName } } }',
+                'query' => 'query { themeData { data { themeUrl } } }',
                 'expected_status' => 200,
-                'description' => 'Get theme data'
+                'description' => 'Get theme data (use themeUrl field)'
             ],
             'searchJobs' => [
-                'query' => 'query { searchJobs(cari: "marketing") { jobs { id title } maxNumPages } }',
+                'query' => 'query { searchJobs(filters: { cari: "marketing" }) { jobs { id title } maxNumPages } }',
                 'expected_status' => 200,
-                'description' => 'Search jobs for marketing'
+                'description' => 'Search jobs for marketing (use filters input)'
             ],
             'syncBookmark' => [
                 'query' => 'query { syncBookmark(ids: [1,2,3]) { id title } }',
@@ -306,8 +306,51 @@ class GraphQLTest extends WplokerbjmTestCase
                     echo "    \033[0;32mNo GraphQL errors\033[0m\n";
                 }
 
-                // Show some key metrics for successful responses
+                // Show some key metrics for successful responses and assert expected data fields
                 if ($statusCode === 200 && isset($data['data'])) {
+                    // Basic assertions for presence of expected top-level fields in the GraphQL response
+                    switch ($name) {
+                        case 'taxonomyTerms':
+                            $this->assertArrayHasKey('taxonomyTerms', $data['data'], "Query '{$name}' should contain 'taxonomyTerms' in data");
+                            break;
+                        case 'lokasiTerms':
+                            $this->assertArrayHasKey('lokasiTerms', $data['data'], "Query '{$name}' should contain 'lokasiTerms' in data");
+                            break;
+                        case 'genderTerms':
+                            $this->assertArrayHasKey('genderTerms', $data['data'], "Query '{$name}' should contain 'genderTerms' in data");
+                            break;
+                        case 'pendidikanTerms':
+                            $this->assertArrayHasKey('pendidikanTerms', $data['data'], "Query '{$name}' should contain 'pendidikanTerms' in data");
+                            break;
+                        case 'autoSuggestions':
+                            $this->assertArrayHasKey('autoSuggestions', $data['data'], "Query '{$name}' should contain 'autoSuggestions' in data");
+                            break;
+                        case 'carousel':
+                            $this->assertArrayHasKey('carousel', $data['data'], "Query '{$name}' should contain 'carousel' in data");
+                            break;
+                        case 'loadMore':
+                            $this->assertArrayHasKey('loadMore', $data['data'], "Query '{$name}' should contain 'loadMore' in data");
+                            break;
+                        case 'jobGrid':
+                            $this->assertArrayHasKey('jobGrid', $data['data'], "Query '{$name}' should contain 'jobGrid' in data");
+                            break;
+                        case 'jobDetail':
+                            $this->assertArrayHasKey('jobDetail', $data['data'], "Query '{$name}' should contain 'jobDetail' in data");
+                            break;
+                        case 'jobSchema':
+                            $this->assertArrayHasKey('jobSchema', $data['data'], "Query '{$name}' should contain 'jobSchema' in data");
+                            break;
+                        case 'themeData':
+                            $this->assertArrayHasKey('themeData', $data['data'], "Query '{$name}' should contain 'themeData' in data");
+                            break;
+                        case 'searchJobs':
+                            $this->assertArrayHasKey('searchJobs', $data['data'], "Query '{$name}' should contain 'searchJobs' in data");
+                            break;
+                        case 'syncBookmark':
+                            $this->assertArrayHasKey('syncBookmark', $data['data'], "Query '{$name}' should contain 'syncBookmark' in data");
+                            break;
+                    }
+
                     if ($name === 'searchJobs' && isset($data['data']['searchJobs']['jobs'])) {
                         echo "    \033[0;37mJobs found:\033[0m " . count($data['data']['searchJobs']['jobs']) . "\n";
                     } elseif ($name === 'jobGrid' && isset($data['data']['jobGrid']['jobs'])) {

@@ -23,10 +23,8 @@ export function getThemeData(): WPLokerBJMThemedData | undefined {
         }
     }
 
-    const dataApi = async () => await APIService.getThemeDataGraphQL()
-
     // Fallback to API for headless setups
-    dataApi().then(data => {
+    APIService.getThemeDataGraphQL().then(data => {
         if (data) {
             cachedThemeData = data;
             return cachedThemeData;

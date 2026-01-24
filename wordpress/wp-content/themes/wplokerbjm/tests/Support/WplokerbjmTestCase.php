@@ -9,12 +9,17 @@ use Psr\Container\ContainerInterface;
 
 abstract class WplokerbjmTestCase extends TestCase
 {
+    private static $mockCache = [];
+
     protected function setUp(): void
     {
         parent::setUp();
 
         ProxyContainer::boot();
         ProxyContainer::resetPerTest();
+
+        // Reset mock cache per test
+        self::$mockCache = [];
 
         // Initialize Brain Monkey
         \Brain\Monkey\setup();
@@ -29,6 +34,17 @@ abstract class WplokerbjmTestCase extends TestCase
         });
         // Note: wp_remote_get and wp_remote_post are mocked per-test as needed to avoid conflicts
         \Brain\Monkey\Functions\when('register_rest_route')->justReturn(true);
+        \Brain\Monkey\Functions\when('wp_cache_get')->alias(function ($key, $group) {
+            return self::$mockCache[$key] ?? false;
+        });
+        \Brain\Monkey\Functions\when('wp_cache_set')->alias(function ($key, $value, $group, $expiration) {
+            self::$mockCache[$key] = $value;
+            return true;
+        });
+        \Brain\Monkey\Functions\when('wp_cache_delete')->alias(function ($key, $group) {
+            unset(self::$mockCache[$key]);
+            return true;
+        });
         \Brain\Monkey\Functions\when('__wplokerbjm_make_multi_http_requests')->alias(function ($requests) {
             $responses = [];
             foreach ($requests as $request) {

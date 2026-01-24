@@ -1,13 +1,10 @@
 import fs from 'fs';
-import path from 'path';
-import { fileURLToPath } from 'url';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-export function generateCaddyEarlyHints() {
+export function generateCaddyEarlyHints(options: { manifestPath: string; outputPath: string }) {
   return {
     name: 'generate-caddy-early-hints',
     writeBundle() {
-      const manifestPath = path.resolve(__dirname, 'assets/dist/.vite/manifest.json');
+      const manifestPath = options.manifestPath;
       if (!fs.existsSync(manifestPath)) return;
       const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf-8'));
 
@@ -31,9 +28,10 @@ export function generateCaddyEarlyHints() {
 
       for (const route of routes) {
         const matcherName = route.name;
+        const itIsProd = "&& {env.WP_ENV} == 'production'";
         const matcher = route.regex
-          ? `expression {http.request.uri.path}.matches("^${route.path}.*")`
-          : `expression {http.request.uri.path} == "${route.path}"`;
+          ? `expression {http.request.uri.path}.matches("^${route.path}.*") ${itIsProd}`
+          : `expression {http.request.uri.path} == "${route.path}" ${itIsProd}`;
 
         caddyConfig += `@${matcherName} ${matcher}\n`;
 
@@ -58,19 +56,17 @@ export function generateCaddyEarlyHints() {
 
         if (linkParts.length > 0) {
           if (isProd) {
-            caddyConfig += `respond @${matcherName} @production 103 {\n`;
-            caddyConfig += `  header Link "${linkParts.join(', ')}"\n`;
-            caddyConfig += `}\n`;
-            caddyConfig += `push @${matcherName} @production\n`;
+            caddyConfig += `respond @${matcherName} 103 \n`;
+            caddyConfig += `header @${matcherName} Link "${linkParts.join(', ')}"\n`;
           } else {
-            caddyConfig += `header @${matcherName} @production Link "${linkParts.join(', ')}"\n`;
+            caddyConfig += `header @${matcherName} Link "${linkParts.join(', ')}"\n`;
           }
 
           caddyConfig += `\n`;
         }
       }
 
-      const outputPath = path.resolve(__dirname, '../../../../configs/caddy-early-hints.conf');
+      const outputPath = options.outputPath;
       fs.writeFileSync(outputPath, caddyConfig);
       console.log('Generated Caddy early hints config at', outputPath);
     }

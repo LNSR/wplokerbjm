@@ -159,6 +159,10 @@
           prevEl: prevEl ?? undefined,
         },
         watchslidesProgress: true,
+        // Favor passive listeners and avoid forcing touchstart preventDefault to reduce touch input latency
+        passiveListeners: true,
+        touchStartPreventDefault: false,
+        touchStartForcePreventDefault: false,
         virtual: {
           enabled: true,
           slides: Array.from({ length: jobs.length }, (_, i) => i),
@@ -687,7 +691,9 @@
     ): void {
       if (typeof window !== "undefined" && window.innerWidth >= 768) {
         // Desktop: open overlay
+        const jobgridElement = document.getElementById("job-grid");
         jobOverlay.openOverlay(slug, job);
+        jobgridElement?.scrollIntoView({ behavior: "smooth", block: "start" });
       } else {
         // Mobile: use SPA navigation to SingleLowongan.svelte route
         const url = new URL(String(permalink), routeStore.currentUrl.origin);
@@ -891,6 +897,15 @@
 </section>
 
 <style>
+  /* Prefer browser native gestures for vertical scrolling to avoid blocking touchstart */
+  :global(.job-carousel),
+  :global(.job-carousel .swiper-wrapper),
+  :global(.job-carousel .swiper-slide) {
+    touch-action: pan-y;
+    -ms-touch-action: pan-y;
+    user-select: none;
+  }
+
   :global(.job-carousel.no-swiper .swiper-wrapper) {
     display: grid !important;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

@@ -117,6 +117,7 @@ class ThemeInject
     #[Filter('site_icon_meta_tags')]
     public static function addSiteIconMetaTags(array $meta_tags): array
     {
+
         $additional_sizes = [48, 96, 144, 256, 384, 512];
 
         foreach ($additional_sizes as $size) {
@@ -126,9 +127,42 @@ class ThemeInject
             }
         }
 
+        // Add PNG fallback pointing directly to the original uploaded favicon
+        $original_url = wp_get_attachment_url(get_option('site_icon'));
+        if ($original_url) {
+            // Replace .avif extension with .png for PNG fallback
+            $original_url = str_replace('cropped-site-icon.avif', 'site-icon.png', $original_url);
+            $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($original_url));
+        }
+
+        $addTypeAttribute = function (&$meta_tags, $type) {
+            foreach ($meta_tags as &$tag) {
+                // For link tags (icon and apple-touch-icon)
+                if (preg_match('/<link (?:rel="icon"|rel="apple-touch-icon")[^>]*href="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
+                    $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
+                }
+                // For meta msapplication-TileImage
+                if (preg_match('/<meta name="msapplication-TileImage"[^>]*content="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
+                    $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
+                }
+            }
+        };
+
+        foreach (['png', 'ico', 'svg', 'webp', 'avif'] as $type) {
+            $addTypeAttribute($meta_tags, $type);
+        }
+
         return $meta_tags;
     }
 
+    /**
+     * Provide additional site icon image sizes for generation.
+     *
+     * This filter adds a set of common icon sizes to be generated when a site icon is set.
+     * It complements the default sizes provided by WordPress.
+     *
+     * @return int[] Array of additional icon sizes in pixels.
+     */
     #[Filter('site_icon_image_sizes')]
     public static function siteIconImageSizes(): array
     {

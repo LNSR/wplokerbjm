@@ -81,7 +81,9 @@
   }
 
   function handleScroll() {
-    show = window.scrollY > 0;
+    const shouldShow = window.scrollY > 0;
+    // Only update reactive state when it actually changes to avoid unnecessary re-renders during scroll
+    if (show !== shouldShow) show = shouldShow;
   }
 
   function handleKeyDown(event: KeyboardEvent) {

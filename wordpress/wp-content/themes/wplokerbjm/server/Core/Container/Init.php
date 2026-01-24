@@ -34,7 +34,10 @@ class Init
      */
     public function __construct(private readonly array $services = [], private readonly array $hookRegistrations = [], private readonly ?ContainerInterface $container = null)
     {
+        $this->initialized = false;
     }
+
+    private bool $initialized;
 
     /**
      * Initialize all services by registering WordPress hooks from attributes.
@@ -47,6 +50,11 @@ class Init
      */
     public function initialize(): void
     {
+        // Prevent multiple initializations
+        if ($this->initialized) {
+            return;
+        }
+
         // Create a map of services by class name for quick lookup
         $serviceMap = [];
         foreach ($this->services as $listService) {
@@ -91,5 +99,7 @@ class Init
                 Logger::error('Init', 'Error registering hook ' . $reg['hook'] . ' for ' . $reg['class'] . '::' . $reg['method'] . ': ' . $e->getMessage());
             }
         }
+
+        $this->initialized = true;
     }
 }

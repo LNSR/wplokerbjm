@@ -4,6 +4,20 @@
   @development expression {env.WP_ENV} == "development"
   import "/etc/caddy/caddy-early-hints.conf"
 
+  # Development early hints for Vite dev server
+  @dev_homepage expression {env.WP_ENV} == "development" && {http.request.uri.path} == "/"
+
+  respond @dev_homepage 103
+  header @dev_homepage Link "</__vite/@vite/client>; rel=modulepreload; as=script; crossorigin, </__vite/src/main.ts>; rel=modulepreload; as=script; crossorigin"
+
+  @dev_pasang expression {env.WP_ENV} == "development" && {http.request.uri.path} == "/pasang-iklan-loker"
+  respond @dev_pasang 103
+  header @dev_pasang Link "</__vite/@vite/client>; rel=modulepreload; as=script; crossorigin, </__vite/src/main.ts>; rel=modulepreload; as=script; crossorigin"
+
+  @dev_single expression {env.WP_ENV} == "development" && {http.request.uri.path}.matches("^/lowongan/.*")
+  respond @dev_single 103
+  header @dev_single Link "</__vite/@vite/client>; rel=modulepreload; as=script; crossorigin, </__vite/src/main.ts>; rel=modulepreload; as=script; crossorigin"
+
   @vite path_regexp vite ^/(__vite|@vite|@id|@fs|sockjs-node|~partytown)(/.*)?$
   handle @vite {
     # Proxy Vite dev endpoints including Partytown dev assets. Tuned for HMR (websockets) and dev performance.
@@ -20,7 +34,7 @@
       header_up Connection {http.request.header.Connection}
 
       # Improve HMR/streaming responsiveness
-      flush_interval 50ms
+      flush_interval 120ms
       stream_timeout 0
       stream_close_delay 1m
     }
@@ -49,11 +63,11 @@
   # This preserves the original host/proto coming from the client/proxy
   # and allows WordPress to choose the correct siteurl/home dynamically.
   php_fastcgi unix//var/run/sock/php-fpm.sock {
-      env HTTP_X_FORWARDED_PROTO {scheme}
-      env HTTP_X_FORWARDED_HOST {host}
-      env HTTP_HOST {host}
-      env HTTP_X_FORWARDED_FOR {remote}
-      env HTTP_X_REAL_IP {remote_host}
+    env HTTP_X_FORWARDED_PROTO {scheme}
+    env HTTP_X_FORWARDED_HOST {host}
+    env HTTP_HOST {host}
+    env HTTP_X_FORWARDED_FOR {remote}
+    env HTTP_X_REAL_IP {remote_host}
   }
 
   file_server {
@@ -69,6 +83,7 @@
   @wp_static path /wp-content/* /wp-includes/* /favicon.ico /robots.txt
   @no_cache path /wp-login.php /wp-admin/* /xmlrpc.php /wp-comments-post.php /wp-cron.php /__vite/*
   @rest_api path /wp-json/*
+  @graphql path_regexp graphql ^/wp-json/graphql(/.*)?$
   @dynamic not path /wp-content/* /wp-includes/* /favicon.ico /robots.txt /wp-admin/* /wp-login.php /wp-json/* /xmlrpc.php /wp-cron.php
   @logged_in header_regexp Cookie wordpress_logged_in_.*
 
@@ -117,11 +132,16 @@
   header @development @wp_static not @static_ext "Last-Modified" {file.modtime}
   header @development @wp_static not @static_ext Access-Control-Allow-Origin "*"
 
+  # GraphQL API: private cache for logged-in users, public cache with background revalidation for anonymous
+  header @production @graphql @logged_in Cache-Control "private, max-age=300, stale-while-revalidate=600, stale-if-error=3600"
+  header @production @graphql not @logged_in Cache-Control "public, max-age=3600, s-maxage=7200, stale-while-revalidate=7200, stale-if-error=86400"
+  header @production @graphql not @logged_in Vary "Accept-Encoding, Cookie"
+  header @development @graphql Cache-Control "private, max-age=60, stale-while-revalidate=120"
+
   # REST API: private cache for logged-in users, long public cache with background revalidation for anonymous
   header @production @rest_api @logged_in Cache-Control "private, max-age=300, stale-while-revalidate=600, stale-if-error=3600"
   header @production @rest_api not @logged_in Cache-Control "public, max-age=3600, s-maxage=7200, stale-while-revalidate=7200, stale-if-error=86400"
   header @production @rest_api not @logged_in Vary "Accept-Encoding, Cookie"
-
   header @development @rest_api Cache-Control "private, max-age=60, stale-while-revalidate=120"
 
   # Privileged paths (wp-login.php, admin, xmlrpc, cron): allow private browser cache only

@@ -9,7 +9,11 @@
   import { isMobile } from "$lib/utils/elements.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import { GlobalNavigateTo, routeStore } from "@/app/lib/stores/Route.svelte";
+  import {
+    GlobalNavigateTo,
+    routeStore,
+    routeStateStore,
+  } from "@/app/lib/stores/Route.svelte";
   import { SvelteDate } from "svelte/reactivity";
   import { fade } from "svelte/transition";
   import {
@@ -35,7 +39,9 @@
   // Virtualization state
   let containerScrollY = $state(0);
   let containerHeight = $state(0);
-  let cardHeights = new SvelteMap<number, number>();
+  let cardHeights = new SvelteMap(
+    routeStateStore.getCardHeights("bookmarkModal"),
+  );
 
   // Dragging state
   let translateX = $state(0);
@@ -132,6 +138,15 @@
       return bookmarkHandler.fetchJobs(true);
     }
 
+    scheduleFetchJobs = () => {
+      const runFetch = () => void bookmarkHandler.fetchJobs();
+      if (typeof (window as any).requestIdleCallback === "function") {
+        (window as any).requestIdleCallback(() => runFetch());
+      } else {
+        requestAnimationFrame(() => runFetch());
+      }
+    };
+
     displayedSavedJobs = $derived.by(() => {
       return savedJobs.map((job) => ({
         ...job,
@@ -216,10 +231,6 @@
         }
       }
       if (heightsToKeep.size !== cardHeights.size) {
-        $inspect("VirtualizationManager.clearCardHeights", {
-          before: cardHeights,
-          after: heightsToKeep,
-        });
         cardHeights = heightsToKeep;
       }
       return cardHeights;
@@ -257,6 +268,27 @@
    * UI Specific Modal Handler
    */
   class ModalHandler {
+    // If a view transition is in progress (or locked), wait until it finishes
+    viewTransition(): void {
+      const vt = routeStore.currentViewTransition;
+      if (
+        typeof document !== "undefined" &&
+        document.startViewTransition &&
+        (vt || routeStore.lockViewTransition)
+      ) {
+        if (vt && vt.finished) {
+          vt.finished
+            .then(() => bookmarkHandler.scheduleFetchJobs())
+            .catch(() => bookmarkHandler.scheduleFetchJobs());
+        } else {
+          // fallback: small delay to allow transition to start then schedule fetch
+          setTimeout(() => bookmarkHandler.scheduleFetchJobs(), 50);
+        }
+      } else {
+        // No view transition — schedule after first paint
+        requestAnimationFrame(() => bookmarkHandler.scheduleFetchJobs());
+      }
+    }
     startDrag = (e: PointerEvent): void => {
       if (e.button && e.button !== 0) return;
       if (!modalBox || !dragHandle) return;
@@ -431,7 +463,8 @@
   onMount(() => {
     if (open) {
       bookmarkStore.flushSync();
-      bookmarkHandler.fetchJobs();
+      modalHandler.viewTransition();
+
       if (!modalEl?.open) modalEl?.showModal();
       if (isMobileValue && modalBox) {
         const vh = window.innerHeight;
@@ -481,6 +514,8 @@
     modalHandler.resetPosition();
 
     modalHandler.portalDialog(false);
+
+    routeStateStore.saveCardHeights(new Map(cardHeights), "bookmarkModal");
   });
 </script>
 
@@ -491,6 +526,8 @@
 >
   <div
     bind:this={modalBox}
+    role="dialog"
+    tabindex="0"
     class="modal-box p-0 flex flex-col relative max-h-[80vh] rounded-t-xl overflow-hidden md:mx-auto md:!max-w-3xl md:z-60 md:rounded-b-xl"
     class:mobile-sheet={isMobileValue}
     style={modalStyle}

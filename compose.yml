@@ -56,10 +56,6 @@ services:
       # generate your own SSL via "mkcert"
       - ./certs/localhost.pem:/var/www/certs/localhost.crt:ro
       - ./certs/localhost-key.pem:/var/www/certs/localhost.key:ro
-      - type: tmpfs
-        target: /data
-      - type: tmpfs
-        target: /config
       - sock:/var/run/sock:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"

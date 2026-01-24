@@ -131,14 +131,6 @@
     }
   });
 
-  $effect(() => {
-    if (!routeStateStore.getSkipScrollRestore(pathname)) {
-      requestAnimationFrame(() => {
-        routeStateStore.restoreScrollForPath(pathname);
-      });
-    }
-  });
-
   onMount(() => {
     routeStore.setCurrentPath(pathname);
     GoogleServices.injectGTMScript()
@@ -163,7 +155,6 @@
 
 <div class="route-container">
   <Header />
-  <!-- {#key pathname} -->
   {#if CurrentComponent && !isTransitioningRoute}
     <div
       class="page-transition"
@@ -172,7 +163,6 @@
       <CurrentComponent {...isInitialLoad ? props : {}} />
     </div>
   {/if}
-  <!-- {/key} -->
   <FloatingActionButton />
 </div>
 

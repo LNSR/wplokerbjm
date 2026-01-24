@@ -15,7 +15,6 @@
   const loading = $derived(searchStore.loading);
   const hasMore = $derived(searchStore.hasMore);
   const isDesktop = $derived.by(() => !isMobile());
-  const selectedSlug = $derived(jobOverlay.selectedSlug);
   const displayTotalJobs = $derived(searchStore.totalJobs);
   const displayTitle = $derived(searchStore.title);
 
@@ -45,10 +44,7 @@
       };
 
       // Save current search state before navigation (implicitly always save for homepage('/') path)
-      routeStateStore.saveSearchState(
-        window.location.pathname,
-        currentSearchState,
-      );
+      routeStateStore.saveSearchState("/", currentSearchState);
 
       async function MobileJobClick(): Promise<void> {
         // Mark as last visited before navigating
@@ -91,7 +87,7 @@
     }
 
     scrollToCard(slug: string): void {
-      jobOverlay.scrollToCard(slug, false, "grid");
+      jobOverlay.scrollToCard(slug, 300, false, "grid");
     }
   }
 
@@ -99,7 +95,7 @@
 </script>
 
 <script lang="ts">
-  import { onMount, untrack } from "svelte";
+  import { onMount, onDestroy, tick } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
   import type { Attachment } from "svelte/attachments";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
@@ -116,8 +112,7 @@
   let hasRestoredState = $state(false);
   let isRefreshing = $state(false);
   let loadMoreSentinel = $state<HTMLElement | null>(null);
-  let loadMoreDebounce = $state<number | null>(null);
-  const cardHeights = new SvelteMap<number, number>();
+  const cardHeights = new SvelteMap(routeStateStore.getCardHeights("jobGrid"));
 
   const props: JobGridProps = $props();
 
@@ -152,7 +147,7 @@
   // fallback height used until measurements are available
   const FALLBACK_ITEM_HEIGHT = 420;
   const gap = 24;
-  const buffer = isDesktop ? 9 : 3;
+  const buffer = 3;
   const virtualization = $derived.by(() =>
     VirtualizationManager.computeListVirtualization(
       displayJobs,
@@ -330,8 +325,68 @@
         isRefreshing = false;
       }
     }
+
+    // for restoring scroll position based on top job slug
+    // used during route change for both mobile and desktop
+    restoreScrollPosition() {
+      const slug = routeStateStore.lastVisitedJob;
+
+      const scrollToEl = async (el: HTMLElement) => {
+        await tick();
+        requestAnimationFrame(() => {
+          el.scrollIntoView({ behavior: "smooth", block: "start" });
+        });
+      };
+
+      const observeContainer = () => {
+        if (!slug || window.location.pathname !== "/") return;
+
+        // If element already exists, scroll immediately
+        const existing = document.querySelector(
+          `[data-job-slug="${slug}"]`,
+        ) as HTMLElement | null;
+        if (existing) {
+          void scrollToEl(existing);
+          return;
+        }
+
+        // Fallback to observing #job-grid (virtualized list will add nodes here)
+        const container =
+          (document.querySelector("#job-grid") as HTMLElement | null) ||
+          document.body;
+        let disconnected = false;
+
+        const mo = new MutationObserver((_mutations, observer) => {
+          const el = document.querySelector(
+            `[data-job-slug="${slug}"]`,
+          ) as HTMLElement | null;
+          if (el) {
+            void scrollToEl(el);
+            observer.disconnect();
+            disconnected = true;
+            if (timeoutId) clearTimeout(timeoutId);
+          }
+        });
+
+        mo.observe(container, { childList: true, subtree: true });
+
+        // Safety: stop observing after a short timeout to avoid leaks
+        const timeoutId = window.setTimeout(() => {
+          if (!disconnected) mo.disconnect();
+        }, 1500);
+      };
+
+      this.initializeJobs()
+        .then(() => {
+          requestAnimationFrame(observeContainer);
+        })
+        .catch((err) => {
+          console.error("Error initializing jobs:", err);
+        });
+    }
   }
 
+  // Refresh JobPosting JSON-LD for visible jobs in the grid
   const refreshJobSchema = () => {
     const jobIds = virtualization.visibleJobs
       .map((job) => Number(job.id))
@@ -346,25 +401,6 @@
     void jobGridHandler.initializeJobs();
   });
 
-  // Watch for jobs changes and close overlay
-  // Removed: keep overlay open always
-  // $effect(() => {
-  //   searchStore.jobs;
-  //   // Close overlay when jobs change (untrack to avoid circular dependencies)
-  //   untrack(() => {
-  //     void jobOverlay.closeIfOpen();
-  //   });
-  // });
-
-  // When an overlay opens (including from URL) ensure the selected card scrolls into view
-  $effect(() => {
-    if (isDesktop && selectedSlug) {
-      setTimeout(() => {
-        overlayManager.scrollToCard(selectedSlug);
-      }, 300);
-    }
-  });
-
   // Add JobPosting JSON-LD for jobs in the grid
   $effect(() => {
     if (routeStore.currentUrl.pathname === "/" && !isDesktop) {
@@ -374,35 +410,30 @@
     }
   });
 
-  // Auto load more using IntersectionObserver sentinel to avoid CLS/scroll snap
+  // Auto prefetch using IntersectionObserver sentinel to prepare next page
   $effect(() => {
     if (!loadMoreSentinel) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting && hasMore && !loading) {
-            if (loadMoreDebounce) window.clearTimeout(loadMoreDebounce);
-            loadMoreDebounce = window.setTimeout(() => {
-              untrack(() => searchStore.loadMore());
-              utilsSEO.initialSchemaSSR = false;
-              utilsSEO.clearPendingJobSchemas();
-            }, 150);
+          if (entry.isIntersecting && hasMore && !searchStore.nextPageLoadMoreCache && !searchStore.isPrefetchingLoadMore) {
+            void searchStore.prefetchNextPage();
           }
         }
       },
-      { root: null, rootMargin: "900px" },
+      { root: null, rootMargin: "1200px" },
     );
 
     observer.observe(loadMoreSentinel);
 
     return () => {
       observer.disconnect();
-      if (loadMoreDebounce) {
-        window.clearTimeout(loadMoreDebounce);
-        loadMoreDebounce = null;
-      }
     };
+  });
+
+  onDestroy(() => {
+    routeStateStore.saveCardHeights(new Map(cardHeights), "jobGrid");
   });
 </script>
 
@@ -471,17 +502,19 @@
                   variant="featured"
                   permalink={job.permalink ?? ""}
                   isVisited={routeStateStore.hasVisitedJob(job.slug ?? "")}
-                  onClick={() => overlayManager.handleJobClick(job)}
+                  onClick={() => {
+                    void overlayManager.handleJobClick(job);
+                  }}
                 />
               </div>
             {/each}
             <!-- load-more sentinel placed at the end of the virtualization spacer -->
             <div
               bind:this={loadMoreSentinel}
-              style="position: absolute; left:0; width:1px; height:1px; top: {Math.max(
+              style="position: absolute; left:0; width:1px; height:1px; transform: translate3d(0, {Math.max(
                 0,
                 (virtualization.totalHeight || 0) - 1,
-              )}px; pointer-events:none; opacity:0;"
+              )}px, 0); pointer-events:none; opacity:0; contain: layout size;"
               aria-hidden="true"
             ></div>
           </div>
@@ -502,18 +535,12 @@
           <div class="flex justify-center mt-8">
             <button
               type="button"
-              class="btn rounded-lg font-semibold bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] border border-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)]"
-              onclick={() => void searchStore.loadMore()}
-              disabled={loading}
+              class="btn rounded-lg font-semibold bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] border border-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)] disabled:opacity-50 disabled:cursor-not-allowed"
+              onclick={() => searchStore.appendCachedPage()}
+              disabled={!searchStore.nextPageLoadMoreCache}
             >
-              {loading ? "Memuat..." : "Muat Lebih Banyak"}
+              {searchStore.nextPageLoadMoreCache ? "Muat Lebih Banyak" : "Mempersiapkan..."}
             </button>
-          </div>
-        {/if}
-
-        {#if loading}
-          <div class="flex justify-center mt-8">
-            <LoadingSpinner srLabel="Memuat lowongan..." size="md" />
           </div>
         {/if}
       </div>

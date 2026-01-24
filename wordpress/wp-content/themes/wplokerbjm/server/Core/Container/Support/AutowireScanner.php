@@ -30,6 +30,8 @@ class AutowireScanner
 {
     private string $baseDirectory;
     private string $namespace;
+    private ?array $cachedDefinitions = null;
+    private ?array $cachedHookRegistrations = null;
 
     public function __construct(string $baseDirectory, string $namespace = 'WPLokerBJM')
     {
@@ -80,12 +82,18 @@ class AutowireScanner
      */
     public function scanForAutowirableClasses(): array
     {
+        // Check in-memory cache first
+        if ($this->cachedDefinitions !== null) {
+            return $this->cachedDefinitions;
+        }
+
         $cacheKey = $this->getCacheKey();
 
         // Check APCu first (fast in-memory cache)
         if (function_exists('apcu_enabled') && apcu_enabled()) {
             $cached = apcu_fetch($cacheKey);
             if ($cached !== false) {
+                $this->cachedDefinitions = $cached;
                 return $cached;
             }
         }
@@ -93,6 +101,7 @@ class AutowireScanner
         // Fallback to Redis-based object cache
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
+            $this->cachedDefinitions = $cached;
             return $cached;
         }
 
@@ -106,6 +115,7 @@ class AutowireScanner
             Cache::set($cacheKey, $definitions, 86400); // Cache for 1 day
         }
 
+        $this->cachedDefinitions = $definitions;
         return $definitions;
     }
 
@@ -436,12 +446,18 @@ class AutowireScanner
      */
     public function getHookRegistrations(): array
     {
+        // Check in-memory cache first
+        if ($this->cachedHookRegistrations !== null) {
+            return $this->cachedHookRegistrations;
+        }
+
         $cacheKey = $this->getCacheKey() . '_hook_registrations';
 
         // Check APCu first
         if (function_exists('apcu_enabled') && apcu_enabled()) {
             $cached = apcu_fetch($cacheKey);
             if ($cached !== false) {
+                $this->cachedHookRegistrations = $cached;
                 return $cached;
             }
         }
@@ -449,6 +465,7 @@ class AutowireScanner
         // Fallback to Redis cache
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
+            $this->cachedHookRegistrations = $cached;
             return $cached;
         }
 
@@ -462,6 +479,7 @@ class AutowireScanner
             Cache::set($cacheKey, $registrations, 86400);
         }
 
+        $this->cachedHookRegistrations = $registrations;
         return $registrations;
     }
 

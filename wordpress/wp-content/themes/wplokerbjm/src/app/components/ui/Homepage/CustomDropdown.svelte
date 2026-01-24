@@ -39,7 +39,7 @@
         cardHeights,
         fallbackHeight: itemHeight,
         gap: 0,
-        buffer: 2,
+        buffer: 3,
       };
       return Virtualization.computeList(opts);
     }

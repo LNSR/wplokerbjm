@@ -25,7 +25,10 @@ export default defineConfig(({ command }) => {
       partytownVite({
         dest: resolve(__dirname, "assets", "dist", "~partytown")
       }),
-      generateCaddyEarlyHints()
+      generateCaddyEarlyHints({
+        manifestPath: resolve(__dirname, 'assets/dist/.vite/manifest.json'),
+        outputPath: resolve(__dirname, '../../../../configs/caddy-early-hints.conf')
+      })
     ],
     resolve: {
       alias: {
@@ -62,7 +65,7 @@ export default defineConfig(({ command }) => {
           exports: "auto",
           hashCharacters: "base64",
           minify: true,
-          codeSplitting: true,
+          // codeSplitting: true,
           format: "esm",
           entryFileNames: "js/[name]-[hash:6].js",
           chunkFileNames: "js/[name]-[hash:6].js",

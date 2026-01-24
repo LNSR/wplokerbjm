@@ -158,9 +158,10 @@ export class RouteManager {
 export class RouteStateManager {
   scrollPositions = new LRUCache<string, number>({ max: 50 }); // Limit to 50 most recent scroll positions
   searchStates = new LRUCache<string, SearchState>({ max: 50 }); // Limit to 50 most recent search states
-  lastVisitedJob: CardJob['slug'] | undefined = undefined; // Remember the last visited job slug for mobile navigation
-  carouselState: CarouselState | null = null; // Single carousel state for homepage
+  lastVisitedJob: CardJob['slug'] | undefined = $state(undefined); // Remember the last visited job slug for mobile navigation
+  carouselState: CarouselState | null = $state(null); // Single carousel state for homepage
   skipScrollRestore = new LRUCache<string, boolean>({ max: 50 }); // Limit to 50 most recent skip flags
+  cardHeights = new LRUCache<string, Record<number, number>>({ max: 500 }); // Global cache for card heights
 
   saveScrollPosition(path: string, scrollY: number) {
     this.scrollPositions.set(path, scrollY);
@@ -353,7 +354,7 @@ export class RouteStateManager {
 
     let attempts = Number(0);
     let restoring = false;
-    const maxAttempts = Number(5);
+    const maxAttempts = Number(3);
 
     const isReady = () => !routeStore.isInitialLoad && !routeStore.isLoading && routeStore.CurrentComponent && !routeStore.isTransitioningRoute;
 
@@ -375,7 +376,7 @@ export class RouteStateManager {
         });
       } else if (path !== "/") {
         // Scroll to top for new routes
-        window.scrollTo({ top: 0, behavior: 'instant' });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
 
@@ -395,6 +396,34 @@ export class RouteStateManager {
     };
 
     requestAnimationFrame(tryRestore);
+  }
+
+  saveCardHeights(heights: Map<number, number>, keyname: string = 'global') {
+    const record = Object.fromEntries(heights);
+    this.cardHeights.set(keyname, record);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(`cardHeights_${keyname}`, JSON.stringify(record));
+      } catch (e) {
+        console.warn('Failed to save cardHeights to sessionStorage', e);
+      }
+    }
+  }
+
+  getCardHeights(keyname: string = 'global'): Map<number, number> {
+    let record = this.cardHeights.get(keyname);
+    if (!record && typeof sessionStorage !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem(`cardHeights_${keyname}`);
+        if (stored) {
+          record = JSON.parse(stored);
+          this.cardHeights.set(keyname, record);
+        }
+      } catch (e) {
+        console.warn('Failed to load cardHeights from sessionStorage', e);
+      }
+    }
+    return record ? new Map(Object.entries(record).map(([k, v]) => [Number(k), Number(v)])) : new Map();
   }
 }
 

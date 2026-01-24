@@ -1,5 +1,6 @@
 <?php
 namespace WPLokerBJM\Core\Plugins;
+use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Container;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
@@ -18,6 +19,7 @@ class Litespeed
     #[Action('litespeed_purged_all')]
     public static function clearObjectCache(): void
     {
+        Logger::info('LiteSpeed', 'Clearing object cache due to LiteSpeed cache purge');
         // Clear APCu cache first
         if (function_exists('apcu_clear_cache')) {
             apcu_clear_cache();
@@ -43,6 +45,7 @@ class Litespeed
 
 /**
  * LiteSpeed Filters Focused Hooks
+ * @link https://docs.litespeedtech.com/lscache/lscwp/api/
  */
 class LiteSpeedFilters
 {

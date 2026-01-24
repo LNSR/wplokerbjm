@@ -30,6 +30,10 @@ export class SearchManager {
     public suggestionsLoading = $state(false)
     public selectedSuggestionIndex = $state(-1)
 
+    // Load more cache for CLS-free loading, avoid dynamically append list cards to DOM which triggered unfair CLS assessment
+    public nextPageLoadMoreCache = $state<CardJob[] | null>(null)
+    public isPrefetchingLoadMore = $state(false)
+
     public filters = $state<SearchFilters>({
         cari: '',
         [TaxonomyType.lokasi]: [],
@@ -204,6 +208,54 @@ export class SearchManager {
         } finally {
             this.loading = false
         }
+    }
+
+    public async prefetchNextPage(): Promise<void> {
+        if (this.isPrefetchingLoadMore || this.page >= this.maxNumPages || this.nextPageLoadMoreCache) {
+            return
+        }
+
+        this.isPrefetchingLoadMore = true
+        this.error = null
+        try {
+            const paged = this.page + 1
+            const context = this.context
+            const filters = SearchUtils.sanitizeFilters({ ...this.filters })
+
+            const loadMoreFilters = {
+                paged,
+                context,
+                ...filters,
+            }
+
+            const response = await APIService.loadMoreJobsGraphQL(loadMoreFilters)
+
+            if (Array.isArray(response.jobs) && response.jobs.length) {
+                // Filter out jobs that already exist (by permalink) to prevent duplicates
+                const newJobs = response.jobs.filter(newJob =>
+                    !this.jobs.some(existingJob => existingJob.permalink === newJob.permalink)
+                );
+                this.nextPageLoadMoreCache = newJobs
+                this.maxNumPages = response.maxNumPages || this.maxNumPages
+            } else {
+                this.page = this.maxNumPages
+            }
+        } catch (err) {
+            console.error('SearchStore: Prefetch failed:', err);
+            this.error = err instanceof Error ? err.message : 'Prefetch failed'
+        } finally {
+            this.isPrefetchingLoadMore = false
+        }
+    }
+
+    public appendCachedPage(): void {
+        if (!this.nextPageLoadMoreCache) {
+            return
+        }
+
+        this.jobs.push(...this.nextPageLoadMoreCache)
+        this.page++
+        this.nextPageLoadMoreCache = null
     }
 
     public get selectedFiltersWithNames() {

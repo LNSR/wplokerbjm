@@ -2,8 +2,11 @@
   import { generalStore } from "$lib/stores/General.svelte";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import { timeEffect } from "$lib/utils/elements.svelte";
-  import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
-  import { GlobalNavigateTo, routeStore } from "$lib/stores/Route.svelte";
+  import {
+    GlobalNavigateTo,
+    routeStateStore,
+    routeStore,
+  } from "$lib/stores/Route.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
   import {
     UserTieSolid,
@@ -19,7 +22,6 @@
     variant = "carousel",
     permalink = "",
     onClick,
-    isVisited = false, // Prop to mark as last visited (e.g., for the last visited job on mobile)
   } = $props<{
     jobdata: CardJob;
     variant: JobCardProps["variant"];
@@ -36,28 +38,19 @@
 
   // Derived UI helpers (keeps UI reactive to prop changes)
   const summaryRows = $derived.by(() =>
-    generalStore.useSummaryJob(jobdata?.ringkasanPekerjaan)
+    generalStore.useSummaryJob(jobdata?.ringkasanPekerjaan),
   );
   const statusInfo = $derived.by(() =>
-    generalStore.useStatusJob(Number(jobdata?.status_pekerjaan ?? 0))
+    generalStore.useStatusJob(Number(jobdata?.status_pekerjaan ?? 0)),
   );
   const deadlineInfo = $derived.by(() =>
-    generalStore.useDeadline(jobdata?.deadline, now)()
+    generalStore.useDeadline(jobdata?.deadline, now)(),
   );
   const timeAgo = $derived.by(() =>
-    generalStore.useTimeAgo(jobdata?.post_time, now)
+    generalStore.useTimeAgo(jobdata?.post_time, now),
   );
 
-  const selected = $derived.by(() => {
-    try {
-      // Only select if there's an active overlay selection OR the job is visited(for mobile)
-      const overlaySelected =
-        jobOverlay.selectedSlug && jobOverlay.selectedSlug === jobdata?.slug;
-      return overlaySelected || isVisited;
-    } catch {
-      return false;
-    }
-  });
+  const selected = $derived(routeStateStore.lastVisitedJob === jobdata?.slug);
 
   const cardClass = $derived.by(() => {
     return `card-base-${variant}${selected ? ` card-selected-${variant}` : ""}`;
@@ -82,35 +75,22 @@
     if (isMobile()) {
       event.preventDefault();
       if (permalink)
-        void GlobalNavigateTo(new URL(permalink, routeStore.currentUrl.origin).pathname);
+        void GlobalNavigateTo(
+          new URL(permalink, routeStore.currentUrl.origin).pathname,
+        );
       return;
     }
 
     // For desktop/tablet: prevent default and handle overlay
     event.preventDefault();
-
-    if (variant === "carousel") {
-      const slug = jobdata?.slug ?? "";
-      // If parent provided an onClick handler (common in grids), delegate and avoid
-      // performing a local scroll here — the parent will open overlay and handle a
-      // robust scroll that respects sticky/fixed headers.
-      if (onClick) {
-        event.preventDefault();
-        onClick(slug, event, 0);
-        return;
-      }
-
-      // Otherwise handle opening overlay. Delegate scrolling to the centralized
-      // jobOverlay manager so carousel, grid and card all use the same logic.
-      jobOverlay.openOverlay(slug, jobdata);
-      // Let the overlay manager handle scrolling after it opens. Prefer the carousel card when present.
-      jobOverlay.scrollToCard(slug, true, 'carousel');
-      return;
-    }
   }
 </script>
 
-<div class={`group ${cardClass}`} data-job-slug={jobdata?.slug} data-job-source={variant === 'carousel' ? 'carousel' : 'grid'}>
+<div
+  class={`group ${cardClass}`}
+  data-job-slug={jobdata?.slug}
+  data-job-source={variant === "carousel" ? "carousel" : "grid"}
+>
   <a href={permalink} class="contents" onclick={handleClick}>
     <div class={bodyClass}>
       <div class="flex-1 flex flex-col justify-start">

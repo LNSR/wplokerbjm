@@ -48,7 +48,8 @@ export type ListOptions<T = any> = {
  * of the web model and not addressed here.
  */
 class VirtualizationService {
-    private listCache = new LRUCache<string, Omit<ListVirtualizationState, 'visibleJobs'>>({ max: 100 });
+    // Cache virtualization computations (exclude visibleJobs to keep cache small)
+    private listCache = new LRUCache<string, Omit<ListVirtualizationState<any>, 'visibleJobs'>>({ max: 100 });
 
     /**
      * Binary search helper for finding the insertion point in a sorted array.
@@ -85,13 +86,16 @@ class VirtualizationService {
             cardHeights,
             fallbackHeight = 200,
             gap = 12,
-            buffer = 2,
+            buffer = 12,
         } = opts;
 
         // Round values for caching to reduce cache misses due to minor variations
         const roundedScrollY = Math.round(scrollY / 50) * 50;
         const roundedContainerHeight = Math.round(containerHeight / 100) * 100;
-        const heightsString = Array.from(cardHeights.entries()).sort().map(([id, h]) => `${id}:${h}`).join(',');
+        // Sort entries by numeric id to ensure stable cache keys (prevent lexicographic surprises)
+        const heightsString = Array.from(cardHeights.entries())
+            .sort((a, b) => Number(a[0]) - Number(b[0]))
+            .map(([id, h]) => `${id}:${h}`).join(',');
 
         const key = `${roundedScrollY}-${roundedContainerHeight}-${fallbackHeight}-${gap}-${buffer}-${displayJobs.length}-${heightsString}`;
 
@@ -165,23 +169,38 @@ class VirtualizationService {
      */
     createMeasureHeight(cardHeights: SvelteMap<number, number>, jobId?: number): Attachment<HTMLElement> {
         return (node: HTMLElement) => {
+            const applyHeight = (height: number) => {
+                if (typeof jobId === 'number' && height > 0 && cardHeights.get(jobId) !== height) {
+                    cardHeights.set(jobId, height);
+                }
+            };
+
             const updateHeight = () => {
                 const height = node.offsetHeight;
-                if (typeof jobId === "number" && height > 0 && cardHeights.get(jobId) !== height) {
-                    cardHeights.set(jobId, height);
-                    // Trigger reactivity
-                    cardHeights = new SvelteMap(cardHeights);
-                }
+                applyHeight(height);
             };
 
             updateHeight();
 
-            const ro = new ResizeObserver(updateHeight);
-            ro.observe(node);
+            let ro: ResizeObserver | null = null;
+            if (typeof ResizeObserver !== 'undefined') {
+                ro = new ResizeObserver((entries: ResizeObserverEntry[]) => {
+                    for (const entry of entries) {
+                        // Prefer contentRect when available; it's more accurate for layout box size
+                        const h = entry.contentRect?.height ?? (entry.target as HTMLElement).offsetHeight ?? node.offsetHeight;
+                        applyHeight(Math.round(h));
+                    }
+                });
+                ro.observe(node as Element);
+            }
+
+            // Safety timeout to re-measure after mount
             const timeoutId = setTimeout(updateHeight, 1000);
 
             return () => {
-                ro.disconnect();
+                if (ro) {
+                    ro.disconnect();
+                }
                 clearTimeout(timeoutId);
             };
         };

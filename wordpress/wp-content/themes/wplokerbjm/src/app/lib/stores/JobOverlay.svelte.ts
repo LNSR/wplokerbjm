@@ -1,7 +1,7 @@
 import type { CardJob, JobDetailResponse } from '@/types'
 import { utilsSEO } from "$lib/utils/SEO.svelte";
 import { isMobile } from '$lib/utils/elements.svelte';
-import { routeStore } from '$lib/stores/Route.svelte';
+import { routeStateStore, routeStore } from '$lib/stores/Route.svelte';
 import { APIService } from '@/services/APIService'
 import { GoogleServices } from "@/services/Google";
 /**
@@ -15,7 +15,7 @@ import { GoogleServices } from "@/services/Google";
  * - Integrate with browser history and SEO updates for desktop
  */
 export class JobOverlayManager {
-	public selectedSlug = $state<string | null>(null)
+	public selectedSlug = $derived(routeStateStore.lastVisitedJob)
 	public selectedJob = $state<CardJob | null>(null)
 
 	// Overlay fetch state
@@ -46,7 +46,8 @@ export class JobOverlayManager {
 	}
 
 	private handleScroll = (): void => {
-		this.isScrolling = true
+		// Only set isScrolling when it transitions from false to true to avoid frequent reactive churn
+		if (!this.isScrolling) this.isScrolling = true
 		if (this.scrollTimeout) clearTimeout(this.scrollTimeout)
 		this.scrollTimeout = setTimeout(() => {
 			this.isScrolling = false
@@ -65,7 +66,7 @@ export class JobOverlayManager {
 	 * - The job detail fetch is started in a debounced manner.
 	 */
 	public openOverlay(slug: string, job?: CardJob): void {
-		this.selectedSlug = slug
+		routeStateStore.MarkVisitedJob(slug)
 		this.selectedJob = job ?? null
 
 		requestAnimationFrame(() => {
@@ -122,6 +123,7 @@ export class JobOverlayManager {
 	 */
 	public scrollToCard(
 		slug?: string,
+		delay: number = 300,
 		skipIfScrolling: boolean = true,
 		preferredSource?: "carousel" | "grid"
 	): void {
@@ -133,66 +135,69 @@ export class JobOverlayManager {
 		// Skip if user is still scrolling and skipIfScrolling is true
 		if (skipIfScrolling && this.isScrolling) return;
 
-		try {
-			const safeSlug = String(targetSlug);
-			const selector = `div[data-job-slug="${safeSlug}"]`;
-			const candidates = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
-			let cardElement: HTMLElement | null = null;
+		setTimeout(() => {
+			try {
+				const safeSlug = String(targetSlug);
+				const selector = `div[data-job-slug="${safeSlug}"]`;
+				const candidates = Array.from(document.querySelectorAll(selector)) as HTMLElement[];
+				let cardElement: HTMLElement | null = null;
 
-			// If multiple elements match the slug (e.g., carousel + grid), prefer a
-			// candidate that matches the preferred source and is visible/close to the viewport.
-			if (candidates.length > 0) {
-				const visibleCandidates = candidates.filter((el) => {
-					const rect = el.getBoundingClientRect();
-					const style = window.getComputedStyle(el);
-					return (
-						rect.width > 0 &&
-						rect.height > 0 &&
-						style.display !== "none" &&
-						el.offsetParent !== null
-					);
-				});
+				// If multiple elements match the slug (e.g., carousel + grid), prefer a
+				// candidate that matches the preferred source and is visible/close to the viewport.
+				if (candidates.length > 0) {
+					const visibleCandidates = candidates.filter((el) => {
+						const rect = el.getBoundingClientRect();
+						const style = window.getComputedStyle(el);
+						return (
+							rect.width > 0 &&
+							rect.height > 0 &&
+							style.display !== "none" &&
+							el.offsetParent !== null
+						);
+					});
 
-				if (preferredSource) {
-					// Prefer visible candidates from the requested source
-					const sourceVisible = visibleCandidates.filter((el) => el.dataset.jobSource === preferredSource);
-					if (sourceVisible.length > 0) {
-						sourceVisible.sort((a, b) => Math.abs(a.getBoundingClientRect().top) - Math.abs(b.getBoundingClientRect().top));
-						cardElement = sourceVisible[0];
-					} else {
-						// No visible matches for the preferred source; prefer any element from that source
-						const sourceAny = candidates.filter((el) => el.dataset.jobSource === preferredSource);
-						if (sourceAny.length > 0) {
-							cardElement = sourceAny[0];
+					if (preferredSource) {
+						// Prefer visible candidates from the requested source
+						const sourceVisible = visibleCandidates.filter((el) => el.dataset.jobSource === preferredSource);
+						if (sourceVisible.length > 0) {
+							sourceVisible.sort((a, b) => Math.abs(a.getBoundingClientRect().top) - Math.abs(b.getBoundingClientRect().top));
+							cardElement = sourceVisible[0];
+						} else {
+							// No visible matches for the preferred source; prefer any element from that source
+							const sourceAny = candidates.filter((el) => el.dataset.jobSource === preferredSource);
+							if (sourceAny.length > 0) {
+								cardElement = sourceAny[0];
+							}
+						}
+					}
+
+					// If still no element chosen, fall back to the closest visible candidate, otherwise the first match
+					if (!cardElement) {
+						if (visibleCandidates.length > 0) {
+							visibleCandidates.sort((a, b) => Math.abs(a.getBoundingClientRect().top) - Math.abs(b.getBoundingClientRect().top));
+							cardElement = visibleCandidates[0];
+						} else {
+							cardElement = candidates[0];
 						}
 					}
 				}
 
-				// If still no element chosen, fall back to the closest visible candidate, otherwise the first match
-				if (!cardElement) {
-					if (visibleCandidates.length > 0) {
-						visibleCandidates.sort((a, b) => Math.abs(a.getBoundingClientRect().top) - Math.abs(b.getBoundingClientRect().top));
-						cardElement = visibleCandidates[0];
-					} else {
-						cardElement = candidates[0];
-					}
+
+				if (cardElement) {
+					cardElement.scrollIntoView({
+						behavior: "smooth",
+						block: "start",
+						inline: "nearest",
+					});
+					return;
 				}
+
+				// No card element found — avoid jumping to unrelated sections.
+			} catch (err) {
+				console.error("scrollToCard error:", err);
 			}
+		}, delay);
 
-
-			if (cardElement) {
-				cardElement.scrollIntoView({
-					behavior: "smooth",
-					block: "start",
-					inline: "nearest",
-				});
-				return;
-			}
-
-			// No card element found — avoid jumping to unrelated sections.
-		} catch (err) {
-			console.error("scrollToCard error:", err);
-		}
 	}
 
 	/**

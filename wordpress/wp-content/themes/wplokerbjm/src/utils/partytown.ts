@@ -53,13 +53,19 @@ class PartytownManager {
 
   /**
    * Ensures Partytown is booted only after detecting human interaction.
+   * For returned visitors (within the session), boots immediately if interaction was previously detected.
    * Listens for user events like mouse, keyboard, touch, and scroll.
-   * Once interaction is detected, boots Partytown and removes listeners.
+   * Once interaction is detected, boots Partytown, sets a session flag, and removes listeners.
    * @param config Optional Partytown configuration.
    * @returns Promise that resolves to true when Partytown is ready.
    */
   public static async ensureBootOnInteraction(config?: PartytownConfig): Promise<boolean> {
-    if (typeof window === "undefined") return false;
+    if (typeof window === 'undefined') return false;
+
+    // Check if user has interacted in this session (returned visitor)
+    if (sessionStorage.getItem('partytown_interacted') === 'true') {
+      return this.ensureBoot(config);
+    }
 
     // If already booted or interaction detected, ensure boot immediately
     if (this.interactionDetected || document.querySelector("script[partytown-boot]")) {
@@ -71,6 +77,8 @@ class PartytownManager {
 
       const handler = () => {
         this.interactionDetected = true;
+        // Set session flag for returned visitors
+        sessionStorage.setItem('partytown_interacted', 'true');
         // Remove all listeners
         events.forEach(event => window.removeEventListener(event, handler));
         // Boot Partytown
@@ -79,7 +87,7 @@ class PartytownManager {
       };
 
       // Add listeners with once: true for efficiency
-      events.forEach(event => window.addEventListener(event, handler, { once: true }));
+      events.forEach(event => window.addEventListener(event, handler, { once: true, passive: true }));
     });
   }
 }

@@ -76,7 +76,9 @@ class Enqueue
             $cacheKey = CacheKey::PRELOAD_LINK_HEADER_PREFIX . md5($path);
             $cachedHeader = Cache::get($cacheKey);
             if ($cachedHeader !== false) {
-                header("Link: {$cachedHeader}", false);
+                if (!self::isLinkHeaderAlreadySet($cachedHeader)) {
+                    header("Link: {$cachedHeader}", false);
+                }
                 return;
             }
 
@@ -97,12 +99,31 @@ class Enqueue
                 $header = implode(', ', $linkParts);
                 // Cache the consolidated header for 1 day to match manifest TTL
                 Cache::set($cacheKey, $header, 86400);
-                header("Link: {$header}", false);
+                if (!self::isLinkHeaderAlreadySet($header)) {
+                    header("Link: {$header}", false);
+                }
             }
         } catch (\Exception $e) {
             Logger::error('Enqueue', 'Enqueue::outputPreloadLinksResponse error: ' . $e->getMessage());
             return;
         }
+    }
+
+    /**
+     * Check if the Link header is already set with the given value.
+     */
+    private static function isLinkHeaderAlreadySet(string $value): bool
+    {
+        $headers = headers_list();
+        foreach ($headers as $header) {
+            if (str_starts_with($header, 'Link: ')) {
+                $existingValue = substr($header, 6);
+                if ($existingValue === $value) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }
 

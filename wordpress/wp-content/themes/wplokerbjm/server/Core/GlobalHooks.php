@@ -26,7 +26,7 @@ class GlobalHooks
      * * For deleted job posts (404 on single lowongan), return 410 Gone.
      * ! Notify search engines with 410 Gone for removed job posts.
      */
-    #[Action('template_redirect', 3)]
+    #[Action('template_redirect', 1)]
     public function oldPost410Redirect(): void
     {
         if (
@@ -43,7 +43,7 @@ class GlobalHooks
         $handleRemovedJob = function () {
             if (is_404()) {
                 status_header(410);
-                wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
+                wp_die('This job posting has been expired or removed.', 'Gone', ['response' => 410]);
             } else {
                 wp_safe_redirect(home_url('/'), 302);
                 exit;
@@ -111,39 +111,24 @@ class GlobalHooks
      ======================================================================*/
 
     /**
-     * Sets X-WP-Nonce header for authenticated users.
+     * Attempts to authenticate the user via the logged-in cookie if not already authenticated.
      */
-    #[Action('send_headers')]
-    public static function restHeadersImpl(): void
+    private static function authenticateViaCookie(): void
     {
-        try {
-            // If a user is not already set for this request, attempt to validate
-            // the WordPress "logged in" cookie so we can emit the X-WP-Nonce
-            if (!is_user_logged_in()) {
-                if (function_exists('wp_validate_auth_cookie') && defined('LOGGED_IN_COOKIE') && isset($_COOKIE[LOGGED_IN_COOKIE])) {
-                    $cookie = $_COOKIE[LOGGED_IN_COOKIE];
-                    $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
-                    if ($user_id) {
-                        // Ensure current user is populated for downstream is_user_logged_in()/nonce creation
-                        wp_set_current_user((int) $user_id);
-                    } else {
-                        // No valid cookie -> nothing to expose
-                        return;
-                    }
+        if (!is_user_logged_in()) {
+            if (function_exists('wp_validate_auth_cookie') && defined('LOGGED_IN_COOKIE') && isset($_COOKIE[LOGGED_IN_COOKIE])) {
+                $cookie = $_COOKIE[LOGGED_IN_COOKIE];
+                $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
+                if ($user_id) {
+                    // Ensure current user is populated for downstream is_user_logged_in()/nonce creation
+                    wp_set_current_user((int) $user_id);
                 } else {
+                    // No valid cookie -> nothing to expose
                     return;
                 }
-            }
-
-            // Still require authenticated user before creating nonce
-            if (!is_user_logged_in()) {
+            } else {
                 return;
             }
-
-            $nonce = wp_create_nonce('wp_rest');
-            header('X-WP-Nonce: ' . $nonce);
-        } catch (\Exception $e) {
-            Logger::error('Hooks', 'Hooks::restHeaders error: ' . $e->getMessage());
         }
     }
 
@@ -171,7 +156,7 @@ class GlobalHooks
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
     #[Filter('graphql_response_headers_to_send')]
-    public static function restrictGraphQLCors(array $headers): array
+    public static function ModifyHeaderGraphQL(array $headers): array
     {
         // Get the site's origin
         $site_url = home_url();
@@ -184,8 +169,14 @@ class GlobalHooks
         // Set CORS to same origin only
         $headers['Access-Control-Allow-Origin'] = $site_origin;
         $headers['Access-Control-Allow-Credentials'] = 'true'; // Required for cookies/nonces
-        $headers['Access-Control-Allow-Headers'] .= ', X-WP-Nonce';
-        $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce';
+
+        self::authenticateViaCookie();
+
+        if (is_user_logged_in()) {
+            $headers['Access-Control-Allow-Headers'] .= ', X-WP-Nonce';
+            $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce';
+            $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
+        }
 
         return $headers;
     }

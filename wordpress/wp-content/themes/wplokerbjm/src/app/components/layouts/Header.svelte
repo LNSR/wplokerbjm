@@ -652,6 +652,47 @@
     }
   }
 
+  // Open bookmark modal using View Transition API when available and
+  // use routeStore.lockViewTransition to avoid concurrent transitions.
+  function openBookmarkModal(): void {
+    if (
+      typeof document !== "undefined" &&
+      document.startViewTransition &&
+      !routeStore.lockViewTransition
+    ) {
+      routeStore.lockViewTransition = true;
+      try {
+        const trans = document.startViewTransition(() => {
+          showBookmarkModal = true;
+        });
+        routeStore.currentViewTransition = trans;
+        if (trans && trans.finished) {
+          trans.finished
+            .then(() => {
+              routeStore.currentViewTransition = null;
+              routeStore.lockViewTransition = false;
+            })
+            .catch(() => {
+              routeStore.currentViewTransition = null;
+              routeStore.lockViewTransition = false;
+            });
+        } else {
+          // No finished promise available; release lock shortly
+          routeStore.currentViewTransition = null;
+          routeStore.lockViewTransition = false;
+        }
+      } catch {
+        // Fallback to immediate open
+        routeStore.currentViewTransition = null;
+        routeStore.lockViewTransition = false;
+        showBookmarkModal = true;
+      }
+    } else {
+      // Fallback: open modal immediately
+      showBookmarkModal = true;
+    }
+  }
+
   onMount(() => {
     try {
       themeStore.init();
@@ -800,7 +841,7 @@
 
           <!-- Bookmark button on desktop -->
           <button
-            onclick={() => (showBookmarkModal = true)}
+            onclick={openBookmarkModal}
             class="btn btn-circle md:flex relative border-[var(--wpl-global-color-1)] border-1 hover:border-2"
             aria-label="Lowongan tersimpan"
             title="Lowongan tersimpan"
