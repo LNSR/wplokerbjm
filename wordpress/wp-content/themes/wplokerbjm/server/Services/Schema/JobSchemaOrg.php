@@ -173,15 +173,12 @@ class JobSchemaOrg
             $position = $index + 1;
             $jobSchema = $this->getJobPostingSchema($post_id);
 
-            // Remove @context from nested item
-            if (isset($jobSchema['@context'])) {
-                unset($jobSchema['@context']);
-            }
 
             $itemListElements[] = [
                 "@type" => "ListItem",
                 "position" => $position,
-                "item" => $jobSchema,
+                "name" => $jobSchema['title'],
+                "url" => $jobSchema['url']
             ];
         }
 
