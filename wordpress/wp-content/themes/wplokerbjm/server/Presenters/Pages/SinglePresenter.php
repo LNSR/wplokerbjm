@@ -26,7 +26,7 @@ class SinglePresenter
         $props = $this->getProps($post_id);
 
         $schema_data = $this->jobSchema->getJobPostingSchema($post_id);
-        $schema = JobPostingSchema::renderSchema($schema_data, $post_id);
+        $schema = JobPostingSchema::renderSchemaJobPosting($schema_data, $post_id);
 
         return [
             'props' => $props,

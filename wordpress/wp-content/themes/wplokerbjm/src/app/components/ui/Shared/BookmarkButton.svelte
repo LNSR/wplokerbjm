@@ -2,13 +2,16 @@
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import type { JobCardProps, WPBasePost } from "@/types";
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
+  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
 
   const { jobId, variant = undefined } = $props<{
     jobId: WPBasePost["id"];
     variant: JobCardProps["variant"];
   }>();
 
-  const isJobSaved = $derived(bookmarkStore.jobs.some(job => (Number(job.id) === jobId)));
+  const isJobSaved = $derived(
+    bookmarkStore.jobs.some((job) => Number(job.id) === jobId),
+  );
   const toggleSave = (id: number) => bookmarkStore.toggleSave(id);
 
   let isLoading = $state(false);
@@ -46,6 +49,11 @@
         confirmationState = "removed";
       }
 
+      // Preload bookmark modal for faster access when viewing bookmarks
+      if (!dynamicComponentStore.BookmarkModal) {
+        void dynamicComponentStore.loadBookmarkModal();
+      }
+      
     } catch {
       isPending = false;
       const wasSaved = preToggleSaved;
@@ -70,7 +78,7 @@
 
   function useBookmarkStyle(
     saved: boolean,
-    showConfirmation: boolean
+    showConfirmation: boolean,
   ): { style: string } {
     if (!saved) return { style: "text-gray-600" };
     if (showConfirmation) return { style: "text-green-700" };
@@ -78,7 +86,7 @@
   }
 
   const bookmarkStyle = $derived.by(() =>
-    useBookmarkStyle(isJobSaved, confirmationState === "saved")
+    useBookmarkStyle(isJobSaved, confirmationState === "saved"),
   );
 
   // New reactive icon spec: name and optional classes (color override)

@@ -58,7 +58,7 @@ define('LITESPEED_CONF__OBJECT__USER', '');
 define('LITESPEED_CONF__OBJECT__PSWD', getenv('REDIS_PWD'));
 
 if (defined('WP_ENV') && WP_ENV === 'development') {
-  define('LITESPEED_DISABLE_ALL', false);
+  define('LITESPEED_DISABLE_ALL', true);
   define('LITESPEED_DEV', false);
 }
 
@@ -73,6 +73,8 @@ switch (WP_ENV) {
       define('WP_DEBUG_DISPLAY', true);
     if (!defined('SCRIPT_DEBUG'))
       define('SCRIPT_DEBUG', true);
+    if (!defined('WP_CACHE'))
+      define('WP_CACHE', false);
 
     // Performance for dev
     define('WP_POST_REVISIONS', 3);
@@ -114,6 +116,9 @@ switch (WP_ENV) {
       define('SCRIPT_DEBUG', true);
     if (!defined('WP_DEBUG_LOG'))
       define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug/debug.log');
+    if (!defined('WP_CACHE')) {
+      define('WP_CACHE', true);
+    }
     define('DISALLOW_FILE_EDIT', false);
     define('DISALLOW_FILE_MODS', false);
     define('WP_ENVIRONMENT_TYPE', 'production');

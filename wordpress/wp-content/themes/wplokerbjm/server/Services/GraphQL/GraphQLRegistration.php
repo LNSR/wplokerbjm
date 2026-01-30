@@ -352,14 +352,18 @@ class GraphQLRegistration
 
         register_graphql_field('RootQuery', 'jobSchema', [
             'type' => 'JobSchemaResponse',
-            'description' => 'Get job schema',
+            'description' => 'Get job schema. Returns per-id JobPosting schemas by default (even for multiple IDs). Set `type` to "ItemList" to explicitly request an ItemList, or "JobPosting" to request per-id JobPosting schemas.',
             'args' => [
                 'ids' => [
-                    'type' => ['list_of' => 'Int'],
-                    'description' => 'Job IDs',
+                    'type' => ['non_null' => ['list_of' => ['non_null' => 'Int']]],
+                    'description' => 'Job IDs to retrieve. By default the resolver returns per-id JobPosting schemas; set `type` to "ItemList" to request a combined ItemList for these IDs.',
+                ],
+                'type' => [
+                    'type' => 'String',
+                    'description' => 'Optional schema type. Allowed values: "ItemList" (returns a single ItemList) or "JobPosting" (returns per-id JobPosting schemas). Defaults to per-id JobPosting behavior when omitted.',
                 ],
             ],
-            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveJobSchema(...$args),
+            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveSchema(...$args),
         ]);
 
         register_graphql_field('RootQuery', 'themeData', [

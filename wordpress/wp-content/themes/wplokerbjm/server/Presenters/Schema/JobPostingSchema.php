@@ -10,25 +10,20 @@ class JobPostingSchema
      * @param int $post_id
      * @return string
      */
-    public static function renderSchema(array $schema, int $post_id): string
+    public static function renderSchemaJobPosting(array $schema, int $post_id): string
     {
         $jsonLd = json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
-        return '<script type="application/ld+json" data-ld-type="JobPosting" data-ld-id="jobposting-' . intval($post_id) . '">' . $jsonLd . '</script>';
+        return '<script type="application/ld+json" data-ld-type="JobPosting">' . $jsonLd . '</script>';
     }
 
     /**
-     * Render multiple JobPosting JSON-LD script tags
-     * @param array $schemas
-     * @param array $post_ids
+     * Render ItemList JSON-LD script tag
+     * @param array $schema
      * @return string
      */
-    public static function renderMultiple(array $schemas, array $post_ids): string
+    public static function renderSchemaItemList(array $schema): string
     {
-        $scripts = [];
-        foreach ($schemas as $index => $schema) {
-            $post_id = $post_ids[$index] ?? 0;
-            $scripts[] = self::renderSchema($schema, $post_id);
-        }
-        return implode('', $scripts);
+        $jsonLd = json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG);
+        return '<script type="application/ld+json" data-ld-type="ItemList">' . $jsonLd . '</script>';
     }
 }

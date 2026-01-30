@@ -173,9 +173,19 @@ class GraphQLData
      * !Useful in future for headless setups
      * @return array
      */
-    public function JobSchema(int $post_id)
+    public function JobSchema(int $post_id): array
     {
         $post_id = (int) $post_id; // Explicit coercion for type safety
         return $this->jobSchema->getJobPostingSchema($post_id);
+    }
+
+    /**
+     * Return an ItemList schema id for post ID
+     * @param int $post_id
+     * @return array
+     */
+    public function ItemListJobPostings(array $post_ids): array
+    {
+        return $this->jobSchema->getItemListSchema($post_ids);
     }
 }

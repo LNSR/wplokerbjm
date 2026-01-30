@@ -47,6 +47,9 @@ class JobSchemaOrg
             $jenis_pekerjaan = trim((string) $jenis_pekerjaan);
         }
 
+        // Map employment and location type via helper
+        [$employmentType, $jobLocationType] = JobSchemaHelper::mapEmploymentAndLocationType($jenis_pekerjaan);
+
         $pendidikan = $jobdata[Taxonomies::PENDIDIKAN] ?? '';
         if (is_array($pendidikan)) {
             $pendidikan = array_filter(array_map('trim', $pendidikan), fn($v) => $v !== '');
@@ -63,25 +66,8 @@ class JobSchemaOrg
                 $pendidikan = "no requirements";
             }
         }
-        $pengalaman = $jobdata[CustomFields::PENGALAMAN] ?? '';
-        $pengalaman_str = '';
-        if (!empty($pengalaman)) {
-            // If numeric, append " tahun"
-            $pengalaman_str = is_numeric($pengalaman) ? $pengalaman . ' tahun' : $pengalaman;
-        }
-
-        // Map pengalaman to Schema.org enum if possible, else use string
-        $experienceEnum = null;
-        if (is_numeric($pengalaman)) {
-            if ($pengalaman <= 1) {
-                $experienceEnum = "EntryLevel";
-            } elseif ($pengalaman <= 3) {
-                $experienceEnum = "MidLevel";
-            } else {
-                $experienceEnum = "SeniorLevel";
-            }
-        }
-        $experienceRequirements = $experienceEnum ?? (!empty($pengalaman_str) ? $pengalaman_str : null);
+        // Map experience requirements via helper
+        $experienceRequirements = JobSchemaHelper::mapExperienceRequirements($jobdata[CustomFields::PENGALAMAN] ?? null);
 
         $sameAs = [];
 
@@ -98,17 +84,30 @@ class JobSchemaOrg
             }
         }
 
+        // Normalize permalink and date to avoid boolean false leaking into JSON-LD
+        $permalink = get_permalink($post_id);
+        $permalink = $permalink ? esc_url($permalink) : null;
+        $idurl = $permalink ? $permalink . '#jobposting' : null;
+        $datePostedRaw = get_post_time('c', false, $post_id);
+        $datePosted = $datePostedRaw ? $datePostedRaw : null;;
+
+        // Build description via helper (combines DESKRIPSI_PEKERJAAN and PERSYARATAN when both present)
+        $descriptionHtml = JobSchemaHelper::buildDescription($jobdata);
+
         $schema = [
             "@context" => "https://schema.org",
             "@type" => "JobPosting",
             "title" => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-            "url" => get_permalink($post_id),
-            "@id" => get_permalink($post_id) . '#jobposting',
-            "description" => !empty($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) ? wp_strip_all_tags($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) : "No description",
+            "url" => $permalink,
+            "@id" => $idurl,
+            "mainEntityOfPage" => $permalink ? [
+                "@type" => "WebPage",
+                "@id" => $permalink
+            ] : null,
+            "description" => $descriptionHtml,
             "aboutCompany" => !empty($jobdata[CustomFields::TENTANG_PERUSAHAAN]) ? wp_strip_all_tags($jobdata[CustomFields::TENTANG_PERUSAHAAN]) : "No information about the company.",
-            "requirements" => !empty($jobdata[CustomFields::PERSYARATAN]) ? wp_strip_all_tags($jobdata[CustomFields::PERSYARATAN]) : null,
             "howToApply" => !empty($jobdata[CustomFields::CARA_MELAMAR]) ? wp_strip_all_tags($jobdata[CustomFields::CARA_MELAMAR]) : null,
-            "datePosted" => get_post_time('c', false, $post_id),
+            "datePosted" => $datePosted,
             "hiringOrganization" => [
                 "@type" => "Organization",
                 "name" => $jobdata[CustomFields::NAMA_PERUSAHAAN] ?? "Anonymous",
@@ -122,7 +121,8 @@ class JobSchemaOrg
                     "addressCountry" => "ID",
                 ],
             ],
-            "employmentType" => $jenis_pekerjaan,
+            "jobLocationType" => $jobLocationType,
+            "employmentType" => $employmentType,
             "validThrough" => $jobdata[CustomFields::DEADLINE] ?? null,
             "identifier" => [
                 "@type" => "PropertyValue",
@@ -134,22 +134,10 @@ class JobSchemaOrg
             "jobBenefits" => !empty($jobdata[CustomFields::BENEFIT]) ? wp_strip_all_tags($jobdata[CustomFields::BENEFIT]) : null,
         ];
 
-        if (!empty($jobdata[CustomFields::GAJI_MINIMAL])) {
-            $maxValue = $jobdata[CustomFields::GAJI_MAKSIMAL] ?? $jobdata[CustomFields::GAJI_MINIMAL];
-            $schema['baseSalary'] = [
-                "@type" => "MonetaryAmount",
-                "currency" => "IDR",
-                "value" => [
-                    "@type" => "QuantitativeValue",
-                    "minValue" => (int) $jobdata[CustomFields::GAJI_MINIMAL],
-                    "maxValue" => (int) $maxValue,
-                    "unitText" => "MONTH",
-                ],
-            ];
-            $gaji_min = (int) $jobdata[CustomFields::GAJI_MINIMAL];
-            $gaji_max = (int) $maxValue;
-            $schema['gaji_minimal'] = $gaji_min;
-            $schema['gaji_maksimal'] = $gaji_max;
+        // Attach salary information via helper when available
+        $salaryData = JobSchemaHelper::formatBaseSalary($jobdata);
+        if (!empty($salaryData)) {
+            $schema = array_merge($schema, $salaryData);
         }
 
         $umur_min = !empty($jobdata[CustomFields::UMUR_MIN]) ? (int) $jobdata[CustomFields::UMUR_MIN] : null;
@@ -163,5 +151,212 @@ class JobSchemaOrg
         Cache::set($cacheKey, $schema, 86400);
 
         return $schema;
+    }
+
+    /**
+     * Schema.org ItemList JSON-LD generator for multiple JobPostings
+     * @param array $post_ids
+     * @return array
+     */
+    public function getItemListSchema(array $post_ids): array
+    {
+        // Use a cache key specific to this set of post IDs to avoid returning
+        // the same ItemList for different ID sets.
+        $cacheKey = CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . md5(implode(',', $post_ids));
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
+        $itemListElements = [];
+        foreach ($post_ids as $index => $post_id) {
+            $position = $index + 1;
+            $jobSchema = $this->getJobPostingSchema($post_id);
+
+            // Remove @context from nested item
+            if (isset($jobSchema['@context'])) {
+                unset($jobSchema['@context']);
+            }
+
+            $itemListElements[] = [
+                "@type" => "ListItem",
+                "position" => $position,
+                "item" => $jobSchema,
+            ];
+        }
+
+        $itemListSchema = [
+            "@context" => "https://schema.org",
+            "@type" => "ItemList",
+            "mainEntity" => [
+                "@type" => "ItemList",
+            ],
+            "itemListElement" => $itemListElements,
+            "itemListOrder" => "https://schema.org/ItemListOrderDescending",
+            "numberOfItems" => count($itemListElements),
+        ];
+
+        Cache::set($cacheKey, $itemListSchema, 86400); // Cache for 1 day
+
+        return $itemListSchema;
+    }
+}
+
+class JobSchemaHelper {
+    /**
+     * Map taxonomy string to Google employmentType and detect remote jobLocationType
+     * @param string|null $jenis
+     * @return array [employmentType, jobLocationType]
+     */
+    public static function mapEmploymentAndLocationType(?string $jenis): array
+    {
+        $employmentType = null;
+        $jobLocationType = null;
+
+        $jenis = trim((string) ($jenis ?? ''));
+        if ($jenis === '') {
+            return ['FULL_TIME', null];
+        }
+
+        $parts = array_filter(array_map('trim', explode(',', $jenis)));
+        $mapped = [];
+        foreach ($parts as $p) {
+            $l = mb_strtolower($p);
+
+            if (str_contains($l, 'remote') || str_contains($l, 'telecommut') || str_contains($l, 'work from home') || $l === 'remote') {
+                $jobLocationType = 'TELECOMMUTE';
+                continue;
+            }
+            if (str_contains($l, 'full') || str_contains($l, 'penuh') || $l === 'fulltime') {
+                $mapped[] = 'FULL_TIME';
+                continue;
+            }
+            if (str_contains($l, 'part') || str_contains($l, 'paruh') || $l === 'parttime') {
+                $mapped[] = 'PART_TIME';
+                continue;
+            }
+            if (str_contains($l, 'kontrak') || str_contains($l, 'contract') || $l === 'kontrak') {
+                $mapped[] = 'CONTRACTOR';
+                continue;
+            }
+            if (str_contains($l, 'freelance')) {
+                $mapped[] = 'CONTRACTOR';
+                continue;
+            }
+            if (str_contains($l, 'temporary') || str_contains($l, 'sementara')) {
+                $mapped[] = 'TEMPORARY';
+                continue;
+            }
+            if (str_contains($l, 'intern') || str_contains($l, 'magang')) {
+                $mapped[] = 'INTERN';
+                continue;
+            }
+            if (str_contains($l, 'volunteer') || str_contains($l, 'relawan')) {
+                $mapped[] = 'VOLUNTEER';
+                continue;
+            }
+            if (str_contains($l, 'per') && str_contains($l, 'diem')) {
+                $mapped[] = 'PER_DIEM';
+                continue;
+            }
+            if ($l === 'other' || str_contains($l, 'lain')) {
+                $mapped[] = 'OTHER';
+                continue;
+            }
+
+            $normalized = preg_replace('/[^a-z0-9\s]+/i', '', $p);
+            $normalized = strtoupper(str_replace(' ', '_', trim($normalized)));
+            $mapped[] = $normalized ?: 'OTHER';
+        }
+
+        $mapped = array_unique(array_filter($mapped));
+        if (empty($mapped)) {
+            $employmentType = 'FULL_TIME';
+        } elseif (count($mapped) === 1) {
+            $employmentType = reset($mapped);
+        } else {
+            $employmentType = array_values($mapped);
+        }
+
+        return [$employmentType, $jobLocationType];
+    }
+
+    /**
+     * Map pengalaman (years or text) to experienceRequirements
+     * @param mixed $pengalaman
+     * @return string|null
+     */
+    public static function mapExperienceRequirements($pengalaman): ?string
+    {
+        if ($pengalaman === null || $pengalaman === '') {
+            return null;
+        }
+
+        if (is_numeric($pengalaman)) {
+            $years = (int) $pengalaman;
+            if ($years <= 1) {
+                return 'EntryLevel';
+            }
+            if ($years <= 3) {
+                return 'MidLevel';
+            }
+            return 'SeniorLevel';
+        }
+
+        // non-numeric text (already sanitized by factory)
+        return (string) $pengalaman;
+    }
+
+    /**
+     * Build description using DESKRIPSI_PEKERJAAN and fallback/appended PERSYARATAN
+     * @param array $jobdata
+     * @return string|null
+     */
+    public static function buildDescription(array $jobdata): ?string
+    {
+        $deskripsi_raw = $jobdata[CustomFields::DESKRIPSI_PEKERJAAN] ?? '';
+        $persyaratan_raw = $jobdata[CustomFields::PERSYARATAN] ?? '';
+
+        if (!empty($deskripsi_raw) && !empty($persyaratan_raw)) {
+            return $deskripsi_raw . '<br>' . $persyaratan_raw;
+        }
+        if (!empty($deskripsi_raw)) {
+            return $deskripsi_raw;
+        }
+        if (!empty($persyaratan_raw)) {
+            return $persyaratan_raw;
+        }
+
+        return null;
+    }
+
+    /**
+     * Format base salary block for schema and return additional keys
+     * @param array $jobdata
+     * @return array
+     */
+    public static function formatBaseSalary(array $jobdata): array
+    {
+        if (empty($jobdata[CustomFields::GAJI_MINIMAL])) {
+            return [];
+        }
+
+        $min = (int) $jobdata[CustomFields::GAJI_MINIMAL];
+        $max = isset($jobdata[CustomFields::GAJI_MAKSIMAL]) ? (int) $jobdata[CustomFields::GAJI_MAKSIMAL] : $min;
+
+        return [
+            'baseSalary' => [
+                "@type" => "MonetaryAmount",
+                "currency" => "IDR",
+                "value" => [
+                    "@type" => "QuantitativeValue",
+                    "minValue" => $min,
+                    "maxValue" => $max,
+                    "unitText" => "MONTH",
+                ],
+            ],
+            'gaji_minimal' => $min,
+            'gaji_maksimal' => $max,
+        ];
     }
 }

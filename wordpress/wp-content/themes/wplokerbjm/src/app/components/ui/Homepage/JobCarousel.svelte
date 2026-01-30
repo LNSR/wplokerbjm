@@ -56,6 +56,7 @@
 <script lang="ts">
   import JobCard from "@components/ui/Homepage/JobCard.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import { isJobGridEl } from "$lib/utils/elements.svelte";
   import {
     GlobalNavigateTo,
     routeStateStore,
@@ -691,7 +692,7 @@
     ): void {
       if (typeof window !== "undefined" && window.innerWidth >= 768) {
         // Desktop: open overlay
-        const jobgridElement = document.getElementById("job-grid");
+        const jobgridElement = isJobGridEl();
         jobOverlay.openOverlay(slug, job);
         jobgridElement?.scrollIntoView({ behavior: "smooth", block: "start" });
       } else {

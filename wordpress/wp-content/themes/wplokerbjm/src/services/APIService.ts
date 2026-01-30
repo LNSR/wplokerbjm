@@ -181,12 +181,15 @@ export class APIService {
     return data;
   }
 
-  static async fetchJobSchemasGraphQL(ids: number[], signal?: AbortSignal): Promise<JobSchemaResponse> {
-    const key = `fetchJobSchemasGraphQL:${ids.join(',')}`;
+  static async fetchJobSchemasGraphQL(ids: number[], signal?: AbortSignal, type?: string): Promise<JobSchemaResponse> {
+    const typeKey = type ? String(type) : 'auto';
+    const key = `fetchJobSchemasGraphQL:${ids.join(',')}:${typeKey}`;
     if (cache.has(key)) {
       return cache.get(key);
     }
-    const result = await graphqlClient.query(GET_JOB_SCHEMA, { ids }, mergedFetchOptionsContext(signal)).toPromise();
+    const variables: any = { ids };
+    if (type) variables.type = type;
+    const result = await graphqlClient.query(GET_JOB_SCHEMA, variables, mergedFetchOptionsContext(signal)).toPromise();
     if (result.error) {
       throw result.error;
     }

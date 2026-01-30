@@ -4,10 +4,11 @@
   import { timeEffect } from "$lib/utils/elements.svelte";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { generalStore } from "$lib/stores/General.svelte";
+  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { Virtualization } from "$lib/utils/Virtualization.svelte";
   import type { CardJob } from "@/types";
-  import { isMobile } from "$lib/utils/elements.svelte";
-  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
+  import { isMobile, isJobGridEl } from "$lib/utils/elements.svelte";
+  import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import {
     GlobalNavigateTo,
@@ -268,27 +269,6 @@
    * UI Specific Modal Handler
    */
   class ModalHandler {
-    // If a view transition is in progress (or locked), wait until it finishes
-    viewTransition(): void {
-      const vt = routeStore.currentViewTransition;
-      if (
-        typeof document !== "undefined" &&
-        document.startViewTransition &&
-        (vt || routeStore.lockViewTransition)
-      ) {
-        if (vt && vt.finished) {
-          vt.finished
-            .then(() => bookmarkHandler.scheduleFetchJobs())
-            .catch(() => bookmarkHandler.scheduleFetchJobs());
-        } else {
-          // fallback: small delay to allow transition to start then schedule fetch
-          setTimeout(() => bookmarkHandler.scheduleFetchJobs(), 50);
-        }
-      } else {
-        // No view transition — schedule after first paint
-        requestAnimationFrame(() => bookmarkHandler.scheduleFetchJobs());
-      }
-    }
     startDrag = (e: PointerEvent): void => {
       if (e.button && e.button !== 0) return;
       if (!modalBox || !dragHandle) return;
@@ -358,13 +338,21 @@
       if (e.key === "Escape" && open) this.closeModal();
     };
 
-    async handleJobClick(job: CardJob): Promise<void> {
+    handleJobClick(job: CardJob): void {
       this.closeModal();
 
-      // Navigate to job detail page
-      if (job.permalink) {
-        const url = new URL(job.permalink, routeStore.currentUrl.origin);
-        void GlobalNavigateTo(url.pathname + url.search + url.hash);
+      const el: HTMLElement | null = isJobGridEl();
+      if (!isMobile() && el) {
+        // Desktop: open overlay
+        routeStateStore.saveCardHeights(new Map(cardHeights), "bookmarkModal");
+        jobOverlay.openOverlay(job.slug ?? "", job);
+        jobOverlay.scrollToCard(job.slug ?? "");
+      } else {
+        // Mobile: navigate
+        if (job.permalink) {
+          const url = new URL(job.permalink, routeStore.currentUrl.origin);
+          void GlobalNavigateTo(url.pathname + url.search + url.hash);
+        }
       }
     }
 
@@ -463,7 +451,7 @@
   onMount(() => {
     if (open) {
       bookmarkStore.flushSync();
-      modalHandler.viewTransition();
+      bookmarkHandler.scheduleFetchJobs();
 
       if (!modalEl?.open) modalEl?.showModal();
       if (isMobileValue && modalBox) {

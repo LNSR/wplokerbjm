@@ -1,5 +1,6 @@
 <script lang="ts">
   import { generalStore } from "$lib/stores/General.svelte";
+  import { onMount } from "svelte";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import { timeEffect } from "$lib/utils/elements.svelte";
   import {
@@ -32,10 +33,6 @@
 
   const now = $state(new SvelteDate());
 
-  $effect(() => {
-    timeEffect(now);
-  });
-
   // Derived UI helpers (keeps UI reactive to prop changes)
   const summaryRows = $derived.by(() =>
     generalStore.useSummaryJob(jobdata?.ringkasanPekerjaan),
@@ -50,7 +47,9 @@
     generalStore.useTimeAgo(jobdata?.post_time, now),
   );
 
-  const selected = $derived(routeStateStore.lastVisitedJob === jobdata?.slug);
+  const selected = $derived(
+    routeStateStore.lastVisitedJob === jobdata?.slug
+  );
 
   const cardClass = $derived.by(() => {
     return `card-base-${variant}${selected ? ` card-selected-${variant}` : ""}`;
@@ -84,6 +83,16 @@
     // For desktop/tablet: prevent default and handle overlay
     event.preventDefault();
   }
+
+  $effect(() => {
+    timeEffect(now);
+  });
+
+  onMount(() => {
+    if (routeStateStore.restoreVisitedJob()) {
+      routeStateStore.restoreVisitedJob();
+    }
+  });
 </script>
 
 <div

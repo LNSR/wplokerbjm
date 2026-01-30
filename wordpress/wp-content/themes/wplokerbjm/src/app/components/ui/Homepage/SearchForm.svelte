@@ -3,6 +3,7 @@
   import { TaxonomyType } from "@/types";
   import { SearchTitle, SearchContext } from "@/types";
   import { searchStore, SearchUtils } from "$lib/stores/Search.svelte";
+  import { isJobGridEl } from "$lib/utils/elements.svelte";
   import {
     dynamicComponentStore,
     type CustomDropdownComponent,
@@ -126,7 +127,7 @@
           searchResults,
         );
         setTimeout(() => {
-          const grid = document.getElementById("job-grid");
+          const grid = isJobGridEl();
           if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
         }, 100);
       } catch (err) {

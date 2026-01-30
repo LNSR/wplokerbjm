@@ -43,17 +43,6 @@
 
   onMount(() => {
     isLoggedIn = !!NonceManager.getNonce;
-    // Removed: no close functionality
-    // document.addEventListener("keydown", (event) =>
-    //   OverlayKeyboardHandler.handleKeydown(event, close)
-    // );
-
-    return () => {
-      // Removed: no close functionality
-      // document.removeEventListener("keydown", (event) =>
-      //   OverlayKeyboardHandler.handleKeydown(event, close)
-      // );
-    };
   });
 
   // Explicitly set slideIn to false first so it shows everytime JobOverlay is opened

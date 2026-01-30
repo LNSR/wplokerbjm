@@ -83,7 +83,9 @@ export class JobOverlayManager {
 				const routeContainer = typeof document !== 'undefined' ? document.querySelector('.route-container') as HTMLElement | null : null;
 				if (routeContainer) routeContainer.setAttribute('data-no-view-transition', 'true');
 
-				window.history.replaceState({}, "", path);
+				window.history.pushState({}, "", path);
+				if (routeStore.isInitialLoad) routeStore.isInitialLoad = false;
+				routeStateStore.saveScrollPosition(path, Number(window.scrollY));
 
 				// Remove the flag after a couple of frames to be safe
 				requestAnimationFrame(() => {
@@ -91,9 +93,8 @@ export class JobOverlayManager {
 						if (routeContainer) routeContainer.removeAttribute('data-no-view-transition');
 					});
 				});
+				utilsSEO.RemoveAllSchemas();
 				utilsSEO.fetchHeadData(path).then(() => {
-					void utilsSEO.clearPendingJobSchemas();
-					void utilsSEO.removeJobPostingJsonLd();
 					void utilsSEO.addJobPostingJsonLd([Number(job.id)] as number[]);
 				}).catch(() => {
 					console.error('Failed to fetch head data for overlay open to', path);
@@ -103,7 +104,9 @@ export class JobOverlayManager {
 			}
 
 			// Start debounced fetch for overlay data
-			this.debouncedFetch(slug)
+			if (this.overlayData !== undefined && !routeStore.isInitialLoad) {
+				this.debouncedFetch(slug)
+			}
 		})
 	}
 

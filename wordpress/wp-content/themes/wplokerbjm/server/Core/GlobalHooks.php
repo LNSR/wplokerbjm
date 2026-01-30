@@ -247,8 +247,9 @@ class GlobalHooks
     #[Filter('option_active_plugins', 0)]
     public function disablePluginsforSimulatedProdImpl(array $plugins): array
     {
-        $isDev = SharedUtils::isDevelopment();
+        $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
         if (!$isDev) {
+            Logger::info('Hooks', 'Not simulating production environment; no plugins disabled.');
             return $plugins;
         }
 
@@ -288,6 +289,8 @@ class GlobalHooks
     {
         return array_merge([
             // 'google-site-kit/',
+            'wpgraphql-smart-cache/',
+            'tinywp-mobile-detect/',
             'fast-indexing-api/',
             'wps-hide-login/',
         ], $extra);
@@ -379,6 +382,7 @@ class GlobalHooks
                 CacheKey::TAXONOMY_DEPTH_LOKASI,
                 CacheKey::TAXONOMY_DEPTH_GENDER,
                 CacheKey::TAXONOMY_DEPTH_PENDIDIKAN,
+                CacheKey::HOMEPAGE_JOB_SCHEMAS,
             ]);
 
             Cache::deletePattern([

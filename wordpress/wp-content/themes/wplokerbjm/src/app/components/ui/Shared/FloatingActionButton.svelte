@@ -1,5 +1,6 @@
 <script module lang="ts">
   import { type SocialMediaItem, SocialMediaPlatform } from "@/types";
+  import { isJobGridEl } from "$lib/utils/elements.svelte";
   import {
     ArrowUpSolid,
     HeadsetSolid,
@@ -67,7 +68,7 @@
   }
 
   function observeJobGrid() {
-    const jobGrid = document.getElementById("job-grid");
+    const jobGrid = isJobGridEl();
     if (!jobGrid) return;
     jobGridObserver = new IntersectionObserver(
       (entries) => {

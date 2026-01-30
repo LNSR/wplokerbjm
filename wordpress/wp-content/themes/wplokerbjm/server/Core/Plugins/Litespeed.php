@@ -75,6 +75,15 @@ class LiteSpeedFilters
         $excludes[] = self::pattern();
         return $excludes;
     }
+
+    /**
+     * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
+     */
+    #[Filter('litespeed_is_mobile', 0)]
+    public static function customMobileDetect()
+    {
+        return wp_is_mobile();
+    }
 }
 
 /**

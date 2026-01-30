@@ -9,7 +9,7 @@ switch (true) {
         $viewClass = PasangIklanLokerView::class;
         break;
     case is_single() && get_post_type() === 'lowongan':
-        $viewClass = SingleLowonganView::class;
+        $viewClass = (bool) wp_is_mobile() ? SingleLowonganView::class : HomepageView::class; // use sidepanel for desktop
         break;
     case is_front_page() || is_page(146):
         $viewClass = HomepageView::class;

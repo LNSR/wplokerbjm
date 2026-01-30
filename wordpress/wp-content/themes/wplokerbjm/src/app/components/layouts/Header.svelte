@@ -652,45 +652,9 @@
     }
   }
 
-  // Open bookmark modal using View Transition API when available and
-  // use routeStore.lockViewTransition to avoid concurrent transitions.
+  // Open bookmark modal
   function openBookmarkModal(): void {
-    if (
-      typeof document !== "undefined" &&
-      document.startViewTransition &&
-      !routeStore.lockViewTransition
-    ) {
-      routeStore.lockViewTransition = true;
-      try {
-        const trans = document.startViewTransition(() => {
-          showBookmarkModal = true;
-        });
-        routeStore.currentViewTransition = trans;
-        if (trans && trans.finished) {
-          trans.finished
-            .then(() => {
-              routeStore.currentViewTransition = null;
-              routeStore.lockViewTransition = false;
-            })
-            .catch(() => {
-              routeStore.currentViewTransition = null;
-              routeStore.lockViewTransition = false;
-            });
-        } else {
-          // No finished promise available; release lock shortly
-          routeStore.currentViewTransition = null;
-          routeStore.lockViewTransition = false;
-        }
-      } catch {
-        // Fallback to immediate open
-        routeStore.currentViewTransition = null;
-        routeStore.lockViewTransition = false;
-        showBookmarkModal = true;
-      }
-    } else {
-      // Fallback: open modal immediately
-      showBookmarkModal = true;
-    }
+    showBookmarkModal = true;
   }
 
   onMount(() => {

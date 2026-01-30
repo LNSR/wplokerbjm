@@ -260,14 +260,16 @@ class Vite
      */
     private static function getRouteKey(string $path): ?string
     {
+        $homepage = 'src/app/routes/Homepage.svelte';
+        $singlelowongan = 'src/app/routes/SingleLowongan.svelte';
         if ($path === '/' || $path === '') {
-            return 'src/app/routes/Homepage.svelte';
+            return $homepage;
         }
         if (strpos($path, '/pasang-iklan-loker') === 0) {
             return 'src/app/routes/PasangIklanLoker.svelte';
         }
         if (preg_match('/^\/lowongan\//', $path)) {
-            return 'src/app/routes/SingleLowongan.svelte';
+            return wp_is_mobile() ? $singlelowongan : $homepage;
         }
         return null;
     }

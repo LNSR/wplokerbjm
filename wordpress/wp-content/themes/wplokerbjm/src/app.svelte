@@ -1,8 +1,9 @@
 <script module lang="ts">
-  import { onMount, type Component } from "svelte";
+  import { onDestroy, onMount, type Component } from "svelte";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import { GoogleServices } from "@/services/Google";
+  import { isMobile } from "$lib/utils/elements.svelte";
 
   const pathname = $derived(routeStore.currentUrl.pathname);
   const isInitialLoad = $derived(routeStore.isInitialLoad);
@@ -20,7 +21,7 @@
         case "PasangIklanLoker":
           return dynamicComponentStore.loadPasangIklanLoker();
         case "SingleLowongan":
-          return dynamicComponentStore.loadSingleLowongan();
+          return isMobile() ? dynamicComponentStore.loadSingleLowongan() : dynamicComponentStore.loadHomepage();
       }
       return null;
     }
@@ -132,6 +133,7 @@
   });
 
   onMount(() => {
+    routeStateStore.observeBreakpointChanges();
     routeStore.setCurrentPath(pathname);
     GoogleServices.injectGTMScript()
       .then(() => {
@@ -150,6 +152,10 @@
         window.removeEventListener("popstate", appRouteHandler.handlePopstate);
       };
     }
+  });
+
+  onDestroy(() => {
+    routeStateStore.cleanUpEffect();
   });
 </script>
 

@@ -177,6 +177,14 @@ class GraphQLTest extends WplokerbjmTestCase
         }
 
         echo "  \033[0;32m✅ All fields have appropriate resolvers\033[0m\n";
+
+        // Verify jobSchema field args include optional 'type' parameter
+        $jobSchemaField = array_values(array_filter($fields, fn($f) => $f['field'] === 'jobSchema'))[0] ?? null;
+        $this->assertNotNull($jobSchemaField, 'jobSchema field must be registered');
+        $args = $jobSchemaField['config']['args'] ?? [];
+        $this->assertArrayHasKey('type', $args, "jobSchema should accept an optional 'type' arg");
+        $this->assertEquals('String', $args['type']['type'], "jobSchema 'type' arg should be a String");
+        echo "  \033[0;32m✓\033[0m jobSchema field accepts 'type' arg\n";
     }
 
     /**
@@ -237,6 +245,16 @@ class GraphQLTest extends WplokerbjmTestCase
                 'query' => 'query { jobSchema(ids: [1,2,3]) { schemas } }',
                 'expected_status' => 200,
                 'description' => 'Get job schemas (ids as list of Ints)'
+            ],
+            'jobSchemaItemList' => [
+                'query' => 'query { jobSchema(ids: [1,2,3], type: "ItemList") { schemas } }',
+                'expected_status' => 200,
+                'description' => 'Get job schemas forced ItemList'
+            ],
+            'jobSchemaJobPosting' => [
+                'query' => 'query { jobSchema(ids: [1,2,3], type: "JobPosting") { schemas } }',
+                'expected_status' => 200,
+                'description' => 'Get job schemas forced JobPosting'
             ],
             'themeData' => [
                 'query' => 'query { themeData { data { themeUrl } } }',
@@ -338,8 +356,29 @@ class GraphQLTest extends WplokerbjmTestCase
                             $this->assertArrayHasKey('jobDetail', $data['data'], "Query '{$name}' should contain 'jobDetail' in data");
                             break;
                         case 'jobSchema':
-                            $this->assertArrayHasKey('jobSchema', $data['data'], "Query '{$name}' should contain 'jobSchema' in data");
+                            $this->assertArrayHasKey('jobSchema', $data['data'], "Query '{$name}' should contain 'jobSchema' in data");                            // basic sanity: should return at least one schema string
+                            $this->assertIsArray($data['data']['jobSchema']['schemas'], "jobSchema should return schemas array");
+                            $this->assertNotEmpty($data['data']['jobSchema']['schemas'], "jobSchema should not return an empty schemas array");
                             break;
+                        case 'jobSchemaItemList':
+                            $this->assertArrayHasKey('jobSchema', $data['data'], "Query '{\$name}' should contain 'jobSchema' in data");
+                            $schemas = $data['data']['jobSchema']['schemas'];
+                            $this->assertCount(1, $schemas, "Forced ItemList should return a single schema string");
+                            $first = json_decode($schemas[0], true);
+                            $this->assertIsArray($first, "Parsed ItemList should be an array");
+                            $this->assertArrayHasKey('@type', $first);
+                            $this->assertEquals('ItemList', $first['@type']);
+                            echo "    \033[0;32mItemList schema returned\033[0m\n";
+                            break;
+                        case 'jobSchemaJobPosting':
+                            $this->assertArrayHasKey('jobSchema', $data['data'], "Query '{\$name}' should contain 'jobSchema' in data");
+                            $schemas = $data['data']['jobSchema']['schemas'];
+                            $this->assertNotEmpty($schemas, "Forced JobPosting should return at least one schema string");
+                            $first = json_decode($schemas[0], true);
+                            $this->assertIsArray($first, "Parsed JobPosting should be an array");
+                            $this->assertArrayHasKey('@type', $first);
+                            $this->assertEquals('JobPosting', $first['@type']);
+                            echo "    \033[0;32mJobPosting schema returned\033[0m\n";                            break;
                         case 'themeData':
                             $this->assertArrayHasKey('themeData', $data['data'], "Query '{$name}' should contain 'themeData' in data");
                             break;

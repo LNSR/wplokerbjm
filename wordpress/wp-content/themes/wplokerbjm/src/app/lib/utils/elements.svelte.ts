@@ -1,8 +1,13 @@
 import { MediaQuery, SvelteDate } from 'svelte/reactivity'
 
-export function isMobile() {
+export function isMobile(): boolean {
     const mobileMq = (typeof window !== 'undefined') ? new MediaQuery('(max-width: 767.98px)') : null
     return mobileMq?.current ?? false;
+}
+
+export const isJobGridEl = (): HTMLElement | null => {
+    if (typeof window === 'undefined') return null;
+    return document.getElementById('job-grid');
 }
 
 /**

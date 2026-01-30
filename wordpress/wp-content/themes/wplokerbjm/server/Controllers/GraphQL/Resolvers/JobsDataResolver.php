@@ -59,8 +59,8 @@ class JobsDataResolver
             }
 
             $argsQuery = match ($context) {
-                'search' => JobQuery::searchJobsArgs($filters, $paged, 27),
-                default => JobQuery::latestJobsArgs($paged, 27),
+                'search' => JobQuery::searchJobsArgs($filters, $paged, 54),
+                default => JobQuery::latestJobsArgs($paged, 54),
             };
 
             $result = $this->jobRepository->queryJob($argsQuery);
@@ -74,12 +74,11 @@ class JobsDataResolver
 
             $data = SharedUtils::filterEmptyValues([
                 'jobs' => $jobs,
+                'filters' => $filters,
                 'context' => $context,
                 'total' => $query->found_posts,
                 'maxNumPages' => $query->max_num_pages,
             ]);
-
-            $data['filters'] = $filters; // Preserve original filters with all keys, including empty ones
 
             $cacheData = [
                 'data' => $data,
@@ -118,8 +117,8 @@ class JobsDataResolver
             }
 
             $query_args = match ($context) {
-                'search' => JobQuery::searchJobsArgs($filters, $paged, 27),
-                default => JobQuery::latestJobsArgs($paged, 27),
+                'search' => JobQuery::searchJobsArgs($filters, $paged, 54),
+                default => JobQuery::latestJobsArgs($paged, 54),
             };
 
             $props = $this->jobGridPresenter->getProps($query_args, $title, $context, $total_jobs);
@@ -173,7 +172,7 @@ class JobsDataResolver
         }
     }
 
-    public function resolveJobSchema($root, $args): array
+    public function resolveSchema($root, $args): array
     {
         try {
             $ids = $args['ids'] ?? [];
@@ -182,29 +181,76 @@ class JobsDataResolver
             }
 
             sort($ids);
-            $cacheKey = CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . md5(implode(',', $ids));
-            $cachedResponse = Cache::get($cacheKey);
-            if ($cachedResponse !== false) {
-                return ['schemas' => $cachedResponse];
-            }
 
-            $argsQuery = JobQuery::allJobsIdsArgs();
-            $argsQuery['post__in'] = $ids;
+            $type = isset($args['type']) ? trim((string) $args['type']) : null;
 
-            $query = new \WP_Query($argsQuery);
-            $existing_ids = $query->posts;
+            // Require explicit request for ItemList. If not requested, return per-id JobPosting schemas
+            if ($type !== 'ItemList') {
+                $schemas = [];
+                foreach ($ids as $id) {
+                    $singleCacheKey = CacheKey::JOB_SCHEMA_PREFIX . $id;
+                    $singleCached = Cache::get($singleCacheKey);
+                    if ($singleCached !== false) {
+                        $schemas[] = json_encode($singleCached);
+                        continue;
+                    }
 
-            $response = [];
-            foreach ($existing_ids as $post_id) {
-                $schema = $this->graphqlData->JobSchema($post_id);
-                if (!empty($schema)) {
-                    $response[] = json_encode($schema);
+                    $schema = $this->graphqlData->JobSchema($id);
+                    Cache::set($singleCacheKey, $schema, 86400);
+                    $schemas[] = json_encode($schema);
                 }
+
+                return ['schemas' => $schemas];
             }
 
-            Cache::set($cacheKey, $response, 86400);
+            // Build ItemList for multiple IDs, or when forced via type='ItemList'
+            $cacheKey = CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . md5(implode(',', $ids) . '|' . ($type ?? 'auto'));
+            $cached = Cache::get($cacheKey);
+            if ($cached !== false) {
+                return ['schemas' => [json_encode($cached)]];
+            }
 
-            return ['schemas' => $response];
+            // Proceed to build ItemList
+            $raw = $this->graphqlData->ItemListJobPostings($ids);
+
+            $elements = [];
+            $itemListOrder = 'https://schema.org/ItemListOrderDescending';
+
+            if (is_array($raw) && isset($raw['@type']) && $raw['@type'] === 'ItemList') {
+                $itemListOrder = $raw['itemListOrder'] ?? $itemListOrder;
+                $elements = is_array($raw['itemListElement']) ? array_values($raw['itemListElement']) : [];
+            } elseif (is_array($raw) && array_values($raw) === $raw) {
+                // Numeric array of JobPosting objects — convert to ListItem elements
+                foreach ($raw as $idx => $jobPosting) {
+                    $elements[] = [
+                        '@type' => 'ListItem',
+                        'position' => $idx + 1,
+                        'item' => $jobPosting,
+                    ];
+                }
+            } else {
+                // Last-resort: try to read itemListElement
+                $elements = isset($raw['itemListElement']) && is_array($raw['itemListElement']) ? array_values($raw['itemListElement']) : [];
+            }
+
+            // Ensure positions are sequential and normalized
+            $mergedElements = [];
+            $position = 1;
+            foreach ($elements as $element) {
+                $element['position'] = $position++;
+                $mergedElements[] = $element;
+            }
+
+            $itemList = [
+                '@context' => 'https://schema.org',
+                '@type' => 'ItemList',
+                'itemListElement' => $mergedElements,
+                'itemListOrder' => $itemListOrder,
+                'numberOfItems' => count($mergedElements),
+            ];
+
+            Cache::set($cacheKey, $itemList, 86400);
+            return ['schemas' => [json_encode($itemList)]];
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'JobsDataResolver::resolveJobSchema error: ' . $e->getMessage());
             return ['schemas' => []];
@@ -232,7 +278,7 @@ class JobsDataResolver
                 return $cached;
             }
 
-            $query_args = JobQuery::searchJobsArgs($searchFilters, 1, 27);
+            $query_args = JobQuery::searchJobsArgs($searchFilters, 1, 54);
 
             $result = $this->jobRepository->queryJob($query_args);
 

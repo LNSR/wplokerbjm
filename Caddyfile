@@ -145,7 +145,7 @@
   header @development @rest_api Cache-Control "private, max-age=60, stale-while-revalidate=120"
 
   # Privileged paths (wp-login.php, admin, xmlrpc, cron): allow private browser cache only
-  header @no_cache Cache-Control "private, no-cache, must-revalidate, max-age=0, no-store"
+  header @no_cache Cache-Control "no-cache, must-revalidate, no-store"
 
   # Dynamic content (pages) — private cache for logged-in users, public cache for anonymous
   header @production @dynamic @logged_in Cache-Control "private, max-age=360"

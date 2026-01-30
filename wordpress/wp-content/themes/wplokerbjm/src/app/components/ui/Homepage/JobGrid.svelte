@@ -1,6 +1,6 @@
 <script module lang="ts">
   import type { CardJob, JobGridProps, SearchState } from "@/types";
-  import { SearchContext, SearchTitle } from "@/types";
+  import { SearchContext, SearchTitle, type JobDetailResponse } from "@/types";
   import {
     routeStore,
     routeStateStore,
@@ -17,8 +17,10 @@
   const isDesktop = $derived.by(() => !isMobile());
   const displayTotalJobs = $derived(searchStore.totalJobs);
   const displayTitle = $derived(searchStore.title);
+  const cardHeights = new SvelteMap(routeStateStore.getCardHeights("jobGrid"));
 
   class OverlayController {
+    // overlay automatically open for desktop
     openJobDetailOverlay(slug: string): void {
       const job = displayJobs.find((j: CardJob) => j.slug === slug);
       jobOverlay.openOverlay(slug, job);
@@ -43,8 +45,22 @@
         error: searchStore.error,
       };
 
-      // Save current search state before navigation (implicitly always save for homepage('/') path)
-      routeStateStore.saveSearchState("/", currentSearchState);
+      const path = () => {
+        if (isDesktop) {
+          const pathname = new URL(
+            String(job.permalink),
+            window.location.origin,
+          ).pathname;
+          return pathname;
+        } else {
+          return "/";
+        }
+      };
+
+      routeStateStore.saveSearchState(path(), currentSearchState);
+
+      // Save card heights before navigating/opening overlay
+      routeStateStore.saveCardHeights(new Map(cardHeights), "jobGrid");
 
       async function MobileJobClick(): Promise<void> {
         // Mark as last visited before navigating
@@ -62,7 +78,6 @@
 
       if (isDesktop) {
         jobOverlay.openOverlay(job.slug ?? "", job);
-        // After updating overlay on desktop, ensure the clicked card is scrolled into view
         this.scrollToCard(job.slug ?? "");
       } else {
         await MobileJobClick();
@@ -81,7 +96,7 @@
         if (match && match[1] && isDesktop) {
           const slug = match[1];
           void overlayManager.openJobDetailOverlay(slug);
-          routeStateStore.setSkipScrollRestore(path, true);
+          routeStateStore.setSkipScrollRestore(path, false);
         }
       }
     }
@@ -95,7 +110,7 @@
 </script>
 
 <script lang="ts">
-  import { onMount, onDestroy, tick } from "svelte";
+  import { onMount } from "svelte";
   import { SvelteMap } from "svelte/reactivity";
   import type { Attachment } from "svelte/attachments";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
@@ -112,11 +127,18 @@
   let hasRestoredState = $state(false);
   let isRefreshing = $state(false);
   let loadMoreSentinel = $state<HTMLElement | null>(null);
-  const cardHeights = new SvelteMap(routeStateStore.getCardHeights("jobGrid"));
 
-  const props: JobGridProps = $props();
+  const props: JobGridProps & { job?: JobDetailResponse | null } = $props();
 
-  const { jobs = [], maxNumPages, context, filters, title, totalJobs } = props;
+  const {
+    jobs = [],
+    maxNumPages,
+    context,
+    filters,
+    title,
+    totalJobs,
+    job,
+  } = props;
 
   class VirtualizationManager {
     static computeListVirtualization(
@@ -325,104 +347,73 @@
         isRefreshing = false;
       }
     }
-
-    // for restoring scroll position based on top job slug
-    // used during route change for both mobile and desktop
-    restoreScrollPosition() {
-      const slug = routeStateStore.lastVisitedJob;
-
-      const scrollToEl = async (el: HTMLElement) => {
-        await tick();
-        requestAnimationFrame(() => {
-          el.scrollIntoView({ behavior: "smooth", block: "start" });
-        });
-      };
-
-      const observeContainer = () => {
-        if (!slug || window.location.pathname !== "/") return;
-
-        // If element already exists, scroll immediately
-        const existing = document.querySelector(
-          `[data-job-slug="${slug}"]`,
-        ) as HTMLElement | null;
-        if (existing) {
-          void scrollToEl(existing);
-          return;
-        }
-
-        // Fallback to observing #job-grid (virtualized list will add nodes here)
-        const container =
-          (document.querySelector("#job-grid") as HTMLElement | null) ||
-          document.body;
-        let disconnected = false;
-
-        const mo = new MutationObserver((_mutations, observer) => {
-          const el = document.querySelector(
-            `[data-job-slug="${slug}"]`,
-          ) as HTMLElement | null;
-          if (el) {
-            void scrollToEl(el);
-            observer.disconnect();
-            disconnected = true;
-            if (timeoutId) clearTimeout(timeoutId);
-          }
-        });
-
-        mo.observe(container, { childList: true, subtree: true });
-
-        // Safety: stop observing after a short timeout to avoid leaks
-        const timeoutId = window.setTimeout(() => {
-          if (!disconnected) mo.disconnect();
-        }, 1500);
-      };
-
-      this.initializeJobs()
-        .then(() => {
-          requestAnimationFrame(observeContainer);
-        })
-        .catch((err) => {
-          console.error("Error initializing jobs:", err);
-        });
-    }
   }
 
-  // Refresh JobPosting JSON-LD for visible jobs in the grid
-  const refreshJobSchema = () => {
-    const jobIds = virtualization.visibleJobs
-      .map((job) => Number(job.id))
-      .filter((id) => id !== undefined) as number[];
-    if (jobIds.length > 0) void utilsSEO.addJobPostingJsonLd(jobIds);
-  };
-
   const jobGridHandler = new JobGridHandler();
+
+  let _prevJobIds: number[] = [];
 
   onMount(() => {
     overlayManager.checkUrlForOverlay();
     void jobGridHandler.initializeJobs();
-  });
-
-  // Add JobPosting JSON-LD for jobs in the grid
-  $effect(() => {
-    if (routeStore.currentUrl.pathname === "/" && !isDesktop) {
-      refreshJobSchema();
-    } else {
-      utilsSEO.clearPendingJobSchemas();
+    if (job) {
+      jobOverlay.overlayData = job; // no need to drill prop to JobDetail component
     }
   });
 
-  // Auto prefetch using IntersectionObserver sentinel to prepare next page
   $effect(() => {
+    // Fetch first 54 immediately once jobs are available and then append subsequent batches
+    const currJobIds = (searchStore.jobs || []).map(j => Number(j.id)).filter(id => !isNaN(id)) as number[];
+
+    if (_prevJobIds.length === 0 && currJobIds.length > 0) {
+      // initial load: take exactly the first 54
+      const firstBatch = currJobIds.slice(0, 54);
+      if (firstBatch.length > 0) {
+        // Only fetch ItemList schema once on initial homepage load. Subsequent
+        // appends should NOT re-fetch or replace the ItemList.
+        try {
+          const comp = routeStore.getComponentNamePath(routeStore.currentUrl.pathname);
+          if (comp === 'Homepage') {
+            void utilsSEO.addJobSchemas(firstBatch);
+          }
+        } catch {
+          // fallback: if routeStore unavailable, do not fetch to be safe
+        }
+        // Track prev ids regardless so appended logic can still detect new items
+        _prevJobIds = [...firstBatch];
+      }
+      return;
+    }
+
+    if (currJobIds.length > _prevJobIds.length) {
+      // appended jobs (load more): only append up to the next 54
+      const appended = currJobIds.slice(_prevJobIds.length, _prevJobIds.length + 54);
+      if (appended.length > 0) {
+        // Do NOT call addJobSchemas on append; only update our local tracking
+        _prevJobIds = _prevJobIds.concat(appended);
+      }
+    }
+  });
+
+  $effect(() => {
+
+    // Auto prefetch using IntersectionObserver sentinel to prepare next page
     if (!loadMoreSentinel) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
-          if (entry.isIntersecting && hasMore && !searchStore.nextPageLoadMoreCache && !searchStore.isPrefetchingLoadMore) {
+          if (
+            entry.isIntersecting &&
+            hasMore &&
+            !searchStore.nextPageLoadMoreCache &&
+            !searchStore.isPrefetchingLoadMore
+          ) {
             void searchStore.prefetchNextPage();
           }
         }
       },
-      { root: null, rootMargin: "1200px" },
+      { root: null, rootMargin: "5000px" }, // large rootMargin to prefetch early
     );
 
     observer.observe(loadMoreSentinel);
@@ -430,10 +421,6 @@
     return () => {
       observer.disconnect();
     };
-  });
-
-  onDestroy(() => {
-    routeStateStore.saveCardHeights(new Map(cardHeights), "jobGrid");
   });
 </script>
 
@@ -532,15 +519,23 @@
         {/if}
 
         {#if hasMore}
-          <div class="flex justify-center mt-8">
+          <div class="flex justify-center mt-8 z-100">
             <button
               type="button"
               class="btn rounded-lg font-semibold bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] border border-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)] disabled:opacity-50 disabled:cursor-not-allowed"
               onclick={() => searchStore.appendCachedPage()}
               disabled={!searchStore.nextPageLoadMoreCache}
             >
-              {searchStore.nextPageLoadMoreCache ? "Muat Lebih Banyak" : "Mempersiapkan..."}
+              {searchStore.nextPageLoadMoreCache
+                ? "Muat Lebih Banyak"
+                : "Mempersiapkan..."}
             </button>
+          </div>
+        {/if}
+
+        {#if !hasMore && displayJobs.length > 0}
+          <div class="flex justify-center mt-8 z-100">
+            <p class="bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] rounded-lg">Tidak ada sisa muatan lagi</p>
           </div>
         {/if}
       </div>

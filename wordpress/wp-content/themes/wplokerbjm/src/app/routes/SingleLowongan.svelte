@@ -92,8 +92,7 @@
       debouncedFetch(slug);
     }
     if (job && job.id && !routeStore.isInitialLoad) {
-      void utilsSEO.clearPendingJobSchemas();
-      void utilsSEO.removeJobPostingJsonLd();
+      void utilsSEO.RemoveAllSchemas();
       void utilsSEO.addJobPostingJsonLd([Number(job.id)]);
     }
   });
