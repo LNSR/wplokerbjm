@@ -5,9 +5,9 @@ namespace WPLokerBJM\Presenters\Pages;
 use WPLokerBJM\Presenters\Components\{JobGrid, JobCarousel};
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Repositories\JobRepository;
-use WPLokerBJM\Presenters\Schema\JobPostingSchema;
+use WPLokerBJM\Presenters\SEO\Schema\JobPostingSchema;
 use WPLokerBJM\Services\GraphQL\GraphQLData;
-use WPLokerBJM\Services\Schema\JobSchemaOrg;
+use WPLokerBJM\Presenters\SEO\SkeletonHTML\SkeletonForSEO;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 
 class HomepagePresenter
@@ -22,6 +22,12 @@ class HomepagePresenter
 
     public function getHomepageData(): array
     {
+        $cacheKey = CacheKey::HOMEPAGE_DATA . '_' . get_the_ID() . '_' . (wp_is_mobile() ? 'mobile' : 'desktop');
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            return $cached;
+        }
+
         $query_args = JobQuery::latestJobsArgs(1, 54);
         $query_result = $this->jobRepository->queryJob($query_args);
 
@@ -41,16 +47,28 @@ class HomepagePresenter
             $post_ids[] = $job['id'];
         }
 
+        $seoHtml = '';
         if (get_the_ID() === 146 || is_front_page()) {
             $itemListSchema = $this->graphqlData->ItemListJobPostings($post_ids);
             $schema = JobPostingSchema::renderSchemaItemList($itemListSchema);
+            $seoHtml = SkeletonForSEO::generateSEOHTML($query_result['jobs']);
         } else {
             $schema = JobPostingSchema::renderSchemaJobPosting($single_schema, get_the_ID());
         }
 
-        return [
+        // Add SEO for sidepanel job if present
+        if (!wp_is_mobile() && get_the_ID() !== 146 && isset($props['job'])) {
+            $seoHtml .= SkeletonForSEO::generateSEOHTML($props['job']);
+        }
+
+        $result = [
             'props' => $props,
             'schema' => $schema,
+            'seoHtml' => $seoHtml,
         ];
+
+        Cache::set($cacheKey, $result);
+
+        return $result;
     }
 }

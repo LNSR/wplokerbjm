@@ -37,10 +37,39 @@ export class BookmarkManager {
         this.debouncedSync = debounce(() => this.syncPending(), 1000)
     }
 
-    private async runQueued<T>(operation: () => Promise<T>): Promise<T> {
-        await this.operationQueue
-        this.operationQueue = operation()
-        return this.operationQueue
+    private async runQueued<T>(operation: () => Promise<T>, timeoutMs: number = 10000): Promise<T> {
+        try {
+            await this.operationQueue
+        } catch (err) {
+            // swallow previous rejection so a failed operation doesn't block the queue forever
+            console.warn('Previous queued operation failed, continuing', err)
+        }
+
+        let timeoutHandle: ReturnType<typeof setTimeout> | null = null
+        const opPromise = (async () => {
+            try {
+                return await Promise.race([
+                    operation(),
+                    new Promise<T>((_, reject) => {
+                        timeoutHandle = setTimeout(() => {
+                            reject(new Error('Queued operation timed out'))
+                        }, timeoutMs)
+                    }),
+                ])
+            } finally {
+                if (timeoutHandle) clearTimeout(timeoutHandle)
+            }
+        })()
+
+        // keep the internal queue reference safe-from-rejection so future ops aren't blocked
+        this.operationQueue = opPromise.then(
+            () => {},
+            (err) => {
+                console.warn('Queued operation failed or timed out:', err)
+            },
+        )
+
+        return opPromise
     }
 
     /**
@@ -300,7 +329,7 @@ export class BookmarkManager {
                     this.isSyncing = false
                 }
             }
-        })
+        }, 60000)
     }
 
     private async syncPending(): Promise<void> {

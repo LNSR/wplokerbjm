@@ -23,6 +23,7 @@ services:
       - wordpress:/var/www/html
       - ./wordpress/wp-content:/var/www/html/wp-content
       - ./configs/wp-config-extra.php:/var/www/html/wp-config-extra.php:ro
+      - ./certs/localhost.pem:/var/www/certs/localhost.crt:ro
       - sock:/var/run/sock
     depends_on:
       - db

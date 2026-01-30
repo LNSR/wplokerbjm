@@ -135,7 +135,7 @@ class GlobalHooks
     /**
      * Modifies HTTP headers to remove unwanted Link headers and add sitemap link.
      */
-    #[Action('template_redirect', 11)]
+    #[Action('template_redirect', 12)]
     public static function modifyLinkHeadersImpl(): void
     {
         if (!headers_sent()) {
@@ -397,7 +397,8 @@ class GlobalHooks
                 CacheKey::SYNC_BOOKMARK_PREFIX . '*',
                 CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . '*',
                 CacheKey::RANKMATH_HEAD_PREFIX . '*',
-                CacheKey::THEME_DATA . '*'
+                CacheKey::THEME_DATA . '*',
+                CacheKey::HOMEPAGE_DATA . '*',
             ]);
 
             // If we detected a post id, also invalidate the per-job caches

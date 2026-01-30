@@ -3,7 +3,6 @@ namespace WPLokerBJM\Shared\Cache;
 
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Configs\CredentialConfig;
-use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * Object Cache management
@@ -23,9 +22,6 @@ class Cache
      */
     public static function set($key, $value, $expiration = 0): bool
     {
-        if (SharedUtils::isDevelopment()) {
-            return true;
-        }
         try {
             if (!function_exists('wp_cache_set')) {
                 return false;
@@ -46,9 +42,6 @@ class Cache
      */
     public static function get($key): mixed
     {
-        if (SharedUtils::isDevelopment()) {
-            return false;
-        }
         try {
             if (!function_exists('wp_cache_get')) {
                 return false;
@@ -69,9 +62,6 @@ class Cache
      */
     public static function delete($key): bool
     {
-        if (SharedUtils::isDevelopment()) {
-            return true;
-        }
         try {
             if (!function_exists('wp_cache_delete')) {
                 return false;
@@ -95,9 +85,6 @@ class Cache
      */
     public static function setMultiple(array $data, int $expiration = 0): array
     {
-        if (SharedUtils::isDevelopment()) {
-            return array_fill_keys(array_keys($data), true);
-        }
         try {
             if (!function_exists('wp_cache_set_multiple')) {
                 // Fallback to individual sets
@@ -123,9 +110,6 @@ class Cache
      */
     public static function deleteMultiple(array $keys): array
     {
-        if (SharedUtils::isDevelopment()) {
-            return array_fill_keys($keys, true);
-        }
         try {
             if (!function_exists('wp_cache_delete_multiple')) {
                 // Fallback to individual deletions
@@ -155,9 +139,6 @@ class Cache
      */
     public static function add($key, $value, $expiration = 0): bool
     {
-        if (SharedUtils::isDevelopment()) {
-            return true;
-        }
         try {
             if (!function_exists('wp_cache_add')) {
                 return false;
@@ -179,9 +160,6 @@ class Cache
      */
     public static function addMultiple(array $data, int $expiration = 0): array
     {
-        if (SharedUtils::isDevelopment()) {
-            return array_fill_keys(array_keys($data), true);
-        }
         try {
             if (!function_exists('wp_cache_add_multiple')) {
                 // Fallback to individual adds
@@ -209,9 +187,6 @@ class Cache
      */
     public static function increment($key, $value = 1, $expiration = 0): int|false
     {
-        if (SharedUtils::isDevelopment()) {
-            return false;
-        }
         try {
             if (!function_exists('wp_cache_incr')) {
                 $current = (int) self::get($key);
@@ -246,9 +221,6 @@ class Cache
      */
     public static function decrement($key, $value = 1): int|false
     {
-        if (SharedUtils::isDevelopment()) {
-            return false;
-        }
         try {
             if (!function_exists('wp_cache_decr')) {
                 $current = (int) self::get($key);
@@ -285,9 +257,6 @@ class Cache
      */
     public static function replace($key, $value, $expiration = 0): bool
     {
-        if (SharedUtils::isDevelopment()) {
-            return true;
-        }
         try {
             if (!function_exists('wp_cache_replace')) {
                 return false;
@@ -310,9 +279,6 @@ class Cache
      */
     public static function getMultiple(array $keys): array
     {
-        if (SharedUtils::isDevelopment()) {
-            return array_fill_keys($keys, false);
-        }
         try {
             if (!function_exists('wp_cache_get_multiple')) {
                 // Fallback to individual gets
@@ -338,9 +304,6 @@ class Cache
      */
     public static function flushGroup(string $group): bool
     {
-        if (SharedUtils::isDevelopment()) {
-            return true;
-        }
         try {
             if (!function_exists('wp_cache_flush_group')) {
                 return false;
@@ -360,9 +323,6 @@ class Cache
      */
     public static function flushAll(): bool
     {
-        if (SharedUtils::isDevelopment()) {
-            return true;
-        }
         try {
             if (!function_exists('wp_cache_flush')) {
                 return false;
@@ -387,9 +347,6 @@ class Cache
      */
     public static function deletePattern(array $patterns): int|false
     {
-        if (SharedUtils::isDevelopment()) {
-            return 0;
-        }
         Logger::info('Cache', "Cache::deletePattern called with patterns: " . implode(', ', $patterns));
 
         try {
@@ -446,9 +403,6 @@ class Cache
      */
     public static function getRedisConnection(): \Redis|false
     {
-        if (SharedUtils::isDevelopment()) {
-            return false;
-        }
         try {
             // Check if Redis extension is available
             if (!extension_loaded('redis')) {
@@ -526,6 +480,7 @@ class CacheKey
     const CAROUSEL_JOBS = 'carousel_jobs';
     const JOB_GRID_PREFIX = 'job_grid_';
     const HOMEPAGE_JOB_SCHEMAS = 'homepage_job_schemas';
+    const HOMEPAGE_DATA = 'homepage_data';
 
     // Taxonomy
     const TAXONOMY_LAST_MODIFIED = 'taxonomy_last_modified';

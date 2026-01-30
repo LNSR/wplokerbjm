@@ -3,7 +3,7 @@ namespace WPLokerBJM\Presenters;
 class DocumentHTML
 {
 
-    public static function renderDocument(?string $schema = null, ?array $props = null): void
+    public static function renderDocument(?string $schema = null, ?array $props = null, string $bodySEOContent = ''): void
     {
         ?>
         <!DOCTYPE html>
@@ -19,7 +19,7 @@ class DocumentHTML
 
         <body <?php body_class(); ?>>
             <?php
-            self::renderAppShell($props);
+            self::renderAppShell($props, $bodySEOContent);
             wp_footer();
             ?>
         </body>
@@ -31,7 +31,7 @@ class DocumentHTML
     /**
      *  Renders the main app container with optional props as JSON
      */
-    private static function renderAppShell(?array $props = null): void
+    private static function renderAppShell(?array $props = null, string $bodySEOContent = ''): void
     {
         ?>
         <div id="app">
@@ -39,6 +39,7 @@ class DocumentHTML
                 <script type="application/json"
                     id="__wplokerbjm_data-props"><?= wp_json_encode($props, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG) ?></script>
             <?php endif; ?>
+            <?= $bodySEOContent ?>
         </div>
         <?php
     }

@@ -1,6 +1,6 @@
 <?php
 
-namespace WPLokerBJM\Presenters\Schema;
+namespace WPLokerBJM\Presenters\SEO\Schema;
 
 class JobPostingSchema
 {

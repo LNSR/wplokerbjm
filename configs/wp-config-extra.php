@@ -58,7 +58,7 @@ define('LITESPEED_CONF__OBJECT__USER', '');
 define('LITESPEED_CONF__OBJECT__PSWD', getenv('REDIS_PWD'));
 
 if (defined('WP_ENV') && WP_ENV === 'development') {
-  define('LITESPEED_DISABLE_ALL', true);
+  define('LITESPEED_DISABLE_ALL', false);
   define('LITESPEED_DEV', false);
 }
 
@@ -74,7 +74,7 @@ switch (WP_ENV) {
     if (!defined('SCRIPT_DEBUG'))
       define('SCRIPT_DEBUG', true);
     if (!defined('WP_CACHE'))
-      define('WP_CACHE', false);
+      define('WP_CACHE', true);
 
     // Performance for dev
     define('WP_POST_REVISIONS', 3);

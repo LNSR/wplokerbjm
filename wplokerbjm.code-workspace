@@ -2,12 +2,12 @@
   "folders": [
     {
       "name": "wplokerbjm-root",
-      "path": "."
+      "path": ".",
     },
     {
       "name": "wplokerbjm-wp-theme",
-      "path": "wordpress/wp-content/themes/wplokerbjm"
-    }
+      "path": "wordpress/wp-content/themes/wplokerbjm",
+    },
   ],
   "settings": {
     "php.version": "8.5",
@@ -19,32 +19,32 @@
       "**/dist": true,
       "**/build": true,
       "**/uploads": true,
-      "**/cache": true
+      "**/cache": true,
     },
     "[svelte]": {
-      "editor.defaultFormatter": "svelte.svelte-vscode"
+      "editor.defaultFormatter": "svelte.svelte-vscode",
     },
     "files.associations": {
-      "*.css": "tailwindcss"
+      "*.css": "tailwindcss",
     },
     "editor.quickSuggestions": {
       "other": "on",
       "comments": "on",
-      "strings": "on"
+      "strings": "on",
     },
     "eslint.options": {
-      "overrideConfigFile": "eslint.config.js"
+      "overrideConfigFile": "eslint.config.js",
     },
     "eslint.workingDirectories": ["${workspaceFolder:wplokerbjm-wp-theme}"],
     "php.stubs": ["all"],
     "[php]": {
-      "editor.defaultFormatter": "DEVSENSE.phptools-vscode"
+      "editor.defaultFormatter": "DEVSENSE.phptools-vscode",
     },
     "editor.fontFamily": "'Cascadia Code NF'",
     "editor.fontSize": 14,
     "debug.console.fontSize": 12,
     "scm.inputFontSize": 12,
-    "terminal.integrated.fontSize": 13
+    "terminal.integrated.fontSize": 13,
   },
   "extensions": {
     "recommendations": [
@@ -58,8 +58,8 @@
       "ms-azuretools.vscode-docker",
       "esbenp.prettier-vscode",
       "ms-vscode.vscode-typescript-next",
-      "svelte.svelte-vscode"
-    ]
+      "svelte.svelte-vscode",
+    ],
   },
   "launch": {
     "version": "0.2.0",
@@ -70,10 +70,10 @@
         "request": "launch",
         "port": 9004,
         "pathMappings": {
-          "/var/www/html/": "${workspaceFolder:wplokerbjm-root}/wordpress/"
-        }
-      }
-    ]
+          "/var/www/html/": "${workspaceFolder:wplokerbjm-root}/wordpress/",
+        },
+      },
+    ],
   },
   "tasks": {
     "version": "2.0.0",
@@ -84,9 +84,9 @@
         "command": "composer run lint:php",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "php-composer-autoload",
@@ -94,9 +94,9 @@
         "command": "composer run watch:autoload",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "php-unit-test",
@@ -104,9 +104,9 @@
         "command": "composer run test",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "dev",
@@ -114,9 +114,9 @@
         "command": "bun -b run dev --host",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "build",
@@ -124,9 +124,9 @@
         "command": "bun -b run build",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "check",
@@ -134,10 +134,10 @@
         "command": "bun -b run check",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}"
+          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
-      }
-    ]
-  }
+        "problemMatcher": [],
+      },
+    ],
+  },
 }

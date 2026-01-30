@@ -1,6 +1,6 @@
 import { mount, type Component } from 'svelte';
 import type { ComponentConfig } from '@/types';
-import { parseProps, removePropsScriptFromElement } from '@/utils';
+import { parseProps } from '@/utils';
 
 export class SvelteMounter {
   private static targetProps = 'id="__wplokerbjm_data-props"';
@@ -8,7 +8,7 @@ export class SvelteMounter {
     for (const config of configs) {
       if (config.selector === undefined) {
         console.error('selector is undefined for SvelteMounter config', config);
-        return;
+        continue;
       }
       const elements = document.querySelectorAll(config.selector);
 
@@ -19,14 +19,11 @@ export class SvelteMounter {
 
           const options: { target: Element; props: Record<string, unknown> } = { target: element, props };
           requestAnimationFrame(() => {
+            element.replaceChildren();
             mount(comp, options);
           });
         } catch {
           console.error(`SvelteMounter: failed to mount ${config.selector}`);
-        } finally {
-          setTimeout(() => {
-            removePropsScriptFromElement(element, SvelteMounter.targetProps);
-          }, 200);
         }
       }
     }

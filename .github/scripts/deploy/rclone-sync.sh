@@ -57,7 +57,7 @@ SELECTED=(
 
 PIDS=()
 
-RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 5m --contimeout 60s --log-level ${RCLONE_LOG_LEVEL} --bwlimit ${RCLONE_BWLIMIT:-20M} --tpslimit ${RCLONE_TPSLIMIT:-1} --tpslimit-burst 2 --delete-after --fast-list --checksum"
+RCLONE_BASE_OPTS="--progress --transfers ${RCLONE_TRANSFERS} --checkers ${RCLONE_CHECKERS} --retries ${RCLONE_RETRIES} --low-level-retries ${RCLONE_LOW_RETRIES} --timeout 5m --contimeout 60s --bwlimit ${RCLONE_BWLIMIT:-20M} --tpslimit ${RCLONE_TPSLIMIT:-1} --tpslimit-burst 2 --delete-after --fast-list --checksum --log-level DEBUG"
 
 if [ "${DRY_RUN:-false}" = "true" ]; then
   DRY_FLAG="--dry-run"
@@ -89,6 +89,9 @@ for p in "${SELECTED[@]}"; do
   else
     REMOTE_TARGET="${REMOTE_PATH%/}/$p"
     echo "Starting rclone sync $p -> sftpdeploy:$REMOTE_TARGET $DRY_FLAG"
+    rclone sync $DRY_FLAG $RCLONE_BASE_OPTS "$p" "sftpdeploy:$REMOTE_TARGET" 2>&1 || true &
+    PIDS+=($!)
+    sleep 5
   fi
 done
 

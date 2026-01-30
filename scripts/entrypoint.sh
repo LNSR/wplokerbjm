@@ -107,6 +107,12 @@ find /var/www/html \( -type f -o -type d \) ! -perm 775 -print0 | xargs -0 -r -P
 mkdir -p /var/run/sock
 chmod 755 /var/run/sock
 
+# Add custom CA certificate for local development
+if [ -f /var/www/certs/localhost.crt ]; then
+    cp /var/www/certs/localhost.crt /usr/local/share/ca-certificates/
+    update-ca-certificates
+fi
+
 # Set up system cron for WordPress if DISABLE_WP_CRON is enabled
 if [ -n "$WP_ENV" ]; then
   # Create crontab for wordpress user to run wp-cron.php every 2 minutes using WP-CLI

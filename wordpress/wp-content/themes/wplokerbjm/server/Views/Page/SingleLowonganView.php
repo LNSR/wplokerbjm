@@ -15,6 +15,6 @@ class SingleLowonganView
 	public function render(): void
 	{
 		$data = $this->singlePresenter->getSingleData(get_the_ID());
-		DocumentHTML::renderDocument($data['schema'], $data['props']);
+		DocumentHTML::renderDocument($data['schema'], $data['props'], $data['seoHtml']);
 	}
 }

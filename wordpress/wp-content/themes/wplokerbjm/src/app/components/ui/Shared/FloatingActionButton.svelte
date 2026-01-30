@@ -6,7 +6,6 @@
     HeadsetSolid,
     ChevronDownSolid,
     InstagramBrands,
-    TiktokBrands,
     FacebookBrands,
     ThreadsBrands,
   } from "svelte-awesome-icons";
@@ -17,12 +16,6 @@
       icon: InstagramBrands,
       platform: SocialMediaPlatform.Instagram,
       color: "text-pink-500 dark:text-pink-400",
-    },
-    {
-      url: "https://www.tiktok.com/@loker_banjarmasin",
-      icon: TiktokBrands,
-      platform: SocialMediaPlatform.TikTok,
-      color: "text-black dark:text-white",
     },
     {
       url: "https://www.facebook.com/loker.banjarmasin.2025",

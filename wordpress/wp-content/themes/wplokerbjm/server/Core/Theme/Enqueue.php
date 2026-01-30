@@ -60,7 +60,7 @@ class Enqueue
     public static function outputPreloadLinksResponse(): void
     {
         try {
-            if (SharedUtils::isDevelopment()) {
+            if (SharedUtils::isDevelopment() || !SharedUtils::isLocalhost()) {
                 return;
             }
 
@@ -269,7 +269,7 @@ class Vite
             return 'src/app/routes/PasangIklanLoker.svelte';
         }
         if (preg_match('/^\/lowongan\//', $path)) {
-            return wp_is_mobile() ? $singlelowongan : $homepage;
+            return wp_is_mobile() ? $singlelowongan : $homepage; // Mobile uses SingleLowongan, desktop uses Homepage with sidepanel
         }
         return null;
     }
