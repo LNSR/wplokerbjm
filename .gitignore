@@ -8,6 +8,7 @@ wordpress/wp-content/mu-plugins/*
 !wordpress/wp-content/themes
 wordpress/wp-content/themes/*
 !wordpress/wp-content/themes/wplokerbjm
+configs/caddy-early-hints.conf
 **/dist
 **/deploy-manual.sh
 **/.playwright-mcp

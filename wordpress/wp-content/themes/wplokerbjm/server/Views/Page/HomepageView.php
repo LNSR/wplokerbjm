@@ -15,6 +15,6 @@ class HomepageView
     public function render(): void
     {
         $data = $this->homepagePresenter->getHomepageData();
-        DocumentHTML::renderDocument($data['schema'], $data['props']);
+        DocumentHTML::renderDocument($data['schema'], $data['props'], $data['seoHtml']);
     }
 }

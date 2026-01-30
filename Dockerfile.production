@@ -79,6 +79,8 @@ RUN apt-get update --allow-releaseinfo-change && \
     gosu \
     less \
     cron \
+    procps \
+    strace \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy WP-CLI from builder (already present there)

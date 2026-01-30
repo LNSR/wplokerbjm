@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Core;
 
+use WPLokerBJM\Core\Theme\Enqueue;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
@@ -25,7 +26,7 @@ class GlobalHooks
      * * For deleted job posts (404 on single lowongan), return 410 Gone.
      * ! Notify search engines with 410 Gone for removed job posts.
      */
-    #[Action('template_redirect', 3)]
+    #[Action('template_redirect', 1)]
     public function oldPost410Redirect(): void
     {
         if (
@@ -42,7 +43,7 @@ class GlobalHooks
         $handleRemovedJob = function () {
             if (is_404()) {
                 status_header(410);
-                wp_die('This job posting has been removed.', 'Gone', ['response' => 410]);
+                wp_die('This job posting has been expired or removed.', 'Gone', ['response' => 410]);
             } else {
                 wp_safe_redirect(home_url('/'), 302);
                 exit;
@@ -110,20 +111,24 @@ class GlobalHooks
      ======================================================================*/
 
     /**
-     * Sets X-WP-Nonce header for authenticated users.
+     * Attempts to authenticate the user via the logged-in cookie if not already authenticated.
      */
-    #[Action('send_headers', 12)]
-    public static function restHeadersImpl(): void
+    private static function authenticateViaCookie(): void
     {
-        try {
-            if (!is_user_logged_in()) {
+        if (!is_user_logged_in()) {
+            if (function_exists('wp_validate_auth_cookie') && defined('LOGGED_IN_COOKIE') && isset($_COOKIE[LOGGED_IN_COOKIE])) {
+                $cookie = $_COOKIE[LOGGED_IN_COOKIE];
+                $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
+                if ($user_id) {
+                    // Ensure current user is populated for downstream is_user_logged_in()/nonce creation
+                    wp_set_current_user((int) $user_id);
+                } else {
+                    // No valid cookie -> nothing to expose
+                    return;
+                }
+            } else {
                 return;
             }
-
-            $nonce = wp_create_nonce('wp_rest');
-            header('X-WP-Nonce: ' . $nonce);
-        } catch (\Exception $e) {
-            Logger::error('Hooks', 'Hooks::restHeaders error: ' . $e->getMessage());
         }
     }
 
@@ -136,29 +141,44 @@ class GlobalHooks
         if (!headers_sent()) {
             // Remove all Link headers to prevent API discovery exposure
             header_remove('Link');
-
-            self::exposeSitemapHeader();
+            Enqueue::outputPreloadLinksResponse();
         }
     }
 
+    #[Action('wp_head')]
     public static function exposeSitemapHeader(): void
     {
-        if (!headers_sent()) {
-            $sitemap_url = home_url('/sitemap_index.xml');
-            header('Link: <' . esc_url($sitemap_url) . '>; rel="sitemap"');
-        }
+        $sitemap_url = home_url('/sitemap_index.xml');
+        echo '<link rel="sitemap" type="application/xml" title="Sitemap" href="' . esc_url($sitemap_url) . '" />' . "\n";
     }
 
     /**
-     * Exposes specific headers for REST API responses.
+     * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
-    #[Filter('rest_pre_serve_request', 10, 4)]
-    public static function filterRestHeadersImpl($served, $result, $request, $server)
+    #[Filter('graphql_response_headers_to_send')]
+    public static function ModifyHeaderGraphQL(array $headers): array
     {
-        if (!headers_sent()) {
-            header('Access-Control-Expose-Headers: X-WP-Total, X-WP-TotalPages, Link, X-WP-Nonce');
+        // Get the site's origin
+        $site_url = home_url();
+        $parsed = wp_parse_url($site_url);
+        $site_origin = $parsed['scheme'] . '://' . $parsed['host'];
+        if (isset($parsed['port']) && $parsed['port'] !== '80' && $parsed['port'] !== '443') {
+            $site_origin .= ':' . $parsed['port'];
         }
-        return $served;
+
+        // Set CORS to same origin only
+        $headers['Access-Control-Allow-Origin'] = $site_origin;
+        $headers['Access-Control-Allow-Credentials'] = 'true'; // Required for cookies/nonces
+
+        self::authenticateViaCookie();
+
+        if (is_user_logged_in()) {
+            $headers['Access-Control-Allow-Headers'] .= ', X-WP-Nonce';
+            $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce';
+            $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
+        }
+
+        return $headers;
     }
 
     /*======================================================================
@@ -227,8 +247,9 @@ class GlobalHooks
     #[Filter('option_active_plugins', 0)]
     public function disablePluginsforSimulatedProdImpl(array $plugins): array
     {
-        $isDev = SharedUtils::isDevelopment();
+        $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
         if (!$isDev) {
+            Logger::info('Hooks', 'Not simulating production environment; no plugins disabled.');
             return $plugins;
         }
 
@@ -268,6 +289,8 @@ class GlobalHooks
     {
         return array_merge([
             // 'google-site-kit/',
+            'wpgraphql-smart-cache/',
+            'tinywp-mobile-detect/',
             'fast-indexing-api/',
             'wps-hide-login/',
         ], $extra);
@@ -359,6 +382,7 @@ class GlobalHooks
                 CacheKey::TAXONOMY_DEPTH_LOKASI,
                 CacheKey::TAXONOMY_DEPTH_GENDER,
                 CacheKey::TAXONOMY_DEPTH_PENDIDIKAN,
+                CacheKey::HOMEPAGE_JOB_SCHEMAS,
             ]);
 
             Cache::deletePattern([
@@ -366,7 +390,15 @@ class GlobalHooks
                 CacheKey::SEARCH_SQL_PREFIX . '*',
                 CacheKey::COMPANY_SEARCH_PREFIX . '*',
                 CacheKey::AUTO_SUGGESTION_PREFIX . '*',
-                CacheKey::POST_TAXONOMIES_PREFIX . '*'
+                CacheKey::POST_TAXONOMIES_PREFIX . '*',
+                CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . '*',
+                CacheKey::GRAPHQL_JOB_CARD_PREFIX . '*',
+                CacheKey::DYNAMIC_SEARCH_PREFIX . '*',
+                CacheKey::SYNC_BOOKMARK_PREFIX . '*',
+                CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . '*',
+                CacheKey::RANKMATH_HEAD_PREFIX . '*',
+                CacheKey::THEME_DATA . '*',
+                CacheKey::HOMEPAGE_DATA . '*',
             ]);
 
             // If we detected a post id, also invalidate the per-job caches
@@ -392,23 +424,19 @@ class GlobalHooks
         }
 
         $jobDataCacheKey = CacheKey::JOB_DATA_PREFIX . $post_id;
-        $cardCacheKey = CacheKey::REST_CARD_PREFIX . $post_id;
-        $overlayCacheKeyLoggedIn = CacheKey::REST_JOBDETAIL_PREFIX . $post_id . '_logged_in';
-        $overlayCacheKeyPublic = CacheKey::REST_JOBDETAIL_PREFIX . $post_id . '_public';
+        $cardCacheKey = CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id;
+        // overlay caches may be per-user or public; we'll invalidate by pattern below
         $schemaCacheKey = CacheKey::JOB_SCHEMA_PREFIX . $post_id;
 
         // Use deleteMultiple for better performance - single network round trip
         $cacheKeys = [
             $jobDataCacheKey,
             $cardCacheKey,
-            $overlayCacheKeyLoggedIn,
-            $overlayCacheKeyPublic,
+            $schemaCacheKey,
             $schemaCacheKey,
         ];
 
         $deleteResults = Cache::deleteMultiple($cacheKeys);
-
-        Cache::deletePattern([CacheKey::REST_JOB_SCHEMA_BATCH_PREFIX . '*']);
 
         // Return true if any cache entry was deleted
         return !empty(array_filter($deleteResults));

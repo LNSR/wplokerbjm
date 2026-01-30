@@ -35,6 +35,9 @@ class CustomFields
     public const SITUS_KONTAK = 'situs_kontak';
     public const SOCIAL_MEDIA = 'social_media';
     public const STATUS_PEKERJAAN = 'status_pekerjaan';
+    public const STATUS_PEKERJAAN_NORMAL = 0;
+    public const STATUS_PEKERJAAN_URGENT = 2;
+    public const STATUS_PEKERJAAN_PINNED = 3;
 
     #[Filter('rwmb_meta_boxes')]
     public function lowongan_meta_boxes($meta_boxes)
@@ -277,9 +280,9 @@ class CustomFields
                     'label_description' => __('Tentukan status prioritas lowongan ini.', 'wplokerbjm'),
                     'desc' => __('Normal: Lowongan biasa. Urgent: Butuh segera. Pinned: Selalu tampil di atas.', 'wplokerbjm'),
                     'options' => [
-                        0 => __('Normal', 'wplokerbjm'),
-                        2 => __('Urgent', 'wplokerbjm'),
-                        3 => __('Pinned', 'wplokerbjm'),
+                        self::STATUS_PEKERJAAN_NORMAL => __('Normal', 'wplokerbjm'),
+                        self::STATUS_PEKERJAAN_URGENT => __('Urgent', 'wplokerbjm'),
+                        self::STATUS_PEKERJAAN_PINNED => __('Pinned', 'wplokerbjm'),
                     ],
                     'multiple' => false,
                     'select_all_none' => false,

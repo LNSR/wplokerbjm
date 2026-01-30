@@ -1,12 +1,13 @@
 import type { SearchState, CarouselState } from '@/types'
+import { isMobile } from '$lib/utils/elements.svelte'
 import { WPPostRoute } from '@/types'
 import { type Component } from 'svelte'
 import { SvelteURL } from 'svelte/reactivity'
 import { utilsSEO } from '$lib/utils/SEO.svelte'
 import { GoogleServices } from '@/services/Google'
 import { scrollY } from 'svelte/reactivity/window';
-import { getThemeData } from '@/utils'
-import type { CardJob } from '@/types'
+import { getThemeData, isDevelopmentMode } from '@/utils'
+import { type CardJob } from '@/types'
 import { LRUCache } from 'lru-cache'
 
 export class RouteManager {
@@ -15,11 +16,10 @@ export class RouteManager {
   isLoading = $state(false);
   loadingComponent = $state<string | null>(null);
   CurrentComponent: Component | null = $state(null);
-  SkeletonComponent: Component | null = $state(null);
   isTransitioningRoute = $state(false); // Indicates if a route transition is in progress
   elRouteContainer: HTMLElement | null = null; // `.route-container` element reference
   setTimeoutWillChange: number | undefined = undefined; // Timeout ID for removing will-change styles
-  currentViewTransition: any = $state(null); // prevent duplicate transitions
+  currentViewTransition: ViewTransition | null = $state(null); // prevent duplicate transitions
   lockViewTransition: boolean = $state(false); // prevent multiple View Transitions
 
   setCurrentPath(path: string) {
@@ -47,16 +47,14 @@ export class RouteManager {
   }
 
   performRouteTransitionSideEffects(path: string): void {
-    utilsSEO.clearPendingJobSchemas();
-
     // Fetch RankMath head data
+    utilsSEO.RemoveAllSchemas();
+    
     utilsSEO.fetchHeadData(path).then(() => {
-      utilsSEO.removeJobPostingJsonLd();
-      // Head data updated
+      utilsSEO.addJobPostingJsonLd([]);
+      GoogleServices.sendPageView(path);
     }).catch((err) => {
       console.error('Failed to fetch head data for route transition to', path, err);
-    }).finally(() => {
-      GoogleServices.sendPageView(path);
     });
 
   }
@@ -114,7 +112,7 @@ export class RouteManager {
       if (!this.elRouteContainer) return;
     }
     // Skip will-change if View Transition API is supported, as it handles performance optimizations
-    if (typeof document !== "undefined" && (document as any).startViewTransition) {
+    if (typeof document !== "undefined" && document.startViewTransition) {
       return;
     }
     const willChangeProps = "transform, opacity, scroll-position, contents";
@@ -157,17 +155,70 @@ export class RouteManager {
 }
 
 export class RouteStateManager {
-  scrollPositions = new LRUCache<string, number>({ max: 50 }); // Limit to 50 most recent scroll positions
-  searchStates = new LRUCache<string, SearchState>({ max: 50 }); // Limit to 50 most recent search states
-  lastVisitedJob: CardJob['slug'] | undefined = undefined; // Remember the last visited job slug for mobile navigation
-  carouselState: CarouselState | null = null; // Single carousel state for homepage
-  skipScrollRestore = new LRUCache<string, boolean>({ max: 50 }); // Limit to 50 most recent skip flags
+  scrollPositions = new LRUCache<string, number>({ max: 100 }); // Limit to 50 most recent scroll positions
+  searchStates = new LRUCache<string, SearchState>({ max: 100 }); // Limit to 50 most recent search states
+  lastVisitedJob: CardJob['slug'] | undefined = $state(undefined); // Remember the last visited job slug for mobile navigation
+  carouselState: CarouselState | null = $state(null); // Single carousel state for homepage
+  skipScrollRestore = new LRUCache<string, boolean>({ max: 100 }); // Limit to 50 most recent skip flags
+  cardHeights = new LRUCache<string, Record<number, number>>({ max: 500 }); // Global cache for card heights
+
+  #currentDevice = $derived(isMobile() ? 'mobile' : 'desktop');
+  #prevDevice = 'desktop';
+  effectCleanup: (() => void) | undefined;
+
+  /**
+   * track breakpoint for better DX during development
+   */
+  observeBreakpointChanges = () => {
+    if (!isDevelopmentMode()) return; // Skip in production
+
+    // Set up the effect and store the cleanup function
+    this.effectCleanup = $effect.root(() => {
+      $effect.pre(() => {
+        if (this.#currentDevice !== this.#prevDevice) {
+          this.clearCachesForDevice();
+          this.#prevDevice = this.#currentDevice;
+        }
+      });
+    });
+  };
+
+  /**
+   * Clean up the breakpoint tracking effect when no longer needed
+   */
+  cleanUpEffect() {
+    if (this.effectCleanup) {
+      void this.effectCleanup();
+      this.effectCleanup = undefined;
+    }
+  };
+
+  /**
+   * When using simulation of mobile/desktop in devtools, clear caches to prevent cross-device data issues
+   */
+  private clearCachesForDevice() {
+    // Clear all LRU caches
+    this.scrollPositions.clear();
+    this.searchStates.clear();
+    this.skipScrollRestore.clear();
+    this.cardHeights.clear();
+
+    // Clear all sessionStorage
+    if (typeof sessionStorage !== 'undefined') {
+      sessionStorage.clear();
+    }
+
+    // Clear state properties
+    this.lastVisitedJob = undefined;
+    this.carouselState = null;
+  }
 
   saveScrollPosition(path: string, scrollY: number) {
-    this.scrollPositions.set(path, scrollY);
+    const key = `${this.#currentDevice}-${path}`;
+    this.scrollPositions.set(key, scrollY);
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.setItem(`scroll_${path}`, scrollY.toString());
+        sessionStorage.setItem(`scrollPositions-${key}`, scrollY.toString());
       } catch (e) {
         console.warn('Failed to save scroll position to sessionStorage', e);
       }
@@ -175,13 +226,14 @@ export class RouteStateManager {
   }
 
   getScrollPosition(path: string): number | undefined {
-    let pos = this.scrollPositions.get(path);
+    const key = `${this.#currentDevice}-${path}`;
+    let pos = this.scrollPositions.get(key);
     if (pos === undefined && typeof sessionStorage !== 'undefined') {
       try {
-        const stored = sessionStorage.getItem(`scroll_${path}`);
+        const stored = sessionStorage.getItem(`scrollPositions-${key}`);
         if (stored) {
           pos = parseInt(stored, 10);
-          this.scrollPositions.set(path, pos); // cache in memory
+          this.scrollPositions.set(key, pos); // cache in memory
         }
       } catch (e) {
         console.warn('Failed to load scroll position from sessionStorage', e);
@@ -204,21 +256,23 @@ export class RouteStateManager {
     }
 
     const stateWithTimestamp = { ...searchState, timestamp: Date.now(), serverLastJobUpdate: serverLast };
-    this.searchStates.set(path, stateWithTimestamp);
+    const key = `${this.#currentDevice}-${path}`;
+    this.searchStates.set(key, stateWithTimestamp);
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.setItem(`searchState_${path}`, JSON.stringify(stateWithTimestamp));
-      } catch {
-        console.warn('Failed to save search state to sessionStorage');
+        sessionStorage.setItem(`searchStates-${key}`, JSON.stringify(stateWithTimestamp));
+      } catch (e) {
+        console.warn('Failed to save search state to sessionStorage', e);
       }
     }
   }
 
   getSearchState(path: string): SearchState | undefined {
-    let state = this.searchStates.get(path);
+    const key = `${this.#currentDevice}-${path}`;
+    let state = this.searchStates.get(key);
     if (!state && typeof sessionStorage !== 'undefined') {
       try {
-        const stored = sessionStorage.getItem(`searchState_${path}`);
+        const stored = sessionStorage.getItem(`searchStates-${key}`);
         if (stored) {
           const parsed = JSON.parse(stored) as SearchState;
           if (parsed) {
@@ -226,24 +280,25 @@ export class RouteStateManager {
             parsed.timestamp = typeof parsed.timestamp === 'number' ? parsed.timestamp : (parsed.timestamp ? Number(parsed.timestamp) : undefined);
             parsed.serverLastJobUpdate = typeof parsed.serverLastJobUpdate === 'number' ? parsed.serverLastJobUpdate : (parsed.serverLastJobUpdate ? Number(parsed.serverLastJobUpdate) : undefined);
 
-            this.searchStates.set(path, parsed); // cache in memory
+            this.searchStates.set(key, parsed); // cache in memory
             state = parsed;
           }
         }
-      } catch {
-        console.warn('Failed to load search state from sessionStorage');
+      } catch (e) {
+        console.warn('Failed to load search state from sessionStorage', e);
       }
     }
     return state;
   }
 
   clearSearchState(path: string) {
-    this.searchStates.delete(path);
+    const key = `${this.#currentDevice}-${path}`;
+    this.searchStates.delete(key);
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.removeItem(`searchState_${path}`);
-      } catch {
-        console.warn('Failed to clear search state from sessionStorage');
+        sessionStorage.removeItem(`searchStates-${key}`);
+      } catch (e) {
+        console.warn('Failed to clear search state from sessionStorage', e);
       }
     }
   }
@@ -252,9 +307,9 @@ export class RouteStateManager {
     this.carouselState = carouselState;
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.setItem('carouselState', JSON.stringify(carouselState));
-      } catch {
-        console.warn('Failed to save carousel state to sessionStorage');
+        sessionStorage.setItem(`carouselState-${this.#currentDevice}`, JSON.stringify(carouselState));
+      } catch (e) {
+        console.warn('Failed to save carousel state to sessionStorage', e);
       }
     }
   }
@@ -263,13 +318,13 @@ export class RouteStateManager {
     if (this.carouselState) return this.carouselState;
     if (typeof sessionStorage !== 'undefined') {
       try {
-        const stored = sessionStorage.getItem('carouselState');
+        const stored = sessionStorage.getItem(`carouselState-${this.#currentDevice}`);
         if (stored) {
           this.carouselState = JSON.parse(stored) as CarouselState;
           return this.carouselState;
         }
-      } catch {
-        console.warn('Failed to load carousel state from sessionStorage');
+      } catch (e) {
+        console.warn('Failed to load carousel state from sessionStorage', e);
       }
     }
     return undefined;
@@ -280,9 +335,9 @@ export class RouteStateManager {
     this.carouselState = null;
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.removeItem('carouselState');
-      } catch {
-        console.warn('Failed to clear carousel state from sessionStorage');
+        sessionStorage.removeItem(`carouselState-${this.#currentDevice}`);
+      } catch (e) {
+        console.warn('Failed to clear carousel state from sessionStorage', e);
       }
     }
   }
@@ -293,9 +348,9 @@ export class RouteStateManager {
     this.lastVisitedJob = slug;
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.setItem('lastVisitedJob', slug);
-      } catch {
-        console.warn('Failed to save last visited job to sessionStorage');
+        sessionStorage.setItem(`lastVisitedJob-${this.#currentDevice}`, slug);
+      } catch (e) {
+        console.warn('Failed to save last visited job to sessionStorage', e);
       }
     }
   }
@@ -306,22 +361,41 @@ export class RouteStateManager {
     if (this.lastVisitedJob === slug) return true;
     if (typeof sessionStorage !== 'undefined') {
       try {
-        const stored = sessionStorage.getItem('lastVisitedJob');
+        const stored = sessionStorage.getItem(`lastVisitedJob-${this.#currentDevice}`);
         if (stored && stored === slug) {
+          this.lastVisitedJob = stored;
           return true;
         }
-      } catch {
-        console.warn('Failed to load last visited job from sessionStorage');
+      } catch (e) {
+        console.warn('Failed to load last visited job from sessionStorage', e);
       }
     }
     return false;
   }
 
-  setSkipScrollRestore(path: string, skip: boolean) {
-    this.skipScrollRestore.set(path, skip);
+  restoreVisitedJob(): CardJob['slug'] | undefined {
+    if (this.lastVisitedJob) return this.lastVisitedJob;
     if (typeof sessionStorage !== 'undefined') {
       try {
-        sessionStorage.setItem(`skipScrollRestore_${path}`, skip.toString());
+        const stored = sessionStorage.getItem(`lastVisitedJob-${this.#currentDevice}`);
+        if (stored) {
+          this.lastVisitedJob = stored;
+          return this.lastVisitedJob;
+        }
+      } catch (e) {
+        console.error('Failed to load last visited job from sessionStorage:', e);
+        return undefined;
+      }
+    }
+    return undefined;
+  }
+
+  setSkipScrollRestore(path: string, skip: boolean) {
+    const key = `${this.#currentDevice}-${path}`;
+    this.skipScrollRestore.set(key, skip);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(`skipScrollRestore-${key}`, skip.toString());
       } catch (e) {
         console.warn('Failed to save skipScrollRestore to sessionStorage', e);
       }
@@ -329,13 +403,14 @@ export class RouteStateManager {
   }
 
   getSkipScrollRestore(path: string): boolean {
-    let skip = this.skipScrollRestore.get(path);
+    const key = `${this.#currentDevice}-${path}`;
+    let skip = this.skipScrollRestore.get(key);
     if (skip === undefined && typeof sessionStorage !== 'undefined') {
       try {
-        const stored = sessionStorage.getItem(`skipScrollRestore_${path}`);
+        const stored = sessionStorage.getItem(`skipScrollRestore-${key}`);
         if (stored) {
           skip = stored === 'true';
-          this.skipScrollRestore.set(path, skip); // cache in memory
+          this.skipScrollRestore.set(key, skip); // cache in memory
         }
       } catch (e) {
         console.warn('Failed to load skipScrollRestore from sessionStorage', e);
@@ -354,7 +429,9 @@ export class RouteStateManager {
 
     let attempts = Number(0);
     let restoring = false;
-    const maxAttempts = Number(10);
+    const maxAttempts = Number(3);
+
+    const isReady = () => !routeStore.isLoading && routeStore.CurrentComponent && !routeStore.isTransitioningRoute;
 
     const attemptRestore = () => {
       const savedScroll = this.getScrollPosition(path);
@@ -374,32 +451,56 @@ export class RouteStateManager {
         });
       } else if (path !== "/") {
         // Scroll to top for new routes
-        window.scrollTo({ top: 0, behavior: 'instant' });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
       }
     };
 
     const tryRestore = () => {
-      if (!routeStore.isLoading && routeStore.CurrentComponent && !routeStore.isTransitioningRoute) {
-        requestAnimationFrame((attemptRestore));
+      if (isReady()) {
+        requestAnimationFrame(attemptRestore);
         restoring = false;
         return;
       }
 
-      // To be safe, inital restore doesnt restore somehow
-      if (attempts < maxAttempts && !restoring) {
+      // To be safe, initial restore doesn't restore somehow
+      if (attempts < maxAttempts && !restoring && isReady()) {
         attempts++;
         requestAnimationFrame(tryRestore);
         restoring = false;
-      } else {
-        // Fallback: attempt a final restore even if component didn't signal readiness
-        attemptRestore();
-        restoring = false;
-        return;
       }
     };
 
-    // Kick off the restore attempts
     requestAnimationFrame(tryRestore);
+  }
+
+  saveCardHeights(heights: Map<number, number>, keyname: string = 'global') {
+    const record = Object.fromEntries(heights);
+    const key = `${this.#currentDevice}-${keyname}`;
+    this.cardHeights.set(key, record);
+    if (typeof sessionStorage !== 'undefined') {
+      try {
+        sessionStorage.setItem(`cardHeights-${key}`, JSON.stringify(record));
+      } catch (e) {
+        console.warn('Failed to save cardHeights to sessionStorage', e);
+      }
+    }
+  }
+
+  getCardHeights(keyname: string = 'global'): Map<number, number> {
+    const key = `${this.#currentDevice}-${keyname}`;
+    let record = this.cardHeights.get(key);
+    if (!record && typeof sessionStorage !== 'undefined') {
+      try {
+        const stored = sessionStorage.getItem(`cardHeights-${key}`);
+        if (stored) {
+          record = JSON.parse(stored);
+          this.cardHeights.set(key, record);
+        }
+      } catch (e) {
+        console.warn('Failed to load cardHeights from sessionStorage', e);
+      }
+    }
+    return record ? new Map(Object.entries(record).map(([k, v]) => [Number(k), Number(v)])) : new Map();
   }
 }
 

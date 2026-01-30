@@ -1,8 +1,22 @@
 :443 {
   tls /var/www/certs/localhost.crt /var/www/certs/localhost.key # ! Use your own certificate
-
   @production expression {env.WP_ENV} == "production"
   @development expression {env.WP_ENV} == "development"
+  import "/etc/caddy/caddy-early-hints.conf"
+
+  # Development early hints for Vite dev server
+  @dev_homepage expression {env.WP_ENV} == "development" && {http.request.uri.path} == "/"
+
+  respond @dev_homepage 103
+  header @dev_homepage Link "</__vite/@vite/client>; rel=modulepreload; as=script; crossorigin, </__vite/src/main.ts>; rel=modulepreload; as=script; crossorigin"
+
+  @dev_pasang expression {env.WP_ENV} == "development" && {http.request.uri.path} == "/pasang-iklan-loker"
+  respond @dev_pasang 103
+  header @dev_pasang Link "</__vite/@vite/client>; rel=modulepreload; as=script; crossorigin, </__vite/src/main.ts>; rel=modulepreload; as=script; crossorigin"
+
+  @dev_single expression {env.WP_ENV} == "development" && {http.request.uri.path}.matches("^/lowongan/.*")
+  respond @dev_single 103
+  header @dev_single Link "</__vite/@vite/client>; rel=modulepreload; as=script; crossorigin, </__vite/src/main.ts>; rel=modulepreload; as=script; crossorigin"
 
   @vite path_regexp vite ^/(__vite|@vite|@id|@fs|sockjs-node|~partytown)(/.*)?$
   handle @vite {
@@ -20,7 +34,7 @@
       header_up Connection {http.request.header.Connection}
 
       # Improve HMR/streaming responsiveness
-      flush_interval 50ms
+      flush_interval 120ms
       stream_timeout 0
       stream_close_delay 1m
     }
@@ -49,11 +63,11 @@
   # This preserves the original host/proto coming from the client/proxy
   # and allows WordPress to choose the correct siteurl/home dynamically.
   php_fastcgi unix//var/run/sock/php-fpm.sock {
-      env HTTP_X_FORWARDED_PROTO {scheme}
-      env HTTP_X_FORWARDED_HOST {host}
-      env HTTP_HOST {host}
-      env HTTP_X_FORWARDED_FOR {remote}
-      env HTTP_X_REAL_IP {remote_host}
+    env HTTP_X_FORWARDED_PROTO {scheme}
+    env HTTP_X_FORWARDED_HOST {host}
+    env HTTP_HOST {host}
+    env HTTP_X_FORWARDED_FOR {remote}
+    env HTTP_X_REAL_IP {remote_host}
   }
 
   file_server {
@@ -69,11 +83,12 @@
   @wp_static path /wp-content/* /wp-includes/* /favicon.ico /robots.txt
   @no_cache path /wp-login.php /wp-admin/* /xmlrpc.php /wp-comments-post.php /wp-cron.php /__vite/*
   @rest_api path /wp-json/*
+  @graphql path_regexp graphql ^/wp-json/graphql(/.*)?$
   @dynamic not path /wp-content/* /wp-includes/* /favicon.ico /robots.txt /wp-admin/* /wp-login.php /wp-json/* /xmlrpc.php /wp-cron.php
   @logged_in header_regexp Cookie wordpress_logged_in_.*
 
   # Default security headers for all responses (keeps site secure while remaining permissive for WordPress plugins)
-  header {
+   header {
     Content-Security-Policy "Upgrade-Insecure-Requests"
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     Referrer-Policy "strict-origin-when-cross-origin"
@@ -104,31 +119,38 @@
   header @development @static_ext "Last-Modified" {file.modtime}
   header @development @static_ext Access-Control-Allow-Origin "*"
 
-  # wp-content paths (plugins, themes) - long-term for static assets while still allowing some dynamic files
-  header @production @wp_static Cache-Control "public, max-age=31536000, immutable, s-maxage=31536000, stale-while-revalidate=2592000"
-  header @production @wp_static Expires "Thu, 31 Dec 2036 23:55:55 GMT"
-  header @production @wp_static Vary "Accept-Encoding"
+  # wp-content paths (plugins, themes) - long-term caching for static assets, shorter for potentially dynamic files
+  header @production @wp_static not @static_ext Cache-Control "public, max-age=86400, s-maxage=86400, stale-while-revalidate=2592000, stale-if-error=604800"
+  header @production @wp_static not @static_ext Expires "Thu, 31 Dec 2036 23:55:55 GMT"
+  header @production @wp_static not @static_ext Vary "Accept-Encoding"
+  header @production @wp_static not @static_ext "Last-Modified" {file.modtime}
+  header @production @wp_static not @static_ext Access-Control-Allow-Origin "*"
 
-  header @development @wp_static Cache-Control "public, max-age=3600, stale-while-revalidate=1800"
-  header @development @wp_static Expires "Thu, 31 Dec 2036 23:55:55 GMT"
-  header @development @wp_static Vary "Accept-Encoding"
+  header @development @wp_static not @static_ext Cache-Control "public, max-age=1800, stale-while-revalidate=1800, stale-if-error=3600"
+  header @development @wp_static not @static_ext Expires "Thu, 31 Dec 2036 23:55:55 GMT"
+  header @development @wp_static not @static_ext Vary "Accept-Encoding"
+  header @development @wp_static not @static_ext "Last-Modified" {file.modtime}
+  header @development @wp_static not @static_ext Access-Control-Allow-Origin "*"
+
+  # GraphQL API: private cache for logged-in users, public cache with background revalidation for anonymous
+  header @production @graphql @logged_in Cache-Control "private, max-age=300, stale-while-revalidate=600, stale-if-error=3600"
+  header @production @graphql not @logged_in Cache-Control "public, max-age=3600, s-maxage=7200, stale-while-revalidate=7200, stale-if-error=86400"
+  header @production @graphql not @logged_in Vary "Accept-Encoding, Cookie"
+  header @development @graphql Cache-Control "private, max-age=60, stale-while-revalidate=120"
 
   # REST API: private cache for logged-in users, long public cache with background revalidation for anonymous
   header @production @rest_api @logged_in Cache-Control "private, max-age=300, stale-while-revalidate=600, stale-if-error=3600"
   header @production @rest_api not @logged_in Cache-Control "public, max-age=3600, s-maxage=7200, stale-while-revalidate=7200, stale-if-error=86400"
   header @production @rest_api not @logged_in Vary "Accept-Encoding, Cookie"
-
   header @development @rest_api Cache-Control "private, max-age=60, stale-while-revalidate=120"
 
   # Privileged paths (wp-login.php, admin, xmlrpc, cron): allow private browser cache only
-  header @no_cache Cache-Control "private, no-cache, must-revalidate, max-age=0"
+  header @no_cache Cache-Control "no-cache, must-revalidate, no-store"
 
   # Dynamic content (pages) — private cache for logged-in users, public cache for anonymous
   header @production @dynamic @logged_in Cache-Control "private, max-age=360"
   header @production @dynamic not @logged_in Cache-Control "public, max-age=600, s-maxage=1200, stale-while-revalidate=1200, stale-if-error=86400"
   header @production @dynamic not @logged_in Vary "Accept-Encoding, Cookie"
-
-  header @development @dynamic Cache-Control "no-cache"
 
   replace "https://localhost" "https://{host}"
 

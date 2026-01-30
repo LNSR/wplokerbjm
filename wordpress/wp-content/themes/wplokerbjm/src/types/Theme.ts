@@ -10,6 +10,7 @@ export interface WPLokerBJMThemedData {
   disableTracking: boolean;
   themeVersion?: number;
   lastTaxonomyUpdate: string;
+  wpRestNonce?: string;
 }
 
 export enum ThemeName {

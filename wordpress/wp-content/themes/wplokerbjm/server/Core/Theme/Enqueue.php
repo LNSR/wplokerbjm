@@ -53,6 +53,78 @@ class Enqueue
             return;
         }
     }
+
+    /**
+     * Send HTTP Link headers for route-specific JS and CSS assets.
+     */
+    public static function outputPreloadLinksResponse(): void
+    {
+        try {
+            if (SharedUtils::isDevelopment() || !SharedUtils::isLocalhost()) {
+                return;
+            }
+
+            // Only send headers if not already sent
+            if (headers_sent()) {
+                Logger::warning('Enqueue', 'Headers already sent, skipping preload Link headers');
+                return;
+            }
+
+            $path = $_SERVER['REQUEST_URI'] ?? '/';
+
+            // Try to serve cached consolidated Link header first. TTL matches manifest/urls cache.
+            $cacheKey = CacheKey::PRELOAD_LINK_HEADER_PREFIX . md5($path);
+            $cachedHeader = Cache::get($cacheKey);
+            if ($cachedHeader !== false) {
+                if (!self::isLinkHeaderAlreadySet($cachedHeader)) {
+                    header("Link: {$cachedHeader}", false);
+                }
+                return;
+            }
+
+            $urls = Vite::getPreloadUrls($path);
+
+            $linkParts = [];
+            foreach ($urls as $url) {
+                // Use raw escaping for header values
+                $safe = esc_url_raw($url);
+                if (str_ends_with($url, '.js')) {
+                    $linkParts[] = "<{$safe}>; rel=modulepreload; as=script; crossorigin";
+                } elseif (str_ends_with($url, '.css')) {
+                    $linkParts[] = "<{$safe}>; rel=preload; as=style; crossorigin";
+                }
+            }
+
+            if (!empty($linkParts)) {
+                $header = implode(', ', $linkParts);
+                // Cache the consolidated header for 1 day to match manifest TTL
+                Cache::set($cacheKey, $header, 86400);
+                if (!self::isLinkHeaderAlreadySet($header)) {
+                    header("Link: {$header}", false);
+                }
+            }
+        } catch (\Exception $e) {
+            Logger::error('Enqueue', 'Enqueue::outputPreloadLinksResponse error: ' . $e->getMessage());
+            return;
+        }
+    }
+
+    /**
+     * Check if the Link header is already set with the given value.
+     */
+    private static function isLinkHeaderAlreadySet(string $value): bool
+    {
+        $headers = headers_list();
+        foreach ($headers as $header) {
+            if (str_starts_with($header, 'Link: ')) {
+                $existingValue = substr($header, 6);
+                if ($existingValue === $value) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
 }
 
 /**
@@ -188,14 +260,16 @@ class Vite
      */
     private static function getRouteKey(string $path): ?string
     {
+        $homepage = 'src/app/routes/Homepage.svelte';
+        $singlelowongan = 'src/app/routes/SingleLowongan.svelte';
         if ($path === '/' || $path === '') {
-            return 'src/app/routes/Homepage.svelte';
+            return $homepage;
         }
         if (strpos($path, '/pasang-iklan-loker') === 0) {
             return 'src/app/routes/PasangIklanLoker.svelte';
         }
         if (preg_match('/^\/lowongan\//', $path)) {
-            return 'src/app/routes/SingleLowongan.svelte';
+            return wp_is_mobile() ? $singlelowongan : $homepage; // Mobile uses SingleLowongan, desktop uses Homepage with sidepanel
         }
         return null;
     }

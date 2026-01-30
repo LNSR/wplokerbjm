@@ -11,7 +11,7 @@ use WPLokerBJM\QueryBuilders\JobQuery;
 class JobRepository
 {
     public function __construct(
-        private \WPLokerBJM\Services\REST\RESTData $restData,
+        private \WPLokerBJM\Services\GraphQL\GraphQLData $restData,
         private \WPLokerBJM\Services\Schema\JobSchemaOrg $jobSchema
     ) {
     }
@@ -33,7 +33,7 @@ class JobRepository
         if ($jobs_query->have_posts()) {
             while ($jobs_query->have_posts()) {
                 $jobs_query->the_post();
-                $post_id = get_the_ID();
+                (int) $post_id = get_the_ID();
                 $jobs[] = $this->restData->getCardData($post_id);
                 $schema_data[] = $this->jobSchema->getJobPostingSchema($post_id);
             }

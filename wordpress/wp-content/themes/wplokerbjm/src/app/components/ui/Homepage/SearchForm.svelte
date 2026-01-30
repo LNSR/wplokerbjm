@@ -3,7 +3,11 @@
   import { TaxonomyType } from "@/types";
   import { SearchTitle, SearchContext } from "@/types";
   import { searchStore, SearchUtils } from "$lib/stores/Search.svelte";
-  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
+  import { isJobGridEl } from "$lib/utils/elements.svelte";
+  import {
+    dynamicComponentStore,
+    type CustomDropdownComponent,
+  } from "$lib/stores/DynamicComponent.svelte";
 
   type LocalSearchFormProps = {
     currentSearch?: string;
@@ -82,7 +86,7 @@
 
     static callSearchResults(
       payload: any,
-      searchResults?: (payload: any) => any
+      searchResults?: (payload: any) => any,
     ) {
       try {
         if (typeof searchResults === "function") {
@@ -108,7 +112,7 @@
     static async handleSubmit(
       e?: Event,
       searchResults?: (payload: any) => any,
-      searchError?: (msg: string) => any
+      searchError?: (msg: string) => any,
     ) {
       e?.preventDefault?.();
       try {
@@ -120,10 +124,10 @@
             shouldScroll: true,
             filters: { ...searchStore.filters },
           },
-          searchResults
+          searchResults,
         );
         setTimeout(() => {
-          const grid = document.getElementById("job-grid");
+          const grid = isJobGridEl();
           if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
         }, 100);
       } catch (err) {
@@ -136,7 +140,7 @@
 
     static async resetFiltersAndSearch(
       searchResults?: (payload: any) => any,
-      searchError?: (msg: string) => any
+      searchError?: (msg: string) => any,
     ) {
       try {
         const response = await SearchFormController.performReset();
@@ -147,7 +151,7 @@
             shouldScroll: false,
             filters: { ...searchStore.filters },
           },
-          searchResults
+          searchResults,
         );
       } catch (err) {
         const errorMessage =
@@ -158,8 +162,7 @@
     }
   }
 
-  let CustomDropdown: typeof import("./CustomDropdown.svelte").default | null =
-    $state(null);
+  let CustomDropdown: CustomDropdownComponent | null = $state(null);
 </script>
 
 <script lang="ts">
@@ -205,7 +208,7 @@
       const idx = arr.indexOf(value);
       if (idx !== -1)
         searchStore.filters[TaxonomyType.lokasi] = arr.filter(
-          (_, i) => i !== idx
+          (_, i) => i !== idx,
         );
       return;
     }
@@ -217,7 +220,7 @@
       const idx = arr.indexOf(value);
       if (idx !== -1)
         searchStore.filters[TaxonomyType.gender] = arr.filter(
-          (_, i) => i !== idx
+          (_, i) => i !== idx,
         );
       return;
     }
@@ -229,7 +232,7 @@
       const idx = arr.indexOf(value);
       if (idx !== -1)
         searchStore.filters[TaxonomyType.pendidikan] = arr.filter(
-          (_, i) => i !== idx
+          (_, i) => i !== idx,
         );
       return;
     }
@@ -271,7 +274,7 @@
   const lokasiLabel = $derived.by(() => {
     const arr = Array.isArray(searchStore.filters[TaxonomyType.lokasi])
       ? searchStore.filters[TaxonomyType.lokasi].filter(
-          (s) => typeof s === "string" && String(s).trim() !== ""
+          (s) => typeof s === "string" && String(s).trim() !== "",
         )
       : [];
     if (!arr || arr.length === 0) return "Lokasi Belum Dipilih";
@@ -283,7 +286,7 @@
   const genderLabel = $derived.by(() => {
     const arr = Array.isArray(searchStore.filters[TaxonomyType.gender])
       ? searchStore.filters[TaxonomyType.gender].filter(
-          (s) => typeof s === "string" && String(s).trim() !== ""
+          (s) => typeof s === "string" && String(s).trim() !== "",
         )
       : [];
     if (!arr || arr.length === 0) return "Gender Belum Dipilih";
@@ -295,7 +298,7 @@
   const pendidikanLabel = $derived.by(() => {
     const arr = Array.isArray(searchStore.filters[TaxonomyType.pendidikan])
       ? searchStore.filters[TaxonomyType.pendidikan].filter(
-          (s) => typeof s === "string" && String(s).trim() !== ""
+          (s) => typeof s === "string" && String(s).trim() !== "",
         )
       : [];
     if (!arr || arr.length === 0) return "Pendidikan Belum Dipilih";
@@ -305,7 +308,7 @@
   });
 
   const sortIsAsc = $derived.by(
-    () => (searchStore.filters.sort?.value ?? "") === "asc"
+    () => (searchStore.filters.sort?.value ?? "") === "asc",
   );
 
   const updateSortFilter = (payload: unknown) => {
@@ -336,13 +339,13 @@
       isPendidikanOpen ||
       (isSortOpen && !CustomDropdown)
     ) {
-      (async () => {
-        CustomDropdown = await dynamicComponentStore.loadCustomDropdown();
-      })();
+      dynamicComponentStore.loadCustomDropdown().then((comp) => {
+        CustomDropdown = comp;
+      });
     }
   });
 
-  onMount(async () => {
+  onMount(() => {
     searchStore.setFilters({
       cari: currentSearch ?? "",
       [TaxonomyType.lokasi]: Array.isArray(currentLokasi)
@@ -430,8 +433,8 @@
                             SearchFormController.handleSubmit(
                               undefined,
                               searchResults,
-                              searchError
-                            )
+                              searchError,
+                            ),
                         )}
                       onmouseenter={() => (selectedSuggestionIndex = idx)}
                       aria-label={`Pilih saran ${suggestion}`}
@@ -475,7 +478,7 @@
                 updateTaxonomyFilter(TaxonomyType.lokasi, payload)}
               options={SearchUtils.mapTerms(
                 taxonomyStore.lokasiTerms,
-                "Semua lokasi"
+                "Semua lokasi",
               )}
               placeholder="Semua Lokasi"
               multiple={true}
@@ -514,7 +517,7 @@
                 updateTaxonomyFilter(TaxonomyType.gender, payload)}
               options={SearchUtils.mapTerms(
                 taxonomyStore.genderTerms,
-                "Semua gender"
+                "Semua gender",
               )}
               placeholder="Semua Gender"
               multiple={true}
@@ -553,7 +556,7 @@
                 updateTaxonomyFilter(TaxonomyType.pendidikan, payload)}
               options={SearchUtils.mapTerms(
                 taxonomyStore.pendidikanTerms,
-                "Semua pendidikan"
+                "Semua pendidikan",
               )}
               placeholder="Semua Pendidikan"
               multiple={true}
@@ -583,7 +586,8 @@
             aria-controls="sort-listbox"
             onclick={() => {
               (async () => {
-                CustomDropdown = await dynamicComponentStore.loadCustomDropdown();
+                CustomDropdown =
+                  await dynamicComponentStore.loadCustomDropdown();
               })();
               isSortOpen = !isSortOpen;
               if (isSortOpen) {
@@ -666,7 +670,7 @@
             onclick={() =>
               SearchFormController.resetFiltersAndSearch(
                 searchResults,
-                searchError
+                searchError,
               )}
           >
             <RotateLeftSolid

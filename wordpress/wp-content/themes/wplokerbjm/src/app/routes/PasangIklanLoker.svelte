@@ -3,10 +3,14 @@
     LightbulbSolid,
     InstagramBrands,
     WhatsappBrands,
-    EnvelopeSolid,
+    FacebookBrands,
+    ThreadsBrands,
     CircleInfoSolid,
+    UsersSolid,
+    PhoneSolid,
     CircleCheckSolid,
   } from "svelte-awesome-icons";
+  import Footer from "@components/layouts/Footer.svelte";
 
   const sectionClass =
     "rounded-xl border-2 border-blue-500 dark:border-blue-400 shadow-md p-4 sm:p-6 md:p-8 mb-12 bg-white dark:bg-gray-900";
@@ -31,7 +35,7 @@
   <section class={sectionClass} aria-labelledby="section-benefit">
     <h2
       id="section-benefit"
-      class="text-2xl text-center font-bold text-[var(--wpl-global-color-1)] dark:text-blue-400 mb-4 break-words"
+      class="text-2xl text-center font-bold text-[var(--wpl-global-color-1)] mb-4 break-words"
     >
       Tingkatkan Peluang Mendapatkan Kandidat Terbaik
     </h2>
@@ -58,11 +62,31 @@
     </div>
   </section>
 
+  <!-- About Us Section -->
+  <section class={sectionClass} aria-labelledby="section-about">
+    <h2
+      id="section-about"
+      class="text-2xl text-center font-bold text-[var(--wpl-global-color-1)] mb-4 break-words"
+    >
+      <UsersSolid
+        class="inline-block mr-2 text-[var(--wpl-global-color-1)]"
+        aria-hidden="true"
+      />
+      Tentang Kami
+    </h2>
+    <p class="text-justify mb-4 text-gray-700 dark:text-gray-200 break-words">
+      Loker Banjarmasin adalah platform lowongan kerja yang dibuat untuk mendukung komunitas bisnis kecil dan lokal di Kalimantan — khususnya Banjarmasin dan sekitarnya. Kami terbuka untuk semua pemberi kerja, dengan fokus pada UMKM, usaha kecil, dan perekrut independen yang ingin membagikan peluang kerja secara mudah dan efektif.
+    </p>
+    <p class="text-justify mb-4 text-gray-700 dark:text-gray-200 break-words">
+      Situs ini tidak menyediakan tombol "lamar" langsung; pelamar akan diarahkan ke pihak HR melalui media sosial atau kontak yang Anda cantumkan, sehingga prosesnya tetap fleksibel dan personal. Setiap lowongan akan ditayangkan selama 1 bulan, kecuali bila Anda menyertakan batas waktu (deadline) yang berbeda.
+    </p>
+  </section>
+
   <!-- Cara Memasang Section -->
   <section class={sectionClass} aria-labelledby="section-cara">
     <h2
       id="section-cara"
-      class="text-2xl font-bold mb-6 text-center text-gray-900 dark:text-gray-100 break-words"
+      class="text-2xl font-bold mb-6 text-center text-[var(--wpl-global-color-1)] break-words"
     >
       Cara Memasang Lowongan Kerja
     </h2>
@@ -78,9 +102,10 @@
             aria-labelledby="info-dibutuhkan"
           >
             <h3
-              class="text-xl text-center font-semibold text-[var(--wpl-global-color-1)] dark:text-blue-400 mb-3 break-words"
+              class="flex flex-row items-center justify-center text-center text-xl font-semibold mb-3 text-[var(--wpl-global-color-1)] break-words"
             >
-              Hubungi Kami
+              <PhoneSolid class="text-xl mr-3 text-[var(--wpl-global-color-1)] dark:text-blue-300" aria-hidden="true" />
+              <span>Hubungi Kami</span>
             </h3>
             <p class="mb-2 text-gray-700 dark:text-gray-200 break-words">
               Silakan hubungi admin kami melalui:
@@ -102,6 +127,30 @@
                   >
                   <a
                     href="https://instagram.com/loker_banjarmasin"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class={linkClass}
+                  >
+                    @loker_banjarmasin
+                  </a>
+                </div>
+              </li>
+              <li class="flex items-center">
+                <span
+                  class={`${baseIconClass} bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-600 dark:to-pink-600`}
+                >
+                  <ThreadsBrands
+                    class="text-xl text-white"
+                    aria-hidden="true"
+                  />
+                </span>
+                <div class="min-w-0 break-words">
+                  <span
+                    class="font-medium block text-gray-800 dark:text-gray-100 break-words"
+                    >Threads:</span
+                  >
+                  <a
+                    href="https://www.threads.com/@loker_banjarmasin"
                     target="_blank"
                     rel="noopener noreferrer"
                     class={linkClass}
@@ -133,8 +182,8 @@
                 </div>
               </li>
               <li class="flex items-center">
-                <span class={`${baseIconClass} bg-[#EA4335] dark:bg-red-700`}>
-                  <EnvelopeSolid
+                <span class={`${baseIconClass} bg-[#1877F2] dark:bg-blue-600`}>
+                  <FacebookBrands
                     class="text-xl text-white"
                     aria-hidden="true"
                   />
@@ -142,10 +191,15 @@
                 <div class="min-w-0 break-words">
                   <span
                     class="font-medium block text-gray-800 dark:text-gray-100 text-wrap break-words"
-                    >Email:</span
+                    >Facebook:</span
                   >
-                  <a href="mailto:muhammadindra003@gmail.com" class={linkClass}>
-                    muhammadindra003@gmail.com
+                  <a
+                    href="https://facebook.com/loker.banjarmasin.2025/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class={linkClass}
+                  >
+                    facebook.com/loker.banjarmasin.2025/
                   </a>
                 </div>
               </li>
@@ -153,7 +207,7 @@
           </aside>
         </div>
         <aside
-          class="p-3 md:pl-8 bg-blue-50 dark:bg-blue-900/30 rounded-xl"
+          class="p-4.5 md:pl-8 bg-blue-50 dark:bg-blue-900/30 rounded-xl"
           aria-labelledby="info-dibutuhkan"
         >
           <h3
@@ -222,7 +276,7 @@
   <section class={sectionClass} aria-labelledby="section-syarat">
     <h2
       id="section-syarat"
-      class="text-2xl font-bold text-center mb-4 text-gray-900 dark:text-gray-100 break-words"
+      class="text-2xl font-bold text-center mb-4 text-[var(--wpl-global-color-1)] break-words"
     >
       Syarat &amp; Ketentuan
     </h2>
@@ -253,3 +307,5 @@
     </div>
   </section>
 </main>
+
+<Footer />

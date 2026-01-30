@@ -24,7 +24,6 @@ $hostname = 'localhost'; // default fallback
 $protocol = 'http://'; // default fallback
 
 // Prioritize forwarded headers over direct headers
-//* NOTE: !In Docker development, localhost doesn't work for internal requests(like wp-cron); use 'host.docker.internal' / IP instead.
 if (isset($_SERVER['HTTP_X_FORWARDED_HOST'])) {
   $hostname = $_SERVER['HTTP_X_FORWARDED_HOST'];
 } elseif (isset($_SERVER['HTTP_HOST'])) {
@@ -74,6 +73,8 @@ switch (WP_ENV) {
       define('WP_DEBUG_DISPLAY', true);
     if (!defined('SCRIPT_DEBUG'))
       define('SCRIPT_DEBUG', true);
+    if (!defined('WP_CACHE'))
+      define('WP_CACHE', true);
 
     // Performance for dev
     define('WP_POST_REVISIONS', 3);
@@ -112,7 +113,12 @@ switch (WP_ENV) {
     if (!defined('WP_DEBUG_DISPLAY'))
       define('WP_DEBUG_DISPLAY', false);
     if (!defined('SCRIPT_DEBUG'))
-      define('SCRIPT_DEBUG', false);
+      define('SCRIPT_DEBUG', true);
+    if (!defined('WP_DEBUG_LOG'))
+      define('WP_DEBUG_LOG', '/var/www/html/wp-content/debug/debug.log');
+    if (!defined('WP_CACHE')) {
+      define('WP_CACHE', true);
+    }
     define('DISALLOW_FILE_EDIT', false);
     define('DISALLOW_FILE_MODS', false);
     define('WP_ENVIRONMENT_TYPE', 'production');

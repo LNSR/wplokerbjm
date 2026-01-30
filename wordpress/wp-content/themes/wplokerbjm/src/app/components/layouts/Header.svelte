@@ -1,19 +1,20 @@
 <script module lang="ts">
   import { debounce, getThemeData } from "@/utils";
-  import { MediaQuery } from "svelte/reactivity";
+  import { MediaQuery, SvelteMap } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
-  import {
-    dynamicComponentStore,
-    type BookmarkModalComponent,
-  } from "$lib/stores/DynamicComponent.svelte";
-
-  let BookmarkModal = $derived<BookmarkModalComponent | null>(
-    dynamicComponentStore.BookmarkModal
-  );
+  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
+  import { NonceManager } from "@/utils/Nonce";
   const isMobileValue = $derived.by(() => isMobile());
+  const isHasNonce = $derived(NonceManager.getNonce !== null);
   let showBookmarkModal = $state(false);
   const bookmarkJobs = $derived(bookmarkStore.jobs);
+
+  let logoSrcset = $state("");
+  let logoSizes = $state("");
+  let logoWidth = $state<number | undefined>(undefined);
+  let logoHeight = $state<number | undefined>(undefined);
+  let logoDecoding = $state<HTMLImgAttributes["decoding"]>(undefined);
 
   class ThemeManager {
     private mediaQuery: MediaQuery | null = null;
@@ -34,7 +35,7 @@
         if (!color) color = dark ? "#0b1220" : "#ffffff";
 
         let meta = document.querySelector(
-          'meta[name="theme-color"]'
+          'meta[name="theme-color"]',
         ) as HTMLMetaElement | null;
         if (!meta) {
           meta = document.createElement("meta");
@@ -68,11 +69,11 @@
           document.documentElement.setAttribute("data-theme", newTheme);
           if (dark) {
             document.documentElement.classList.add(
-              "wplokerbjm-dark-mode-enable"
+              "wplokerbjm-dark-mode-enable",
             );
           } else {
             document.documentElement.classList.remove(
-              "wplokerbjm-dark-mode-enable"
+              "wplokerbjm-dark-mode-enable",
             );
           }
           this.updateMetaThemeColor(dark);
@@ -80,11 +81,12 @@
 
         if (
           typeof document !== "undefined" &&
-          (document as any).startViewTransition &&
-          !(document as any).viewTransition &&
+          !routeStore.isInitialLoad &&
+          document.startViewTransition &&
+          !document.viewTransition &&
           !routeStore.lockViewTransition
         ) {
-          const trans = document.startViewTransition(applyTheme);
+          const trans = document.startViewTransition!(applyTheme);
           routeStore.lockViewTransition = true;
           trans;
           if (trans && trans.finished) {
@@ -148,7 +150,7 @@
       this._initialized = true;
       this.debouncedSetTheme = debounce(
         (dark: boolean) => this.setThemeDirect(dark),
-        10
+        10,
       );
 
       let saved = "";
@@ -218,13 +220,16 @@
 
   class HeaderManager {
     headerEl: HTMLElement | null = null;
-    private _lastOffsetUpdate = 0;
+    private _lastOffsetUpdate = $state(0);
     rafId: number | null = null;
     mutationObserver: MutationObserver | null = null;
     adminBarObserver: MutationObserver | null = null;
     resizeObserver: ResizeObserver | null = null;
+    headerResizeObserver: ResizeObserver | null = null;
     domObserver: MutationObserver | null = null;
     adminBarEl: HTMLElement | null = null;
+    adminBarCache: object = $state({});
+    adminBarCacheMap = $state(new SvelteMap<string, any>());
 
     scheduleUpdate = () => {
       if (this.rafId !== null) return;
@@ -243,31 +248,47 @@
       // Avoid updating during view transitions to prevent race conditions
       if (routeStore.currentViewTransition) {
         routeStore.currentViewTransition.finished.then(() =>
-          this.updateOffsets()
+          this.updateOffsets(),
         );
         return;
       }
 
       this.headerEl = document.querySelector("header");
       try {
-        headerStore.setSiteHeaderVars({
-          headerEl: this.headerEl,
-        });
-
-        // Update the signal-based store
+        // Update the signal-based store for top offset
         const adminBarHeight = headerStore.getWpAdminBarHeight();
-        const headerHeight = this.headerEl ? this.headerEl.offsetHeight : 0;
         headerStore.headerTop = adminBarHeight;
-        headerStore.headerHeight = headerHeight;
+        headerStore.appEl?.style.setProperty(
+          "--site-header-top",
+          adminBarHeight + "px",
+        );
+        // Update height initially
+        this.updateHeaderHeight();
       } catch {
         // Fallback: ensure at least --site-header-top is set using admin bar height
         const adminBarHeight = headerStore.getWpAdminBarHeight();
         headerStore.appEl?.style.setProperty(
           "--site-header-top",
-          adminBarHeight + "px"
+          adminBarHeight + "px",
         );
         headerStore.headerTop = adminBarHeight;
         headerStore.headerHeight = 0;
+      }
+    };
+
+    private updateHeaderHeight = () => {
+      if (this.headerEl) {
+        const height = this.headerEl.offsetHeight;
+        headerStore.headerHeight = height;
+        headerStore.appEl?.style.setProperty(
+          "--site-header-height",
+          height + "px",
+        );
+        const scrollPadding = headerStore.headerTop + height;
+        headerStore.appEl?.style.setProperty(
+          "--site-scroll-padding-top",
+          scrollPadding + "px",
+        );
       }
     };
 
@@ -287,11 +308,11 @@
         try {
           this.adminBarEl.removeEventListener(
             "transitionend",
-            this.scheduleUpdate
+            this.scheduleUpdate,
           );
           this.adminBarEl.removeEventListener(
             "animationend",
-            this.scheduleUpdate
+            this.scheduleUpdate,
           );
         } catch {
           // ignore
@@ -319,6 +340,147 @@
       this.adminBarEl!.addEventListener("animationend", this.scheduleUpdate, {
         passive: true,
       });
+    }
+
+    moveAdminBarIntoHeader() {
+      try {
+        let adminBar = document.getElementById("wpadminbar");
+        const headerEl = document.querySelector("header");
+        const prevBodyMarginTop =
+          typeof document !== "undefined"
+            ? document.body.style.marginTop || ""
+            : "";
+
+        // Use SvelteMap-backed cache under key 'wpadminbar'
+        const existing = this.adminBarCacheMap.get("wpadminbar") || {};
+        const cache = existing;
+        cache.prevBodyMarginTop = prevBodyMarginTop;
+        cache.prevParent = adminBar?.parentElement || cache.prevParent || null;
+        cache.nextSibling = adminBar?.nextSibling || cache.nextSibling || null;
+        if (adminBar) {
+          try {
+            cache.savedHTML = adminBar.outerHTML;
+          } catch {
+            // best-effort
+          }
+        }
+        this.adminBarCacheMap.set("wpadminbar", cache);
+        this.adminBarCache = cache;
+
+        // If adminBar is missing (e.g., due to HMR), try to rehydrate from cached HTML in 'cache'
+        if (!adminBar && cache?.savedHTML) {
+          try {
+            const container = document.createElement("div");
+            container.innerHTML = cache.savedHTML;
+            const candidate = container.querySelector(
+              "#wpadminbar",
+            ) as HTMLElement | null;
+            if (candidate) {
+              // Prefer previous parent if it's still in the document, otherwise fall back to body
+              const potentialParent =
+                cache.prevParent && document.contains(cache.prevParent)
+                  ? cache.prevParent
+                  : document.body;
+              const parent = potentialParent as Node;
+              if (
+                cache.nextSibling &&
+                cache.nextSibling.parentNode === parent
+              ) {
+                parent.insertBefore(candidate, cache.nextSibling);
+              } else {
+                parent.appendChild(candidate);
+              }
+              adminBar = candidate;
+              try {
+                cache.savedHTML = adminBar.outerHTML;
+                this.adminBarCacheMap.set("wpadminbar", cache);
+                this.adminBarCache = cache;
+              } catch {
+                /* best-effort */
+              }
+            }
+          } catch (e) {
+            // ignore rehydrate failures
+            console.error("Failed to rehydrate wpadminbar from cache", e);
+          }
+        }
+
+        if (adminBar && headerEl && !headerEl.contains(adminBar)) {
+          headerEl.prepend(adminBar);
+          adminBar.classList.add("in-header");
+          try {
+            cache.savedHTML = adminBar.outerHTML;
+            this.adminBarCacheMap.set("wpadminbar", cache);
+            this.adminBarCache = cache;
+          } catch {
+            /* best-effort */
+          }
+          this.adminBarEl = adminBar;
+        }
+      } catch (e) {
+        console.error("Failed to move wpadminbar into header", e);
+      }
+    }
+
+    restoreAdminBar() {
+      try {
+        const cache =
+          this.adminBarCacheMap.get("wpadminbar") || this.adminBarCache || {};
+        let adminBar = document.getElementById("wpadminbar");
+
+        // If adminBar is missing but we have cached HTML, re-insert it into prevParent
+        if (!adminBar && cache && cache.savedHTML) {
+          try {
+            const container = document.createElement("div");
+            container.innerHTML = cache.savedHTML;
+            const candidate = container.querySelector(
+              "#wpadminbar",
+            ) as HTMLElement | null;
+            if (candidate) {
+              const potentialParent =
+                cache.prevParent && document.contains(cache.prevParent)
+                  ? cache.prevParent
+                  : document.body;
+              const parent = potentialParent as Node;
+              if (
+                cache.nextSibling &&
+                cache.nextSibling.parentNode === parent
+              ) {
+                parent.insertBefore(candidate, cache.nextSibling);
+              } else {
+                parent.appendChild(candidate);
+              }
+              adminBar = candidate;
+              try {
+                cache.savedHTML = adminBar.outerHTML;
+                this.adminBarCacheMap.set("wpadminbar", cache);
+                this.adminBarCache = cache;
+              } catch {
+                /* best-effort */
+              }
+            }
+          } catch (e) {
+            console.error("Failed to reinsert cached wpadminbar", e);
+          }
+        }
+
+        if (cache && adminBar && cache.prevParent) {
+          if (cache.nextSibling)
+            cache.prevParent.insertBefore(adminBar, cache.nextSibling);
+          else cache.prevParent.appendChild(adminBar);
+          adminBar.classList.remove("in-header");
+          adminBar.style.position = "";
+          adminBar.style.transform = "";
+          adminBar.style.top = "";
+          try {
+            document.body.style.marginTop = cache.prevBodyMarginTop || "";
+          } catch {
+            // ignore
+          }
+        }
+      } catch (e) {
+        console.error("Failed to restore wpadminbar to original location", e);
+      }
     }
 
     attachMutationObserver() {
@@ -360,12 +522,36 @@
       // run immediately once
       this.scheduleUpdate();
 
+      // Move admin bar into header early so offsets are simpler
+      if (isHasNonce) {
+        try {
+          this.moveAdminBarIntoHeader();
+        } catch {
+          // best-effort
+        }
+      }
+
       this.attachMutationObserver();
       this.attachDomObserver();
       this.attachAdminBarObservers();
+
+      // Attach ResizeObserver for header height changes
+      if (this.headerEl && !this.headerResizeObserver) {
+        this.headerResizeObserver = new ResizeObserver(() => {
+          this.updateHeaderHeight();
+        });
+        this.headerResizeObserver.observe(this.headerEl);
+      }
     };
 
     destroy = () => {
+      // attempt to restore admin bar to its original location
+      try {
+        this.restoreAdminBar();
+      } catch {
+        // best-effort
+      }
+
       // cleanup listeners and observers
       if (this.rafId !== null) cancelAnimationFrame(this.rafId);
 
@@ -384,16 +570,21 @@
         this.resizeObserver = null;
       }
 
+      if (this.headerResizeObserver) {
+        this.headerResizeObserver.disconnect();
+        this.headerResizeObserver = null;
+      }
+
       // remove any remaining event listeners from the admin bar element
       if (this.adminBarEl) {
         try {
           this.adminBarEl.removeEventListener(
             "transitionend",
-            this.scheduleUpdate
+            this.scheduleUpdate,
           );
           this.adminBarEl.removeEventListener(
             "animationend",
-            this.scheduleUpdate
+            this.scheduleUpdate,
           );
         } catch {
           // ignore
@@ -418,7 +609,7 @@
   import { GlobalNavigateTo, routeStore } from "$lib/stores/Route.svelte";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
   import { ThemeName } from "@/types";
-  import { innerWidth, scrollY } from "svelte/reactivity/window";
+  import { innerWidth } from "svelte/reactivity/window";
   import {
     SunSolid,
     MoonSolid,
@@ -428,11 +619,6 @@
   } from "svelte-awesome-icons";
 
   let { logo = "" } = $props();
-  let logoSrcset = $state("");
-  let logoSizes = $state("");
-  let logoWidth = $state<number | undefined>(undefined);
-  let logoHeight = $state<number | undefined>(undefined);
-  let logoDecoding = $state<HTMLImgAttributes["decoding"]>(undefined);
 
   function updateLogo(): void {
     try {
@@ -444,14 +630,14 @@
       const runtimeLogoWidth = themeData?.logoWidth;
       const runtimeLogoHeight = themeData?.logoHeight;
 
-      function parseDimension(value: unknown): number | undefined {
+      const parseDimension = (value: unknown): number | undefined => {
         if (typeof value === "number" && value > 0) return value;
         if (typeof value === "string" && value.trim()) {
           const parsed = Number(value.trim());
           if (!Number.isNaN(parsed) && parsed > 0) return parsed;
         }
         return undefined;
-      }
+      };
 
       if (runtimeLogo) {
         logo = runtimeLogo;
@@ -466,38 +652,75 @@
     }
   }
 
-  if (typeof window !== "undefined") {
-    updateLogo();
+  // Open bookmark modal
+  function openBookmarkModal(): void {
+    showBookmarkModal = true;
   }
 
   onMount(() => {
     try {
       themeStore.init();
+      updateLogo();
     } catch {
       console.error("Theme initialization error");
     }
 
     // Start header manager after DOM is available
     headerManager.start();
+
+    // Handle will-change for drawer animation
+    const drawerInput = document.getElementById(
+      "header-drawer",
+    ) as HTMLInputElement;
+    const drawerSide = document.getElementById("header-drawer-side");
+    if (drawerInput && drawerSide) {
+      const handleDrawerChange = () => {
+        if (drawerInput.checked) {
+          drawerSide.style.willChange = "transform";
+        } else {
+          // Remove after transition
+          drawerSide.addEventListener(
+            "transitionend",
+            () => {
+              drawerSide.style.willChange = "";
+            },
+            { once: true },
+          );
+        }
+      };
+      drawerInput.addEventListener("change", handleDrawerChange);
+      // Store for cleanup
+      (drawerInput as any)._drawerListener = handleDrawerChange;
+    }
   });
   onDestroy(() => {
+    // headerManager.destroy will attempt to restore wpadminbar as a best-effort
     headerManager?.destroy();
+
     headerStore.appEl?.style.removeProperty("--site-header-top");
     headerStore.appEl?.style.removeProperty("--site-header-height");
     headerStore.appEl?.style.removeProperty("--site-scroll-padding-top");
+
+    // Remove drawer event listener
+    const drawerInput = document.getElementById(
+      "header-drawer",
+    ) as HTMLInputElement;
+    if (drawerInput && (drawerInput as any)._drawerListener) {
+      drawerInput.removeEventListener(
+        "change",
+        (drawerInput as any)._drawerListener,
+      );
+    }
   });
 
   $effect(() => {
-    if (showBookmarkModal && !BookmarkModal) {
-      (async () => {
-        BookmarkModal = await dynamicComponentStore.loadBookmarkModal();
-      })();
+    if (showBookmarkModal && !dynamicComponentStore.BookmarkModal) {
+      dynamicComponentStore.loadBookmarkModal();
     }
   });
 
   $effect(() => {
     innerWidth.current;
-    scrollY.current;
     headerManager.scheduleUpdate();
   });
 </script>
@@ -582,7 +805,7 @@
 
           <!-- Bookmark button on desktop -->
           <button
-            onclick={() => (showBookmarkModal = true)}
+            onclick={openBookmarkModal}
             class="btn btn-circle md:flex relative border-[var(--wpl-global-color-1)] border-1 hover:border-2"
             aria-label="Lowongan tersimpan"
             title="Lowongan tersimpan"
@@ -656,7 +879,19 @@
       </div>
     {/if}
   </div>
-  {#if showBookmarkModal && BookmarkModal}
-    <BookmarkModal bind:open={showBookmarkModal} />
+  {#if showBookmarkModal && dynamicComponentStore.BookmarkModal}
+    {#await dynamicComponentStore.BookmarkModal then BookmarkModal}
+      <BookmarkModal bind:open={showBookmarkModal} />
+    {/await}
   {/if}
 </header>
+
+<style>
+  :global(#wpadminbar.in-header) {
+    position: static !important;
+    transform: none !important;
+    top: auto !important;
+    left: auto !important;
+    z-index: inherit !important;
+  }
+</style>

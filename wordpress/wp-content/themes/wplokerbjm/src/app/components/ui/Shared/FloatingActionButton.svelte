@@ -1,11 +1,11 @@
 <script module lang="ts">
   import { type SocialMediaItem, SocialMediaPlatform } from "@/types";
+  import { isJobGridEl } from "$lib/utils/elements.svelte";
   import {
     ArrowUpSolid,
     HeadsetSolid,
     ChevronDownSolid,
     InstagramBrands,
-    TiktokBrands,
     FacebookBrands,
     ThreadsBrands,
   } from "svelte-awesome-icons";
@@ -16,12 +16,6 @@
       icon: InstagramBrands,
       platform: SocialMediaPlatform.Instagram,
       color: "text-pink-500 dark:text-pink-400",
-    },
-    {
-      url: "https://www.tiktok.com/@loker_banjarmasin",
-      icon: TiktokBrands,
-      platform: SocialMediaPlatform.TikTok,
-      color: "text-black dark:text-white",
     },
     {
       url: "https://www.facebook.com/loker.banjarmasin.2025",
@@ -67,7 +61,7 @@
   }
 
   function observeJobGrid() {
-    const jobGrid = document.getElementById("job-grid");
+    const jobGrid = isJobGridEl();
     if (!jobGrid) return;
     jobGridObserver = new IntersectionObserver(
       (entries) => {
@@ -81,7 +75,9 @@
   }
 
   function handleScroll() {
-    show = window.scrollY > 0;
+    const shouldShow = window.scrollY > 0;
+    // Only update reactive state when it actually changes to avoid unnecessary re-renders during scroll
+    if (show !== shouldShow) show = shouldShow;
   }
 
   function handleKeyDown(event: KeyboardEvent) {
@@ -110,7 +106,7 @@
   });
 </script>
 
-<aside class="fixed bottom-3 right-3 z-100 flex flex-col items-end gap-4" style="view-transition-name: fab;">
+<aside class="fixed bottom-3 right-3 z-30 flex flex-col items-end gap-4" style="view-transition-name: fab;">
   {#if show}
     <!-- Scroll to Top Button -->
     <button

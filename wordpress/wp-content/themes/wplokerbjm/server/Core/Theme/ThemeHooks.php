@@ -117,6 +117,7 @@ class ThemeInject
     #[Filter('site_icon_meta_tags')]
     public static function addSiteIconMetaTags(array $meta_tags): array
     {
+
         $additional_sizes = [48, 96, 144, 256, 384, 512];
 
         foreach ($additional_sizes as $size) {
@@ -126,9 +127,42 @@ class ThemeInject
             }
         }
 
+        // Add PNG fallback pointing directly to the original uploaded favicon
+        $original_url = wp_get_attachment_url(get_option('site_icon'));
+        if ($original_url) {
+            // Replace .avif extension with .png for PNG fallback
+            $original_url = str_replace('cropped-site-icon.avif', 'site-icon.png', $original_url);
+            $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($original_url));
+        }
+
+        $addTypeAttribute = function (&$meta_tags, $type) {
+            foreach ($meta_tags as &$tag) {
+                // For link tags (icon and apple-touch-icon)
+                if (preg_match('/<link (?:rel="icon"|rel="apple-touch-icon")[^>]*href="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
+                    $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
+                }
+                // For meta msapplication-TileImage
+                if (preg_match('/<meta name="msapplication-TileImage"[^>]*content="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
+                    $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
+                }
+            }
+        };
+
+        foreach (['png', 'ico', 'svg', 'webp', 'avif'] as $type) {
+            $addTypeAttribute($meta_tags, $type);
+        }
+
         return $meta_tags;
     }
 
+    /**
+     * Provide additional site icon image sizes for generation.
+     *
+     * This filter adds a set of common icon sizes to be generated when a site icon is set.
+     * It complements the default sizes provided by WordPress.
+     *
+     * @return int[] Array of additional icon sizes in pixels.
+     */
     #[Filter('site_icon_image_sizes')]
     public static function siteIconImageSizes(): array
     {
@@ -178,14 +212,26 @@ class ThemeInject
      */
     public static function themeData(): array
     {
-        $cached = Cache::get(CacheKey::THEME_DATA);
+        $loggedIn = is_user_logged_in();
+        // For logged-in users store per-user caches to avoid leaking any per-user secrets (nonces)
+        $cacheKey = $loggedIn
+            ? CacheKey::THEME_DATA . '_user_' . (int) get_current_user_id()
+            : CacheKey::THEME_DATA . '_anonymous';
+        $cached = Cache::get($cacheKey);
         if ($cached !== false) {
-            // Add dynamic disableTracking
-            $cached['disableTracking'] = !!is_user_logged_in();
+            // override disableTracking and wpRestNonce for logged-in state
+            $cached['disableTracking'] = $loggedIn;
+            if ($loggedIn) {
+                $cached['wpRestNonce'] = wp_create_nonce('wp_rest');
+            } else {
+                // safety remove in case cached from logged-in
+                if (isset($cached['wpRestNonce'])) {
+                    unset($cached['wpRestNonce']);
+                }
+            }
             return $cached;
         }
 
-        $disableTracking = !!is_user_logged_in();
 
         $logoData = ThemeInject::getLogoData();
         if (empty($logoData['sizes'])) {
@@ -204,14 +250,15 @@ class ThemeInject
             'logoHeight' => intval($logoData['height'] ?? 0),
             'lastJobUpdate' => $last_update_iso,
             'lastTaxonomyUpdate' => \WPLokerBJM\QueryBuilders\TaxonomyQuery::getLastModifiedDateForTaxonomies(),
-            'disableTracking' => $disableTracking,
+            'disableTracking' => $loggedIn,
             'themeVersion' => (int) filemtime(get_stylesheet_directory() . '/composer.json'),
         ];
 
-        // Cache without disableTracking
-        $cacheData = $wpThemeData;
-        unset($cacheData['disableTracking']);
-        Cache::set(CacheKey::THEME_DATA, $cacheData, 86400); // Cache for 1 day
+        if ($loggedIn) {
+            $wpThemeData['wpRestNonce'] = wp_create_nonce('wp_rest');
+        }
+
+        Cache::set($cacheKey, $wpThemeData, 86400); // Cache for 1 day
 
         return $wpThemeData;
     }
@@ -228,7 +275,7 @@ class ThemeInject
      *
      * @return void
      */
-    #[Action('wp_head', 0)]
+    #[Action('wp_head')]
     public static function injectThemeScript(): void
     {
         $wpThemeData = self::themeData(); // theme data for hydration
@@ -242,10 +289,6 @@ class ThemeInject
                     scriptElement?.remove();
                 };
                 try {
-                    <?php if (is_user_logged_in()): ?>
-                        sessionStorage.setItem('wp-rest-nonce', '<?= esc_js(wp_create_nonce('wp_rest')); ?>');
-                    <?php endif; ?>
-
                     const KEY = 'wplokerbjm-theme';
                     const root = document.documentElement;
 

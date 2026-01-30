@@ -7,7 +7,7 @@
   let swiperFailed = $state(false);
   let activeIndex = $state(0);
   let carouselData = $state<{ jobs: CardJob[]; totalJobs?: number } | null>(
-    null
+    null,
   );
   let isLoading = $state(false);
   let error = $state<string | null>(null);
@@ -35,7 +35,7 @@
     let maxHeight = 0;
     slides.forEach((slide) => {
       const card = slide.querySelector(
-        ".card-base-carousel"
+        ".card-base-carousel",
       ) as HTMLElement | null;
       if (card) {
         card.style.height = "auto";
@@ -44,7 +44,7 @@
     });
     slides.forEach((slide) => {
       const card = slide.querySelector(
-        ".card-base-carousel"
+        ".card-base-carousel",
       ) as HTMLElement | null;
       if (card) {
         card.style.height = maxHeight + "px";
@@ -56,6 +56,7 @@
 <script lang="ts">
   import JobCard from "@components/ui/Homepage/JobCard.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import { isJobGridEl } from "$lib/utils/elements.svelte";
   import {
     GlobalNavigateTo,
     routeStateStore,
@@ -111,7 +112,7 @@
   }>();
 
   const jobs = $derived(
-    initialpropJobs.length > 0 ? initialpropJobs : (carouselData?.jobs ?? [])
+    initialpropJobs.length > 0 ? initialpropJobs : (carouselData?.jobs ?? []),
   );
 
   const breakpoint = $derived.by(() => {
@@ -136,7 +137,7 @@
     private static createSwiperConfig(
       paginationEl: HTMLElement | null,
       nextEl: HTMLElement | null,
-      prevEl: HTMLElement | null
+      prevEl: HTMLElement | null,
     ) {
       return {
         loop: false,
@@ -159,6 +160,10 @@
           prevEl: prevEl ?? undefined,
         },
         watchslidesProgress: true,
+        // Favor passive listeners and avoid forcing touchstart preventDefault to reduce touch input latency
+        passiveListeners: true,
+        touchStartPreventDefault: false,
+        touchStartForcePreventDefault: false,
         virtual: {
           enabled: true,
           slides: Array.from({ length: jobs.length }, (_, i) => i),
@@ -212,7 +217,7 @@
                         const wrapper = (
                           swiperContainerEl as HTMLElement | null
                         )?.querySelector(
-                          ".swiper-wrapper"
+                          ".swiper-wrapper",
                         ) as HTMLElement | null;
                         if (
                           swiperInstance &&
@@ -221,7 +226,7 @@
                         ) {
                           try {
                             (swiperInstance as any).setTranslate(
-                              savedOffsetNow
+                              savedOffsetNow,
                             );
                           } catch {}
                         } else if (wrapper) {
@@ -257,7 +262,7 @@
     }
 
     private static async waitForSlidesAndWidth(
-      el: HTMLElement | null
+      el: HTMLElement | null,
     ): Promise<boolean> {
       if (!el) return false;
       const MAX_INIT_ATTEMPTS = 12;
@@ -288,7 +293,7 @@
       el: HTMLElement,
       paginationEl: HTMLElement | null,
       nextEl: HTMLElement | null,
-      prevEl: HTMLElement | null
+      prevEl: HTMLElement | null,
     ): Promise<void> {
       try {
         try {
@@ -321,7 +326,7 @@
         const cfg = SwiperManager.createSwiperConfig(
           paginationEl,
           nextEl,
-          prevEl
+          prevEl,
         );
         const finalCfg = {
           ...(cfg || {}),
@@ -365,7 +370,7 @@
                     } catch {}
                   } else {
                     const wrapper = el.querySelector(
-                      ".swiper-wrapper"
+                      ".swiper-wrapper",
                     ) as HTMLElement | null;
                     if (wrapper)
                       wrapper.style.transform = `translate3d(${savedOffset}px, 0, 0)`;
@@ -409,16 +414,16 @@
       } catch {}
 
       const paginationEl = el.querySelector(
-        ".swiper-pagination"
+        ".swiper-pagination",
       ) as HTMLElement | null;
 
       const nextEl = (nextButtonEl ??
         el.parentElement?.querySelector(
-          ".job-carousel-next"
+          ".job-carousel-next",
         )) as HTMLElement | null;
       const prevEl = (prevButtonEl ??
         el.parentElement?.querySelector(
-          ".job-carousel-prev"
+          ".job-carousel-prev",
         )) as HTMLElement | null;
 
       // Wait until there are slides and the container has width
@@ -442,7 +447,7 @@
           el,
           paginationEl,
           nextEl,
-          prevEl
+          prevEl,
         );
 
         swiperFailed = false;
@@ -499,7 +504,7 @@
       if (!el) {
         try {
           const possibleNode = document.querySelector(
-            ".job-carousel"
+            ".job-carousel",
           ) as HTMLElement | null;
           if (possibleNode) possibleNode.classList.remove("invisible");
         } catch {
@@ -540,7 +545,7 @@
           swiperInstance = null;
         }
         // Fetch fresh carousel data
-        const data = await APIService.fetchCarousel();
+        const data = await APIService.fetchCarouselGraphQL();
         carouselData = data ?? null;
         error = null;
       } catch {
@@ -562,17 +567,18 @@
     static fetchCarouselData(): void {
       if (initialpropJobs.length === 0 && !carouselData && !isLoading) {
         isLoading = true;
-        APIService.fetchCarousel()
-          .then((data) => {
-            carouselData = data;
+        new Promise<void>(async (resolve) => {
+          try {
+            const data = await APIService.fetchCarouselGraphQL();
+            carouselData = data ?? null;
             error = null;
-          })
-          .catch(() => {
+          } catch {
             error = "Failed to load carousel data";
-          })
-          .finally(() => {
+          } finally {
             isLoading = false;
-          });
+            resolve();
+          }
+        });
       }
     }
 
@@ -602,7 +608,7 @@
         if (swiperInstance.virtual) {
           swiperInstance.virtual.slides = Array.from(
             { length: count },
-            (_, i) => i
+            (_, i) => i,
           );
           swiperInstance.virtual.update(true);
         }
@@ -632,7 +638,7 @@
     public static async handleClickNavigateToJob(
       slug: string,
       permalink: CardJob["permalink"],
-      job: CardJob
+      job: CardJob,
     ): Promise<void> {
       this.carouselSaveCurrentSlideState();
       await this.handlePlatformSpecificNavigation(slug, permalink, job);
@@ -645,7 +651,7 @@
       let offset = 0;
       try {
         const wrapper = swiperContainerEl?.querySelector(
-          ".swiper-wrapper"
+          ".swiper-wrapper",
         ) as HTMLElement | null;
         if (wrapper) {
           const transform =
@@ -654,7 +660,7 @@
             "";
           // translate3d(xpx, ypx, zpx)
           const t3 = transform.match(
-            /translate3d\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\)/
+            /translate3d\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\)/,
           );
           if (t3) {
             offset = Number(t3[1]);
@@ -679,14 +685,16 @@
       });
     }
 
-    private static async handlePlatformSpecificNavigation(
+    private static handlePlatformSpecificNavigation(
       slug: string,
       permalink: CardJob["permalink"],
-      job: CardJob
-    ): Promise<void> {
+      job: CardJob,
+    ): void {
       if (typeof window !== "undefined" && window.innerWidth >= 768) {
         // Desktop: open overlay
-        await jobOverlay.openOverlay(slug, job);
+        const jobgridElement = isJobGridEl();
+        jobOverlay.openOverlay(slug, job);
+        jobgridElement?.scrollIntoView({ behavior: "smooth", block: "start" });
       } else {
         // Mobile: use SPA navigation to SingleLowongan.svelte route
         const url = new URL(String(permalink), routeStore.currentUrl.origin);
@@ -841,7 +849,7 @@
           <div
             class="swiper-slide"
             data-swiper-slide-index={idx}
-            style={`transform: translate3d(${virtualData.offset}px, 0, 0); `}
+            style={`transform: translate3d(${virtualData.offset ?? 0}px, 0, 0); `}
           >
             <JobCard
               jobdata={job}
@@ -851,7 +859,7 @@
                 CarouselNavigationHandler.handleClickNavigateToJob(
                   slug,
                   job.permalink ?? "",
-                  job
+                  job,
                 )}
             />
           </div>
@@ -866,7 +874,7 @@
         <div
           class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
         >
-          {#each jobs as job, idx (job.id ?? job.permalink ?? idx)}
+          {#each jobs as job, idx (Number(job.id) ?? job.permalink ?? idx)}
             <div class="fallback-item">
               <JobCard
                 jobdata={job}
@@ -890,6 +898,15 @@
 </section>
 
 <style>
+  /* Prefer browser native gestures for vertical scrolling to avoid blocking touchstart */
+  :global(.job-carousel),
+  :global(.job-carousel .swiper-wrapper),
+  :global(.job-carousel .swiper-slide) {
+    touch-action: pan-y;
+    -ms-touch-action: pan-y;
+    user-select: none;
+  }
+
   :global(.job-carousel.no-swiper .swiper-wrapper) {
     display: grid !important;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));

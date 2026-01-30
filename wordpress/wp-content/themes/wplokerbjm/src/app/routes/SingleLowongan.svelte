@@ -6,6 +6,7 @@
   import { type JobDetailResponse as SingleJob } from "@/types";
   import { utilsSEO } from "$lib/utils/SEO.svelte";
   import { routeStore } from "$lib/stores/Route.svelte";
+  import Footer from "@components/layouts/Footer.svelte";
 
   const { job: initialJob } = $props<{
     job: SingleJob;
@@ -41,9 +42,7 @@
     job = null; // Reset job state for new fetch
 
     try {
-      const fetchedJob = await APIService.fetchJobDetail(slug, {
-        signal: abortController.signal,
-      });
+      const fetchedJob = await APIService.fetchJobDetailGraphQL(slug, abortController.signal);
       // Only update if this is still the latest request and not aborted
       if (requestId === currentRequestId && !abortController.signal.aborted) {
         job = fetchedJob;
@@ -94,19 +93,18 @@
       debouncedFetch(slug);
     }
     if (job && job.id && !routeStore.isInitialLoad) {
-      void utilsSEO.clearPendingJobSchemas();
-      void utilsSEO.removeJobPostingJsonLd();
-      void utilsSEO.addJobPostingJsonLd([job.id]);
+      void utilsSEO.RemoveAllSchemas();
+      void utilsSEO.addJobPostingJsonLd([Number(job.id)]);
     }
   });
 </script>
 
 {#if isLoading}
-  <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8">
-    <SkeletonSingleLowongan />
-  </main>
+  <SkeletonSingleLowongan />
 {:else if job}
   <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12">
     <JobDetail {job} />
   </main>
 {/if}
+
+<Footer />

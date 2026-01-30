@@ -10,11 +10,11 @@
 
 ## 📁 Important Theme Files & Folders
 
-2. 🎨 **`style.css`** - Boilerplate WordPress stylesheet for the theme. Contains theme metadata and custom styles.
-3. ⚙️ **`server/`** - Directory containing backend PHP code, including custom functions, REST APIs, hooks, and filters.
-4. 🖼️ **`src/`** - Directory containing Svelte components and all client-side code that enhances the user interface.
-5. 📦 **`assets/`** - Directory for static assets like images, fonts, static site generation, and compiled CSS/JS files.
-6. 🛠️ **`tools/`** - Directory for development and build tools.
+1. 🎨 **`style.css`** - Boilerplate WordPress stylesheet for the theme. Contains theme metadata and custom styles.
+2. ⚙️ **`server/`** - Directory containing backend PHP code, including custom functions, GraphQL APIs, hooks, and filters.
+3. 🖼️ **`src/`** - Directory containing Svelte components and all client-side code that enhances the user interface.
+4. 📦 **`assets/`** - Directory for static assets like images, fonts, static site generation, and compiled CSS/JS files.
+5. 🛠️ **`tools/`** - Directory for development and build tools.
 
 ## 🔌 Must-Use Plugin (MU Plugin)
 
@@ -76,7 +76,7 @@ You can still create manual definitions for special cases:
 3. **Service arrays** - When you need to pass arrays of services (like the `Init` class)
 4. **Singleton patterns** - When you need specific instantiation logic
 
-Manual definitions are placed in `server/Core/Definitions/` and take precedence over auto-scanned definitions.
+Manual definitions are placed in `server/Core/Container/Definitions/` and take precedence over auto-scanned definitions.
 
 ### Usage Examples
 
@@ -138,7 +138,7 @@ class MyService
 }
 ```
 
-### How It Works
+### How Hook Registration Works
 
 - The `AutowireScanner` scans all autowirable classes for methods with `#[Action]` or `#[Filter]` attributes.
 - The `Init` service automatically registers these hooks when the container is initialized.
@@ -158,8 +158,9 @@ This approach keeps hook registration declarative and centralized.
 
 ## 📋 Mini Kanban Table
 
-| 📥 BACKLOG                                             | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                           |
-| ------------------------------------------------------ | ------- | -------------- | -------------------------------------- |
-|                                                        |         |                | ✅ Migrate to Svelte for most frontend |
-| 🚀 Migrate to SvelteKit and deploy to Vercel/CF Worker |         |                | ✅ Fully CSR `<body>`                  |
-| 🗺️ Add Job Fair Page (map & event details)             |         |                | ✅ Client side bookmark system         |
+| 📥 BACKLOG                                 | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                                     |
+| ------------------------------------------ | ------- | -------------- | ------------------------------------------------ |
+|                                            |         |                | ✅ Migrate to Svelte for most frontend           |
+| 🗺️ Add Job Fair Page (map & event details) |         |                | ✅ Client side bookmark system                   |
+| 🛠️ Add Skeleton SSR for SEO                |         |                | ✅ Add Skeleton just for SEO                     |
+| 🛠️ Add Skeleton noscript for SEO           |         |                | ✅ Virtualization listing for better performance |

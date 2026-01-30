@@ -3,7 +3,6 @@ import { taxonomyStore } from './Taxonomy.svelte'
 import { debounce, validation } from '@/utils'
 import type {
     SearchFilters,
-    LoadMoreFilters,
     CardJob,
     LoadMoreResponse,
     SearchResponse,
@@ -30,6 +29,10 @@ export class SearchManager {
     public error = $state<string | null>(null)
     public suggestionsLoading = $state(false)
     public selectedSuggestionIndex = $state(-1)
+
+    // Load more cache for CLS-free loading, avoid dynamically append list cards to DOM which triggered unfair CLS assessment
+    public nextPageLoadMoreCache = $state<CardJob[] | null>(null)
+    public isPrefetchingLoadMore = $state(false)
 
     public filters = $state<SearchFilters>({
         cari: '',
@@ -70,7 +73,7 @@ export class SearchManager {
         if (validation.isValidQuery(cleanQuery)) {
             this.suggestionsLoading = true
             try {
-                const data = await APIService.getAutoSuggestions(cleanQuery)
+                const data = await APIService.getAutoSuggestionsGraphQL(cleanQuery)
                 this.suggestions = data || []
                 this.showSuggestions = this.suggestions.length > 0
             } catch {
@@ -94,7 +97,9 @@ export class SearchManager {
         this.filters[TaxonomyType.lokasi] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.lokasi]) ?? this.filters[TaxonomyType.lokasi]
         this.filters[TaxonomyType.gender] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.gender]) ?? this.filters[TaxonomyType.gender]
         this.filters[TaxonomyType.pendidikan] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.pendidikan]) ?? this.filters[TaxonomyType.pendidikan]
-        this.filters.sort = typeof newFilters.sort === 'object' && newFilters.sort !== null ? (newFilters.sort as SortOption) : this.filters.sort
+        if (newFilters.sort && typeof newFilters.sort === 'object') {
+            this.filters.sort = { value: newFilters.sort.value, label: newFilters.sort.label }
+        }
         this.filters.context = newFilters.context ?? this.filters.context
     }
 
@@ -139,12 +144,12 @@ export class SearchManager {
         this.error = null
         try {
             const cleaned = SearchUtils.sanitizeFilters({ ...this.filters })
-            const response = await APIService.searchJobs(cleaned)
+            const response = await APIService.searchJobsGraphQL(cleaned)
             this.jobs = [...(response.jobs || [])]
             this.context = (response.context as SearchContext) || SearchContext.Search
             this.title = response.title || SearchTitle.Search
-            this.totalJobs = response.meta?.total || 0
-            this.maxNumPages = response.meta?.totalPages || 1
+            this.totalJobs = response.total || 0
+            this.maxNumPages = response.maxNumPages || 1
             this.page = 1
             if (cleaned.cari) this.addToHistory(String(cleaned.cari))
             return response
@@ -164,13 +169,17 @@ export class SearchManager {
         this.loading = true
         this.error = null
         try {
-            const loadMoreFilters: LoadMoreFilters = {
-                paged: this.page + 1,
-                context: this.context,
-                ...SearchUtils.sanitizeFilters({ ...this.filters }),
+            const paged = this.page + 1
+            const context = this.context
+            const filters = SearchUtils.sanitizeFilters({ ...this.filters })
+
+            const loadMoreFilters = {
+                paged,
+                context,
+                ...filters,
             }
 
-            const response = await APIService.loadMoreJobs(loadMoreFilters)
+            const response = await APIService.loadMoreJobsGraphQL(loadMoreFilters)
 
             if (Array.isArray(response.jobs) && response.jobs.length) {
                 // Filter out jobs that already exist (by permalink) to prevent duplicates
@@ -178,8 +187,8 @@ export class SearchManager {
                     !this.jobs.some(existingJob => existingJob.permalink === newJob.permalink)
                 );
                 this.jobs.push(...newJobs)
-                this.page = loadMoreFilters.paged
-                this.maxNumPages = response.meta?.totalPages || this.maxNumPages
+                this.page = paged
+                this.maxNumPages = response.maxNumPages || this.maxNumPages
             } else {
                 this.page = this.maxNumPages
             }
@@ -199,6 +208,54 @@ export class SearchManager {
         } finally {
             this.loading = false
         }
+    }
+
+    public async prefetchNextPage(): Promise<void> {
+        if (this.isPrefetchingLoadMore || this.page >= this.maxNumPages || this.nextPageLoadMoreCache) {
+            return
+        }
+
+        this.isPrefetchingLoadMore = true
+        this.error = null
+        try {
+            const paged = this.page + 1
+            const context = this.context
+            const filters = SearchUtils.sanitizeFilters({ ...this.filters })
+
+            const loadMoreFilters = {
+                paged,
+                context,
+                ...filters,
+            }
+
+            const response = await APIService.loadMoreJobsGraphQL(loadMoreFilters)
+
+            if (Array.isArray(response.jobs) && response.jobs.length) {
+                // Filter out jobs that already exist (by permalink) to prevent duplicates
+                const newJobs = response.jobs.filter(newJob =>
+                    !this.jobs.some(existingJob => existingJob.permalink === newJob.permalink)
+                );
+                this.nextPageLoadMoreCache = newJobs
+                this.maxNumPages = response.maxNumPages || this.maxNumPages
+            } else {
+                this.page = this.maxNumPages
+            }
+        } catch (err) {
+            console.error('SearchStore: Prefetch failed:', err);
+            this.error = err instanceof Error ? err.message : 'Prefetch failed'
+        } finally {
+            this.isPrefetchingLoadMore = false
+        }
+    }
+
+    public appendCachedPage(): void {
+        if (!this.nextPageLoadMoreCache) {
+            return
+        }
+
+        this.jobs.push(...this.nextPageLoadMoreCache)
+        this.page++
+        this.nextPageLoadMoreCache = null
     }
 
     public get selectedFiltersWithNames() {
@@ -288,6 +345,7 @@ export class SearchUtils {
                     .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
                     .filter((s) => String(s).trim() !== '')
                 : f[TaxonomyType.pendidikan],
+            sort: f.sort ? { value: f.sort.value, label: f.sort.label } : f.sort,
             context: f.context,
         }
     }

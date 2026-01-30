@@ -7,8 +7,7 @@ import liveReload from "vite-plugin-live-reload";
 import { unstableRolldownAdapter } from 'vite-bundle-analyzer'
 import { analyzer } from 'vite-bundle-analyzer'
 import { partytownVite } from "@qwik.dev/partytown/utils";
-// import { compression, defineAlgorithm } from 'vite-plugin-compression2'
-// import zlib from 'zlib';
+import { generateCaddyEarlyHints } from "./vite-plugins/generate-caddy-early-hints";
 
 export default defineConfig(({ command }) => {
   return {
@@ -26,18 +25,10 @@ export default defineConfig(({ command }) => {
       partytownVite({
         dest: resolve(__dirname, "assets", "dist", "~partytown")
       }),
-      // compression({
-      //   deleteOriginalAssets: false,
-      //   exclude: ["**/*.json", "**/*.map", "**/*.xml", "**/*.svg", "**/*.webmanifest", "**/*.txt", "**/*.woff2", "**/*.woff"],
-      //   threshold: 0,
-      //   skipIfLargerOrEqual: false,
-      //   logLevel: 'info',
-      //   algorithms: [defineAlgorithm('brotliCompress', {
-      //     params: {
-      //       [zlib.constants.BROTLI_PARAM_QUALITY]: 11
-      //     }
-      //   })]
-      // })
+      generateCaddyEarlyHints({
+        manifestPath: resolve(__dirname, 'assets/dist/.vite/manifest.json'),
+        outputPath: resolve(__dirname, '../../../../configs/caddy-early-hints.conf')
+      })
     ],
     resolve: {
       alias: {
@@ -74,22 +65,22 @@ export default defineConfig(({ command }) => {
           exports: "auto",
           hashCharacters: "base64",
           minify: true,
-          inlineDynamicImports: false,
+          // codeSplitting: true,
           format: "esm",
-          entryFileNames: "js/[name]-[hash:21].js",
-          chunkFileNames: "js/[name]-[hash:21].js",
+          entryFileNames: "js/[name]-[hash:6].js",
+          chunkFileNames: "js/[name]-[hash:6].js",
           assetFileNames: (assetInfo: any): string => {
             const assetName =
               assetInfo.names && assetInfo.names.length > 0
                 ? assetInfo.names[0]
                 : "";
             if (assetName.endsWith(".css")) {
-              return "css/[name]-[hash:32][extname]";
+              return "css/[name]-[hash:6][extname]";
             }
             if (assetName && /\.(woff2?|ttf|otf|eot)$/.test(assetName)) {
-              return "webfonts/[name]-[hash:32][extname]";
+              return "webfonts/[name]-[hash:6][extname]";
             }
-            return "assets/[name]-[hash:32][extname]";
+            return "assets/[name]-[hash:6][extname]";
           },
         },
       },

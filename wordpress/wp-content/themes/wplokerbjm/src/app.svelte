@@ -1,34 +1,19 @@
 <script module lang="ts">
-  import { onMount, type Component } from "svelte";
+  import { onDestroy, onMount, type Component } from "svelte";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import { GoogleServices } from "@/services/Google";
+  import { isMobile } from "$lib/utils/elements.svelte";
 
   const pathname = $derived(routeStore.currentUrl.pathname);
-  const isLoading = $derived(routeStore.isLoading);
   const isInitialLoad = $derived(routeStore.isInitialLoad);
   const componentNamePath = $derived(routeStore.getComponentNamePath(pathname));
   const CurrentComponent = $derived(routeStore.CurrentComponent);
-  const SkeletonComponent = $derived(routeStore.SkeletonComponent);
   const isTransitioningRoute = $derived(routeStore.isTransitioningRoute);
 
   class AppRouteHandler {
-    public getSkeletonLoader(
-      componentName: string
-    ): Promise<Component<any>> | null {
-      switch (componentName) {
-        case "Homepage":
-          return dynamicComponentStore.loadSkeletonHomepage();
-        case "SingleLowongan":
-          return dynamicComponentStore.loadSkeletonSingleLowongan();
-        case "PasangIklanLoker":
-          return dynamicComponentStore.loadSkeletonPasangIklanLoker();
-      }
-      return null;
-    }
-
     public mapComponentName(
-      name: typeof componentNamePath
+      name: typeof componentNamePath,
     ): Promise<Component<any>> | null {
       switch (name) {
         case "Homepage":
@@ -36,26 +21,9 @@
         case "PasangIklanLoker":
           return dynamicComponentStore.loadPasangIklanLoker();
         case "SingleLowongan":
-          return dynamicComponentStore.loadSingleLowongan();
+          return isMobile() ? dynamicComponentStore.loadSingleLowongan() : dynamicComponentStore.loadHomepage();
       }
       return null;
-    }
-
-    private loadSkeleton(componentName: string): void {
-      if (!isInitialLoad) {
-        const skeletonPromise = this.getSkeletonLoader(componentName);
-        if (skeletonPromise) {
-          skeletonPromise
-            .then((comp: Component<any> | null) => {
-              routeStore.SkeletonComponent = comp;
-            })
-            .catch(() => {
-              routeStore.SkeletonComponent = null;
-            });
-        } else {
-          routeStore.SkeletonComponent = null;
-        }
-      }
     }
 
     private setComponentWithTransition(component: any, path: string): void {
@@ -68,17 +36,18 @@
 
       if (
         typeof document !== "undefined" &&
-        (document as any).startViewTransition &&
-        !(document as any).viewTransition &&
-        !routeStore.lockViewTransition
+        document.startViewTransition &&
+        !document.viewTransition &&
+        !routeStore.lockViewTransition &&
+        !isInitialLoad // Skip view transition for initial load to avoid browser incompatibilities issue
       ) {
         routeStore.lockViewTransition = true;
 
         try {
-          const trans = (document as any).startViewTransition(() => {
+          const trans = document.startViewTransition!(() => {
             routeStore.CurrentComponent = component;
-            routeStateStore.restoreScrollForPath(path);
             routeStore.isTransitioningRoute = false;
+            routeStateStore.restoreScrollForPath(path);
           });
           routeStore.currentViewTransition = trans;
           if (trans && trans.finished) {
@@ -100,9 +69,9 @@
           routeStateStore.restoreScrollForPath(path);
         }
       } else {
-        // Fallback without view transition (no lock needed here, as we're not transitioning)
+        // Fallback without view transition
         routeStore.currentViewTransition = null;
-        routeStore.lockViewTransition = false; // Ensure it's reset
+        routeStore.lockViewTransition = false;
         routeStore.CurrentComponent = component;
         routeStore.isTransitioningRoute = false;
         routeStateStore.restoreScrollForPath(path);
@@ -111,12 +80,11 @@
 
     public loadRoute(
       importPromise: Promise<Component<any>>,
-      componentNamePath: string
+      componentNamePath: string,
     ): void {
       const loadForPath = pathname;
       try {
         routeStore.loadStart(componentNamePath);
-        this.loadSkeleton(componentNamePath);
 
         importPromise
           .then((m) => {
@@ -130,7 +98,6 @@
           })
           .finally(() => {
             routeStore.loadEnd();
-            routeStateStore.setSkipScrollRestore(pathname, true);
           });
       } catch (err) {
         routeStore.CurrentComponent = null;
@@ -149,6 +116,7 @@
 </script>
 
 <script lang="ts">
+  import "@css/app.css";
   import FloatingActionButton from "@components/ui/Shared/FloatingActionButton.svelte";
   import Header from "@components/layouts/Header.svelte";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
@@ -164,18 +132,8 @@
     }
   });
 
-  $effect(() => {
-    if (
-      !isInitialLoad &&
-      !routeStateStore.getSkipScrollRestore(pathname) &&
-      CurrentComponent &&
-      !isTransitioningRoute
-    ) {
-      routeStateStore.restoreScrollForPath(pathname);
-    }
-  });
-
   onMount(() => {
+    routeStateStore.observeBreakpointChanges();
     routeStore.setCurrentPath(pathname);
     GoogleServices.injectGTMScript()
       .then(() => {
@@ -195,33 +153,24 @@
       };
     }
   });
+
+  onDestroy(() => {
+    routeStateStore.cleanUpEffect();
+  });
 </script>
 
-<Header />
 <div class="route-container">
-  <!-- {#key pathname} -->
-  {#if isLoading && !isInitialLoad && SkeletonComponent}
-    <div
-      class="page-transition"
-      style="padding-top:{headerStore.totalOffset}px;"
-    >
-      {#await Promise.resolve(SkeletonComponent) then Skeleton}
-        <Skeleton />
-      {/await}
-    </div>
-  {:else if CurrentComponent && !isTransitioningRoute}
+  <Header />
+  {#if CurrentComponent && !isTransitioningRoute}
     <div
       class="page-transition"
       style="padding-top:{headerStore.totalOffset}px"
     >
-      {#await Promise.resolve(CurrentComponent) then RouteComponent}
-        <RouteComponent {...isInitialLoad ? props : {}} />
-      {/await}
+      <CurrentComponent {...isInitialLoad ? props : {}} />
     </div>
   {/if}
-  <!-- {/key} -->
+  <FloatingActionButton />
 </div>
-<FloatingActionButton />
 
 <style lang="postcss">
   /* Page transition styles */
@@ -241,6 +190,7 @@
   .route-container {
     min-height: 100vh;
     transition: all 0.2s ease-in-out;
+    position: relative;
     /* Prefer Document Transition API: provide a stable view name so the UA can capture snapshots */
     view-transition-name: route;
     /* tuneable CSS vars for platforms that respect view transition tuning */

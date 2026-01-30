@@ -140,7 +140,7 @@ class TaxonomyManager {
 		this.lokasiLoading = true
 		this.lokasiError = null
 		try {
-			const data = await APIService.fetchLokasiTerms()
+			const data = await APIService.fetchLokasiTermsGraphQL()
 			this.lokasiTerms = data
 			this.lokasiLoaded = true
 			this.setCachedTerms(TaxonomyType.lokasi, data)
@@ -166,7 +166,7 @@ class TaxonomyManager {
 		this.genderLoading = true
 		this.genderError = null
 		try {
-			const data = await APIService.fetchGenderTerms()
+			const data = await APIService.fetchGenderTermsGraphQL()
 			this.genderTerms = data
 			this.genderLoaded = true
 			this.setCachedTerms(TaxonomyType.gender, data)
@@ -192,7 +192,7 @@ class TaxonomyManager {
 		this.pendidikanLoading = true
 		this.pendidikanError = null
 		try {
-			const data = await APIService.fetchPendidikanTerms()
+			const data = await APIService.fetchPendidikanTermsGraphQL()
 			this.pendidikanTerms = data
 			this.pendidikanLoaded = true
 			this.setCachedTerms(TaxonomyType.pendidikan, data)

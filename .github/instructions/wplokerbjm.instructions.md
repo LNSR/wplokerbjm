@@ -33,7 +33,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - If there errors, immediately fix them.
 - Never run Vite dev and Vite build.
 - These repositories are using Docker for development and production(simulated configs only, not resources).
-- Production are on shared hosting with 1GB RAM and 1 CPU core, its using Litespeed Server and QUIC Cloud.
+- Production server are on shared hosting with 1GB RAM and 1 CPU core, its using Litespeed Server and QUIC Cloud.
 
 ## Backend(PHP)
 
@@ -50,5 +50,5 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 
 - Use **Bun** for JavaScript/TypeScript package management, always using the latest versions of JavaScript/TypeScript frameworks and syntaxes.
 - Frontend tooling is using Vite.
-- Svelte 5 Runes mode.
+- Use Svelte 5 Runes mode.
 - Tailwind CSS with DaisyUI for styling.

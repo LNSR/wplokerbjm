@@ -1,5 +1,6 @@
 <?php
 namespace WPLokerBJM\Core\Plugins;
+use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Container;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
@@ -18,6 +19,7 @@ class Litespeed
     #[Action('litespeed_purged_all')]
     public static function clearObjectCache(): void
     {
+        Logger::info('LiteSpeed', 'Clearing object cache due to LiteSpeed cache purge');
         // Clear APCu cache first
         if (function_exists('apcu_clear_cache')) {
             apcu_clear_cache();
@@ -43,6 +45,7 @@ class Litespeed
 
 /**
  * LiteSpeed Filters Focused Hooks
+ * @link https://docs.litespeedtech.com/lscache/lscwp/api/
  */
 class LiteSpeedFilters
 {
@@ -71,5 +74,58 @@ class LiteSpeedFilters
     {
         $excludes[] = self::pattern();
         return $excludes;
+    }
+
+    /**
+     * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
+     */
+    #[Filter('litespeed_is_mobile', 0)]
+    public static function customMobileDetect()
+    {
+        return wp_is_mobile();
+    }
+}
+
+/**
+ * LiteSpeed GraphQL Integration
+ */
+class LiteSpeedGraphQL
+{
+    /**
+     * Force GraphQL Queries returned via HTTP GET requests to be cacheable
+     */
+    #[Action('graphql_process_http_request_response', 0)]
+    public static function forceCacheable(): void
+    {
+        if ('GET' !== $_SERVER['REQUEST_METHOD']) {
+            return;
+        }
+
+        do_action('litespeed_control_force_cacheable');
+    }
+
+    /**
+     * Add LiteSpeed tags, unset the x-graphql-keys
+     */
+    #[Filter('graphql_response_headers_to_send', 10, 1)]
+    public static function tagResponses(array $headers = []): array
+    {
+        if (isset($headers['X-GraphQL-Keys'])) {
+            do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
+            
+            // Unset the x-graphql-keys headers so that we don't overpopulate the headers
+            // as there are header size limitations
+            unset($headers['X-GraphQL-Keys']);
+        }
+        return $headers;
+    }
+
+    /**
+     * Call litespeed_purge when graphql_purge is called
+     */
+    #[Action('graphql_purge', 0)]
+    public static function purgeCache($keys): void
+    {
+        do_action('litespeed_purge', $keys);
     }
 }

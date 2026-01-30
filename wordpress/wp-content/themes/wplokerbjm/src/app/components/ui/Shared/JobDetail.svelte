@@ -38,14 +38,14 @@
   const now = $state(new SvelteDate());
 
   const ringkasanPekerjaan = $derived(
-    generalStore.useSummaryJob(job.ringkasanPekerjaan)
+    generalStore.useSummaryJob(job.ringkasanPekerjaan),
   );
   const contacts = $derived(generalStore.useContactsJob(job.contacts));
   const socialMediaItems = $derived(
-    generalStore.useSocialMedia().socialMediaItems(job.social_media)
+    generalStore.useSocialMedia().socialMediaItems(job.social_media),
   );
   const timeAgo = $derived.by(() =>
-    generalStore.useTimeAgo(job.post_time, now)
+    generalStore.useTimeAgo(job.post_time, now),
   );
 
   const allImages = $derived(
@@ -55,13 +55,14 @@
       ...extractImages(job.persyaratan || ""),
       ...extractImages(job.cara_melamar || ""),
       ...extractImages(job.benefit || ""),
-    ].filter((v, i, a) => a.indexOf(v) === i)
+    ].filter((v, i, a) => a.indexOf(v) === i),
   );
   let galleryRef = $state<HTMLElement>();
   let viewer = $state<Viewer>();
 
   const viewerOptions: unknown = {
     hidden: true,
+    container: document.querySelector(".route-container") ?? document.body,
     focus: true,
     toolbar: {
       zoomIn: false,
@@ -166,7 +167,7 @@
 <div class="space-y-8">
   <!-- Job Title -->
   {#if job.title}
-    <section class="top-0 backdrop-blur text-center">
+    <section class="top-0 text-center">
       <div class="flex items-center justify-center gap-4">
         <h1 class="text-3xl font-bold">{job.title}</h1>
       </div>
@@ -179,7 +180,7 @@
             aria-hidden="true"
           />
           <span>Diupdate: {timeAgo()}</span>
-          <BookmarkButton jobId={job.id || 0} variant="detail" />
+          <BookmarkButton jobId={Number(job.id) || 0} variant="detail" />
         </div>
       {/if}
     </section>

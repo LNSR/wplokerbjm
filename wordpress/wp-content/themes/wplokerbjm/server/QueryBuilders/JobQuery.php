@@ -26,7 +26,7 @@ class JobQuery
 		return array_merge(self::getBaseArgs, [
 			'posts_per_page' => $posts_per_page,
 			'paged' => $paged,
-			'orderby' => 'date',
+			'orderby' => 'post_date',
 			'order' => 'DESC',
 		]);
 	}
@@ -59,22 +59,31 @@ class JobQuery
 		return array_merge(self::getBaseArgs, [
 			'posts_per_page' => $per_page,
 			'meta_query' => [
+				'relation' => 'OR',
+				// Pinned jobs (status 3) - always show
 				[
 					'key' => CustomFields::STATUS_PEKERJAAN,
-					'value' => [2, 3],
-					'compare' => 'IN',
+					'value' => CustomFields::STATUS_PEKERJAAN_PINNED,
+					'compare' => '=',
 					'type' => 'NUMERIC',
 				],
+				// Urgent jobs (status 2) with upcoming deadlines
 				[
-					'key' => CustomFields::DEADLINE,
-					'value' => [$today, $seven_days],
-					'compare' => 'BETWEEN',
-					'type' => 'DATE',
+					'relation' => 'AND',
+					[
+						'key' => CustomFields::STATUS_PEKERJAAN,
+						'value' => CustomFields::STATUS_PEKERJAAN_URGENT,
+						'compare' => '=',
+						'type' => 'NUMERIC',
+					],
+					[
+						'key' => CustomFields::DEADLINE,
+						'value' => [$today, $seven_days],
+						'compare' => 'BETWEEN',
+						'type' => 'DATE',
+					],
 				],
 			],
-			'orderby' => 'meta_value',
-			'meta_key' => CustomFields::DEADLINE,
-			'order' => 'ASC',
 		]);
 	}
 
@@ -88,12 +97,13 @@ class JobQuery
 	 */
 	public static function searchJobsArgs(array $params, int $paged, int $per_page): array
 	{
-		$order = (isset($params['sort']) && strtolower($params['sort']) === 'asc') ? 'ASC' : 'DESC';
+		$sortValue = isset($params['sort']) ? (is_array($params['sort']) ? ($params['sort']['value'] ?? 'desc') : $params['sort']) : 'desc';
+		$order = (strtolower($sortValue) === 'asc') ? 'ASC' : 'DESC';
 
 		$args = array_merge(self::getBaseArgs, [
 			'posts_per_page' => $per_page,
 			'paged' => $paged,
-			'orderby' => 'date',
+			'orderby' => 'post_date',
 			'order' => $order,
 		]);
 

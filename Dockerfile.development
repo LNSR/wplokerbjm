@@ -77,8 +77,10 @@ RUN apt-get update --allow-releaseinfo-change && \
     libyaml-0-2 \
     default-jre-headless \
     gosu \
+    strace \
     less \
     cron \
+    procps \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy WP-CLI from builder (already present there)

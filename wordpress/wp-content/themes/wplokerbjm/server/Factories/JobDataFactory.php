@@ -72,10 +72,12 @@ class JobDataFactory
             // Process WYSIWYG fields
             $wysiwyg_fields = [CustomFields::TENTANG_PERUSAHAAN, CustomFields::DESKRIPSI_PEKERJAAN, CustomFields::PERSYARATAN, CustomFields::CARA_MELAMAR, CustomFields::BENEFIT];
             foreach ($wysiwyg_fields as $field) {
-                if (!empty($customFields[$field])) {
+                if (isset($customFields[$field])) {
                     // Accept strings only; other types are ignored
                     if (is_string($customFields[$field])) {
                         $customFields[$field] = do_shortcode(wpautop(wp_kses_post($customFields[$field])));
+                    } else {
+                        $customFields[$field] = null;
                     }
                 }
             }
@@ -83,31 +85,41 @@ class JobDataFactory
             // Process number fields
             $number_fields = [CustomFields::UMUR_MIN, CustomFields::UMUR_MAX, CustomFields::PENGALAMAN, CustomFields::GAJI_MINIMAL, CustomFields::GAJI_MAKSIMAL, CustomFields::STATUS_PEKERJAAN];
             foreach ($number_fields as $field) {
-                if (!empty($customFields[$field]) && is_numeric($customFields[$field])) {
-                    // Cast numeric strings or numbers to int
-                    $customFields[$field] = (int) $customFields[$field];
+                if (isset($customFields[$field])) {
+                    if (is_numeric($customFields[$field])) {
+                        // Cast numeric strings or numbers to int
+                        $customFields[$field] = (int) $customFields[$field];
+                    } else {
+                        $customFields[$field] = null;
+                    }
                 }
             }
 
             $sanitize_contact_fields = [
-                CustomFields::EMAIL_KONTAK => fn($v) => is_string($v) ? sanitize_email($v) : null,
-                CustomFields::SITUS_KONTAK => fn($v) => is_string($v) ? esc_url($v) : null,
-                CustomFields::NOMOR_KONTAK => fn($v) => is_string($v) ? sanitize_text_field($v) : null,
+                CustomFields::EMAIL_KONTAK => fn($v) => is_string($v) ? (sanitize_email($v) ?: null) : null,
+                CustomFields::SITUS_KONTAK => fn($v) => is_string($v) ? (esc_url($v) ?: null) : null,
+                CustomFields::NOMOR_KONTAK => fn($v) => is_string($v) ? (sanitize_text_field($v) ?: null) : null,
             ];
 
             // Process email, URL, and text fields (handle arrays for cloned fields)
             foreach ([CustomFields::EMAIL_KONTAK, CustomFields::SITUS_KONTAK, CustomFields::NOMOR_KONTAK] as $field) {
-                $sanitize_callback = $sanitize_contact_fields[$field];
-                if (!empty($customFields[$field]) && is_array($customFields[$field])) {
-                    array_filter(array_map($sanitize_callback, $customFields[$field]));
-                } else {
-                    $customFields[$field] = $sanitize_callback($customFields[$field]);
+                if (isset($customFields[$field])) {
+                    $sanitize_callback = $sanitize_contact_fields[$field];
+                    if (is_array($customFields[$field])) {
+                        $customFields[$field] = implode(', ', array_filter(array_map($sanitize_callback, $customFields[$field])));
+                    } else {
+                        $customFields[$field] = $sanitize_callback($customFields[$field]);
+                    }
                 }
             }
 
             // Process date fields
-            if (!empty($customFields[CustomFields::DEADLINE]) && is_string($customFields[CustomFields::DEADLINE])) {
-                $customFields[CustomFields::DEADLINE] = date('Y-m-d', strtotime($customFields[CustomFields::DEADLINE]));
+            if (isset($customFields[CustomFields::DEADLINE])) {
+                if (is_string($customFields[CustomFields::DEADLINE]) && strtotime($customFields[CustomFields::DEADLINE]) !== false) {
+                    $customFields[CustomFields::DEADLINE] = date('Y-m-d', strtotime($customFields[CustomFields::DEADLINE]));
+                } else {
+                    $customFields[CustomFields::DEADLINE] = null;
+                }
             }
 
             // Process fieldset fields (e.g., social media)
@@ -150,7 +162,11 @@ class JobDataFactory
                     }
                 }
 
-                $customFields[CustomFields::SOCIAL_MEDIA] = $processedSocialMedia;
+                $customFields[CustomFields::SOCIAL_MEDIA] = implode('; ', array_map(
+                    fn($platform, $usernames) => $platform . ': ' . implode(', ', $usernames),
+                    array_keys($processedSocialMedia),
+                    $processedSocialMedia
+                ));
             }
         } catch (\Exception $e) {
             Logger::error('Factory', 'CustomFieldsService::processCustomFields error: ' . $e->getMessage());

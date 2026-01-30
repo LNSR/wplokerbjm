@@ -1,13 +1,13 @@
 <?php
 
-namespace WPLokerBJM\Services\REST;
+namespace WPLokerBJM\Services\GraphQL;
 
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
-class RESTData
+class GraphQLData
 {
     public function __construct(
         private \WPLokerBJM\Factories\JobDataFactory $jobDataFactory,
@@ -23,7 +23,8 @@ class RESTData
      */
     public function getCardData(int $post_id): array
     {
-        $cacheKey = CacheKey::REST_CARD_PREFIX . $post_id;
+        $post_id = (int) $post_id; // Explicit coercion for type safety
+        $cacheKey = CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id;
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -74,10 +75,24 @@ class RESTData
      */
     public function getJobDetailData(int $post_id): array
     {
-        $cacheKey = CacheKey::REST_JOBDETAIL_PREFIX . $post_id . (is_user_logged_in() ? '_logged_in' : '_public');
+        $post_id = (int) $post_id; // Explicit coercion for type safety
+        // Use per-user cache for logged-in users to avoid leaking user-specific nonces
+        $cacheKey = is_user_logged_in()
+            ? CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . $post_id . '_user_' . (int) get_current_user_id()
+            : CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . $post_id . '_public';
+
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
-            return $cached;
+            if (is_user_logged_in()) {
+                $cached['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
+                return $cached;
+            } else {
+                // safety remove in case cached from logged-in
+                if (isset($cached['duplicateNonce'])) {
+                    unset($cached['duplicateNonce']);
+                }
+                return $cached;
+            }
         }
 
         try {
@@ -158,7 +173,19 @@ class RESTData
      * !Useful in future for headless setups
      * @return array
      */
-    public function JobSchema(int $post_id) {
+    public function JobSchema(int $post_id): array
+    {
+        $post_id = (int) $post_id; // Explicit coercion for type safety
         return $this->jobSchema->getJobPostingSchema($post_id);
+    }
+
+    /**
+     * Return an ItemList schema id for post ID
+     * @param int $post_id
+     * @return array
+     */
+    public function ItemListJobPostings(array $post_ids): array
+    {
+        return $this->jobSchema->getItemListSchema($post_ids);
     }
 }

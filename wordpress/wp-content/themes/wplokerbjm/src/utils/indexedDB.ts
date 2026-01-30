@@ -9,7 +9,7 @@ interface WPLokerIDB {
 
 class IDB {
   protected DB_NAME: WPLokerIDB['dbName'] = 'wplokerbjm'
-  protected DB_VERSION: WPLokerIDB['version'] = 1
+  protected DB_VERSION: WPLokerIDB['version'] = Number(1)
   protected STORE_NAME: WPLokerIDB['storeName'] = ''
 
   private dbPromise: Promise<IDBPDatabase<CardJob>> | null = null
@@ -43,7 +43,7 @@ export class BookmarkIDB extends IDB {
       const tx = db.transaction(this.STORE_NAME, 'readwrite')
       await tx.store.clear()
       for (const job of jobs) {
-        await tx.store.put(job, job.id)
+        await tx.store.put(job, (Number(job.id)))
       }
       await tx.done
     } catch (error) {
@@ -60,7 +60,7 @@ export class BookmarkIDB extends IDB {
   async addBookmark(job: CardJob): Promise<void> {
     try {
       const db = await this.getDB()
-      await db.put(this.STORE_NAME, job, job.id)
+      await db.put(this.STORE_NAME, job, Number(job.id))
     } catch (error) {
       if (error instanceof DOMException && error.name === 'QuotaExceededError') {
         console.error('IndexedDB quota exceeded. Clearing old bookmarks to free space.')

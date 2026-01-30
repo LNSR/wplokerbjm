@@ -1,17 +1,12 @@
 # 💼 WPLokerBJM Source Code & Configuration
 
-<div align="center">
-  
-![WordPress](https://img.shields.io/badge/WordPress-21759B?style=for-the-badge&logo=wordpress&logoColor=white)
-![Svelte](https://img.shields.io/badge/Svelte-4A4A55?style=for-the-badge&logo=svelte&logoColor=FF3E00)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=for-the-badge&logo=typescript&logoColor=white)
-![PHP](https://img.shields.io/badge/PHP-777BB4?style=for-the-badge&logo=php&logoColor=white)
-![Docker](https://img.shields.io/badge/Docker-2496ED?style=for-the-badge&logo=docker&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=for-the-badge&logo=vite&logoColor=white)
+![WordPress](https://img.shields.io/badge/WordPress-21759B?style=flat-square&logo=wordpress&logoColor=white)
+![Svelte](https://img.shields.io/badge/Svelte-4A4A55?style=flat-square&logo=svelte&logoColor=FF3E00)
+![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)
+![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat-square&logo=php&logoColor=white)
+![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white)
 
-</div>
-
-> 🚀 A simple WordPress job portal built with Svelte frontend and PHP backend.
+> 🚀 A simple WordPress job board built with Svelte frontend and WordPress backend.
 
 This repository contains the source code and configuration for **WPLokerBJM**.
 
@@ -36,31 +31,54 @@ This repository contains the source code and configuration for **WPLokerBJM**.
 ```bash
 ├── .env
 ├── .env.example
-├── .github/
 ├── .gitignore
-├── .vscode/
-├── configs/                           # Configuration files for docker compose setups
 ├── caddy.Dockerfile                   # Dockerfile for Caddy web server
 ├── Caddyfile                          # Reverse Proxy. See https://caddyserver.com/docs/
 ├── compose.yml                        # Docker Compose configuration
-├── docker.conf.d                      # Images Docker configurations (dev/prod)
-│   ├── opcache.ini                    # PHP OPcache settings
-│   ├── php.ini                        # PHP configuration
-│   ├── www.conf                       # PHP-FPM worker settings
-│   └── xdebug.ini                     # Xdebug configuration for debugging
-├── Dockerfile                         # Main application Dockerfile
-├── localhost-key.pem                  # Generated via mkcert, used for HTTPS local dev
-├── localhost.pem                      # Same(but for public cert)
-├── mkcert                             # Mkcert certificates directory
-│   ├── rootCA-key.pem                 # Root CA private key
-│   └── rootCA.pem                     # Root CA certificate
-├── readme.md                          # This documentation file
-├── scripts                            # Setup scripts
-│   └── entrypoint.sh                  # Wordpress entrypoint script
-├── wordpress                          # WordPress installation
-│   └── wp-content                     # WordPress content directory
+├── Dockerfile.development             # Development Dockerfile
+├── Dockerfile.production              # Production Dockerfile
+├── README.md                          # This documentation file
 ├── wpcli.sh                           # Provide alias for "wpcli"(change to your own container)
-└── wplokerbjm.code-workspace          # VS Code workspace configuration
+├── wplokerbjm.code-workspace          # VS Code workspace configuration
+├── .github/                           # GitHub Actions CI/CD configurations
+│   ├── actions/
+│   │   ├── setup-dependencies/
+│   │   │   └── action.yml
+│   │   └── setup-deployment/
+│   │       └── action.yml
+│   ├── instructions/
+│   │   └── wplokerbjm.instructions.md # AI instructions
+│   ├── scripts/
+│   │   ├── prepare-ssh-key.sh
+│   │   ├── ssh-auth-check.sh
+│   │   ├── verify-deploy-key.sh
+│   │   └── deploy/
+│   │       └── rclone-sync.sh
+│   └── workflows/
+│       ├── clean-workflow.yml
+│       └── deploy.yml
+├── .vscode/
+│   └── mcp.json
+├── certs/                             # SSL certificates directory
+├── configs/                           # Configuration files for docker compose setups
+│   ├── caddy-early-hints.conf
+│   ├── cloudflared-config.yml
+│   └── wp-config-extra.php
+├── docker.conf.d/                     # Images Docker configurations (dev/prod)
+│   ├── dev/
+│   │   ├── opcache.ini                # PHP OPcache settings (dev)
+│   │   ├── php.ini                    # PHP configuration (dev)
+│   │   ├── www.conf                   # PHP-FPM worker settings (dev)
+│   │   └── xdebug.ini                 # Xdebug configuration for debugging
+│   └── prod/
+│       ├── opcache.ini                # PHP OPcache settings (prod)
+│       ├── php.ini                    # PHP configuration (prod)
+│       └── www.conf                   # PHP-FPM worker settings (prod)
+├── scripts/                           # Setup scripts
+│   └── entrypoint.sh                  # WordPress entrypoint script
+├── tools/
+└── wordpress/                         # WordPress installation
+    └── wp-content/                    # WordPress content directory
 ```
 
 ## 🔌 WordPress Core Plugins
@@ -68,6 +86,7 @@ This repository contains the source code and configuration for **WPLokerBJM**.
 | Plugin                 | Description                              | Status      |
 | ---------------------- | ---------------------------------------- | ----------- |
 | 🧩 **MetaBox**         | Dynamic data framework for custom fields | ✅ Required |
+| 🔗 **WPGraphQL**       | GraphQL API with smart caching for WP    | ✅ Required |
 | 🖥️ **Query Monitor**   | Debugging and performance monitoring     | 🔧 Optional |
 | 🔍 **Rank Math SEO**   | Custom Job Posting schema integration    | 🔧 Optional |
 | 💾 **UpdraftPlus**     | Backup and restore functionality         | 🔧 Optional |
@@ -84,26 +103,38 @@ server/
 ├── Configs/                   # Configuration files
 │   └── CredentialConfig.php
 ├── Controllers/               # Controllers
-│   ├── REST/                  # REST API controllers
+│   ├── GraphQL/
+│   │   ├── Resolvers/         # GraphQL resolvers
+│   │   │   ├── JobsDataResolver.php
+│   │   │   ├── TaxonomyResolver.php
+│   │   │   └── ThemeDataResolver.php
+│   │   └── Types/             # GraphQL types
 │   └── Utilities/             # Utility for controllers
+│       └── ControllerUtils.php
 ├── Core/                      # Core framework and dependency injection
 │   ├── Container/             # Container setup and definitions
 │   │   ├── Attributes/        # Hook attributes
-│   │   ├── Definitions/       # Container definitions
-│   │   ├── Support/           # Container support utilities
+│   │   │   └── WPHooksAttributes.php
 │   │   ├── Container.php      # Main DI container
-│   │   └── Init.php           # Container initialization
+│   │   ├── Definitions/       # Container definitions
+│   │   │   ├── AutoScanned.php
+│   │   │   └── Core.php
+│   │   ├── Init.php           # Container initialization
+│   │   └── Support/           # Container support utilities
+│   │       └── AutowireScanner.php
 │   ├── Cron/                  # Cron job management
 │   │   └── WPCron.php
+│   ├── GlobalHooks.php        # Global WordPress hooks
 │   ├── Plugins/               # Plugin integrations
+│   │   ├── Litespeed.php
+│   │   └── Rankmath.php
 │   ├── Posts/                 # Post management
 │   │   └── PostsManagement.php
 │   ├── Taxonomy/              # Taxonomy management
 │   │   └── TaxonomyManagement.php
-│   ├── Theme/                 # Theme-specific functionality
-│   │   ├── Enqueue.php        # Asset enqueuing
-│   │   └── ThemeHooks.php     # Theme hooks
-│   └── GlobalHooks.php        # Global WordPress hooks
+│   └── Theme/                 # Theme-specific functionality
+│       ├── Enqueue.php        # Asset enqueuing
+│       └── ThemeHooks.php     # Theme hooks
 ├── Factories/                 # Factory classes
 │   └── JobDataFactory.php
 ├── Models/                    # Data models and schema definitions
@@ -113,10 +144,18 @@ server/
 │       └── Taxonomies.php
 ├── Presenters/                # Page presenters (provide initial data for CSR)
 │   ├── Components/            # PHP UI components
+│   │   ├── JobCarousel.php
+│   │   └── JobGrid.php
+│   ├── DocumentHTML.php       # HTML document presenter
 │   ├── Pages/                 # Page-specific presenters
-│   ├── Schema/                # Schema.org presenters
-│   │   └── JobPostingSchema.php
-│   └── DocumentHTML.php       # HTML document presenter
+│   │   ├── HomepagePresenter.php
+│   │   ├── PasangIklanLokerPresenter.php
+│   │   └── SinglePresenter.php
+│   └── SEO/                   # SEO-related presenters
+│       ├── Schema/            # Schema.org presenters
+│       │   └── JobPostingSchema.php
+│       └── SkeletonHTML/      # Skeleton HTML for SEO
+│           └── SkeletonForSEO.php
 ├── QueryBuilders/             # Query builder classes
 │   ├── JobQuery.php
 │   └── TaxonomyQuery.php
@@ -125,11 +164,11 @@ server/
 │   ├── JobRepository.php
 │   └── TaxonomyRepository.php
 ├── Services/                  # Business logic/services
-│   ├── Log/                   # Logging services
-│   ├── REST/                  # REST API services
-│   ├── Schema/                # Schema services
-│   ├── Utilities/             # Utility services
-│   └── Webhooks/              # Webhook services
+│   ├── GraphQL/               # GraphQL services
+│   │   ├── GraphQLData.php
+│   │   └── GraphQLRegistration.php
+│   └── Schema/                # Schema services
+│       └── JobSchemaOrg.php
 ├── Shared/                    # Shared utilities and services
 │   ├── Cache/                 # Caching utilities
 │   │   └── Cache.php
@@ -153,41 +192,80 @@ src/
 ├── app/                       # App-level components and logic
 │   ├── components/            # Reusable UI components
 │   │   ├── layouts/           # Layout components
+│   │   │   ├── Footer.svelte
 │   │   │   └── Header.svelte
 │   │   └── ui/                # UI component groups
+│   │       ├── Header/
+│   │       │   └── BookmarkModal.svelte
+│   │       ├── Homepage/
+│   │       │   ├── CustomDropdown.svelte
+│   │       │   ├── JobCard.svelte
+│   │       │   ├── JobCarousel.svelte
+│   │       │   ├── JobGrid.svelte
+│   │       │   ├── SearchForm.svelte
+│   │       │   └── SingleOverlay.svelte
+│   │       ├── Shared/
+│   │       │   ├── BookmarkButton.svelte
+│   │       │   ├── FloatingActionButton.svelte
+│   │       │   ├── JobDetail.svelte
+│   │       │   ├── LoadingSpinner.svelte
+│   │       │   └── RefreshSpinner.svelte
+│   │       └── Skeletons/
+│   │           └── SkeletonSingleLowongan.svelte
 │   ├── lib/                   # App libraries and utilities
 │   │   ├── stores/            # Svelte stores for state management
+│   │   │   ├── Bookmark.svelte.ts
+│   │   │   ├── DynamicComponent.svelte.ts
+│   │   │   ├── General.svelte.ts
+│   │   │   ├── HeaderStore.svelte.ts
+│   │   │   ├── JobOverlay.svelte.ts
+│   │   │   ├── Route.svelte.ts
+│   │   │   ├── Search.svelte.ts
+│   │   │   └── Taxonomy.svelte.ts
 │   │   └── utils/             # Library utilities
+│   │       ├── elements.svelte.ts
+│   │       ├── SEO.svelte.ts
+│   │       └── Virtualization.svelte.ts
 │   └── routes/                # Route components
 │       ├── Homepage.svelte
 │       ├── PasangIklanLoker.svelte
 │       └── SingleLowongan.svelte
 ├── app.svelte                 # Main Svelte app boot component
 ├── assets/                    # Static assets
-│   ├── css/                   # Stylesheets
-│   │   ├── app.css
-│   │   └── theme.css
-│   └── svelte.svg
+│   └── css/                   # Stylesheets
+│       ├── app.css
+│       └── theme.css
 ├── global.d.ts                # Global TypeScript declarations
 ├── main.ts                    # Svelte app entry point
 ├── services/                  # Service classes (API, Auth, etc.)
-│   ├── api/                   # API-related services
-│   │   ├── endpoints/         # API endpoint logic
-│   │   │   ├── WP-Plugins/    # WordPress plugin integrations
-│   │   │   │   └── RankMath.ts
-│   │   │   ├── Jobs.ts        # Jobs-related API calls
-│   │   │   ├── Taxonomy.ts    # Taxonomy-related API calls
-│   │   │   └── WPThemeData.ts
-│   │   ├── Client.ts          # API client setup/utilities
-│   │   ├── Error.ts           # API error handling
-│   │   └── index.ts           # API module entry
 │   ├── APIService.ts
-│   ├── AuthService.ts
 │   ├── Formatting.ts
 │   ├── Google.ts
-│   └── Mounter.ts
+│   ├── Mounter.ts
+│   └── api/                   # API-related services
+│       └── graphql/
+│           └── query/
+│               ├── index.ts
+│               ├── job.ts
+│               ├── Taxonomy.ts
+│               └── theme.ts
 ├── types/                     # TypeScript type definitions
+│   ├── API.ts
+│   ├── Component.ts
+│   ├── index.ts
+│   ├── MetaBox.ts
+│   ├── SavedState.ts
+│   ├── Theme.ts
+│   └── Wordpress.ts
 └── utils/                     # Agnostic utility functions
+    ├── elements.ts
+    ├── environment.ts
+    ├── index.ts
+    ├── indexedDB.ts
+    ├── lodash.ts
+    ├── Nonce.ts
+    ├── partytown.ts
+    └── validation.ts
 ```
 
 ---

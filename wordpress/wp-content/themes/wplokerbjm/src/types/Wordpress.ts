@@ -2,7 +2,7 @@ import { PostTypesMetabox } from '@/types';
 
 // Base WordPress post fields
 export interface WPBasePost {
-    id?: number;
+    id: number;
     title: string;
     slug?: string;
     post_type?: string;
@@ -91,7 +91,7 @@ export interface WPMenuItem {
 // WordPress REST API response meta
 export interface WPRestMeta {
     total?: number;
-    totalPages?: number;
+    maxNumPages?: number;
     links?: {
         self?: string;
         collection?: string;

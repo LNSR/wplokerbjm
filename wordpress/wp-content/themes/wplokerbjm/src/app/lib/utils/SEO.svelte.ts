@@ -4,16 +4,44 @@ import type { HeadData } from '@/types'
 import { SvelteSet, SvelteMap, SvelteDate } from 'svelte/reactivity'
 
 /**
- * SEO Service to manage RankMath head data
+ * SEO Service to manage RankMath head data.
+ *
+ * Responsibilities:
+ * - Fetch RankMath head HTML via GraphQL and parse it to a structured HeadData.
+ * - Update document <head> elements (title, meta tags, canonical link, Open Graph/Twitter tags).
+ * - Manage insertion/removal of JSON-LD schema scripts (JobPosting / ItemList).
+ * - Prefer explicit SSR-provided schemas marked with data attributes; otherwise fetch via API.
+ *
+ * Note: Methods operate on the global document and are intended to run in a browser context.
  */
 export class SEOUtils {
     private headDataCache = $state(new SvelteMap<string, { data: HeadData; timestamp: number }>());
     private addedJobPostingIds = $state(new SvelteSet<number>());
     public initialSchemaSSR: boolean = true;
-    private pendingJobIds = $state(new SvelteSet<number>());
-    private processTimeout: number | null = null;
+    private headAbortController: AbortController | null = null;
+    private schemaAbortController: AbortController | null = null;
 
+    /**
+     * Fetch RankMath head HTML for the given path and immediately update the document <head>.
+     *
+     * - Uses a short in-memory cache (2 minutes) keyed by path.
+     * - Aborts any in-flight head fetch when a new request is initiated.
+     * - Parses the returned HTML and applies changes via {@link updateHead}.
+     *
+     * @param path - Relative path (e.g. '/some-page') to fetch head data for
+     * @returns Parsed HeadData on success, or null if aborted/failed
+     */
     async fetchHeadData(path: string): Promise<HeadData | null> {
+        // Abort any previous head data fetch
+        if (this.headAbortController) {
+            this.headAbortController.abort();
+        }
+        this.headAbortController = new AbortController();
+
+        if (this.initialSchemaSSR) {
+            this.initialSchemaSSR = false;
+        }
+
         // Check cache first
         const cached = this.headDataCache.get(path);
         if (cached && (SvelteDate.now() - cached.timestamp) < 1 * 60 * 2000) { // 2 minutes cache
@@ -23,19 +51,29 @@ export class SEOUtils {
 
         try {
             const fullUrl = `${routeStore.currentUrl.origin}${path}`;
-            const response = await APIService.getRankMathHead(fullUrl);
-            const head = this.parseHeadHtml(response.head);
+            const response = await APIService.getRankMathHeadGraphQL(fullUrl, this.headAbortController.signal);
+            const head = this.parseHeadHtml(response);
             this.headDataCache.set(path, { data: head, timestamp: SvelteDate.now() });
             this.updateHead(head);
             return head;
         } catch (error) {
+            if (error instanceof Error && error.name === 'AbortError') {
+                // Request was aborted, ignore
+                return null;
+            }
             console.warn('Failed to fetch RankMath head data:', error);
             return null;
         }
     }
 
     /**
-     * Parse RankMath HTML head string into structured data
+     * Parse RankMath HTML head string into structured data.
+     *
+     * Extracts title, meta tags (by name/property), canonical link, and the first
+     * application/ld+json script (parsed as JSON).
+     *
+     * @param headHtml - Raw head HTML returned by RankMath
+     * @returns Structured HeadData object (may contain schema JSON if present)
      */
     private parseHeadHtml(headHtml: string): HeadData {
         const headData: HeadData = {}
@@ -268,6 +306,14 @@ export class SEOUtils {
         return headData
     }
 
+    /**
+     * Apply parsed head data to the current document.
+     *
+     * Updates document title, canonical link, meta tags (description, robots, OpenGraph, Twitter, etc.),
+     * and inserts/removes JSON-LD scripts as appropriate.
+     *
+     * @param headData - Parsed head data returned by {@link parseHeadHtml}
+     */
     private updateHead(headData: HeadData) {
         if (!headData) return;
 
@@ -359,15 +405,33 @@ export class SEOUtils {
         this.updateMetaTag('property', 'article:section', headData.article_section);
         this.updateMetaTag('property', 'article:tag', headData.article_tag);
 
-        // Update schema markup if present
         if (headData.schema) {
-            this.updateSchemaMarkup(headData.schema);
+            // Heuristic: treat schemas containing @graph (or arrays with multiple
+            // types) as vendor/RankMath bundles. Mark and insert them as
+            // 'rank-math' so we don't collide with our custom ItemList/JobPosting.
+            const schema = headData.schema;
+            const looksLikeGraph = Boolean(schema && (schema['@graph'] || (Array.isArray(schema) && schema.some((s: any) => s && s['@type']))));
+            if (looksLikeGraph) {
+                this.updateSchemaMarkup(headData.schema, 'rank-math');
+            } else {
+                this.updateSchemaMarkup(headData.schema);
+            }
         } else {
-            const existingSchemas = document.querySelectorAll('script[type="application/ld+json"]:not([data-ld-type="JobPosting"]):not([data-ld-id^="jobposting-"])');
+            const existingSchemas = document.querySelectorAll('script[type="application/ld+json"]:not([data-ld-type="JobPosting"]):not([data-ld-id^="jobposting-"]):not([data-ld-type="ItemList"]):not(.rank-math-schema)');
             existingSchemas.forEach(script => script.remove());
         }
     }
 
+    /**
+     * Update or remove a meta tag in the document head.
+     *
+     * If `content` is falsy this removes the meta tag; otherwise it upserts the meta tag
+     * with the given attribute name/value (e.g. `name="description"` or `property="og:title"`).
+     *
+     * @param attrName - Attribute to match (`name` or `property`)
+     * @param attrValue - Attribute value to match (e.g. 'description', 'og:title')
+     * @param content - Meta content value; if omitted the meta is removed
+     */
     private updateMetaTag(attrName: string, attrValue: string, content?: string) {
         if (!content) {
             const existingMeta = document.querySelector(`meta[${attrName}="${attrValue}"]`);
@@ -386,6 +450,11 @@ export class SEOUtils {
         }
     }
 
+    /**
+     * Update or remove the canonical link tag in the document head.
+     *
+     * @param href - Canonical URL to set. If omitted, the canonical link is removed.
+     */
     private updateCanonicalLink(href?: string) {
         if (!href) {
             const existingLink = document.querySelector('link[rel="canonical"]');
@@ -404,120 +473,325 @@ export class SEOUtils {
         }
     }
 
-    private updateSchemaMarkup(schema: any) {
-        const existingSchemas = document.querySelectorAll('script[type="application/ld+json"]:not([data-ld-type="JobPosting"]):not([data-ld-id^="jobposting-"])');
-        existingSchemas.forEach(script => script.remove());
+    /**
+     * Insert or remove JSON-LD schema scripts in the document head.
+     *
+     * - If `dataLdType` is provided, remove scripts previously inserted with the same data type
+     *   (e.g. 'ItemList' or 'JobPosting') to avoid duplicates.
+     * - Always removes any JobPosting scripts previously created by this utility.
+     *
+     * @param schema - Schema object to insert. If falsy, matching scripts are removed.
+     * @param dataLdType - Optional marker type used to label inserted scripts (set as `data-ld-type`).
+     */
+    private updateSchemaMarkup(schema: any, dataLdType?: string) {
+        // Only remove scripts that we previously inserted or explicitly match
+        // the data attributes we're managing. Do NOT touch other vendor
+        // scripts (e.g., RankMath) that do not carry our GraphQL data attributes.
+        try {
+            if (typeof document === 'undefined') return;
+            if (dataLdType) {
+                // Remove only scripts we marked with the same data-ld-type
+                const toRemove = Array.from(document.querySelectorAll(`script[type="application/ld+json"][data-ld-type="${dataLdType}"]`));
+                toRemove.forEach(s => s.remove());
+            }
+            // Also remove any jobposting scripts we created (by data-ld-id prefix)
+            const jobPostingRem = Array.from(document.querySelectorAll('script[type="application/ld+json"][data-ld-id^="jobposting-"]'));
+            jobPostingRem.forEach(s => s.remove());
+        } catch (e) {
+            console.warn('Failed to update schema markup cleanup', e);
+        }
 
         // Add new schema script
         if (schema) {
             const script = document.createElement('script');
             script.type = 'application/ld+json';
+            if (dataLdType) script.setAttribute('data-ld-type', dataLdType);
             script.textContent = JSON.stringify(schema);
             document.head.appendChild(script);
         }
     }
 
     /**
-     * Custom madeup schema for JobPosting JSON-LD
-     * Add JobPosting JSON-LD script tags without duplicating
+     * Add a JobPosting JSON-LD script for a single job id.
+     *
+     * Behavior:
+     * - When called with an empty array, removes all previously inserted JobPosting scripts and clears internal tracking.
+     * - Supports only single-ID insertion; call with one ID to add or refresh the JobPosting script for that job.
+     * - Prefers using an SSR-provided script (if present and explicitly marked) to avoid an unnecessary network fetch.
+     *
+     * @param jobIds - Array containing exactly one job ID to insert, or an empty array to remove existing JobPosting scripts.
      */
-    public addJobPostingJsonLd(jobIds: number[]): void {
-        jobIds.forEach(id => this.pendingJobIds.add(id));
-
-        if (this.processTimeout) clearTimeout(this.processTimeout);
-
-        this.processTimeout = setTimeout(async () => {
-            const ids = [...this.pendingJobIds];
-            this.pendingJobIds.clear();
-            await processJobSchemas(ids);
-        }, 1000);
-
-        const processJobSchemas = async (jobIds: number[]): Promise<void> => {
-            if (jobIds.length === 0) return;
-
-            // Filter out jobIds that already have JobPosting scripts to avoid fetching duplicates
-            jobIds = jobIds.filter(id => !this.addedJobPostingIds.has(id));
-
-            // Limit to maximum 27 JobPosting scripts on DOM
-            const maxAllowed = 27;
-            const remainingSlots = maxAllowed - this.addedJobPostingIds.size;
-            jobIds = jobIds.slice(0, remainingSlots);
-
-            if (jobIds.length === 0) return;
-
-            let schemas: Record<string, any>[] = [];
-
+    public addJobPostingJsonLd(jobIds: number[] = []): void {
+        // If called with empty array, remove all existing JobPosting scripts
+        if (!jobIds || jobIds.length === 0) {
             try {
-                if (!this.initialSchemaSSR) {
-                    schemas = await APIService.fetchJobSchemas(jobIds);
+                if (typeof document === 'undefined') return;
+
+                const explicit = Array.from(document.querySelectorAll('script[type="application/ld+json"][data-ld-type="JobPosting"]')) as HTMLScriptElement[];
+                explicit.forEach(s => {
+                    const idAttr = s.getAttribute('data-ld-id');
+                    if (idAttr && idAttr.startsWith('jobposting-')) {
+                        const id = parseInt(idAttr.replace('jobposting-', ''), 10);
+                        if (!isNaN(id)) {
+                            this.addedJobPostingIds.delete(id);
+                        }
+                    }
+                    s.remove();
+                });
+
+                // Ensure we don't think SSR is still present after explicit removal
+                this.initialSchemaSSR = false;
+            } catch (e) {
+                console.warn('Failed to remove JobPosting JSON-LD', e);
+            }
+            return;
+        }
+
+        // Only support single job ID insertion for JobPosting
+        if (jobIds.length !== 1) return;
+
+        const jobId = jobIds[0];
+
+        // Remove any existing JobPosting scripts (we will replace)
+        try {
+            const existingAll = Array.from(document.querySelectorAll('script[type="application/ld+json"][data-ld-type="JobPosting"]')) as HTMLScriptElement[];
+            existingAll.forEach(s => s.remove());
+            this.addedJobPostingIds.clear();
+        } catch {
+            // ignore
+        }
+
+        // Abort any previous schema fetch
+        if (this.schemaAbortController) {
+            this.schemaAbortController.abort();
+        }
+        this.schemaAbortController = new AbortController();
+
+        const addSchema = async (): Promise<void> => {
+            try {
+                let schema: any = null;
+
+                if (this.initialSchemaSSR) {
+                    // Prefer SSR-provided script if present; avoid unnecessary fetch
+                    const existingScript = document.querySelector(`script[data-ld-id="jobposting-${jobId}"]`) as HTMLScriptElement | null;
+                    if (existingScript && existingScript.textContent) {
+                        try {
+                            const parsed = JSON.parse(existingScript.textContent);
+                            // Only accept if the SSR script explicitly declares JobPosting type
+                            const isJobPosting = parsed && (parsed['@type'] === 'JobPosting' || (Array.isArray(parsed) && parsed.some((p: any) => p && p['@type'] === 'JobPosting')));
+                            if (isJobPosting) {
+                                // If parsed contains an identifier or id, ensure it matches the requested jobId
+                                let matchesId = false;
+                                try {
+                                    const identifierVal = parsed['identifier'] && (parsed['identifier']['value'] || parsed['identifier']);
+                                    const candidateId = identifierVal || parsed['jobId'] || parsed['id'];
+                                    if (candidateId && `${candidateId}` === `${jobId}`) matchesId = true;
+                                } catch { }
+
+                                // Accept SSR script only when it explicitly indicates JobPosting and matches id (or the script's data-ld-id matched the requested id)
+                                if (matchesId || existingScript.getAttribute('data-ld-id') === `jobposting-${jobId}`) {
+                                    schema = parsed;
+                                } else {
+                                    schema = null;
+                                }
+                            } else {
+                                schema = null;
+                            }
+                        } catch {
+                            schema = null;
+                        }
+                    }
+                    // Mark SSR as consumed so subsequent navigations will fetch as needed
+                    this.initialSchemaSSR = false;
                 }
 
-                if (schemas.length === 0) return;
+                if (!schema) {
+                    const schemas = await APIService.fetchJobSchemasGraphQL([jobId], this.schemaAbortController?.signal, 'JobPosting');
+                    schema = schemas?.[0];
+                }
 
-                // Create script elements, but only if not already present
-                schemas.forEach((schema, index) => {
-                    const postId = jobIds[index];
-                    if (!postId || !schema) return;
+                if (!schema) return;
 
-                    // Check if script already exists (additional safeguard)
-                    const existingScript = document.querySelector(`script[data-ld-id="jobposting-${postId}"]`);
-                    if (existingScript) return;
+                const script = document.createElement('script');
+                script.type = 'application/ld+json';
+                script.setAttribute('data-ld-type', 'JobPosting');
+                script.setAttribute('data-ld-id', `jobposting-${jobId}`);
+                script.textContent = JSON.stringify(schema);
 
-                    const script = document.createElement('script');
-                    script.type = 'application/ld+json';
-                    script.setAttribute('data-ld-type', 'JobPosting');
-                    script.setAttribute('data-ld-id', `jobposting-${postId}`);
-                    script.textContent = JSON.stringify(schema);
-
-                    document.head.appendChild(script);
-                    this.addedJobPostingIds.add(postId);
-                });
+                document.head.appendChild(script);
+                this.addedJobPostingIds.add(jobId);
             } catch (e) {
+                if (e instanceof Error && e.name === 'AbortError') {
+                    // Request was aborted, ignore
+                    return;
+                }
                 console.warn('Failed to add JobPosting JSON-LD', e);
             }
         };
+
+        void addSchema();
     }
 
     /**
-     * Remove custom JobPosting JSON-LD.
+     * Remove any JSON-LD schema scripts inserted by this utility and clear tracking.
+     *
+     * This is a blunt operation intended for teardown or navigation where all inserted
+     * schemas should be removed from the document.
      */
-    public removeJobPostingJsonLd(): number {
+    public RemoveAllSchemas(): void {
         try {
-            let removed = 0;
-
-            if (typeof document === 'undefined') return removed;
-
-            const explicit = Array.from(document.querySelectorAll('script[type="application/ld+json"][data-ld-type="JobPosting"]'));
-            explicit.forEach(s => {
-                const idAttr = s.getAttribute('data-ld-id');
-                if (idAttr && idAttr.startsWith('jobposting-')) {
-                    const id = parseInt(idAttr.replace('jobposting-', ''), 10);
-                    if (!isNaN(id)) {
-                        this.addedJobPostingIds.delete(id);
-                    }
-                }
-                s.remove();
-                removed++;
-            });
-
-            this.initialSchemaSSR = false;
-
-            return removed;
+            if (typeof document === 'undefined') return;
+            const existingSchemas = Array.from(document.querySelectorAll('script[type="application/ld+json"]')) as HTMLScriptElement[];
+            existingSchemas.forEach(s => s.remove());
+            try {
+                // Clear addedJobPostingIds tracking
+                this.addedJobPostingIds.clear();
+            } catch {
+                // ignore
+            }
         } catch (e) {
-            console.warn(`Failed to remove JobPosting JSON-LD`, e);
-            return 0;
+            console.warn('Failed to remove JSON-LD schemas', e);
         }
     }
 
     /**
-     * Clear pending job schema requests.
+     * Add or refresh an ItemList JSON-LD script for a batch of job IDs.
+     *
+     * Behavior:
+     * - If an explicit SSR-provided script marked with `data-ld-type="ItemList"` exists, it will be used and no fetch is made.
+     * - Otherwise fetches schema data via {@link APIService.fetchJobSchemasGraphQL} and normalizes/insserts the ItemList script.
+     * - Replaces any existing ItemList scripts rather than appending.
+     *
+     * @param jobIds - Array of job IDs to include in the ItemList
      */
-    public clearPendingJobSchemas(): void {
-        if (this.processTimeout) {
-            clearTimeout(this.processTimeout);
-            this.processTimeout = null;
+    public addItemListSchema(jobIds: number[]): void {
+        if (!jobIds || jobIds.length === 0) return;
+
+        if (this.schemaAbortController) {
+            this.schemaAbortController.abort();
         }
-        this.pendingJobIds.clear();
+        this.schemaAbortController = new AbortController();
+
+        const fetchAndInsert = async (): Promise<void> => {
+            try {
+                let schemas: any = null;
+                let schema: any = null;
+                let ssrProvided = false;
+
+                if (this.initialSchemaSSR) {
+                    const explicitItemList = document.querySelector('script[type="application/ld+json"][data-ld-type="ItemList"]') as HTMLScriptElement | null;
+                    if (explicitItemList && explicitItemList.textContent) {
+                        try {
+                            const parsed = JSON.parse(explicitItemList.textContent);
+                            if (parsed && parsed['@type'] === 'ItemList') {
+                                schema = parsed;
+                                ssrProvided = true;
+                            }
+                        } catch {
+                            // ignore parse errors
+                        }
+                    }
+                    // Mark SSR consumed so subsequent calls will fetch fresh data
+                    this.initialSchemaSSR = false;
+                }
+
+                // If SSR provided a usable ItemList/JobPosting schema, skip fetching to avoid duplicate insertion.
+                if (ssrProvided && schema) {
+                    // Ensure we normalize by setting our data attribute (done above) and then return.
+                    return;
+                }
+
+                // If SSR was a vendor bundle (RankMath), we set ssrProvided true and schema null — bail out to avoid colliding.
+                if (ssrProvided && !schema) {
+                    return;
+                }
+
+                // Fetch only when SSR did not provide schema or parsing failed
+                if (!schema) {
+                    schemas = await APIService.fetchJobSchemasGraphQL(jobIds, this.schemaAbortController?.signal, 'ItemList');
+                }
+
+                // Normalize response: API may return an array of JobPosting objects (old behavior) or a single ItemList.
+                if (Array.isArray(schemas)) {
+                    // If it's already an ItemList as first element, use it
+                    if (schemas.length === 1 && schemas[0] && schemas[0]['@type'] === 'ItemList') {
+                        schema = schemas[0];
+                    } else if (schemas.length >= 1 && schemas.every((s: any) => s && s['@type'] === 'JobPosting')) {
+                        // Server returned JobPosting items individually — convert to ItemList client-side
+                        const elements = schemas.map((job: any, idx: number) => {
+                            const item = { ...job };
+                            if (item['@context']) delete item['@context'];
+                            return { "@type": "ListItem", "position": idx + 1, "item": item };
+                        });
+                        schema = {
+                            "@context": "https://schema.org",
+                            "@type": "ItemList",
+                            "itemListElement": elements,
+                            "itemListOrder": "https://schema.org/ItemListOrderDescending",
+                            "numberOfItems": elements.length,
+                        };
+                    } else if (schemas.length >= 1) {
+                        schema = schemas[0];
+                    }
+                } else if (!schema) {
+                    schema = schemas;
+                }
+
+                if (!schema) return;
+
+                // Always replace the ItemList script with the fetched batch or SSR one
+                this.updateSchemaMarkup(schema, 'ItemList');
+            } catch (e) {
+                if (e instanceof Error && e.name === 'AbortError') {
+                    return;
+                }
+                console.warn('Failed to fetch/insert ItemList schema', e);
+            }
+        };
+
+        void fetchAndInsert();
+    }
+
+    /**
+     * Public convenience for adding schemas for a batch of job IDs.
+     *
+     * - Emits an ItemList only when the current route is the Homepage. Otherwise
+     *   any existing ItemList scripts are removed (ItemList should only appear on Homepage).
+     * - Delegates the actual fetch/insert work to {@link addItemListSchema}.
+     *
+     * @param jobIds - Array of job IDs to include in the ItemList
+     */
+    public addJobSchemas(jobIds: number[]): void {
+        if (!jobIds || jobIds.length === 0) return;
+
+        // Only emit ItemList schema when on the Homepage route. If not on
+        // homepage, ensure any existing ItemList schemas are removed so they
+        // are exclusive to the homepage.
+        try {
+            const comp = routeStore.getComponentNamePath(routeStore.currentUrl.pathname);
+            if (comp !== 'Homepage') {
+                if (typeof document !== 'undefined') {
+                    const existingItemLists = Array.from(document.querySelectorAll('script[type="application/ld+json"][data-ld-type="ItemList"]')) as HTMLScriptElement[];
+                    existingItemLists.forEach(s => s.remove());
+                }
+                return;
+            }
+        } catch {
+            // If routeStore is not available for some reason, fail open and continue
+            // to avoid breaking schema insertion. But prefer to not add ItemList.
+            try {
+                if (typeof document !== 'undefined') {
+                    const existingItemLists = Array.from(document.querySelectorAll('script[type="application/ld+json"][data-ld-type="ItemList"]')) as HTMLScriptElement[];
+                    existingItemLists.forEach(s => s.remove());
+                }
+            } catch {
+                // ignore
+            }
+            return;
+        }
+
+        this.addItemListSchema(jobIds);
+        return;
     }
 }
 

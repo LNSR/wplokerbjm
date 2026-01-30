@@ -3,14 +3,15 @@
 namespace WPLokerBJM\Presenters\Pages;
 
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
-use WPLokerBJM\Services\REST\RESTData;
-use WPLokerBJM\Presenters\Schema\JobPostingSchema;
+use WPLokerBJM\Services\GraphQL\GraphQLData;
+use WPLokerBJM\Presenters\SEO\Schema\JobPostingSchema;
+use WPLokerBJM\Presenters\SEO\SkeletonHTML\SkeletonForSEO;
 
 class SinglePresenter
 {
     public function __construct(
         private JobSchemaOrg $jobSchema,
-        private RESTData $restData
+        private GraphQLData $restData,
     ) {
     }
 
@@ -26,11 +27,14 @@ class SinglePresenter
         $props = $this->getProps($post_id);
 
         $schema_data = $this->jobSchema->getJobPostingSchema($post_id);
-        $schema = JobPostingSchema::renderSchema($schema_data, $post_id);
+        $schema = JobPostingSchema::renderSchemaJobPosting($schema_data, $post_id);
+
+        $seoHtml = SkeletonForSEO::generateSEOHTML($props['job']);
 
         return [
             'props' => $props,
             'schema' => $schema,
+            'seoHtml' => $seoHtml,
         ];
     }
 }
