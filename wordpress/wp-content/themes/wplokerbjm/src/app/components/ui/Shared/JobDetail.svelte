@@ -144,10 +144,8 @@
   }
 
   $effect(() => {
-    timeEffect(now);
-  });
+    timeEffect(now); // Update 'now' every minute for timeAgo
 
-  $effect(() => {
     return () => {
       if (viewer) {
         const viewerElement = (viewer as any).element;

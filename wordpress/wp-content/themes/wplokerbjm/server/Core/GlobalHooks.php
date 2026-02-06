@@ -152,6 +152,14 @@ class GlobalHooks
         echo '<link rel="sitemap" type="application/xml" title="Sitemap" href="' . esc_url($sitemap_url) . '" />' . "\n";
     }
 
+    #[Action('wp_head')]
+    public static function AdsenseMetaTag(): void
+    {
+        ?>
+        <meta name="google-adsense-account" content="ca-pub-3206452872913415">
+        <?php
+    }
+
     /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */

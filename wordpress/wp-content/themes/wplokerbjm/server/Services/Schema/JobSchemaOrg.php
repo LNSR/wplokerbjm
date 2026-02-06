@@ -94,6 +94,13 @@ class JobSchemaOrg
         // Build description via helper (combines DESKRIPSI_PEKERJAAN and PERSYARATAN when both present)
         $descriptionHtml = JobSchemaHelper::buildDescription($jobdata);
 
+        $validThrough = $jobdata[CustomFields::DEADLINE] ?? null;
+        if (empty($validThrough) && $datePostedRaw) {
+            $postDate = new \DateTime($datePostedRaw);
+            $postDate->modify('+1 month');
+            $validThrough = $postDate->format('Y-m-d');
+        }
+
         $schema = [
             "@context" => "https://schema.org",
             "@type" => "JobPosting",
@@ -123,7 +130,7 @@ class JobSchemaOrg
             ],
             "jobLocationType" => $jobLocationType,
             "employmentType" => $employmentType,
-            "validThrough" => $jobdata[CustomFields::DEADLINE] ?? null,
+            "validThrough" => $validThrough,
             "identifier" => [
                 "@type" => "PropertyValue",
                 "name" => $jobdata[CustomFields::NAMA_PERUSAHAAN] ?? "Anonymous",

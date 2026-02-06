@@ -766,7 +766,7 @@
           <div class="rounded-full shadow-lg p-2">
             <label class="flex cursor-pointer gap-2 items-center">
               <span
-                class="relative w-12 h-6 flex items-center"
+                class="relative w-6 h-12 flex flex-col items-center"
                 role="switch"
                 aria-checked={themeStore.isDark}
               >
@@ -776,17 +776,17 @@
                 <span
                   class="absolute top-0 left-0 w-6 h-6 rounded-full bg-white dark:bg-slate-800 shadow transition-transform"
                   style:transform={themeStore.isDark
-                    ? "translateX(100%)"
-                    : "translateX(0)"}
+                    ? "translateY(100%)"
+                    : "translateY(0)"}
                 ></span>
                 <SunSolid
-                  class="absolute left-1 top-1 w-4 h-4 transition-all z-10 {themeStore.isDark
+                  class="absolute top-1 left-1 w-4 h-4 transition-all z-10 {themeStore.isDark
                     ? 'opacity-40 grayscale'
                     : 'opacity-100'}"
                   style="color: var(--icon-color);"
                 />
                 <MoonSolid
-                  class="absolute right-1 top-1 w-4 h-4 transition-all z-10 {themeStore.isDark
+                  class="absolute bottom-1 left-1 w-4 h-4 transition-all z-10 {themeStore.isDark
                     ? 'opacity-100'
                     : 'opacity-40 grayscale'}"
                   style="color: var(--icon-color);"
@@ -794,7 +794,7 @@
                 <input
                   type="checkbox"
                   value="dark"
-                  class="toggle theme-controller focus:ring-2 focus:ring-blue-400 absolute w-12 h-6 opacity-0 cursor-pointer"
+                  class="toggle theme-controller focus:ring-2 focus:ring-blue-400 absolute w-6 h-12 opacity-0 cursor-pointer"
                   aria-label="Toggle color theme"
                   aria-checked={themeStore.isDark}
                   bind:checked={themeStore.isDark}

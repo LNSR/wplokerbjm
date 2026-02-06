@@ -369,11 +369,11 @@
 </script>
 
 <section class="mx-auto px-4 py-4 text-center">
-  <h1 class="text-2xl md:text-3xl mt-4 font-bold mb-2">
-    Temukan Lowongan Kerja Terbaru di Sekitar
+  <h1 class="text-2xl md:text-3xl mt-4 font-bold mb-3">
+    Temukan Lowongan Kerja di Kalimantan terutama Banjarmasin dan sekitarnya
   </h1>
   <p class="mb-8 text-lg text-semibold">
-    Update setiap hari, mudah diakses, dan gratis!
+    Update berkala, mudah diakses, dan tanpa kewajiban biaya!
   </p>
   <div
     class="border-2 border-blue-500 mt-4 rounded-xl p-4 md:p-6 min-h-[220px] sm:min-h-[306px] md:min-h-[204px]"

@@ -19,6 +19,7 @@ class SkeletonForSEO
             ob_start();
             ?>
             <?php self::style(); ?>
+            <?php self::header(); ?>
             <div class="seo-job-detail">
                 <h1><?php echo esc_html($job['title'] ?? ''); ?></h1>
                 <?php if (!empty($job[CustomFields::NAMA_PERUSAHAAN])): ?>
@@ -83,15 +84,38 @@ class SkeletonForSEO
             ob_start();
             ?>
             <?php self::style(); ?>
+            <?php self::header(); ?>
             <div class="seo-job-listings">
                 <div>
-                    <h1>Temukan Lowongan Kerja Terbaru di Sekitar</h1>
-                    <p>Update setiap hari, mudah diakses, dan gratis!</p>
+                    <h1>Temukan Lowongan Kerja di Kalimantan terutama Banjarmasin dan sekitarnya</h1>
+                    <p>Update berkala, mudah diakses, dan tanpa kewajiban biaya!</p>
                 </div>
                 <div>
-                    <h2>Lowongan Terbaru</h2>
+                    <h2>Lowongan Terbaru(max 1 Bulan)</h2>
                     <?php foreach ($jobs as $job): ?>
-                        <a href="<?= esc_url(get_permalink($job['id'])); ?>"><?= esc_html(get_the_title($job['id'])); ?></a>
+                        <div>
+                            <h3><a href="<?php echo esc_url($job['permalink']); ?>"><?php echo esc_html($job['title']); ?></a></h3>
+                            <?php if (!empty($job[CustomFields::NAMA_PERUSAHAAN])): ?>
+                                <p>Perusahaan: <?php echo esc_html($job[CustomFields::NAMA_PERUSAHAAN]); ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($job['ringkasanPekerjaan'])): ?>
+                                <ul>
+                                    <?php foreach ($job['ringkasanPekerjaan'] as $key => $value): ?>
+                                        <?php if (!empty($value)): ?>
+                                            <li><?php echo esc_html(ucfirst(str_replace('_', ' ', $key)) . ': ' . $value); ?></li>
+                                        <?php endif; ?>
+                                    <?php endforeach; ?>
+                                </ul>
+                            <?php endif; ?>
+                            <?php if (!empty($job[CustomFields::STATUS_PEKERJAAN])): ?>
+                                <p>Status: <?php echo esc_html($job[CustomFields::STATUS_PEKERJAAN]); ?></p>
+                            <?php endif; ?>
+                            <?php if (!empty($job[CustomFields::DEADLINE])): ?>
+                                <p>Deadline: <?php echo esc_html($job[CustomFields::DEADLINE]); ?></p>
+                            <?php endif; ?>
+                            <time
+                                datetime="<?php echo esc_attr($job['post_time']); ?>"><?php echo esc_html(date('M j, Y', strtotime($job['post_time']))); ?></time>
+                        </div>
                     <?php endforeach; ?>
                 </div>
             </div>
@@ -106,6 +130,7 @@ class SkeletonForSEO
     {
         ob_start();
         self::style();
+        self::header();
         ?>
         <div class="seo-pasang-iklan">
             <h1>Pasang Iklan Lowongan Kerja</h1>
@@ -116,8 +141,12 @@ class SkeletonForSEO
             <p>Keuntungan: Iklan lowongan kerja Anda akan ditampilkan di website dan dipromosikan ke media sosial kami dengan
                 jangkauan ribuan pencari kerja.</p>
             <h2>Tentang Kami</h2>
-            <p>Loker Banjarmasin adalah platform lowongan kerja yang dibuat untuk mendukung komunitas bisnis kecil dan lokal di Kalimantan — khususnya Banjarmasin dan sekitarnya. Kami terbuka untuk semua pemberi kerja, dengan fokus pada UMKM, usaha kecil, dan perekrut independen yang ingin membagikan peluang kerja secara mudah dan efektif.</p>
-            <p>Situs ini tidak menyediakan tombol "lamar" langsung; pelamar akan diarahkan ke pihak HR melalui media sosial atau kontak yang Anda cantumkan, sehingga prosesnya tetap fleksibel dan personal. Setiap lowongan akan ditayangkan selama 1 bulan, kecuali bila Anda menyertakan batas waktu (deadline) yang berbeda.</p>
+            <p>Loker Banjarmasin adalah platform lowongan kerja yang dibuat untuk mendukung komunitas bisnis kecil dan lokal di
+                Kalimantan — khususnya Banjarmasin dan sekitarnya. Kami terbuka untuk semua pemberi kerja, dengan fokus pada
+                UMKM, usaha kecil, dan perekrut independen yang ingin membagikan peluang kerja secara mudah dan efektif.</p>
+            <p>Situs ini tidak menyediakan tombol "lamar" langsung; pelamar akan diarahkan ke pihak HR melalui media sosial atau
+                kontak yang Anda cantumkan, sehingga prosesnya tetap fleksibel dan personal. Setiap lowongan akan ditayangkan
+                selama 1 bulan, kecuali bila Anda menyertakan batas waktu (deadline) yang berbeda.</p>
             <h2>Cara Memasang Lowongan Kerja</h2>
             <h3>Hubungi Kami</h3>
             <p>Silakan hubungi admin kami melalui:</p>
@@ -125,7 +154,8 @@ class SkeletonForSEO
                 <li>Instagram: <a href="https://instagram.com/loker_banjarmasin">@loker_banjarmasin</a></li>
                 <li>Threads: <a href="https://threads.com/@loker_banjarmasin">@loker_banjarmasin</a></li>
                 <li>WhatsApp: <a href="https://wa.me/6283862447271">+62 838-6244-7271</a></li>
-                <li>Facebook: <a href="https://facebook.com/loker.banjarmasin.2025/">facebook.com/loker.banjarmasin.2025/</a></li>
+                <li>Facebook: <a href="https://facebook.com/loker.banjarmasin.2025/">facebook.com/loker.banjarmasin.2025/</a>
+                </li>
             </ul>
             <h3>Informasi yang Dibutuhkan</h3>
             <ul>
@@ -156,15 +186,33 @@ class SkeletonForSEO
             .seo-job-detail,
             .seo-job-listings,
             .seo-pasang-iklan {
-                position: absolute;
-                left: -9999px;
-                top: auto;
-                width: 1px;
-                height: 1px;
-                overflow: hidden;
-                color: blue;
+                display: block;
+                width: 100%;
+                position: relative;
+
+                opacity: 0.4;
+                pointer-events: none;
+
+                transition: opacity 2s ease-in-out;
+                transition-delay: 2s;
+
+                animation: stay-visible 0.5s linear 3s forwards;
+            }
+
+            @keyframes stay-visible {
+                to {
+                    opacity: 1;
+                    pointer-events: auto;
+                }
             }
         </style>
+        <?php
+    }
+
+    private static function header(): void
+    {
+        ?>
+        <header><a href="/pasang-iklan-loker/">Pasang Iklan Loker</a></header>
         <?php
     }
 }

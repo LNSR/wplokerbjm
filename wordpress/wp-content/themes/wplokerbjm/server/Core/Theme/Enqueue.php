@@ -150,7 +150,8 @@ class Vite
         }
 
         $key = self::getRouteKey($path);
-        if (!$key || !isset($manifest[$key])) {
+        $keys = is_array($key) ? $key : ($key ? [$key] : []);
+        if (empty($keys)) {
             return [];
         }
 
@@ -173,8 +174,14 @@ class Vite
             $urls[] = $dist_uri . '/' . $url;
         }
 
-        // Collect all transitive imports for route
-        $route_urls = self::getAllTransitiveAssets($manifest, $key);
+        // Collect all transitive imports for route(s)
+        $route_urls = [];
+        foreach ($keys as $k) {
+            if (!isset($manifest[$k])) {
+                continue;
+            }
+            $route_urls = array_merge($route_urls, self::getAllTransitiveAssets($manifest, $k));
+        }
         foreach ($route_urls as $url) {
             $urls[] = $dist_uri . '/' . $url;
         }
@@ -192,14 +199,14 @@ class Vite
      */
     public static function enqueueForDevelopment(): array
     {
-        $vite_base_url = home_url() . '/__vite';
+        $vite_base_url = '/__vite';
         $vite_handle = 'vite-entry';
         $client_handle = 'vite-client';
 
         // Enqueue module scripts for dev server
         wp_enqueue_script_module(
             $vite_handle,
-            "{$vite_base_url}/" . self::viteEntry(),
+            "{$vite_base_url}/" . self::viteEntry(), // entry point are from manifest keys, so build first to generate manifest.json
             [],
             null,
             [
@@ -258,7 +265,7 @@ class Vite
     /**
      * Get the route key based on the path.
      */
-    private static function getRouteKey(string $path): ?string
+    private static function getRouteKey(string $path): string|array|null
     {
         $homepage = 'src/app/routes/Homepage.svelte';
         $singlelowongan = 'src/app/routes/SingleLowongan.svelte';
@@ -269,7 +276,7 @@ class Vite
             return 'src/app/routes/PasangIklanLoker.svelte';
         }
         if (preg_match('/^\/lowongan\//', $path)) {
-            return wp_is_mobile() ? $singlelowongan : $homepage; // Mobile uses SingleLowongan, desktop uses Homepage with sidepanel
+            return wp_is_mobile() ? $singlelowongan : [$homepage, $singlelowongan]; // Desktop preloads both for sidepanel
         }
         return null;
     }

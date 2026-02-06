@@ -48,7 +48,7 @@ export interface SearchResponse extends BaseJobSearchResponse {
 } 
 
 export enum SearchTitle {
-  Latest = 'Lowongan Terbaru',
+  Latest = 'Lowongan Terbaru(max 1 Bulan)',
   Search = 'Hasil Pencarian'
 }
 

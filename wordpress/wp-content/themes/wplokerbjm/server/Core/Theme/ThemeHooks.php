@@ -382,7 +382,7 @@ class DebloatWPTheme
         remove_action('wp_footer', 'wp_enqueue_stored_styles', 1);
         remove_action('wp_footer', 'wp_maybe_inline_styles', 1);
         remove_action('wp_footer', ['WP_Duotone', 'output_footer_assets'], 10);
-        remove_action('wp_footer', 'the_block_template_skip_link', 10); // !deprecated
+        remove_action('wp_footer', 'the_block_template_skip_link', 10); // !Core something from WP deprecated(Query Monitor report)
         remove_action('wp_footer', 'wp_enqueue_block_template_skip_link', 10); // this theme are fully custom no need for block features
 
         // Remove REST API discovery link
