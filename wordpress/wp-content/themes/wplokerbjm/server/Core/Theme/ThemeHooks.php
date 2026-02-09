@@ -301,9 +301,11 @@ class ThemeInject
                         root.classList.toggle('wplokerbjm-dark-mode-enable', theme === 'dark');
                     };
 
-                    if (stored === 'dark' || stored === 'light') {
+                    const allowed = ['dark', 'light', 'lavender'];
+                    if (allowed.indexOf(stored) !== -1) {
                         apply(stored);
                         root.setAttribute('data-wplokerbjm-theme-sourced', 'local');
+                        root.setAttribute('data-wplokerbjm-theme', stored);
                         removeThisScript();
                         return;
                     }
@@ -313,8 +315,10 @@ class ThemeInject
                         prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
                     } catch (e) { prefersDark = false; }
 
-                    apply(prefersDark ? 'dark' : 'light');
+                    const chosen = prefersDark ? 'dark' : 'light';
+                    apply(chosen);
                     root.setAttribute('data-wplokerbjm-theme-sourced', 'system');
+                    root.setAttribute('data-wplokerbjm-theme', chosen);
                 } catch (e) {
                     console.log('fail applying theme preferences', e);
                 } finally {

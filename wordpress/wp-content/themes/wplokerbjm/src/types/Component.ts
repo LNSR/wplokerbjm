@@ -29,7 +29,7 @@ export type JobContactRow = Pick<MetaBox, 'email_kontak' | 'nomor_kontak' | 'sit
 // Props for the JobCard component (shared type)
 export interface JobCardProps {
   jobdata?: CardJob | undefined;
-  variant?: 'featured' | 'carousel' | 'detail';
+  variant?: 'featured' | 'carousel' | 'bookmark' | 'detail';
   permalink?: string | undefined;
   onClick?: (slug: string, event: MouseEvent, index: number) => void;
   isSelected?: boolean;

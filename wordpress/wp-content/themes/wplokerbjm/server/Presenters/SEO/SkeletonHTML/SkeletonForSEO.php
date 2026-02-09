@@ -4,6 +4,9 @@ namespace WPLokerBJM\Presenters\SEO\SkeletonHTML;
 
 use WPLokerBJM\Models\Schema\CustomFields;
 
+/**
+ * Poor man SSR, but this is more efficent and more better DX than migrating frontend to SvelteKit
+ */
 class SkeletonForSEO
 {
     public static function generateSEOHTML(array $data): string
@@ -14,68 +17,101 @@ class SkeletonForSEO
 
         // Check if single job (has 'title') or array of jobs (has 'id' in first element)
         if (isset($data['title'])) {
-            // Single job detail
+            // Single job detail - produce markup aligned with new Svelte structure
             $job = $data;
             ob_start();
             ?>
             <?php self::style(); ?>
             <?php self::header(); ?>
-            <div class="seo-job-detail">
-                <h1><?php echo esc_html($job['title'] ?? ''); ?></h1>
-                <?php if (!empty($job[CustomFields::NAMA_PERUSAHAAN])): ?>
-                    <h2><?php echo esc_html($job[CustomFields::NAMA_PERUSAHAAN]); ?></h2>
-                <?php endif; ?>
+            <article class="seo-job-detail">
+                <header>
+                    <h1><?php echo esc_html($job['title'] ?? ''); ?></h1>
+                    <?php if (!empty($job[CustomFields::NAMA_PERUSAHAAN])): ?>
+                        <h2><?php echo esc_html($job[CustomFields::NAMA_PERUSAHAAN]); ?></h2>
+                    <?php endif; ?>
+                </header>
+
                 <?php if (!empty($job[CustomFields::TENTANG_PERUSAHAAN])): ?>
-                    <h2>Tentang Perusahaan</h2>
-                    <div><?php echo wp_kses_post($job[CustomFields::TENTANG_PERUSAHAAN]); ?></div>
+                    <section>
+                        <h2>Tentang Perusahaan</h2>
+                        <div><?php echo wp_kses_post($job[CustomFields::TENTANG_PERUSAHAAN]); ?></div>
+                    </section>
                 <?php endif; ?>
+
                 <?php if (!empty($job['ringkasanPekerjaan'])): ?>
-                    <h2>Ringkasan Pekerjaan</h2>
-                    <ul>
-                        <?php foreach ($job['ringkasanPekerjaan'] as $key => $value): ?>
-                            <?php if (!empty($value)): ?>
-                                <li><?php echo esc_html(ucfirst($key) . ': ' . $value); ?></li>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </ul>
+                    <section>
+                        <h2>Ringkasan Pekerjaan</h2>
+                        <div>
+                            <ul>
+                                <?php foreach ($job['ringkasanPekerjaan'] as $key => $value): ?>
+                                    <?php if (!empty($value)): ?>
+                                        <li><?php echo esc_html(ucfirst(str_replace('_', ' ', $key)) . ': ' . $value); ?></li>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </ul>
+                        </div>
+                    </section>
                 <?php endif; ?>
+
                 <?php if (!empty($job[CustomFields::DESKRIPSI_PEKERJAAN])): ?>
-                    <h2>Deskripsi Pekerjaan</h2>
-                    <div><?php echo wp_kses_post($job[CustomFields::DESKRIPSI_PEKERJAAN]); ?></div>
+                    <section>
+                        <h2>Deskripsi Pekerjaan</h2>
+                        <div><?php echo wp_kses_post($job[CustomFields::DESKRIPSI_PEKERJAAN]); ?></div>
+                    </section>
                 <?php endif; ?>
+
                 <?php if (!empty($job[CustomFields::PERSYARATAN])): ?>
-                    <h2>Persyaratan</h2>
-                    <div><?php echo wp_kses_post($job[CustomFields::PERSYARATAN]); ?></div>
+                    <section>
+                        <h2>Persyaratan</h2>
+                        <div><?php echo wp_kses_post($job[CustomFields::PERSYARATAN]); ?></div>
+                    </section>
                 <?php endif; ?>
+
                 <?php if (!empty($job[CustomFields::CARA_MELAMAR])): ?>
-                    <h2>Cara Melamar</h2>
-                    <div><?php echo wp_kses_post($job[CustomFields::CARA_MELAMAR]); ?></div>
+                    <section>
+                        <h2>Cara Melamar</h2>
+                        <div><?php echo wp_kses_post($job[CustomFields::CARA_MELAMAR]); ?></div>
+                    </section>
                 <?php endif; ?>
+
                 <?php if (!empty($job[CustomFields::BENEFIT])): ?>
-                    <h2>Benefit</h2>
-                    <div><?php echo wp_kses_post($job[CustomFields::BENEFIT]); ?></div>
+                    <section>
+                        <h2>Benefit</h2>
+                        <div><?php echo wp_kses_post($job[CustomFields::BENEFIT]); ?></div>
+                    </section>
                 <?php endif; ?>
+
                 <?php if (!empty($job['contacts'])): ?>
-                    <h2>Kontak</h2>
-                    <ul>
-                        <?php foreach ($job['contacts'] as $contact): ?>
-                            <?php if (!empty($contact)): ?>
-                                <li><?php echo esc_html($contact); ?></li>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </ul>
+                    <section>
+                        <h2>Kontak</h2>
+                        <address>
+                            <ul>
+                                <?php foreach ($job['contacts'] as $contact): ?>
+                                    <?php if (!empty($contact)): ?>
+                                        <li><?php echo esc_html($contact); ?></li>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </ul>
+                        </address>
+                    </section>
                 <?php endif; ?>
+
                 <?php if (!empty($job[CustomFields::SOCIAL_MEDIA])): ?>
-                    <h2>Sosial Media</h2>
-                    <ul>
-                        <?php foreach ($job[CustomFields::SOCIAL_MEDIA] as $social): ?>
-                            <?php if (!empty($social)): ?>
-                                <li><?php echo esc_html($social); ?></li>
-                            <?php endif; ?>
-                        <?php endforeach; ?>
-                    </ul>
+                    <section>
+                        <h2>Sosial Media</h2>
+                        <nav>
+                            <ul>
+                                <?php $socials = explode('; ', $job[CustomFields::SOCIAL_MEDIA]); ?>
+                                <?php foreach ($socials as $social): ?>
+                                    <?php if (!empty($social)): ?>
+                                        <li><?php echo esc_html($social); ?></li>
+                                    <?php endif; ?>
+                                <?php endforeach; ?>
+                            </ul>
+                        </nav>
+                    </section>
                 <?php endif; ?>
-            </div>
+            </article>
             <?php
             return ob_get_clean();
         } elseif (is_array($data) && isset($data[0]['id'])) {
@@ -87,7 +123,7 @@ class SkeletonForSEO
             <?php self::header(); ?>
             <div class="seo-job-listings">
                 <div>
-                    <h1>Temukan Lowongan Kerja di Kalimantan terutama Banjarmasin dan sekitarnya</h1>
+                    <h1>Temukan Lowongan Kerja di Kalimantan terutama Banjarmasin, Banjarbaru, Martapura dan sekitarnya</h1>
                     <p>Update berkala, mudah diakses, dan tanpa kewajiban biaya!</p>
                 </div>
                 <div>
@@ -113,8 +149,10 @@ class SkeletonForSEO
                             <?php if (!empty($job[CustomFields::DEADLINE])): ?>
                                 <p>Deadline: <?php echo esc_html($job[CustomFields::DEADLINE]); ?></p>
                             <?php endif; ?>
-                            <time
-                                datetime="<?php echo esc_attr($job['post_time']); ?>"><?php echo esc_html(date('M j, Y', strtotime($job['post_time']))); ?></time>
+                            <?php if (!empty($job['post_time'])): ?>
+                                <time
+                                    datetime="<?php echo esc_attr($job['post_time']); ?>"><?php echo esc_html(date('M j, Y', strtotime($job['post_time']))); ?></time>
+                            <?php endif; ?>
                         </div>
                     <?php endforeach; ?>
                 </div>
@@ -135,14 +173,16 @@ class SkeletonForSEO
         <div class="seo-pasang-iklan">
             <h1>Pasang Iklan Lowongan Kerja</h1>
             <h2>Tingkatkan Peluang Mendapatkan Kandidat Terbaik</h2>
-            <p>Sebarkan informasi lowongan kerja Anda ke ribuan pencari kerja di Banjarmasin dan sekitarnya melalui platform
-                kami. Dengan jangkauan luas dan fitur pencarian yang efektif, Anda dapat menemukan kandidat yang tepat dengan
-                cepat.</p>
+            <p>Sebarkan informasi lowongan kerja Anda ke ribuan pencari kerja di
+                Banjarmasin, Banjarbaru, Martapura dan sekitarnya melalui platform kami.
+                Dengan jangkauan luas dan fitur pencarian yang efektif, Anda dapat
+                menemukan kandidat yang tepat dengan cepat.</p>
             <p>Keuntungan: Iklan lowongan kerja Anda akan ditampilkan di website dan dipromosikan ke media sosial kami dengan
                 jangkauan ribuan pencari kerja.</p>
             <h2>Tentang Kami</h2>
             <p>Loker Banjarmasin adalah platform lowongan kerja yang dibuat untuk mendukung komunitas bisnis kecil dan lokal di
-                Kalimantan — khususnya Banjarmasin dan sekitarnya. Kami terbuka untuk semua pemberi kerja, dengan fokus pada
+                Kalimantan — khususnya Banjarmasin, Banjarbaru, Martapura, dan sekitarnya. Kami terbuka untuk semua pemberi
+                kerja, dengan fokus pada
                 UMKM, usaha kecil, dan perekrut independen yang ingin membagikan peluang kerja secara mudah dan efektif.</p>
             <p>Situs ini tidak menyediakan tombol "lamar" langsung; pelamar akan diarahkan ke pihak HR melalui media sosial atau
                 kontak yang Anda cantumkan, sehingga prosesnya tetap fleksibel dan personal. Setiap lowongan akan ditayangkan
@@ -179,6 +219,7 @@ class SkeletonForSEO
         return ob_get_clean();
     }
 
+    /** Stall FOUC till JS boot */
     private static function style(): void
     {
         ?>
@@ -211,8 +252,9 @@ class SkeletonForSEO
 
     private static function header(): void
     {
+        $homeUrl = home_url() . '/pasang-iklan-loker/';
         ?>
-        <header><a href="/pasang-iklan-loker/">Pasang Iklan Loker</a></header>
+        <header><a href="<?= $homeUrl; ?>">Pasang Iklan Loker</a></header>
         <?php
     }
 }

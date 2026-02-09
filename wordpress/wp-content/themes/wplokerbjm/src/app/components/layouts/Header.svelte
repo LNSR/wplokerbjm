@@ -1,5 +1,6 @@
 <script module lang="ts">
   import { debounce, getThemeData } from "@/utils";
+  import { ThemeName } from "@/types";
   import { MediaQuery, SvelteMap } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
@@ -18,7 +19,7 @@
 
   class ThemeManager {
     private mediaQuery: MediaQuery | null = null;
-    private debouncedSetTheme: (d: boolean) => void = () => {};
+    private debouncedSetTheme: (d: ThemeName) => void = () => {};
     public isDark = $state(false);
     public currentTheme = $state<ThemeName>(ThemeName.Light);
     private _initialized = false;
@@ -48,16 +49,17 @@
       }
     }
 
-    private setThemeDirect(dark: boolean): void {
+    private setThemeDirect(theme: ThemeName): void {
       // guard against concurrent invocations during view transitions
       if (routeStore.currentViewTransition) {
         routeStore.currentViewTransition.finished.then(() => {
-          this.setThemeDirect(dark);
+          this.setThemeDirect(theme);
         });
         return;
       }
 
-      const newTheme = dark ? ThemeName.Dark : ThemeName.Light;
+      const newTheme = theme;
+      const isDark = newTheme === ThemeName.Dark;
 
       if (this.currentTheme === newTheme) return;
 
@@ -67,7 +69,7 @@
         const applyTheme = () => {
           document.documentElement.classList.add("theme-switching");
           document.documentElement.setAttribute("data-theme", newTheme);
-          if (dark) {
+          if (isDark) {
             document.documentElement.classList.add(
               "wplokerbjm-dark-mode-enable",
             );
@@ -76,7 +78,7 @@
               "wplokerbjm-dark-mode-enable",
             );
           }
-          this.updateMetaThemeColor(dark);
+          this.updateMetaThemeColor(isDark);
         };
 
         if (
@@ -109,8 +111,11 @@
           const write = () => {
             try {
               localStorage.setItem("wplokerbjm-theme", newTheme);
-            } catch {
-              /* best-effort */
+            } catch (e) {
+              console.warn(
+                "Failed to write theme preference to localStorage",
+                e,
+              );
             }
           };
           if (typeof (window as any).requestIdleCallback === "function") {
@@ -138,8 +143,8 @@
                 }
               });
             }, 50);
-          } catch {
-            /* best-effort */
+          } catch (e) {
+            console.warn("Failed to schedule header measurement", e);
           }
         }, 30);
       });
@@ -149,7 +154,7 @@
       if (this._initialized) return;
       this._initialized = true;
       this.debouncedSetTheme = debounce(
-        (dark: boolean) => this.setThemeDirect(dark),
+        (theme: ThemeName) => this.setThemeDirect(theme),
         10,
       );
 
@@ -171,12 +176,20 @@
         }
       })();
 
-      if (saved === ThemeName.Dark || (!saved && systemPrefersDark)) {
+      if (
+        saved === ThemeName.Dark ||
+        saved === ThemeName.Lavender ||
+        saved === ThemeName.Light
+      ) {
+        // persisted preference
+        this.isDark = saved === ThemeName.Dark;
+        this.setThemeDirect(saved as ThemeName);
+      } else if (!saved && systemPrefersDark) {
         this.isDark = true;
-        this.setThemeDirect(true);
+        this.setThemeDirect(ThemeName.Dark);
       } else {
         this.isDark = false;
-        this.setThemeDirect(false);
+        this.setThemeDirect(ThemeName.Light);
       }
 
       try {
@@ -191,7 +204,9 @@
           }
           if (!hasStored) {
             this.isDark = this.mediaQuery!.current;
-            this.setThemeDirect(this.mediaQuery!.current);
+            this.setThemeDirect(
+              this.mediaQuery!.current ? ThemeName.Dark : ThemeName.Light,
+            );
           }
         });
       } catch {
@@ -199,22 +214,32 @@
       }
 
       $effect(() => {
-        this.isDark;
-        this.debouncedSetTheme(this.isDark);
+        this.currentTheme;
+        this.debouncedSetTheme(this.currentTheme);
       });
     }
 
-    public teardown(): void {
-      // keep teardown minimal; do not attempt to remove $effects created
-      // in the module reactive scope. Reset internal state so re-init is possible
-      // in testing or HMR scenarios.
-      this.mediaQuery = null;
-      this._initialized = false;
-    }
+    public setTheme(theme: ThemeName): void {
+      // update boolean flag early so UI icon flips, but DON'T set currentTheme yet
+      // otherwise setThemeDirect will erroneously early-return without updating DOM
+      this.isDark = theme === ThemeName.Dark;
 
-    public setTheme(dark: boolean): void {
-      this.isDark = dark;
-      this.debouncedSetTheme(dark);
+      // apply immediately for responsive UI, but keep debounced path for save/side-effects
+      try {
+        this.setThemeDirect(theme);
+      } catch {
+        // fallback to debounced if direct fails for some reason
+        this.debouncedSetTheme(theme);
+      }
+
+      // ensure a debounced call remains to avoid double-write races
+      try {
+        if ((this.debouncedSetTheme as any)?.flush) {
+          (this.debouncedSetTheme as any).flush();
+        }
+      } catch {
+        // ignore
+      }
     }
   }
 
@@ -360,8 +385,8 @@
         if (adminBar) {
           try {
             cache.savedHTML = adminBar.outerHTML;
-          } catch {
-            // best-effort
+          } catch (e) {
+            console.warn("Failed to read wpadminbar.outerHTML", e);
           }
         }
         this.adminBarCacheMap.set("wpadminbar", cache);
@@ -395,8 +420,11 @@
                 cache.savedHTML = adminBar.outerHTML;
                 this.adminBarCacheMap.set("wpadminbar", cache);
                 this.adminBarCache = cache;
-              } catch {
-                /* best-effort */
+              } catch (e) {
+                console.warn(
+                  "Failed to update adminBar cache after rehydration",
+                  e,
+                );
               }
             }
           } catch (e) {
@@ -412,8 +440,11 @@
             cache.savedHTML = adminBar.outerHTML;
             this.adminBarCacheMap.set("wpadminbar", cache);
             this.adminBarCache = cache;
-          } catch {
-            /* best-effort */
+          } catch (e) {
+            console.warn(
+              "Failed to update adminBar cache after moving into header",
+              e,
+            );
           }
           this.adminBarEl = adminBar;
         }
@@ -455,8 +486,11 @@
                 cache.savedHTML = adminBar.outerHTML;
                 this.adminBarCacheMap.set("wpadminbar", cache);
                 this.adminBarCache = cache;
-              } catch {
-                /* best-effort */
+              } catch (e) {
+                console.warn(
+                  "Failed to update adminBar cache after reinsertion",
+                  e,
+                );
               }
             }
           } catch (e) {
@@ -526,8 +560,8 @@
       if (isHasNonce) {
         try {
           this.moveAdminBarIntoHeader();
-        } catch {
-          // best-effort
+        } catch (e) {
+          console.warn("moveAdminBarIntoHeader failed", e);
         }
       }
 
@@ -548,8 +582,8 @@
       // attempt to restore admin bar to its original location
       try {
         this.restoreAdminBar();
-      } catch {
-        // best-effort
+      } catch (e) {
+        console.warn("restoreAdminBar failed", e);
       }
 
       // cleanup listeners and observers
@@ -596,6 +630,9 @@
         this.domObserver.disconnect();
         this.domObserver = null;
       }
+      headerStore.appEl?.style.removeProperty("--site-header-top");
+      headerStore.appEl?.style.removeProperty("--site-header-height");
+      headerStore.appEl?.style.removeProperty("--site-scroll-padding-top");
     };
   }
 
@@ -608,7 +645,6 @@
   import type { HTMLImgAttributes } from "svelte/elements";
   import { GlobalNavigateTo, routeStore } from "$lib/stores/Route.svelte";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
-  import { ThemeName } from "@/types";
   import { innerWidth } from "svelte/reactivity/window";
   import {
     SunSolid,
@@ -617,8 +653,10 @@
     BookmarkSolid,
     ExternalLinkSolid,
   } from "svelte-awesome-icons";
+  import { PortalManager } from "$lib/utils/elements.svelte";
 
   let { logo = "" } = $props();
+  let showThemeModal = $state(false);
 
   function updateLogo(): void {
     try {
@@ -665,52 +703,11 @@
       console.error("Theme initialization error");
     }
 
-    // Start header manager after DOM is available
     headerManager.start();
-
-    // Handle will-change for drawer animation
-    const drawerInput = document.getElementById(
-      "header-drawer",
-    ) as HTMLInputElement;
-    const drawerSide = document.getElementById("header-drawer-side");
-    if (drawerInput && drawerSide) {
-      const handleDrawerChange = () => {
-        if (drawerInput.checked) {
-          drawerSide.style.willChange = "transform";
-        } else {
-          // Remove after transition
-          drawerSide.addEventListener(
-            "transitionend",
-            () => {
-              drawerSide.style.willChange = "";
-            },
-            { once: true },
-          );
-        }
-      };
-      drawerInput.addEventListener("change", handleDrawerChange);
-      // Store for cleanup
-      (drawerInput as any)._drawerListener = handleDrawerChange;
-    }
   });
   onDestroy(() => {
-    // headerManager.destroy will attempt to restore wpadminbar as a best-effort
+    // headerManager.destroy will attempt to restore wpadminbar; failures are logged (non-fatal)
     headerManager?.destroy();
-
-    headerStore.appEl?.style.removeProperty("--site-header-top");
-    headerStore.appEl?.style.removeProperty("--site-header-height");
-    headerStore.appEl?.style.removeProperty("--site-scroll-padding-top");
-
-    // Remove drawer event listener
-    const drawerInput = document.getElementById(
-      "header-drawer",
-    ) as HTMLInputElement;
-    if (drawerInput && (drawerInput as any)._drawerListener) {
-      drawerInput.removeEventListener(
-        "change",
-        (drawerInput as any)._drawerListener,
-      );
-    }
   });
 
   $effect(() => {
@@ -726,7 +723,7 @@
 </script>
 
 <header
-  class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b-2 border-[var(--wpl-global-color-5)] min-h-auto z-[60]"
+  class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b-3 border-[var(--wpl-global-color-5)] min-h-auto z-[60]"
   style="top:0; transform: translateY(var(--site-header-top, 0)); view-transition-name: site-header;"
 >
   <div class="drawer drawer-end">
@@ -763,45 +760,75 @@
         </div>
         <div class="flex items-center gap-1 mt-5">
           <!-- Color/theme switcher -->
-          <div class="rounded-full shadow-lg p-2">
-            <label class="flex cursor-pointer gap-2 items-center">
-              <span
-                class="relative w-6 h-12 flex flex-col items-center"
-                role="switch"
-                aria-checked={themeStore.isDark}
-              >
-                <span
-                  class="absolute inset-0 rounded-full bg-gray-200 dark:bg-slate-700 transition-colors"
-                ></span>
-                <span
-                  class="absolute top-0 left-0 w-6 h-6 rounded-full bg-white dark:bg-slate-800 shadow transition-transform"
-                  style:transform={themeStore.isDark
-                    ? "translateY(100%)"
-                    : "translateY(0)"}
-                ></span>
-                <SunSolid
-                  class="absolute top-1 left-1 w-4 h-4 transition-all z-10 {themeStore.isDark
-                    ? 'opacity-40 grayscale'
-                    : 'opacity-100'}"
-                  style="color: var(--icon-color);"
-                />
-                <MoonSolid
-                  class="absolute bottom-1 left-1 w-4 h-4 transition-all z-10 {themeStore.isDark
-                    ? 'opacity-100'
-                    : 'opacity-40 grayscale'}"
-                  style="color: var(--icon-color);"
-                />
-                <input
-                  type="checkbox"
-                  value="dark"
-                  class="toggle theme-controller focus:ring-2 focus:ring-blue-400 absolute w-6 h-12 opacity-0 cursor-pointer"
-                  aria-label="Toggle color theme"
-                  aria-checked={themeStore.isDark}
-                  bind:checked={themeStore.isDark}
-                />
-              </span>
-            </label>
+          <div class="p-1">
+            <button
+              class="flex items-center gap-2 p-2 rounded focus:outline-none"
+              aria-label="Choose color theme"
+              title="Pilih tema warna"
+              onclick={() => (showThemeModal = true)}
+            >
+              {#if themeStore.isDark}
+                <MoonSolid class="w-5 h-5" style="color: var(--icon-color);" />
+              {:else if themeStore.currentTheme === ThemeName.Lavender}
+                <SunSolid class="w-5 h-5" style="color: var(--icon-color);" />
+              {:else}
+                <SunSolid class="w-5 h-5" style="color: var(--icon-color);" />
+              {/if}
+            </button>
           </div>
+
+          {#if showThemeModal}
+            <div use:PortalManager.teleport={".route-container"}>
+              <div class="modal modal-open z-[1000]">
+                <div class="modal-box">
+                  <h3 class="font-semibold text-lg">Pilih Tema</h3>
+                  <p class="py-2 text-sm text-muted">
+                    Pilih tema yang ingin Anda gunakan.
+                  </p>
+                  <div class="flex gap-3 mt-3">
+                    <button
+                      class="btn flex-1"
+                      class:btn-primary={themeStore.currentTheme ===
+                        ThemeName.Light}
+                      onclick={() => {
+                        themeStore.setTheme(ThemeName.Light);
+                        showThemeModal = false;
+                      }}
+                    >
+                      Light
+                    </button>
+                    <button
+                      class="btn flex-1"
+                      class:btn-primary={themeStore.currentTheme ===
+                        ThemeName.Dark}
+                      onclick={() => {
+                        themeStore.setTheme(ThemeName.Dark);
+                        showThemeModal = false;
+                      }}
+                    >
+                      Dark
+                    </button>
+                    <button
+                      class="btn flex-1"
+                      class:btn-primary={themeStore.currentTheme ===
+                        ThemeName.Lavender}
+                      onclick={() => {
+                        themeStore.setTheme(ThemeName.Lavender);
+                        showThemeModal = false;
+                      }}
+                    >
+                      Lavender
+                    </button>
+                  </div>
+                  <div class="modal-action">
+                    <button class="btn" onclick={() => (showThemeModal = false)}
+                      >Close</button
+                    >
+                  </div>
+                </div>
+              </div>
+            </div>
+          {/if}
 
           <!-- Bookmark button on desktop -->
           <button

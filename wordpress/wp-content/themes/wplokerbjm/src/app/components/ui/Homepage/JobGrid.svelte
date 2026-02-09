@@ -118,7 +118,7 @@
   import { searchStore } from "$lib/stores/Search.svelte";
   import { APIService } from "@/services/APIService";
   import { utilsSEO } from "$lib/utils/SEO.svelte";
-  import JobCard from "@components/ui/Homepage/JobCard.svelte";
+  import JobCard from "@components/ui/Shared/JobCard.svelte";
   import SingleOverlay from "@components/ui/Homepage/SingleOverlay.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
@@ -127,6 +127,7 @@
   let hasRestoredState = $state(false);
   let isRefreshing = $state(false);
   let loadMoreSentinel = $state<HTMLElement | null>(null);
+  let prevFilters = $state(""); // to track filter changes so card heights can be cleared
 
   const props: JobGridProps & { job?: JobDetailResponse | null } = $props();
 
@@ -353,17 +354,11 @@
 
   let _prevJobIds: number[] = [];
 
-  onMount(() => {
-    overlayManager.checkUrlForOverlay();
-    void jobGridHandler.initializeJobs();
-    if (job) {
-      jobOverlay.overlayData = job; // no need to drill prop to JobDetail component
-    }
-  });
-
   $effect(() => {
     // Fetch first 54 immediately once jobs are available and then append subsequent batches
-    const currJobIds = (searchStore.jobs || []).map(j => Number(j.id)).filter(id => !isNaN(id)) as number[];
+    const currJobIds = (searchStore.jobs || [])
+      .map((j) => Number(j.id))
+      .filter((id) => !isNaN(id)) as number[];
 
     if (_prevJobIds.length === 0 && currJobIds.length > 0) {
       // initial load: take exactly the first 54
@@ -372,8 +367,10 @@
         // Only fetch ItemList schema once on initial homepage load. Subsequent
         // appends should NOT re-fetch or replace the ItemList.
         try {
-          const comp = routeStore.getComponentNamePath(routeStore.currentUrl.pathname);
-          if (comp === 'Homepage') {
+          const comp = routeStore.getComponentNamePath(
+            routeStore.currentUrl.pathname,
+          );
+          if (comp === "Homepage") {
             void utilsSEO.addJobSchemas(firstBatch);
           }
         } catch {
@@ -387,7 +384,10 @@
 
     if (currJobIds.length > _prevJobIds.length) {
       // appended jobs (load more): only append up to the next 54
-      const appended = currJobIds.slice(_prevJobIds.length, _prevJobIds.length + 54);
+      const appended = currJobIds.slice(
+        _prevJobIds.length,
+        _prevJobIds.length + 54,
+      );
       if (appended.length > 0) {
         // Do NOT call addJobSchemas on append; only update our local tracking
         _prevJobIds = _prevJobIds.concat(appended);
@@ -396,7 +396,6 @@
   });
 
   $effect(() => {
-
     // Auto prefetch using IntersectionObserver sentinel to prepare next page
     if (!loadMoreSentinel) return;
 
@@ -421,6 +420,37 @@
     return () => {
       observer.disconnect();
     };
+  });
+
+  onMount(() => {
+    overlayManager.checkUrlForOverlay();
+    void jobGridHandler.initializeJobs();
+    if (job) {
+      jobOverlay.overlayData = job; // no need to drill prop to JobDetail component
+    }
+  });
+
+  // Clear virtualization measurements when filters change to avoid layout glitches
+  $effect(() => {
+    const current = JSON.stringify(searchStore.filters || {});
+    // skip first-run; only clear when filters actually change after initial mount
+    if (!prevFilters) {
+      prevFilters = current;
+      return;
+    }
+    if (current !== prevFilters) {
+      prevFilters = current;
+      try {
+        // clear in-memory map used by virtualization
+        if (cardHeights && typeof cardHeights.clear === 'function') {
+          cardHeights.clear();
+        }
+        // persist empty heights so other components/tabs use fresh measurements
+        routeStateStore.saveCardHeights(new Map(), "jobGrid");
+      } catch (e) {
+        void e;
+      }
+    }
   });
 </script>
 
@@ -535,7 +565,11 @@
 
         {#if !hasMore && displayJobs.length > 0}
           <div class="flex justify-center mt-8 z-100">
-            <p class="bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] rounded-lg">Tidak ada sisa muatan lagi</p>
+            <p
+              class="bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] rounded-lg"
+            >
+              Tidak ada sisa muatan lagi
+            </p>
           </div>
         {/if}
       </div>

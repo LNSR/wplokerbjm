@@ -7,26 +7,28 @@
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { Virtualization } from "$lib/utils/Virtualization.svelte";
   import type { CardJob } from "@/types";
-  import { isMobile, isJobGridEl } from "$lib/utils/elements.svelte";
+  import {
+    isMobile,
+    isJobGridEl,
+    PortalManager,
+  } from "$lib/utils/elements.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import {
     GlobalNavigateTo,
     routeStore,
     routeStateStore,
-  } from "@/app/lib/stores/Route.svelte";
+  } from "$lib/stores/Route.svelte";
   import { SvelteDate } from "svelte/reactivity";
+  import JobCard from "@components/ui/Shared/JobCard.svelte";
   import { fade } from "svelte/transition";
   import {
     BookmarkSolid,
     XmarkSolid,
     TrashAltSolid,
     ExclamationTriangleSolid,
-    UserTieSolid,
-    CalendarSolid,
     ExclamationCircleSolid,
     CheckCircleSolid,
-    ThumbTackSolid,
     MagnifyingGlassSolid,
   } from "svelte-awesome-icons";
   import type { Attachment } from "svelte/attachments";
@@ -100,7 +102,7 @@
 
     async removeBookmark(id: number): Promise<void> {
       removingIds.add(id);
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+      await new Promise((resolve) => setTimeout(resolve, 200));
       await bookmarkStore.removeJob(id);
       removingIds.delete(id);
     }
@@ -114,7 +116,7 @@
       savedJobs.forEach((job) => {
         if (job.id) removingIds.add(job.id);
       });
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 200));
       loading = true;
       try {
         await bookmarkStore.clearAll();
@@ -183,8 +185,8 @@
         containerHeight: containerHeight,
         cardHeights: cardHeights,
         fallbackHeight: 200,
-        gap: 12,
-        buffer: 2,
+        gap: 24,
+        buffer: 1,
       });
     });
 
@@ -362,30 +364,22 @@
 
     portalDialog(append: boolean = true): void {
       if (typeof document === "undefined") return;
-      const appContainer =
-        document.querySelector(".route-container") ?? document.body;
-      switch (append) {
-        case true:
-          if (modalEl && modalEl.parentElement !== appContainer) {
-            appContainer.appendChild(modalEl);
-          }
+      if (append) {
+        // append and show dialog only after appended to DOM to avoid race conditions
+        PortalManager.append(modalEl, ".route-container", () => {
+          if (modalEl && !modalEl.open) modalEl.showModal();
+        });
+        PortalManager.append(deleteConfirmModal, ".route-container", () => {
           if (
+            showDeleteConfirm &&
             deleteConfirmModal &&
-            deleteConfirmModal.parentElement !== appContainer
-          ) {
-            appContainer.appendChild(deleteConfirmModal);
-          }
-          break;
-        case false:
-          if (modalEl && modalEl.parentElement === appContainer) {
-            appContainer.removeChild(modalEl);
-          }
-          if (
-            deleteConfirmModal &&
-            deleteConfirmModal.parentElement === appContainer
-          ) {
-            appContainer.removeChild(deleteConfirmModal);
-          }
+            !deleteConfirmModal.open
+          )
+            deleteConfirmModal.showModal();
+        });
+      } else {
+        PortalManager.remove(modalEl, ".route-container");
+        PortalManager.remove(deleteConfirmModal, ".route-container");
       }
     }
     get layoutBreakpoint() {
@@ -548,7 +542,7 @@
               Lowongan Tersimpan
               {#if !loading && savedJobs.length > 0}
                 <span
-                  class="bg-[var(--wpl-global-color-1)] text-sm rounded-full px-2 py-0.1 z-10"
+                  class="bg-[var(--wpl-global-color-1)] text-[var(--wpl-global-color-5)] text-sm rounded-full px-2 py-0.1 z-10"
                   >{savedJobs.length}</span
                 >
               {/if}
@@ -611,8 +605,8 @@
                   searchQuery = "";
                   try {
                     searchInput?.blur();
-                  } catch {
-                    // ignore
+                  } catch (e) {
+                    console.error(e);
                   }
                 }}
                 class="btn btn-ghost btn-sm"
@@ -726,10 +720,9 @@
                 {@const topPosition =
                   virtualizedJobs.itemPositions[absoluteIndex] || 0}
                 <div
-                  class="card bg-base-300 shadow-sm hover:shadow-md transition-transform duration-400 absolute left-0 right-0"
+                  class="card bg-[var(--wpl-global-color-5)] border-2 border-[var(--wpl-global-color-1)] shadow-sm hover:shadow-md absolute left-0 right-0"
                   class:scale-0={removingIds.has(job.id || 0)}
                   style="transform: translate3d(0, {topPosition}px, 0);"
-                  out:fade={{ duration: 200 }}
                   {@attach virtualizationManager.measureHeight(job.id || 0)}
                 >
                   <div class="card-body p-4">
@@ -771,99 +764,19 @@
                         </div>
                       </div>
                     {:else}
-                      <div class="flex items-start justify-between gap-3">
-                        <div class="flex-1 min-w-0">
-                          <p
-                            class="font-bold text-base flex items-center gap-2 mb-1"
-                          >
-                            <button
-                              onclick={() => modalHandler.handleJobClick(job)}
-                              class="hover:text-[var(--wpl-global-color-1)] transition-colors text-left w-full"
-                              aria-label={`View job details for ${job.title}`}
-                            >
-                              {job.title}
-                            </button>
-                          </p>
-                          {#if !job.nama_perusahaan}
-                            <div class="divider mt-0"></div>
-                          {/if}
-
-                          {#if job.nama_perusahaan}
-                            <p
-                              class="text-base font-semibold mb-6 flex items-center gap-2"
-                            >
-                              <UserTieSolid
-                                class="h-4 w-4 text-[var(--wpl-global-color-1)] inline-block"
-                                aria-hidden="true"
-                              />
-                              {job.nama_perusahaan}
-                            </p>
-                            <div class="divider -mt-4"></div>
-                          {/if}
-
-                          <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
-                            {#each generalStore.useSummaryJob(job.ringkasanPekerjaan) as row}
-                              {#if row.label !== "Deadline"}
-                                {@const Icon = row.icon}
-                                <span
-                                  class="flex items-center text-base md:text-base font-semibold gap-2 py-1"
-                                >
-                                  {#if Icon}
-                                    <Icon
-                                      class="text-[var(--wpl-global-color-1)] w-4 h-4 shrink-0"
-                                      aria-hidden="true"
-                                    />
-                                  {/if}
-                                  <span>{@html row.value}</span>
-                                </span>
-                              {/if}
-                            {/each}
-                          </div>
-
-                          {#if job.statusInfo.label || job.deadlineInfo.text}
-                            <div class="divider my-2"></div>
-                            <div class="mt-2 inline-block">
-                              {#if job.statusInfo.label}
-                                <span
-                                  class="px-3 py-1 badge font-bold rounded mr-2 {job
-                                    .statusInfo.color}"
-                                >
-                                  {#if job.statusInfo.label === "Urgent"}
-                                    <ExclamationTriangleSolid
-                                      class="h-4 w-4"
-                                      aria-hidden="true"
-                                    />
-                                  {:else if job.statusInfo.label === "Pinned"}
-                                    <ThumbTackSolid
-                                      class="h-4 w-4"
-                                      aria-hidden="true"
-                                    />
-                                  {/if}
-                                  {job.statusInfo.label}
-                                </span>
-                              {/if}
-                              {#if job.deadlineInfo.text}
-                                <span
-                                  class="px-3 py-1 badge font-bold rounded {job
-                                    .deadlineInfo.style}"
-                                >
-                                  <CalendarSolid
-                                    class="h-4 w-4"
-                                    aria-hidden="true"
-                                  />
-                                  <span>{job.deadlineInfo.text}</span>
-                                </span>
-                              {/if}
-                            </div>
-                          {/if}
-
-                          {#if loading}
-                            <div class="flex items-center justify-center py-12">
-                              <LoadingSpinner srLabel="Memuat..." size="md" />
-                            </div>
-                          {/if}
+                      <div class="flex">
+                        <div
+                          class="flex-1 min-w-0"
+                        >
+                          <JobCard
+                            jobdata={job}
+                            variant="bookmark"
+                            permalink={job.permalink as string}
+                            onClick={() => modalHandler.handleJobClick(job)}
+                          />
                         </div>
-                        <div class="flex flex-col gap-1">
+
+                        <div class="flex-shrink-0 ml-2 pl-2 border-l-1 border-[var(--wpl-global-color-1)] flex items-center">
                           <button
                             onclick={() =>
                               bookmarkHandler.removeBookmark(job.id || 0)}
@@ -872,7 +785,7 @@
                             title="Hapus bookmark"
                             aria-label="Hapus bookmark untuk {job.title}"
                           >
-                            <TrashAltSolid class="h-4 w-4" aria-hidden="true" />
+                            <TrashAltSolid class="h-6 w-6" aria-hidden="true" />
                           </button>
                         </div>
                       </div>

@@ -10,10 +10,9 @@
     PhoneSolid,
     CircleCheckSolid,
   } from "svelte-awesome-icons";
-  import Footer from "@components/layouts/Footer.svelte";
 
   const sectionClass =
-    "rounded-xl border-2 border-blue-500 dark:border-blue-400 shadow-md p-4 sm:p-6 md:p-8 mb-12 bg-white dark:bg-gray-900";
+    "rounded-xl border-2 border-[var(--wpl-global-color-1)] shadow-md p-4 sm:p-6 md:p-8 mb-12 bg-[var(--wpl-global-color-5)]";
 
   const baseIconClass =
     "flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full mr-4 shadow-sm";
@@ -41,13 +40,13 @@
     </h2>
     <p class="text-justify mb-4 text-gray-700 dark:text-gray-200 break-words">
       Sebarkan informasi lowongan kerja Anda ke ribuan pencari kerja di
-      Banjarmasin dan sekitarnya melalui platform kami. Dengan jangkauan luas
-      dan fitur pencarian yang efektif, Anda dapat menemukan kandidat yang tepat
-      dengan cepat.
+      Banjarmasin, Banjarbaru, Martapura dan sekitarnya melalui platform kami.
+      Dengan jangkauan luas dan fitur pencarian yang efektif, Anda dapat
+      menemukan kandidat yang tepat dengan cepat.
     </p>
 
     <div
-      class="flex flex-row items-center gap-3 mt-6 p-4 bg-blue-200 dark:bg-blue-900/40 rounded-lg border border-blue-300 dark:border-blue-700 break-words"
+      class="flex flex-row items-center gap-3 mt-6 p-4 border-1 rounded-xl border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-1)]/10 break-words"
       role="note"
     >
       <LightbulbSolid
@@ -75,10 +74,18 @@
       Tentang Kami
     </h2>
     <p class="text-justify mb-4 text-gray-700 dark:text-gray-200 break-words">
-      Loker Banjarmasin adalah platform lowongan kerja yang dibuat untuk mendukung komunitas bisnis kecil dan lokal di Kalimantan — khususnya Banjarmasin dan sekitarnya. Kami terbuka untuk semua pemberi kerja, dengan fokus pada UMKM, usaha kecil, dan perekrut independen yang ingin membagikan peluang kerja secara mudah dan efektif.
+      Loker Banjarmasin adalah platform lowongan kerja yang dibuat untuk
+      mendukung komunitas bisnis kecil dan lokal di Kalimantan — khususnya
+      Banjarmasin, Banjarbaru, Martapura, dan sekitarnya. Kami terbuka untuk
+      semua pemberi kerja, dengan fokus pada UMKM, usaha kecil, dan perekrut
+      independen yang ingin membagikan peluang kerja secara mudah dan efektif.
     </p>
     <p class="text-justify mb-4 text-gray-700 dark:text-gray-200 break-words">
-      Situs ini tidak menyediakan tombol "lamar" langsung; pelamar akan diarahkan ke pihak HR melalui media sosial atau kontak yang Anda cantumkan, sehingga prosesnya tetap fleksibel dan personal. Setiap lowongan akan ditayangkan selama 1 bulan, kecuali bila Anda menyertakan batas waktu (deadline) yang berbeda.
+      Situs ini tidak menyediakan tombol "lamar" langsung; pelamar akan
+      diarahkan ke pihak HR melalui media sosial atau kontak yang Anda
+      cantumkan, sehingga prosesnya tetap fleksibel dan personal. Setiap
+      lowongan akan ditayangkan selama 1 bulan, kecuali bila Anda menyertakan
+      batas waktu (deadline) yang berbeda.
     </p>
   </section>
 
@@ -98,13 +105,16 @@
       <div class="grid grid-cols-1 md:grid-cols-2 md:gap-12 gap-8 pt-4">
         <div class="md:pr-5">
           <aside
-            class="p-3 md:pl-8 bg-blue-50 dark:bg-blue-900/30 rounded-xl"
+            class="p-3 md:pl-8 rounded-xl bg-[var(--wpl-global-color-1)]/10"
             aria-labelledby="info-dibutuhkan"
           >
             <h3
               class="flex flex-row items-center justify-center text-center text-xl font-semibold mb-3 text-[var(--wpl-global-color-1)] break-words"
             >
-              <PhoneSolid class="text-xl mr-3 text-[var(--wpl-global-color-1)] dark:text-blue-300" aria-hidden="true" />
+              <PhoneSolid
+                class="text-xl mr-3 text-[var(--wpl-global-color-1)]"
+                aria-hidden="true"
+              />
               <span>Hubungi Kami</span>
             </h3>
             <p class="mb-2 text-gray-700 dark:text-gray-200 break-words">
@@ -150,7 +160,7 @@
                     >Threads:</span
                   >
                   <a
-                    href="https://www.threads.com/@loker_banjarmasin"
+                    href="https://threads.com/@loker_banjarmasin"
                     target="_blank"
                     rel="noopener noreferrer"
                     class={linkClass}
@@ -207,15 +217,15 @@
           </aside>
         </div>
         <aside
-          class="p-4.5 md:pl-8 bg-blue-50 dark:bg-blue-900/30 rounded-xl"
+          class="p-4.5 md:pl-8 rounded-xl bg-[var(--wpl-global-color-1)]/10"
           aria-labelledby="info-dibutuhkan"
         >
           <h3
             id="info-dibutuhkan"
-            class="flex flex-row items-center justify-center text-center text-lg font-semibold mb-3 text-blue-700 dark:text-blue-300 break-words"
+            class="flex flex-row items-center justify-center text-center text-lg font-semibold mb-3 text-[var(--wpl-global-color-1)] break-words"
           >
             <CircleInfoSolid
-              class="text-[var(--wpl-global-color-1)] dark:text-blue-300 items-start mr-3"
+              class="text-[var(--wpl-global-color-1)] items-start mr-3"
               aria-hidden="true"
             />
             <span>Informasi yang Dibutuhkan:</span>
@@ -307,5 +317,3 @@
     </div>
   </section>
 </main>
-
-<Footer />

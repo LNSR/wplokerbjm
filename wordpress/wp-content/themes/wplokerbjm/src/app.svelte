@@ -21,7 +21,9 @@
         case "PasangIklanLoker":
           return dynamicComponentStore.loadPasangIklanLoker();
         case "SingleLowongan":
-          return isMobile() ? dynamicComponentStore.loadSingleLowongan() : dynamicComponentStore.loadHomepage();
+          return isMobile()
+            ? dynamicComponentStore.loadSingleLowongan()
+            : dynamicComponentStore.loadHomepage();
       }
       return null;
     }
@@ -119,6 +121,7 @@
   import "@css/app.css";
   import FloatingActionButton from "@components/ui/Shared/FloatingActionButton.svelte";
   import Header from "@components/layouts/Header.svelte";
+  import Footer from "@components/layouts/Footer.svelte";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
 
   const props = $props();
@@ -167,9 +170,11 @@
       style="padding-top:{headerStore.totalOffset}px"
     >
       <CurrentComponent {...isInitialLoad ? props : {}} />
+      <Footer />
+      <!-- we put footer here to avoid layout shifts, async component cause footer being pushed down -->
     </div>
+    <FloatingActionButton />
   {/if}
-  <FloatingActionButton />
 </div>
 
 <style lang="postcss">

@@ -22,7 +22,6 @@
     ClockSolid,
     UserTieSolid,
     MapPinSolid,
-    ClipboardCheckSolid,
     CircleInfoSolid,
     CircleCheckSolid,
     FileSignatureSolid,
@@ -162,227 +161,246 @@
   });
 </script>
 
-<div class="space-y-8">
-  <!-- Job Title -->
-  {#if job.title}
-    <section class="top-0 text-center">
-      <div class="flex items-center justify-center gap-4">
-        <h1 class="text-3xl font-bold">{job.title}</h1>
-      </div>
-      {#if job.post_time}
-        <div
-          class="text-md mt-2 flex items-center justify-center gap-2 font-semibold text-center"
-        >
-          <ClockSolid
-            class="text-[var(--wpl-global-color-1)] inline-block min-w-3 min-h-3 w-4 h-4 md:w-5 md:h-5"
-            aria-hidden="true"
-          />
-          <span>Diupdate: {timeAgo()}</span>
-          <BookmarkButton jobId={Number(job.id) || 0} variant="detail" />
+<article class="space-y-8">
+  <!-- Title + Summary -->
+  {#if job.title || (ringkasanPekerjaan && ringkasanPekerjaan.length)}
+    <section
+      class="overflow-hidden border-1 border-[var(--wpl-global-color-1)] p-6 rounded-xl bg-[var(--wpl-global-color-5)]"
+    >
+      <div class="grid grid-cols-1 pt-6">
+        <div class="flex items-start gap-4 flex-col">
+          <div class="w-full flex flex-col">
+            {#if job.title}
+              <div class="justify-between flex flex-row items-start gap-2">
+                <h1 class="text-2xl md:text-3xl xl:text-4xl font-bold mb-5">
+                  {job.title}
+                </h1>
+                <div class="flex items-center shrink-0">
+                  <BookmarkButton
+                    jobId={Number(job.id) || 0}
+                    variant="detail"
+                  />
+                </div>
+              </div>
+            {/if}
+
+            <div class="flex flex-col wrap-anywhere mb-4">
+              {#if job.nama_perusahaan}
+                <div class="items-center gap-2 mb-2">
+                  <UserTieSolid
+                    class="text-[var(--wpl-global-color-1)] inline-block w-4 h-4"
+                    aria-hidden="true"
+                  />
+                  <span class="font-bold ml-1">{job.nama_perusahaan}</span>
+                </div>
+              {/if}
+              {#if job.post_time}
+                <div class="items-center gap-2 mb-2">
+                  <ClockSolid
+                    class="text-[var(--wpl-global-color-1)] inline-block w-4 h-4"
+                    aria-hidden="true"
+                  />
+                  <time class="font-bold ml-1" datetime={job.post_time}
+                    >Diupdate: {timeAgo()}</time
+                  >
+                </div>
+              {/if}
+            </div>
+          </div>
         </div>
-      {/if}
-    </section>
 
-    <div class="divider"></div>
-  {/if}
-
-  <!-- Nama Perusahaan -->
-  {#if job.nama_perusahaan}
-    <section>
-      <h2 class="text-2xl md:text-3xl flex items-center gap-2 mb-4">
-        <UserTieSolid
-          class="text-[var(--wpl-global-color-1)] inline-block"
-          aria-hidden="true"
-        />
-        <span class="font-bold">{job.nama_perusahaan}</span>
-      </h2>
-      <div class="divider"></div>
+        {#if ringkasanPekerjaan && ringkasanPekerjaan.length}
+          <div
+            class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm md:text-base"
+          >
+            {#each ringkasanPekerjaan as row (row.label)}
+              {@const Icon = row.icon}
+              <div class="flex items-start gap-2">
+                {#if Icon}
+                  <Icon
+                    class="text-[var(--wpl-global-color-1)] inline-block w-5 h-5"
+                    aria-hidden="true"
+                  />
+                {/if}
+                <div class="w-full">
+                  <div class="font-bold">{row.label}</div>
+                  <div
+                    class="text-[var(--wpl-global-color-1)] font-bold wrap-anywhere"
+                  >
+                    {@html row.value}
+                  </div>
+                </div>
+              </div>
+            {/each}
+          </div>
+        {/if}
+      </div>
     </section>
   {/if}
 
   <!-- Tentang Perusahaan -->
   {#if job.tentang_perusahaan}
-    <section class="wysiwyg-content">
-      <h2 class="text-3xl flex items-center gap-2 mb-4">
+    <section class="wysiwyg-content" aria-labelledby="about-company">
+      <h2 id="about-company" class="text-2xl flex items-center gap-2 mb-4">
         <MapPinSolid
           class="text-[var(--wpl-global-color-1)] inline-block"
           aria-hidden="true"
         />
-        <span class="font-bold">Tentang Perusahaan</span>
+        <span class="font-semibold text-[var(--wpl-global-color-1)]"
+          >Tentang Perusahaan</span
+        >
       </h2>
-      <div onclick={onWysiwygImgClick} role="none">
+      <div onclick={onWysiwygImgClick} role="presentation">
         {@html job.tentang_perusahaan}
       </div>
-      <div class="divider"></div>
-    </section>
-  {/if}
-
-  <!-- Ringkasan Pekerjaan -->
-  {#if ringkasanPekerjaan && ringkasanPekerjaan.length}
-    <section>
-      <h2 class="flex items-center gap-2 mb-4 text-2xl">
-        <ClipboardCheckSolid
-          class="text-[var(--wpl-global-color-1)]"
-          aria-hidden="true"
-        />
-        <span class="font-bold">Ringkasan Pekerjaan</span>
-      </h2>
-      <div class="gap-4 mt-4">
-        <div class="gap-x-6 gap-y-2 ml-1">
-          {#each ringkasanPekerjaan as row (row.label)}
-            {@const Icon = row.icon}
-            <div class="flex items-start mb-2">
-              {#if Icon}
-                <Icon
-                  class="text-[var(--wpl-global-color-1)] min-w-5 min-h-5 w-5 h-5 mt-1 inline-block align-middle"
-                  aria-hidden="true"
-                />
-              {/if}
-              <div class="ml-2 flex w-full">
-                <span class="w-40 md:w-56 flex-shrink-0 font-semibold text-lg"
-                  >{row.label}</span
-                >
-                <span class="mx-2 font-semibold">:</span>
-                <span class="flex-1 font-semibold break-words"
-                  >{@html row.value}</span
-                >
-              </div>
-            </div>
-          {/each}
-        </div>
-      </div>
-      <div class="divider"></div>
     </section>
   {/if}
 
   <!-- Deskripsi Pekerjaan -->
   {#if job.deskripsi_pekerjaan}
-    <section class="wysiwyg-content">
-      <h2 class="text-xl flex items-center gap-2 mb-4">
+    <section class="wysiwyg-content" aria-labelledby="job-description">
+      <h2 id="job-description" class="text-xl flex items-center gap-2 mb-4">
         <CircleInfoSolid
           class="text-[var(--wpl-global-color-1)] inline-block"
           aria-hidden="true"
         />
-        <span class="font-bold">Deskripsi Pekerjaan</span>
+        <span class="font-semibold text-[var(--wpl-global-color-1)]"
+          >Deskripsi Pekerjaan</span
+        >
       </h2>
-      <div onclick={onWysiwygImgClick} role="none">
+      <div onclick={onWysiwygImgClick} role="presentation">
         {@html job.deskripsi_pekerjaan}
       </div>
-      <div class="divider"></div>
     </section>
   {/if}
 
   <!-- Persyaratan -->
   {#if job.persyaratan}
-    <section class="wysiwyg-content">
-      <h2 class="text-2xl flex items-center gap-2 mb-4">
+    <section class="wysiwyg-content" aria-labelledby="requirements">
+      <h2 id="requirements" class="text-2xl flex items-center gap-2">
         <CircleCheckSolid
           class="text-[var(--wpl-global-color-1)] inline-block"
           aria-hidden="true"
         />
-        <span class="font-bold">Persyaratan</span>
+        <span class="font-semibold text-[var(--wpl-global-color-1)]"
+          >Persyaratan</span
+        >
       </h2>
-      <div onclick={onWysiwygImgClick} role="none">
+      <div onclick={onWysiwygImgClick} role="presentation">
         {@html job.persyaratan}
       </div>
-      <div class="divider"></div>
     </section>
   {/if}
 
   <!-- Cara Melamar -->
   {#if job.cara_melamar}
-    <section class="wysiwyg-content">
-      <h2 class="text-2xl flex items-center gap-2 mb-4">
+    <section class="wysiwyg-content" aria-labelledby="how-to-apply">
+      <h2 id="how-to-apply" class="text-2xl flex items-center gap-2">
         <FileSignatureSolid
           class="text-[var(--wpl-global-color-1)] inline-block"
           aria-hidden="true"
         />
-        <span class="font-bold">Cara Melamar</span>
+        <span class="font-semibold text-[var(--wpl-global-color-1)]"
+          >Cara Melamar</span
+        >
       </h2>
-      <div onclick={onWysiwygImgClick} role="none">
+      <div onclick={onWysiwygImgClick} role="presentation">
         {@html job.cara_melamar}
       </div>
-      <div class="divider"></div>
     </section>
   {/if}
 
   <!-- Benefit -->
   {#if job.benefit}
-    <section class="wysiwyg-content">
-      <h2 class="text-2xl flex items-center gap-2 mb-4">
+    <section class="wysiwyg-content" aria-labelledby="benefits">
+      <h2 id="benefits" class="text-2xl flex items-center gap-2 mb-4">
         <HandHoldingHeartSolid
           class="text-[var(--wpl-global-color-1)] inline-block"
           aria-hidden="true"
         />
-        <span class="font-bold">Benefit</span>
+        <span class="font-semibold text-[var(--wpl-global-color-1)]"
+          >Benefit</span
+        >
       </h2>
-      <div onclick={onWysiwygImgClick} role="none">
+      <div onclick={onWysiwygImgClick} role="presentation">
         {@html job.benefit}
       </div>
-      <div class="divider"></div>
     </section>
   {/if}
 
   <!-- Kontak -->
   {#if contacts && contacts.length}
-    <section>
-      <h2 class="text-2xl flex items-center justify-between mb-4">
+    <section class="aside-content" aria-labelledby="contacts-heading">
+      <h2
+        id="contacts-heading"
+        class="text-2xl flex items-center justify-between mb-4"
+      >
         <span class="flex items-center gap-2">
           <AddressCardSolid
             class="text-[var(--wpl-global-color-1)]"
             aria-hidden="true"
           />
-          <span class="font-bold">Kontak</span>
+          <span class="font-semibold text-[var(--wpl-global-color-1)]"
+            >Kontak</span
+          >
         </span>
       </h2>
-      <div class="grid grid-cols-1 gap-4 mt-4">
-        <div
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
-        >
-          {#each contacts as contact (contact.label + contact.value)}
-            {@const Icon = contact.icon}
-            <div class="flex items-center">
-              {#if Icon}
-                <Icon
-                  class="text-[var(--wpl-global-color-1)] w-6 text-center text-xl inline-block"
-                  aria-hidden="true"
-                />
-              {/if}
-              <div class="ml-2 font-semibold text-md">
-                <span class="block font-semibold">{contact.label}:</span>
-                <a
-                  href={contact.href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="block font-semibold break-words max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
-                  >{contact.value}</a
-                >
-              </div>
-            </div>
-          {/each}
+      <address class="not-italic">
+        <div class="grid grid-cols-1 gap-4 mt-4">
+          <div
+            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
+          >
+            <ul class="space-y-3">
+              {#each contacts as contact (contact.label + contact.value)}
+                {@const Icon = contact.icon}
+                <li class="flex items-center">
+                  {#if Icon}
+                    <Icon
+                      class="text-[var(--wpl-global-color-1)] w-6 text-center text-xl inline-block"
+                      aria-hidden="true"
+                    />
+                  {/if}
+                  <div class="ml-2 font-semibold text-md">
+                    <span class="block font-semibold">{contact.label}:</span>
+                    <a
+                      href={contact.href}
+                      target="_blank"
+                      rel="noopener noreferrer nofollow"
+                      class="block font-semibold wrap-anywhere max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
+                      >{contact.value}</a
+                    >
+                  </div>
+                </li>
+              {/each}
+            </ul>
+          </div>
         </div>
-      </div>
-      <div class="divider"></div>
+      </address>
     </section>
   {/if}
 
   <!-- Sosial Media -->
   {#if socialMediaItems && socialMediaItems.length}
-    <section>
-      <h2 class="text-2xl flex items-center gap-2 mb-4">
+    <section class="aside-content" aria-labelledby="social-media-heading">
+      <h2
+        id="social-media-heading"
+        class="text-2xl flex items-center gap-2 mb-4"
+      >
         <AddressBookSolid
           class="text-[var(--wpl-global-color-1)]"
           aria-hidden="true"
         />
-        <span class="font-bold">Sosial Media</span>
+        <span class="font-semibold text-[var(--wpl-global-color-1)]"
+          >Sosial Media</span
+        >
       </h2>
-      <div class="grid grid-cols-1 gap-4 mt-4">
-        <div
-          class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
+      <nav aria-label="Sosial media links">
+        <ul
+          class="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
         >
           {#each socialMediaItems as item (item.platform + item.username)}
             {@const Icon = item.icon}
-            <div class="flex items-center">
+            <li class="flex items-center">
               {#if Icon}
                 <Icon
                   class="text-[var(--wpl-global-color-1)] w-6 text-center text-xl inline-block"
@@ -394,7 +412,7 @@
                 <a
                   href={item.url}
                   target="_blank"
-                  rel="noopener noreferrer"
+                  rel="noopener noreferrer nofollow"
                   class="block font-semibold break-words max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
                 >
                   {item.platform === SocialMediaPlatform.WhatsApp
@@ -404,14 +422,13 @@
                     : (item.username ?? "")}
                 </a>
               </div>
-            </div>
+            </li>
           {/each}
-        </div>
-      </div>
-      <div class="divider"></div>
+        </ul>
+      </nav>
     </section>
   {/if}
-</div>
+</article>
 {#if allImages.length}
   <div bind:this={galleryRef} class="hidden">
     {#each allImages as img}
@@ -419,3 +436,16 @@
     {/each}
   </div>
 {/if}
+
+<style lang="postcss">
+  @reference "@css/app.css";
+  @utility job-detail-base-content {
+    @apply rounded-xl border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)];
+  }
+  .wysiwyg-content {
+    @apply job-detail-base-content px-3;
+  }
+  .aside-content {
+    @apply job-detail-base-content p-4;
+  }
+</style>

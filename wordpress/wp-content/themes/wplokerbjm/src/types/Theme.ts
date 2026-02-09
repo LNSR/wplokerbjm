@@ -16,4 +16,5 @@ export interface WPLokerBJMThemedData {
 export enum ThemeName {
   Light = 'light',
   Dark = 'dark',
+  Lavender = 'lavender',
 }

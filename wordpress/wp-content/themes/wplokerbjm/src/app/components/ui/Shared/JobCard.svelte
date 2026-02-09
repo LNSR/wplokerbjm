@@ -26,7 +26,7 @@
   } = $props<{
     jobdata: CardJob;
     variant: JobCardProps["variant"];
-    permalink: string;
+    permalink?: string;
     onClick?: (slug: string, event: MouseEvent, index: number) => void;
     isVisited?: boolean;
   }>();
@@ -47,9 +47,7 @@
     generalStore.useTimeAgo(jobdata?.post_time, now),
   );
 
-  const selected = $derived(
-    routeStateStore.lastVisitedJob === jobdata?.slug
-  );
+  const selected = $derived(routeStateStore.lastVisitedJob === jobdata?.slug);
 
   const cardClass = $derived.by(() => {
     return `card-base-${variant}${selected ? ` card-selected-${variant}` : ""}`;
@@ -105,7 +103,7 @@
       <div class="flex-1 flex flex-col justify-start">
         <div class="flex items-center justify-between mb-2 gap-x-2">
           <h3
-            class="card-title font-bold md:text-xl group-hover:text-blue-700 transition-colors"
+            class="card-title font-bold md:text-xl group-hover:text-[var(--wpl-global-color-1)] transition-colors"
           >
             {jobdata?.title}
           </h3>
@@ -185,8 +183,9 @@
             </span>
           {/if}
 
-          <!-- Bookmark button migrated to Svelte component -->
-          <BookmarkButton jobId={Number(jobdata.id)} {variant} />
+          {#if variant !== "bookmark"}
+            <BookmarkButton jobId={Number(jobdata.id)} {variant} />
+          {/if}
         </div>
       </div>
     </div>
@@ -200,23 +199,23 @@
     scroll-margin-top: var(--site-scroll-padding-top, 0px);
   }
   @utility card-base {
-    @apply card block rounded-xl cursor-pointer border-2 border-blue-500 bg-base-200 dark:bg-base-100/50;
+    @apply card block rounded-xl cursor-pointer border-2 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)];
   }
 
   .card-base-carousel {
-    @apply card-base max-w-full hover:shadow-lg hover:border-blue-400;
+    @apply card-base max-w-full hover:shadow-lg hover:border-[var(--wpl-global-color-1)];
   }
 
   .card-selected-carousel {
-    @apply ring-2 ring-blue-600 border-blue-700 transition-transform translate-y-5;
+    @apply ring-2 ring-[var(--wpl-global-color-1)] border-[var(--wpl-global-color-1)] transition-transform translate-y-5;
   }
 
   .card-base-featured {
-    @apply card-base w-full h-full hover:shadow-xl hover:border-blue-600 hover:scale-[1.02] hover:border-solid;
+    @apply card-base w-full h-full hover:shadow-xl hover:border-[var(--wpl-global-color-1)] hover:scale-[1.02] hover:border-solid;
   }
 
   .card-selected-featured {
-    @apply ring-4 ring-blue-500 border-blue-700 transition-transform scale-[1.03];
+    @apply ring-4 ring-[var(--wpl-global-color-1)] border-[var(--wpl-global-color-1)] transition-transform scale-[1.03];
   }
 
   .card-body-carousel {

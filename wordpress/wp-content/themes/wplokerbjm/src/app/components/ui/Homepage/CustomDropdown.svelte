@@ -786,7 +786,7 @@
                   aria-label="Lihat sub"
                 >
                   <span
-                    class="absolute left-6 -top-1 translate-y-1 bg-[var(--wpl-global-color-1)]/80 text-xs rounded-full px-1.5 py-0.1 z-20"
+                    class="absolute left-6 -top-1 translate-y-1 bg-[var(--wpl-global-color-1)] text-[var(--wpl-global-color-5)] text-xs rounded-full px-1.5 py-0.1 z-20"
                     >{option.children.length}</span
                   >
                   <ChevronRightSolid

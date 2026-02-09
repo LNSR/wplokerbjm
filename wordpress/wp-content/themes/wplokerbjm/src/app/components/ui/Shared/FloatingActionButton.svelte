@@ -164,7 +164,7 @@
 
       {#if dropdownOpen}
         <div
-          class="shadow-xl border border-blue-500 rounded-xl p-4 w-72 absolute bottom-full mb-2 right-0 z-50 bg-[var(--wpl-global-color-5)]"
+          class="shadow-xl border border-[var(--wpl-global-color-5)] rounded-xl p-4 w-72 absolute bottom-full mb-2 right-0 z-50 bg-[var(--wpl-global-color-5)]"
           role="menu"
         >
           <div class="grid grid-cols-2 gap-2" role="menu">

@@ -89,7 +89,8 @@ class JobSchemaOrg
         $permalink = $permalink ? esc_url($permalink) : null;
         $idurl = $permalink ? $permalink . '#jobposting' : null;
         $datePostedRaw = get_post_time('c', false, $post_id);
-        $datePosted = $datePostedRaw ? $datePostedRaw : null;;
+        $datePosted = $datePostedRaw ? $datePostedRaw : null;
+        ;
 
         // Build description via helper (combines DESKRIPSI_PEKERJAAN and PERSYARATAN when both present)
         $descriptionHtml = JobSchemaHelper::buildDescription($jobdata);
@@ -101,6 +102,16 @@ class JobSchemaOrg
             $validThrough = $postDate->format('Y-m-d');
         }
 
+        $hiringOrganization = [
+            "@type" => "Organization",
+            "name" => $jobdata[CustomFields::NAMA_PERUSAHAAN] ?? "Anonymous",
+            "sameAs" => !empty($sameAs) ? array_values(array_unique($sameAs)) : null,
+        ];
+
+        if (!empty($jobdata[CustomFields::TENTANG_PERUSAHAAN])) {
+            $hiringOrganization["description"] = wp_strip_all_tags($jobdata[CustomFields::TENTANG_PERUSAHAAN]);
+        }
+
         $schema = [
             "@context" => "https://schema.org",
             "@type" => "JobPosting",
@@ -109,17 +120,12 @@ class JobSchemaOrg
             "@id" => $idurl,
             "mainEntityOfPage" => $permalink ? [
                 "@type" => "WebPage",
-                "@id" => $permalink
+                "@id" => $permalink,
             ] : null,
             "description" => $descriptionHtml,
-            "aboutCompany" => !empty($jobdata[CustomFields::TENTANG_PERUSAHAAN]) ? wp_strip_all_tags($jobdata[CustomFields::TENTANG_PERUSAHAAN]) : "No information about the company.",
             "howToApply" => !empty($jobdata[CustomFields::CARA_MELAMAR]) ? wp_strip_all_tags($jobdata[CustomFields::CARA_MELAMAR]) : null,
             "datePosted" => $datePosted,
-            "hiringOrganization" => [
-                "@type" => "Organization",
-                "name" => $jobdata[CustomFields::NAMA_PERUSAHAAN] ?? "Anonymous",
-                "sameAs" => !empty($sameAs) ? array_values(array_unique($sameAs)) : null,
-            ],
+            "hiringOrganization" => $hiringOrganization,
             "jobLocation" => [
                 "@type" => "Place",
                 "address" => [
@@ -146,11 +152,6 @@ class JobSchemaOrg
         if (!empty($salaryData)) {
             $schema = array_merge($schema, $salaryData);
         }
-
-        $umur_min = !empty($jobdata[CustomFields::UMUR_MIN]) ? (int) $jobdata[CustomFields::UMUR_MIN] : null;
-        $umur_max = !empty($jobdata[CustomFields::UMUR_MAX]) ? (int) $jobdata[CustomFields::UMUR_MAX] : null;
-        $schema['umur_minimal'] = $umur_min;
-        $schema['umur_maksimal'] = $umur_max;
 
         $schema['hiringOrganization'] = array_filter($schema['hiringOrganization'], fn($v) => !is_null($v));
         $schema = SharedUtils::filterEmptyValues($schema);
@@ -185,7 +186,7 @@ class JobSchemaOrg
                 "@type" => "ListItem",
                 "position" => $position,
                 "name" => $jobSchema['title'],
-                "url" => $jobSchema['url']
+                "url" => $jobSchema['url'],
             ];
         }
 
@@ -206,7 +207,8 @@ class JobSchemaOrg
     }
 }
 
-class JobSchemaHelper {
+class JobSchemaHelper
+{
     /**
      * Map taxonomy string to Google employmentType and detect remote jobLocationType
      * @param string|null $jenis
@@ -341,26 +343,46 @@ class JobSchemaHelper {
      */
     public static function formatBaseSalary(array $jobdata): array
     {
-        if (empty($jobdata[CustomFields::GAJI_MINIMAL])) {
+        $min = null;
+        $max = null;
+
+        if (!empty($jobdata[CustomFields::GAJI_MINIMAL])) {
+            $min = (int) $jobdata[CustomFields::GAJI_MINIMAL];
+        }
+
+        if (!empty($jobdata[CustomFields::GAJI_MAKSIMAL])) {
+            $max = (int) $jobdata[CustomFields::GAJI_MAKSIMAL];
+        }
+
+        if ($min === null && $max === null) {
             return [];
         }
 
-        $min = (int) $jobdata[CustomFields::GAJI_MINIMAL];
-        $max = isset($jobdata[CustomFields::GAJI_MAKSIMAL]) ? (int) $jobdata[CustomFields::GAJI_MAKSIMAL] : $min;
+        if ($min === null) {
+            $min = $max;
+        }
+
+        if ($max === null) {
+            $max = $min;
+        }
+
+        $value = $min === $max ? [
+            "@type" => "QuantitativeValue",
+            "value" => $min, // fixed salary
+            "unitText" => "MONTH",
+        ] : [
+            "@type" => "QuantitativeValue",
+            "minValue" => $min,
+            "maxValue" => $max,
+            "unitText" => "MONTH",
+        ];
 
         return [
             'baseSalary' => [
                 "@type" => "MonetaryAmount",
                 "currency" => "IDR",
-                "value" => [
-                    "@type" => "QuantitativeValue",
-                    "minValue" => $min,
-                    "maxValue" => $max,
-                    "unitText" => "MONTH",
-                ],
+                "value" => $value,
             ],
-            'gaji_minimal' => $min,
-            'gaji_maksimal' => $max,
         ];
     }
 }

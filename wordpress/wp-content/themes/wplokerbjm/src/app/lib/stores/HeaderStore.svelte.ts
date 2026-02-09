@@ -18,7 +18,6 @@ export class HeaderStore {
         try {
             const cs = getComputedStyle(el);
             if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity || '1') === 0) return 0;
-            // Use simple height measurement (avoid parsing transform matrices)
             return el.offsetHeight || 0;
         } catch {
             return 0;

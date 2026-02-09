@@ -3,7 +3,7 @@
 </script>
 
 <footer
-  class="footer footer-center bg-[var(--wpl-global-color-4)] border-t-2 border-[var(--wpl-global-color-5)] rounded p-2"
+  class="footer footer-center bg-[var(--wpl-global-color-4)] border-t-3 border-[var(--wpl-global-color-5)] rounded p-2"
 >
   <aside>
     <p class="text-lg font-bold flex items-center justify-center gap-2"></p>
@@ -15,3 +15,10 @@
     </a>
   </aside>
 </footer>
+
+<style lang="postcss">
+  @reference "@css/app.css";
+  footer {
+    contain: layout style paint;
+  }
+</style>
