@@ -297,7 +297,6 @@ class GlobalHooks
     {
         return array_merge([
             // 'google-site-kit/',
-            'wpgraphql-smart-cache/',
             'tinywp-mobile-detect/',
             'fast-indexing-api/',
             'wps-hide-login/',

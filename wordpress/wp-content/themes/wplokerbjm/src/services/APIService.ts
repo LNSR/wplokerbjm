@@ -1,6 +1,7 @@
 import type { SearchFilters, LoadMoreFilters, JobGridFilters, CarouselProps, LoadMoreResponse, JobGridProps, JobDetailResponse, CardJob, WPLokerBJMThemedData, SearchResponse, TaxonomyApiInterface } from '@/types';
 import { LRUCache } from 'lru-cache';
 import { createClient, cacheExchange, fetchExchange } from 'urql';
+import { persistedExchange } from '@urql/exchange-persisted';
 import { GET_ALL_TERMS, GET_LOKASI_TERMS, GET_GENDER_TERMS, GET_PENDIDIKAN_TERMS, GET_AUTO_SUGGESTIONS, GET_CAROUSEL, GET_LOAD_MORE, GET_JOB_GRID, GET_JOB_DETAIL, GET_JOB_SCHEMA, GET_THEME_DATA, GET_SEARCH_JOBS, SYNC_BOOKMARK, GET_RANK_MATH_HEAD, GET_THEME_NONCE } from '@/services/api/graphql/query';
 import { NonceManager } from '@/utils';
 
@@ -9,10 +10,16 @@ const cache = new LRUCache<string, any>({
   ttl: 10000, // 10 seconds in milliseconds
 }); // prevent excessive API calls
 
-// Create urql client for GraphQL queries
 const graphqlClient = createClient({
   url: '/graphql',
-  exchanges: [cacheExchange, fetchExchange],
+  exchanges: [
+    cacheExchange,
+    persistedExchange({
+      preferGetForPersistedQueries: true,
+      enforcePersistedQueries: false,
+    }),
+    fetchExchange,
+  ],
   preferGetMethod: 'within-url-limit',
   fetchOptions: () => ({
     credentials: 'include',

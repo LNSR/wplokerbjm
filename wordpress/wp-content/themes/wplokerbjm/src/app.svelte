@@ -82,11 +82,10 @@
 
     public loadRoute(
       importPromise: Promise<Component<any>>,
-      componentNamePath: string,
     ): void {
       const loadForPath = pathname;
       try {
-        routeStore.loadStart(componentNamePath);
+        routeStore.loadStart();
 
         importPromise
           .then((m) => {
@@ -129,7 +128,7 @@
   $effect(() => {
     const importPromise = appRouteHandler.mapComponentName(componentNamePath);
     if (importPromise) {
-      appRouteHandler.loadRoute(importPromise, componentNamePath);
+      appRouteHandler.loadRoute(importPromise);
     } else {
       routeStore.isTransitioningRoute = false;
     }

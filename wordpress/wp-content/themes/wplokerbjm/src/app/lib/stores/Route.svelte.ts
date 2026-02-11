@@ -34,9 +34,8 @@ export class RouteManager {
     this.isInitialLoad = value;
   }
 
-  setIsLoading(loading: boolean, component?: string) {
+  setIsLoading(loading: boolean) {
     this.isLoading = loading;
-    this.loadingComponent = component || null;
   }
 
   getComponentNamePath(path: string): string {
@@ -83,7 +82,7 @@ export class RouteManager {
       }
 
       this.setIsInitialLoad(false);
-      if (componentName) this.setIsLoading(true, componentName);
+      if (componentName) this.setIsLoading(true);
 
       // perform side effects (analytics/head updates)
       void this.performRouteTransitionSideEffects(path);
@@ -142,15 +141,13 @@ export class RouteManager {
     }, 5000);
   }
 
-  loadStart(componentName?: string) {
-    this.setIsLoading(true, componentName);
+  loadStart() {
+    this.setIsLoading(true);
     this.isTransitioningRoute = true;
-    // this.CurrentComponent = null;
   }
 
   loadEnd() {
     this.setIsLoading(false);
-    // this.loadingComponent = null;
   }
 }
 
