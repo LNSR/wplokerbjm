@@ -655,18 +655,18 @@
   } from "svelte-awesome-icons";
   import { PortalManager } from "$lib/utils/elements.svelte";
 
-  let { logo = "" } = $props();
+  let { HeaderLogo = "" } = $props();
   let showThemeModal = $state(false);
 
   function updateLogo(): void {
     try {
       const themeData = getThemeData();
-      const runtimeLogo = themeData?.logo;
-      const runtimeLogoSrcset = themeData?.logoSrcset;
-      const runtimeLogoSizes = themeData?.logoSizes;
-      const runtimeLogoDecoding = themeData?.logoDecoding;
-      const runtimeLogoWidth = themeData?.logoWidth;
-      const runtimeLogoHeight = themeData?.logoHeight;
+      const runtimeLogo = themeData?.logo?.logoUrl;
+      const runtimeLogoSrcset = themeData?.logo?.logoSrcset;
+      const runtimeLogoSizes = themeData?.logo?.logoSizes;
+      const runtimeLogoDecoding = themeData?.logo?.logoDecoding;
+      const runtimeLogoWidth = themeData?.logo?.logoWidth;
+      const runtimeLogoHeight = themeData?.logo?.logoHeight;
 
       const parseDimension = (value: unknown): number | undefined => {
         if (typeof value === "number" && value > 0) return value;
@@ -678,7 +678,7 @@
       };
 
       if (runtimeLogo) {
-        logo = runtimeLogo;
+        HeaderLogo = runtimeLogo as string;
         logoSrcset = runtimeLogoSrcset || "";
         logoSizes = runtimeLogoSizes || "";
         logoDecoding = runtimeLogoDecoding;
@@ -739,13 +739,16 @@
         class="mr-auto ml-auto pl-4 pr-4 max-w-screen-xl w-full flex items-center justify-between"
       >
         <div class="mt-3">
-          <button
-            onclick={() => GlobalNavigateTo("/")}
+          <a href="/"
+            onclick={(e) => {
+              e.preventDefault();
+              GlobalNavigateTo("/");
+            }}
             class="focus:outline-none"
           >
-            {#if logo}
+            {#if HeaderLogo}
               <img
-                src={logo}
+                src={HeaderLogo}
                 srcset={logoSrcset}
                 sizes={logoSizes}
                 decoding={logoDecoding}
@@ -756,7 +759,7 @@
                 class="h-12 w-auto mt-1 md:h-16 md:w-auto"
               />
             {/if}
-          </button>
+          </a>
         </div>
         <div class="flex items-center gap-1 mt-5">
           <!-- Color/theme switcher -->
@@ -850,9 +853,13 @@
               </span>
             {/if}
           </button>
-          <button
+          <a
             class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)] hidden rounded-full md:inline-flex"
-            onclick={() => GlobalNavigateTo("/pasang-iklan-loker/")}
+            href="/pasang-iklan-loker/"
+            onclick={(e) => {
+              e.preventDefault();
+              GlobalNavigateTo("/pasang-iklan-loker/");
+            }}
           >
             <ExternalLinkSolid
               class="h-6 w-6"
@@ -860,7 +867,7 @@
               focusable="false"
             />
             Pasang Iklan Loker
-          </button>
+          </a>
           <!-- Drawer toggle button, shown only on mobile -->
           {#if isMobileValue}
             <label
@@ -890,8 +897,12 @@
           class="menu bg-base-200 text-base-content min-h-full w-auto max-w-[90vw] p-4 px-2 gap-4"
         >
           <li>
-            <button
-              onclick={() => GlobalNavigateTo("/pasang-iklan-loker")}
+            <a
+              href="/pasang-iklan-loker/"
+              onclick={(e) => {
+                e.preventDefault();
+                GlobalNavigateTo("/pasang-iklan-loker/");
+              }}
               class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] justify-start"
             >
               <ExternalLinkSolid
@@ -900,7 +911,7 @@
                 focusable="false"
               />
               Pasang Iklan Loker
-            </button>
+            </a>
           </li>
         </ul>
       </div>

@@ -11,7 +11,7 @@
   }>();
 </script>
 
-<main class="container mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-8">
+<main class="container mx-auto max-w-[90vw] lg:max-w-[85vw] space-y-8 mt-12">
   <SearchForm />
   <JobCarousel {...carousel} />
   <JobGrid {...jobGrid} {job} />

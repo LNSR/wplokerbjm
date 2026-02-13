@@ -42,13 +42,14 @@ export class RouteManager {
     if (path === '/') return 'Homepage';
     if (path.startsWith(`/${WPPostRoute.PasangIklanLoker}`)) return 'PasangIklanLoker';
     if (path.startsWith(`/${WPPostRoute.lowongan}`)) return 'SingleLowongan';
+    if (path.startsWith(`/${WPPostRoute.KebijakanPrivacy}`)) return 'KebijakanPrivasi';
     return 'Unknown';
   }
 
   performRouteTransitionSideEffects(path: string): void {
     // Fetch RankMath head data
     utilsSEO.RemoveAllSchemas();
-    
+
     utilsSEO.fetchHeadData(path).then(() => {
       utilsSEO.addJobPostingJsonLd([]);
       GoogleServices.sendPageView(path);
@@ -167,7 +168,7 @@ export class RouteStateManager {
    * track breakpoint for better DX during development
    */
   observeBreakpointChanges = () => {
-    if (!isDevelopmentMode()) return; // Skip in production
+    if (!isDevelopmentMode() || this.effectCleanup) return; // Skip in production or if already set up
 
     // Set up the effect and store the cleanup function
     this.effectCleanup = $effect.root(() => {

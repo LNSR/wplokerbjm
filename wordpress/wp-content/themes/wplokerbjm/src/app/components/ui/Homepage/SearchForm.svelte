@@ -192,7 +192,7 @@
     archiveLink = "/",
     searchResults = undefined,
     searchError = undefined,
-  } = props as LocalSearchFormProps;
+  } = (() => props)() as LocalSearchFormProps;
 
   let isLokasiOpen = $state(false);
   let isGenderOpen = $state(false);

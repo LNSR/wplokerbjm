@@ -59,52 +59,82 @@
   let galleryRef = $state<HTMLElement>();
   let viewer = $state<Viewer>();
 
-  const viewerOptions: unknown = {
-    hidden: true,
-    container: document.querySelector(".route-container") ?? document.body,
-    focus: true,
-    toolbar: {
-      zoomIn: false,
-      zoomOut: false,
-      oneToOne: false,
-      reset: false,
-      prev: true,
-      play: {
-        show: false,
-        size: "large",
+  class ViewerJSManager {
+    static #eventHandlers: WeakMap<
+      Viewer,
+      {
+        onShown: () => void;
+        onHide: () => void;
+        onHidden: () => void;
+      }
+    > = new WeakMap();
+    static viewerOptions: unknown = {
+      hidden: true,
+      container: document.querySelector(".route-container") ?? document.body,
+      focus: true,
+      toolbar: {
+        zoomIn: false,
+        zoomOut: false,
+        oneToOne: false,
+        reset: false,
+        prev: true,
+        play: {
+          show: false,
+          size: "large",
+        },
+        next: true,
+        rotateLeft: false,
+        rotateRight: false,
+        flipHorizontal: false,
+        flipVertical: false,
       },
-      next: true,
-      rotateLeft: false,
-      rotateRight: false,
-      flipHorizontal: false,
-      flipVertical: false,
-    },
-  };
+    };
+    static setupViewer(): void {
+      viewer = new Viewer(
+        galleryRef!,
+        ViewerJSManager.viewerOptions as Viewer.Options,
+      );
 
-  function setupViewer(): void {
-    viewer = new Viewer(galleryRef!, viewerOptions as Viewer.Options);
-    /** Aria-hidden issue best-effort fix for now */
-    const viewerElement = (viewer as any).element;
-    if (viewerElement) {
-      const onShown = () => {
-        viewerElement.removeAttribute("aria-hidden");
-        viewerElement.removeAttribute("inert");
-      };
-      const onHide = () => {
-        const focused = document.activeElement as HTMLElement | null;
-        if (focused && viewerElement.contains(focused)) {
-          focused.blur();
+      const viewerElement = (viewer as any).element;
+      if (viewerElement) {
+        const onShown = () => {
+          viewerElement.removeAttribute("aria-hidden");
+          viewerElement.removeAttribute("inert");
+        };
+        const onHide = () => {
+          const focused = document.activeElement as HTMLElement | null;
+          if (focused && viewerElement.contains(focused)) {
+            focused.blur();
+          }
+        };
+        const onHidden = () => {
+          viewerElement.removeAttribute("aria-hidden");
+          viewerElement.setAttribute("inert", "true");
+        };
+        viewerElement.addEventListener("shown", onShown);
+        viewerElement.addEventListener("hide", onHide);
+        viewerElement.addEventListener("hidden", onHidden);
+        ViewerJSManager.#eventHandlers.set(viewer, {
+          onShown,
+          onHide,
+          onHidden,
+        });
+      }
+    }
+
+    static destroyViewer(): void {
+      if (viewer) {
+        const viewerElement = (viewer as any).element;
+        if (viewerElement && ViewerJSManager.#eventHandlers.has(viewer)) {
+          const { onShown, onHide, onHidden } =
+            ViewerJSManager.#eventHandlers.get(viewer)!;
+          viewerElement.removeEventListener("shown", onShown);
+          viewerElement.removeEventListener("hide", onHide);
+          viewerElement.removeEventListener("hidden", onHidden);
         }
-      };
-      const onHidden = () => {
-        viewerElement.removeAttribute("aria-hidden");
-        viewerElement.setAttribute("inert", "true");
-      };
-      viewerElement.addEventListener("shown", onShown);
-      viewerElement.addEventListener("hide", onHide);
-      viewerElement.addEventListener("hidden", onHidden);
-      // Store references for cleanup
-      (viewer as any)._eventHandlers = { onShown, onHide, onHidden };
+        viewer.destroy();
+        viewer = undefined;
+      }
     }
   }
 
@@ -135,7 +165,7 @@
     const imageIndex = allImages.indexOf(src);
     if (imageIndex >= 0) {
       if (!viewer) {
-        setupViewer();
+        ViewerJSManager.setupViewer();
       }
       viewer!.show();
       viewer!.view(imageIndex);
@@ -143,20 +173,10 @@
   }
 
   $effect(() => {
-    timeEffect(now); // Update 'now' every minute for timeAgo
-
+    const stopTime = timeEffect(now);
     return () => {
-      if (viewer) {
-        const viewerElement = (viewer as any).element;
-        if (viewerElement && (viewer as any)._eventHandlers) {
-          const { onShown, onHide, onHidden } = (viewer as any)._eventHandlers;
-          viewerElement.removeEventListener("shown", onShown);
-          viewerElement.removeEventListener("hide", onHide);
-          viewerElement.removeEventListener("hidden", onHidden);
-        }
-        viewer.destroy();
-        viewer = undefined;
-      }
+      stopTime();
+      ViewerJSManager.destroyViewer();
     };
   });
 </script>
@@ -366,7 +386,7 @@
                       href={contact.href}
                       target="_blank"
                       rel="noopener noreferrer nofollow"
-                      class="block font-semibold wrap-anywhere max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
+                      class="block font-semibold wrap-anywhere max-w-full whitespace-normal text-[var(--wpl-global-color-1)] underline hover:font-bold"
                       >{contact.value}</a
                     >
                   </div>
@@ -413,7 +433,7 @@
                   href={item.url}
                   target="_blank"
                   rel="noopener noreferrer nofollow"
-                  class="block font-semibold break-words max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
+                  class="block font-semibold break-words max-w-full whitespace-normal text-[var(--wpl-global-color-1)] underline hover:font-bold"
                 >
                   {item.platform === SocialMediaPlatform.WhatsApp
                     ? item.username

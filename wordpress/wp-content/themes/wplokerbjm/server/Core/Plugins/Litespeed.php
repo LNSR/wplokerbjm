@@ -113,8 +113,6 @@ class LiteSpeedGraphQL
         if (isset($headers['X-GraphQL-Keys'])) {
             do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
             
-            // Unset the x-graphql-keys headers so that we don't overpopulate the headers
-            // as there are header size limitations
             unset($headers['X-GraphQL-Keys']);
         }
         return $headers;

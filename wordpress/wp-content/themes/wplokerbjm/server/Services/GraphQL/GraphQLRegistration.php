@@ -175,16 +175,24 @@ class GraphQLRegistration
             ],
         ]);
 
-        register_graphql_object_type('ThemeData', [
-            'description' => 'Theme data object',
+        
+        register_graphql_object_type('Logo', [
+            'description' => 'Logo image data',
             'fields' => [
-                'themeUrl' => ['type' => 'String'],
-                'logo' => ['type' => 'String'],
+                'logoUrl' => ['type' => 'String'],
                 'logoSrcset' => ['type' => 'String'],
                 'logoSizes' => ['type' => 'String'],
                 'logoDecoding' => ['type' => 'String'],
                 'logoWidth' => ['type' => 'Int'],
                 'logoHeight' => ['type' => 'Int'],
+            ],
+        ]);
+
+        register_graphql_object_type('ThemeData', [
+            'description' => 'Theme data object',
+            'fields' => [
+                'themeUrl' => ['type' => 'String'],
+                'logo' => ['type' => 'Logo'],
                 'lastJobUpdate' => ['type' => 'String'],
                 'lastTaxonomyUpdate' => ['type' => 'String'],
                 'themeVersion' => ['type' => 'Int'],

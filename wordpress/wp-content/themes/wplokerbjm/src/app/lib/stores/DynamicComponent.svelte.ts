@@ -3,6 +3,7 @@ export type CustomDropdownComponent = typeof import("@components/ui/Homepage/Cus
 export type HomepageComponent = typeof import("@routes/Homepage.svelte").default;
 export type PasangIklanLokerComponent = typeof import("@routes/PasangIklanLoker.svelte").default;
 export type SingleLowonganComponent = typeof import("@routes/SingleLowongan.svelte").default;
+export type KebijakanPrivasiComponent = typeof import("@/app/routes/KebijakanPrivasi.svelte").default;
 class DynamicComponentStore {
 
   BookmarkModal: BookmarkModalComponent | null = $state(null);
@@ -13,6 +14,7 @@ class DynamicComponentStore {
   PasangIklanLoker: PasangIklanLokerComponent | null = $state(null);
 
   SingleLowongan: SingleLowonganComponent | null = $state(null);
+  KebijakanPrivasi: KebijakanPrivasiComponent | null = $state(null);
 
   public async loadBookmarkModal(): Promise<BookmarkModalComponent> {
     if (this.BookmarkModal) return this.BookmarkModal;
@@ -65,6 +67,17 @@ class DynamicComponentStore {
       return this.SingleLowongan;
     } catch (error) {
       console.error("Failed to load SingleLowongan:", error);
+      throw error;
+    }
+  }
+
+  public async loadKebijakanPrivasi(): Promise<KebijakanPrivasiComponent> {
+    if (this.KebijakanPrivasi) return this.KebijakanPrivasi;
+    try {
+      this.KebijakanPrivasi = (await import("@/app/routes/KebijakanPrivasi.svelte")).default;
+      return this.KebijakanPrivasi;
+    } catch (error) {
+      console.error("Failed to load KebijakanPrivasi:", error);
       throw error;
     }
   }

@@ -13,6 +13,7 @@ export interface WPBasePost {
 // WordPress inbuilt post routes
 export enum PostRouteName {
     PasangIklanLoker = 'pasang-iklan-loker',
+    KebijakanPrivacy = 'kebijakan-privasi',
 }
 
 // WordPress post routes combined with custom post types(MetaBox)

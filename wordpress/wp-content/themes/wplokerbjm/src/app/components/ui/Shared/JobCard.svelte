@@ -83,7 +83,10 @@
   }
 
   $effect(() => {
-    timeEffect(now);
+    const stopTime = timeEffect(now);
+    return () => {
+      stopTime();
+    };
   });
 
   onMount(() => {

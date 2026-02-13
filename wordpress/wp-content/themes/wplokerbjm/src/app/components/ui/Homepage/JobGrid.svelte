@@ -139,7 +139,7 @@
     title,
     totalJobs,
     job,
-  } = props;
+  } = (() => props)() as JobGridProps & { job?: JobDetailResponse | null };
 
   class VirtualizationManager {
     static computeListVirtualization(

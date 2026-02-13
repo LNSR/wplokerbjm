@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import { onDestroy, onMount, type Component } from "svelte";
+  import { onMount, type Component } from "svelte";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import { GoogleServices } from "@/services/Google";
@@ -24,6 +24,8 @@
           return isMobile()
             ? dynamicComponentStore.loadSingleLowongan()
             : dynamicComponentStore.loadHomepage();
+        case "KebijakanPrivasi":
+          return dynamicComponentStore.loadKebijakanPrivasi();
       }
       return null;
     }
@@ -80,9 +82,7 @@
       }
     }
 
-    public loadRoute(
-      importPromise: Promise<Component<any>>,
-    ): void {
+    public loadRoute(importPromise: Promise<Component<any>>): void {
       const loadForPath = pathname;
       try {
         routeStore.loadStart();
@@ -152,12 +152,9 @@
       // Return cleanup function
       return () => {
         window.removeEventListener("popstate", appRouteHandler.handlePopstate);
+        routeStateStore.cleanUpEffect();
       };
     }
-  });
-
-  onDestroy(() => {
-    routeStateStore.cleanUpEffect();
   });
 </script>
 

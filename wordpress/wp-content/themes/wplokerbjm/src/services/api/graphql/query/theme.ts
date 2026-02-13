@@ -4,12 +4,14 @@ export const GET_THEME_DATA = gql`
     themeData {
       data {
         themeUrl
-        logo
-        logoSrcset
-        logoSizes
-        logoDecoding
-        logoWidth
-        logoHeight
+        logo {
+          logoUrl
+          logoSrcset
+          logoSizes
+          logoDecoding
+          logoWidth
+          logoHeight
+        }
         lastJobUpdate
         lastTaxonomyUpdate
         themeVersion

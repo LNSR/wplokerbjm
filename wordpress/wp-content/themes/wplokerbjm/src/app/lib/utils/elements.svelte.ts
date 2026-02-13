@@ -18,6 +18,7 @@ export const isJobGridEl = (): HTMLElement | null => {
  */
 export function timeEffect(now?: SvelteDate): () => void {
     const id = setInterval(() => now?.setTime(Date.now()), 1000);
+    // Return a cleanup function to clear the interval when the component is destroyed
     return () => clearInterval(id);
 }
 

@@ -199,7 +199,7 @@ class ThemeInject
         ];
 
         $preloadAttrs = array_filter($Attrs, fn($value) => !empty($value));
-        echo '<link ' . implode(' ', array: array_map(
+        echo '<link ' . implode(' ', array_map(
             fn($key, $value) => $key . '="' . $value . '"',
             array_keys($preloadAttrs),
             $preloadAttrs
@@ -242,12 +242,14 @@ class ThemeInject
 
         $wpThemeData = [
             'themeUrl' => esc_url(get_stylesheet_directory_uri()),
-            'logo' => esc_url($logoData['url'] ?: ''),
-            'logoSrcset' => $logoData['srcset'] ?? '',
-            'logoSizes' => $logoData['sizes'] ?? '',
-            'logoDecoding' => 'async',
-            'logoWidth' => intval($logoData['width'] ?? 0),
-            'logoHeight' => intval($logoData['height'] ?? 0),
+            'logo' => [
+                'logoUrl' => $logoData['url'] ?? '',
+                'logoSrcset' => $logoData['srcset'] ?? '',
+                'logoSizes' => $logoData['sizes'] ?? '',
+                'logoDecoding' => 'async',
+                'logoWidth' => intval($logoData['width'] ?? 0),
+                'logoHeight' => intval($logoData['height'] ?? 0),
+            ],
             'lastJobUpdate' => $last_update_iso,
             'lastTaxonomyUpdate' => \WPLokerBJM\QueryBuilders\TaxonomyQuery::getLastModifiedDateForTaxonomies(),
             'disableTracking' => $loggedIn,
@@ -284,10 +286,15 @@ class ThemeInject
             id="wp-theme-data"><?= wp_json_encode($wpThemeData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?></script>
         <script id="theme-preferences">
             (() => {
-                const removeThisScript = () => {
+                function removeThisScript() {
                     const scriptElement = document.getElementById('theme-preferences');
-                    scriptElement?.remove();
-                };
+                    if (!scriptElement) return;
+                    try {
+                        scriptElement.remove();
+                    } catch (e) {
+                        console.warn('Failed to remove theme preferences script element', e);
+                    }
+                }
                 try {
                     const KEY = 'wplokerbjm-theme';
                     const root = document.documentElement;

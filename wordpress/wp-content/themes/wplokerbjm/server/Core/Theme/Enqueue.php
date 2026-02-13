@@ -27,12 +27,8 @@ class Enqueue
         }
     }
 
-    /**
-     * Output preload links for route-specific JS and CSS assets.
-     * Production only.
-     */
-    #[Action('wp_head', 0)]
-    public static function outputPreloadLinks(): void
+    #[Action('wp_head')]
+    public static function outputViteAssets(): void
     {
         try {
             if (SharedUtils::isDevelopment()) {
@@ -40,16 +36,17 @@ class Enqueue
             }
 
             $urls = Vite::getPreloadUrls($_SERVER['REQUEST_URI'] ?? '/');
-            foreach ($urls as $url):
+            foreach ($urls as $url) {
                 if (str_ends_with($url, '.js')) {
                     echo '<link rel="modulepreload" as="script" crossorigin href="' . esc_url($url) . '">' . "\n";
-                } elseif (str_ends_with($url, '.css')) {
+                }
+                if (str_ends_with($url, '.css')) {
                     echo '<link rel="preload" as="style" crossorigin href="' . esc_url($url) . '">' . "\n";
                     echo '<link rel="stylesheet" crossorigin href="' . esc_url($url) . '">' . "\n";
                 }
-            endforeach;
+            }
         } catch (\Exception $e) {
-            Logger::error('Enqueue', 'Enqueue::outputPreloadLinks error: ' . $e->getMessage());
+            Logger::error('Enqueue', 'Enqueue::outputViteAssets error: ' . $e->getMessage());
             return;
         }
     }
@@ -57,7 +54,7 @@ class Enqueue
     /**
      * Send HTTP Link headers for route-specific JS and CSS assets.
      */
-    public static function outputPreloadLinksResponse(): void
+    public static function outputViteAssetsPreloadLinksResponse(): void
     {
         try {
             if (SharedUtils::isDevelopment() || !SharedUtils::isLocalhost()) {
@@ -73,7 +70,8 @@ class Enqueue
             $path = $_SERVER['REQUEST_URI'] ?? '/';
 
             // Try to serve cached consolidated Link header first. TTL matches manifest/urls cache.
-            $cacheKey = CacheKey::PRELOAD_LINK_HEADER_PREFIX . md5($path);
+            $device = wp_is_mobile() ? 'mobile' : 'desktop';
+            $cacheKey = CacheKey::PRELOAD_LINK_HEADER_PREFIX . $device . '_' . md5($path);
             $cachedHeader = Cache::get($cacheKey);
             if ($cachedHeader !== false) {
                 if (!self::isLinkHeaderAlreadySet($cachedHeader)) {
@@ -104,7 +102,7 @@ class Enqueue
                 }
             }
         } catch (\Exception $e) {
-            Logger::error('Enqueue', 'Enqueue::outputPreloadLinksResponse error: ' . $e->getMessage());
+            Logger::error('Enqueue', 'Enqueue::outputViteAssetsPreloadLinksResponse error: ' . $e->getMessage());
             return;
         }
     }
@@ -138,7 +136,8 @@ class Vite
      */
     public static function getPreloadUrls(string $path): array
     {
-        $cacheKey = CacheKey::PRELOAD_URLS_PREFIX . md5($path);
+        $device = wp_is_mobile() ? 'mobile' : 'desktop';
+        $cacheKey = CacheKey::PRELOAD_URLS_PREFIX . $device . '_' . md5($path);
         $urls = Cache::get($cacheKey);
         if ($urls !== false) {
             return $urls;
@@ -275,8 +274,11 @@ class Vite
         if (strpos($path, '/pasang-iklan-loker') === 0) {
             return 'src/app/routes/PasangIklanLoker.svelte';
         }
+        if (strpos($path, '/kebijakan-privasi') === 0) {
+            return 'src/app/routes/KebijakanPrivasi.svelte';
+        }
         if (preg_match('/^\/lowongan\//', $path)) {
-            return wp_is_mobile() ? $singlelowongan : [$homepage, $singlelowongan]; // Desktop preloads both for sidepanel
+            return wp_is_mobile() ? $singlelowongan : $homepage; // Desktop use sidepanel
         }
         return null;
     }

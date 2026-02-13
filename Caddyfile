@@ -82,8 +82,8 @@
   @static_ext path_regexp staticExt ^/.*\.(css|js|json|xml|pdf|txt|ico|jpg|jpeg|png|webp|avif|svg|htc|ttf|woff|woff2|eot|otf|html)$
   @wp_static path /wp-content/* /wp-includes/* /favicon.ico /robots.txt
   @no_cache path /wp-login.php /wp-admin/* /xmlrpc.php /wp-comments-post.php /wp-cron.php /__vite/*
-  @rest_api path /wp-json/*
-  @graphql path_regexp graphql ^/wp-json/graphql(/.*)?$
+  @rest_api path ^/wp-json(/.*)?$
+  @graphql path_regexp graphql ^/graphql(/.*)?$
   @dynamic not path /wp-content/* /wp-includes/* /favicon.ico /robots.txt /wp-admin/* /wp-login.php /wp-json/* /xmlrpc.php /wp-cron.php
   @logged_in header_regexp Cookie wordpress_logged_in_.*
 
@@ -145,7 +145,7 @@
   header @development @rest_api Cache-Control "private, max-age=60, stale-while-revalidate=120"
 
   # Privileged paths (wp-login.php, admin, xmlrpc, cron): allow private browser cache only
-  header @no_cache Cache-Control "no-cache, must-revalidate, no-store"
+  header @no_cache Cache-Control "no-cache, must-revalidate, no-store, max-age=0, private"
 
   # Dynamic content (pages) — private cache for logged-in users, public cache for anonymous
   header @production @dynamic @logged_in Cache-Control "private, max-age=360"

@@ -433,13 +433,16 @@
   });
 
   $effect(() => {
-    timeEffect(); //;
+    const stopTime = timeEffect(now);
     // React to showDeleteConfirm changes to control the delete confirmation modal
     if (showDeleteConfirm) {
       if (!deleteConfirmModal?.open) deleteConfirmModal?.showModal();
     } else {
       deleteConfirmModal?.close();
     }
+    return () => {
+      stopTime();
+    };
   });
 
   onMount(() => {
