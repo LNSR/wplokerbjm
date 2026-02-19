@@ -34,22 +34,22 @@ export class RouteManager {
     this.isInitialLoad = value;
   }
 
-  setIsLoading(loading: boolean, component?: string) {
+  setIsLoading(loading: boolean) {
     this.isLoading = loading;
-    this.loadingComponent = component || null;
   }
 
   getComponentNamePath(path: string): string {
     if (path === '/') return 'Homepage';
     if (path.startsWith(`/${WPPostRoute.PasangIklanLoker}`)) return 'PasangIklanLoker';
     if (path.startsWith(`/${WPPostRoute.lowongan}`)) return 'SingleLowongan';
+    if (path.startsWith(`/${WPPostRoute.KebijakanPrivacy}`)) return 'KebijakanPrivasi';
     return 'Unknown';
   }
 
   performRouteTransitionSideEffects(path: string): void {
     // Fetch RankMath head data
     utilsSEO.RemoveAllSchemas();
-    
+
     utilsSEO.fetchHeadData(path).then(() => {
       utilsSEO.addJobPostingJsonLd([]);
       GoogleServices.sendPageView(path);
@@ -83,7 +83,7 @@ export class RouteManager {
       }
 
       this.setIsInitialLoad(false);
-      if (componentName) this.setIsLoading(true, componentName);
+      if (componentName) this.setIsLoading(true);
 
       // perform side effects (analytics/head updates)
       void this.performRouteTransitionSideEffects(path);
@@ -142,15 +142,13 @@ export class RouteManager {
     }, 5000);
   }
 
-  loadStart(componentName?: string) {
-    this.setIsLoading(true, componentName);
+  loadStart() {
+    this.setIsLoading(true);
     this.isTransitioningRoute = true;
-    // this.CurrentComponent = null;
   }
 
   loadEnd() {
     this.setIsLoading(false);
-    // this.loadingComponent = null;
   }
 }
 
@@ -170,7 +168,7 @@ export class RouteStateManager {
    * track breakpoint for better DX during development
    */
   observeBreakpointChanges = () => {
-    if (!isDevelopmentMode()) return; // Skip in production
+    if (!isDevelopmentMode() || this.effectCleanup) return; // Skip in production or if already set up
 
     // Set up the effect and store the cleanup function
     this.effectCleanup = $effect.root(() => {

@@ -33,7 +33,7 @@ class HomepagePresenter
 
         $props = [
             'carousel' => $this->jobCarousel->getProps(),
-            'jobGrid' => $this->jobGrid->getProps($query_args, 'Lowongan Terbaru', 'latest'),
+            'jobGrid' => $this->jobGrid->getProps($query_args, 'Lowongan Terbaru(max 1 Bulan)', 'latest'),
         ];
 
         // sidepanel job detail for desktop view
@@ -51,7 +51,8 @@ class HomepagePresenter
         if (get_the_ID() === 146 || is_front_page()) {
             $itemListSchema = $this->graphqlData->ItemListJobPostings($post_ids);
             $schema = JobPostingSchema::renderSchemaItemList($itemListSchema);
-            $seoHtml = SkeletonForSEO::generateSEOHTML($query_result['jobs']);
+            $cardsData = $query_result['jobs'];
+            $seoHtml = SkeletonForSEO::generateSEOHTML($cardsData);
         } else {
             $schema = JobPostingSchema::renderSchemaJobPosting($single_schema, get_the_ID());
         }

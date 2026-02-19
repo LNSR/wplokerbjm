@@ -125,7 +125,7 @@ export class GeneralStore {
         // variable which would otherwise capture only its initial value.
         return () => value
     }
-    
+
     public useStatusJob(status_pekerjaan: number): { label: string; color: string } {
         switch (status_pekerjaan) {
             case 2:
@@ -279,12 +279,13 @@ export class GeneralStore {
         const sites = jobdata.situs_kontak ? jobdata.situs_kontak.split(',').map((s: string) => s.trim()) : [];
         sites.forEach((site: string) => {
             if (site) {
+                const href = site.replace(/^http:\/\//i, 'https://');
                 contacts.push({
                     type: 'website',
                     icon: GlobeSolid,
                     label: 'Website',
-                    value: site.replace(/^https?:\/\//, ''),
-                    href: site,
+                    value: site.replace(/^https?:\/\//i, ''),
+                    href,
                 })
             }
         });
@@ -323,7 +324,8 @@ export class GeneralStore {
             username: string
         ): SocialMediaItem {
             if (/^https?:\/\/wa\.me\/qr\/[A-Z0-9]+$/i.test(username)) {
-                return { platform, icon: config.icon, url: username, username };
+                const normalized = username.replace(/^http:\/\//i, 'https://');
+                return { platform, icon: config.icon, url: normalized, username };
             }
             const waMeMatch = /^(?:https?:\/\/)?wa\.me\/(\d+)$/i.exec(username);
             if (waMeMatch) {
@@ -336,7 +338,8 @@ export class GeneralStore {
                 };
             }
             if (/^https?:\/\/((api|web)\.whatsapp\.com)/.test(username)) {
-                return { platform, icon: config.icon, url: username, username };
+                const normalized = username.replace(/^http:\/\//i, 'https://');
+                return { platform, icon: config.icon, url: normalized, username };
             }
             const clean_number = username.replace(/[^0-9]/g, "");
             return {
@@ -353,7 +356,8 @@ export class GeneralStore {
             username: string
         ): SocialMediaItem {
             if (/^https?:\/\//i.test(username)) {
-                return { platform, icon: config.icon, url: username, username };
+                const normalized = username.replace(/^http:\/\//i, 'https://');
+                return { platform, icon: config.icon, url: normalized, username };
             }
             const clean_username = username.replace(/^@/, "");
             const companyMatch = /^company[:/](.+)$/i.exec(clean_username);
@@ -372,7 +376,8 @@ export class GeneralStore {
             username: string
         ): SocialMediaItem {
             if (/^https?:\/\//i.test(username)) {
-                return { platform, icon: config.icon, url: username, username };
+                const normalized = username.replace(/^http:\/\//i, 'https://');
+                return { platform, icon: config.icon, url: normalized, username };
             }
             const clean_username = username.replace(/^@/, "");
             const url = config.base_url + clean_username;
@@ -385,11 +390,13 @@ export class GeneralStore {
             const seen = new SvelteSet<string>();
             if (!socialMediaData) return processedItems;
 
-            // socialMediaData is now a semicolon-separated string like "Instagram: value; WhatsApp: value"
-            const items = socialMediaData.split(';').map((s: string) => s.trim());
+            const items = socialMediaData.split(';').map((s: string) => s.trim()).filter(Boolean);
 
             for (const item of items) {
-                const [platform, usernames] = item.split(':').map((s: string) => s.trim());
+                const idx = item.indexOf(':');
+                if (idx === -1) continue;
+                const platform = item.slice(0, idx).trim();
+                const usernames = item.slice(idx + 1).trim();
                 if (!platform || !usernames) continue;
                 const usernameList = usernames.split(',').map((u: string) => u.trim()).filter(u => u);
                 for (const username of usernameList) {

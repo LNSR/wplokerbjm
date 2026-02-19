@@ -284,10 +284,15 @@ class ThemeInject
             id="wp-theme-data"><?= wp_json_encode($wpThemeData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?></script>
         <script id="theme-preferences">
             (() => {
-                const removeThisScript = () => {
+                function removeThisScript() {
                     const scriptElement = document.getElementById('theme-preferences');
-                    scriptElement?.remove();
-                };
+                    if (!scriptElement) return;
+                    try {
+                        scriptElement.remove();
+                    } catch (e) {
+                        console.warn('Failed to remove theme preferences script element', e);
+                    }
+                }
                 try {
                     const KEY = 'wplokerbjm-theme';
                     const root = document.documentElement;
@@ -301,9 +306,11 @@ class ThemeInject
                         root.classList.toggle('wplokerbjm-dark-mode-enable', theme === 'dark');
                     };
 
-                    if (stored === 'dark' || stored === 'light') {
+                    const allowed = ['dark', 'light', 'lavender'];
+                    if (allowed.indexOf(stored) !== -1) {
                         apply(stored);
                         root.setAttribute('data-wplokerbjm-theme-sourced', 'local');
+                        root.setAttribute('data-wplokerbjm-theme', stored);
                         removeThisScript();
                         return;
                     }
@@ -313,8 +320,10 @@ class ThemeInject
                         prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
                     } catch (e) { prefersDark = false; }
 
-                    apply(prefersDark ? 'dark' : 'light');
+                    const chosen = prefersDark ? 'dark' : 'light';
+                    apply(chosen);
                     root.setAttribute('data-wplokerbjm-theme-sourced', 'system');
+                    root.setAttribute('data-wplokerbjm-theme', chosen);
                 } catch (e) {
                     console.log('fail applying theme preferences', e);
                 } finally {
@@ -382,7 +391,7 @@ class DebloatWPTheme
         remove_action('wp_footer', 'wp_enqueue_stored_styles', 1);
         remove_action('wp_footer', 'wp_maybe_inline_styles', 1);
         remove_action('wp_footer', ['WP_Duotone', 'output_footer_assets'], 10);
-        remove_action('wp_footer', 'the_block_template_skip_link', 10); // !deprecated
+        remove_action('wp_footer', 'the_block_template_skip_link', 10); // !Core something from WP deprecated(Query Monitor report)
         remove_action('wp_footer', 'wp_enqueue_block_template_skip_link', 10); // this theme are fully custom no need for block features
 
         // Remove REST API discovery link

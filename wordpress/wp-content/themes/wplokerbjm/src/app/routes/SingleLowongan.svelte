@@ -6,8 +6,6 @@
   import { type JobDetailResponse as SingleJob } from "@/types";
   import { utilsSEO } from "$lib/utils/SEO.svelte";
   import { routeStore } from "$lib/stores/Route.svelte";
-  import Footer from "@components/layouts/Footer.svelte";
-
   const { job: initialJob } = $props<{
     job: SingleJob;
   }>();
@@ -106,5 +104,3 @@
     <JobDetail {job} />
   </main>
 {/if}
-
-<Footer />

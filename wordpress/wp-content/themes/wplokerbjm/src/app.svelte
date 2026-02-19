@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import { onDestroy, onMount, type Component } from "svelte";
+  import { onMount, type Component } from "svelte";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import { GoogleServices } from "@/services/Google";
@@ -21,7 +21,11 @@
         case "PasangIklanLoker":
           return dynamicComponentStore.loadPasangIklanLoker();
         case "SingleLowongan":
-          return isMobile() ? dynamicComponentStore.loadSingleLowongan() : dynamicComponentStore.loadHomepage();
+          return isMobile()
+            ? dynamicComponentStore.loadSingleLowongan()
+            : dynamicComponentStore.loadHomepage();
+        case "KebijakanPrivasi":
+          return dynamicComponentStore.loadKebijakanPrivasi();
       }
       return null;
     }
@@ -78,13 +82,10 @@
       }
     }
 
-    public loadRoute(
-      importPromise: Promise<Component<any>>,
-      componentNamePath: string,
-    ): void {
+    public loadRoute(importPromise: Promise<Component<any>>): void {
       const loadForPath = pathname;
       try {
-        routeStore.loadStart(componentNamePath);
+        routeStore.loadStart();
 
         importPromise
           .then((m) => {
@@ -119,6 +120,7 @@
   import "@css/app.css";
   import FloatingActionButton from "@components/ui/Shared/FloatingActionButton.svelte";
   import Header from "@components/layouts/Header.svelte";
+  import Footer from "@components/layouts/Footer.svelte";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
 
   const props = $props();
@@ -126,7 +128,7 @@
   $effect(() => {
     const importPromise = appRouteHandler.mapComponentName(componentNamePath);
     if (importPromise) {
-      appRouteHandler.loadRoute(importPromise, componentNamePath);
+      appRouteHandler.loadRoute(importPromise);
     } else {
       routeStore.isTransitioningRoute = false;
     }
@@ -150,12 +152,9 @@
       // Return cleanup function
       return () => {
         window.removeEventListener("popstate", appRouteHandler.handlePopstate);
+        routeStateStore.cleanUpEffect();
       };
     }
-  });
-
-  onDestroy(() => {
-    routeStateStore.cleanUpEffect();
   });
 </script>
 
@@ -167,9 +166,11 @@
       style="padding-top:{headerStore.totalOffset}px"
     >
       <CurrentComponent {...isInitialLoad ? props : {}} />
+      <Footer />
+      <!-- we put footer here to avoid layout shifts, async component cause footer being pushed down -->
     </div>
+    <FloatingActionButton />
   {/if}
-  <FloatingActionButton />
 </div>
 
 <style lang="postcss">

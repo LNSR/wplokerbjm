@@ -195,7 +195,7 @@ class VirtualizationService {
             }
 
             // Safety timeout to re-measure after mount
-            const timeoutId = setTimeout(updateHeight, 1000);
+            const timeoutId = setTimeout(updateHeight, 500);
 
             return () => {
                 if (ro) {

@@ -27,12 +27,8 @@ class Enqueue
         }
     }
 
-    /**
-     * Output preload links for route-specific JS and CSS assets.
-     * Production only.
-     */
-    #[Action('wp_head', 0)]
-    public static function outputPreloadLinks(): void
+    #[Action('wp_head', 30)]
+    public static function outputViteCSSAssets(): void
     {
         try {
             if (SharedUtils::isDevelopment()) {
@@ -40,16 +36,13 @@ class Enqueue
             }
 
             $urls = Vite::getPreloadUrls($_SERVER['REQUEST_URI'] ?? '/');
-            foreach ($urls as $url):
-                if (str_ends_with($url, '.js')) {
-                    echo '<link rel="modulepreload" as="script" crossorigin href="' . esc_url($url) . '">' . "\n";
-                } elseif (str_ends_with($url, '.css')) {
-                    echo '<link rel="preload" as="style" crossorigin href="' . esc_url($url) . '">' . "\n";
+            foreach ($urls as $url) {
+                if (str_ends_with($url, '.css')) {
                     echo '<link rel="stylesheet" crossorigin href="' . esc_url($url) . '">' . "\n";
                 }
-            endforeach;
+            }
         } catch (\Exception $e) {
-            Logger::error('Enqueue', 'Enqueue::outputPreloadLinks error: ' . $e->getMessage());
+            Logger::error('Enqueue', 'Enqueue::outputViteCSSAssets error: ' . $e->getMessage());
             return;
         }
     }
@@ -57,10 +50,10 @@ class Enqueue
     /**
      * Send HTTP Link headers for route-specific JS and CSS assets.
      */
-    public static function outputPreloadLinksResponse(): void
+    public static function outputViteAssetsPreloadLinksResponse(): void
     {
         try {
-            if (SharedUtils::isDevelopment() || !SharedUtils::isLocalhost()) {
+            if (SharedUtils::isDevelopment() || SharedUtils::isLocalhost()) {
                 return;
             }
 
@@ -73,7 +66,8 @@ class Enqueue
             $path = $_SERVER['REQUEST_URI'] ?? '/';
 
             // Try to serve cached consolidated Link header first. TTL matches manifest/urls cache.
-            $cacheKey = CacheKey::PRELOAD_LINK_HEADER_PREFIX . md5($path);
+            $device = wp_is_mobile() ? 'mobile' : 'desktop';
+            $cacheKey = CacheKey::PRELOAD_LINK_HEADER_PREFIX . $device . '_' . md5($path);
             $cachedHeader = Cache::get($cacheKey);
             if ($cachedHeader !== false) {
                 if (!self::isLinkHeaderAlreadySet($cachedHeader)) {
@@ -104,7 +98,7 @@ class Enqueue
                 }
             }
         } catch (\Exception $e) {
-            Logger::error('Enqueue', 'Enqueue::outputPreloadLinksResponse error: ' . $e->getMessage());
+            Logger::error('Enqueue', 'Enqueue::outputViteAssetsPreloadLinksResponse error: ' . $e->getMessage());
             return;
         }
     }
@@ -138,7 +132,8 @@ class Vite
      */
     public static function getPreloadUrls(string $path): array
     {
-        $cacheKey = CacheKey::PRELOAD_URLS_PREFIX . md5($path);
+        $device = wp_is_mobile() ? 'mobile' : 'desktop';
+        $cacheKey = CacheKey::PRELOAD_URLS_PREFIX . $device . '_' . md5($path);
         $urls = Cache::get($cacheKey);
         if ($urls !== false) {
             return $urls;
@@ -150,7 +145,8 @@ class Vite
         }
 
         $key = self::getRouteKey($path);
-        if (!$key || !isset($manifest[$key])) {
+        $keys = is_array($key) ? $key : ($key ? [$key] : []);
+        if (empty($keys)) {
             return [];
         }
 
@@ -173,8 +169,14 @@ class Vite
             $urls[] = $dist_uri . '/' . $url;
         }
 
-        // Collect all transitive imports for route
-        $route_urls = self::getAllTransitiveAssets($manifest, $key);
+        // Collect all transitive imports for route(s)
+        $route_urls = [];
+        foreach ($keys as $k) {
+            if (!isset($manifest[$k])) {
+                continue;
+            }
+            $route_urls = array_merge($route_urls, self::getAllTransitiveAssets($manifest, $k));
+        }
         foreach ($route_urls as $url) {
             $urls[] = $dist_uri . '/' . $url;
         }
@@ -192,14 +194,14 @@ class Vite
      */
     public static function enqueueForDevelopment(): array
     {
-        $vite_base_url = home_url() . '/__vite';
+        $vite_base_url = '/__vite';
         $vite_handle = 'vite-entry';
         $client_handle = 'vite-client';
 
         // Enqueue module scripts for dev server
         wp_enqueue_script_module(
             $vite_handle,
-            "{$vite_base_url}/" . self::viteEntry(),
+            "{$vite_base_url}/" . self::viteEntry(), // entry point are from manifest keys, so build first to generate manifest.json
             [],
             null,
             [
@@ -258,7 +260,7 @@ class Vite
     /**
      * Get the route key based on the path.
      */
-    private static function getRouteKey(string $path): ?string
+    private static function getRouteKey(string $path): string|array|null
     {
         $homepage = 'src/app/routes/Homepage.svelte';
         $singlelowongan = 'src/app/routes/SingleLowongan.svelte';
@@ -268,8 +270,11 @@ class Vite
         if (strpos($path, '/pasang-iklan-loker') === 0) {
             return 'src/app/routes/PasangIklanLoker.svelte';
         }
+        if (strpos($path, '/kebijakan-privasi') === 0) {
+            return 'src/app/routes/KebijakanPrivasi.svelte';
+        }
         if (preg_match('/^\/lowongan\//', $path)) {
-            return wp_is_mobile() ? $singlelowongan : $homepage; // Mobile uses SingleLowongan, desktop uses Homepage with sidepanel
+            return wp_is_mobile() ? $singlelowongan : [$homepage, $singlelowongan]; // Desktop preloads both for sidepanel
         }
         return null;
     }

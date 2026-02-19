@@ -54,7 +54,7 @@
 </script>
 
 <script lang="ts">
-  import JobCard from "@components/ui/Homepage/JobCard.svelte";
+  import JobCard from "@components/ui/Shared/JobCard.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import { isJobGridEl } from "$lib/utils/elements.svelte";
   import {

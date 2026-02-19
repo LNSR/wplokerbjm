@@ -135,21 +135,14 @@ class GlobalHooks
     /**
      * Modifies HTTP headers to remove unwanted Link headers and add sitemap link.
      */
-    #[Action('template_redirect', 12)]
+    #[Action('template_redirect', 11)]
     public static function modifyLinkHeadersImpl(): void
     {
         if (!headers_sent()) {
             // Remove all Link headers to prevent API discovery exposure
             header_remove('Link');
-            Enqueue::outputPreloadLinksResponse();
+            Enqueue::outputViteAssetsPreloadLinksResponse();
         }
-    }
-
-    #[Action('wp_head')]
-    public static function exposeSitemapHeader(): void
-    {
-        $sitemap_url = home_url('/sitemap_index.xml');
-        echo '<link rel="sitemap" type="application/xml" title="Sitemap" href="' . esc_url($sitemap_url) . '" />' . "\n";
     }
 
     /**
@@ -289,7 +282,6 @@ class GlobalHooks
     {
         return array_merge([
             // 'google-site-kit/',
-            'wpgraphql-smart-cache/',
             'tinywp-mobile-detect/',
             'fast-indexing-api/',
             'wps-hide-login/',

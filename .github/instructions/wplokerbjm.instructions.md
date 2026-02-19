@@ -7,6 +7,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 ## Cache
 
 - Cache plugin used: **LiteSpeed Cache** with object caching redis.
+- WPGraphQL cache plugin used: **WPGraphQL Smart Cache** with only network caching enabled.
 
 ## Dynamic Data Framework
 
@@ -41,7 +42,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - bootstrap: [wplokerbjm-bootstrap.php](../../wordpress/wp-content/mu-plugins/wplokerbjm-bootstrap.php)
 - Use **Composer** for PHP dependencies, ensuring the latest PHP version is used.
 - For PHP DI structure, refer to file:  
-  [Container.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Container//Container.php)
+  [Container.php](../../wordpress/wp-content/themes/wplokerbjm/server/Core/Container/Container.php)
 - Use Cache if it's the best decision.
   - [Cache.php](../../wordpress/wp-content/themes/wplokerbjm/server/Shared/Cache/Cache.php)
   - Use APCu if is appropriate.
@@ -49,6 +50,3 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 ## Frontend(Svelte/TypeScript)
 
 - Use **Bun** for JavaScript/TypeScript package management, always using the latest versions of JavaScript/TypeScript frameworks and syntaxes.
-- Frontend tooling is using Vite.
-- Use Svelte 5 Runes mode.
-- Tailwind CSS with DaisyUI for styling.

@@ -53,7 +53,6 @@
       if (!dynamicComponentStore.BookmarkModal) {
         void dynamicComponentStore.loadBookmarkModal();
       }
-      
     } catch {
       isPending = false;
       const wasSaved = preToggleSaved;
@@ -69,7 +68,6 @@
       case "carousel":
         return "btn-sm btn-circle ";
       case "featured":
-      case "detail":
         return "btn-md btn-circle ";
       default:
         return "btn-md btn-circle ";
@@ -122,7 +120,6 @@
       case "carousel":
         return "h-4 w-4 ";
       case "featured":
-      case "detail":
         return "h-5 w-5 ";
       default:
         return "h-5 w-5 ";
