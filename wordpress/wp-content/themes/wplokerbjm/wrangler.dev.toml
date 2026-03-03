@@ -1,0 +1,15 @@
+name = "wplokerbjm-dev"
+main = ".svelte-kit/cloudflare/_worker.js"
+compatibility_flags = [ "nodejs_compat" ]
+compatibility_date = "2026-02-22"
+account_id = "5996bc6e6329a2824240d44bc86bcc03"
+route = "dev.lokerbanjarmasin.my.id/*"
+
+# needed for adapter-cloudflare: make built assets available to the Worker
+[assets]
+directory = ".svelte-kit"
+binding = "ASSETS"
+[env]
+[env.vars]
+PUBLIC_CMS_ORIGIN = "https://dev.lokerbanjarmasin.my.id"
+PUBLIC_CMS_ORIGIN_DEV = "https://localhost"

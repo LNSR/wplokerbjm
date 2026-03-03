@@ -14,7 +14,6 @@ class JobsDataResolver
         private readonly \WPLokerBJM\Presenters\Components\JobCarousel $jobCarouselPresenter,
         private readonly \WPLokerBJM\Repositories\JobRepository $jobRepository,
         private readonly \WPLokerBJM\Presenters\Components\JobGrid $jobGridPresenter,
-        private readonly \WPLokerBJM\Presenters\Pages\SinglePresenter $singlePresenter,
     ) {
     }
 
@@ -59,8 +58,8 @@ class JobsDataResolver
             }
 
             $argsQuery = match ($context) {
-                'search' => JobQuery::searchJobsArgs($filters, $paged, 54),
-                default => JobQuery::latestJobsArgs($paged, 54),
+                'search' => JobQuery::searchJobsArgs($filters, $paged, 27),
+                default => JobQuery::latestJobsArgs($paged, 27),
             };
 
             $result = $this->jobRepository->queryJob($argsQuery);
@@ -117,8 +116,8 @@ class JobsDataResolver
             }
 
             $query_args = match ($context) {
-                'search' => JobQuery::searchJobsArgs($filters, $paged, 54),
-                default => JobQuery::latestJobsArgs($paged, 54),
+                'search' => JobQuery::searchJobsArgs($filters, $paged, 27),
+                default => JobQuery::latestJobsArgs($paged, 27),
             };
 
             $props = $this->jobGridPresenter->getProps($query_args, $title, $context, $total_jobs);
@@ -156,7 +155,7 @@ class JobsDataResolver
                 throw new \Exception('Post not found');
             }
 
-            $job = $this->singlePresenter->getProps($post->ID)['job']; // cached internally
+            $job = $this->graphqlData->getJobDetailData($post->ID); // cached internally
 
             $result = [
                 'job' => $job,
@@ -179,8 +178,6 @@ class JobsDataResolver
             if (empty($ids)) {
                 return ['schemas' => []];
             }
-
-            sort($ids);
 
             $type = isset($args['type']) ? trim((string) $args['type']) : null;
 
@@ -278,7 +275,7 @@ class JobsDataResolver
                 return $cached;
             }
 
-            $query_args = JobQuery::searchJobsArgs($searchFilters, 1, 54);
+            $query_args = JobQuery::searchJobsArgs($searchFilters, 1, 27);
 
             $result = $this->jobRepository->queryJob($query_args);
 

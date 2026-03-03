@@ -100,6 +100,7 @@ class GraphQLData
 
             $data = [
                 'id' => $post_id,
+                'slug' => get_post_field('post_name', $post_id),
                 'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 CustomFields::NAMA_PERUSAHAAN => !empty($jobdata[Taxonomies::PERUSAHAAN])
                     ? html_entity_decode($jobdata[Taxonomies::PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') // prioritize taxonomy perusahaan first

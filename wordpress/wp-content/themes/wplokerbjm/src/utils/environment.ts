@@ -1,37 +1,26 @@
-import type { WPLokerBJMThemedData } from '@/types';
-import { parseProps, removePropsScriptFromElement } from '@/utils';
-import { APIService } from '@/services/APIService';
-
-let cachedThemeData: WPLokerBJMThemedData | undefined = undefined;
+import { PUBLIC_CMS_ORIGIN, PUBLIC_CMS_ORIGIN_DEV } from "$env/static/public";
+import { dev } from "$app/environment";
 
 export function isDevelopmentMode(): boolean {
-    const viteDev = typeof import.meta !== 'undefined' && Boolean((import.meta as any).env?.DEV);
-    const wpEnvDev = typeof import.meta !== 'undefined' && (import.meta as any).env?.WP_ENV === 'development';
-    return viteDev || wpEnvDev;
+  return dev;
 }
 
-export function getThemeData(): WPLokerBJMThemedData | undefined {
-    if (cachedThemeData !== undefined) return cachedThemeData;
+/**
+ * Return the canonical origin that should be used when constructing
+ * absolute URLs for API requests (including rankmath head fetches).
+ *
+ * WordPress may live on a different domain than the frontend bundle, and the
+ * head data endpoint requires the CMS host so it can produce valid canonicals.
+ */
+export function getCmsOrigin(): string {
+  const dev = isDevelopmentMode();
+  let origin = dev ? PUBLIC_CMS_ORIGIN_DEV : PUBLIC_CMS_ORIGIN;
 
-    const el = document.getElementById('wp-theme-data');
-    if (el) {
-        const props = parseProps(document, 'id="wp-theme-data"') as unknown as WPLokerBJMThemedData;
-        if (Object.keys(props).length > 0) {
-            cachedThemeData = props;
-            !isDevelopmentMode() && removePropsScriptFromElement(document, 'id="wp-theme-data"');
-            return cachedThemeData;
-        }
-    }
+  if (!origin && typeof process !== "undefined") {
+    origin = dev
+      ? process.env.PUBLIC_CMS_ORIGIN_DEV || ""
+      : process.env.PUBLIC_CMS_ORIGIN || "";
+  }
 
-    // Fallback to API for headless setups
-    APIService.getThemeDataGraphQL().then(data => {
-        if (data) {
-            cachedThemeData = data;
-            return cachedThemeData;
-        }
-    }).catch(err => {
-        console.warn('Failed to fetch theme data from API:', err);
-    });
-
-    return undefined;
+  return origin || "";
 }

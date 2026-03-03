@@ -1,10 +1,22 @@
-import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
+import adapter from "@sveltejs/adapter-cloudflare";
 
-/** @type {import("@sveltejs/vite-plugin-svelte").SvelteConfig} */
-export default {
-  // Consult https://svelte.dev/docs#compile-time-svelte-preprocess
-  // for more information about preprocessors
-  preprocess: vitePreprocess(),
+/** @type {import('@sveltejs/kit').Config} */
+const wranglerConfig = process.env.WRANGLER_ENV === "dev"
+  ? "wrangler.dev.toml"
+  : process.env.WRANGLER_ENV === "staging"
+    ? "wrangler.staging.toml"
+    : process.env.WRANGLER_ENV === "production" ? "wrangler.prod.toml" : "wrangler.dev.toml"; // default to dev if WRANGLER_ENV is not set or has an unexpected value
+
+const config = {
+  kit: {
+    adapter: adapter(),
+    alias: {
+      "@components": "src/lib/components",
+      "@css": "src/lib/assets/css",
+      "@": "src",
+      "@@": "/"
+    }
+  },
   compilerOptions: {
     runes: true,
     modernAst: true,
@@ -12,4 +24,6 @@ export default {
     discloseVersion: false,
     dev: true
   }
-}
+};
+
+export default config;

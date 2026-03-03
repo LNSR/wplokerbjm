@@ -62,7 +62,7 @@ class GlobalHooks
     /**
      * Redirect to home if accessing the lowongan post type archive.
      */
-    #[Action('template_redirect', 3)]
+    #[Action('template_redirect', 4)]
     public static function redirectToHome(): void
     {
         // Avoid redirecting during admin, AJAX, REST API, cron, or preview requests
@@ -80,6 +80,49 @@ class GlobalHooks
             wp_safe_redirect(home_url('/'), 302);
             exit;
         }
+    }
+
+    /**
+     * Headless frontend redirect.
+     * Runs early during `template_redirect` so the theme always forwards
+     * public requests to the Svelte frontend (dev vs prod).
+     */
+    #[Action('template_redirect', 2)]
+    public static function headlessFrontendAdminSideRedirect(): void
+    {
+        // Avoid redirecting during admin, AJAX, REST API, cron, preview, or CLI requests
+        if (
+            is_admin() ||
+            (defined('REST_REQUEST') && REST_REQUEST) ||
+            (defined('DOING_AJAX') && DOING_AJAX) ||
+            (function_exists('wp_doing_cron') && wp_doing_cron()) ||
+            (defined('WP_CLI') && WP_CLI) ||
+            is_preview()
+        ) {
+            return;
+        }
+
+        $baseUrl = SharedUtils::headlessDomainRedirect();
+
+        $path = '/';
+        if (function_exists('is_page') && (is_page('pasang-iklan-loker') || is_page(184))) {
+            $path = '/pasang-iklan-loker';
+        } elseif (function_exists('is_page') && is_page('kebijakan-privasi')) {
+            $path = '/kebijakan-privasi';
+        } elseif (function_exists('is_single') && is_single() && get_post_type() === 'lowongan') {
+            $post = get_post();
+            if ($post && !empty($post->post_name)) {
+                $path = '/lowongan/' . $post->post_name;
+            }
+        } elseif (function_exists('is_front_page') && (is_front_page() || is_page(146))) {
+            $path = '/';
+        }
+
+        $query = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '' ? ('?' . $_SERVER['QUERY_STRING']) : '';
+        $location = rtrim($baseUrl, '/') . $path . $query;
+
+        wp_redirect($location, 302);
+        exit;
     }
 
     /*======================================================================
@@ -110,38 +153,69 @@ class GlobalHooks
      | HEADERS
      ======================================================================*/
 
+
     /**
-     * Attempts to authenticate the user via the logged-in cookie if not already authenticated.
+     * Inject the JWT from the HttpOnly cookie as a Bearer token so the JWT
+     * authentication plugin can authenticate the request transparently.
      */
-    private static function authenticateViaCookie(): void
+    #[Action('graphql_init')]
+    public static function injectJwtFromCookie(): void
     {
-        if (!is_user_logged_in()) {
-            if (function_exists('wp_validate_auth_cookie') && defined('LOGGED_IN_COOKIE') && isset($_COOKIE[LOGGED_IN_COOKIE])) {
-                $cookie = $_COOKIE[LOGGED_IN_COOKIE];
-                $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
-                if ($user_id) {
-                    // Ensure current user is populated for downstream is_user_logged_in()/nonce creation
-                    wp_set_current_user((int) $user_id);
-                } else {
-                    // No valid cookie -> nothing to expose
-                    return;
-                }
-            } else {
-                return;
-            }
+        if (empty($_SERVER['HTTP_AUTHORIZATION']) && !empty($_COOKIE['jwt-token'])) {
+            $bearer = 'Bearer ' . $_COOKIE['jwt-token'];
+            $_SERVER['HTTP_AUTHORIZATION'] = $bearer;
+            $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $bearer;
         }
+
     }
 
     /**
-     * Modifies HTTP headers to remove unwanted Link headers and add sitemap link.
+     * Authenticate GraphQL requests
+     * * Must be logged in Wordpress to have the cookies, but this allows GraphQL requests to be authenticated for decoupled frontend.
      */
-    #[Action('template_redirect', 11)]
-    public static function modifyLinkHeadersImpl(): void
+    #[Action('init_graphql_request')]
+    public static function authenticateViaCookie(): void
     {
-        if (!headers_sent()) {
-            // Remove all Link headers to prevent API discovery exposure
-            header_remove('Link');
-            Enqueue::outputViteAssetsPreloadLinksResponse();
+        $cookieValue = '';
+        $cookieName = '';
+
+        // Prefer the normal PHP cookie superglobal and detect WP login cookies by name
+        if (!empty($_COOKIE)) {
+            foreach ($_COOKIE as $name => $val) {
+                // support both the regular login and secure login cookies
+                if (
+                    str_starts_with($name, 'wordpress_logged_in_') ||
+                    str_starts_with($name, 'wordpress_sec_')
+                ) {
+                    $cookieValue = wp_unslash($val);
+                    $cookieName = $name;
+                    break;
+                }
+            }
+        }
+
+        // If we still don't have it, try parsing the raw Cookie header for known WP login cookies
+        if ($cookieValue === '' && !empty($_SERVER['HTTP_COOKIE'])) {
+            $header = $_SERVER['HTTP_COOKIE'];
+            if (preg_match('/(?:^|;\s*)(wordpress_logged_in_[^=]+|wordpress_sec_[^=]+)=([^;]+)/', $header, $m2)) {
+                $cookieName = $m2[1] ?? '';
+                $cookieValue = rawurldecode($m2[2]);
+            }
+        }
+
+        if ($cookieValue === '') {
+            return;
+        }
+
+        // Validate the cookie value using WP helper
+        // choose scheme based on cookie type: secure login cookies use the secure_auth scheme
+        $scheme = str_starts_with($cookieName, 'wordpress_sec_') ? 'secure_auth' : 'logged_in';
+        $user_id = wp_validate_auth_cookie($cookieValue, $scheme);
+        if ($user_id) {
+            wp_set_current_user((int) $user_id);
+            wp_get_current_user();
+        } else {
+            Logger::error('AuthDebug', 'authenticateViaCookie validation FAILED for cookie_name=' . $cookieName);
         }
     }
 
@@ -151,24 +225,32 @@ class GlobalHooks
     #[Filter('graphql_response_headers_to_send')]
     public static function ModifyHeaderGraphQL(array $headers): array
     {
-        // Get the site's origin
-        $site_url = home_url();
-        $parsed = wp_parse_url($site_url);
-        $site_origin = $parsed['scheme'] . '://' . $parsed['host'];
-        if (isset($parsed['port']) && $parsed['port'] !== '80' && $parsed['port'] !== '443') {
-            $site_origin .= ':' . $parsed['port'];
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+
+        $allowList = [
+            'https://dev.lokerbanjarmasin.my.id',
+            'https://staging.lokerbanjarmasin.my.id',
+            'https://lokerbanjarmasin.my.id',
+            'https://wp.lokerbanjarmasin.my.id',
+            'https://localhost:3000',
+            'https://localhost:5173',
+            'https://localhost:8173',
+            'https://localhost:4173',
+        ];
+
+        if (in_array($origin, $allowList, true)) {
+            $headers['Access-Control-Allow-Origin'] = $origin;
         }
 
-        // Set CORS to same origin only
-        $headers['Access-Control-Allow-Origin'] = $site_origin;
-        $headers['Access-Control-Allow-Credentials'] = 'true'; // Required for cookies/nonces
+        $headers['Access-Control-Allow-Credentials'] = 'true';
 
-        self::authenticateViaCookie();
-
-        if (is_user_logged_in()) {
-            $headers['Access-Control-Allow-Headers'] .= ', X-WP-Nonce';
-            $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce';
-            $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
+        $headers['Access-Control-Allow-Headers'] = ($headers['Access-Control-Allow-Headers'] ?? '') !== ''
+            ? $headers['Access-Control-Allow-Headers'] . ', X-WP-Nonce'
+            : 'X-WP-Nonce';
+        $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce';
+        $loggedIn = is_user_logged_in();
+        if ($loggedIn) {
+            $headers['Logged-In'] = $loggedIn ? 'true' : 'false';
         }
 
         return $headers;
@@ -220,7 +302,7 @@ class GlobalHooks
     /**
      * Temporarily disable specific plugins if in development environment.
      */
-    #[Filter('option_active_plugins', 0)]
+    #[Filter('option_active_plugins', 4)]
     public function disablePluginsForDevImpl(array $plugins): array
     {
         $isDev = SharedUtils::isDevelopment();
@@ -237,16 +319,12 @@ class GlobalHooks
     /**
      * Temporarily disable specific plugins if simulating production environment on local machine.
      */
-    #[Filter('option_active_plugins', 0)]
+    #[Filter('option_active_plugins', 4)]
     public function disablePluginsforSimulatedProdImpl(array $plugins): array
     {
         $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
-        if (!$isDev) {
-            Logger::info('Hooks', 'Not simulating production environment; no plugins disabled.');
-            return $plugins;
-        }
 
-        $pluginsToDisable = $this->listPluginsToDisable();
+        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
 
         return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
@@ -284,13 +362,14 @@ class GlobalHooks
             // 'google-site-kit/',
             'tinywp-mobile-detect/',
             'fast-indexing-api/',
-            'wps-hide-login/',
+            // 'wps-hide-login/',
         ], $extra);
     }
 
     /*======================================================================
      | CACHE
      ======================================================================*/
+
 
     /**
      * Centralized cache purge when posts, meta, terms, or status change.

@@ -8,10 +8,6 @@ export interface SearchState {
   maxNumPages: number
   page: number
   filters: SearchFilters
-  loading: boolean
-  error: string | null
-  timestamp?: number
-  serverLastJobUpdate?: number
 }
 
 export interface CarouselState {

@@ -1,0 +1,459 @@
+/*! WYSIWYG Lines */
+/* Center images (frontend & editor). Consolidated for editor preview + frontend consistency */
+figure.wp-caption.aligncenter img,
+img.aligncenter[class*="wp-image-"],
+.wp-block-image.aligncenter img,
+figure.aligncenter img,
+.wysiwyg-content img.aligncenter,
+.wysiwyg-content figure.aligncenter img {
+  display: block;
+  margin: 0 auto; /* centers and is RTL-friendly */
+  margin-inline: auto; /* RTL-friendly */
+  float: none !important; /* undo floats from other styles */
+  max-width: min(100%, 500px); /* responsive but capped */
+  width: 100%; /* keep images responsive */
+  height: auto;
+  border-radius: 8px;
+}
+
+.wysiwyg-content h1,
+.wysiwyg-content h2,
+.wysiwyg-content h3,
+.wysiwyg-content h4 {
+  margin-top: 1.25em;
+  margin-bottom: 0.5em;
+  line-height: 1.2;
+  font-weight: 700;
+}
+
+.wysiwyg-content p {
+  margin: 0 0 1em 0;
+}
+
+/* Consolidated, RTL-safe list spacing and marker control */
+.wysiwyg-content ul,
+.wysiwyg-content ol,
+.editor-styles-wrapper .wysiwyg-content ul,
+.editor-styles-wrapper .wysiwyg-content ol {
+  list-style-position: outside;
+  padding-inline-start: 1.8rem; /* unified indent for both ul & ol */
+  margin: 0 0 1em 0;
+}
+
+/* Make the marker -> content gap consistent */
+.wysiwyg-content li::marker,
+.editor-styles-wrapper .wysiwyg-content li::marker {
+  font-size: 1em; /* match text size */
+  font-weight: inherit;
+  /* gap between marker and content (supported in modern browsers) */
+  margin-inline-end: 0.4rem;
+}
+
+/* Explicit types for top-level lists; nested lists inherit or can be overridden */
+.wysiwyg-content ul,
+.editor-styles-wrapper .wysiwyg-content ul {
+  list-style-type: disc;
+}
+.wysiwyg-content ol,
+.editor-styles-wrapper .wysiwyg-content ol {
+  list-style-type: decimal;
+}
+
+/* Nested lists: slightly smaller indent and maintain markers */
+.wysiwyg-content ul ul,
+.wysiwyg-content ol ol,
+.wysiwyg-content ul ol,
+.wysiwyg-content ol ul,
+.editor-styles-wrapper .wysiwyg-content ul ul,
+.editor-styles-wrapper .wysiwyg-content ol ol,
+.editor-styles-wrapper .wysiwyg-content ul ol,
+.editor-styles-wrapper .wysiwyg-content ol ul {
+  padding-left: 0.5rem;
+  margin-top: 0.5rem;
+}
+.wysiwyg-content ol,
+.editor-styles-wrapper .wysiwyg-content ol {
+  margin: 0 0 1em 1em;
+}
+
+/* Make sure list items render marker even if upstream resets removed them */
+.wysiwyg-content li,
+.editor-styles-wrapper .wysiwyg-content li {
+  display: list-item;
+}
+
+/* ::marker control for modern browsers; keep default color/size but allow overrides */
+.wysiwyg-content li::marker,
+.editor-styles-wrapper .wysiwyg-content li::marker {
+  /* Ensure the marker matches the computed size and line-height of the list item
+     so bullets/numbers appear visually consistent with the text. */
+  color: currentColor;
+  /* Slightly scale markers up because browsers often render them visually
+     smaller than text at large font sizes. Tweak 1.15 as needed. */
+  font-size: inherit;
+  line-height: 1;
+  font-weight: inherit; /* keep weight consistent with surrounding text */
+  /* Slight vertical tweak if needed; some browsers align markers differently. */
+  transform: translateY(0.02em);
+}
+
+/* Use native list markers (::marker). We removed custom ::before markers to
+   rely on the browser-native markers which are easier to scale and align.
+   Keep list-style-position and left padding so markers have room. */
+.wysiwyg-content ul,
+.editor-styles-wrapper .wysiwyg-content ul {
+  list-style-type: disc;
+  list-style-position: outside;
+  padding-left: 1.6rem; /* space for marker */
+}
+.wysiwyg-content ol,
+.editor-styles-wrapper .wysiwyg-content ol {
+  list-style-type: decimal;
+  list-style-position: outside;
+  padding-left: 1.8rem; /* space for numeric marker */
+}
+.wysiwyg-content ul li,
+.wysiwyg-content ol li,
+.editor-styles-wrapper .wysiwyg-content ul li,
+.editor-styles-wrapper .wysiwyg-content ol li {
+  position: relative;
+}
+
+/* Native ordered lists will use ::marker; no need for manual counters here. */
+/* We intentionally use native ::marker so do not hide it. */
+/* Undo aggressive resets if present (fallback) */
+.wysiwyg-content ul,
+.wysiwyg-content ol,
+.editor-styles-wrapper .wysiwyg-content ul,
+.editor-styles-wrapper .wysiwyg-content ol {
+  /* Undo aggressive resets if present (fallback): prefer the browser default */
+  list-style: revert;
+}
+
+.wysiwyg-content blockquote,
+.editor-styles-wrapper .wysiwyg-content blockquote {
+  border-left: 4px solid rgba(0, 0, 0, 0.08);
+  padding-left: 1rem;
+  color: rgba(0, 0, 0, 0.7);
+  margin: 0 0 1em;
+}
+
+.wysiwyg-content pre,
+.wysiwyg-content code,
+.editor-styles-wrapper .wysiwyg-content pre,
+.editor-styles-wrapper .wysiwyg-content code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Roboto Mono",
+    "Helvetica Neue", monospace;
+  background: rgba(27, 31, 35, 0.05);
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+}
+
+.wysiwyg-content table,
+.editor-styles-wrapper .wysiwyg-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0 0 1em;
+}
+.wysiwyg-content th,
+.wysiwyg-content td,
+.editor-styles-wrapper .wysiwyg-content th,
+.editor-styles-wrapper .wysiwyg-content td {
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+}
+
+/* Dark mode adjustments for editor preview to better match frontend dark theme */
+[data-theme="dark"] .wysiwyg-content,
+[data-theme="dark"] .editor-styles-wrapper .wysiwyg-content {
+  color: var(--wpl-global-color-2);
+}
+
+[data-theme="dark"] .wysiwyg-content blockquote,
+[data-theme="dark"] .editor-styles-wrapper .wysiwyg-content blockquote {
+  border-left-color: rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.85);
+}
+
+[data-theme="dark"] .wysiwyg-content pre,
+[data-theme="dark"] .wysiwyg-content code,
+[data-theme="dark"] .editor-styles-wrapper .wysiwyg-content pre,
+[data-theme="dark"] .editor-styles-wrapper .wysiwyg-content code {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+[data-theme="dark"] .wysiwyg-content th,
+[data-theme="dark"] .wysiwyg-content td,
+[data-theme="dark"] .editor-styles-wrapper .wysiwyg-content th,
+[data-theme="dark"] .editor-styles-wrapper .wysiwyg-content td {
+  border-color: rgba(255, 255, 255, 0.04);
+}
+
+.editor-styles-wrapper .wysiwyg-content {
+  padding: 0;
+  max-width: none;
+}
+
+.wysiwyg-content img,
+.editor-styles-wrapper .wysiwyg-content img {
+  max-width: min(100%, 500px);
+  width: auto; /* allow natural sizing up to the max */
+  height: auto; /* maintain aspect ratio */
+}
+
+/* Link styles within WYSIWYG/editor */
+.wysiwyg-content a,
+.editor-styles-wrapper .wysiwyg-content a {
+  color: var(--wpl-global-color-1);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  word-break: break-word; /* prefer breaking at word boundaries */
+  overflow-wrap: anywhere;
+}
+
+.wysiwyg-content a:hover,
+.editor-styles-wrapper .wysiwyg-content a:hover {
+  color: color-mix(in oklab, var(--wpl-global-color-1) 85%, #0000);
+  text-decoration-thickness: 2px;
+}
+
+.wysiwyg-content a:focus,
+.editor-styles-wrapper .wysiwyg-content a:focus {
+  outline: 3px solid color-mix(in oklab, var(--wpl-global-color-1) 20%, #0000);
+  outline-offset: 2px;
+}
+
+.wysiwyg-content a:visited,
+.editor-styles-wrapper .wysiwyg-content a:visited {
+  color: color-mix(in oklab, var(--wpl-global-color-1) 60%, #0000);
+}
+
+/* Ensure WYSIWYG content wraps long words/URLs and links to avoid horizontal overflow */
+.wysiwyg-content,
+.editor-styles-wrapper .wysiwyg-content {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+/* WordPress Gallery Block Styles */
+.wysiwyg-content .wp-block-gallery,
+.editor-styles-wrapper .wp-block-gallery {
+  margin: 0 0 1em 0;
+}
+
+.wysiwyg-content .wp-block-gallery .blocks-gallery-grid,
+.editor-styles-wrapper .wp-block-gallery .blocks-gallery-grid,
+.wysiwyg-content .gallery,
+.editor-styles-wrapper .gallery {
+  display: grid;
+  gap: 1rem;
+  list-style: none;
+  padding: 0;
+}
+
+.wysiwyg-content .wp-block-gallery.columns-1 .blocks-gallery-grid,
+.editor-styles-wrapper .wp-block-gallery.columns-1 .blocks-gallery-grid {
+  grid-template-columns: 1fr;
+}
+
+.wysiwyg-content .wp-block-gallery.columns-2 .blocks-gallery-grid,
+.editor-styles-wrapper .wp-block-gallery.columns-2 .blocks-gallery-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.wysiwyg-content .wp-block-gallery.columns-3 .blocks-gallery-grid,
+.editor-styles-wrapper .wp-block-gallery.columns-3 .blocks-gallery-grid {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.wysiwyg-content .wp-block-gallery.columns-4 .blocks-gallery-grid,
+.editor-styles-wrapper .wp-block-gallery.columns-4 .blocks-gallery-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.wysiwyg-content .wp-block-gallery.columns-5 .blocks-gallery-grid,
+.editor-styles-wrapper .wp-block-gallery.columns-5 .blocks-gallery-grid {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+.wysiwyg-content .wp-block-gallery.columns-6 .blocks-gallery-grid,
+.editor-styles-wrapper .wp-block-gallery.columns-6 .blocks-gallery-grid {
+  grid-template-columns: repeat(6, 1fr);
+}
+
+.wysiwyg-content .wp-block-gallery.columns-7 .blocks-gallery-grid,
+.editor-styles-wrapper .wp-block-gallery.columns-7 .blocks-gallery-grid {
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.wysiwyg-content .wp-block-gallery.columns-8 .blocks-gallery-grid,
+.editor-styles-wrapper .wp-block-gallery.columns-8 .blocks-gallery-grid {
+  grid-template-columns: repeat(8, 1fr);
+}
+
+/* Responsive adjustments for block galleries */
+@media (max-width: 768px) {
+  .wysiwyg-content .wp-block-gallery.columns-3 .blocks-gallery-grid,
+  .wysiwyg-content .wp-block-gallery.columns-4 .blocks-gallery-grid,
+  .wysiwyg-content .wp-block-gallery.columns-5 .blocks-gallery-grid,
+  .wysiwyg-content .wp-block-gallery.columns-6 .blocks-gallery-grid,
+  .wysiwyg-content .wp-block-gallery.columns-7 .blocks-gallery-grid,
+  .wysiwyg-content .wp-block-gallery.columns-8 .blocks-gallery-grid,
+  .editor-styles-wrapper .wp-block-gallery.columns-3 .blocks-gallery-grid,
+  .editor-styles-wrapper .wp-block-gallery.columns-4 .blocks-gallery-grid,
+  .editor-styles-wrapper .wp-block-gallery.columns-5 .blocks-gallery-grid,
+  .editor-styles-wrapper .wp-block-gallery.columns-6 .blocks-gallery-grid,
+  .editor-styles-wrapper .wp-block-gallery.columns-7 .blocks-gallery-grid,
+  .editor-styles-wrapper .wp-block-gallery.columns-8 .blocks-gallery-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .wysiwyg-content .wp-block-gallery .blocks-gallery-grid,
+  .editor-styles-wrapper .wp-block-gallery .blocks-gallery-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wysiwyg-content .wp-block-gallery .blocks-gallery-item img,
+.editor-styles-wrapper .wp-block-gallery .blocks-gallery-item img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+}
+
+.wysiwyg-content .wp-block-gallery .blocks-gallery-item figcaption,
+.editor-styles-wrapper .wp-block-gallery .blocks-gallery-item figcaption {
+  text-align: center;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  color: var(--wpl-global-color-3);
+}
+
+/* Dark mode adjustments for block gallery captions */
+[data-theme="dark"]
+  .wysiwyg-content
+  .wp-block-gallery
+  .blocks-gallery-item
+  figcaption,
+[data-theme="dark"]
+  .editor-styles-wrapper
+  .wp-block-gallery
+  .blocks-gallery-item
+  figcaption {
+  color: var(--wpl-global-color-3);
+}
+
+/* WordPress Classic Gallery Styles */
+.wysiwyg-content .gallery,
+.editor-styles-wrapper .gallery {
+  margin: 0 auto 1em auto;
+  width: fit-content;
+
+  &.gallery-columns-1 {
+    grid-template-columns: 1fr;
+  }
+  &.gallery-columns-2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  &.gallery-columns-3 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  &.gallery-columns-4 {
+    grid-template-columns: repeat(4, 1fr);
+  }
+  &.gallery-columns-5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  &.gallery-columns-6 {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  &.gallery-columns-7 {
+    grid-template-columns: repeat(7, 1fr);
+  }
+  &.gallery-columns-8 {
+    grid-template-columns: repeat(8, 1fr);
+  }
+  &.gallery-columns-9 {
+    grid-template-columns: repeat(9, 1fr);
+  }
+}
+
+/* Responsive adjustments for classic galleries */
+@media (max-width: 768px) {
+  .wysiwyg-content .gallery.gallery-columns-3,
+  .wysiwyg-content .gallery.gallery-columns-4,
+  .wysiwyg-content .gallery.gallery-columns-5,
+  .wysiwyg-content .gallery.gallery-columns-6,
+  .wysiwyg-content .gallery.gallery-columns-7,
+  .wysiwyg-content .gallery.gallery-columns-8,
+  .wysiwyg-content .gallery.gallery-columns-9,
+  .editor-styles-wrapper .gallery.gallery-columns-3,
+  .editor-styles-wrapper .gallery.gallery-columns-4,
+  .editor-styles-wrapper .gallery.gallery-columns-5,
+  .editor-styles-wrapper .gallery.gallery-columns-6,
+  .editor-styles-wrapper .gallery.gallery-columns-7,
+  .editor-styles-wrapper .gallery.gallery-columns-8,
+  .editor-styles-wrapper .gallery.gallery-columns-9 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .wysiwyg-content .gallery,
+  .editor-styles-wrapper .gallery {
+    grid-template-columns: 1fr;
+  }
+}
+
+.wysiwyg-content .gallery-item,
+.editor-styles-wrapper .gallery-item {
+  position: relative;
+}
+
+.wysiwyg-content .gallery-icon img,
+.editor-styles-wrapper .gallery-icon img {
+  width: 100%;
+  height: auto;
+  border-radius: 8px;
+  display: block;
+}
+
+.wysiwyg-content .gallery-caption,
+.editor-styles-wrapper .gallery-caption {
+  text-align: center;
+  font-size: 0.875rem;
+  margin-top: 0.5rem;
+  color: var(--wpl-global-color-3);
+}
+
+/* Dark mode adjustments for classic gallery captions */
+[data-theme="dark"] .wysiwyg-content .gallery-caption,
+[data-theme="dark"] .editor-styles-wrapper .gallery-caption {
+  color: var(--wpl-global-color-3);
+}
+
+/* Gallery Alignment Styles (for specific cases, since galleries are centered by default) */
+.wysiwyg-content .wp-block-gallery.alignleft,
+.editor-styles-wrapper .wp-block-gallery.alignleft,
+.wysiwyg-content .gallery.alignleft,
+.editor-styles-wrapper .gallery.alignleft {
+  float: left;
+  margin-right: 1rem;
+}
+
+.wysiwyg-content .wp-block-gallery.alignright,
+.editor-styles-wrapper .wp-block-gallery.alignright,
+.wysiwyg-content .gallery.alignright,
+.editor-styles-wrapper .gallery.alignright {
+  float: right;
+  margin-left: 1rem;
+}
+
+/* WordPress auto sizes contain intrinsic size */
+img:is([sizes="auto" i], [sizes^="auto," i]) {
+  contain-intrinsic-size: 3000px 1500px;
+}

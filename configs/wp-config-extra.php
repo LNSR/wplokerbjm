@@ -19,6 +19,9 @@ if (!defined('WP_ENV')) {
   define('WP_ENV', getenv('WP_ENV') ?: 'production');
 }
 
+define('JWT_AUTH_SECRET_KEY', getenv('JWT_AUTH_SECRET_KEY'));
+define('JWT_AUTH_CORS_ENABLE', true);
+
 // Auto-discover protocol and hostname from forwarded headers (for all proxies)
 $hostname = 'localhost'; // default fallback
 $protocol = 'http://'; // default fallback
@@ -46,6 +49,22 @@ if (strpos($hostname, 'staging.') === 0 || strpos($hostname, 'dev.') === 0) {
 
 define('WP_HOME', $protocol . $hostname);
 define('WP_SITEURL', $protocol . $hostname);
+
+$host_no_port = preg_replace('/:\d+$/', '', $hostname);
+if (preg_match('/^[^.]+\.(.+)$/', $host_no_port, $m)) {
+  $cookie_domain = '.' . $m[1];
+} else {
+  $cookie_domain = $host_no_port;
+}
+define('COOKIE_DOMAIN', $cookie_domain);
+define('ADMIN_COOKIE_PATH', '/');
+define('COOKIEPATH', '/');
+define('SITECOOKIEPATH', '/');
+
+// If JWT issuer wasn't provided earlier, default it to the cookie domain.
+if (!defined('JWT_AUTH_ISS')) {
+  define('JWT_AUTH_ISS', $cookie_domain);
+}
 
 //! LiteSpeed Cache Configuration Flag
 // https://docs.litespeedtech.com/lscache/lscwp/constants/

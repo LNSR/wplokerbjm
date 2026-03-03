@@ -42,6 +42,18 @@ class SharedUtils
     }
 
     /**
+     * Return the headless frontend base URL depending on environment.
+     * - development => https://localhost:5173
+     * - production  => https://lokerbanjarmasin.my.id
+     *
+     * @return string
+     */
+    public static function headlessDomainRedirect(): string
+    {
+        return self::isDevelopment() ? 'https://localhost:5173' : 'https://lokerbanjarmasin.my.id';
+    }
+
+    /**
      * Recursively filter out empty values from an array.
      *! make arrays returned values more compact by removing empty entries 
      *

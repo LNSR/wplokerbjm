@@ -2,52 +2,9 @@
   tls /var/www/certs/localhost.crt /var/www/certs/localhost.key # ! Use your own certificate
   @production expression {env.WP_ENV} == "production"
   @development expression {env.WP_ENV} == "development"
-  import "/etc/caddy/caddy-early-hints.conf"
 
-  # Development early hints for Vite dev server
-  @dev_homepage expression {env.WP_ENV} == "development" && {http.request.uri.path} == "/"
-
-  respond @dev_homepage 103
-  header @dev_homepage Link "</__vite/@vite/client>; rel=modulepreload; as=script; crossorigin, </__vite/src/main.ts>; rel=modulepreload; as=script; crossorigin"
-
-  @dev_pasang expression {env.WP_ENV} == "development" && {http.request.uri.path} == "/pasang-iklan-loker"
-  respond @dev_pasang 103
-  header @dev_pasang Link "</__vite/@vite/client>; rel=modulepreload; as=script; crossorigin, </__vite/src/main.ts>; rel=modulepreload; as=script; crossorigin"
-
-  @dev_single expression {env.WP_ENV} == "development" && {http.request.uri.path}.matches("^/lowongan/.*")
-  respond @dev_single 103
-  header @dev_single Link "</__vite/@vite/client>; rel=modulepreload; as=script; crossorigin, </__vite/src/main.ts>; rel=modulepreload; as=script; crossorigin"
-
-  @vite path_regexp vite ^/(__vite|@vite|@id|@fs|sockjs-node|~partytown)(/.*)?$
-  handle @vite {
-    # Proxy Vite dev endpoints including Partytown dev assets. Tuned for HMR (websockets) and dev performance.
-    # If you run multiple Vite instances for scaling, add them here as additional upstreams.
-    reverse_proxy host.docker.internal:5173 {
-      # Preserve headers Vite needs for HMR / dev pages
-      header_up Origin {http.request.header.Origin}
-      header_up Host {http.request.host}
-      header_up X-Forwarded-Host {host}
-      header_up X-Forwarded-Proto {scheme}
-      header_up X-Forwarded-For {remote}
-      header_up X-Real-IP {remote_host}
-      header_up Upgrade {http.request.header.Upgrade}
-      header_up Connection {http.request.header.Connection}
-
-      # Improve HMR/streaming responsiveness
-      flush_interval 120ms
-      stream_timeout 0
-      stream_close_delay 1m
-    }
-  }
-
-  # Ensure Partytown dev assets can register service workers by setting Service-Worker-Allowed
   @partytown_dev path_regexp partytownDev ^/~partytown(/.*)?$
   header @partytown_dev Service-Worker-Allowed "/"
-
-  # * Rewrite /node_modules/* to the Vite node_modules directory
-  # * Use this to serve local node_modules for development purposes
-  @node_modules_path path_regexp node_modules ^/node_modules/(.*)$
-  rewrite @node_modules_path /__vite/node_modules/{re.node_modules.1}
 
   @partytown_assets path_regexp partytownAssets ^/wp-content/themes/wplokerbjm/assets/dist/~partytown(/.*)?$
   header @partytown_assets Service-Worker-Allowed "/"

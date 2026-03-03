@@ -6,6 +6,7 @@ use WPLokerBJM\Shared\Cache\Cache;
 use WPLokerBJM\Shared\Cache\CacheKey;
 use WPLokerBJM\Shared\Log\Logger;
 use WPlokerBJM\Core\Container\Attributes\Filter;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * Rank Math Integration Service
@@ -54,6 +55,87 @@ class Rankmath
 		}
 
 		return $input;
+	}
+
+	/**
+	 * Rewrite publish URL to use headless/frontend domain before Rank Math
+	 * Instant Indexing submits the URL.
+	 *
+	 * @see ../../../../../../wp-content/plugins/fast-indexing-api/includes/class-instant-indexing.php
+	 * @see \RM_GIAPI::publish_post
+	 *
+	 * @param string $url Original URL (usually from get_permalink()).
+	 * @param mixed  $post WP_Post or post ID passed by Rank Math.
+	 * @param string $provider Provider identifier (e.g., 'google'|'bing').
+	 * @return string Rewritten URL using headless domain.
+	 */
+	#[Filter('rank_math/indexing_api/publish_url')]
+	public static function RewritePublishUrl($url, $post = null, $provider = '')
+	{
+		if (empty($url)) {
+			return $url;
+		}
+		$headless = SharedUtils::headlessDomainRedirect();
+		$parts = function_exists('wp_parse_url') ? wp_parse_url($url) : parse_url($url);
+		$path = $parts['path'] ?? '/';
+		$query = isset($parts['query']) && $parts['query'] !== '' ? ('?' . $parts['query']) : '';
+		return rtrim($headless, '/') . $path . $query;
+	}
+
+	
+	/**
+	 * Rewrite delete URL to use headless/frontend domain before Rank Math
+	 * Instant Indexing submits the delete notification.
+	 *
+	 * @see ../../../../../../wp-content/plugins/fast-indexing-api/includes/class-instant-indexing.php
+	 * @see \RM_GIAPI::delete_post
+	 *
+	 * @param string $url Original URL to delete (get_permalink()).
+	 * @param mixed  $post WP_Post or post ID passed by Rank Math.
+	 * @return string Rewritten URL using headless domain.
+	 */
+	#[Filter('rank_math/indexing_api/delete_url')]
+	public static function RewriteDeleteUrl($url, $post = null)
+	{
+		if (empty($url)) {
+			return $url;
+		}
+		$headless = SharedUtils::headlessDomainRedirect();
+		$parts = function_exists('wp_parse_url') ? wp_parse_url($url) : parse_url($url);
+		$path = $parts['path'] ?? '/';
+		$query = isset($parts['query']) && $parts['query'] !== '' ? ('?' . $parts['query']) : '';
+		return rtrim($headless, '/') . $path . $query;
+	}
+
+	/**
+	 * Ensure Rank Math's SEO Analyzer uses the headless frontend domain for analysis.
+	 * Hooks into the analyzer after it sets the default URL and rewrites it.
+	 *
+	 * @see ../../../../../../wp-content/plugins/seo-by-rank-math/includes/modules/seo-analysis/class-seo-analyzer.php
+	 * @param object $analyzer Instance of RankMath\SEO_Analysis\SEO_Analyzer (passed by action).
+	 * @return void
+	 */
+	#[Filter('seo_analysis/after_set_url')]
+	public static function rewriteSeoAnalyzerInstanceUrl($analyzer): void
+	{
+		if (! self::isActive()) {
+			return;
+		}
+
+		if (empty($analyzer) || ! property_exists($analyzer, 'analyse_url')) {
+			return;
+		}
+
+		$original = $analyzer->analyse_url;
+		if (empty($original)) {
+			return;
+		}
+
+		$headless = rtrim(SharedUtils::headlessDomainRedirect(), '/');
+		$parts = function_exists('wp_parse_url') ? wp_parse_url($original) : parse_url($original);
+		$path = $parts['path'] ?? '/';
+		$query = isset($parts['query']) && $parts['query'] !== '' ? ('?' . $parts['query']) : '';
+		$analyzer->analyse_url = $headless . $path . $query;
 	}
 }
 

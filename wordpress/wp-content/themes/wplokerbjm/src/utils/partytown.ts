@@ -1,4 +1,8 @@
-import { partytownSnippet, type PartytownConfig } from "@qwik.dev/partytown/integration";
+import {
+  partytownSnippet,
+  type PartytownConfig,
+} from "@qwik.dev/partytown/integration";
+import { isDevelopmentMode } from "@/utils";
 
 /**
  * to initialize globals and ensure Partytown is bootstrapped.
@@ -7,7 +11,7 @@ class PartytownManager {
   public static DEFAULT_CONFIG: PartytownConfig = {
     // debug: true,
     forward: ["dataLayer.push", "gtag"],
-    lib: "/wp-content/themes/wplokerbjm/assets/dist/~partytown/",
+    lib: "/~partytown/",
   };
 
   private static interactionDetected = false;
@@ -21,10 +25,12 @@ class PartytownManager {
     if (typeof window === "undefined") return;
 
     window.dataLayer = window.dataLayer || [];
-    window.gtag = window.gtag || ((...args: unknown[]) => {
-      // gtag sometimes forwards args as an Array-like object; normalize to array
-      window.dataLayer!.push(args as unknown[]);
-    });
+    window.gtag =
+      window.gtag ||
+      ((...args: unknown[]) => {
+        // gtag sometimes forwards args as an Array-like object; normalize to array
+        window.dataLayer!.push(args as unknown[]);
+      });
   }
 
   /**
@@ -59,35 +65,48 @@ class PartytownManager {
    * @param config Optional Partytown configuration.
    * @returns Promise that resolves to true when Partytown is ready.
    */
-  public static async ensureBootOnInteraction(config?: PartytownConfig): Promise<boolean> {
-    if (typeof window === 'undefined') return false;
+  public static async ensureBootOnInteraction(
+    config?: PartytownConfig,
+  ): Promise<boolean> {
+    if (typeof window === "undefined") return false;
 
     // Check if user has interacted in this session (returned visitor)
-    if (sessionStorage.getItem('partytown_interacted') === 'true') {
+    if (sessionStorage.getItem("partytown_interacted") === "true") {
       return this.ensureBoot(config);
     }
 
     // If already booted or interaction detected, ensure boot immediately
-    if (this.interactionDetected || document.querySelector("script[partytown-boot]")) {
+    if (
+      this.interactionDetected ||
+      document.querySelector("script[partytown-boot]")
+    ) {
       return this.ensureBoot(config);
     }
 
     return new Promise((resolve) => {
-      const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+      const events = [
+        "mousedown",
+        "mousemove",
+        "keypress",
+        "scroll",
+        "touchstart",
+      ];
 
       const handler = () => {
         this.interactionDetected = true;
         // Set session flag for returned visitors
-        sessionStorage.setItem('partytown_interacted', 'true');
+        sessionStorage.setItem("partytown_interacted", "true");
         // Remove all listeners
-        events.forEach(event => window.removeEventListener(event, handler));
+        events.forEach((event) => window.removeEventListener(event, handler));
         // Boot Partytown
         const booted = this.ensureBoot(config);
         resolve(booted);
       };
 
       // Add listeners with once: true for efficiency
-      events.forEach(event => window.addEventListener(event, handler, { once: true, passive: true }));
+      events.forEach((event) =>
+        window.addEventListener(event, handler, { once: true, passive: true }),
+      );
     });
   }
 }

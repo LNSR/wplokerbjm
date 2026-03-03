@@ -1,22 +1,2 @@
 <?php
-use WPLokerBJM\Core\Container\Container;
-use WPLokerBJM\Views\Page\{HomepageView, SingleLowonganView, PasangIklanLokerView, KebijakanPrivacyView};
-
-$container = Container::getContainer();
-
-switch (true) {
-    case (is_page('pasang-iklan-loker') || is_page(184)):
-        $viewClass = PasangIklanLokerView::class;
-        break;
-    case (is_page('kebijakan-privasi')):
-        $viewClass = KebijakanPrivacyView::class;
-        break;
-    case is_single() && get_post_type() === 'lowongan':
-        $viewClass = (bool) wp_is_mobile() ? SingleLowonganView::class : HomepageView::class; // use sidepanel for desktop
-        break;
-    case is_front_page() || is_page(146):
-        $viewClass = HomepageView::class;
-        break;
-}
-
-$container->get($viewClass)->render();
+// Silence is golden. Blank theme for headless WordPress.
