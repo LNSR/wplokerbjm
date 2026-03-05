@@ -54,6 +54,45 @@ class SharedUtils
     }
 
     /**
+     * Plugin active helpers to centralize checks for optional integrations.
+     */
+    public static function isLitespeedActive(): bool
+    {
+        return defined('LITESPEED_VERSION') || function_exists('litespeed_purge') || function_exists('litespeed_tag_add');
+    }
+
+    public static function isWPGraphQLActive(): bool
+    {
+        return function_exists('graphql_register_types') || defined('WPGRAPHQL_VERSION') || class_exists('\\WPGraphQL\\Plugin');
+    }
+
+    public static function isRankMathActive(): bool
+    {
+        return function_exists('rank_math') || defined('RANK_MATH_VERSION') || class_exists('\\RankMath');
+    }
+
+    /**
+     * Generic plugin active check by known identifiers.
+     * @param string $pluginKey one of: 'litespeed','wpgraphql','rankmath'
+     */
+    public static function isPluginActive(string $pluginKey): bool
+    {
+        switch (strtolower($pluginKey)) {
+            case 'litespeed':
+            case 'litespeed-cache':
+                return self::isLitespeedActive();
+            case 'wpgraphql':
+            case 'wp-graphql':
+                return self::isWPGraphQLActive();
+            case 'rankmath':
+            case 'rank-math':
+                return self::isRankMathActive();
+            default:
+                return false;
+        }
+    }
+
+    /**
      * Recursively filter out empty values from an array.
      *! make arrays returned values more compact by removing empty entries 
      *

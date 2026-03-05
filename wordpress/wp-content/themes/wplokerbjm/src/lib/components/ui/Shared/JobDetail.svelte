@@ -28,6 +28,7 @@
   import { FormattingService } from "@/services/Formatting";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import { SvelteDate } from "svelte/reactivity";
+  import { onDestroy } from "svelte";
   import {
     ClockSolid,
     UserTieSolid,
@@ -88,7 +89,7 @@
       const opts: unknown = {
         hidden: true,
         container,
-        focus: true,
+        focus: false,
         toolbar: {
           zoomIn: false,
           zoomOut: false,
@@ -119,49 +120,17 @@
 
       if (!galleryRef) return;
 
-      viewer = new Viewer(galleryRef!, ViewerJSManager.viewerOptions());
+      if (viewer) return;
 
-      const viewerElement = (viewer as any).element;
-      if (viewerElement) {
-        const onShown = () => {
-          viewerElement.removeAttribute("aria-hidden");
-          viewerElement.removeAttribute("inert");
-        };
-        const onHide = () => {
-          const focused = document.activeElement as HTMLElement | null;
-          if (focused && viewerElement.contains(focused)) {
-            focused.blur();
-          }
-        };
-        const onHidden = () => {
-          viewerElement.removeAttribute("aria-hidden");
-          viewerElement.setAttribute("inert", "true");
-        };
-        viewerElement.addEventListener("shown", onShown);
-        viewerElement.addEventListener("hide", onHide);
-        viewerElement.addEventListener("hidden", onHidden);
-        ViewerJSManager.#eventHandlers.set(viewer, {
-          onShown,
-          onHide,
-          onHidden,
-        });
-      }
+      viewer = new Viewer(galleryRef!, ViewerJSManager.viewerOptions());
     }
 
     static destroyViewer(): void {
       if (viewer) {
-        const viewerElement = (viewer as any).element;
-        if (viewerElement && ViewerJSManager.#eventHandlers.has(viewer)) {
-          const { onShown, onHide, onHidden } =
-            ViewerJSManager.#eventHandlers.get(viewer)!;
-          viewerElement.removeEventListener("shown", onShown);
-          viewerElement.removeEventListener("hide", onHide);
-          viewerElement.removeEventListener("hidden", onHidden);
-        }
         try {
           viewer.destroy();
         } catch (e) {
-          // ignore
+          // ignore - library sometimes throws when already torn down
         }
         viewer = undefined;
       }
@@ -201,12 +170,18 @@
     }
   }
 
+  // run the time effect separately from viewer teardown.  the previous
+  // implementation destroyed the viewer on every tick because `now` is a
+  // reactive value; that explain why the gallery would show exactly once and
+  // then never again.
   $effect(() => {
     const stopTime = timeEffect(now);
-    return () => {
-      stopTime();
-      ViewerJSManager.destroyViewer();
-    };
+    return () => stopTime();
+  });
+
+  // clean up the viewer when the component is removed from the DOM
+  onDestroy(() => {
+    ViewerJSManager.destroyViewer();
   });
 </script>
 

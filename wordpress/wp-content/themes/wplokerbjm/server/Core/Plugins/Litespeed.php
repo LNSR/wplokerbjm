@@ -4,6 +4,7 @@ use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Container;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * LiteSpeed General Hooks
@@ -19,6 +20,9 @@ class Litespeed
     #[Action('litespeed_purged_all')]
     public static function clearObjectCache(): void
     {
+        if (!SharedUtils::isLitespeedActive()) {
+            return;
+        }
         Logger::info('LiteSpeed', 'Clearing object cache due to LiteSpeed cache purge');
         // Clear APCu cache first
         if (function_exists('apcu_clear_cache')) {
@@ -41,6 +45,7 @@ class Litespeed
         }
 
     }
+
 }
 
 /**
@@ -56,12 +61,16 @@ class LiteSpeedFilters
         }
         return '/wp-content/themes/' . get_stylesheet() . '/assets/dist/';
     }
+    
     /**
      * Exclude specific JS files from LiteSpeed Cache JS optimization.
      */
     #[Filter('litespeed_optimize_js_excludes', 0)]
     public static function lscJsExcludes($excludes)
     {
+        if (!SharedUtils::isLitespeedActive()) {
+            return $excludes;
+        }
         $excludes[] = self::pattern();
         return $excludes;
     }
@@ -72,6 +81,9 @@ class LiteSpeedFilters
     #[Filter('litespeed_optimize_css_excludes', 0)]
     public static function lscCssExcludes($excludes)
     {
+        if (!SharedUtils::isLitespeedActive()) {
+            return $excludes;
+        }
         $excludes[] = self::pattern();
         return $excludes;
     }
@@ -97,6 +109,9 @@ class LiteSpeedGraphQL
     #[Action('graphql_process_http_request_response', 0)]
     public static function forceCacheable(): void
     {
+        if (!SharedUtils::isLitespeedActive()) {
+            return;
+        }
         if ('GET' !== $_SERVER['REQUEST_METHOD']) {
             return;
         }
@@ -110,9 +125,12 @@ class LiteSpeedGraphQL
     #[Filter('graphql_response_headers_to_send', 10, 1)]
     public static function tagResponses(array $headers = []): array
     {
+        if (!SharedUtils::isLitespeedActive()) {
+            return $headers;
+        }
+
         if (isset($headers['X-GraphQL-Keys'])) {
             do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
-            
             unset($headers['X-GraphQL-Keys']);
         }
         return $headers;
@@ -124,6 +142,9 @@ class LiteSpeedGraphQL
     #[Action('graphql_purge', 0)]
     public static function purgeCache($keys): void
     {
+        if (!SharedUtils::isLitespeedActive()) {
+            return;
+        }
         do_action('litespeed_purge', $keys);
     }
 }

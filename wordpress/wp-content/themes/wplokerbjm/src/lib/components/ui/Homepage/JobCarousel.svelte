@@ -199,48 +199,33 @@
             // translate after Swiper has provided its own virtual offsets. This
             // helps keep visual position stable when Swiper updates virtualData
             // after initialization. Only do this once per init to avoid thrash.
-            try {
-              const savedStateNow = routeStateStore.getCarouselState();
-              if (
-                savedStateNow &&
-                typeof (savedStateNow as any).offset === "number" &&
-                !reappliedSavedOffset
-              ) {
-                const savedOffsetNow = (savedStateNow as any).offset;
-                // Schedule re-apply on next RAFs to let Swiper finish its work.
-                // Ensure Svelte has flushed DOM updates for virtual slides before
-                // reapplying the wrapper translate.
-                try {
-                  tick().then(() => {
-                    requestAnimationFrame(() => {
-                      try {
-                        const wrapper = (
-                          swiperContainerEl as HTMLElement | null
-                        )?.querySelector(
-                          ".swiper-wrapper",
-                        ) as HTMLElement | null;
-                        if (
-                          swiperInstance &&
-                          typeof (swiperInstance as any)?.setTranslate ===
-                            "function"
-                        ) {
-                          try {
-                            (swiperInstance as any).setTranslate(
-                              savedOffsetNow,
-                            );
-                          } catch {}
-                        } else if (wrapper) {
-                          try {
-                            wrapper.style.transform = `translate3d(${savedOffsetNow}px, 0, 0)`;
-                          } catch {}
-                        }
-                      } catch {}
-                    });
-                  });
-                } catch {}
-                reappliedSavedOffset = true;
-              }
-            } catch {}
+            const savedStateNow = routeStateStore.getCarouselState();
+            if (
+              savedStateNow &&
+              typeof (savedStateNow as any).offset === "number" &&
+              !reappliedSavedOffset
+            ) {
+              const savedOffsetNow = (savedStateNow as any).offset;
+              // Schedule re-apply on next RAFs to let Swiper finish its work.
+              // Ensure Svelte has flushed DOM updates for virtual slides before
+              // reapplying the wrapper translate.
+              tick().then(() => {
+                requestAnimationFrame(() => {
+                  const wrapper = (
+                    swiperContainerEl as HTMLElement | null
+                  )?.querySelector(".swiper-wrapper") as HTMLElement | null;
+                  if (
+                    swiperInstance &&
+                    typeof (swiperInstance as any)?.setTranslate === "function"
+                  ) {
+                    (swiperInstance as any).setTranslate(savedOffsetNow);
+                  } else if (wrapper) {
+                    wrapper.style.transform = `translate3d(${savedOffsetNow}px, 0, 0)`;
+                  }
+                });
+              });
+              reappliedSavedOffset = true;
+            }
           },
         },
         on: {
@@ -275,11 +260,7 @@
         if (width > 0) return true;
         attempts += 1;
         if (attempts >= MAX_INIT_ATTEMPTS) {
-          try {
-            el.classList.remove("invisible");
-          } catch {
-            // ignore
-          }
+          el.classList.remove("invisible");
           // If we timed out, mark swiper as failed to fall back to a static grid.
           swiperFailed = true;
           return false;
@@ -296,11 +277,9 @@
       prevEl: HTMLElement | null,
     ): Promise<void> {
       try {
-        try {
-          if (SwiperCore && (SwiperCore as typeof SwiperCore).use) {
-            SwiperCore.use([Navigation, Pagination, Autoplay, Virtual]);
-          }
-        } catch {}
+        if (SwiperCore && (SwiperCore as typeof SwiperCore).use) {
+          SwiperCore.use([Navigation, Pagination, Autoplay, Virtual]);
+        }
 
         // If there is a saved carousel state, set `virtualData` first so
         // Svelte renders slides with the saved offset before Swiper measures
@@ -308,19 +287,15 @@
         // after initialization (which would overwrite Swiper's own values).
         const savedState = routeStateStore.getCarouselState();
         if (savedState && typeof savedState.offset === "number") {
-          try {
-            // Debug: log saved state before applying (snapshot reactive proxies to avoid Svelte proxy warnings)
-            // debug info removed
+          // Debug: log saved state before applying (snapshot reactive proxies to avoid Svelte proxy warnings)
+          // debug info removed
 
-            virtualData = {
-              from: virtualData?.from ?? 0,
-              to: virtualData?.to ?? -1,
-              offset: savedState.offset,
-            } as typeof virtualData;
-            // Apply pending offset so Swiper's first renderExternal uses it.
-            pendingVirtualOffset = savedState.offset;
-            // debug info removed
-          } catch {}
+          virtualData = {
+            from: virtualData?.from ?? 0,
+            to: virtualData?.to ?? -1,
+            offset: savedState.offset,
+          } as typeof virtualData;
+          pendingVirtualOffset = savedState.offset;
         }
 
         const cfg = SwiperManager.createSwiperConfig(
@@ -339,57 +314,45 @@
         // `virtualData` are painted before we attempt to call Swiper APIs that
         // rely on DOM measurements. This prevents fighting Swiper's internal
         // layout updates and makes our applyTranslate more deterministic.
-        try {
-          await tick();
-        } catch {}
+        await tick();
 
         // After creating Swiper, navigate to the saved slide index (if any)
         // and then clear the stored state so we don't reapply it later.
         if (savedState) {
-          try {
-            swiperInstance.slideTo(savedState.slideIndex);
-          } catch {}
-          try {
-            // If we saved the wrapper translate previously, set Swiper's
-            // translate directly after slideTo so the visual position matches
-            // exactly. Use the Swiper API where available; fall back to
-            // writing the wrapper style if necessary.
-            const savedOffset = (savedState as any).offset;
-            if (typeof savedOffset === "number") {
-              // Re-apply translate across multiple RAFs to avoid being stomped by
-              // Swiper's internal layout steps. We do not clear the saved state
-              // yet — keep it for debugging.
-              const applyTranslate = () => {
-                try {
-                  if (typeof swiperInstance?.setTranslate === "function") {
-                    try {
-                      swiperInstance.setTranslate(savedOffset);
-                      swiperInstance?.update?.();
-                      swiperInstance?.updateProgress?.();
-                      swiperInstance?.updateSlidesClasses?.();
-                    } catch {}
-                  } else {
-                    const wrapper = el.querySelector(
-                      ".swiper-wrapper",
-                    ) as HTMLElement | null;
-                    if (wrapper)
-                      wrapper.style.transform = `translate3d(${savedOffset}px, 0, 0)`;
-                  }
-                } catch {}
-              };
+          swiperInstance.slideTo(savedState.slideIndex);
+          // If we saved the wrapper translate previously, set Swiper's
+          // translate directly after slideTo so the visual position matches
+          // exactly. Use the Swiper API where available; fall back to
+          // writing the wrapper style if necessary.
+          const savedOffset = (savedState as any).offset;
+          if (typeof savedOffset === "number") {
+            // Re-apply translate across multiple RAFs to avoid being stomped by
+            // Swiper's internal layout steps. We do not clear the saved state
+            // yet — keep it for debugging.
+            const applyTranslate = () => {
+              if (typeof swiperInstance?.setTranslate === "function") {
+                swiperInstance.setTranslate(savedOffset);
+                swiperInstance?.update?.();
+                swiperInstance?.updateProgress?.();
+                swiperInstance?.updateSlidesClasses?.();
+              } else {
+                const wrapper = el.querySelector(
+                  ".swiper-wrapper",
+                ) as HTMLElement | null;
+                if (wrapper)
+                  wrapper.style.transform = `translate3d(${savedOffset}px, 0, 0)`;
+              }
+            };
 
-              try {
-                requestAnimationFrame(() => {
-                  applyTranslate();
-                  requestAnimationFrame(() => {
-                    applyTranslate();
-                    // Final attempt after a short delay in case Swiper triggers async updates
-                    setTimeout(() => applyTranslate(), 40);
-                  });
-                });
-              } catch {}
-            }
-          } catch {}
+            requestAnimationFrame(() => {
+              applyTranslate();
+              requestAnimationFrame(() => {
+                applyTranslate();
+                // Final attempt after a short delay in case Swiper triggers async updates
+                setTimeout(() => applyTranslate(), 40);
+              });
+            });
+          }
         }
 
         await tick();
@@ -409,9 +372,7 @@
 
       await tick();
 
-      try {
-        el.classList.remove("invisible");
-      } catch {}
+      el.classList.remove("invisible");
 
       const paginationEl = el.querySelector(
         ".swiper-pagination",
@@ -434,11 +395,7 @@
       }
 
       if (swiperInstance) {
-        try {
-          swiperInstance.destroy(true, true);
-        } catch {
-          // ignore
-        }
+        swiperInstance.destroy(true, true);
         swiperInstance = null;
       }
 
@@ -451,19 +408,13 @@
         );
 
         swiperFailed = false;
-        try {
-          el.classList.remove("no-swiper");
-        } catch {}
+        el.classList.remove("no-swiper");
         equalizeCardHeights();
       } catch {
         swiperFailed = true;
-        try {
-          el.classList.add("no-swiper");
-        } catch {}
+        el.classList.add("no-swiper");
       } finally {
-        try {
-          el.classList.remove("invisible");
-        } catch {}
+        el.classList.remove("invisible");
         isInitializing = false;
       }
     }
@@ -502,14 +453,10 @@
 
       const el = swiperContainerEl as HTMLElement | null;
       if (!el) {
-        try {
-          const possibleNode = document.querySelector(
-            ".job-carousel",
-          ) as HTMLElement | null;
-          if (possibleNode) possibleNode.classList.remove("invisible");
-        } catch {
-          // ignore
-        }
+        const possibleNode = document.querySelector(
+          ".job-carousel",
+        ) as HTMLElement | null;
+        if (possibleNode) possibleNode.classList.remove("invisible");
         return;
       }
 
@@ -523,11 +470,7 @@
       // After attempting to initialize, ensure the carousel is visible even if
       // initialization failed. createSwiper removes "invisible" on success/failure
       // but in case it returned early elsewhere ensure we remove it here.
-      try {
-        el.classList.remove("invisible");
-      } catch {
-        // ignore
-      }
+      el.classList.remove("invisible");
     }
 
     // Refresh handler: fetch fresh data and reinitialize the carousel
@@ -649,34 +592,28 @@
       // Try to capture the current wrapper translateX so virtual positioning
       // can be restored exactly after navigation. Falls back to 0 on errors.
       let offset = 0;
-      try {
-        const wrapper = swiperContainerEl?.querySelector(
-          ".swiper-wrapper",
-        ) as HTMLElement | null;
-        if (wrapper) {
-          const transform =
-            wrapper.style.transform ||
-            getComputedStyle(wrapper).transform ||
-            "";
-          // translate3d(xpx, ypx, zpx)
-          const t3 = transform.match(
-            /translate3d\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\)/,
-          );
-          if (t3) {
-            offset = Number(t3[1]);
-          } else {
-            // matrix(a,b,c,d,tx,ty) -> tx is index 4
-            const m = transform.match(/matrix\(([^)]+)\)/);
-            if (m) {
-              const parts = m[1].split(",").map((s) => s.trim());
-              if (parts.length >= 6) {
-                offset = Number(parts[4]) || 0;
-              }
+      const wrapper = swiperContainerEl?.querySelector(
+        ".swiper-wrapper",
+      ) as HTMLElement | null;
+      if (wrapper) {
+        const transform =
+          wrapper.style.transform || getComputedStyle(wrapper).transform || "";
+        // translate3d(xpx, ypx, zpx)
+        const t3 = transform.match(
+          /translate3d\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\)/,
+        );
+        if (t3) {
+          offset = Number(t3[1]);
+        } else {
+          // matrix(a,b,c,d,tx,ty) -> tx is index 4
+          const m = transform.match(/matrix\(([^)]+)\)/);
+          if (m) {
+            const parts = m[1].split(",").map((s) => s.trim());
+            if (parts.length >= 6) {
+              offset = Number(parts[4]) || 0;
             }
           }
         }
-      } catch {
-        offset = 0;
       }
 
       routeStateStore.saveCarouselState({
@@ -697,12 +634,7 @@
         jobgridElement?.scrollIntoView({ behavior: "smooth", block: "start" });
       } else {
         // Mobile: mark visited for carousel then use SPA navigation to SingleLowongan.svelte route
-        try {
-          routeStateStore.MarkVisitedJob(slug, "carousel");
-        } catch (err) {
-          // swallow — best-effort marking
-          console.warn("Failed to mark visited job (carousel)", err);
-        }
+        routeStateStore.MarkVisitedJob(slug, "carousel");
         const url = new URL(String(permalink), window.location.origin);
         void GlobalNavigateTo(url.pathname + url.search + url.hash);
       }
@@ -724,13 +656,9 @@
     virtualData;
     if (!swiperInstance) return;
     void tick().then(() => {
-      try {
-        swiperInstance?.updateSlides();
-        swiperInstance?.updateProgress();
-        swiperInstance?.updateSlidesClasses();
-      } catch {
-        // ignore
-      }
+      swiperInstance?.updateSlides();
+      swiperInstance?.updateProgress();
+      swiperInstance?.updateSlidesClasses();
     });
   });
 
@@ -752,17 +680,24 @@
       }, 120);
     }
   });
+  
   onMount(() => {
-    if (initialpropJobs && initialpropJobs.length > 0) {
-      if (!carouselData || (carouselData.jobs ?? []).length === 0) {
-        carouselData = {
-          jobs: initialpropJobs,
-          totalJobs: initialpropJobs.length,
-        };
+    requestIdleCallback(() => {
+      if (
+        initialpropJobs &&
+        initialpropJobs.length > 0 &&
+        routeStore.isInitialLoad
+      ) {
+        if (!carouselData || (carouselData.jobs ?? []).length === 0) {
+          carouselData = {
+            jobs: initialpropJobs,
+            totalJobs: initialpropJobs.length,
+          };
+        }
       }
-    }
-    requestAnimationFrame(() => void SwiperManager.createSwiper());
-    void SwiperManager.fetchCarouselData();
+      requestAnimationFrame(() => void SwiperManager.createSwiper());
+      void SwiperManager.fetchCarouselData();
+    });
   });
 
   onDestroy(() => {

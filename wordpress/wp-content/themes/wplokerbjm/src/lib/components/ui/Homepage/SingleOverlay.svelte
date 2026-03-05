@@ -1,4 +1,8 @@
 <script module lang="ts">
+  import { onMount, tick } from "svelte";
+  import { page } from "$app/state";
+  import type { JobDetailResponse } from "@/types";
+  import { routeStore } from "@/lib/stores/Route.svelte";
   import { nonceManager } from "$lib/utils/Nonce.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
@@ -9,7 +13,7 @@
 
   let slideIn = $state(false);
 
-  const data = $derived(jobOverlay.overlayData);
+  const data = $derived((page.data?.job as JobDetailResponse | null) ?? null);
   const editPostId = $derived(data?.id ?? null);
 
   function isLoggedIn(): boolean {
@@ -36,19 +40,12 @@
 </script>
 
 <script lang="ts">
-  import { onMount, tick } from "svelte";
-  import { page } from "$app/state";
-  import type { JobDetailResponse } from "@/types";
-  import { routeStore } from "@/lib/stores/Route.svelte";
-
   const { visible } = $props<{
     visible: boolean;
   }>();
 
-  const pageJob = $derived((page.data?.job as JobDetailResponse | null) ?? null);
-  
   $effect(() => {
-  jobOverlay.overlayData = pageJob;
+    jobOverlay.overlayData = data; // Update the store with the current job data from SvelteKit's page store
     if (visible) {
       slideIn = false;
       tick().then(() => {

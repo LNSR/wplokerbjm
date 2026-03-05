@@ -2,9 +2,6 @@
 
 namespace WPLokerBJM\Core\Plugins;
 
-use WPLokerBJM\Shared\Cache\Cache;
-use WPLokerBJM\Shared\Cache\CacheKey;
-use WPLokerBJM\Shared\Log\Logger;
 use WPlokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
@@ -24,7 +21,7 @@ class Rankmath
 	public static function isActive(): bool
 	{
 		if (self::$isActiveCache === null) {
-			self::$isActiveCache = function_exists('rank_math');
+			self::$isActiveCache = SharedUtils::isRankMathActive();
 		}
 		return self::$isActiveCache;
 	}
@@ -72,7 +69,7 @@ class Rankmath
 	#[Filter('rank_math/indexing_api/publish_url')]
 	public static function RewritePublishUrl($url, $post = null, $provider = '')
 	{
-		if (empty($url)) {
+		if (!self::isActive() || empty($url)) {
 			return $url;
 		}
 		$headless = SharedUtils::headlessDomainRedirect();
@@ -82,7 +79,7 @@ class Rankmath
 		return rtrim($headless, '/') . $path . $query;
 	}
 
-	
+
 	/**
 	 * Rewrite delete URL to use headless/frontend domain before Rank Math
 	 * Instant Indexing submits the delete notification.
@@ -97,7 +94,7 @@ class Rankmath
 	#[Filter('rank_math/indexing_api/delete_url')]
 	public static function RewriteDeleteUrl($url, $post = null)
 	{
-		if (empty($url)) {
+		if (!self::isActive() || empty($url)) {
 			return $url;
 		}
 		$headless = SharedUtils::headlessDomainRedirect();
@@ -118,11 +115,11 @@ class Rankmath
 	#[Filter('seo_analysis/after_set_url')]
 	public static function rewriteSeoAnalyzerInstanceUrl($analyzer): void
 	{
-		if (! self::isActive()) {
+		if (!self::isActive()) {
 			return;
 		}
 
-		if (empty($analyzer) || ! property_exists($analyzer, 'analyse_url')) {
+		if (empty($analyzer) || !property_exists($analyzer, 'analyse_url')) {
 			return;
 		}
 

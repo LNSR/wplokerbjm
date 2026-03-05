@@ -108,10 +108,10 @@ export const handle: Handle = async ({ event, resolve }) => {
       );
     } else {
       // Serve stale content while revalidating for public requests
-      // max-age: 6 minutes, stale-while-revalidate: 7 days
+      // max-age: 2 hours, stale-while-revalidate: 7 days
       response.headers.set(
         "Cache-Control",
-        "public, max-age=360, s-maxage=3600, stale-while-revalidate=604800"
+        "public, max-age=7200, s-maxage=86400, stale-while-revalidate=604800, must-revalidate"
       );
     }
 
@@ -122,28 +122,13 @@ export const handle: Handle = async ({ event, resolve }) => {
     contentType.startsWith("text/javascript") ||
     contentType.startsWith("application/javascript")
   ) {
-    // Cache JS assets longer
-    if (!authenticated) {
-      response.headers.set(
-        "Cache-Control",
-        "public, max-age=31536000, immutable, stale-while-revalidate=604800"
-      );
-    }
-  } else if (contentType.startsWith("text/css")) {
-    // Cache CSS assets longer
-    if (!authenticated) {
-      response.headers.set(
-        "Cache-Control",
-        "public, max-age=31536000, immutable, stale-while-revalidate=604800"
-      );
-    }
   } else if (contentType.includes("application/json")) {
     if (authenticated) {
       response.headers.set("Cache-Control", "private, no-cache, no-store, must-revalidate");
     } else {
       response.headers.set(
         "Cache-Control",
-        "public, max-age=360, s-maxage=3600, stale-while-revalidate=604800"
+        "public, max-age=7200, s-maxage=86400, stale-while-revalidate=604800, must-revalidate"
       );
     }
   }

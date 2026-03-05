@@ -20,7 +20,6 @@ class GraphQLTest extends WplokerbjmTestCase
 
     // Mock resolvers (still needed for field registration testing)
     private $taxonomyResolverMock;
-    private $autoSuggestionResolverMock;
     private $jobsDataResolverMock;
     private $themeDataResolverMock;
 
@@ -29,6 +28,12 @@ class GraphQLTest extends WplokerbjmTestCase
     public function setUp(): void
     {
         parent::setUp();
+
+        // Ensure registration tracking globals are clean for each test run
+        $GLOBALS['__wplokerbjm_registered_fields'] = [];
+        $GLOBALS['__wplokerbjm_registered_types'] = [];
+        $GLOBALS['__wplokerbjm_registered_input_types'] = [];
+        $GLOBALS['__wplokerbjm_registered_scalars'] = [];
 
         // Set base URL for real API calls - use Caddy container IP for HTTPS
         $this->baseUrl = 'https://host.docker.internal/graphql';
@@ -148,6 +153,12 @@ class GraphQLTest extends WplokerbjmTestCase
 
         // All fields should be on RootQuery
         foreach ($fields as $field) {
+            if ($field['field'] === 'jwt') {
+                $this->assertEquals('RootMutation', $field['type'], "Field {$field['field']} should be registered on RootMutation");
+                echo "  \033[0;32m✓\033[0m Field on RootMutation: {$field['field']}\n";
+                continue;
+            }
+
             $this->assertEquals('RootQuery', $field['type'], "Field {$field['field']} should be registered on RootQuery");
             echo "  \033[0;32m✓\033[0m Field on RootQuery: {$field['field']}\n";
         }
@@ -273,7 +284,8 @@ class GraphQLTest extends WplokerbjmTestCase
                 'description' => 'Get bookmarked jobs',
             ],
             'jwt' => [
-                'query' => 'mutation { jwt(token: "invalid") }',
+                // Use test user credentials provided by the developer for login test
+                'query' => 'mutation { jwt(username: "test", password: "&CjxM(7si2et&m*9^Ta3IQnp") }',
                 'expected_status' => 200,
                 'description' => 'Validate fake token (should return null or errors)',
             ],

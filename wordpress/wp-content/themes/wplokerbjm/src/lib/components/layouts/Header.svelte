@@ -342,11 +342,8 @@
         loginError = "Terjadi kesalahan saat login.";
         loginPassword = ""; // also clear on error
       } finally {
-        APIService.getThemeNonceGraphQL().then((nonce) => {
-          nonceManager.setNonce(nonce as string);
-          tick().then(() => {
-            loginLoading = false;
-          });
+        tick().then(() => {
+          Promise.all([nonceManager.getNonceFromAPI(), (loginLoading = false)]);
         });
       }
     }
@@ -672,10 +669,7 @@
     </div>
     <!-- Mobile drawer side. margin-top reads the same CSS var we set in JS (--site-header-top) -->
     {#if isMobileValue}
-      <div
-        id="header-drawer-side"
-        class="drawer-side z-50"
-      >
+      <div id="header-drawer-side" class="drawer-side z-50">
         <label
           for="header-drawer"
           aria-label="Close navigation menu"
@@ -709,8 +703,8 @@
               onclick={(e) => {
                 e.preventDefault();
                 GlobalNavigateTo("/pasang-iklan-loker");
-                document.getElementById("header-drawer")?.click()}
-              }
+                document.getElementById("header-drawer")?.click();
+              }}
             >
               <ExternalLinkSolid
                 class="h-6 w-6"
@@ -744,5 +738,3 @@
     {/await}
   {/if}
 </header>
-
-
