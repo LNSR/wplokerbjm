@@ -3,6 +3,7 @@ namespace WPLokerBJM\Core\Theme;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\GlobalHooks;
 class ThemeInject
 {
 
@@ -181,7 +182,7 @@ class ThemeInject
      *
      * @return void
      */
-    #[Action('wp_head', 0)]
+    #[Action('wp_head')]
     public static function preloadLogo(): void
     {
         $logoData = self::getLogoData();
@@ -208,7 +209,17 @@ class ThemeInject
 
     /**
      * Provide theme runtime data for client-side hydration as an associative array.
-     * 
+     *
+     * The array contains:
+     * - themeUrl (string)
+     * - logo: nested logo metadata
+     * - lastJobUpdate, lastTaxonomyUpdate (ISO strings)
+     * - disableTracking (bool)
+     * - themeVersion (int)
+     * - wpRestNonce (string, when logged in)
+     * - siteIconTags (string): newline‑separated <link> tags generated via the
+     *   `site_icon_meta_tags` filter. Useful for rendering favicon markup in
+     *   head elements when hydrating client code.
      */
     public static function themeData(): array
     {
@@ -240,6 +251,13 @@ class ThemeInject
         $last_update = \WPLokerBJM\QueryBuilders\JobQuery::getLastModifiedDate();
         $last_update_iso = $last_update ? gmdate('c', strtotime($last_update)) : gmdate('c');
 
+        // compute optional site icon <link> tags using the same filter used in addSiteIconMetaTags()
+        $siteIconTags = '';
+        $tags = apply_filters('site_icon_meta_tags', []);
+        if (!empty($tags) && is_array($tags)) {
+            $siteIconTags = implode("\n", $tags);
+        }
+
         $wpThemeData = [
             'themeUrl' => esc_url(get_stylesheet_directory_uri()),
             'logo' => [
@@ -254,6 +272,7 @@ class ThemeInject
             'lastTaxonomyUpdate' => \WPLokerBJM\QueryBuilders\TaxonomyQuery::getLastModifiedDateForTaxonomies(),
             'disableTracking' => $loggedIn,
             'themeVersion' => (int) filemtime(get_stylesheet_directory() . '/composer.json'),
+            'siteIconTags' => $siteIconTags,
         ];
 
         if ($loggedIn) {
@@ -263,150 +282,5 @@ class ThemeInject
         Cache::set($cacheKey, $wpThemeData, 86400); // Cache for 1 day
 
         return $wpThemeData;
-    }
-
-    /**
-     * Echo an inline script that exposes theme runtime data to client code as JSON props for hydration.
-     *
-     * This outputs:
-     * - A JSON script tag with theme data for hydration props.
-     * - A small, non-blocking <script> that:
-     *   - Stores a WP REST nonce in sessionStorage for logged-in users.
-     *   - Applies a preferred color theme (localStorage > system preference) and marks the source
-     *     using data-wplokerbjm-theme-sourced attribute on <html>.
-     *
-     * @return void
-     */
-    #[Action('wp_head')]
-    public static function injectThemeScript(): void
-    {
-        $wpThemeData = self::themeData(); // theme data for hydration
-        ?>
-        <script type="application/json"
-            id="wp-theme-data"><?= wp_json_encode($wpThemeData, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_HEX_TAG); ?></script>
-        <script id="theme-preferences">
-            (() => {
-                function removeThisScript() {
-                    const scriptElement = document.getElementById('theme-preferences');
-                    if (!scriptElement) return;
-                    try {
-                        scriptElement.remove();
-                    } catch (e) {
-                        console.warn('Failed to remove theme preferences script element', e);
-                    }
-                }
-                try {
-                    const KEY = 'wplokerbjm-theme';
-                    const root = document.documentElement;
-
-                    let stored = null;
-                    try { stored = localStorage.getItem(KEY); } catch (e) { stored = null; }
-
-                    const apply = (theme) => {
-                        if (!theme) return;
-                        root.setAttribute('data-theme', theme);
-                        root.classList.toggle('wplokerbjm-dark-mode-enable', theme === 'dark');
-                    };
-
-                    const allowed = ['dark', 'light', 'lavender'];
-                    if (allowed.indexOf(stored) !== -1) {
-                        apply(stored);
-                        root.setAttribute('data-wplokerbjm-theme-sourced', 'local');
-                        root.setAttribute('data-wplokerbjm-theme', stored);
-                        removeThisScript();
-                        return;
-                    }
-
-                    let prefersDark = false;
-                    try {
-                        prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)')?.matches ?? false;
-                    } catch (e) { prefersDark = false; }
-
-                    const chosen = prefersDark ? 'dark' : 'light';
-                    apply(chosen);
-                    root.setAttribute('data-wplokerbjm-theme-sourced', 'system');
-                    root.setAttribute('data-wplokerbjm-theme', chosen);
-                } catch (e) {
-                    console.log('fail applying theme preferences', e);
-                } finally {
-                    removeThisScript();
-                }
-            })();
-        </script>
-        <?php
-    }
-}
-
-class DebloatWPTheme
-{
-    /**
-     * Remove default WP block/library styles and unwanted scripts that are often not needed for custom themes.
-     *
-     * Removes jQuery and related scripts, deregisters/dequeues:
-     * - wp-block-library
-     * - wp-block-library-theme
-     * - wc-block-style
-     *
-     * Use this to avoid loading Gutenberg's styles and jQuery when building a custom-styled frontend.
-     *
-     * @return void
-     */
-    #[Action('wp_enqueue_scripts', 4)]
-    public static function removeWPLibrary(): void
-    {
-        // Remove jQuery and related scripts
-        global $wp_scripts;
-        if (isset($wp_scripts) && ($wp_scripts instanceof WP_Scripts)) {
-            foreach ($wp_scripts->registered as $handle => $script) {
-                // Check if the handle contains 'jquery' (case-insensitive)
-                if (false !== stripos($handle, 'jquery')) {
-                    wp_dequeue_script($handle);
-                    wp_deregister_script($handle);
-                }
-            }
-        }
-
-        // Remove actions that enqueue unwanted styles and scripts
-        remove_action('wp_enqueue_scripts', 'wp_enqueue_block_style_variation_styles', 1);
-        remove_action('wp_enqueue_scripts', 'WP_Duotone::output_block_styles', 9);
-        remove_action('wp_enqueue_scripts', 'wp_enqueue_emoji_styles', 10);
-        remove_action('wp_enqueue_scripts', 'wp_common_block_scripts_and_styles', 10);
-        remove_action('wp_enqueue_scripts', 'wp_enqueue_classic_theme_styles', 10);
-        remove_action('wp_enqueue_scripts', 'wp_enqueue_global_styles', 10);
-        remove_action('wp_enqueue_scripts', 'wp_enqueue_stored_styles', 10);
-        remove_action('wp_enqueue_scripts', 'WP_Duotone::output_global_styles', 11);
-        remove_action('wp_enqueue_scripts', 'wp_enqueue_block_template_skip_link', 10);
-        remove_action('wp_enqueue_scripts', 'wp_localize_jquery_ui_datepicker', 1000);
-        remove_filter('print_scripts_array', 'wp_prototype_before_jquery', 10);
-        remove_action('wp_print_styles', 'print_emoji_styles');
-        remove_action('wp_head', 'print_emoji_detection_script', 7);
-        remove_action('wp_head', 'wp_shortlink_wp_head');
-        remove_action('wp_head', 'wp_generator');
-        remove_action('wp_head', 'wp_oembed_add_discovery_links');
-        remove_action('wp_head', 'rsd_link');
-        remove_action('wp_head', 'wlwmanifest_link');
-        remove_action('wp_head', 'feed_links', 2);
-        remove_action('wp_head', 'feed_links_extra', 3);
-
-        // Remove actions that enqueue global styles and duotone in WP 6.9+
-        remove_action('wp_footer', 'wp_enqueue_global_styles', 1);
-        remove_action('wp_footer', 'wp_enqueue_stored_styles', 1);
-        remove_action('wp_footer', 'wp_maybe_inline_styles', 1);
-        remove_action('wp_footer', ['WP_Duotone', 'output_footer_assets'], 10);
-        remove_action('wp_footer', 'the_block_template_skip_link', 10); // !Core something from WP deprecated(Query Monitor report)
-        remove_action('wp_footer', 'wp_enqueue_block_template_skip_link', 10); // this theme are fully custom no need for block features
-
-        // Remove REST API discovery link
-        remove_action('wp_head', 'rest_output_link_wp_head');
-
-        // Remove JSON alternate link for posts
-        remove_action('wp_head', 'wp_json_output_link_wp_head');
-
-        wp_dequeue_style('wc-block-style');
-        wp_dequeue_style('wp-img-auto-sizes-contain');
-        wp_dequeue_style('global-styles-inline-css');
-        wp_deregister_style('wc-block-style');
-        wp_deregister_style('global-styles-inline-css');
-        wp_deregister_style('wp-img-auto-sizes-contain');
     }
 }

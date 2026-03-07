@@ -2,7 +2,7 @@ export interface WPLokerBJMThemedData {
   themeUrl: string;
   logo: {
     logoUrl: string;
-    logoSrcset: string;
+    logoSrcset?: string;
     logoSizes: string;
     logoDecoding: HTMLImageElement["decoding"];
     logoWidth?: number;
@@ -10,9 +10,10 @@ export interface WPLokerBJMThemedData {
   };
   lastJobUpdate: string;
   disableTracking: boolean;
-  themeVersion?: number;
+  themeVersion: number;
   lastTaxonomyUpdate: string;
   wpRestNonce?: string;
+  siteIconTags: string;
 }
 
 export enum ThemeName {

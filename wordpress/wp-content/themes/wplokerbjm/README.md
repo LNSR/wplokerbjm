@@ -1,6 +1,6 @@
 # 🎨 WPLokerBJM Theme
 
-> 🚀 Modern WordPress job portal theme built with Svelte, TypeScript, and PHP-DI
+> 🚀 Modern WordPress job board theme built with SvelteKit, TypeScript, and PHP-DI
 
 ![WordPress](https://img.shields.io/badge/WordPress-21759B?style=flat-square&logo=wordpress&logoColor=white)
 ![Svelte](https://img.shields.io/badge/Svelte-4A4A55?style=flat-square&logo=svelte&logoColor=FF3E00)
@@ -10,10 +10,10 @@
 
 ## 📁 Important Theme Files & Folders
 
-1. 🎨 **`style.css`** - Boilerplate WordPress stylesheet for the theme. Contains theme metadata and custom styles.
+1. 🎨 **`style.css`** - Boilerplate WordPress stylesheet for the theme. Contains theme metadata and custom styles, not literally used, we redirect_template to SvelteKit domain.
 2. ⚙️ **`server/`** - Directory containing backend PHP code, including custom functions, GraphQL APIs, hooks, and filters.
-3. 🖼️ **`src/`** - Directory containing Svelte components and all client-side code that enhances the user interface.
-4. 📦 **`assets/`** - Directory for static assets like images, fonts, static site generation, and compiled CSS/JS files.
+3. 🖼️ **`src/`** - Directory containing SvelteKit code.
+4. 📦 **`/.svelte-kit`** - Directory for SvelteKit build artifacts.
 5. 🛠️ **`tools/`** - Directory for development and build tools.
 
 ## 🔌 Must-Use Plugin (MU Plugin)
@@ -23,21 +23,7 @@
 - ⚡ **Benefits**: Ensures hooks, services, and dependencies are registered before regular plugins and themes load, preventing conflicts and ensuring early execution.
 - 🚀 **Deployment**: Automatically deployed via GitHub Actions CI/CD pipeline to the remote server.
 
-This MU plugin is crucial for the theme's architecture, as it bootstraps the dependency injection system and custom hooks that power the job portal functionality.
-
-## 📄 Theme Routing
-
-The theme uses a single router file [`index.php`](index.php) that routes requests to appropriate view classes based on WordPress conditions.
-
-| Page          | View Class             | Description                         | Status    |
-| ------------- | ---------------------- | ----------------------------------- | --------- |
-| 🏠 Homepage   | `HomepageView`         | Main landing page with job listings | ✅ Active |
-| 💼 Job Detail | `SingleLowonganView`   | Individual job posting page         | ✅ Active |
-| 📝 Post Job   | `PasangIklanLokerView` | Job posting submission form         | ✅ Active |
-
-## 🔧 Automation Tools
-
-- 🚀 Performance optimization
+This MU plugin is crucial for the theme's architecture, as it bootstraps the dependency injection system and custom hooks that power the job board functionality.
 
 ## 🔗 Dependency Injection System
 
@@ -119,10 +105,9 @@ The theme uses attribute-based hook registration for WordPress actions and filte
 ### Using Attributes
 
 ```php
-use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Attributes\Filter;
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 
-class MyService
+class MyClassName
 {
     #[Action('wp_enqueue_scripts')]
     public function enqueueScripts(): void
@@ -153,14 +138,15 @@ This approach keeps hook registration declarative and centralized.
 >
 > - 🔗 See [Init.php](server/Core/Container/Init.php) and [PHP-DI Container](server/Core/Container.php) for WordPress event-driven hooks implementation
 > - 🔗 See the **Dependency Injection System** section above for details on automatic class discovery and registration
-> - 🎨 [Assets](assets) are shared between backend and frontend - Tailwind scans both PHP and Svelte source files
-> - ⚡ All frontend rendering happens in `<body>` (CSR) while `<head>` contains server-side data
 
 ## 📋 Mini Kanban Table
 
-| 📥 BACKLOG                                 | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                                     |
-| ------------------------------------------ | ------- | -------------- | ------------------------------------------------ |
-|                                            |         |                | ✅ Migrate to Svelte for most frontend           |
-| 🗺️ Add Job Fair Page (map & event details) |         |                | ✅ Client side bookmark system                   |
-| 🛠️ Add Skeleton SSR for SEO                |         |                | ✅ Add Skeleton just for SEO                     |
-| 🛠️ Add Skeleton noscript for SEO           |         |                | ✅ Virtualization listing for better performance |
+| 📥 BACKLOG                                 | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                                                           |
+| ------------------------------------------ | ------- | -------------- | ---------------------------------------------------------------------- |
+| 🗺️ Add Job Fair Page (map & event details) |         |                | ✅ Migrate from AlpineJS to Vue                                        |
+|                                            |         |                | ✅ Migrate from Vue to bare theme and Svelte for frontend `<body>` CSR |
+|                                            |         |                | ✅ Playwright Github Action microservice for SSG                       |
+|                                            |         |                | ✅ Client side bookmark system                                         |
+|                                            |         |                | ✅ Add SkeletonHTML for SEO efficiency                                 |
+|                                            |         |                | ✅ Virtualization listing for better performance                       |
+|                                            |         |                | ✅ Migrated to SvelteKit                                               |

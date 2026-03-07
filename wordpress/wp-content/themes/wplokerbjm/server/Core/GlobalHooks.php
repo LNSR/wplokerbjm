@@ -2,7 +2,6 @@
 
 namespace WPLokerBJM\Core;
 
-use WPLokerBJM\Core\Theme\Enqueue;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
@@ -62,7 +61,7 @@ class GlobalHooks
     /**
      * Redirect to home if accessing the lowongan post type archive.
      */
-    #[Action('template_redirect', 3)]
+    #[Action('template_redirect', 4)]
     public static function redirectToHome(): void
     {
         // Avoid redirecting during admin, AJAX, REST API, cron, or preview requests
@@ -80,6 +79,49 @@ class GlobalHooks
             wp_safe_redirect(home_url('/'), 302);
             exit;
         }
+    }
+
+    /**
+     * Headless frontend redirect.
+     * Runs early during `template_redirect` so the theme always forwards
+     * public requests to the Svelte frontend (dev vs prod).
+     */
+    #[Action('template_redirect', 2)]
+    public static function headlessFrontendAdminSideRedirect(): void
+    {
+        // Avoid redirecting during admin, AJAX, REST API, cron, preview, or CLI requests
+        if (
+            is_admin() ||
+            (defined('REST_REQUEST') && REST_REQUEST) ||
+            (defined('DOING_AJAX') && DOING_AJAX) ||
+            (function_exists('wp_doing_cron') && wp_doing_cron()) ||
+            (defined('WP_CLI') && WP_CLI) ||
+            is_preview()
+        ) {
+            return;
+        }
+
+        $baseUrl = SharedUtils::headlessDomainRedirect();
+
+        $path = '/';
+        if (function_exists('is_page') && (is_page('pasang-iklan-loker') || is_page(184))) {
+            $path = '/pasang-iklan-loker';
+        } elseif (function_exists('is_page') && is_page('kebijakan-privasi')) {
+            $path = '/kebijakan-privasi';
+        } elseif (function_exists('is_single') && is_single() && get_post_type() === 'lowongan') {
+            $post = get_post();
+            if ($post && !empty($post->post_name)) {
+                $path = '/lowongan/' . $post->post_name;
+            }
+        } elseif (function_exists('is_front_page') && (is_front_page() || is_page(146))) {
+            $path = '/';
+        }
+
+        $query = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '' ? ('?' . $_SERVER['QUERY_STRING']) : '';
+        $location = rtrim($baseUrl, '/') . $path . $query;
+
+        wp_redirect($location, 302);
+        exit;
     }
 
     /*======================================================================
@@ -110,69 +152,7 @@ class GlobalHooks
      | HEADERS
      ======================================================================*/
 
-    /**
-     * Attempts to authenticate the user via the logged-in cookie if not already authenticated.
-     */
-    private static function authenticateViaCookie(): void
-    {
-        if (!is_user_logged_in()) {
-            if (function_exists('wp_validate_auth_cookie') && defined('LOGGED_IN_COOKIE') && isset($_COOKIE[LOGGED_IN_COOKIE])) {
-                $cookie = $_COOKIE[LOGGED_IN_COOKIE];
-                $user_id = wp_validate_auth_cookie($cookie, 'logged_in');
-                if ($user_id) {
-                    // Ensure current user is populated for downstream is_user_logged_in()/nonce creation
-                    wp_set_current_user((int) $user_id);
-                } else {
-                    // No valid cookie -> nothing to expose
-                    return;
-                }
-            } else {
-                return;
-            }
-        }
-    }
 
-    /**
-     * Modifies HTTP headers to remove unwanted Link headers and add sitemap link.
-     */
-    #[Action('template_redirect', 11)]
-    public static function modifyLinkHeadersImpl(): void
-    {
-        if (!headers_sent()) {
-            // Remove all Link headers to prevent API discovery exposure
-            header_remove('Link');
-            Enqueue::outputViteAssetsPreloadLinksResponse();
-        }
-    }
-
-    /**
-     * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
-     */
-    #[Filter('graphql_response_headers_to_send')]
-    public static function ModifyHeaderGraphQL(array $headers): array
-    {
-        // Get the site's origin
-        $site_url = home_url();
-        $parsed = wp_parse_url($site_url);
-        $site_origin = $parsed['scheme'] . '://' . $parsed['host'];
-        if (isset($parsed['port']) && $parsed['port'] !== '80' && $parsed['port'] !== '443') {
-            $site_origin .= ':' . $parsed['port'];
-        }
-
-        // Set CORS to same origin only
-        $headers['Access-Control-Allow-Origin'] = $site_origin;
-        $headers['Access-Control-Allow-Credentials'] = 'true'; // Required for cookies/nonces
-
-        self::authenticateViaCookie();
-
-        if (is_user_logged_in()) {
-            $headers['Access-Control-Allow-Headers'] .= ', X-WP-Nonce';
-            $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce';
-            $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
-        }
-
-        return $headers;
-    }
 
     /*======================================================================
      | FILTERS
@@ -220,7 +200,7 @@ class GlobalHooks
     /**
      * Temporarily disable specific plugins if in development environment.
      */
-    #[Filter('option_active_plugins', 0)]
+    #[Filter('option_active_plugins', 4)]
     public function disablePluginsForDevImpl(array $plugins): array
     {
         $isDev = SharedUtils::isDevelopment();
@@ -237,18 +217,26 @@ class GlobalHooks
     /**
      * Temporarily disable specific plugins if simulating production environment on local machine.
      */
-    #[Filter('option_active_plugins', 0)]
+    #[Filter('option_active_plugins', 4)]
     public function disablePluginsforSimulatedProdImpl(array $plugins): array
     {
         $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
-        if (!$isDev) {
-            Logger::info('Hooks', 'Not simulating production environment; no plugins disabled.');
-            return $plugins;
-        }
 
-        $pluginsToDisable = $this->listPluginsToDisable();
+        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
 
         return $this->filteredPlugins($plugins, $pluginsToDisable);
+    }
+
+    /**
+     * Force locale to Indonesian on the frontend for consistent user experience, while keeping admin in English.
+     */
+    #[Filter('locale')]
+    public function frontendLocal($locale)
+    {
+        if (!is_admin()) { // Only affects the public site, keeps your dashboard English
+            return 'id_ID';
+        }
+        return $locale;
     }
 
     /**
@@ -284,13 +272,14 @@ class GlobalHooks
             // 'google-site-kit/',
             'tinywp-mobile-detect/',
             'fast-indexing-api/',
-            'wps-hide-login/',
+            // 'wps-hide-login/',
         ], $extra);
     }
 
     /*======================================================================
      | CACHE
      ======================================================================*/
+
 
     /**
      * Centralized cache purge when posts, meta, terms, or status change.

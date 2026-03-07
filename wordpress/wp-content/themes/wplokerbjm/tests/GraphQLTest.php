@@ -20,7 +20,6 @@ class GraphQLTest extends WplokerbjmTestCase
 
     // Mock resolvers (still needed for field registration testing)
     private $taxonomyResolverMock;
-    private $autoSuggestionResolverMock;
     private $jobsDataResolverMock;
     private $themeDataResolverMock;
 
@@ -29,6 +28,12 @@ class GraphQLTest extends WplokerbjmTestCase
     public function setUp(): void
     {
         parent::setUp();
+
+        // Ensure registration tracking globals are clean for each test run
+        $GLOBALS['__wplokerbjm_registered_fields'] = [];
+        $GLOBALS['__wplokerbjm_registered_types'] = [];
+        $GLOBALS['__wplokerbjm_registered_input_types'] = [];
+        $GLOBALS['__wplokerbjm_registered_scalars'] = [];
 
         // Set base URL for real API calls - use Caddy container IP for HTTPS
         $this->baseUrl = 'https://host.docker.internal/graphql';
@@ -117,9 +122,10 @@ class GraphQLTest extends WplokerbjmTestCase
             'searchJobs',
             'rankMathHead',
             'syncBookmark',
+            'jwt',
         ];
 
-        $this->assertCount(14, $fields, 'Should register exactly 14 fields');
+        $this->assertCount(15, $fields, 'Should register exactly 15 fields (including jwt)');
 
         $registeredFields = array_column($fields, 'field');
         foreach ($expectedFields as $expectedField) {
@@ -147,6 +153,12 @@ class GraphQLTest extends WplokerbjmTestCase
 
         // All fields should be on RootQuery
         foreach ($fields as $field) {
+            if ($field['field'] === 'jwt') {
+                $this->assertEquals('RootMutation', $field['type'], "Field {$field['field']} should be registered on RootMutation");
+                echo "  \033[0;32m✓\033[0m Field on RootMutation: {$field['field']}\n";
+                continue;
+            }
+
             $this->assertEquals('RootQuery', $field['type'], "Field {$field['field']} should be registered on RootQuery");
             echo "  \033[0;32m✓\033[0m Field on RootQuery: {$field['field']}\n";
         }
@@ -199,77 +211,83 @@ class GraphQLTest extends WplokerbjmTestCase
             'taxonomyTerms' => [
                 'query' => 'query { taxonomyTerms { lokasiTerms { slug name } genderTerms { slug name } pendidikanTerms { slug name } } }',
                 'expected_status' => 200,
-                'description' => 'Get all taxonomy terms'
+                'description' => 'Get all taxonomy terms',
             ],
             'lokasiTerms' => [
                 'query' => 'query { lokasiTerms { slug name } }',
                 'expected_status' => 200,
-                'description' => 'Get location taxonomy terms'
+                'description' => 'Get location taxonomy terms',
             ],
             'genderTerms' => [
                 'query' => 'query { genderTerms { slug name } }',
                 'expected_status' => 200,
-                'description' => 'Get gender taxonomy terms'
+                'description' => 'Get gender taxonomy terms',
             ],
             'pendidikanTerms' => [
                 'query' => 'query { pendidikanTerms { slug name } }',
                 'expected_status' => 200,
-                'description' => 'Get education taxonomy terms'
+                'description' => 'Get education taxonomy terms',
             ],
             'autoSuggestions' => [
                 'query' => 'query { autoSuggestions(query: "marketing") }',
                 'expected_status' => 200,
-                'description' => 'Get auto suggestions for marketing'
+                'description' => 'Get auto suggestions for marketing',
             ],
             'carousel' => [
                 'query' => 'query { carousel { jobs { id title } totalJobs } }',
                 'expected_status' => 200,
-                'description' => 'Get carousel jobs'
+                'description' => 'Get carousel jobs',
             ],
             'loadMore' => [
                 'query' => 'query { loadMore(paged: 2) { jobs { id title } maxNumPages } }',
                 'expected_status' => 200,
-                'description' => 'Load more jobs (page 2)'
+                'description' => 'Load more jobs (page 2)',
             ],
             'jobGrid' => [
                 'query' => 'query { jobGrid(filters: { cari: "marketing" }) { jobs { id title } maxNumPages } }',
                 'expected_status' => 200,
-                'description' => 'Get job grid with marketing search (use filters input)'
+                'description' => 'Get job grid with marketing search (use filters input)',
             ],
             'jobDetail' => [
                 'query' => 'query { jobDetail(slug: "marketing") { job { id title } } }',
                 'expected_status' => [200, 404], // Can be 200 or 404
-                'description' => 'Get job detail'
+                'description' => 'Get job detail',
             ],
             'jobSchema' => [
                 'query' => 'query { jobSchema(ids: [1,2,3]) { schemas } }',
                 'expected_status' => 200,
-                'description' => 'Get job schemas (ids as list of Ints)'
+                'description' => 'Get job schemas (ids as list of Ints)',
             ],
             'jobSchemaItemList' => [
                 'query' => 'query { jobSchema(ids: [1,2,3], type: "ItemList") { schemas } }',
                 'expected_status' => 200,
-                'description' => 'Get job schemas forced ItemList'
+                'description' => 'Get job schemas forced ItemList',
             ],
             'jobSchemaJobPosting' => [
                 'query' => 'query { jobSchema(ids: [1,2,3], type: "JobPosting") { schemas } }',
                 'expected_status' => 200,
-                'description' => 'Get job schemas forced JobPosting'
+                'description' => 'Get job schemas forced JobPosting',
             ],
             'themeData' => [
-                'query' => 'query { themeData { data { themeUrl } } }',
+                'query' => 'query { themeData { data { themeUrl siteIconTags } } }',
                 'expected_status' => 200,
-                'description' => 'Get theme data (use themeUrl field)'
+                'description' => 'Get theme data (include siteIconTags in query)',
             ],
             'searchJobs' => [
                 'query' => 'query { searchJobs(filters: { cari: "marketing" }) { jobs { id title } maxNumPages } }',
                 'expected_status' => 200,
-                'description' => 'Search jobs for marketing (use filters input)'
+                'description' => 'Search jobs for marketing (use filters input)',
             ],
             'syncBookmark' => [
                 'query' => 'query { syncBookmark(ids: [1,2,3]) { id title } }',
                 'expected_status' => [200, 404], // Can be 200 or 404
-                'description' => 'Get bookmarked jobs'
+                'description' => 'Get bookmarked jobs',
+            ],
+            'jwt' => [
+                // Use test user credentials provided by the developer for login test
+                'query' => 'mutation { jwt(username: "test", password: "&CjxM(7si2et&m*9^Ta3IQnp") }',
+                'expected_status' => 200,
+                'description' => 'Validate fake token (should return null or errors)',
             ],
         ];
 
@@ -305,8 +323,11 @@ class GraphQLTest extends WplokerbjmTestCase
             echo "    \033[0;37mStatus:\033[0m {$statusCode} " . (in_array($statusCode, $expectedStatuses) ? "\033[0;32m✓\033[0m" : "\033[0;31m✗\033[0m") . "\n";
 
             // Validate status code
-            $this->assertContains($statusCode, $expectedStatuses,
-                "Query '{$name}' should return one of [" . implode(', ', $expectedStatuses) . "], got {$statusCode}");
+            $this->assertContains(
+                $statusCode,
+                $expectedStatuses,
+                "Query '{$name}' should return one of [" . implode(', ', $expectedStatuses) . "], got {$statusCode}"
+            );
 
             // Validate JSON response for successful requests
             if (in_array($statusCode, [200, 404])) {
@@ -378,14 +399,22 @@ class GraphQLTest extends WplokerbjmTestCase
                             $this->assertIsArray($first, "Parsed JobPosting should be an array");
                             $this->assertArrayHasKey('@type', $first);
                             $this->assertEquals('JobPosting', $first['@type']);
-                            echo "    \033[0;32mJobPosting schema returned\033[0m\n";                            break;
+                            echo "    \033[0;32mJobPosting schema returned\033[0m\n";
+                            break;
                         case 'themeData':
-                            $this->assertArrayHasKey('themeData', $data['data'], "Query '{$name}' should contain 'themeData' in data");
+                            $this->assertArrayHasKey('themeData', $data['data'], "Query '{$name}' should contain 'themeData' in data");                            // ensure the nested data object includes siteIconTags key (may be empty)
+                            if (isset($data['data']['themeData']['data'])) {
+                                $this->assertArrayHasKey('siteIconTags', $data['data']['themeData']['data'], "themeData.data should contain siteIconTags");
+                            }
                             break;
                         case 'searchJobs':
                             $this->assertArrayHasKey('searchJobs', $data['data'], "Query '{$name}' should contain 'searchJobs' in data");
                             break;
                         case 'syncBookmark':
+                        case 'jwt':
+                            $this->assertArrayHasKey('jwt', $data['data'], "Query '{$name}' should contain 'jwt' in data");
+                            // token may be null if invalid
+                            break;
                             $this->assertArrayHasKey('syncBookmark', $data['data'], "Query '{$name}' should contain 'syncBookmark' in data");
                             break;
                     }

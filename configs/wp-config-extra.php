@@ -6,6 +6,9 @@ define('ADVMO_CLOUDFLARE_R2_SECRET', getenv('ADVMO_CLOUDFLARE_R2_SECRET'));
 define('ADVMO_CLOUDFLARE_R2_DOMAIN', getenv('ADVMO_CLOUDFLARE_R2_DOMAIN'));
 define('ADVMO_CLOUDFLARE_R2_ENDPOINT', getenv('ADVMO_CLOUDFLARE_R2_ENDPOINT'));
 
+define('WORDPRESS_API_TOKEN_DOMAIN', getenv('WORDPRESS_API_TOKEN_DOMAIN'));
+define('CLOUDFLARE_ZONE_ID', getenv('CLOUDFLARE_ZONE_ID'));
+
 define('WP_REDIS_SOCK', getenv('REDIS_SOCK'));
 define('WP_REDIS_HOST', getenv('REDIS_HOST'));
 define('WP_REDIS_PASSWORD', getenv('REDIS_PWD'));
@@ -18,6 +21,9 @@ define('WP_CACHE_KEY_SALT', getenv('WORDPRESS_WP_SITEURL'));
 if (!defined('WP_ENV')) {
   define('WP_ENV', getenv('WP_ENV') ?: 'production');
 }
+
+define('JWT_AUTH_SECRET_KEY', getenv('JWT_AUTH_SECRET_KEY'));
+define('JWT_AUTH_CORS_ENABLE', true);
 
 // Auto-discover protocol and hostname from forwarded headers (for all proxies)
 $hostname = 'localhost'; // default fallback
@@ -46,6 +52,23 @@ if (strpos($hostname, 'staging.') === 0 || strpos($hostname, 'dev.') === 0) {
 
 define('WP_HOME', $protocol . $hostname);
 define('WP_SITEURL', $protocol . $hostname);
+
+$host_no_port = preg_replace('/:\d+$/', '', $hostname);
+if (preg_match('/^[^.]+\.(.+)$/', $host_no_port, $m)) {
+  $cookie_domain = '.' . $m[1];
+} else {
+  $cookie_domain = $host_no_port;
+}
+define('COOKIE_DOMAIN', $cookie_domain);
+define('ADMIN_COOKIE_PATH', '/');
+define('COOKIEPATH', '/');
+define('SITECOOKIEPATH', '/');
+
+// If JWT issuer wasn't provided earlier, default it to the cookie domain.
+if (!defined('JWT_AUTH_ISS')) {
+  define('JWT_AUTH_ISS', $cookie_domain);
+}
+
 
 //! LiteSpeed Cache Configuration Flag
 // https://docs.litespeedtech.com/lscache/lscwp/constants/

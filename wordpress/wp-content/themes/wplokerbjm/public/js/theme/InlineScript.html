@@ -1,0 +1,41 @@
+<script id="wplokerbjm-theme-inline-script">
+  (() => {
+    const cleanUp = () => {
+      const el = document.getElementById("wplokerbjm-theme-inline-script");
+      if (el) {
+        el.remove();
+      }
+    };
+
+    try {
+      const KEY = "wplokerbjm-theme";
+      const root = document.documentElement;
+      let stored = null;
+      try {
+        stored = localStorage.getItem(KEY);
+      } catch (e) {
+        stored = null;
+      }
+      const apply = (theme) => {
+        if (!theme) return;
+        root.setAttribute("data-theme", theme);
+        root.classList.toggle("wplokerbjm-dark-mode-enable", theme === "dark");
+      };
+      if (["dark", "light", "lavender"].indexOf(stored) !== -1) {
+        apply(stored);
+        return;
+      }
+      let prefersDark = false;
+      try {
+        prefersDark =
+          window.matchMedia?.("(prefers-color-scheme: dark)")?.matches ?? false;
+      } catch {}
+      const chosen = prefersDark ? "dark" : "light";
+      apply(chosen);
+    } catch (e) {
+      console.log("fail applying theme preferences", e);
+    } finally {
+      cleanUp();
+    }
+  })();
+</script>

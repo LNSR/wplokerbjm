@@ -51,7 +51,6 @@ SELECTED=(
   "server"
   "index.php"
   "composer.json"
-  "assets"
   ".htaccess"
 )
 

@@ -175,7 +175,7 @@ class GraphQLRegistration
             ],
         ]);
 
-        
+
         register_graphql_object_type('Logo', [
             'description' => 'Logo image data',
             'fields' => [
@@ -198,6 +198,8 @@ class GraphQLRegistration
                 'themeVersion' => ['type' => 'Int'],
                 'disableTracking' => ['type' => 'Boolean'],
                 'wpRestNonce' => ['type' => 'String'],
+                // HTML string containing favicon <link> tags produced by site_icon_meta_tags filter
+                'siteIconTags' => ['type' => 'String'],
             ],
         ]);
 
@@ -414,6 +416,18 @@ class GraphQLRegistration
                 ],
             ],
             'resolve' => fn(...$args) => $this->jobsDataResolver->resolveSyncBookmark(...$args),
+        ]);
+
+        // JWT mutation is registered separately because of the POST requirement
+        register_graphql_field('RootMutation', 'jwt', [
+            'type' => 'String',
+            'description' => 'Request or validate JWT token (provide username/password or existing token)',
+            'args' => [
+                'username' => ['type' => 'String'],
+                'password' => ['type' => 'String'],
+                'token' => ['type' => 'String'],
+            ],
+            'resolve' => fn(...$args) => $this->themeDataResolver->resolveJWTorValidate(...$args),
         ]);
     }
 }

@@ -8,6 +8,9 @@ wordpress/wp-content/mu-plugins/*
 !wordpress/wp-content/themes
 wordpress/wp-content/themes/*
 !wordpress/wp-content/themes/wplokerbjm
+**/.svelte-kit
+**/.wrangler
+**/build
 configs/caddy-early-hints.conf
 **/dist
 **/deploy-manual.sh
@@ -21,7 +24,10 @@ configs/caddy-early-hints.conf
 **/package-lock.json
 **/composer.lock
 **/stats.html
+**/~partytown
 source.zsh
 mkcert
 localhost.pem
 localhost-key.pem
+localhost.key
+localhost.crt

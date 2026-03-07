@@ -23,7 +23,7 @@ services:
       - wordpress:/var/www/html
       - ./wordpress/wp-content:/var/www/html/wp-content
       - ./configs/wp-config-extra.php:/var/www/html/wp-config-extra.php:ro
-      - ./certs/localhost.pem:/var/www/certs/localhost.crt:ro
+      - ./certs/localhost.crt:/var/www/certs/localhost.crt:ro
       - sock:/var/run/sock
     depends_on:
       - db
@@ -54,9 +54,8 @@ services:
       - ./wordpress/wp-content:/var/www/html/wp-content:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./configs/caddy-early-hints.conf:/etc/caddy/caddy-early-hints.conf:ro
-      # generate your own SSL via "mkcert"
-      - ./certs/localhost.pem:/var/www/certs/localhost.crt:ro
-      - ./certs/localhost-key.pem:/var/www/certs/localhost.key:ro
+      - ./certs/localhost.crt:/var/www/certs/localhost.crt:ro
+      - ./certs/localhost.key:/var/www/certs/localhost.key:ro
       - sock:/var/run/sock:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"

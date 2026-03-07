@@ -1,0 +1,111 @@
+@import "tailwindcss";
+@plugin "daisyui";
+@import "@css/wordpress.css";
+@custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
+
+body {
+  background-color: var(--wpl-global-color-4);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+:root {
+  --wpl-global-color-0: #0067ff;
+  --wpl-global-color-1: #005ee9;
+  --wpl-global-color-2: #0f172a;
+  --wpl-global-color-3: #364151;
+  --wpl-global-color-4: #ffffff;
+  --wpl-global-color-5: #e7f6ff;
+  --wpl-global-color-6: #070614;
+  --wpl-global-color-7: #d1dae5;
+  --wpl-global-color-8: #222222;
+
+  --icon-color: var(--wpl-global-color-0); /* Sun: */
+}
+
+[data-theme="light"] {
+  /* Astra Global Colors (Light) */
+  --wpl-global-color-0: #0067ff;
+  --wpl-global-color-1: #005ee9;
+  --wpl-global-color-2: #0f172a;
+  --wpl-global-color-3: #364151;
+  --wpl-global-color-4: #f2f7ff;
+  --wpl-global-color-5: #e7f6ff;
+  --wpl-global-color-6: #070614;
+  --wpl-global-color-7: #d1dae5;
+  --wpl-global-color-8: #222222;
+
+  color-scheme: light;
+
+  --icon-color: var(--wpl-global-color-0); /* Sun: */
+}
+
+[data-theme="dark"] {
+  /* Astra Global Colors (Dark) */
+  --wpl-global-color-0: #0085ff;
+  --wpl-global-color-1: #0177e3;
+  --wpl-global-color-2: #ffffff;
+  --wpl-global-color-3: #e7f6ff;
+  --wpl-global-color-4: #212a37;
+  --wpl-global-color-5: #0f172a;
+  --wpl-global-color-6: #4f5b62;
+  --wpl-global-color-7: #070614;
+  --wpl-global-color-8: #222222;
+
+  color-scheme: dark;
+
+  --icon-color: #f1f5f9; /* Moon: */
+}
+
+[data-theme="lavender"] {
+  --wpl-global-color-0: #6528f7;
+  --wpl-global-color-1: #5511f8;
+  --wpl-global-color-2: #0f172a;
+  --wpl-global-color-3: #454f5e;
+  --wpl-global-color-4: #f6f5ff;
+  --wpl-global-color-5: #f2f0fe;
+  --wpl-global-color-6: #0d0614;
+  --wpl-global-color-7: #d8d8f5;
+  --wpl-global-color-8: #222222;
+  --icon-color: var(--wpl-global-color-0); /* Sun: */
+
+  color-scheme: light;
+}
+
+/* Force the scrollbar area to always exist on the root */
+html {
+  scrollbar-gutter: stable;
+}
+
+/* Page transition styles */
+.page-transition {
+  transition: opacity 0.1s ease-in-out;
+  content-visibility: auto;
+  contain: layout style paint;
+  /* Reserve viewport space using header CSS vars to avoid layout shifts */
+  contain-intrinsic-size: auto
+    calc(
+      100vh -
+        (var(--site-header-height, 0px) + var(--site-scroll-padding-top, 0px))
+    );
+  opacity: 1;
+}
+
+/* Ensure smooth transitions for route changes */
+.route-container {
+  min-height: 100vh;
+  transition: all 0.2s ease-in-out;
+  position: relative;
+}
+
+.search-input {
+  background-color: var(--wpl-global-color-5);
+  border-color: transparent;
+}
+
+.search-input:focus,
+.search-input:focus-visible {
+  outline: 2px solid var(--wpl-global-color-0);
+  outline-offset: 2px;
+  box-shadow: 0 0 0 4px
+    color-mix(in oklab, var(--wpl-global-color-0) 15%, #0000);
+}

@@ -134,7 +134,7 @@ Instructions for building high-quality Svelte 5 and SvelteKit applications with 
 
 ### Performance Optimization
 - Use keyed `{#each}` blocks for efficient list rendering
-- Implement lazy loading with dynamic imports and `<svelte:component>`
+- Implement lazy loading with dynamic imports.
 - Use `$derived()` for expensive computations to avoid unnecessary recalculations
 - Use `$derived.by()` for complex derived values that require multiple statements
 - Avoid `$effect()` for derived state - it's less efficient than `$derived()`
@@ -204,3 +204,39 @@ Instructions for building high-quality Svelte 5 and SvelteKit applications with 
 - Server-side rendering with client-side hydration for optimal performance
 - Function bindings (`bind:value={() => value, setValue}`) for two-way binding
 - Avoid `$effect()` for state synchronization - use `$derived()` or callbacks instead
+
+## Deprecated / legacy Svelte 4 APIs (Svelte 5) — PROHIBITED
+**Policy:** Legacy Svelte APIs (the "legacy / compatibility" forms described in the Svelte docs) are banned in this repository..
+
+Why: using modern runes and the Svelte 5 API keeps code uniform, safer for SSR, and easier to maintain.
+
+What is banned (do NOT use — reference docs):
+- legacy `let` / instance props — https://svelte.dev/docs/svelte/legacy-let — use `$props()` and typed destructuring instead.
+- legacy reactive assignments (`$:`) — https://svelte.dev/docs/svelte/legacy-reactive-assignments — use `$derived()` / `$derived.by()` and runes.
+- legacy `export let` props — https://svelte.dev/docs/svelte/legacy-export-let — use `$props()` and explicit typed props.
+- `$$props` / `$$restProps` patterns — https://svelte.dev/docs/svelte/legacy-$$props-and-$$restProps — prefer `$props()` and explicit prop handling.
+- `on:` directive (legacy event handlers) — https://svelte.dev/docs/svelte/legacy-on — use handler props (e.g. `onclick`) / callback props.
+- legacy slots / `$$slots` — https://svelte.dev/docs/svelte/legacy-slots  and https://svelte.dev/docs/svelte/legacy-$$slots — use `{#snippet}`, `children`/`{@render}` patterns.
+- legacy fragments (`svelte:fragment`) — https://svelte.dev/docs/svelte/legacy-svelte-fragment — follow Svelte 5 fragment patterns.
+- legacy component APIs (`svelte:component`, `svelte:self`, Component API) — https://svelte.dev/docs/svelte/legacy-svelte-component  https://svelte.dev/docs/svelte/legacy-svelte-self  https://svelte.dev/docs/svelte/legacy-component-api — avoid legacy usage described in these docs; prefer typed, runes-friendly patterns and dynamic imports where appropriate.
+
+Quick migration cheatsheet:
+- `export let x` / `let x` → `let { x }: { x: Type } = $props()`
+- `$:` reactive statements → `$derived()` / `$derived.by()`
+- `on:click` → accept `onclick` / pass callback props
+- `<slot>` / `$$slots` → `{#snippet}` / `children` / `{@render}`
+- `$$props` / `$$restProps` → explicit `$props()` handling
+- `createEventDispatcher` → named callback prop (e.g. `ondone`)
+
+References (DO NOT USE these patterns in new code):
+- https://svelte.dev/docs/svelte/legacy-let
+- https://svelte.dev/docs/svelte/legacy-reactive-assignments
+- https://svelte.dev/docs/svelte/legacy-export-let
+- https://svelte.dev/docs/svelte/legacy-$$props-and-$$restProps
+- https://svelte.dev/docs/svelte/legacy-on
+- https://svelte.dev/docs/svelte/legacy-slots
+- https://svelte.dev/docs/svelte/legacy-$$slots
+- https://svelte.dev/docs/svelte/legacy-svelte-fragment
+- https://svelte.dev/docs/svelte/legacy-svelte-component
+- https://svelte.dev/docs/svelte/legacy-svelte-self
+- https://svelte.dev/docs/svelte/legacy-component-api

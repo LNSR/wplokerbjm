@@ -1,89 +1,55 @@
-/** @type {import('vite').UserConfigExport} */
-import { defineConfig } from "vite";
-import { svelte } from "@sveltejs/vite-plugin-svelte";
+import devtoolsJson from "vite-plugin-devtools-json";
 import tailwindcss from "@tailwindcss/vite";
+import { sveltekit } from "@sveltejs/kit/vite";
+import { defineConfig } from "vite";
+import fs from "fs";
 import { resolve } from "path";
-import liveReload from "vite-plugin-live-reload";
-import { unstableRolldownAdapter } from 'vite-bundle-analyzer'
-import { analyzer } from 'vite-bundle-analyzer'
-import { partytownVite } from "@qwik.dev/partytown/utils";
-import { generateCaddyEarlyHints } from "./vite-plugins/generate-caddy-early-hints";
+import { analyzer, unstableRolldownAdapter } from "vite-bundle-analyzer";
+import { partytownVite, copyLibFiles } from "@qwik.dev/partytown/utils";
 
-export default defineConfig(({ command }) => {
+export default defineConfig(({ mode }) => {
+  const isDev = mode === "development";
+
   return {
-    define: {
-      // Only expose WP_ENV in development to avoid bundling it in production
-      ...(command === 'serve' ? {
-        'import.meta.env.WP_ENV': JSON.stringify(process.env.WP_ENV || 'production'),
-      } : {}),
-    },
     plugins: [
-      svelte(),
       tailwindcss(),
-      liveReload(["./vendor/composer/autoload_real.php"]),
-      unstableRolldownAdapter(analyzer({ fileName: 'stats', openAnalyzer: false, analyzerMode: 'static' })),
+      sveltekit(),
+      devtoolsJson(),
       partytownVite({
-        dest: resolve(__dirname, "assets", "dist", "~partytown")
+        dest: resolve(__dirname, "static", "~partytown"),
       }),
-      generateCaddyEarlyHints({
-        manifestPath: resolve(__dirname, 'assets/dist/.vite/manifest.json'),
-        outputPath: resolve(__dirname, '../../../../configs/caddy-early-hints.conf')
-      })
+      unstableRolldownAdapter(
+        analyzer({
+          fileName: "stats",
+          openAnalyzer: false,
+          analyzerMode: "static",
+        }),
+      ),
+      {
+        name: 'copy-partytown-assets',
+        async closeBundle() {
+          try {
+            const dest = resolve(__dirname, '.svelte-kit', 'cloudflare', '~partytown');
+            await copyLibFiles(dest);
+          } catch (e) {
+            console.warn('failed to copy Partytown assets to cloudflare dir', e);
+          }
+        }
+      }
     ],
-    resolve: {
-      alias: {
-        "@@": resolve(__dirname, "./"),
-        "@": resolve(__dirname, "./src"),
-        "$lib": resolve(__dirname, "./src/app/lib"),
-        "@routes": resolve(__dirname, "./src/app/routes"),
-        "@components": resolve(__dirname, "./src/app/components"),
-        "@css": resolve(__dirname, "./src/assets/css"),
-      },
-    },
-    server: {
-      host: "0.0.0.0",
-      allowedHosts: true,
-      port: 5173,
-      cors: true,
-      strictPort: false,
-      hmr: { overlay: true, port: 5173, clientPort: 443 }
-    },
-    ...(command === "build"
-      ? { base: "/wp-content/themes/wplokerbjm/assets/dist/" }
-      : { base: "/__vite/" }),
-    build: {
-      outDir: "./assets/dist",
-      emptyOutDir: true,
-      sourcemap: false,
-      manifest: true,
-      target: "esnext",
-      rolldownOptions: {
-        input: {
-          main: "src/main.ts",
-        },
-        output: {
-          exports: "auto",
-          hashCharacters: "base64",
-          minify: true,
-          // codeSplitting: true,
-          format: "esm",
-          entryFileNames: "js/[name]-[hash:6].js",
-          chunkFileNames: "js/[name]-[hash:6].js",
-          assetFileNames: (assetInfo: any): string => {
-            const assetName =
-              assetInfo.names && assetInfo.names.length > 0
-                ? assetInfo.names[0]
-                : "";
-            if (assetName.endsWith(".css")) {
-              return "css/[name]-[hash:6][extname]";
-            }
-            if (assetName && /\.(woff2?|ttf|otf|eot)$/.test(assetName)) {
-              return "webfonts/[name]-[hash:6][extname]";
-            }
-            return "assets/[name]-[hash:6][extname]";
-          },
-        },
-      },
-    },
+    ...(isDev ? {
+      server: (() => {
+        const server: any = { host: true };
+        const keyPath = "../../../../certs/localhost.key";
+        const certPath = "../../../../certs/localhost.crt";
+        if (fs.existsSync(keyPath) && fs.existsSync(certPath)) {
+          server.https = {
+            key: fs.readFileSync(keyPath),
+            cert: fs.readFileSync(certPath),
+          };
+        }
+        return server;
+      })()
+    } : undefined),
   };
 });

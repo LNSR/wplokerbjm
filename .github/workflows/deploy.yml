@@ -38,7 +38,18 @@ jobs:
 
       - name: Build (theme)
         working-directory: ${{ env.THEME_DIR }}
+        env:
+          PUBLIC_CMS_ORIGIN: "https://wp.lokerbanjarmasin.my.id"
+          PUBLIC_CMS_ORIGIN_DEV: "https://localhost"
         run: bun -b run build
+
+      # sanity check - ensure the adapter produced a worker and assets
+      - name: List build output
+        working-directory: ${{ env.THEME_DIR }}
+        run: |
+          echo "Contents of .svelte-kit/cloudflare:";
+          ls -al .svelte-kit/cloudflare || true
+
 
       - name: Setup deployment
         uses: ./.github/actions/setup-deployment
@@ -66,3 +77,12 @@ jobs:
           RCLONE_LOG_LEVEL: ${{ env.RCLONE_LOG_LEVEL }}
           MU_PLUGIN_REMOTE_PATH: ${{ secrets.MU_PLUGIN_REMOTE_PATH }}
         run: bash .github/scripts/deploy/rclone-sync.sh
+
+      - name: Sveltekit to Cloudflare Worker
+        working-directory: ${{ env.THEME_DIR }}
+        env:
+          WRANGLER_ENV: production
+          CLOUDFLARE_API_TOKEN: ${{ secrets.EDIT_CLOUDFLARE_WORKER_SVELTEKIT }}
+        run: |
+          # specify env explicitly to silence warning
+          bun wrangler deploy --env ${{ env.WRANGLER_ENV }} -c wrangler.prod.toml

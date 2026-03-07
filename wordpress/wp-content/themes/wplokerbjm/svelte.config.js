@@ -1,10 +1,19 @@
-import { vitePreprocess } from '@sveltejs/vite-plugin-svelte'
+import adapter from "@sveltejs/adapter-cloudflare";
 
-/** @type {import("@sveltejs/vite-plugin-svelte").SvelteConfig} */
-export default {
-  // Consult https://svelte.dev/docs#compile-time-svelte-preprocess
-  // for more information about preprocessors
-  preprocess: vitePreprocess(),
+/** @type {import('@sveltejs/kit').Config} */
+const config = {
+  kit: {
+    version: {
+      name: Date.now().toString() 
+    },
+    adapter: adapter(),
+    alias: {
+      "@components": "src/lib/components",
+      "@css": "src/lib/assets/css",
+      "@": "src",
+      "@@": "/"
+    }
+  },
   compilerOptions: {
     runes: true,
     modernAst: true,
@@ -12,4 +21,6 @@ export default {
     discloseVersion: false,
     dev: true
   }
-}
+};
+
+export default config;

@@ -1,7 +1,7 @@
 //* Universal utility functions for DOM manipulation not tied to a specific framework.
 import { isDevelopmentMode } from "@/utils";
 
-export const isAppEl: string = "#app"; // Selector for the main application element
+export const isAppEl: string = ".route-container"; // Selector for the main application element
 
 export function parseProps(element: Element | Document, propAttr: string): Record<string, unknown> {
     const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`);
