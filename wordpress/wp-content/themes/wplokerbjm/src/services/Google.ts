@@ -6,7 +6,7 @@ import { Partytown } from "@/utils";
  * Focused on Google-related functionality like sending page views and managing tracking availability.
  */
 export class GoogleServices {
-  private static gtmLoaded = false;
+  public static gtmLoaded = false;
 
   /**
    * Checks if tracking is enabled (client-side and not logged-in).
@@ -15,7 +15,7 @@ export class GoogleServices {
    */
   private static isTrackingEnabled(): boolean {
     if (typeof window === "undefined") return false;
-    const themeData = themeManager.getThemeData();
+    const themeData = themeManager.getThemeData;
     if (themeData?.disableTracking) return false;
     return !nonceManager.getNonce;
   }

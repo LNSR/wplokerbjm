@@ -39,7 +39,7 @@
 </script>
 
 {#if open}
-  <div use:PortalManager.teleport={"#app"}>
+  <div {@attach PortalManager.teleport("#app")}>
     <div class="modal modal-open z-[1100]">
       <div class="modal-box">
         <h3 class="font-bold text-lg">Masuk</h3>

@@ -7,19 +7,15 @@
   import { onMount } from "svelte";
   import { afterNavigate, onNavigate } from "$app/navigation";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
-  import type { HeadData, WPLokerBJMThemedData } from "@/types";
+  import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
   import { themeManager } from "@/lib/stores/Theme.svelte";
   import script from "@@/public/js/theme/InlineScript.html?raw";
 
+  let initialPageviewSent = false;
+
   onNavigate(() => {
-    routeStore.addContainerWillChange();
     routeStore.setIsInitialLoad(false);
     routeStore.isTransitioningRoute = true;
-
-    // return cleanup executed once the new content is mounted
-    return () => {
-      routeStore.removeContainerWillChange();
-    };
   });
 
   const {
@@ -30,7 +26,7 @@
     data?: {
       themeData?: WPLokerBJMThemedData | null;
       deviceType?: App.PageData["deviceType"];
-      rankMathHead?: HeadData | null;
+      rankMathHead?: RankMathHeadData | null;
     };
   } = $props();
 
@@ -39,33 +35,37 @@
     rankMathHead: data?.rankMathHead ?? null,
   });
 
-  afterNavigate(async (nav: any) => {
-    const url =
-      nav && nav.to && nav.to.url ? nav.to.url : new URL(window.location.href);
-
+  afterNavigate(() => {
     routeStore.setIsLoading(false);
     routeStore.isTransitioningRoute = false;
-    setTimeout(() => {
-      GoogleServices.sendPageView();
-    }, 1000); // delay to ensure GTM has time to process the route change
+    if (routeStore.isInitialLoad) {
+      if (!initialPageviewSent) {
+        GoogleServices.injectGTMScript()
+          .then(() => {
+            if (GoogleServices.gtmLoaded) {
+              GoogleServices.sendPageView();
+              initialPageviewSent = true;
+            }
+          })
+          .catch(() => {
+            console.error("Failed to inject GTM script on initial load");
+          });
+      }
+    } else {
+      if (GoogleServices.gtmLoaded) {
+        GoogleServices.sendPageView();
+      }
+    }
   });
 
   onMount(() => {
     themeManager.setThemeData(themeData as WPLokerBJMThemedData);
+    routeStateStore.setInitialDevice(
+      data?.deviceType?.isMobile ? "mobile" : "desktop",
+    );
 
-    // keep breakpoint observer running
     routeStateStore.observeBreakpointChanges();
 
-    if (routeStore.isInitialLoad) {
-      // Only inject GTM script on initial load to avoid duplicates during navigation
-      GoogleServices.injectGTMScript()
-        .then(() => {
-          GoogleServices.sendPageView(); // Send initial pageview after GTM loads
-        })
-        .catch(() => {
-          console.error("Failed to inject GTM script on initial load");
-        });
-    }
     return () => {
       routeStateStore.cleanUpEffectObserveBreakpointChanges();
     };

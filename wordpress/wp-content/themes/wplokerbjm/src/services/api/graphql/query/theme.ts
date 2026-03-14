@@ -4,7 +4,6 @@ export const GET_THEME_DATA = gql`
   query GetThemeData {
     themeData {
       data {
-        themeUrl
         siteIconTags
         logo {
           logoUrl
@@ -14,9 +13,6 @@ export const GET_THEME_DATA = gql`
           logoWidth
           logoHeight
         }
-        lastJobUpdate
-        lastTaxonomyUpdate
-        themeVersion
         disableTracking
         wpRestNonce
       }

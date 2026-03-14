@@ -23,4 +23,21 @@ class CredentialConfig
            'endpoint' => $params['endpoint'] ?? (defined('ADVMO_CLOUDFLARE_R2_ENDPOINT') ? ADVMO_CLOUDFLARE_R2_ENDPOINT : null),
        ];
    }
+
+   /**
+    * Return Cloudflare API credentials (token + zone) for cache purging.
+    *
+    * This keeps the environment constants out of the service layer and
+    * centralizes lookup logic for any future rotation or override needs.
+    *
+    * @param array|null $params Optional overrides ('token' and/or 'zone').
+    * @return array{token:?string,zone:?string}
+    */
+   public static function CloudflareCredential(?array $params = null): array
+   {
+       return [
+           'token' => $params['token'] ?? (defined('WORDPRESS_API_TOKEN_DOMAIN') ? WORDPRESS_API_TOKEN_DOMAIN : null),
+           'zone'  => $params['zone']  ?? (defined('CLOUDFLARE_ZONE_ID') ? CLOUDFLARE_ZONE_ID : null),
+       ];
+   }
 }

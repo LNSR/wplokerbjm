@@ -175,6 +175,22 @@ class JobsDataResolver
     {
         try {
             $ids = $args['ids'] ?? [];
+            $slug = isset($args['slug']) ? trim((string) $args['slug']) : null;
+
+            // Allow fetching schema by slug to avoid an extra lookup for the post ID.
+            if (empty($ids) && $slug) {
+                $post = get_page_by_path($slug, 'OBJECT', 'lowongan');
+                if ($post && is_object($post)) {
+                    $ids = [(int) $post->ID];
+                }
+            }
+
+            if (empty($ids)) {
+                return ['schemas' => []];
+            }
+
+            // Normalize IDs to integers
+            $ids = array_values(array_filter(array_map('intval', (array) $ids)));
             if (empty($ids)) {
                 return ['schemas' => []];
             }

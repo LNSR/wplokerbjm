@@ -30,6 +30,15 @@
     e.preventDefault();
     e.stopPropagation();
     if (isNaN(jobId) || jobId < 1) return;
+
+    // If this tab is outdated (a newer build is open elsewhere), do a cache-reload fetch then force navigation.
+    if (typeof window !== "undefined" && bookmarkStore.isOutdated) {
+      fetch(window.location.href, { cache: "reload" }).then(() => {
+        window.location.reload;
+      });
+      return;
+    }
+
     // protect against both reactive loading state and synchronous re-entry
     if (isLoading || _clickLock) return;
 

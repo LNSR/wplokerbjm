@@ -21,7 +21,7 @@ class Rankmath
 	public static function isActive(): bool
 	{
 		if (self::$isActiveCache === null) {
-			self::$isActiveCache = SharedUtils::isRankMathActive();
+			self::$isActiveCache = SharedUtils::isPluginActive('rankmath');
 		}
 		return self::$isActiveCache;
 	}
@@ -135,4 +135,3 @@ class Rankmath
 		$analyzer->analyse_url = $headless . $path . $query;
 	}
 }
-

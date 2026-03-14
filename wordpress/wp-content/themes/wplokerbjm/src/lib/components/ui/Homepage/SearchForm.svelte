@@ -369,7 +369,7 @@
 </script>
 
 <section class="mx-auto px-4 py-4 text-center">
-  <h1 class="text-2xl md:text-3xl mt-4 font-bold mb-3">
+  <h1 class="text-2xl md:text-3xl max-w-4xl mx-auto mt-4 font-bold mb-3">
     Temukan Lowongan Kerja di Kalimantan terutama Banjarmasin, Banjarbaru,
     Martapura dan sekitarnya
   </h1>

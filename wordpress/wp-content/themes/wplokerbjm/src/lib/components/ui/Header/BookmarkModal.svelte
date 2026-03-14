@@ -16,8 +16,8 @@
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import {
     GlobalNavigateTo,
-    routeStore,
     routeStateStore,
+    routeStore,
   } from "$lib/stores/Route.svelte";
   import { SvelteDate } from "svelte/reactivity";
   import JobCard from "@components/ui/Shared/JobCard.svelte";
@@ -62,11 +62,12 @@
   let isOffline = $state(false);
   let showDeleteConfirm = $state(false);
   const removingIds = $state(new SvelteSet<number>());
-  const now = $state(new SvelteDate());
+  const now = new SvelteDate();
 
   // Store bindings
   const savedJobs = $derived(bookmarkStore.jobs);
   const warning = $derived(bookmarkStore.warning);
+  const isOutdated = $derived(bookmarkStore.isOutdated);
   const deletedJobs = $derived(bookmarkStore.deletedJobs);
   const lastSyncTime = $derived(bookmarkStore.lastSyncTime);
 
@@ -116,7 +117,6 @@
       savedJobs.forEach((job) => {
         if (job.id) removingIds.add(job.id);
       });
-      await new Promise((resolve) => setTimeout(resolve, 200));
       loading = true;
       try {
         await bookmarkStore.clearAll();
@@ -143,8 +143,8 @@
 
     scheduleFetchJobs = () => {
       const runFetch = () => void bookmarkHandler.fetchJobs();
-      if (typeof (window as any).requestIdleCallback === "function") {
-        (window as any).requestIdleCallback(() => runFetch());
+      if (typeof requestIdleCallback === "function") {
+        requestIdleCallback(() => runFetch());
       } else {
         requestAnimationFrame(() => runFetch());
       }
@@ -153,9 +153,9 @@
     displayedSavedJobs = $derived.by(() => {
       return savedJobs.map((job) => ({
         ...job,
-        timeAgo: generalStore.useTimeAgo(job.post_time, now)(),
+        timeAgo: generalStore.useTimeAgo(job.post_time, now),
         deadlineInfo: job.deadline
-          ? generalStore.useDeadline(job.deadline, now)()
+          ? generalStore.useDeadline(job.deadline, now)
           : { text: "", style: "" },
         statusInfo: job.status_pekerjaan
           ? generalStore.useStatusJob(Number(job.status_pekerjaan))
@@ -177,7 +177,10 @@
   }
 
   class VirtualizationManager {
-    // Virtualized jobs computation
+    public measuring = $state(false); // measuring: true while card heights are being measured in background to avoid INP
+    #measurePollHandle: ReturnType<typeof setInterval> | null = null;
+    #measureTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+
     virtualizedJobs = $derived.by(() => {
       return Virtualization.computeList({
         displayJobs: bookmarkHandler.filteredDisplayedJobs,
@@ -195,7 +198,7 @@
     }
 
     // Update container dimensions
-    updateContainerDimensions() {
+    updateContainerDimensions(): void {
       if (!contentContainer) return;
 
       // Measure on next animation frame to ensure layout is complete (dialog might be animating)
@@ -215,13 +218,13 @@
             containerScrollY = scrollTop;
           }
         } catch (e) {
-          void e;
+          console.error("Error measuring container dimensions:", e);
         }
       });
     }
 
     // Clear card heights that are no longer displayed
-    get clearCardHeights(): SvelteMap<number, number> {
+    get clearCardHeights() {
       const currentJobIds = new SvelteSet(
         bookmarkHandler.filteredDisplayedJobs.map(
           (job: CardJob) => job.id || 0,
@@ -237,6 +240,88 @@
         cardHeights = heightsToKeep;
       }
       return cardHeights;
+    }
+
+    // Start background measurement: poll cardHeights until visible items measured or timeout
+    startBackgroundMeasure() {
+      // clear any existing handles
+      if (this.#measurePollHandle) {
+        clearInterval(this.#measurePollHandle);
+        this.#measurePollHandle = null;
+      }
+      if (this.#measureTimeoutHandle) {
+        clearTimeout(this.#measureTimeoutHandle);
+        this.#measureTimeoutHandle = null;
+      }
+
+      this.measuring = true;
+
+      // ensure dimensions are measured first
+      this.updateContainerDimensions();
+
+      const maxWait = 1000; // ms
+      const interval = 80; // ms
+      let elapsed = 0;
+
+      this.#measurePollHandle = setInterval(() => {
+        try {
+          const visible =
+            (this.virtualizedJobs && this.virtualizedJobs.visibleJobs) || [];
+          const needed = visible.length;
+
+          // Count measured heights for visible IDs
+          let measured = 0;
+          for (const [id] of cardHeights) {
+            if (visible.some((v: any) => Number(v.id) === Number(id)))
+              measured++;
+          }
+
+          if (needed === 0 || measured >= needed) {
+            if (this.#measurePollHandle) {
+              clearInterval(this.#measurePollHandle);
+              this.#measurePollHandle = null;
+            }
+            if (this.#measureTimeoutHandle) {
+              clearTimeout(this.#measureTimeoutHandle);
+              this.#measureTimeoutHandle = null;
+            }
+            this.measuring = false;
+          }
+        } catch (e) {
+          console.error("Error during background measure polling:", e);
+        }
+
+        elapsed += interval;
+        if (elapsed >= maxWait) {
+          if (this.#measurePollHandle) {
+            clearInterval(this.#measurePollHandle);
+            this.#measurePollHandle = null;
+          }
+          this.measuring = false;
+        }
+      }, interval);
+
+      // fallback timeout to stop measuring
+      this.#measureTimeoutHandle = setTimeout(() => {
+        if (this.#measurePollHandle) {
+          clearInterval(this.#measurePollHandle);
+          this.#measurePollHandle = null;
+        }
+        this.measuring = false;
+        this.#measureTimeoutHandle = null;
+      }, maxWait + 200);
+    }
+
+    stopBackgroundMeasure() {
+      if (this.#measurePollHandle) {
+        clearInterval(this.#measurePollHandle);
+        this.#measurePollHandle = null;
+      }
+      if (this.#measureTimeoutHandle) {
+        clearTimeout(this.#measureTimeoutHandle);
+        this.#measureTimeoutHandle = null;
+      }
+      this.measuring = false;
     }
   }
 
@@ -271,6 +356,7 @@
    * UI Specific Modal Handler
    */
   class ModalHandler {
+    transitioningRoute = $derived(routeStore.isTransitioningRoute);
     startDrag = (e: PointerEvent): void => {
       if (e.button && e.button !== 0) return;
       if (!modalBox || !dragHandle) return;
@@ -341,47 +427,59 @@
     };
 
     handleJobClick(job: CardJob): void {
-      this.closeModal();
+      routeStateStore.MarkVisitedJob(job.slug ?? "", "bookmark");
 
       const el: HTMLElement | null = isJobGridEl();
+
+      const waitUntilAfterNav = () => {
+        return new Promise<void>((resolve) => {
+          const check = async () => {
+            if (!this.transitioningRoute) {
+              resolve();
+            } else {
+              requestAnimationFrame(async () => await check());
+            }
+          };
+          void check();
+        });
+      };
+
       if (!isMobile() && el) {
         // Desktop: open overlay
-        routeStateStore.saveCardHeights(new Map(cardHeights), "bookmarkModal");
+        routeStateStore.saveCardHeights(
+          new SvelteMap(cardHeights),
+          "bookmarkModal",
+        );
         jobOverlay.openOverlay(job.slug ?? "", job);
-        jobOverlay.scrollToCard(job.slug ?? "");
+        this.closeModal();
       } else {
         // Mobile: navigate
         if (job.permalink) {
+          routeStateStore.saveCardHeights(
+            new SvelteMap(cardHeights),
+            "bookmarkModal",
+          );
           const url = new URL(job.permalink, window.location.origin);
-          void GlobalNavigateTo(url.pathname + url.search + url.hash);
+          GlobalNavigateTo(url.pathname + url.search + url.hash);
+
+          // Wait until after any route transition completes before closing the modal to avoid jank during navigation
+          waitUntilAfterNav()
+            .then(() => {
+              this.closeModal();
+            })
+            .catch((e) => {
+              console.error("Error waiting for route transition:", e);
+              this.closeModal();
+            });
         }
       }
     }
 
     closeModal(): void {
       open = false;
+      virtualizationManager.stopBackgroundMeasure();
     }
 
-    portalDialog(append: boolean = true): void {
-      if (typeof document === "undefined") return;
-      if (append) {
-        // append and show dialog only after appended to DOM to avoid race conditions
-        PortalManager.append(modalEl, "#app", () => {
-          if (modalEl && !modalEl.open) modalEl.showModal();
-        });
-        PortalManager.append(deleteConfirmModal, "#app", () => {
-          if (
-            showDeleteConfirm &&
-            deleteConfirmModal &&
-            !deleteConfirmModal.open
-          )
-            deleteConfirmModal.showModal();
-        });
-      } else {
-        PortalManager.remove(modalEl, "#app");
-        PortalManager.remove(deleteConfirmModal, "#app");
-      }
-    }
     get layoutBreakpoint() {
       const w = window.innerWidth;
       if (w < 640) return "mobile";
@@ -404,33 +502,12 @@
     `transform: translate(${translateX}px, ${translateY}px); touch-action: ${isMobileValue ? "none" : "auto"};`,
   );
 
-  // Virtualized jobs for rendering
-  const virtualizedJobs = $derived(virtualizationManager.virtualizedJobs);
-
   // Only collapse action buttons on small (mobile) layouts when search is active
   const shouldCollapseActions = $derived.by(() => {
     return isSearchOpen && modalHandler.layoutBreakpoint === "mobile";
   });
 
   // Ensure we re-measure when the modal is opened so virtualization has correct container size
-  $effect(() => {
-    if (!open) return;
-
-    // Small delay to allow dialog show animation / placement into DOM, then measure
-    setTimeout(() => {
-      virtualizationManager.updateContainerDimensions();
-      // Double-check on next frame as layout may still settle
-      requestAnimationFrame(virtualizationManager.updateContainerDimensions);
-      // Force read of scrollTop to trigger reactivity if needed
-      containerScrollY = contentContainer?.scrollTop ?? 0;
-    }, 50);
-  });
-
-  $effect(() => {
-    requestAnimationFrame(() => {
-      virtualizationManager.clearCardHeights;
-    });
-  });
 
   $effect(() => {
     const stopTime = timeEffect(now);
@@ -446,6 +523,11 @@
   });
 
   onMount(() => {
+    document.addEventListener("keydown", modalHandler.handleKeydown);
+    window.addEventListener(
+      "resize",
+      virtualizationManager.updateContainerDimensions,
+    );
     if (open) {
       bookmarkStore.flushSync();
       bookmarkHandler.scheduleFetchJobs();
@@ -456,6 +538,8 @@
         const initialHeight = Math.round(vh * 0.6);
         modalBox.style.setProperty("height", `${initialHeight}px`, "important");
       }
+      // Start measuring container + card heights in background to avoid blocking interaction
+      virtualizationManager.startBackgroundMeasure();
     } else {
       modalEl?.close();
       modalHandler.resetPosition();
@@ -465,19 +549,6 @@
       isSearchOpen = true;
       searchInput?.focus();
     }
-
-    document.addEventListener("keydown", modalHandler.handleKeydown);
-    window.addEventListener(
-      "resize",
-      virtualizationManager.updateContainerDimensions,
-    );
-    if (open) {
-      open = true;
-      // Update dimensions after mount
-      setTimeout(() => virtualizationManager.updateContainerDimensions(), 0);
-    }
-
-    modalHandler.portalDialog(true);
   });
 
   onDestroy(() => {
@@ -497,15 +568,15 @@
     }
 
     modalHandler.resetPosition();
+    virtualizationManager.stopBackgroundMeasure();
 
-    modalHandler.portalDialog(false);
-
-    routeStateStore.saveCardHeights(new Map(cardHeights), "bookmarkModal");
+    virtualizationManager.clearCardHeights;
   });
 </script>
 
 <dialog
   bind:this={modalEl}
+  {@attach PortalManager.teleport("#app")}
   class="modal modal-bottom sm:modal-middle"
   class:modal-open={open}
 >
@@ -543,7 +614,7 @@
                 aria-hidden="true"
               />
               Lowongan Tersimpan
-              {#if !loading && savedJobs.length > 0}
+              {#if !(loading || virtualizationManager.measuring) && savedJobs.length > 0}
                 <span
                   class="bg-[var(--wpl-global-color-1)] text-[var(--wpl-global-color-5)] text-sm rounded-full px-2 py-0.1 z-10"
                   >{savedJobs.length}</span
@@ -568,12 +639,13 @@
         >
           <!-- Left: search control that expands; when open, action buttons collapse to the right -->
           <div class="flex-1 flex items-center min-w-0">
-            {#if !loading}
+            {#if !(loading || virtualizationManager.measuring)}
               <button
                 onclick={() => {
                   isSearchOpen = !isSearchOpen;
                   if (isSearchOpen) setTimeout(() => searchInput?.focus(), 0);
                 }}
+                disabled={loading || virtualizationManager.measuring || isOutdated}
                 class="btn btn-ghost btn-sm mr-2"
                 aria-label="Cari dalam simpanan"
                 title="Cari"
@@ -582,12 +654,13 @@
               </button>
             {/if}
 
-            {#if !loading && isSearchOpen}
+            {#if !(loading || virtualizationManager.measuring) && isSearchOpen}
               <input
                 id="bookmark-search"
                 name="bookmark_search"
                 bind:this={searchInput}
                 bind:value={searchQuery}
+                disabled={isOutdated}
                 class="input input-sm w-full md:w-96 min-w-0 flex-grow"
                 placeholder="Cari judul atau perusahaan"
                 onkeydown={(e) => {
@@ -601,7 +674,7 @@
 
           <!-- Right: action buttons or close-search button when search open -->
           <div class="flex items-center gap-2 flex-shrink-0">
-            {#if !loading && isSearchOpen}
+            {#if !(loading || virtualizationManager.measuring) && isSearchOpen}
               <button
                 onclick={() => {
                   isSearchOpen = false;
@@ -621,10 +694,10 @@
             {/if}
 
             {#if !shouldCollapseActions}
-              {#if !loading && savedJobs.length > 0}
+              {#if !(loading || virtualizationManager.measuring) && savedJobs.length > 0}
                 <button
                   onclick={bookmarkHandler.handleDeleteAll}
-                  disabled={loading}
+                  disabled={loading || virtualizationManager.measuring || isOutdated}
                   class="btn btn-ghost btn-sm md:btn-md text-error w-auto whitespace-nowrap"
                   aria-label="hapus semua"
                   title="hapus semua"
@@ -634,12 +707,15 @@
                 </button>
                 <button
                   onclick={bookmarkHandler.handleRefresh}
-                  disabled={loading}
+                  disabled={loading || virtualizationManager.measuring || isOutdated}
                   class="btn btn-ghost btn-sm md:btn-md w-auto whitespace-nowrap"
                   aria-label="sync ke server"
                   title="sync ke server"
                 >
-                  <RefreshSpinner size="h-4 w-4 mr-2" spin={loading} />
+                  <RefreshSpinner
+                    size="h-4 w-4 mr-2"
+                    spin={loading || virtualizationManager.measuring}
+                  />
                   Sync/Refresh
                 </button>
               {/if}
@@ -655,8 +731,8 @@
       class="flex-1 overflow-y-auto max-h-full px-6 py-4"
       onscroll={modalHandler.handleContentScroll}
     >
-      <!-- Loading State -->
-      {#if loading}
+      <!-- Loading / initial measuring State -->
+      {#if loading || virtualizationManager.measuring}
         <div class="flex items-center justify-center py-12">
           <LoadingSpinner srLabel="Memuat..." size="md" />
         </div>
@@ -716,84 +792,90 @@
 
             <div
               class="relative"
-              style="height: {virtualizedJobs.totalHeight}px;"
+              style="height: {virtualizationManager.virtualizedJobs
+                .totalHeight}px;"
             >
-              {#each virtualizedJobs.visibleJobs as job, idx (job.id)}
-                {@const absoluteIndex = virtualizedJobs.startIndex + idx}
+              {#each virtualizationManager.virtualizedJobs.visibleJobs as job, idx (job.id)}
+                {@const absoluteIndex =
+                  virtualizationManager.virtualizedJobs.startIndex + idx}
                 {@const topPosition =
-                  virtualizedJobs.itemPositions[absoluteIndex] || 0}
+                  virtualizationManager.virtualizedJobs.itemPositions[
+                    absoluteIndex
+                  ] || 0}
                 <div
                   class="card bg-[var(--wpl-global-color-5)] border-2 border-[var(--wpl-global-color-1)] shadow-sm hover:shadow-md absolute left-0 right-0"
                   class:scale-0={removingIds.has(job.id || 0)}
                   style="transform: translate3d(0, {topPosition}px, 0);"
                   {@attach virtualizationManager.measureHeight(job.id || 0)}
                 >
-                  <div class="card-body p-4">
-                    {#if job.title === ""}
-                      <div class="animate-pulse">
-                        <div class="flex items-start justify-between gap-3">
-                          <div class="flex-1 min-w-1">
+                  {#if job.title === ""}
+                    <div class="card-body animate-pulse">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="flex-1 min-w-1">
+                          <div
+                            class="h-4 bg-base-content/20 rounded mb-2"
+                          ></div>
+                          <div
+                            class="h-3 bg-base-content/20 rounded mb-2 w-3/4"
+                          ></div>
+                          <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
                             <div
-                              class="h-4 bg-base-content/20 rounded mb-2"
+                              class="h-3 bg-base-content/20 rounded w-20"
                             ></div>
                             <div
-                              class="h-3 bg-base-content/20 rounded mb-2 w-3/4"
+                              class="h-3 bg-base-content/20 rounded w-16"
                             ></div>
-                            <div class="flex flex-wrap gap-x-4 gap-y-1 mb-2">
-                              <div
-                                class="h-3 bg-base-content/20 rounded w-20"
-                              ></div>
-                              <div
-                                class="h-3 bg-base-content/20 rounded w-16"
-                              ></div>
-                              <div
-                                class="h-3 bg-base-content/20 rounded w-24"
-                              ></div>
-                            </div>
-                            <div class="mt-2">
-                              <div
-                                class="h-3 bg-base-content/20 rounded w-32 mb-2"
-                              ></div>
-                              <div
-                                class="h-3 bg-base-content/20 rounded w-28"
-                              ></div>
-                            </div>
-                          </div>
-                          <div class="flex flex-col gap-1">
                             <div
-                              class="h-8 w-8 bg-base-content/20 rounded"
+                              class="h-3 bg-base-content/20 rounded w-24"
                             ></div>
                           </div>
+                          <div class="mt-2">
+                            <div
+                              class="h-3 bg-base-content/20 rounded w-32 mb-2"
+                            ></div>
+                            <div
+                              class="h-3 bg-base-content/20 rounded w-28"
+                            ></div>
+                          </div>
+                        </div>
+                        <div class="flex flex-col gap-1">
+                          <div class="h-8 w-8 bg-base-content/20 rounded"></div>
                         </div>
                       </div>
-                    {:else}
-                      <div class="flex">
-                        <div
-                          class="flex-1 min-w-0"
-                        >
-                          <JobCard
-                            jobdata={job}
-                            variant="bookmark"
-                            permalink={job.permalink as string}
-                            onClick={() => modalHandler.handleJobClick(job)}
-                          />
-                        </div>
+                    </div>
+                  {:else}
+                    <div class="flex w-full">
+                      <div class="flex-1">
+                        <JobCard
+                          jobdata={job}
+                          variant="bookmark"
+                          isVisited={routeStateStore.hasVisitedJob(
+                            job.slug,
+                            "bookmark",
+                          )}
+                          permalink={job.permalink as string}
+                          onClick={() => modalHandler.handleJobClick(job)}
+                        />
+                      </div>
 
-                        <div class="flex-shrink-0 ml-2 pl-2 border-l-1 border-[var(--wpl-global-color-1)] flex items-center">
-                          <button
-                            onclick={() =>
-                              bookmarkHandler.removeBookmark(job.id || 0)}
-                            disabled={loading || removingIds.has(job.id || 0)}
-                            class="btn btn-xs btn-ghost text-error"
-                            title="Hapus bookmark"
-                            aria-label="Hapus bookmark untuk {job.title}"
-                          >
-                            <TrashAltSolid class="h-6 w-6" aria-hidden="true" />
-                          </button>
-                        </div>
+                      <div
+                        class="flex flex-shrink-1 border-l-1 border-[var(--wpl-global-color-1)] items-center"
+                      >
+                        <button
+                          onclick={() =>
+                            bookmarkHandler.removeBookmark(job.id || 0)}
+                          disabled={loading ||
+                            virtualizationManager.measuring ||
+                            removingIds.has(job.id || 0)}
+                          class="btn btn-xs btn-ghost text-error"
+                          title="Hapus bookmark"
+                          aria-label="Hapus bookmark untuk {job.title}"
+                        >
+                          <TrashAltSolid class="h-6 w-6" aria-hidden="true" />
+                        </button>
                       </div>
-                    {/if}
-                  </div>
+                    </div>
+                  {/if}
                 </div>
               {/each}
             </div>
@@ -886,6 +968,7 @@
 <!-- Delete All Confirmation Modal -->
 <dialog
   bind:this={deleteConfirmModal}
+  {@attach PortalManager.teleport("#app")}
   class="modal modal-bottom sm:modal-middle"
   class:modal-open={showDeleteConfirm}
 >
@@ -902,14 +985,14 @@
       <button
         onclick={bookmarkHandler.cancelDeleteAll}
         class="btn btn-ghost"
-        disabled={loading}
+        disabled={loading || virtualizationManager.measuring}
       >
         Batal
       </button>
       <button
         onclick={bookmarkHandler.confirmDeleteAll}
         class="btn btn-error"
-        disabled={loading}
+        disabled={loading || virtualizationManager.measuring}
       >
         {#if loading}
           <LoadingSpinner size="sm" srLabel="Menghapus semua..." />

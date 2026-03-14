@@ -54,42 +54,38 @@ class SharedUtils
     }
 
     /**
-     * Plugin active helpers to centralize checks for optional integrations.
-     */
-    public static function isLitespeedActive(): bool
-    {
-        return defined('LITESPEED_VERSION') || function_exists('litespeed_purge') || function_exists('litespeed_tag_add');
-    }
-
-    public static function isWPGraphQLActive(): bool
-    {
-        return function_exists('graphql_register_types') || defined('WPGRAPHQL_VERSION') || class_exists('\\WPGraphQL\\Plugin');
-    }
-
-    public static function isRankMathActive(): bool
-    {
-        return function_exists('rank_math') || defined('RANK_MATH_VERSION') || class_exists('\\RankMath');
-    }
-
-    /**
-     * Generic plugin active check by known identifiers.
+     * Check if a plugin is active by inspecting the 'active_plugins' option in wp_options.
      * @param string $pluginKey one of: 'litespeed','wpgraphql','rankmath'
+     * @return bool
      */
     public static function isPluginActive(string $pluginKey): bool
     {
-        switch (strtolower($pluginKey)) {
-            case 'litespeed':
-            case 'litespeed-cache':
-                return self::isLitespeedActive();
-            case 'wpgraphql':
-            case 'wp-graphql':
-                return self::isWPGraphQLActive();
-            case 'rankmath':
-            case 'rank-math':
-                return self::isRankMathActive();
-            default:
-                return false;
+        // Map pluginKey to plugin file slug
+        $pluginMap = [
+            'litespeed' => 'litespeed-cache/litespeed-cache.php',
+            'litespeed-cache' => 'litespeed-cache/litespeed-cache.php',
+            'wpgraphql' => 'wp-graphql/wp-graphql.php',
+            'wp-graphql' => 'wp-graphql/wp-graphql.php',
+            'rankmath' => 'seo-by-rank-math/rank-math.php',
+            'rank-math' => 'seo-by-rank-math/rank-math.php',
+        ];
+        $pluginFile = $pluginMap[strtolower($pluginKey)] ?? null;
+        if (!$pluginFile) {
+            return false;
         }
+
+        $checkPlugins = function() {
+            $plugins = get_option('active_plugins');
+            return is_array($plugins) ? $plugins : null;
+        };
+
+
+        // Query the database for active_plugins
+        $activePlugins = $checkPlugins();
+        if (!is_array($activePlugins)) {
+            return false;
+        }
+        return in_array($pluginFile, $activePlugins, true);
     }
 
     /**

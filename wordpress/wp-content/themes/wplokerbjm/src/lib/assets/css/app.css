@@ -71,9 +71,14 @@ body {
   color-scheme: light;
 }
 
+/* Force the scrollbar area to always exist on the root */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* Page transition styles */
 .page-transition {
-  transition: opacity 0.3s ease-in-out;
+  transition: opacity 0.1s ease-in-out;
   content-visibility: auto;
   contain: layout style paint;
   /* Reserve viewport space using header CSS vars to avoid layout shifts */

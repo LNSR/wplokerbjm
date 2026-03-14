@@ -321,7 +321,9 @@
         if (active && active.matches(".drawer-toggle")) {
           active.blur();
         }
-      } catch {}
+      } catch(e) {
+        console.error("Element focus error during login", e);
+      }
 
       loginLoading = true;
       loginError = "";
@@ -340,17 +342,14 @@
       } catch (e) {
         console.error("login error", e);
         loginError = "Terjadi kesalahan saat login.";
-        loginPassword = ""; // also clear on error
+        loginPassword = "";
       } finally {
         tick().then(() => {
-          Promise.all([nonceManager.getNonceFromAPI(), (loginLoading = false)]);
+          Promise.all([nonceManager.getNonceFromAPI, (loginLoading = false)]);
         });
       }
     }
     static async Logout(): Promise<void> {
-      try {
-        // perform logout directly against CMS GraphQL
-      } catch {}
       window.location.reload();
     }
     static closeLogin() {
@@ -384,7 +383,7 @@
 
   let {
     HeaderLogo = "",
-    themeData: themeDataProp,
+    themeData,
   }: {
     HeaderLogo?: string;
     themeData?: import("@/types").WPLokerBJMThemedData | null;
@@ -394,7 +393,6 @@
   const bookmarkJobs = $derived(bookmarkStore.jobs);
   function updateLogo(): void {
     try {
-      const themeData = themeDataProp;
       const runtimeLogo = themeData?.logo?.logoUrl;
       const runtimeLogoSrcset = themeData?.logo?.logoSrcset;
       const runtimeLogoSizes = themeData?.logo?.logoSizes;
@@ -497,7 +495,7 @@
 </script>
 
 <header
-  class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b-3 border-[var(--wpl-global-color-5)] min-h-auto z-[60]"
+  class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b border-[var(--wpl-global-color-1)] min-h-auto z-[60]"
 >
   <div class="drawer drawer-end">
     <input
@@ -555,7 +553,7 @@
           </div>
 
           {#if showThemeModal}
-            <div use:PortalManager.teleport={"#app"}>
+            <div {@attach PortalManager.teleport("#app")}>
               <div class="modal modal-open z-[1100]">
                 <div class="modal-box">
                   <h3 class="font-semibold text-lg">Pilih Tema</h3>

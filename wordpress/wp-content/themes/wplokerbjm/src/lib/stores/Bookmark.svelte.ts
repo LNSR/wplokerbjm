@@ -3,45 +3,53 @@ import {
   bookmarkIDB,
   type DebouncedFunction,
 } from "@/utils";
-import { SvelteSet, SvelteMap } from "svelte/reactivity";
+import { SvelteSet, SvelteMap, SvelteDate } from "svelte/reactivity";
 import { APIService } from "@/services/APIService";
-import type { CardJob, WPLokerBJMThemedData } from "@/types";
-import { browser } from "$app/environment";
-import { themeManager } from "$lib/stores/Theme.svelte";
+import type { CardJob } from "@/types";
+import { browser, version } from "$app/environment";
 
 interface BookmarkBroadcastMessage {
   type: "update" | "sync" | "reload";
   deleted?: number[];
-  version?: WPLokerBJMThemedData["themeVersion"];
+  version?: string;
+  tabStartedAt?: number;
 }
 export class BookmarkManager {
-  // Current theme version from server (mtime of composer.json), used for cross-tab version checking
-  private CURRENT_VERSION = themeManager.getThemeData()?.themeVersion || 0;
+  private CURRENT_VERSION = $derived(version);
   public jobs = $state<CardJob[]>([]);
   public isInitialized = $state(false);
   public isSyncing = $state(false);
   public warning = $state("");
+  public isOutdated = $state(false);
   private cache = new SvelteMap<number, CardJob>();
   public deletedJobs = $state<number[]>([]);
   public lastSyncTime = $state<number>(0);
 
   private channel: BroadcastChannel | null = null;
+  private readonly tabStartedAt = Date.now();
   private debouncedSync: DebouncedFunction | null = null;
   private pendingSyncIds = new SvelteSet<number>();
-  private _debouncedSaveCall: any = null;
-  private _pendingSavePromise: Promise<void> | null = null;
-  private _pendingSaveResolve: (() => void) | null = null;
-  private _pendingSaveReject: ((reason?: any) => void) | null = null;
-  private _saveInProgress = false;
-  private _retryTimer: ReturnType<typeof setTimeout> | null = null;
+  #debouncedSaveCall: any = null;
+  #pendingSavePromise: Promise<void> | null = null;
+  #pendingSaveResolve: (() => void) | null = null;
+  #pendingSaveReject: ((reason?: any) => void) | null = null;
+  #saveInProgress = false;
+  #retryTimer: ReturnType<typeof setTimeout> | null = null;
   private operationQueue: Promise<any> = Promise.resolve();
 
   constructor() {
-    void this.initialize();
+    this.initialize();
     this.crossTabChannel();
     this.debouncedSync = debounce(() => this.syncPending(), 1000);
   }
 
+  /**
+   * Run operation in sequence to avoid race conditions on IndexedDB and ensure predictable state updates. Each operation waits for the previous one to complete before starting.
+   * A timeout is included to prevent the queue from getting stuck indefinitely due to unforeseen issues. If an operation fails or times out, it logs a warning but allows subsequent operations to continue.
+   * @param operation The asynchronous operation to run in the queue.
+   * @param timeoutMs The maximum time to wait for the operation to complete before timing out.
+   * @returns A promise that resolves with the operation's result or rejects if it times out.
+   */
   private async runQueued<T>(
     operation: () => Promise<T>,
     timeoutMs: number = 10000,
@@ -71,7 +79,7 @@ export class BookmarkManager {
 
     // keep the internal queue reference safe-from-rejection so future ops aren't blocked
     this.operationQueue = opPromise.then(
-      () => {},
+      () => { },
       (err) => {
         console.warn("Queued operation failed or timed out:", err);
       },
@@ -90,7 +98,7 @@ export class BookmarkManager {
    * - Messages include 'update' (for add/remove), 'sync' (for full sync), and 'reload' (force refresh).
    */
   public crossTabChannel(): void {
-    if (!browser || typeof BroadcastChannel === "undefined") {
+    if (!browser) {
       return;
     }
 
@@ -98,11 +106,15 @@ export class BookmarkManager {
     this.channel.onmessage = (event: MessageEvent): void => {
       const data = event.data as BookmarkBroadcastMessage;
 
-      // Version mismatch: ignore messages from different versions
-      // If incoming version is newer, force reload to update assets
+      // Version mismatch: ignore messages from different builds/versions.
+      // If the incoming message is from a newer tab instance, mark this tab as outdated.
       if (data.version !== undefined && data.version !== this.CURRENT_VERSION) {
-        if (data.version > this.CURRENT_VERSION) {
-          if (browser) location.replace(location.href); // Reload without history entry
+        const incomingTabTs = typeof data.tabStartedAt === "number" ? data.tabStartedAt : 0;
+        if (incomingTabTs > this.tabStartedAt) {
+          // Prevent new data mutations in outdated tabs and instruct user to refresh.
+          this.isOutdated = true;
+          this.warning =
+            "Versi baru tersedia di tab lain. Tutup tab lama dan muat ulang untuk melanjutkan.";
         }
         return;
       }
@@ -115,7 +127,7 @@ export class BookmarkManager {
           this.deletedJobs = data.deleted ?? [];
           break;
         case "reload":
-          // Explicit reload from newer tabs
+          // Explicit reload from newer tabs: force a refresh to align versions
           if (browser) location.replace(location.href);
           break;
         case "update":
@@ -123,15 +135,32 @@ export class BookmarkManager {
           // Update message: load from storage and schedule API sync retry
           void this.loadFromStorage();
           // schedule a single retry (avoid stacking many scheduled syncs)
-          if (!this._retryTimer) {
-            this._retryTimer = setTimeout(() => {
-              this._retryTimer = null;
+          if (!this.#retryTimer) {
+            this.#retryTimer = setTimeout(() => {
+              this.#retryTimer = null;
               void this.syncWithAPI();
             }, 1000);
           }
           break;
       }
     };
+
+    // Add visibility change listener: sync data when tab becomes visible again
+    // This ensures we don't miss broadcasts while in the background
+    if (browser) {
+      document.addEventListener("visibilitychange", () => {
+        if (document.visibilityState === "visible" && !this.isOutdated) {
+          void this.loadFromStorage();
+          // Schedule a sync to pick up any changes from the API while we were away
+          if (!this.#retryTimer) {
+            this.#retryTimer = setTimeout(() => {
+              this.#retryTimer = null;
+              void this.syncWithAPI();
+            }, 500);
+          }
+        }
+      });
+    }
   }
 
   private async loadFromStorage(): Promise<void> {
@@ -151,11 +180,11 @@ export class BookmarkManager {
 
   // immediate low-level save that actually writes to IndexedDB
   private async saveToStorageImmediate(): Promise<void> {
-    if (this._saveInProgress) {
+    if (this.#saveInProgress) {
       // if a save is already in progress, avoid overlapping writes
       return;
     }
-    this._saveInProgress = true;
+    this.#saveInProgress = true;
     try {
       // Avoid deep clone to save memory on mobile; assume jobs are serializable
       await bookmarkIDB.saveBookmarks(Array.from(this.cache.values()));
@@ -163,7 +192,7 @@ export class BookmarkManager {
       console.error("Failed to save bookmarks to IndexedDB:", error);
       throw error;
     } finally {
-      this._saveInProgress = false;
+      this.#saveInProgress = false;
     }
   }
 
@@ -174,39 +203,44 @@ export class BookmarkManager {
    * await this method to be notified when the save finished.
    */
   private async saveToStorage(): Promise<void> {
-    // Lazily create the debounced function so it has access to instance methods
-    if (!this._debouncedSaveCall) {
-      this._debouncedSaveCall = debounce(async () => {
+    if (!this.#debouncedSaveCall) {
+      this.#debouncedSaveCall = debounce(async () => {
         try {
           await this.saveToStorageImmediate();
           // resolve any pending promise waiting on this save
-          if (this._pendingSaveResolve) {
-            this._pendingSaveResolve();
+          if (this.#pendingSaveResolve) {
+            this.#pendingSaveResolve();
           }
         } catch (error) {
           // forward the error to awaiting callers so callers can revert
-          if (this._pendingSaveReject) this._pendingSaveReject(error);
+          if (this.#pendingSaveReject) this.#pendingSaveReject(error);
         } finally {
-          this._pendingSaveResolve = null;
-          this._pendingSaveReject = null;
-          this._pendingSavePromise = null;
+          this.#pendingSaveResolve = null;
+          this.#pendingSaveReject = null;
+          this.#pendingSavePromise = null;
         }
       }, 300);
     }
 
-    if (!this._pendingSavePromise) {
-      this._pendingSavePromise = new Promise<void>((resolve, reject) => {
-        this._pendingSaveResolve = resolve;
-        this._pendingSaveReject = reject;
+    if (!this.#pendingSavePromise) {
+      this.#pendingSavePromise = new Promise<void>((resolve, reject) => {
+        this.#pendingSaveResolve = resolve;
+        this.#pendingSaveReject = reject;
       });
     }
 
     // schedule (or reschedule) the debounced save
-    this._debouncedSaveCall();
-    return this._pendingSavePromise!;
+    this.#debouncedSaveCall();
+    return this.#pendingSavePromise!;
   }
 
   public async addJob(id: number): Promise<void> {
+    if (this.isOutdated) {
+      this.warning =
+        "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
+      return;
+    }
+
     return this.runQueued(async () => {
       try {
         const job: CardJob = { id, title: "" };
@@ -238,6 +272,12 @@ export class BookmarkManager {
   }
 
   public async removeJob(id: number): Promise<void> {
+    if (this.isOutdated) {
+      this.warning =
+        "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
+      return;
+    }
+
     return this.runQueued(async () => {
       try {
         this.cache.delete(id);
@@ -263,6 +303,12 @@ export class BookmarkManager {
    * Toggle saved state for a job id. If saved, remove it; otherwise add it.
    */
   public async toggleSave(id: number): Promise<void> {
+    if (this.isOutdated) {
+      this.warning =
+        "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
+      return;
+    }
+
     return this.runQueued(async () => {
       if (this.isSaved(id)) {
         await this.removeJob(id);
@@ -277,6 +323,12 @@ export class BookmarkManager {
   }
 
   public async syncWithAPI(idsToSync?: number[]): Promise<void> {
+    if (this.isOutdated) {
+      this.warning =
+        "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
+      return;
+    }
+
     // Only sync when running in browser and tab is visible to avoid background interference
     if (!browser || document.visibilityState !== "visible") return;
 
@@ -284,18 +336,18 @@ export class BookmarkManager {
       if (this.isSyncing) {
         // if already syncing, set a warning and ensure we only schedule one retry
         this.warning = "Data tidak sinkron. Tolong refresh ulang.";
-        if (!this._retryTimer) {
-          this._retryTimer = setTimeout(() => {
-            this._retryTimer = null;
+        if (!this.#retryTimer) {
+          this.#retryTimer = setTimeout(() => {
+            this.#retryTimer = null;
             void this.syncWithAPI(idsToSync);
           }, 3000);
         }
         return;
       }
       // clear any pending retry as we're starting a real sync now
-      if (this._retryTimer) {
-        clearTimeout(this._retryTimer);
-        this._retryTimer = null;
+      if (this.#retryTimer) {
+        clearTimeout(this.#retryTimer);
+        this.#retryTimer = null;
       }
       this.warning = "";
       // Only set global syncing for full sync, not individual job refresh
@@ -345,12 +397,13 @@ export class BookmarkManager {
           this.deletedJobs = Array.from(previousIds).filter(
             (id) => !currentIds.has(id),
           );
-          this.lastSyncTime = Date.now();
+          this.lastSyncTime = SvelteDate.now();
           if (this.channel) {
             this.channel.postMessage({
               type: "sync",
               deleted: JSON.parse(JSON.stringify(this.deletedJobs)),
               version: this.CURRENT_VERSION,
+              tabStartedAt: this.tabStartedAt,
             } as BookmarkBroadcastMessage); // Broadcast full sync with version
           }
         }
@@ -406,6 +459,7 @@ export class BookmarkManager {
           this.channel.postMessage({
             type: "update",
             version: this.CURRENT_VERSION,
+            tabStartedAt: this.tabStartedAt,
           } as BookmarkBroadcastMessage); // Broadcast clear with version
       } catch (error) {
         console.error("Failed to clear all bookmarks:", error);
@@ -418,20 +472,22 @@ export class BookmarkManager {
     this.deletedJobs = [];
   }
 
-  private async initialize(): Promise<void> {
+  private initialize(): void {
     if (!browser) {
       this.isInitialized = false;
       return;
     }
 
-    await this.loadFromStorage();
-    // Only sync if data is stale (older than 5 minutes) or no sync has been done
-    const now = Date.now();
-    const isStale = now - this.lastSyncTime > 5 * 60 * 1000; // 5 minutes
-    if (isStale || this.lastSyncTime === 0) {
-      // Run initial sync outside the queue to avoid blocking user interactions
-      void this.syncWithAPI();
-    }
+    requestIdleCallback(() => {
+      this.loadFromStorage();
+      // Only sync if data is stale (older than 5 minutes) or no sync has been done
+      const now = SvelteDate.now();
+      const isStale = now - this.lastSyncTime > 5 * 60 * 1000; // 5 minutes
+      if (isStale || this.lastSyncTime === 0) {
+        // Run initial sync outside the queue to avoid blocking user interactions
+        void this.syncWithAPI();
+      }
+    });
   }
 }
 

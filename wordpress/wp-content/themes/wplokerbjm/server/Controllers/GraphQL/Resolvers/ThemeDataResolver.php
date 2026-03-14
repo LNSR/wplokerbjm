@@ -43,9 +43,12 @@ class ThemeDataResolver
                 if (function_exists('rest_do_request')) {
                     $req = new \WP_REST_Request('POST', '/jwt-auth/v1/token/validate');
                     $req->set_header('Content-Type', 'application/json');
-                    $req->set_body_params(['token' => $argArr['token']]);
+                    $req->set_header('Authorization', 'Bearer ' . $argArr['token']);
                     $resp = rest_do_request($req);
                     if (is_wp_error($resp)) {
+                        if (defined('WP_DEBUG') && WP_DEBUG) {
+                            Logger::error('GraphQL', 'JWT validate wp_error: ' . $resp->get_error_message());
+                        }
                         return null;
                     }
                     $code = method_exists($resp, 'get_status') ? $resp->get_status() : 0;
@@ -53,14 +56,20 @@ class ThemeDataResolver
                     if ($code === 200 && !empty($data['data']['status']) && $data['data']['status'] === 200) {
                         return 'ok';
                     }
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        Logger::error('GraphQL', "JWT validate failed with code={$code} data=" . print_r($data, true));
+                    }
                     return null;
                 }
                 // fallback to remote post if rest_do_request unavailable
                 $response = wp_remote_post(
                     site_url('/wp-json/jwt-auth/v1/token/validate'),
                     [
-                        'body' => json_encode(['token' => $argArr['token']]),
-                        'headers' => ['Content-Type' => 'application/json'],
+                        'body' => null,
+                        'headers' => [
+                            'Content-Type' => 'application/json',
+                            'Authorization' => 'Bearer ' . $argArr['token'],
+                        ],
                         'timeout' => 5,
                     ]
                 );
@@ -91,7 +100,9 @@ class ThemeDataResolver
                     ]);
                     $resp = rest_do_request($req);
                     if (is_wp_error($resp)) {
-                        Logger::error('GraphQL', 'JWT login wp_error: ' . $resp->get_error_message());
+                        if (defined('WP_DEBUG') && WP_DEBUG) {
+                            Logger::error('GraphQL', 'JWT login wp_error: ' . $resp->get_error_message());
+                        }
                         return null;
                     }
                     $code = method_exists($resp, 'get_status') ? $resp->get_status() : 0;
@@ -120,7 +131,9 @@ class ThemeDataResolver
                 );
 
                 if (is_wp_error($response)) {
-                    Logger::error('GraphQL', 'JWT login wp_error: ' . $response->get_error_message());
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        Logger::error('GraphQL', 'JWT login wp_error: ' . $response->get_error_message());
+                    }
                     return null;
                 }
                 $code = wp_remote_retrieve_response_code($response);
@@ -129,6 +142,9 @@ class ThemeDataResolver
                     Logger::error('GraphQL', "JWT login response code={$code} body=" . substr($body, 0, 500));
                 }
                 if ($code !== 200) {
+                    if (defined('WP_DEBUG') && WP_DEBUG) {
+                        Logger::error('GraphQL', "JWT login failed with response code={$code}");
+                    }
                     return null;
                 }
                 $data = json_decode($body, true);

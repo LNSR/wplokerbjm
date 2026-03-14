@@ -2,7 +2,7 @@ import type { WPLokerBJMThemedData } from "@/types";
 
 class ThemeManager {
   themeProps: WPLokerBJMThemedData | undefined = $state(undefined);
-  public getThemeData(): WPLokerBJMThemedData | undefined {
+  public get getThemeData(): WPLokerBJMThemedData | undefined {
     if (this.themeProps !== undefined) return this.themeProps;
 
     return undefined;
@@ -10,6 +10,10 @@ class ThemeManager {
 
   public setThemeData(data: WPLokerBJMThemedData): void {
     this.themeProps = data;
+  }
+
+  public setNonce(nonce: WPLokerBJMThemedData["wpRestNonce"]): void {
+      this.themeProps!.wpRestNonce = nonce;
   }
 }
 

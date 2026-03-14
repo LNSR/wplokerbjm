@@ -1,12 +1,12 @@
+import type { Attachment } from "svelte/attachments";
 import { MediaQuery, SvelteDate } from "svelte/reactivity";
 import { browser } from "$app/environment";
 import { page } from "$app/state";
 
-export function isMobile(): boolean {
+export const isMobile = (): boolean => {
   if (!browser) {
     try {
-      const pdata = page.data as { deviceType?: { isMobile: boolean } };
-      return pdata?.deviceType?.isMobile ?? false;
+      return page.data?.deviceType?.isMobile ?? false;
     } catch {
       return false;
     }
@@ -27,7 +27,7 @@ export const isJobGridEl = (): HTMLElement | null => {
  * Creates a time side effect that updates the SvelteDate every second.
  * Returns a cleanup function to clear the interval.
  */
-export function timeEffect(now?: SvelteDate): () => void {
+export const timeEffect = (now?: SvelteDate): () => void => {
   const id = setInterval(() => now?.setTime(Date.now()), 1000);
   // Return a cleanup function to clear the interval when the component is destroyed
   return () => clearInterval(id);
@@ -39,25 +39,30 @@ export function timeEffect(now?: SvelteDate): () => void {
  * once the append/remove operation has completed.
  */
 export class PortalManager {
-  static teleport = (node: HTMLElement, selector: string = "body") => {
-    if (!browser) {
-      return { destroy() {} };
-    }
-    const target = document.querySelector(selector) ?? document.body;
-    try {
-      target.appendChild(node);
-    } catch (err) {
-      console.error("[portal] teleport failed", err);
-    }
+  /**
+   * Creates a Svelte attachment that teleports the element into the given selector.
+   * @param selector - element selector for the target container to teleport into (default: "body")
+   * @returns A Svelte attachment function
+   * @summary Usage example: <dialog {@attach PortalManager.teleport("#app")} class="modal">...</dialog>
+   */
+  static teleport = (selector: string = "body"): Attachment => {
+    return (node: Element) => {
+      if (!browser) return;
 
-    return {
-      destroy() {
+      const target = document.querySelector(selector) ?? document.body;
+      try {
+        target.appendChild(node);
+      } catch (err) {
+        console.error("[portal] teleport failed", err);
+      }
+
+      return () => {
         try {
           node.parentNode?.removeChild(node);
         } catch (err) {
           console.error("[portal] destroy failed", err);
         }
-      },
+      };
     };
   };
 

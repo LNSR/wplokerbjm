@@ -17,6 +17,12 @@
   "observability": {
     "enabled": true
   },
+  "kv_namespaces": [
+    {
+      "binding": "wplokerbjm",
+      "id": "75fc8b0cd2d74548b6c05321296d4d45"
+    }
+  ],
   "env": {
     "production": {
       "name": "wplokerbjm-prod",

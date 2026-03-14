@@ -192,7 +192,7 @@
   {/if}
 </svelte:head>
 
-<article class="space-y-8">
+<article class="space-y-8" style="contain: layout paint;">
   <!-- Title + Summary -->
   {#if job.title || (ringkasanPekerjaan && ringkasanPekerjaan.length)}
     <section
@@ -232,7 +232,7 @@
                     aria-hidden="true"
                   />
                   <time class="font-bold ml-1" datetime={job.post_time}
-                    >Diupdate: {timeAgo()}</time
+                    >Diupdate: {timeAgo}</time
                   >
                 </div>
               {/if}

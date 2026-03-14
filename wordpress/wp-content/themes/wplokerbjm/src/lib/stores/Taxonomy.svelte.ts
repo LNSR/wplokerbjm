@@ -1,12 +1,11 @@
 import { APIService } from '@/services/APIService'
 import type { TaxonomyTerm, WPLokerBJMThemedData } from '@/types'
 import { TaxonomyType } from '@/types'
-import { themeManager } from '$lib/stores/Theme.svelte';
+import { version } from '$app/environment';
 import { SvelteMap } from 'svelte/reactivity'
 
 interface CachedTaxonomyData {
-	version: WPLokerBJMThemedData['themeVersion']
-	lastTaxonomyUpdate: string
+	version: string // TODO: use BroadcastChannel
 	data: TaxonomyTerm[]
 }
 
@@ -53,14 +52,14 @@ class TaxonomyManager {
 
 	private getCachedTerms(type: TaxonomyType): TaxonomyTerm[] | null {
 		if (typeof sessionStorage === 'undefined') return null
-		const themeData = themeManager.getThemeData()
-		if (!themeData?.themeVersion || !themeData?.lastTaxonomyUpdate) return null
+		const buildVersion = version
+		if (!buildVersion) return null
 		const key: TaxonomyCacheKey = `wplokerbjm_taxonomy_${type}`
 		try {
 			const stored = sessionStorage.getItem(key)
 			if (!stored) return null
 			const parsed: CachedTaxonomyData = JSON.parse(stored)
-			if (parsed.version === themeData.themeVersion && parsed.lastTaxonomyUpdate === themeData.lastTaxonomyUpdate) {
+			if (parsed.version === buildVersion) {
 				return parsed.data
 			}
 		} catch (err) {
@@ -71,11 +70,11 @@ class TaxonomyManager {
 
 	private setCachedTerms(type: TaxonomyType, data: TaxonomyTerm[]): void {
 		if (typeof sessionStorage === 'undefined') return
-		const themeData = themeManager.getThemeData()
-		if (!themeData?.themeVersion || !themeData?.lastTaxonomyUpdate) return
+		const buildVersion = version
+		if (!buildVersion) return
 		const key: TaxonomyCacheKey = `wplokerbjm_taxonomy_${type}`
 		try {
-			const toStore: CachedTaxonomyData = { version: themeData.themeVersion, lastTaxonomyUpdate: themeData.lastTaxonomyUpdate, data }
+			const toStore: CachedTaxonomyData = { version: buildVersion, data }
 			sessionStorage.setItem(key, JSON.stringify(toStore))
 		} catch (err) {
 			console.warn(`Failed to cache taxonomy ${type}:`, err)
@@ -100,14 +99,14 @@ class TaxonomyManager {
 	}
 
 	private getNameFromStorage(type: TaxonomyType, slug: string): string {
-		const themeData = themeManager.getThemeData()
-		if (!themeData?.themeVersion || !themeData?.lastTaxonomyUpdate) return slug
+		const buildVersion = version
+		if (!buildVersion) return slug
 		const key: TaxonomyCacheKey = `wplokerbjm_taxonomy_${type}`
 		try {
 			const stored = sessionStorage.getItem(key)
 			if (!stored) return slug
 			const parsed: CachedTaxonomyData = JSON.parse(stored)
-			if (parsed.version === themeData.themeVersion && parsed.lastTaxonomyUpdate === themeData.lastTaxonomyUpdate) {
+			if (parsed.version === buildVersion) {
 				function find(terms: TaxonomyTerm[]): string | undefined {
 					for (const t of terms) {
 						if (t.slug === slug) return t.name

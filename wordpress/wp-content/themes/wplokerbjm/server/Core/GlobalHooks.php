@@ -152,7 +152,7 @@ class GlobalHooks
      | HEADERS
      ======================================================================*/
 
-    
+
 
     /*======================================================================
      | FILTERS
@@ -225,6 +225,18 @@ class GlobalHooks
         $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
 
         return $this->filteredPlugins($plugins, $pluginsToDisable);
+    }
+
+    /**
+     * Force locale to Indonesian on the frontend for consistent user experience, while keeping admin in English.
+     */
+    #[Filter('locale')]
+    public function frontendLocal($locale)
+    {
+        if (!is_admin()) { // Only affects the public site, keeps your dashboard English
+            return 'id_ID';
+        }
+        return $locale;
     }
 
     /**

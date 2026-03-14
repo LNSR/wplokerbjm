@@ -6,6 +6,9 @@ define('ADVMO_CLOUDFLARE_R2_SECRET', getenv('ADVMO_CLOUDFLARE_R2_SECRET'));
 define('ADVMO_CLOUDFLARE_R2_DOMAIN', getenv('ADVMO_CLOUDFLARE_R2_DOMAIN'));
 define('ADVMO_CLOUDFLARE_R2_ENDPOINT', getenv('ADVMO_CLOUDFLARE_R2_ENDPOINT'));
 
+define('WORDPRESS_API_TOKEN_DOMAIN', getenv('WORDPRESS_API_TOKEN_DOMAIN'));
+define('CLOUDFLARE_ZONE_ID', getenv('CLOUDFLARE_ZONE_ID'));
+
 define('WP_REDIS_SOCK', getenv('REDIS_SOCK'));
 define('WP_REDIS_HOST', getenv('REDIS_HOST'));
 define('WP_REDIS_PASSWORD', getenv('REDIS_PWD'));
@@ -65,6 +68,7 @@ define('SITECOOKIEPATH', '/');
 if (!defined('JWT_AUTH_ISS')) {
   define('JWT_AUTH_ISS', $cookie_domain);
 }
+
 
 //! LiteSpeed Cache Configuration Flag
 // https://docs.litespeedtech.com/lscache/lscwp/constants/

@@ -54,7 +54,7 @@ class JobQuery
 	public static function getCarouselArgs(int $per_page): array
 	{
 		$today = date('Y-m-d');
-		$seven_days = date('Y-m-d', strtotime('+7 days'));
+		$two_weeks = date('Y-m-d', strtotime('+14 days'));
 
 		return array_merge(self::getBaseArgs, [
 			'posts_per_page' => $per_page,
@@ -78,7 +78,7 @@ class JobQuery
 					],
 					[
 						'key' => CustomFields::DEADLINE,
-						'value' => [$today, $seven_days],
+						'value' => [$today, $two_weeks],
 						'compare' => 'BETWEEN',
 						'type' => 'DATE',
 					],

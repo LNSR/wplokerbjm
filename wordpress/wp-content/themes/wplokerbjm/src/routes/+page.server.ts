@@ -22,7 +22,6 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
           ids,
           undefined,
           "ItemList",
-          undefined,
           fetch,
         );
         itemListSchema = schemas?.[0] || null;

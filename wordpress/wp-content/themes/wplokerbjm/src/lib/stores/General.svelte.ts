@@ -40,7 +40,7 @@ interface ContactRow {
 }
 export class GeneralStore {
 
-    public useDeadline(deadline: string | null | undefined, now?: SvelteDate): () => { text: string; style: string } {
+    public useDeadline(deadline: string | null | undefined, now?: SvelteDate): { text: string; style: string } {
         function computeDeadlineInfo(dl?: string | null, nowMs?: number): { text: string; style: string } {
             if (!dl) {
                 return { text: '', style: '' }
@@ -84,10 +84,10 @@ export class GeneralStore {
             now,
         )
 
-        return deadlineInfo
+        return deadlineInfo()
     }
 
-    public useTimeAgo(postTime?: string, now?: SvelteDate): () => string {
+    public useTimeAgo(postTime?: string, now?: SvelteDate): string {
         function computeTimeText(pt?: string, nowMs?: number): string {
             if (!pt) return ''
             const postDate = new Date(pt)
@@ -109,7 +109,7 @@ export class GeneralStore {
             now,
         )
 
-        return time
+        return time()
     }
 
     private timeReactiveValues<T>(compute: (nowMs: number) => T, now?: SvelteDate,): () => T {

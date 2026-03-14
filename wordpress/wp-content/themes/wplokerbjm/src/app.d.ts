@@ -1,6 +1,13 @@
 import { type PartytownConfig } from "@qwik.dev/partytown/integration";
 import type { DevicePayload } from "sveltekit-device-detector/dist/types";
-import { KVNamespace } from "@cloudflare/workers-types";
+import type {
+  Env,
+  ExecutionContext,
+  CacheStorage,
+  IncomingRequestCfProperties,
+  DurableObjectNamespace,
+  KVNamespace,
+} from "@cloudflare/workers-types";
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
@@ -12,7 +19,6 @@ declare global {
     // interface PageState {}
     interface Locals {
       deviceType: DevicePayload;
-      /** JWT token read from the HttpOnly cookie, forwarded as Bearer to WP. */
       jwtToken: string | null;
 
       /** Theme data fetched from the CMS and stored on locals for downstream usage. */
@@ -22,18 +28,13 @@ declare global {
     interface PageData { deviceType: DevicePayload }
 
     interface Platform {
-      env?: { wplokerbjm: KVNamespace
-
-      // YOUR_DURABLE_OBJECT_NAMESPACE: DurableObjectNamespace;
-       };
+      env?: {
+        wplokerbjm: KVNamespace;
+      };
       env: Env;
       ctx: ExecutionContext;
       caches: CacheStorage;
       cf?: IncomingRequestCfProperties;
-      env: Env;
-      ctx: ExecutionContext;
-      caches: CacheStorage;
-      cf?: IncomingRequestCfProperties
     }
 
     interface PrivateEnv {}

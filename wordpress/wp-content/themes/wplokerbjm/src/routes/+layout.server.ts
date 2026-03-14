@@ -4,10 +4,7 @@ import type { WPLokerBJMThemedData } from "@/types";
 import { getCmsOrigin } from "@/utils/environment";
 export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
   try {
-    // Prefer theme data fetched in hooks and exposed on locals; fall back to fetching here
-    let themeData: WPLokerBJMThemedData | null = (locals as any).themeData ??
-      await APIService.getThemeDataGraphQL(undefined, undefined, fetch);
-
+    let themeData: WPLokerBJMThemedData = locals.themeData;
     // fetch RankMath head from CMS domain using the request URL path
     const origin = getCmsOrigin();
     const fullUrl = `${origin}${url.pathname}`;
@@ -34,13 +31,13 @@ export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
     return {
       themeData,
       rankMathHead,
-      deviceType: locals.deviceType,
+      deviceType: locals.deviceType
     };
   } catch (err) {
     return {
       themeData: null,
       rankMathHead: null,
-      deviceType: locals.deviceType,
+      deviceType: locals.deviceType
     };
   }
 };

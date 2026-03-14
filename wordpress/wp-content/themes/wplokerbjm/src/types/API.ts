@@ -92,7 +92,7 @@ export interface JobDetailResponse extends Pick<WPBasePost, 'id' | 'title' | 'po
 }
 
 // RankMath head data interface
-export interface HeadData {
+export interface RankMathHeadData {
   title?: string;
   description?: string;
   canonical?: string;

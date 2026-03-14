@@ -18,7 +18,7 @@ class WPGraphQL
     #[Action('graphql_init')]
     public static function injectJwtFromCookie(): void
     {
-        if (!SharedUtils::isWPGraphQLActive()) {
+        if (!SharedUtils::isPluginActive('wpgraphql')) {
             return;
         }
 
@@ -36,7 +36,7 @@ class WPGraphQL
     #[Action('init_graphql_request')]
     public static function authenticateViaCookie(): void
     {
-        if (!SharedUtils::isWPGraphQLActive()) {
+        if (!SharedUtils::isPluginActive('wpgraphql')) {
             return;
         }
         $cookieValue = '';
@@ -85,10 +85,10 @@ class WPGraphQL
     /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
-    #[Filter('graphql_response_headers_to_send')]
+    #[Filter('graphql_response_headers_to_send', 11)]
     public static function ModifyHeaderGraphQL(array $headers): array
     {
-        if (!SharedUtils::isWPGraphQLActive()) {
+        if (!SharedUtils::isPluginActive('wpgraphql')) {
             return $headers;
         }
 
@@ -111,13 +111,24 @@ class WPGraphQL
 
         $headers['Access-Control-Allow-Credentials'] = 'true';
 
-        $headers['Access-Control-Allow-Headers'] = ($headers['Access-Control-Allow-Headers'] ?? '') !== ''
-            ? $headers['Access-Control-Allow-Headers'] . ', X-WP-Nonce'
-            : 'X-WP-Nonce';
-        $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce';
+        $headers['Access-Control-Allow-Headers'] = $headers['Access-Control-Allow-Headers'] . ', X-WP-Nonce, If-None-Match, If-Match, Cache-Control, If-Modified-Since';
+        $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag, Cache-Control, Last-Modified';
+
+        if (isset($headers['Access-Control-Max-Age'])) {
+            unset($headers['Access-Control-Max-Age']);
+        }
+        $cacheControl = function ($extra) use (&$headers) {
+            if (isset($headers['Cache-Control'])) {
+                unset($headers['Cache-Control']);
+                $headers['Cache-Control'] = $extra . ' , must-revalidate';
+            }
+        };
         $loggedIn = is_user_logged_in();
         if ($loggedIn) {
+            $cacheControl('private, max-age=10');
             $headers['Logged-In'] = $loggedIn ? 'true' : 'false';
+        } else {
+            $cacheControl('public, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400');
         }
 
         return $headers;

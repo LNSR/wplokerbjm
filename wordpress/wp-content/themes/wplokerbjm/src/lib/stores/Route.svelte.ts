@@ -1,11 +1,9 @@
-import type { SearchState, CarouselState } from "@/types";
+import type { SearchState, CarouselState, JobCardProps } from "@/types";
 import { isMobile } from "$lib/utils/elements.svelte";
-import { SvelteURL, SvelteMap } from "svelte/reactivity";
+import { SvelteMap } from "svelte/reactivity";
 import { WPPostRoute } from "@/types";
-import { isDevelopmentMode } from "@/utils";
 import { type CardJob } from "@/types";
 import { LRUCache } from "lru-cache";
-import { browser } from "$app/environment";
 import type { goto } from "$app/navigation";
 
 
@@ -13,8 +11,6 @@ export class RouteManager {
   isInitialLoad = $state(true);
   isLoading = $state(false);
   isTransitioningRoute = $state(false);
-  elRouteContainer: HTMLElement | null = null; // `.route-container` element reference
-  setTimeoutWillChange: number | undefined = undefined; // Timeout ID for removing will-change styles
 
   setIsInitialLoad(value: boolean) {
     this.isInitialLoad = value;
@@ -39,66 +35,33 @@ export class RouteManager {
       return "KebijakanPrivasi";
     return "Unknown";
   }
-
-  addContainerWillChange() {
-    if (!this.elRouteContainer) {
-      this.elRouteContainer = document.querySelector(".route-container");
-      if (!this.elRouteContainer) return;
-    }
-    const willChangeProps = "transform, opacity, scroll-position, contents";
-    try {
-      this.elRouteContainer.style.setProperty("will-change", willChangeProps);
-    } catch {
-      console.warn("Failed to set will-change styles on route container");
-    }
-  }
-
-  removeContainerWillChange() {
-    if (this.setTimeoutWillChange) {
-      clearTimeout(this.setTimeoutWillChange);
-      this.setTimeoutWillChange = undefined;
-    }
-
-    this.setTimeoutWillChange = window.setTimeout(() => {
-      if (!this.elRouteContainer) return;
-      this.elRouteContainer.style.removeProperty("will-change");
-
-      // Remove style attribute only if there are no other inline styles
-      if (
-        !this.elRouteContainer.getAttribute("style") ||
-        this.elRouteContainer.style.cssText.trim() === "" ||
-        this.elRouteContainer.style.length === 0
-      ) {
-        this.elRouteContainer.removeAttribute("style");
-      }
-    }, 5000);
-  }
 }
-
+type Device = "desktop" | "mobile";
 export class RouteStateManager {
   scrollPositions = new LRUCache<string, number>({ max: 100 }); // Scroll position cache per route
   searchStates = new LRUCache<string, SearchState>({ max: 100 }); // Limit to 50 most recent search states
   lastVisitedJob: CardJob["slug"] | undefined = $state(undefined); // Remember the last visited job slug for mobile navigation
   // Variant source for the last visited job: 'carousel' | 'grid' | undefined
-  lastVisitedJobSource: "carousel" | "grid" | undefined = $state(undefined);
-  carouselState: CarouselState | null = $state(null); // Single carousel state for homepage
+  lastVisitedJobSource: JobCardProps["variant"] | undefined = $state(undefined);
+  carouselState: CarouselState | null = $state(null);
   skipScrollRestore = new LRUCache<string, boolean>({ max: 100 }); // Skip scroll restore for specific routes
   cardHeights = new LRUCache<string, Record<number, number>>({ max: 500 }); // Global cache for card heights
 
-  #currentDevice = $derived.by(() => (isMobile() ? "mobile" : "desktop"));
-  #prevDevice = "desktop";
+  #currentDevice: Device = $derived.by(() => (isMobile() ? "mobile" : "desktop"));
+  #prevDevice: Device | undefined = undefined;
   effectCleanup: (() => void) | undefined;
 
   /**
    * track breakpoint for better DX during development
    */
   observeBreakpointChanges = () => {
-    if (!isDevelopmentMode() || this.effectCleanup) return; // Skip in production or if already set up
+    if (this.effectCleanup) return; // Skip if already observing
 
     // Set up the effect and store the cleanup function
     this.effectCleanup = $effect.root(() => {
       $effect.pre(() => {
         if (this.#currentDevice !== this.#prevDevice) {
+          $inspect("Previous device", this.#prevDevice, ", Current device", this.#currentDevice);
           this.clearCachesForDevice();
           this.#prevDevice = this.#currentDevice;
         }
@@ -114,6 +77,10 @@ export class RouteStateManager {
       void this.effectCleanup();
       this.effectCleanup = undefined;
     }
+  }
+
+  setInitialDevice(device: Device) {
+    this.#prevDevice = device;
   }
 
   /**
@@ -133,6 +100,7 @@ export class RouteStateManager {
 
     // Clear state properties
     this.lastVisitedJob = undefined;
+    this.lastVisitedJobSource = undefined;
     this.carouselState = null;
   }
 
@@ -227,7 +195,7 @@ export class RouteStateManager {
 
   // Mark a job slug as the last visited for mobile navigation.
   // `source` indicates where the user clicked the job (carousel or grid).
-  MarkVisitedJob(slug: CardJob["slug"], source: "carousel" | "grid" = "grid") {
+  MarkVisitedJob(slug: CardJob["slug"], source?: JobCardProps["variant"]): void {
     if (!slug) return;
     this.lastVisitedJob = slug;
     this.lastVisitedJobSource = source;
@@ -236,7 +204,7 @@ export class RouteStateManager {
         sessionStorage.setItem(`lastVisitedJob-${this.#currentDevice}`, slug);
         sessionStorage.setItem(
           `lastVisitedJobSource-${this.#currentDevice}`,
-          source,
+          source ?? "",
         );
       } catch (e) {
         console.warn("Failed to save last visited job to sessionStorage", e);
@@ -246,7 +214,7 @@ export class RouteStateManager {
 
   // Check if a job slug is the last visited for mobile navigation.
   // If `source` is provided, only return true when the stored source matches.
-  hasVisitedJob(slug: CardJob["slug"], source?: "carousel" | "grid"): boolean {
+  hasVisitedJob(slug: CardJob["slug"], source?: JobCardProps["variant"]): boolean {
     if (!slug) return false;
     if (this.lastVisitedJob === slug) {
       if (!source) return true;
@@ -263,7 +231,7 @@ export class RouteStateManager {
           try {
             const src = sessionStorage.getItem(
               `lastVisitedJobSource-${this.#currentDevice}`,
-            ) as "carousel" | "grid" | null;
+            ) as JobCardProps["variant"] | null;
             if (src) this.lastVisitedJobSource = src;
           } catch { }
           if (!source) return true;
@@ -287,7 +255,7 @@ export class RouteStateManager {
           this.lastVisitedJob = stored;
           const src = sessionStorage.getItem(
             `lastVisitedJobSource-${this.#currentDevice}`,
-          ) as "carousel" | "grid" | null;
+          ) as JobCardProps["variant"] | null;
           if (src) this.lastVisitedJobSource = src;
           return this.lastVisitedJob;
         }
@@ -303,7 +271,7 @@ export class RouteStateManager {
   }
 
   saveCardHeights(
-    heights: SvelteMap<number, number> | Map<number, number>,
+    heights: SvelteMap<number, number>, 
     keyname: string = "global",
   ) {
     // Accept either SvelteMap or native Map and persist as a plain record for storage
@@ -438,7 +406,6 @@ export type GotoOptions = Parameters<typeof goto>[1];
  */
 export function GlobalNavigateTo(path: string, gotoOpts?: GotoOptions) {
 
-  routeStore.addContainerWillChange();
   routeStore.setIsInitialLoad(false);
   routeStore.setIsLoading(true);
   routeStore.isTransitioningRoute = true;
@@ -450,10 +417,6 @@ export function GlobalNavigateTo(path: string, gotoOpts?: GotoOptions) {
       await goto(path, gotoOpts);
     } catch (e) {
       console.error("goto failed for", path, e);
-      // Fallback: update store so app can recover
-    } finally {
-      // remove will-change after a (short) safety delay — the afterNavigate handler will also clear flags
-      routeStore.removeContainerWillChange();
     }
   })();
 }

@@ -32,7 +32,7 @@
   }>();
 
   // show spinner overlay when mobile navigating for the card currently selected by slug
-  const spinnerVisible = $derived(() => {
+  const spinnerVisible = $derived.by(() => {
     return isMobile() && routeStore.isLoading && selected;
   });
 
@@ -46,7 +46,7 @@
     generalStore.useStatusJob(Number(jobdata?.status_pekerjaan ?? 0)),
   );
   const deadlineInfo = $derived.by(() =>
-    generalStore.useDeadline(jobdata?.deadline, now)(),
+    generalStore.useDeadline(jobdata?.deadline, now),
   );
   const timeAgo = $derived.by(() =>
     generalStore.useTimeAgo(jobdata?.post_time, now),
@@ -54,7 +54,7 @@
 
   const selected = $derived.by(() => {
     const slugMatch = routeStateStore.lastVisitedJob === jobdata?.slug;
-    const expectedSource = variant === "carousel" ? "carousel" : "grid";
+    const expectedSource = variant;
     const sourceMatch = routeStateStore.lastVisitedJobSource === expectedSource;
     return slugMatch && sourceMatch;
   });
@@ -109,7 +109,7 @@
 <div
   class={`group relative ${cardClass}`}
   data-job-slug={jobdata?.slug}
-  data-job-source={variant === "carousel" ? "carousel" : "grid"}
+  data-job-source={variant}
 >
   <a href={permalink} class="contents" onclick={handleClick}>
     <div class={bodyClass}>
@@ -125,7 +125,7 @@
               class="text-lg font-semibold text-center text-[var(--wpl-global-color-1)]"
               datetime={jobdata?.post_time}
             >
-              {timeAgo()}
+              {timeAgo}
             </time>
           </div>
         </div>
@@ -167,7 +167,7 @@
 
       <div class="divider my-2"></div>
 
-      <div class="flex items-center justify-between font-semibold">
+      <div class="flex items-center justify-between font-semibold gap-3">
         {#if statusInfo.label}
           <span
             class={[
@@ -180,28 +180,26 @@
             {:else if statusInfo.label === "Pinned"}
               <ThumbTackSolid class="h-4 w-4" aria-hidden="true" />
             {/if}
-            {statusInfo.label}
+          </span>
+        {/if}
+        {#if deadlineInfo.text}
+          <span
+            class={[
+              "flex items-center badge gap-1 px-3 py-1 font-semibold rounded",
+              deadlineInfo.style,
+            ].join(" ")}
+          >
+            <CalendarSolid class="h-4 w-4" aria-hidden="true" />
+            <span>{deadlineInfo.text}</span>
           </span>
         {/if}
         <div class="flex items-center gap-1 ml-auto">
-          {#if deadlineInfo.text}
-            <span
-              class={[
-                "flex items-center badge gap-1 px-3 py-1 font-semibold rounded",
-                deadlineInfo.style,
-              ].join(" ")}
-            >
-              <CalendarSolid class="h-4 w-4" aria-hidden="true" />
-              <span>{deadlineInfo.text}</span>
-            </span>
-          {/if}
-
           {#if variant !== "bookmark"}
             <BookmarkButton jobId={Number(jobdata.id)} {variant} />
           {/if}
         </div>
       </div>
-      {#if spinnerVisible()}
+      {#if spinnerVisible}
         <div
           class="absolute inset-0 backdrop-blur-sm flex items-center justify-center z-20 will-change-contents"
         >
@@ -223,7 +221,7 @@
   }
 
   .card-base-carousel {
-    @apply card-base max-w-full hover:shadow-lg hover:border-[var(--wpl-global-color-1)];
+    @apply flex card-base max-w-full hover:shadow-lg hover:border-[var(--wpl-global-color-1)] flex-col;
   }
 
   .card-selected-carousel {
@@ -242,7 +240,7 @@
     @apply card-body relative p-3 gap-0 flex flex-col min-h-[300px] h-full;
   }
 
-  .card-body-featured {
+  .card-body-featured, .card-body-bookmark {
     @apply card-body relative p-4 gap-1 flex flex-col h-full;
   }
 </style>

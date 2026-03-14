@@ -36,7 +36,7 @@
 
       async function MobileJobClick(): Promise<void> {
         // Mark as last visited before navigating
-        routeStateStore.MarkVisitedJob(job.slug ?? "", "grid");
+        routeStateStore.MarkVisitedJob(job.slug ?? "", "featured");
         // use SPA navigation to SingleLowongan.svelte route
         const url = new URL(String(job.permalink), window.location.origin);
         jobGridManager.saveGridStates();
@@ -48,7 +48,7 @@
           new URL(String(job.permalink), window.location.origin).pathname,
         ); // save state with the target path so it can be restored in sidepanel context
 
-        jobOverlay.openOverlay(job.slug ?? "", job, "grid");
+        jobOverlay.openOverlay(job.slug ?? "", job, "featured");
         this.scrollToCard(job.slug ?? "");
       } else {
         await MobileJobClick();
@@ -56,13 +56,11 @@
     }
 
     scrollToCard(slug: string): void {
-      jobOverlay.scrollToCard(slug, 300, false, "grid");
+      jobOverlay.scrollToCard(slug, 300, false, "featured");
     }
   }
 
   class GridJobManager {
-    #disposeSave: (() => void) | undefined;
-
     /**
      * Refresh the job grid based on the current search context and filters
      * Refresh button initialized in the UI to allow users to manually refresh the grid when they want to see updated results without changing filters or search terms
@@ -127,6 +125,7 @@
           if (typeof saved.totalJobs === "number")
             searchStore.totalJobs = saved.totalJobs;
         }
+        
 
         if (routeStore.isInitialLoad) {
           tick().then(() => {
@@ -194,7 +193,7 @@
     totalJobs,
   } = (() => props)() as JobGridProps;
   // Prime from SSR
-  if (jobs && jobs.length && routeStore.isInitialLoad) {
+  if (jobs && jobs.length) {
     searchStore.jobs = [...jobs];
     if (typeof maxNumPages === "number" && maxNumPages > 0) {
       searchStore.maxNumPages = maxNumPages;
@@ -278,23 +277,25 @@
   // Clear virtualization measurements when filters change to avoid layout glitches
   $effect(() => {
     const current = JSON.stringify(searchStore.filters || {});
-    if (!prevFilters) {
-      prevFilters = current;
-      return;
-    }
-    if (current !== prevFilters) {
-      prevFilters = current;
-      try {
-        // clear in-memory map used by virtualization
-        if (cardHeights && typeof cardHeights.clear === "function") {
-          cardHeights.clear();
-        }
-        // persist empty heights so other components/tabs use fresh measurements
-        routeStateStore.saveCardHeights(new SvelteMap(), "jobGrid");
-      } catch (e) {
-        void e;
+    requestIdleCallback(() => {
+      if (!prevFilters) {
+        prevFilters = current;
+        return;
       }
-    }
+      if (current !== prevFilters) {
+        prevFilters = current;
+        try {
+          // clear in-memory map used by virtualization
+          if (cardHeights && typeof cardHeights.clear === "function") {
+            cardHeights.clear();
+          }
+          // persist empty heights so other components/tabs use fresh measurements
+          routeStateStore.saveCardHeights(new SvelteMap(), "jobGrid");
+        } catch (e) {
+          void e;
+        }
+      }
+    });
   });
 
   onMount(() => {
@@ -302,7 +303,7 @@
   });
 </script>
 
-<section class="relative mt-8" id="job-grid">
+<section class="relative mt-12" id="job-grid" style="contain: layout;">
   <div class="flex items-center justify-between mb-6">
     {#if displayJobs.length}
       <h2 class="text-xl md:text-2xl font-semibold">{displayTitle}</h2>
@@ -371,7 +372,7 @@
                     permalink={job.permalink ?? ""}
                     isVisited={routeStateStore.hasVisitedJob(
                       job.slug ?? "",
-                      "grid",
+                      "featured",
                     )}
                     onClick={() => {
                       routeStore.setIsInitialLoad(false);
@@ -400,7 +401,7 @@
                   permalink={job.permalink ?? ""}
                   isVisited={routeStateStore.hasVisitedJob(
                     job.slug ?? "",
-                    "grid",
+                    "featured",
                   )}
                   onClick={() => {
                     routeStore.setIsInitialLoad(false);

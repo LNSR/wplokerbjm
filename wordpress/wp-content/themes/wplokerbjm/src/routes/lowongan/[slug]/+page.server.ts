@@ -11,51 +11,46 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) => {
   const isMobile = Boolean(locals.deviceType?.isMobile);
 
   try {
-    // always fetch the job detail first; we need its id for schema
-    const job = await APIService.fetchJobDetailGraphQL(
-      slug,
-      undefined,
-      undefined,
-      fetch,
+    const jobPromise = APIService.fetchJobDetailGraphQL(slug, undefined, fetch);
+    const schemaPromise = APIService.fetchJobSchemasGraphQL(slug, undefined, "JobPosting", fetch).catch(
+      (e) => {
+        console.warn("Failed to fetch job schema on server load:", e);
+        return null;
+      },
     );
 
-    // compute jobSchema even if mobile; schema is useful for SEO on both
-    let jobSchema: any = null;
-    if (job && job.id) {
-      try {
-        const schemas = await APIService.fetchJobSchemasGraphQL(
-          [Number(job.id)],
-          undefined,
-          "JobPosting",
-          undefined,
-          fetch,
-        );
-        jobSchema = schemas?.[0] || null;
+    const desktopDataPromise = !isMobile
+      ? Promise.all([
+        APIService.fetchCarouselGraphQL(fetch),
+        APIService.fetchJobGridGraphQL({ paged: 1 }, fetch),
+      ]).catch((e) => {
+        console.warn("Failed to fetch carousel/jobGrid on server load:", e);
+        return [null, null] as const;
+      })
+      : Promise.resolve([null, null] as const);
 
-        if (jobSchema && url.origin) {
-          const cmsOrigin = getCmsOrigin();
-          try {
-            const hostOnly = cmsOrigin.replace(/^https?:\/\//, "").replace(/\/$/, "");
-            const originRegex = new RegExp(`https?:\\/\\/${hostOnly}`, "g");
-            const str = JSON.stringify(jobSchema);
-            jobSchema = JSON.parse(str.replace(originRegex, url.origin));
-          } catch (e) {
-            const str = JSON.stringify(jobSchema);
-            jobSchema = JSON.parse(str.split(cmsOrigin).join(url.origin));
-          }
-        }
+    const [job, schemas, [carousel, jobGrid]] = await Promise.all([
+      jobPromise,
+      schemaPromise,
+      desktopDataPromise,
+    ]);
+
+    let jobSchema: any = schemas?.[0] || null;
+    if (jobSchema && url.origin) {
+      const cmsOrigin = getCmsOrigin();
+      try {
+        const hostOnly = cmsOrigin.replace(/^https?:\/\//, "").replace(/\/$/, "");
+        const originRegex = new RegExp(`https?:\\/\\/${hostOnly}`, "g");
+        const str = JSON.stringify(jobSchema);
+        jobSchema = JSON.parse(str.replace(originRegex, url.origin));
       } catch (e) {
-        console.warn("Failed to fetch job schema on server load:", e);
+        const str = JSON.stringify(jobSchema);
+        jobSchema = JSON.parse(str.split(cmsOrigin).join(url.origin));
       }
     }
 
     if (!isMobile) {
       if (!job) throw error(410, "Lowongan tidak ditemukan");
-
-      const [carousel, jobGrid] = await Promise.all([
-        APIService.fetchCarouselGraphQL(fetch),
-        APIService.fetchJobGridGraphQL({ paged: 1 }, fetch),
-      ]);
 
       return {
         carousel: carousel ?? { jobs: [], totalJobs: 0 },

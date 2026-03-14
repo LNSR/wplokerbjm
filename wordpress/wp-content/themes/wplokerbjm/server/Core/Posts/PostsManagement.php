@@ -156,8 +156,8 @@ class PostsJobStatus
                 return;
             }
             $now = time();
-            $seven_days_ahead = strtotime('+7 days 23:59:59', strtotime('today', $now));
-            if ($deadline_ts >= $now && $deadline_ts <= $seven_days_ahead && $current_status !== CustomFields::STATUS_PEKERJAAN_URGENT) {
+            $fourteen_days_ahead = strtotime('+14 days 23:59:59', strtotime('today', $now));
+            if ($deadline_ts >= $now && $deadline_ts <= $fourteen_days_ahead && $current_status !== CustomFields::STATUS_PEKERJAAN_URGENT) {
                 update_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, CustomFields::STATUS_PEKERJAAN_URGENT);
             }
         } catch (\Exception $e) {

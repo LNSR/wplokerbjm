@@ -1,4 +1,4 @@
-import type { CardJob, JobDetailResponse } from "@/types";
+import type { CardJob, JobCardProps, JobDetailResponse } from "@/types";
 import { isMobile } from "$lib/utils/elements.svelte";
 import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
 import { SvelteURL } from "svelte/reactivity";
@@ -61,7 +61,7 @@ export class JobOverlayManager {
   public openOverlay(
     slug: string,
     job?: CardJob,
-    source: "carousel" | "grid" = "grid",
+    source: JobCardProps["variant"] = "featured",
   ): void {
     routeStateStore.MarkVisitedJob(slug, source);
     this.selectedJob = job ?? null;
@@ -74,7 +74,7 @@ export class JobOverlayManager {
         const url = new SvelteURL(job.permalink, window.location.origin);
         const path = url.pathname + url.search + url.hash;
 
-        GlobalNavigateTo(path, { replaceState: true, noScroll: true });
+        GlobalNavigateTo(path, { replaceState: true, noScroll: true, keepFocus: true });
       }
     });
   }
@@ -84,7 +84,7 @@ export class JobOverlayManager {
    *
    * @param slug - The job slug to scroll to; defaults to `this.selectedSlug`
    * @param skipIfScrolling - If true, skip scrolling if user is actively scrolling (default: true)
-   * @param preferredSource - Preferred source of the card ("carousel" or "grid") when multiple matches exist
+   * @param preferredSource - Preferred source of the card ("carousel" or "featured") when multiple matches exist
    *
    * Notes:
    * - If no slug is provided and `this.selectedSlug` is null, no action is taken.
@@ -97,7 +97,7 @@ export class JobOverlayManager {
     slug?: string,
     delay: number = 300,
     skipIfScrolling: boolean = true,
-    preferredSource?: "carousel" | "grid",
+    preferredSource?: JobCardProps["variant"],
   ): void {
     const targetSlug = slug ?? this.selectedSlug;
     if (!targetSlug) return;

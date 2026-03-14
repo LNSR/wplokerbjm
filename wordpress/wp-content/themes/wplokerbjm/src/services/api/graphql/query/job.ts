@@ -163,8 +163,8 @@ export const GET_JOB_DETAIL = gql`
 `;
 
 export const GET_JOB_SCHEMA = gql`
-  query GetJobSchema($ids: [Int!]!, $type: String) {
-    jobSchema(ids: $ids, type: $type) {
+  query GetJobSchema($ids: [Int], $slug: String, $type: String) {
+    jobSchema(ids: $ids, slug: $slug, type: $type) {
       schemas
     }
   }
