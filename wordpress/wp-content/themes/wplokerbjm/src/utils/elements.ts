@@ -23,11 +23,6 @@ export function removePropsScriptFromElement(element: Element | Document, propAt
     const isDev = isDevelopmentMode();
     if (isDev) return;
 
-    try {
-        const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`) as HTMLScriptElement | null;
-        if (scriptElement)
-            scriptElement.remove();
-    } catch {
-        // Ignore
-    }
+    const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`) as HTMLScriptElement | null;
+    if (scriptElement) scriptElement.remove();
 }

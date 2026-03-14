@@ -31,3 +31,4 @@ localhost.pem
 localhost-key.pem
 localhost.key
 localhost.crt
+worker-configuration.d.ts

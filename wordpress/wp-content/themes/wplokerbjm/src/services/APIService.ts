@@ -10,6 +10,7 @@ import type {
   WPLokerBJMThemedData,
   SearchResponse,
   TaxonomyApiInterface,
+  RankMathHeadData,
 } from "@/types";
 import { createClient, fetchExchange, type ClientOptions } from "urql";
 import { persistedExchange } from "@urql/exchange-persisted";
@@ -31,8 +32,8 @@ import {
   GET_RANK_MATH_HEAD,
   GET_THEME_NONCE,
 } from "@/services/api/graphql/query";
-import { getCmsOrigin, isDevelopmentMode } from "@/utils";
-import { nonceManager } from "$lib/utils/Nonce.svelte";
+import { getCmsOrigin } from "@/utils";
+import { themeManager } from "$lib/stores/Theme.svelte";
 
 type BookmarkedJobsResponse = CardJob[];
 type JobSchemaResponse = Record<string, any>[];
@@ -69,8 +70,8 @@ class URQLClientManager {
         credentials: "include",
         mode: "cors",
         headers: {
-          ...(nonceManager.getNonce
-            ? { "X-WP-Nonce": nonceManager.getNonce }
+          ...(themeManager.getNonce
+            ? { "X-WP-Nonce": themeManager.getNonce }
             : {}),
         },
       }),
@@ -279,13 +280,21 @@ export class APIService {
   }
 
   static async fetchJobSchemasGraphQL(
-    ids: number[],
+    idsOrSlug?: number[] | string,
     signal?: AbortSignal,
     type?: string,
     fetchFn?: typeof fetch,
   ): Promise<JobSchemaResponse> {
-    const variables: any = { ids };
+    const variables: any = {};
+
+    if (typeof idsOrSlug === 'string') {
+      variables.slug = idsOrSlug;
+    } else if (Array.isArray(idsOrSlug)) {
+      variables.ids = idsOrSlug;
+    }
+
     if (type) variables.type = type;
+
     const data = await URQLClientManager.runQuery(
       GET_JOB_SCHEMA,
       variables,
@@ -293,6 +302,7 @@ export class APIService {
       undefined,
       fetchFn,
     );
+
     return data.jobSchema.schemas.map((s: string) => JSON.parse(s));
   }
 
@@ -311,7 +321,28 @@ export class APIService {
     return data.themeData.data;
   }
 
-  static async getThemeNonceGraphQL(): Promise<string | null> {
+    static async getJWTGraphQL(
+    options: {
+      username?: string;
+      password?: string;
+      token?: string;
+    },
+    fetchFn?: typeof fetch,
+  ): Promise<JWTResponse> {
+    const data = await URQLClientManager.runMutation(
+      GET_JWT,
+      {
+        username: options.username,
+        password: options.password,
+        token: options.token,
+      },
+      URQLClientManager.mergedFetchOptionsContext(),
+      fetchFn,
+    );
+    return data.jwt ?? null;
+  }
+
+  static async getThemeNonceGraphQL(): Promise<WPLokerBJMThemedData["wpRestNonce"]> {
     const data = await URQLClientManager.runQuery(GET_THEME_NONCE, {}, undefined, undefined);
     return data.themeData.data?.wpRestNonce ?? null;
   }
@@ -348,7 +379,7 @@ export class APIService {
     url: string,
     signal?: AbortSignal,
     fetchFn?: typeof fetch,
-  ): Promise<string> {
+  ): Promise<RankMathHeadData> {
     const data = await URQLClientManager.runQuery(
       GET_RANK_MATH_HEAD,
       { url },
@@ -356,27 +387,6 @@ export class APIService {
       "force",
       fetchFn,
     );
-    return data.rankMathHead;
-  }
-
-  static async getJWTGraphQL(
-    options: {
-      username?: string;
-      password?: string;
-      token?: string;
-    },
-    fetchFn?: typeof fetch,
-  ): Promise<JWTResponse> {
-    const data = await URQLClientManager.runMutation(
-      GET_JWT,
-      {
-        username: options.username,
-        password: options.password,
-        token: options.token,
-      },
-      URQLClientManager.mergedFetchOptionsContext(),
-      fetchFn,
-    );
-    return data.jwt ?? null;
+    return data.rankMathHead ?? null;
   }
 }

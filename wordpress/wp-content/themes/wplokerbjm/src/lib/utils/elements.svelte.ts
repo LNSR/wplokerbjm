@@ -1,8 +1,9 @@
+import type { Attachment } from "svelte/attachments";
 import { MediaQuery, SvelteDate } from "svelte/reactivity";
 import { browser } from "$app/environment";
 import { page } from "$app/state";
 
-export function isMobile(): boolean {
+export const isMobile = (): boolean => {
   if (!browser) {
     try {
       return page.data?.deviceType?.isMobile ?? false;
@@ -19,90 +20,75 @@ export const isJobGridEl = (): HTMLElement | null => {
   if (!browser) return null;
   return document.getElementById("job-grid");
 };
-/**
+
+export class SharedClock {
+  public static now = new SvelteDate();
+  static #intervalId: ReturnType<typeof setInterval> | null = null;
+  static #refCount: number = 0;
+
+  /**
  * @see generalStore.useTimeAgo()
  * @see generalStore.useDeadline()
  * Provides reactive time updates for generalStore.useTimeAgo().
- * Creates a time side effect that updates the SvelteDate every second.
+ * Creates a time side effect that updates the SvelteDate every minute.
  * Returns a cleanup function to clear the interval.
  */
-export function timeEffect(now?: SvelteDate): () => void {
-  const id = setInterval(() => now?.setTime(Date.now()), 1000);
-  // Return a cleanup function to clear the interval when the component is destroyed
-  return () => clearInterval(id);
+  public static timeEffect(): () => void {
+    SharedClock.startTimeEffect();
+
+    // Return a cleanup function to clear the interval when the component is destroyed
+    return () => {
+      SharedClock.stopTimeEffect();
+    };
+  }
+
+  private static startTimeEffect(): void {
+    SharedClock.#refCount += 1;
+
+    if (!SharedClock.#intervalId) {
+      SharedClock.#intervalId = setInterval(() => {
+        const now = Date.now();
+        SharedClock.now.setTime(now);
+      }, 60000); // Update every minute
+    }
+  }
+
+  private static stopTimeEffect(): void {
+    SharedClock.#refCount = Math.max(SharedClock.#refCount - 1, 0);
+    if (SharedClock.#refCount === 0 && SharedClock.#intervalId) {
+      clearInterval(SharedClock.#intervalId);
+      SharedClock.#intervalId = null;
+    }
+  };
 }
 
 /**
- * PortalManager encapsulates portal/teleport behaviors and exposes a reusable
- * instance for use across the app. Methods accept an optional callback invoked
- * once the append/remove operation has completed.
- */
+ * PortalManager encapsulates portal/teleport behaviors for Svelte components, allowing elements to be rendered outside their parent hierarchy. */
 export class PortalManager {
-  static teleport = (node: HTMLElement, selector: string = "body") => {
-    if (!browser) {
-      return { destroy() { } };
-    }
-    const target = document.querySelector(selector) ?? document.body;
-    try {
-      target.appendChild(node);
-    } catch (err) {
-      console.error("[portal] teleport failed", err);
-    }
+  /**
+   * Creates a Svelte attachment that teleports the element into the given selector.
+   * @param selector - element selector for the target container to teleport into (default: "body")
+   * @returns A Svelte attachment function
+   * @summary Usage example: <dialog {@attach PortalManager.teleport("#app")} class="modal">...</dialog>
+   */
+  static teleport(selector: string = "body"): Attachment {
+    return (node: Element) => {
+      if (!browser) return;
 
-    return {
-      destroy() {
+      const target = document.querySelector(selector) ?? document.body;
+      try {
+        target.appendChild(node);
+      } catch (err) {
+        console.error("[portal] teleport failed", err);
+      }
+
+      return () => {
         try {
           node.parentNode?.removeChild(node);
         } catch (err) {
           console.error("[portal] destroy failed", err);
         }
-      },
+      };
     };
   };
-
-  // Append element into the target container and invoke callback once appended
-  static append(
-    el: HTMLElement | null,
-    selector: string = "body",
-    callback?: () => void,
-  ) {
-    if (!browser) {
-      this.safeCallback(callback);
-      return;
-    }
-    const target = document.querySelector(selector) ?? document.body;
-    try {
-      if (el && el.parentElement !== target) target.appendChild(el);
-    } catch (err) {
-      console.error("[portal] append failed", err);
-    }
-    this.safeCallback(callback);
-  }
-
-  // Remove element from the target container and invoke callback once removed
-  static remove(
-    el: HTMLElement | null,
-    selector: string = "body",
-    callback?: () => void,
-  ) {
-    if (!browser) {
-      this.safeCallback(callback);
-      return;
-    }
-    const target = document.querySelector(selector) ?? document.body;
-    try {
-      if (el && el.parentElement === target) target.removeChild(el);
-    } catch (err) {
-      console.error("[portal] remove failed", err);
-    }
-    this.safeCallback(callback);
-  }
-
-  private static safeCallback(cb?: () => void) {
-    try {
-      cb?.();
-    } catch (e) {
-      console.error("[portal] callback failed", e);
-    }
-  }
 }

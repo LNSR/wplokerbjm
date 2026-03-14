@@ -1,16 +1,7 @@
 import { APIService } from '@/services/APIService'
-import type { TaxonomyTerm, WPLokerBJMThemedData } from '@/types'
+import type { TaxonomyTerm } from '@/types'
 import { TaxonomyType } from '@/types'
-import { themeManager } from '$lib/stores/Theme.svelte';
 import { SvelteMap } from 'svelte/reactivity'
-
-interface CachedTaxonomyData {
-	version: WPLokerBJMThemedData['themeVersion']
-	lastTaxonomyUpdate: string
-	data: TaxonomyTerm[]
-}
-
-type TaxonomyCacheKey = `wplokerbjm_taxonomy_${TaxonomyType}`
 
 class TaxonomyManager {
 	// State
@@ -51,36 +42,6 @@ class TaxonomyManager {
 		)
 	}
 
-	private getCachedTerms(type: TaxonomyType): TaxonomyTerm[] | null {
-		if (typeof sessionStorage === 'undefined') return null
-		const themeData = themeManager.getThemeData
-		if (!themeData?.themeVersion || !themeData?.lastTaxonomyUpdate) return null
-		const key: TaxonomyCacheKey = `wplokerbjm_taxonomy_${type}`
-		try {
-			const stored = sessionStorage.getItem(key)
-			if (!stored) return null
-			const parsed: CachedTaxonomyData = JSON.parse(stored)
-			if (parsed.version === themeData.themeVersion && parsed.lastTaxonomyUpdate === themeData.lastTaxonomyUpdate) {
-				return parsed.data
-			}
-		} catch (err) {
-			console.warn(`Failed to parse cached taxonomy ${type}:`, err)
-		}
-		return null
-	}
-
-	private setCachedTerms(type: TaxonomyType, data: TaxonomyTerm[]): void {
-		if (typeof sessionStorage === 'undefined') return
-		const themeData = themeManager.getThemeData
-		if (!themeData?.themeVersion || !themeData?.lastTaxonomyUpdate) return
-		const key: TaxonomyCacheKey = `wplokerbjm_taxonomy_${type}`
-		try {
-			const toStore: CachedTaxonomyData = { version: themeData.themeVersion, lastTaxonomyUpdate: themeData.lastTaxonomyUpdate, data }
-			sessionStorage.setItem(key, JSON.stringify(toStore))
-		} catch (err) {
-			console.warn(`Failed to cache taxonomy ${type}:`, err)
-		}
-	}
 
 	private buildSlugMap(type: TaxonomyType, terms: TaxonomyTerm[]): void {
 		let map: SvelteMap<string, string>
@@ -99,51 +60,16 @@ class TaxonomyManager {
 		addToMap(terms)
 	}
 
-	private getNameFromStorage(type: TaxonomyType, slug: string): string {
-		const themeData = themeManager.getThemeData
-		if (!themeData?.themeVersion || !themeData?.lastTaxonomyUpdate) return slug
-		const key: TaxonomyCacheKey = `wplokerbjm_taxonomy_${type}`
-		try {
-			const stored = sessionStorage.getItem(key)
-			if (!stored) return slug
-			const parsed: CachedTaxonomyData = JSON.parse(stored)
-			if (parsed.version === themeData.themeVersion && parsed.lastTaxonomyUpdate === themeData.lastTaxonomyUpdate) {
-				function find(terms: TaxonomyTerm[]): string | undefined {
-					for (const t of terms) {
-						if (t.slug === slug) return t.name
-						if (t.children) {
-							const found = find(t.children)
-							if (found) return found
-						}
-					}
-					return undefined
-				}
-				return find(parsed.data) || slug
-			}
-		} catch {
-			return slug
-		}
-		return slug
-	}
 
 	// Actions
 	public async fetchLokasiTerms(): Promise<void> {
 		if (this.lokasiLoaded && !this.lokasiError) return
-		// Check cache first
-		const cached = this.getCachedTerms(TaxonomyType.lokasi)
-		if (cached) {
-			this.lokasiTerms = cached
-			this.lokasiLoaded = true
-			this.buildSlugMap(TaxonomyType.lokasi, cached)
-			return
-		}
 		this.lokasiLoading = true
 		this.lokasiError = null
 		try {
 			const data = await APIService.fetchLokasiTermsGraphQL()
 			this.lokasiTerms = data
 			this.lokasiLoaded = true
-			this.setCachedTerms(TaxonomyType.lokasi, data)
 			this.buildSlugMap(TaxonomyType.lokasi, data)
 		} catch (err) {
 			this.lokasiError = err instanceof Error ? err.message : 'Failed to fetch lokasi terms'
@@ -155,21 +81,12 @@ class TaxonomyManager {
 
 	public async fetchGenderTerms(): Promise<void> {
 		if (this.genderLoaded && !this.genderError) return
-		// Check cache first
-		const cached = this.getCachedTerms(TaxonomyType.gender)
-		if (cached) {
-			this.genderTerms = cached
-			this.genderLoaded = true
-			this.buildSlugMap(TaxonomyType.gender, cached)
-			return
-		}
 		this.genderLoading = true
 		this.genderError = null
 		try {
 			const data = await APIService.fetchGenderTermsGraphQL()
 			this.genderTerms = data
 			this.genderLoaded = true
-			this.setCachedTerms(TaxonomyType.gender, data)
 			this.buildSlugMap(TaxonomyType.gender, data)
 		} catch (err) {
 			this.genderError = err instanceof Error ? err.message : 'Failed to fetch gender terms'
@@ -181,21 +98,12 @@ class TaxonomyManager {
 
 	public async fetchPendidikanTerms(): Promise<void> {
 		if (this.pendidikanLoaded && !this.pendidikanError) return
-		// Check cache first
-		const cached = this.getCachedTerms(TaxonomyType.pendidikan)
-		if (cached) {
-			this.pendidikanTerms = cached
-			this.pendidikanLoaded = true
-			this.buildSlugMap(TaxonomyType.pendidikan, cached)
-			return
-		}
 		this.pendidikanLoading = true
 		this.pendidikanError = null
 		try {
 			const data = await APIService.fetchPendidikanTermsGraphQL()
 			this.pendidikanTerms = data
 			this.pendidikanLoaded = true
-			this.setCachedTerms(TaxonomyType.pendidikan, data)
 			this.buildSlugMap(TaxonomyType.pendidikan, data)
 		} catch (err) {
 			this.pendidikanError = err instanceof Error ? err.message : 'Failed to fetch pendidikan terms'
@@ -235,9 +143,7 @@ class TaxonomyManager {
 		if (type === TaxonomyType.lokasi) map = this.lokasiSlugMap
 		else if (type === TaxonomyType.gender) map = this.genderSlugMap
 		else map = this.pendidikanSlugMap
-		const fromMap = map.get(slug)
-		if (fromMap) return fromMap
-		return this.getNameFromStorage(type, slug)
+		return map.get(slug) ?? slug
 	}
 }
 

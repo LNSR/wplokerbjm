@@ -25,11 +25,25 @@
   // synchronous lock to prevent same-tick re-entrancy from multiple rapid DOM clicks
   let _clickLock = false;
 
-  async function handleToggleSave(e: MouseEvent) {
+  function handleToggleSave(e: MouseEvent) {
     // prevent parent handlers
     e.preventDefault();
     e.stopPropagation();
     if (isNaN(jobId) || jobId < 1) return;
+
+    // If this tab is outdated (a newer build is open elsewhere), do a cache-reload fetch then force navigation.
+    if (typeof window !== "undefined" && bookmarkStore.isOutdated) {
+      fetch(window.location.href, { cache: "reload" }).then(() => {
+        window.location.reload;
+      });
+      return;
+    }
+
+    // Preload bookmark modal for faster access when viewing bookmarks
+    if (!dynamicComponentStore.BookmarkModal) {
+      void dynamicComponentStore.loadBookmarkModal();
+    }
+
     // protect against both reactive loading state and synchronous re-entry
     if (isLoading || _clickLock) return;
 
@@ -40,19 +54,14 @@
     isPending = true;
     try {
       const wasSaved = isJobSaved;
-      await toggleSave(jobId);
-      isPending = false;
-
-      if (!wasSaved) {
-        confirmationState = "saved";
-      } else {
-        confirmationState = "removed";
-      }
-
-      // Preload bookmark modal for faster access when viewing bookmarks
-      if (!dynamicComponentStore.BookmarkModal) {
-        void dynamicComponentStore.loadBookmarkModal();
-      }
+      toggleSave(jobId).then(() => {
+        isPending = false;
+        if (!wasSaved) {
+          confirmationState = "saved";
+        } else {
+          confirmationState = "removed";
+        }
+      });
     } catch {
       isPending = false;
       const wasSaved = preToggleSaved;

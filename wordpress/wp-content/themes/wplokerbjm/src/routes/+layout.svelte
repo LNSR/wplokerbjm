@@ -4,53 +4,75 @@
   import Header from "$lib/components/layouts/Header.svelte";
   import Footer from "$lib/components/layouts/Footer.svelte";
   import FloatingActionButton from "$lib/components/ui/Shared/FloatingActionButton.svelte";
-  import { onMount } from "svelte";
-  import { afterNavigate, onNavigate } from "$app/navigation";
+  import { onMount, type Snippet } from "svelte";
+  import { afterNavigate, onNavigate, beforeNavigate } from "$app/navigation";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
-  import type { HeadData, WPLokerBJMThemedData } from "@/types";
+  import { updated } from "$app/state";
+  import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
   import { themeManager } from "@/lib/stores/Theme.svelte";
   import script from "@@/public/js/theme/InlineScript.html?raw";
+  import type { OnNavigate } from "@sveltejs/kit";
 
   let initialPageviewSent = false;
-
-  onNavigate(() => {
-    routeStore.setIsInitialLoad(false);
-    routeStore.isTransitioningRoute = true;
-  });
 
   const {
     children,
     data,
   }: {
-    children?: any;
+    children: Snippet;
     data?: {
-      themeData?: WPLokerBJMThemedData | null;
+      themeData?: WPLokerBJMThemedData;
       deviceType?: App.PageData["deviceType"];
-      rankMathHead?: HeadData | null;
+      rankMathHead?: RankMathHeadData;
     };
   } = $props();
 
   const { themeData, rankMathHead } = $derived({
-    themeData: data?.themeData ?? null,
-    rankMathHead: data?.rankMathHead ?? null,
+    themeData: data?.themeData,
+    rankMathHead: data?.rankMathHead,
+  });
+
+  beforeNavigate(({ to, willUnload }) => {
+    try {
+      if (updated.current && !willUnload && to?.url) {
+        location.href = to.url.href;
+      }
+      routeStore.setIsInitialLoad(false);
+      routeStore.setIsLoading(true);
+      routeStore.setIsTransitioningRoute(true);
+    } catch (error) {
+      console.error("Error during beforeNavigate:", error);
+    }
+  });
+
+  onNavigate(async (navigation: OnNavigate) => {
+    if (
+      !document.startViewTransition ||
+      typeof document.startViewTransition !== "function"
+    )
+      return;
+    return new Promise((resolve) => {
+      document.startViewTransition(async () => {
+        resolve();
+        await navigation.complete;
+      });
+    });
   });
 
   afterNavigate(() => {
     routeStore.setIsLoading(false);
-    routeStore.isTransitioningRoute = false;
-    if (routeStore.isInitialLoad) {
-      if (!initialPageviewSent) {
-        GoogleServices.injectGTMScript()
-          .then(() => {
-            if (GoogleServices.gtmLoaded) {
-              GoogleServices.sendPageView();
-              initialPageviewSent = true;
-            }
-          })
-          .catch(() => {
-            console.error("Failed to inject GTM script on initial load");
-          });
-      }
+    routeStore.setIsTransitioningRoute(false);
+    if (routeStore.isInitialLoad && !initialPageviewSent) {
+      GoogleServices.injectGTMScript()
+        .then(() => {
+          if (GoogleServices.gtmLoaded) {
+            GoogleServices.sendPageView();
+            initialPageviewSent = true;
+          }
+        })
+        .catch(() => {
+          console.error("Failed to inject GTM script on initial load");
+        });
     } else {
       if (GoogleServices.gtmLoaded) {
         GoogleServices.sendPageView();
@@ -59,15 +81,16 @@
   });
 
   onMount(() => {
-    themeManager.setThemeData(themeData as WPLokerBJMThemedData);
+    themeManager.setThemeData(themeData!);
     routeStateStore.setInitialDevice(
       data?.deviceType?.isMobile ? "mobile" : "desktop",
     );
 
-    routeStateStore.observeBreakpointChanges();
+    const cleanupObserveBreakpointChanges =
+      routeStateStore.observeBreakpointChanges();
 
     return () => {
-      routeStateStore.cleanUpEffectObserveBreakpointChanges();
+      cleanupObserveBreakpointChanges?.();
     };
   });
 </script>
@@ -91,3 +114,26 @@
   <Footer />
 </div>
 <FloatingActionButton />
+
+<style lang="postcss">
+  @reference "@css/app.css";
+  .page-transition {
+    transition: opacity 0.1s ease-in-out;
+    content-visibility: auto;
+    /* Reserve viewport space using header CSS vars to avoid layout shifts */
+    contain-intrinsic-size: auto
+      calc(
+        100vh -
+          (var(--site-header-height, 0px) + var(--site-scroll-padding-top, 0px))
+      );
+    opacity: 1;
+    view-transition-name: auto;
+  }
+
+  /* Ensure smooth transitions for route changes */
+  .route-container {
+    min-height: 100vh;
+    transition: all 0.2s ease-in-out;
+    position: relative;
+  }
+</style>

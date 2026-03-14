@@ -162,7 +162,9 @@
     }
   }
 
-  let CustomDropdown: CustomDropdownComponent | null = $state(null);
+  let CustomDropdown: CustomDropdownComponent | null = $derived(
+    dynamicComponentStore.CustomDropdown,
+  );
 </script>
 
 <script lang="ts">
@@ -192,7 +194,7 @@
     archiveLink = "/",
     searchResults = undefined,
     searchError = undefined,
-  } = (() => props)() as LocalSearchFormProps;
+  } = $derived<LocalSearchFormProps>(props);
 
   let isLokasiOpen = $state(false);
   let isGenderOpen = $state(false);
@@ -332,16 +334,16 @@
     }
   };
 
-  $effect(() => {
+  $effect.pre(() => {
     if (
       isGenderOpen ||
       isLokasiOpen ||
       isPendidikanOpen ||
       (isSortOpen && !CustomDropdown)
     ) {
-      dynamicComponentStore.loadCustomDropdown().then((comp) => {
-        CustomDropdown = comp;
-      });
+      if (!dynamicComponentStore.CustomDropdown) {
+        void dynamicComponentStore.loadCustomDropdown();
+      }
     }
   });
 
@@ -368,16 +370,9 @@
   });
 </script>
 
-<section class="mx-auto px-4 py-4 text-center">
-  <h1 class="text-2xl md:text-3xl max-w-4xl mx-auto mt-4 font-bold mb-3">
-    Temukan Lowongan Kerja di Kalimantan terutama Banjarmasin, Banjarbaru,
-    Martapura dan sekitarnya
-  </h1>
-  <p class="mb-8 text-lg text-semibold">
-    Update berkala, mudah diakses, dan tanpa kewajiban biaya!
-  </p>
+<section class="mx-auto p-4 text-center mb-16">
   <div
-    class="border-2 border-[var(--wpl-global-color-1)] mt-4 rounded-xl p-4 md:p-6 min-h-[220px] sm:min-h-[306px] md:min-h-[204px]"
+    class="lg:mx-[calc(50vw-50%)] border-2 border-[var(--wpl-global-color-1)] rounded-xl p-5 min-h-[220px] sm:min-h-[306px] md:min-h-[204px]"
   >
     <form
       class="space-y-4"
@@ -586,10 +581,6 @@
             aria-expanded={isSortOpen}
             aria-controls="sort-listbox"
             onclick={() => {
-              (async () => {
-                CustomDropdown =
-                  await dynamicComponentStore.loadCustomDropdown();
-              })();
               isSortOpen = !isSortOpen;
               if (isSortOpen) {
                 isLokasiOpen = false;

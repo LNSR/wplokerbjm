@@ -28,7 +28,7 @@ class JobGrid
         if (!$title) {
             $title = match ($context) {
                 'search' => 'Hasil Pencarian',
-                'latest' => 'Lowongan Terbaru(max 1 Bulan)',
+                'latest' => 'Lowongan Terbaru',
                 default => '',
             };
         }

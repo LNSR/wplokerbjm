@@ -85,7 +85,7 @@ class WPGraphQL
     /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
-    #[Filter('graphql_response_headers_to_send', 11)]
+    #[Filter('graphql_response_headers_to_send', PHP_INT_MAX)]
     public static function ModifyHeaderGraphQL(array $headers): array
     {
         if (!SharedUtils::isPluginActive('wpgraphql')) {
@@ -111,17 +111,19 @@ class WPGraphQL
 
         $headers['Access-Control-Allow-Credentials'] = 'true';
 
-        $headers['Access-Control-Allow-Headers'] = $headers['Access-Control-Allow-Headers'] . ', X-WP-Nonce, If-None-Match, If-Match, Cache-Control, If-Modified-Since';
-        $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag, Cache-Control, Last-Modified';
+        $headers['Access-Control-Allow-Headers'] = $headers['Access-Control-Allow-Headers'] . ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
+        $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag';
 
         if (isset($headers['Access-Control-Max-Age'])) {
             unset($headers['Access-Control-Max-Age']);
+            $headers['Access-Control-Max-Age'] = '86400';
         }
         $cacheControl = function ($extra) use (&$headers) {
+            // Force-set Cache-Control to ensure no stale directives like `no-store` remain.
             if (isset($headers['Cache-Control'])) {
                 unset($headers['Cache-Control']);
-                $headers['Cache-Control'] = $extra . ' , must-revalidate';
             }
+            $headers['Cache-Control'] = $extra . ', must-revalidate';
         };
         $loggedIn = is_user_logged_in();
         if ($loggedIn) {

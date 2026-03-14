@@ -48,7 +48,7 @@ export interface SearchResponse extends BaseJobSearchResponse {
 } 
 
 export enum SearchTitle {
-  Latest = 'Lowongan Terbaru(max 1 Bulan)',
+  Latest = 'Lowongan Terbaru',
   Search = 'Hasil Pencarian'
 }
 
@@ -92,7 +92,7 @@ export interface JobDetailResponse extends Pick<WPBasePost, 'id' | 'title' | 'po
 }
 
 // RankMath head data interface
-export interface HeadData {
+export interface RankMathHeadData {
   title?: string;
   description?: string;
   canonical?: string;

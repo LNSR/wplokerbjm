@@ -29,17 +29,12 @@
     }
   }
 
-  onMount(() => {
-    document.addEventListener("keydown", handleKeydown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeydown);
-    };
-  });
 </script>
 
+<svelte:window on:keydown={(e) => handleKeydown(e)} />
+
 {#if open}
-  <div use:PortalManager.teleport={"#app"}>
+  <div {@attach PortalManager.teleport("#app")}>
     <div class="modal modal-open z-[1100]">
       <div class="modal-box">
         <h3 class="font-bold text-lg">Masuk</h3>
@@ -99,7 +94,7 @@
             <button
               class="btn btn-ghost"
               type="button"
-              onclick={onClose}
+              onclick={() => onClose?.()}
               aria-label="Tutup"
             >
               Tutup
@@ -112,9 +107,9 @@
         role="button"
         tabindex="0"
         class="modal-backdrop"
-        onclick={onClose}
+        onclick={() => onClose?.()}
         onkeydown={(e: KeyboardEvent) => {
-          if (e.key === "Enter" || e.key === " ") onClose();
+          if (e.key === "Enter" || e.key === " ") onClose?.();
         }}
       ></div>
     </div>

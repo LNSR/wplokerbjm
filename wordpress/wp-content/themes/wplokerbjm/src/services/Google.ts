@@ -1,4 +1,3 @@
-import { nonceManager } from "$lib/utils/Nonce.svelte";
 import { themeManager } from "$lib/stores/Theme.svelte";
 import { Partytown } from "@/utils";
 
@@ -17,7 +16,7 @@ export class GoogleServices {
     if (typeof window === "undefined") return false;
     const themeData = themeManager.getThemeData;
     if (themeData?.disableTracking) return false;
-    return !nonceManager.getNonce;
+    return !themeManager.getNonce;
   }
 
   /**

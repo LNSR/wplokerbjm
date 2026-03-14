@@ -2,7 +2,7 @@ import type { CardJob, JobCardProps, JobDetailResponse } from "@/types";
 import { isMobile } from "$lib/utils/elements.svelte";
 import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
 import { SvelteURL } from "svelte/reactivity";
-import { GlobalNavigateTo } from "$lib/stores/Route.svelte";
+import { goto } from "$app/navigation";
 /**
  * JobOverlayManager
  *
@@ -21,7 +21,7 @@ export class JobOverlayManager {
   public overlayData = $state<JobDetailResponse | null>(null);
 
   // Scroll detection
-  public isScrolling = false;
+  private isScrolling: boolean = false;
   private scrollTimeout: ReturnType<typeof setTimeout> | null = null;
 
   /**
@@ -74,7 +74,7 @@ export class JobOverlayManager {
         const url = new SvelteURL(job.permalink, window.location.origin);
         const path = url.pathname + url.search + url.hash;
 
-        GlobalNavigateTo(path, { replaceState: true, noScroll: true, keepFocus: true });
+        goto(path, { replaceState: true, noScroll: true, keepFocus: true });
       }
     });
   }

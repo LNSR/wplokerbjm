@@ -1,45 +1,45 @@
 import type { Handle } from "@sveltejs/kit";
+import type { IncomingRequestCfProperties } from "@cloudflare/workers-types";
 import { handleDeviceDetector } from "sveltekit-device-detector";
 import { APIService } from "@/services/APIService";
 
 const deviceHandler: Handle = handleDeviceDetector({});
 
-// Check if request is authenticated
-function isAuthenticated(cookies: string | null): boolean {
-  if (!cookies) return false;
+class hooksHelper {
+  static isAuthenticated(cookies: string | null): boolean {
+    if (!cookies) return false;
 
-  // Check for JWT token
-  if (/jwt-token=([^;]+)/.test(cookies)) return true;
+    const wpAuthCookiePattern = /wordpress_logged_in|wordpress_sec|wordpress_\w+_?\d+/i;
+    
+    if (/jwt-token=([^;]+)/.test(cookies)) return true;
+    if (wpAuthCookiePattern.test(cookies)) return true;
 
-  // Check for WordPress authentication cookies
-  const wpAuthCookiePattern = /wordpress_logged_in|wordpress_sec|wordpress_\w+_?\d+/i;
-  if (wpAuthCookiePattern.test(cookies)) return true;
-
-  return false;
-}
-
-function prependHeader(headers: Headers, name: string, value: string) {
-  const existing = headers.get(name);
-  if (existing) {
-    headers.set(name, `${value}, ${existing}`);
-  } else {
-    headers.set(name, value);
+    return false;
   }
-}
 
-function filterCookieString(raw: string, isMobile: boolean | null): string {
-  const parts = raw.split(";").map(p => p.trim());
-  const allowed = parts.filter(cook => {
-    // name before first =
-    const name = cook.split("=")[0] || "";
-    return (
-      name.toLowerCase().startsWith("wordpress") ||
-      name.toLowerCase().startsWith("wp") ||
-      name.toLowerCase().startsWith("jwt-token")
-    );
-  });
-  // you could add more device-specific logic here if needed
-  return allowed.join("; ");
+  static prependHeader(headers: Headers, name: string, value: string) {
+    const existing = headers.get(name);
+    if (existing) {
+      headers.set(name, `${value}, ${existing}`);
+    } else {
+      headers.set(name, value);
+    }
+  }
+
+  static filterCookieString(raw: string, isMobile: boolean | null): string {
+    const parts = raw.split(";").map(p => p.trim());
+    const allowed = parts.filter(cook => {
+      // name before first =
+      const name = cook.split("=")[0] || "";
+      return (
+        name.toLowerCase().startsWith("wordpress") ||
+        name.toLowerCase().startsWith("wp") ||
+        name.toLowerCase().startsWith("jwt-token")
+      );
+    });
+    // you could add more device-specific logic here if needed
+    return allowed.join("; ");
+  }
 }
 
 export const handle: Handle = async ({ event, resolve }) => {
@@ -51,7 +51,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
     const cookie = event.request.headers.get("cookie");
     if (cookie) {
-      const filtered = filterCookieString(
+      const filtered = hooksHelper.filterCookieString(
         cookie,
         event.locals.deviceType?.isMobile ?? null
       );
@@ -71,12 +71,12 @@ export const handle: Handle = async ({ event, resolve }) => {
     return original(info, init);
   };
 
-  const cf = (event.request as Request & { cf?: any }).cf;
+  const cf = (event.request as Request & { cf?: IncomingRequestCfProperties }).cf;
   if (cf?.deviceType) {
     event.locals.deviceType = {
       isMobile: cf.deviceType === "mobile",
       deviceType: cf.deviceType,
-    } as any;
+    };
   }
 
   // fetch theme data as early as possible so load functions can see it
@@ -87,6 +87,10 @@ export const handle: Handle = async ({ event, resolve }) => {
     console.warn("hooks.handle: failed to fetch theme data", e);
     event.locals.themeData = null;
   }
+
+  const path = event.url.pathname;
+  const cookie = event.request.headers.get("cookie");
+  const authenticated = hooksHelper.isAuthenticated(cookie);
 
   try {
     if (cf?.deviceType) {
@@ -111,11 +115,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       console.warn("hooks.handle: failed to set Device-Type header", e);
     }
   }
-
-  const path = event.url.pathname;
   const contentType = response.headers.get("content-type") || "";
-  const cookie = event.request.headers.get("cookie");
-  const authenticated = isAuthenticated(cookie);
   const publicCache = "public, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400";
   const privateCache = "private, max-age=15, must-revalidate";
   // Set cache control headers
@@ -142,7 +142,7 @@ export const handle: Handle = async ({ event, resolve }) => {
         let link = `<${logoUrl}>; rel=preload; as=image`;
         link += `; nopush`;
 
-        prependHeader(response.headers, "Link", link);
+        hooksHelper.prependHeader(response.headers, "Link", link);
       }
     } catch (e) {
       console.warn("hooks.handle: failed to append Link header", e);
@@ -170,7 +170,7 @@ export const handle: Handle = async ({ event, resolve }) => {
   }
 
   // always expose and allow common headers for CORS responses
-  response.headers.set("Access-Control-Expose-Headers", 'ETag, Cache-Control, Last-Modified, CF-Ray');
-  response.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, If-None-Match, If-Match, Cache-Control, If-Modified-Since");
+  response.headers.set("Access-Control-Expose-Headers", 'ETag, CF-Ray, Last-Modified');
+  response.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, If-None-Match, If-Match, If-Modified-Since, If-Unmodified-Since");
   return response;
 };

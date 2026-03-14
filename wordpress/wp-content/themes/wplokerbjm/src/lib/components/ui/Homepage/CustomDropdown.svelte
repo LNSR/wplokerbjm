@@ -28,10 +28,12 @@
       filteredNonEmpty: DropdownOption[],
       scrollTop: number,
       itemHeight: number,
-      containerHeight: number
+      containerHeight: number,
     ) {
       const jobsWithId = filteredNonEmpty.map((job, i) => ({ ...job, id: i }));
-      const cardHeights = new Map(jobsWithId.map((job) => [job.id, itemHeight]));
+      const cardHeights = new SvelteMap(
+        jobsWithId.map((job) => [job.id, itemHeight]),
+      );
       const opts = {
         displayJobs: jobsWithId,
         scrollY: scrollTop,
@@ -50,7 +52,7 @@
 
     static async measureItemHeight(
       listboxEl: HTMLElement | null,
-      currentItemHeight: number
+      currentItemHeight: number,
     ): Promise<number> {
       await tick();
       try {
@@ -70,7 +72,9 @@
         lis.forEach((li, idx) => {
           if (li instanceof HTMLElement) li.style.height = originals[idx] || "";
         });
-        return maxH > 0 && maxH !== currentItemHeight ? maxH : currentItemHeight;
+        return maxH > 0 && maxH !== currentItemHeight
+          ? maxH
+          : currentItemHeight;
       } catch {
         return currentItemHeight;
       }
@@ -255,6 +259,7 @@
       dropdownRef: HTMLElement | null,
       close?: () => void,
     ): void {
+      if (!open) return;
       if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
         CustomDropdownController.callClose(close);
       }
@@ -287,6 +292,7 @@
     ArrowLeftSolid,
     TrashAltSolid,
   } from "svelte-awesome-icons";
+  import { SvelteMap } from "svelte/reactivity";
 
   const {
     id,
@@ -353,11 +359,17 @@
   });
 
   const virtualState = $derived.by(() =>
-    VirtualizationManager.computeVirtualState(filteredNonEmpty, scrollTop, itemHeight, containerHeight)
+    VirtualizationManager.computeVirtualState(
+      filteredNonEmpty,
+      scrollTop,
+      itemHeight,
+      containerHeight,
+    ),
   );
 
   function updateContainerHeight() {
-    containerHeight = VirtualizationManager.updateContainerHeight(scrollContainer);
+    containerHeight =
+      VirtualizationManager.updateContainerHeight(scrollContainer);
   }
 
   const onKeyDown = (e: KeyboardEvent): void => {
@@ -427,13 +439,13 @@
   let ro: ResizeObserver | null = null;
 
   async function measureItemHeight() {
-    itemHeight = await VirtualizationManager.measureItemHeight(listboxEl, itemHeight);
+    itemHeight = await VirtualizationManager.measureItemHeight(
+      listboxEl,
+      itemHeight,
+    );
   }
 
   onMount(() => {
-    document.addEventListener("mousedown", (e) =>
-      CustomDropdownController.handleClickOutside(e, dropdownRef, close),
-    );
     // reference listboxEl to satisfy TS/linter (it's bound in template)
     if (listboxEl) {
       void listboxEl;
@@ -453,16 +465,11 @@
     void measureItemHeight();
     // initial container height measurement
     setTimeout(() => updateContainerHeight(), 0);
-    window.addEventListener('resize', updateContainerHeight);
   });
 
   onDestroy(() => {
-    document.removeEventListener("mousedown", (e) =>
-      CustomDropdownController.handleClickOutside(e, dropdownRef, close),
-    );
     if (ro) ro.disconnect();
     if (scrollUpdateTimeout) clearTimeout(scrollUpdateTimeout);
-    window.removeEventListener('resize', updateContainerHeight);
   });
 
   $effect(() => {
@@ -500,6 +507,14 @@
       sc.scrollTop = targetTop + row - vh;
   });
 </script>
+
+<svelte:document
+  on:mousedown={(e) => {
+    CustomDropdownController.handleClickOutside(e, dropdownRef, close);
+  }}
+/>
+
+<svelte:window on:resize={updateContainerHeight} />
 
 <div
   class="relative"

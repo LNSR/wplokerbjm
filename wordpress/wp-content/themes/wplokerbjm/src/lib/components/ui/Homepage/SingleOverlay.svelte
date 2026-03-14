@@ -3,7 +3,7 @@
   import { page } from "$app/state";
   import type { JobDetailResponse } from "@/types";
   import { routeStore } from "@/lib/stores/Route.svelte";
-  import { nonceManager } from "$lib/utils/Nonce.svelte";
+  import { themeManager } from "$lib/stores/Theme.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
@@ -17,7 +17,7 @@
   const editPostId = $derived(data?.id ?? null);
 
   function isLoggedIn(): boolean {
-    if (nonceManager.getNonce) {
+    if (themeManager.getNonce) {
       return true;
     }
     return false;
@@ -31,8 +31,8 @@
       const dup = data?.duplicateNonce;
       if (typeof dup === "string" && dup.length > 0)
         return `${base}&nonce=${encodeURIComponent(dup)}`;
-    } catch {
-      // Ignore errors and return base URL
+    } catch (e) {
+      console.error("Error constructing clone URL with nonce:", e);
     }
 
     return base;
@@ -44,10 +44,16 @@
     visible: boolean;
   }>();
 
+  let drawerElement: HTMLElement;
+
   $effect(() => {
     jobOverlay.overlayData = data; // Update the store with the current job data from SvelteKit's page store
     if (visible) {
       slideIn = false;
+      // Reset drawer scroll on each job open/navigation.
+      if (drawerElement) {
+        drawerElement.scrollTop = 0;
+      }
       tick().then(() => {
         slideIn = true;
       });
@@ -57,6 +63,7 @@
   });
 
   onMount(() => {
+    // Check login status after a short delay to ensure themeManager is initialized
     const timeoutId = setTimeout(() => {
       isLoggedIn();
     }, 2000);
@@ -90,6 +97,7 @@
 
   <!-- Drawer -->
   <aside
+    bind:this={drawerElement}
     class="relative shadow-xl rounded-xl border-2 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)] w-full max-h-[calc(100vh-var(--site-scroll-padding-top)-var(--site-header-height))] overflow-y-auto flex flex-col z-50"
   >
     <div

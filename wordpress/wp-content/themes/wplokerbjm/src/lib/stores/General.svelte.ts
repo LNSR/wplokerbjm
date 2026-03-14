@@ -1,5 +1,6 @@
-import { SvelteDate, SvelteSet } from 'svelte/reactivity'
+import { SvelteSet } from 'svelte/reactivity'
 import { FormattingService } from '@/services/Formatting'
+import { SharedClock } from '$lib/utils/elements.svelte'
 import { type JobSummary, type JobContactRow, type SocialMediaItem, type CustomFields, SocialMediaPlatform } from "@/types";
 import type { Component } from 'svelte';
 import {
@@ -38,92 +39,63 @@ interface ContactRow {
     value: string
     href: string
 }
-export class GeneralStore {
-
-    public useDeadline(deadline: string | null | undefined, now?: SvelteDate): () => { text: string; style: string } {
-        function computeDeadlineInfo(dl?: string | null, nowMs?: number): { text: string; style: string } {
-            if (!dl) {
-                return { text: '', style: '' }
-            }
-            const deadlineDateRaw = new Date(dl)
-            const nowRaw = new Date(nowMs ?? Date.now())
-            const deadlineDate = new Date(
-                deadlineDateRaw.getFullYear(),
-                deadlineDateRaw.getMonth(),
-                deadlineDateRaw.getDate()
-            )
-            const now = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate())
-            const msPerDay = 1000 * 60 * 60 * 24
-            const days_left = Math.floor((deadlineDate.getTime() - now.getTime()) / msPerDay)
-            let text = ''
-            let style = ''
-            if (days_left > 1) {
-                text = `Sisa ${days_left} hari`
-                style = 'bg-blue-600 text-white border border-blue-800'
-            } else if (days_left === 1) {
-                text = 'Sisa 1 hari'
-                style = 'bg-yellow-400 text-black border border-yellow-600'
-            } else if (days_left === 0) {
-                text = 'Hari terakhir'
-                style = 'bg-red-600 text-white border border-red-800'
-            } else if (days_left === -1) {
-                text = 'Berakhir kemarin'
-                style = 'bg-gray-500 text-white border border-gray-700'
-            } else if (days_left < -1) {
-                text = `Berakhir ${Math.abs(days_left)} hari lalu`
-                style = 'bg-gray-400 text-black border border-gray-700'
-            } else {
-                text = 'Berakhir hari ini'
-                style = 'bg-red-600 text-white border border-red-800'
-            }
-            return { text, style }
+class GeneralStore {
+    #nowMS = $derived.by(() => SharedClock.now.getTime()); // in Milliseconds
+    
+    public useDeadline(deadline: string | null | undefined): { text: string; style: string } {
+        if (!deadline) {
+            return { text: '', style: '' }
         }
 
-        const deadlineInfo = this.timeReactiveValues<{ text: string; style: string }>(
-            (nowMs) => computeDeadlineInfo(deadline, nowMs),
-            now,
+        const deadlineDateRaw = new Date(deadline)
+        const nowRaw = new Date(this.#nowMS) // Use the reactive now from SharedClock
+        const deadlineDate = new Date(
+            deadlineDateRaw.getFullYear(),
+            deadlineDateRaw.getMonth(),
+            deadlineDateRaw.getDate()
         )
-
-        return deadlineInfo
-    }
-
-    public useTimeAgo(postTime?: string, now?: SvelteDate): () => string {
-        function computeTimeText(pt?: string, nowMs?: number): string {
-            if (!pt) return ''
-            const postDate = new Date(pt)
-            if (isNaN(postDate.getTime())) return ''
-            const nowDate = new Date(nowMs ?? Date.now())
-            const diff = Math.floor((nowDate.getTime() - postDate.getTime()) / 1000)
-
-            if (diff < 60) return 'Baru saja diposting'
-            if (diff < 3600) return `${Math.floor(diff / 60)} menit lalu`
-            if (diff < 86400) return `${Math.floor(diff / 3600)} jam lalu`
-            if (diff < 604800) return `${Math.floor(diff / 86400)} hari lalu`
-            if (diff < 2592000) return `${Math.floor(diff / 604800)} minggu lalu`
-            if (diff < 31536000) return `${Math.floor(diff / 2592000)} bulan lalu`
-            return `${Math.floor(diff / 31536000)} tahun lalu`
+        const now = new Date(nowRaw.getFullYear(), nowRaw.getMonth(), nowRaw.getDate())
+        const msPerDay = 1000 * 60 * 60 * 24
+        const days_left = Math.floor((deadlineDate.getTime() - now.getTime()) / msPerDay)
+        let text = ''
+        let style = ''
+        if (days_left > 1) {
+            text = `Sisa ${days_left} hari`
+            style = 'bg-blue-600 text-white border border-blue-800'
+        } else if (days_left === 1) {
+            text = 'Sisa 1 hari'
+            style = 'bg-yellow-400 text-black border border-yellow-600'
+        } else if (days_left === 0) {
+            text = 'Hari terakhir'
+            style = 'bg-red-600 text-white border border-red-800'
+        } else if (days_left === -1) {
+            text = 'Berakhir kemarin'
+            style = 'bg-gray-500 text-white border border-gray-700'
+        } else if (days_left < -1) {
+            text = `Berakhir ${Math.abs(days_left)} hari lalu`
+            style = 'bg-gray-400 text-black border border-gray-700'
+        } else {
+            text = 'Berakhir hari ini'
+            style = 'bg-red-600 text-white border border-red-800'
         }
-
-        const time = this.timeReactiveValues<string>(
-            (nowMs) => computeTimeText(postTime, nowMs),
-            now,
-        )
-
-        return time
+        return { text, style }
     }
 
-    private timeReactiveValues<T>(compute: (nowMs: number) => T, now?: SvelteDate,): () => T {
-        const value = $derived.by(() => {
-            // read now so derived recalculates every tick
-            now
-            const nowMs = now ? now.getTime() : Date.now()
-            return compute(nowMs)
-        })
+    public useTimeAgo(postTime?: string): string {
+        if (!postTime) return ''
 
-        // Return a thunk so callers read the reactive value lazily. This
-        // avoids the compiler warning about returning a local reactive
-        // variable which would otherwise capture only its initial value.
-        return () => value
+        const postDate = new Date(postTime)
+        if (isNaN(postDate.getTime())) return ''
+        const nowDate = new Date(this.#nowMS)
+        const diff = Math.floor((nowDate.getTime() - postDate.getTime()) / 1000)
+
+        if (diff < 60) return 'Baru saja diposting'
+        if (diff < 3600) return `${Math.floor(diff / 60)} menit lalu`
+        if (diff < 86400) return `${Math.floor(diff / 3600)} jam lalu`
+        if (diff < 604800) return `${Math.floor(diff / 86400)} hari lalu`
+        if (diff < 2592000) return `${Math.floor(diff / 604800)} minggu lalu`
+        if (diff < 31536000) return `${Math.floor(diff / 2592000)} bulan lalu`
+        return `${Math.floor(diff / 31536000)} tahun lalu`
     }
 
     public useStatusJob(status_pekerjaan: number): { label: string; color: string } {

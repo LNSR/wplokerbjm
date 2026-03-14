@@ -1,11 +1,11 @@
 <script lang="ts">
   import { generalStore } from "$lib/stores/General.svelte";
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
-  import { timeEffect, isMobile } from "$lib/utils/elements.svelte";
+  import { SharedClock, isMobile } from "$lib/utils/elements.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import {
-    GlobalNavigateTo,
     routeStateStore,
     routeStore,
   } from "$lib/stores/Route.svelte";
@@ -15,28 +15,27 @@
     ExclamationTriangleSolid,
     ThumbTackSolid,
   } from "svelte-awesome-icons";
-  import { SvelteDate } from "svelte/reactivity";
   import type { CardJob, JobCardProps } from "@/types";
 
   const {
     jobdata = {},
     variant = "carousel",
     permalink = "",
+    index = 0,
     onClick,
   } = $props<{
     jobdata: CardJob;
     variant: JobCardProps["variant"];
     permalink?: string;
+    index?: number;
     onClick?: (slug: string, event: MouseEvent, index: number) => void;
     isVisited?: boolean;
   }>();
 
   // show spinner overlay when mobile navigating for the card currently selected by slug
-  const spinnerVisible = $derived(() => {
+  const spinnerVisible = $derived.by(() => {
     return isMobile() && routeStore.isLoading && selected;
   });
-
-  const now = $state(new SvelteDate());
 
   // Derived UI helpers (keeps UI reactive to prop changes)
   const summaryRows = $derived.by(() =>
@@ -45,12 +44,12 @@
   const statusInfo = $derived.by(() =>
     generalStore.useStatusJob(Number(jobdata?.status_pekerjaan ?? 0)),
   );
-  const deadlineInfo = $derived.by(() =>
-    generalStore.useDeadline(jobdata?.deadline, now)(),
-  );
-  const timeAgo = $derived.by(() =>
-    generalStore.useTimeAgo(jobdata?.post_time, now),
-  );
+  const deadlineInfo = $derived.by(() => {
+    return generalStore.useDeadline(jobdata?.deadline);
+  });
+  const timeAgo = $derived.by(() => {
+    return generalStore.useTimeAgo(jobdata?.post_time);
+  });
 
   const selected = $derived.by(() => {
     const slugMatch = routeStateStore.lastVisitedJob === jobdata?.slug;
@@ -75,16 +74,14 @@
     if (onClick) {
       event.preventDefault();
       const slug = jobdata?.slug ?? "";
-      onClick(slug, event, 0);
+      onClick(slug, event, index ?? 0);
       return;
     }
 
     if (isMobile()) {
       event.preventDefault();
       if (permalink)
-        void GlobalNavigateTo(
-          new URL(permalink, window.location.origin).pathname,
-        );
+        void goto(new URL(permalink, window.location.origin).pathname);
       return;
     }
 
@@ -93,7 +90,7 @@
   }
 
   $effect(() => {
-    const stopTime = timeEffect(now);
+    const stopTime = SharedClock.timeEffect();
     return () => {
       stopTime();
     };
@@ -125,7 +122,7 @@
               class="text-lg font-semibold text-center text-[var(--wpl-global-color-1)]"
               datetime={jobdata?.post_time}
             >
-              {timeAgo()}
+              {timeAgo}
             </time>
           </div>
         </div>
@@ -199,7 +196,7 @@
           {/if}
         </div>
       </div>
-      {#if spinnerVisible()}
+      {#if spinnerVisible}
         <div
           class="absolute inset-0 backdrop-blur-sm flex items-center justify-center z-20 will-change-contents"
         >
@@ -222,7 +219,6 @@
 
   .card-base-carousel {
     @apply flex card-base max-w-full hover:shadow-lg hover:border-[var(--wpl-global-color-1)] flex-col;
-    flex: 1 1 auto;
   }
 
   .card-selected-carousel {
@@ -241,7 +237,8 @@
     @apply card-body relative p-3 gap-0 flex flex-col min-h-[300px] h-full;
   }
 
-  .card-body-featured, .card-body-bookmark {
+  .card-body-featured,
+  .card-body-bookmark {
     @apply card-body relative p-4 gap-1 flex flex-col h-full;
   }
 </style>

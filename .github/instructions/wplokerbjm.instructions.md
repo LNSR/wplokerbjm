@@ -4,18 +4,29 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 
 # Production Instructions for WPLokerBJM
 
-## Cache
+## Plugins Used
 
-- Cache plugin used: **LiteSpeed Cache** with object caching redis.
-- WPGraphQL cache plugin used: **WPGraphQL Smart Cache** with only network caching enabled.
-
-## Dynamic Data Framework
-
-- Dynamic data framework: **Metabox Lite**
-
-## SEO
-
-- SEO plugin used: **Rank Math Free**
+1. tinymce-advanced
+2. advanced-media-offloader
+3. duplicate-wp-page-post
+4. health-check
+5. fast-indexing-api
+6. jwt-authentication-for-wp-rest-api
+7. litespeed-cache
+8. meta-box
+9. meta-box-lite
+10. webp-uploads
+11. performance-lab
+12. seo-by-rank-math
+13. updraftplus
+14. view-admin-as
+15. wp-crontrol
+16. wp-graphql
+17. wpgraphql-smart-cache
+18. wps-hide-login
+19. health-check-troubleshooting-mode
+20. wplokerbjm-bootstrap <!-- Mandatory for the app to work, do not remove --> 
+21. object-cache.php
 
 # Development Instructions for WPLokerBJM
 
@@ -34,7 +45,7 @@ applyTo: "**/*.{js,ts,php,css,html,json,yml,md,scss,less,sass,cjs,mjs,jsx,tsx,sh
 - If there errors, immediately fix them.
 - Never run Vite dev and Vite build.
 - These repositories are using Docker for development and production(simulated configs only, not resources).
-- Production server are on shared hosting with 1GB RAM and 1 CPU core, its using Litespeed Server and QUIC Cloud.
+- Production server are on shared hosting with 1GB RAM and 1 CPU core, it's using Litespeed Server and QUIC Cloud.
 
 ## Backend(PHP)
 

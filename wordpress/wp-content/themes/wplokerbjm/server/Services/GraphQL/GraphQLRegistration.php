@@ -191,11 +191,7 @@ class GraphQLRegistration
         register_graphql_object_type('ThemeData', [
             'description' => 'Theme data object',
             'fields' => [
-                'themeUrl' => ['type' => 'String'],
                 'logo' => ['type' => 'Logo'],
-                'lastJobUpdate' => ['type' => 'String'],
-                'lastTaxonomyUpdate' => ['type' => 'String'],
-                'themeVersion' => ['type' => 'Int'],
                 'disableTracking' => ['type' => 'Boolean'],
                 'wpRestNonce' => ['type' => 'String'],
                 // HTML string containing favicon <link> tags produced by site_icon_meta_tags filter
@@ -362,11 +358,15 @@ class GraphQLRegistration
 
         register_graphql_field('RootQuery', 'jobSchema', [
             'type' => 'JobSchemaResponse',
-            'description' => 'Get job schema. Returns per-id JobPosting schemas by default (even for multiple IDs). Set `type` to "ItemList" to explicitly request an ItemList, or "JobPosting" to request per-id JobPosting schemas.',
+            'description' => 'Get job schema. Returns per-id JobPosting schemas by default (even for multiple IDs). Set `type` to "ItemList" to explicitly request an ItemList, or "JobPosting" to request per-id JobPosting schemas. You can also request schema by `slug` to avoid an extra lookup for the post ID.',
             'args' => [
                 'ids' => [
-                    'type' => ['non_null' => ['list_of' => ['non_null' => 'Int']]],
+                    'type' => ['list_of' => 'Int'],
                     'description' => 'Job IDs to retrieve. By default the resolver returns per-id JobPosting schemas; set `type` to "ItemList" to request a combined ItemList for these IDs.',
+                ],
+                'slug' => [
+                    'type' => 'String',
+                    'description' => 'Optional job slug. When provided, schema is generated for the job matching this slug.',
                 ],
                 'type' => [
                     'type' => 'String',

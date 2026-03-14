@@ -1,4 +1,5 @@
 import type { PageServerLoad } from "./$types";
+
 import { APIService } from "@/services/APIService";
 import { getCmsOrigin } from "@/utils/environment";
 export const ssr = true;
@@ -11,7 +12,7 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
     ]);
 
     // compute initial ItemList schema for homepage using jobGrid IDs
-    let itemListSchema: any = null;
+    let itemListSchema = null;
     const ids = (jobGrid?.jobs || [])
       .map((j: any) => Number(j.id))
       .filter((n: number) => !isNaN(n));
@@ -22,7 +23,6 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
           ids,
           undefined,
           "ItemList",
-          undefined,
           fetch,
         );
         itemListSchema = schemas?.[0] || null;

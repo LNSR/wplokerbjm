@@ -21,7 +21,7 @@
     "!text-[var(--wpl-global-color-1)] dark:!text-blue-400 font-medium hover:underline break-words";
 </script>
 
-<main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12">
+<main class="container mx-auto max-w-[90vw] lg:max-w-[50vw] space-y-8 mt-12">
   <div>
     <h1
       class="text-3xl md:text-4xl font-bold mt-8 mb-8 text-gray-900 dark:text-gray-100 text-center"

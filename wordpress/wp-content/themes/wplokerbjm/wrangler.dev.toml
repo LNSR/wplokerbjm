@@ -11,7 +11,7 @@ id                  = "75fc8b0cd2d74548b6c05321296d4d45"
 
 # needed for adapter-cloudflare: make built assets available to the Worker
 [assets]
-directory = ".svelte-kit"
+directory = ".svelte-kit/cloudflare"
 binding = "ASSETS"
 [env]
 [env.vars]

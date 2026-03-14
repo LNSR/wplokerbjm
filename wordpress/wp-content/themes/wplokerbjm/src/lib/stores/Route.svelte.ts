@@ -1,13 +1,12 @@
 import type { SearchState, CarouselState, JobCardProps } from "@/types";
 import { isMobile } from "$lib/utils/elements.svelte";
 import { SvelteMap } from "svelte/reactivity";
-import { WPPostRoute } from "@/types";
 import { type CardJob } from "@/types";
 import { LRUCache } from "lru-cache";
-import type { goto } from "$app/navigation";
+import { goto } from "$app/navigation";
 
 
-export class RouteManager {
+class RouteManager {
   isInitialLoad = $state(true);
   isLoading = $state(false);
   isTransitioningRoute = $state(false);
@@ -20,30 +19,18 @@ export class RouteManager {
     this.isLoading = loading;
   }
 
-  /**
-   * Map a request path to the internal component name used by the SPA logic.
-   * This is only used by a handful of helpers (SEO, job grid) and mirrors
-   * the switch in the legacy app.  Keeping it here avoids pulling the
-   * mapping into multiple packages.
-   */
-  getComponentNamePath(path: string): string {
-    if (path === "/") return "Homepage";
-    if (path.startsWith(`/${WPPostRoute.PasangIklanLoker}`))
-      return "PasangIklanLoker";
-    if (path.startsWith(`/${WPPostRoute.lowongan}`)) return "SingleLowongan";
-    if (path.startsWith(`/${WPPostRoute.KebijakanPrivacy}`))
-      return "KebijakanPrivasi";
-    return "Unknown";
+  setIsTransitioningRoute(transitioning: boolean) {
+    this.isTransitioningRoute = transitioning;
   }
+
 }
 type Device = "desktop" | "mobile";
-export class RouteStateManager {
+class RouteStateManager {
   scrollPositions = new LRUCache<string, number>({ max: 100 }); // Scroll position cache per route
   searchStates = new LRUCache<string, SearchState>({ max: 100 }); // Limit to 50 most recent search states
   lastVisitedJob: CardJob["slug"] | undefined = $state(undefined); // Remember the last visited job slug for mobile navigation
-  // Variant source for the last visited job: 'carousel' | 'grid' | undefined
   lastVisitedJobSource: JobCardProps["variant"] | undefined = $state(undefined);
-  carouselState: CarouselState | null = $state(null);
+  carouselState: CarouselState | undefined = $state(undefined);
   skipScrollRestore = new LRUCache<string, boolean>({ max: 100 }); // Skip scroll restore for specific routes
   cardHeights = new LRUCache<string, Record<number, number>>({ max: 500 }); // Global cache for card heights
 
@@ -54,7 +41,7 @@ export class RouteStateManager {
   /**
    * track breakpoint for better DX during development
    */
-  observeBreakpointChanges = () => {
+  observeBreakpointChanges(): (() => void) | undefined {
     if (this.effectCleanup) return; // Skip if already observing
 
     // Set up the effect and store the cleanup function
@@ -67,16 +54,20 @@ export class RouteStateManager {
         }
       });
     });
-  };
 
-  /**
+    /**
    * Clean up the breakpoint tracking effect when no longer needed
    */
-  cleanUpEffectObserveBreakpointChanges() {
-    if (this.effectCleanup) {
-      void this.effectCleanup();
-      this.effectCleanup = undefined;
+    const cleanUpEffectObserveBreakpointChanges = () => {
+      if (this.effectCleanup) {
+        void this.effectCleanup();
+        this.effectCleanup = undefined;
+      }
     }
+
+    return () => {
+      cleanUpEffectObserveBreakpointChanges();
+    };
   }
 
   setInitialDevice(device: Device) {
@@ -101,7 +92,7 @@ export class RouteStateManager {
     // Clear state properties
     this.lastVisitedJob = undefined;
     this.lastVisitedJobSource = undefined;
-    this.carouselState = null;
+    this.carouselState = undefined;
   }
 
   saveSearchState(path: string, searchState: SearchState) {
@@ -183,7 +174,7 @@ export class RouteStateManager {
 
   clearCarouselState() {
     if (!this.carouselState) return;
-    this.carouselState = null;
+    this.carouselState = undefined;
     if (typeof sessionStorage !== "undefined") {
       try {
         sessionStorage.removeItem(`carouselState-${this.#currentDevice}`);
@@ -271,7 +262,7 @@ export class RouteStateManager {
   }
 
   saveCardHeights(
-    heights: SvelteMap<number, number>, 
+    heights: SvelteMap<number, number>,
     keyname: string = "global",
   ) {
     // Accept either SvelteMap or native Map and persist as a plain record for storage
@@ -396,27 +387,5 @@ export class RouteStateManager {
     }
   }
 }
-
 export const routeStore = new RouteManager();
 export const routeStateStore = new RouteStateManager();
-export type GotoOptions = Parameters<typeof goto>[1];
-/** Navigate to a new path within the SPA.
- * @param path The target path to navigate to.
- * @param gotoOpts Optional SvelteKit goto options to control navigation behavior (e.g. replaceState, noScroll, etc.).
- */
-export function GlobalNavigateTo(path: string, gotoOpts?: GotoOptions) {
-
-  routeStore.setIsInitialLoad(false);
-  routeStore.setIsLoading(true);
-  routeStore.isTransitioningRoute = true;
-
-  // Use SvelteKit's goto so Kit handles fetch/history; afterNavigate will run post-navigation side-effects
-  void (async () => {
-    try {
-      const { goto } = await import("$app/navigation");
-      await goto(path, gotoOpts);
-    } catch (e) {
-      console.error("goto failed for", path, e);
-    }
-  })();
-}

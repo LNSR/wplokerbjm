@@ -269,7 +269,7 @@ class GraphQLTest extends WplokerbjmTestCase
                 'description' => 'Get job schemas forced JobPosting',
             ],
             'themeData' => [
-                'query' => 'query { themeData { data { themeUrl siteIconTags } } }',
+                'query' => 'query { themeData { data { siteIconTags } } }',
                 'expected_status' => 200,
                 'description' => 'Get theme data (include siteIconTags in query)',
             ],

@@ -53,40 +53,6 @@ class Litespeed
 class LiteSpeedFilters
 {
 
-    private static function pattern(): string
-    {
-        if (defined('ABSPATH')) {
-            return str_replace(ABSPATH, '/', get_stylesheet_directory() . '/assets/dist/');
-        }
-        return '/wp-content/themes/' . get_stylesheet() . '/assets/dist/';
-    }
-
-    /**
-     * Exclude specific JS files from LiteSpeed Cache JS optimization.
-     */
-    #[Filter('litespeed_optimize_js_excludes', 0)]
-    public static function lscJsExcludes($excludes)
-    {
-        if (!SharedUtils::isPluginActive('litespeed')) {
-            return $excludes;
-        }
-        $excludes[] = self::pattern();
-        return $excludes;
-    }
-
-    /**
-     * Exclude specific CSS files from LiteSpeed Cache CSS optimization.
-     */
-    #[Filter('litespeed_optimize_css_excludes', 0)]
-    public static function lscCssExcludes($excludes)
-    {
-        if (!SharedUtils::isPluginActive('litespeed')) {
-            return $excludes;
-        }
-        $excludes[] = self::pattern();
-        return $excludes;
-    }
-
     /**
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
@@ -104,10 +70,10 @@ class LiteSpeedGraphQL
 {
 
     /**
-     * Force GraphQL Queries returned via HTTP GET requests to be cacheable
+     * Set GraphQL Queries returned via HTTP GET requests to be cacheable
      */
-    #[Action('graphql_process_http_request_response')]
-    public static function forceCacheable(): void
+    #[Action('graphql_process_http_request_response', 5)]
+    public static function setCacheable(): void
     {
         if (!SharedUtils::isPluginActive('litespeed')) {
             return;
@@ -116,13 +82,17 @@ class LiteSpeedGraphQL
             return;
         }
 
-        do_action('litespeed_control_force_cacheable');
+        if (is_user_logged_in()) {
+            do_action('litespeed_control_set_private');
+        } else {
+            do_action('litespeed_control_set_cacheable');
+        }
     }
 
     /**
      * Add LiteSpeed tags, unset the x-graphql-keys
      */
-    #[Filter('graphql_response_headers_to_send', 8)]
+    #[Filter('graphql_response_headers_to_send', 10)]
     public static function tagResponses(array $headers = []): array
     {
         if (!SharedUtils::isPluginActive('litespeed')) {
@@ -133,16 +103,16 @@ class LiteSpeedGraphQL
             $keys = $headers['X-GraphQL-Keys'];
 
             do_action('litespeed_tag_add', explode(' ', $keys));
-            unset($headers['X-LiteSpeed-Cache-Control']);
-            if (!headers_sent()) {
-                if (is_admin()) {
-                    header('X-LiteSpeed-Cache-Control: private, no-cache, must-revalidate');
-                } else {
-                    header('X-LiteSpeed-Cache-Control: public, must-revalidate, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400');
-                }
-            }
 
             unset($headers['X-GraphQL-Keys']);
+        }
+        if (isset($headers['X-LiteSpeed-Cache-Control'])) {
+            unset($headers['X-LiteSpeed-Cache-Control']);
+            if (is_user_logged_in()) {
+                header('X-LiteSpeed-Cache-Control: private, no-cache, must-revalidate');
+            } else {
+                header('X-LiteSpeed-Cache-Control: public, must-revalidate, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400');
+            }
         }
         return $headers;
     }
@@ -150,7 +120,7 @@ class LiteSpeedGraphQL
     /**
      * Call litespeed_purge when graphql_purge is called
      */
-    #[Action('graphql_purge', 0)]
+    #[Action('graphql_purge')]
     public static function purgeCache($keys): void
     {
         if (!SharedUtils::isPluginActive('litespeed')) {

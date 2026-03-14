@@ -4,7 +4,7 @@
   import { MediaQuery } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
-  import { nonceManager } from "$lib/utils/Nonce.svelte";
+  import { themeManager } from "$lib/stores/Theme.svelte";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import { browser } from "$app/environment";
   import { APIService } from "@/services/APIService";
@@ -25,11 +25,11 @@
   let loginLoading = $state(false);
 
   class ThemeColorManager {
-    private mediaQuery: MediaQuery | null = null;
-    private debouncedSetTheme: (d: ThemeName) => void = () => {};
+    mediaQuery: MediaQuery | null = null;
+    debouncedSetTheme: (d: ThemeName) => void = () => {};
     public isDark = $state(false);
     public currentTheme = $state<ThemeName>(ThemeName.Light);
-    private _initialized = false;
+    #initialized = false;
 
     private updateMetaThemeColor(dark: boolean): void {
       try {
@@ -56,7 +56,7 @@
       }
     }
 
-    private setThemeDirect(theme: ThemeName): void {
+    public setThemeDirect(theme: ThemeName): void {
       const newTheme = theme;
       const isDark = newTheme === ThemeName.Dark;
 
@@ -80,57 +80,31 @@
           this.updateMetaThemeColor(isDark);
         };
 
-        // apply immediately, no view transition
         applyTheme();
 
-        try {
-          // Defer storage write off the critical paint path so it cannot
-          // block rendering or cause forced reflow during theme toggles.
-          const write = () => {
-            try {
-              localStorage.setItem("wplokerbjm-theme", newTheme);
-            } catch (e) {
-              console.warn(
-                "Failed to write theme preference to localStorage",
-                e,
-              );
-            }
-          };
-          if (typeof (window as any).requestIdleCallback === "function") {
-            (window as any).requestIdleCallback(write);
-          } else {
-            setTimeout(write, 0);
-          }
-        } catch {
-          console.error("Failed to schedule theme preference save");
-        }
-        setTimeout(() => {
-          document.documentElement.classList.remove("theme-switching");
-          // Give the browser a short moment to paint the theme change, then
-          // trigger a single header measurement. This avoids forcing layout
-          // during the theme toggle which causes long presentation delays.
+        // Defer storage write off the critical paint path so it cannot
+        // block rendering or cause forced reflow during theme toggles.
+        const write = () => {
           try {
-            setTimeout(() => {
-              requestAnimationFrame(() => {
-                if (
-                  typeof headerManager !== "undefined" &&
-                  headerManager &&
-                  headerManager.scheduleUpdate
-                ) {
-                  headerManager.scheduleUpdate();
-                }
-              });
-            }, 50);
+            localStorage.setItem("wplokerbjm-theme", newTheme);
           } catch (e) {
-            console.warn("Failed to schedule header measurement", e);
+            console.warn("Failed to write theme preference to localStorage", e);
           }
-        }, 30);
+        };
+
+        requestAnimationFrame(() => {
+          document.documentElement.classList.remove("theme-switching");
+          requestIdleCallback(() => {
+            write();
+            headerManager.scheduleUpdate();
+          });
+        });
       });
     }
 
     public init(): void {
-      if (this._initialized) return;
-      this._initialized = true;
+      if (this.#initialized) return;
+      this.#initialized = true;
       this.debouncedSetTheme = debounce(
         (theme: ThemeName) => this.setThemeDirect(theme),
         10,
@@ -154,47 +128,23 @@
         }
       })();
 
-      if (
-        saved === ThemeName.Dark ||
-        saved === ThemeName.Lavender ||
-        saved === ThemeName.Light
-      ) {
-        // persisted preference
-        this.isDark = saved === ThemeName.Dark;
-        this.setThemeDirect(saved as ThemeName);
-      } else if (!saved && systemPrefersDark) {
-        this.isDark = true;
-        this.setThemeDirect(ThemeName.Dark);
-      } else {
-        this.isDark = false;
-        this.setThemeDirect(ThemeName.Light);
-      }
-
-      try {
-        this.mediaQuery = new MediaQuery("(prefers-color-scheme: dark)");
-        $effect(() => {
-          this.mediaQuery!.current;
-          let hasStored = false;
-          try {
-            hasStored = !!localStorage.getItem("wplokerbjm-theme");
-          } catch {
-            hasStored = false;
+      switch (saved) {
+        case ThemeName.Dark:
+        case ThemeName.Lavender:
+        case ThemeName.Light:
+          // persisted preference
+          this.isDark = saved === ThemeName.Dark;
+          this.setThemeDirect(saved as ThemeName);
+          break;
+        default:
+          if (systemPrefersDark) {
+            this.isDark = true;
+            this.setThemeDirect(ThemeName.Dark);
+          } else {
+            this.isDark = false;
+            this.setThemeDirect(ThemeName.Light);
           }
-          if (!hasStored) {
-            this.isDark = this.mediaQuery!.current;
-            this.setThemeDirect(
-              this.mediaQuery!.current ? ThemeName.Dark : ThemeName.Light,
-            );
-          }
-        });
-      } catch {
-        this.mediaQuery = null;
       }
-
-      $effect(() => {
-        this.currentTheme;
-        this.debouncedSetTheme(this.currentTheme);
-      });
     }
 
     public setTheme(theme: ThemeName): void {
@@ -211,19 +161,15 @@
       }
 
       // ensure a debounced call remains to avoid double-write races
-      try {
-        if ((this.debouncedSetTheme as any)?.flush) {
-          (this.debouncedSetTheme as any).flush();
-        }
-      } catch {
-        // ignore
+      if ((this.debouncedSetTheme as any)?.flush) {
+        (this.debouncedSetTheme as any).flush();
       }
     }
   }
 
   class HeaderManager {
     headerEl: HTMLElement | null = null;
-    private _lastOffsetUpdate = $state(0);
+    #lastOffsetUpdate = $state(0);
     rafId: number | null = null;
     mutationObserver: MutationObserver | null = null;
     headerResizeObserver: ResizeObserver | null = null;
@@ -239,8 +185,8 @@
     updateOffsets = () => {
       // Throttle expensive offset calculations to avoid layout thrash.
       const now = Date.now();
-      if (this._lastOffsetUpdate && now - this._lastOffsetUpdate < 100) return;
-      this._lastOffsetUpdate = now;
+      if (this.#lastOffsetUpdate && now - this.#lastOffsetUpdate < 100) return;
+      this.#lastOffsetUpdate = now;
 
       this.headerEl = document.querySelector("header");
       try {
@@ -321,7 +267,9 @@
         if (active && active.matches(".drawer-toggle")) {
           active.blur();
         }
-      } catch {}
+      } catch (e) {
+        console.error("Element focus error during login", e);
+      }
 
       loginLoading = true;
       loginError = "";
@@ -340,17 +288,23 @@
       } catch (e) {
         console.error("login error", e);
         loginError = "Terjadi kesalahan saat login.";
-        loginPassword = ""; // also clear on error
+        loginPassword = "";
       } finally {
-        tick().then(() => {
-          Promise.all([nonceManager.getNonceFromAPI, (loginLoading = false)]);
+        tick().then(async () => {
+          try {
+            const nonce = await APIService.getThemeNonceGraphQL();
+            if (nonce && nonce.length > 0) {
+              themeManager.setNonce(nonce);
+            }
+          } catch (error) {
+            console.error("Error refreshing nonce after login:", error);
+          } finally {
+            loginLoading = false;
+          }
         });
       }
     }
     static async Logout(): Promise<void> {
-      try {
-        // perform logout directly against CMS GraphQL
-      } catch {}
       window.location.reload();
     }
     static closeLogin() {
@@ -369,7 +323,7 @@
 <script lang="ts">
   import { onMount, onDestroy, tick } from "svelte";
   import type { HTMLImgAttributes } from "svelte/elements";
-  import { GlobalNavigateTo } from "$lib/stores/Route.svelte";
+  import { goto } from "$app/navigation";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
   import { innerWidth } from "svelte/reactivity/window";
   import {
@@ -429,7 +383,7 @@
   }
 
   function showButtonLogin(): void {
-    const w = window as any;
+    const w = window as Window & { loginadmin?: boolean };
     const initial = !!w.loginadmin;
     loginAdmin = initial;
     const desc = Object.getOwnPropertyDescriptor(w, "loginadmin");
@@ -476,27 +430,54 @@
   });
 
   $effect(() => {
+    if (!themeColorManager.mediaQuery) {
+      themeColorManager.mediaQuery = new MediaQuery(
+        "(prefers-color-scheme: dark)",
+      );
+    }
+    themeColorManager.mediaQuery!.current;
+    let hasStored = false;
+    try {
+      hasStored = !!localStorage.getItem("wplokerbjm-theme");
+    } catch {
+      hasStored = false;
+    }
+    if (!hasStored) {
+      themeColorManager.isDark = themeColorManager.mediaQuery!.current;
+      themeColorManager.setThemeDirect(
+        themeColorManager.mediaQuery!.current
+          ? ThemeName.Dark
+          : ThemeName.Light,
+      );
+    }
+  });
+
+  $effect(() => {
+    themeColorManager.currentTheme;
+    themeColorManager.debouncedSetTheme(themeColorManager.currentTheme);
+  });
+
+  $effect.pre(() => {
     if (showBookmarkModal && !dynamicComponentStore.BookmarkModal) {
-      dynamicComponentStore.loadBookmarkModal();
+      void dynamicComponentStore.loadBookmarkModal();
     }
   });
 
-  $effect(() => {
+  $effect.pre(() => {
     if (showLoginModal && !dynamicComponentStore.LoginModal) {
-      dynamicComponentStore.loadLoginModal();
+      void dynamicComponentStore.loadLoginModal();
     }
   });
 
   $effect(() => {
-    // guard so this effect is a no-op during SSR
-    if (typeof window === "undefined") return;
     innerWidth.current;
     headerManager.scheduleUpdate();
   });
 </script>
 
 <header
-  class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b-3 border-[var(--wpl-global-color-5)] min-h-auto z-[60]"
+  class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b-3 border-base-300 min-h-auto z-[60]"
+  style="view-transition-name: none;"
 >
   <div class="drawer drawer-end">
     <input
@@ -516,7 +497,7 @@
             class="focus:outline-none"
             onclick={(e) => {
               e.preventDefault();
-              GlobalNavigateTo("/");
+              void goto("/");
             }}
           >
             {#if HeaderLogo}
@@ -554,7 +535,7 @@
           </div>
 
           {#if showThemeModal}
-            <div use:PortalManager.teleport={"#app"}>
+            <div {@attach PortalManager.teleport("#app")}>
               <div class="modal modal-open z-[1100]">
                 <div class="modal-box">
                   <h3 class="font-semibold text-lg">Pilih Tema</h3>
@@ -641,10 +622,6 @@
           <a
             class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)] hidden rounded-full md:inline-flex"
             href="/pasang-iklan-loker"
-            onclick={(e) => {
-              e.preventDefault();
-              GlobalNavigateTo("/pasang-iklan-loker");
-            }}
           >
             <ExternalLinkSolid
               class="h-6 w-6"
@@ -699,9 +676,7 @@
             <a
               href="/pasang-iklan-loker"
               class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] justify-center"
-              onclick={(e) => {
-                e.preventDefault();
-                GlobalNavigateTo("/pasang-iklan-loker");
+              onclick={() => {
                 document.getElementById("header-drawer")?.click();
               }}
             >

@@ -208,4 +208,3 @@ class VirtualizationService {
 }
 
 export const Virtualization = new VirtualizationService();
-export default Virtualization;

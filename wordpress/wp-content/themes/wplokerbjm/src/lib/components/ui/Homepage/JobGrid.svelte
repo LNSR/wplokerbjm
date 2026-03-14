@@ -1,11 +1,8 @@
 <script module lang="ts">
   import type { CardJob, JobGridProps, SearchState } from "@/types";
   import { SearchContext, SearchTitle } from "@/types";
-  import {
-    routeStore,
-    routeStateStore,
-    GlobalNavigateTo,
-  } from "$lib/stores/Route.svelte";
+  import { goto } from "$app/navigation";
+  import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
   import { Virtualization } from "$lib/utils/Virtualization.svelte";
@@ -25,7 +22,7 @@
   let prevFilters = $state(""); // to track filter changes so card heights can be cleared
 
   class OverlayController {
-    async handleJobClick(job: CardJob): Promise<void> {
+    handleJobClick(job: CardJob): void {
       if (!job.permalink) return;
 
       // NOTE: Overlay feature is for desktop only (window.innerWidth >= 768)
@@ -34,13 +31,13 @@
       // Save card heights before navigating/opening overlay
       routeStateStore.saveCardHeights(cardHeights, "jobGrid");
 
-      async function MobileJobClick(): Promise<void> {
+      function MobileJobClick(): void {
         // Mark as last visited before navigating
         routeStateStore.MarkVisitedJob(job.slug ?? "", "featured");
         // use SPA navigation to SingleLowongan.svelte route
         const url = new URL(String(job.permalink), window.location.origin);
         jobGridManager.saveGridStates();
-        return void GlobalNavigateTo(url.pathname + url.search + url.hash);
+        void goto(url.pathname + url.search + url.hash);
       }
 
       if (isDesktop) {
@@ -51,7 +48,7 @@
         jobOverlay.openOverlay(job.slug ?? "", job, "featured");
         this.scrollToCard(job.slug ?? "");
       } else {
-        await MobileJobClick();
+        MobileJobClick();
       }
     }
 
@@ -125,7 +122,6 @@
           if (typeof saved.totalJobs === "number")
             searchStore.totalJobs = saved.totalJobs;
         }
-        
 
         if (routeStore.isInitialLoad) {
           tick().then(() => {
@@ -191,18 +187,7 @@
     filters,
     title,
     totalJobs,
-  } = (() => props)() as JobGridProps;
-  // Prime from SSR
-  if (jobs && jobs.length) {
-    searchStore.jobs = [...jobs];
-    if (typeof maxNumPages === "number" && maxNumPages > 0) {
-      searchStore.maxNumPages = maxNumPages;
-    }
-    if (context) searchStore.context = context;
-    if (title) searchStore.title = title as SearchTitle;
-    if (totalJobs !== undefined) searchStore.totalJobs = totalJobs;
-    if (filters) searchStore.setFilters(filters);
-  }
+  } = $derived<JobGridProps>(props);
 
   class VirtualizationManager {
     static computeListVirtualization(
@@ -298,12 +283,30 @@
     });
   });
 
+  /**
+   * SSR initialization to populate searchStore with server-provided data on initial load. This ensures that the job grid is populated immediately with the correct data without waiting for client-side JS to fetch it, improving perceived performance and SEO. The check for routeStore.isInitialLoad ensures this only runs on the first load and not on client-side navigations where the state should be preserved/restored instead.
+   */
+  function SSRInit(): void {
+    if (jobs && jobs.length > 0 && routeStore.isInitialLoad) {
+      searchStore.jobs = [...jobs];
+      if (typeof maxNumPages === "number" && maxNumPages > 0) {
+        searchStore.maxNumPages = maxNumPages;
+      }
+      if (context) searchStore.context = context;
+      if (title) searchStore.title = title as SearchTitle;
+      if (totalJobs !== undefined) searchStore.totalJobs = totalJobs;
+      if (filters) searchStore.setFilters(filters);
+    }
+  }
+
+  SSRInit();
+
   onMount(() => {
     jobGridManager.init();
   });
 </script>
 
-<section class="relative mt-12" id="job-grid" style="contain: layout;">
+<section class="relative mt-12" id="job-grid">
   <div class="flex items-center justify-between mb-6">
     {#if displayJobs.length}
       <h2 class="text-xl md:text-2xl font-semibold">{displayTitle}</h2>
@@ -375,7 +378,6 @@
                       "featured",
                     )}
                     onClick={() => {
-                      routeStore.setIsInitialLoad(false);
                       void overlayManager.handleJobClick(job);
                     }}
                   />
@@ -392,8 +394,8 @@
               ></div>
             </div>
           {:else}
-            <!-- SSR rendering: show up to first 27 jobs -->
-            {#each displayJobs.slice(0, 27) as job}
+            <!-- SSR rendering -->
+            {#each displayJobs as job}
               <div class="relative w-full pt-4">
                 <JobCard
                   jobdata={job}
@@ -404,7 +406,6 @@
                     "featured",
                   )}
                   onClick={() => {
-                    routeStore.setIsInitialLoad(false);
                     void overlayManager.handleJobClick(job);
                   }}
                 />

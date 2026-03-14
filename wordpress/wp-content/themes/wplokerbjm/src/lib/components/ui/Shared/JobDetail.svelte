@@ -27,7 +27,6 @@
   import { generalStore } from "$lib/stores/General.svelte";
   import { FormattingService } from "@/services/Formatting";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
-  import { SvelteDate } from "svelte/reactivity";
   import { onDestroy } from "svelte";
   import {
     ClockSolid,
@@ -41,14 +40,12 @@
     AddressBookSolid,
   } from "svelte-awesome-icons";
   import type { JobDetailResponse } from "@/types";
-  import { timeEffect } from "$lib/utils/elements.svelte";
+  import { SharedClock } from "$lib/utils/elements.svelte";
   import { page } from "$app/state";
 
   const { job }: { job: JobDetailResponse } = $props();
 
   let Viewer: any;
-
-  const now = $state(new SvelteDate());
 
   const ringkasanPekerjaan = $derived(
     generalStore.useSummaryJob(job.ringkasanPekerjaan),
@@ -57,9 +54,9 @@
   const socialMediaItems = $derived(
     generalStore.useSocialMedia().socialMediaItems(job.social_media),
   );
-  const timeAgo = $derived.by(() =>
-    generalStore.useTimeAgo(job.post_time, now),
-  );
+  const timeAgo = $derived.by(() => {
+    return generalStore.useTimeAgo(job.post_time);
+  });
 
   const allImages = $derived(
     [
@@ -113,7 +110,6 @@
     static async setupViewer(): Promise<void> {
       if (!browser) return;
       if (!Viewer) {
-        if (!browser) return;
         Viewer =
           (ViewerModule && (ViewerModule as any).default) ?? ViewerModule;
       }
@@ -175,7 +171,7 @@
   // reactive value; that explain why the gallery would show exactly once and
   // then never again.
   $effect(() => {
-    const stopTime = timeEffect(now);
+    const stopTime = SharedClock.timeEffect();
     return () => stopTime();
   });
 
@@ -232,7 +228,7 @@
                     aria-hidden="true"
                   />
                   <time class="font-bold ml-1" datetime={job.post_time}
-                    >Diupdate: {timeAgo()}</time
+                    >Diupdate: {timeAgo}</time
                   >
                 </div>
               {/if}

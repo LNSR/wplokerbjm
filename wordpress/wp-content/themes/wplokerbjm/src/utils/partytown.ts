@@ -49,7 +49,7 @@ class PartytownManager {
     window.partytown = partytownConfig;
 
     const script = document.createElement("script");
-    script.async = true;
+    script.async = false;
     script.setAttribute("partytown-boot", "");
     script.innerHTML = partytownSnippet(partytownConfig);
     document.head.appendChild(script);

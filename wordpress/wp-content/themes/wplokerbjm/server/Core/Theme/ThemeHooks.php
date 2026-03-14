@@ -211,11 +211,8 @@ class ThemeInject
      * Provide theme runtime data for client-side hydration as an associative array.
      *
      * The array contains:
-     * - themeUrl (string)
      * - logo: nested logo metadata
-     * - lastJobUpdate, lastTaxonomyUpdate (ISO strings)
      * - disableTracking (bool)
-     * - themeVersion (int)
      * - wpRestNonce (string, when logged in)
      * - siteIconTags (string): newline‑separated <link> tags generated via the
      *   `site_icon_meta_tags` filter. Useful for rendering favicon markup in
@@ -248,8 +245,6 @@ class ThemeInject
         if (empty($logoData['sizes'])) {
             $logoData['sizes'] = '(max-width: 640px) 48px, (max-width: 1024px) 64px, 128px';
         }
-        $last_update = \WPLokerBJM\QueryBuilders\JobQuery::getLastModifiedDate();
-        $last_update_iso = $last_update ? gmdate('c', strtotime($last_update)) : gmdate('c');
 
         // compute optional site icon <link> tags using the same filter used in addSiteIconMetaTags()
         $siteIconTags = '';
@@ -259,7 +254,6 @@ class ThemeInject
         }
 
         $wpThemeData = [
-            'themeUrl' => esc_url(get_stylesheet_directory_uri()),
             'logo' => [
                 'logoUrl' => $logoData['url'] ?? '',
                 'logoSrcset' => $logoData['srcset'] ?? '',
@@ -268,10 +262,7 @@ class ThemeInject
                 'logoWidth' => intval($logoData['width'] ?? 0),
                 'logoHeight' => intval($logoData['height'] ?? 0),
             ],
-            'lastJobUpdate' => $last_update_iso,
-            'lastTaxonomyUpdate' => \WPLokerBJM\QueryBuilders\TaxonomyQuery::getLastModifiedDateForTaxonomies(),
-            'disableTracking' => $loggedIn,
-            'themeVersion' => (int) filemtime(get_stylesheet_directory() . '/composer.json'),
+            'disableTracking' => $loggedIn, // Disable Google Tag Manager
             'siteIconTags' => $siteIconTags,
         ];
 
