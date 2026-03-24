@@ -2,8 +2,6 @@ import type { PageServerLoad } from "./$types";
 
 import { APIService } from "@/services/APIService";
 import { getCmsOrigin } from "@/utils/environment";
-export const ssr = true;
-export const csr = true;
 export const load: PageServerLoad = async ({ url, fetch }) => {
   try {
     const [carousel, jobGrid] = await Promise.all([

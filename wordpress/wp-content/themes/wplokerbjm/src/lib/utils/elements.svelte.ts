@@ -34,30 +34,30 @@ export class SharedClock {
  * Returns a cleanup function to clear the interval.
  */
   public static timeEffect(): () => void {
-    SharedClock.startTimeEffect();
+    this.startTimeEffect();
 
     // Return a cleanup function to clear the interval when the component is destroyed
     return () => {
-      SharedClock.stopTimeEffect();
+      this.stopTimeEffect();
     };
   }
 
   private static startTimeEffect(): void {
-    SharedClock.#refCount += 1;
+    this.#refCount += 1;
 
-    if (!SharedClock.#intervalId) {
-      SharedClock.#intervalId = setInterval(() => {
+    if (!this.#intervalId) {
+      this.#intervalId = setInterval(() => {
         const now = Date.now();
-        SharedClock.now.setTime(now);
+        this.now.setTime(now);
       }, 60000); // Update every minute
     }
   }
 
   private static stopTimeEffect(): void {
-    SharedClock.#refCount = Math.max(SharedClock.#refCount - 1, 0);
-    if (SharedClock.#refCount === 0 && SharedClock.#intervalId) {
-      clearInterval(SharedClock.#intervalId);
-      SharedClock.#intervalId = null;
+    this.#refCount = Math.max(this.#refCount - 1, 0);
+    if (this.#refCount === 0 && this.#intervalId) {
+      clearInterval(this.#intervalId);
+      this.#intervalId = null;
     }
   };
 }

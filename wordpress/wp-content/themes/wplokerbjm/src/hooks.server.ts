@@ -116,8 +116,8 @@ export const handle: Handle = async ({ event, resolve }) => {
     }
   }
   const contentType = response.headers.get("content-type") || "";
-  const publicCache = "public, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400";
-  const privateCache = "private, max-age=15, must-revalidate";
+  const publicCache = "public, max-age=60, stale-while-revalidate=3600, s-maxage=5184000, stale-if-error=86400";
+  const privateCache = "private, max-age=20, must-revalidate";
   // Set cache control headers
   if (contentType.startsWith("text/html")) {
     if (authenticated) {

@@ -14,13 +14,19 @@ import { goto } from "$app/navigation";
  * - Integrate with browser history and SEO updates for desktop
  */
 export class JobOverlayManager {
+  // Current slug of the job that was last activated through routeStateStore
+  // This is derived from shared route state so other components can react.
   public selectedSlug = $derived(routeStateStore.lastVisitedJob);
+
+  // Fully resolved job card element data from the UI list (optional).
+  // This allows immediate overlay content while the remote detail may still load.
   public selectedJob = $state<CardJob | null>(null);
 
-  // Overlay detail state, synchronized from page.data.job in SingleOverlay.svelte
+  // Overlay detail payload from the server response, set by SingleOverlay.svelte.
+  // This is the canonical detail state for the overlay panel content.
   public overlayData = $state<JobDetailResponse | null>(null);
 
-  // Scroll detection
+  // Scroll detection state to avoid interrupting user-initiated scrolling.
   private isScrolling: boolean = false;
   private scrollTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -51,6 +57,8 @@ export class JobOverlayManager {
    *
    * @param slug - The job slug to open
    * @param job - Optional job object to set as the selected job immediately
+   * @param source - The source of the job card interaction (e.g., "featured", "carousel") for analytics
+   * @param gotoCB - Optional callback to execute after navigation completes (desktop only)
    *
    * Notes:
    * - On desktop this will replace the current history entry with the
@@ -62,6 +70,7 @@ export class JobOverlayManager {
     slug: string,
     job?: CardJob,
     source: JobCardProps["variant"] = "featured",
+    { gotoCB }: { gotoCB?: () => void } = {},
   ): void {
     routeStateStore.MarkVisitedJob(slug, source);
     this.selectedJob = job ?? null;
@@ -74,7 +83,9 @@ export class JobOverlayManager {
         const url = new SvelteURL(job.permalink, window.location.origin);
         const path = url.pathname + url.search + url.hash;
 
-        goto(path, { replaceState: true, noScroll: true, keepFocus: true });
+        goto(path, { replaceState: true, noScroll: true, keepFocus: true }).then(() => {
+          if (gotoCB) gotoCB();
+        });
       }
     });
   }

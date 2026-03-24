@@ -45,17 +45,31 @@
     }
   });
 
-  onNavigate(async (navigation: OnNavigate) => {
+  onNavigate((navigation: OnNavigate) => {
     if (
       !document.startViewTransition ||
       typeof document.startViewTransition !== "function"
     )
       return;
-    return new Promise((resolve) => {
-      document.startViewTransition(async () => {
+
+    return new Promise((resolve, reject) => {
+      const transition = document.startViewTransition(() => {
         resolve();
-        await navigation.complete;
       });
+      try {
+        transition;
+      } catch (error) {
+        console.error("Error during onNavigate:", error);
+        reject(error);
+        return;
+      } finally {
+        if (transition) {
+          transition.finished.then(() => {
+            navigation.complete;
+          });
+        }
+        return;
+      }
     });
   });
 
@@ -106,21 +120,21 @@
     {@html rankMathHead}
   {/if}
 </svelte:head>
+
 <Header {themeData} />
 <div class="route-container pt-20">
   <div class="page-transition">
     {@render children()}
   </div>
-  <Footer />
+  <FloatingActionButton />
 </div>
-<FloatingActionButton />
+<Footer />
 
 <style lang="postcss">
   @reference "@css/app.css";
   .page-transition {
     transition: opacity 0.1s ease-in-out;
     content-visibility: auto;
-    /* Reserve viewport space using header CSS vars to avoid layout shifts */
     contain-intrinsic-size: auto
       calc(
         100vh -

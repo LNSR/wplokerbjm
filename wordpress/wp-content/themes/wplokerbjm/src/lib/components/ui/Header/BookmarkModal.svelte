@@ -15,10 +15,7 @@
   import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { goto } from "$app/navigation";
-  import {
-    routeStateStore,
-    routeStore,
-  } from "$lib/stores/Route.svelte";
+  import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
   import JobCard from "@components/ui/Shared/JobCard.svelte";
   import { fade } from "svelte/transition";
   import {
@@ -425,27 +422,18 @@
 
       const el: HTMLElement | null = isJobGridEl();
 
-      const waitUntilAfterNav = () => {
-        return new Promise<void>((resolve) => {
-          const check = async () => {
-            if (!this.transitioningRoute) {
-              resolve();
-            } else {
-              requestAnimationFrame(async () => await check());
-            }
-          };
-          void check();
-        });
-      };
-
       if (!isMobile() && el) {
         // Desktop: open overlay
         routeStateStore.saveCardHeights(
           new SvelteMap(cardHeights),
           "bookmarkModal",
         );
-        jobOverlay.openOverlay(job.slug ?? "", job);
-        this.closeModal();
+        // mark as "featured" for desktop
+        jobOverlay.openOverlay(job.slug ?? "", job, "featured", {
+          gotoCB: () => {
+            this.closeModal();
+          },
+        });
       } else {
         // Mobile: navigate
         if (job.permalink) {
@@ -454,17 +442,9 @@
             "bookmarkModal",
           );
           const url = new URL(job.permalink, window.location.origin);
-          void goto(url.pathname + url.search + url.hash);
-
-          // Wait until after any route transition completes before closing the modal to avoid jank during navigation
-          waitUntilAfterNav()
-            .then(() => {
-              this.closeModal();
-            })
-            .catch((e) => {
-              console.error("Error waiting for route transition:", e);
-              this.closeModal();
-            });
+          goto(url.pathname + url.search + url.hash).then(() => {
+            this.closeModal();
+          });
         }
       }
     }

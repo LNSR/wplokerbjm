@@ -344,7 +344,7 @@
     {/if}
 
     <div class="relative flex">
-      <div class="w-full lg:w-[calc(100%-420px)]">
+      <div class="w-full lg:w-[calc(100%-420px)]" style="contain: layout;">
         {#if displayJobs.length}
           {#if browser}
             <div

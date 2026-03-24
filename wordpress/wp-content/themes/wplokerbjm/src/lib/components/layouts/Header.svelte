@@ -56,7 +56,53 @@
       }
     }
 
-    public setThemeDirect(theme: ThemeName): void {
+    private persistTheme(theme: ThemeName): void {
+      try {
+        localStorage.setItem("wplokerbjm-theme", theme);
+      } catch (e) {
+        console.warn("Failed to write theme preference to localStorage", e);
+      }
+    }
+
+    private queueThemeCleanup(theme: ThemeName): void {
+      const runIdle =
+        typeof window.requestIdleCallback === "function"
+          ? window.requestIdleCallback.bind(window)
+          : (callback: IdleRequestCallback) => window.setTimeout(callback, 0);
+
+      requestAnimationFrame(() => {
+        document.documentElement.classList.remove("theme-switching");
+        runIdle(() => {
+          this.persistTheme(theme);
+          headerManager.scheduleUpdate();
+        });
+      });
+    }
+
+    private applyTheme(theme: ThemeName, dark: boolean): void {
+      document.documentElement.setAttribute("data-theme", theme);
+      if (dark) {
+        document.documentElement.classList.add("wplokerbjm-dark-mode-enable");
+      } else {
+        document.documentElement.classList.remove(
+          "wplokerbjm-dark-mode-enable",
+        );
+      }
+      this.updateMetaThemeColor(dark);
+    }
+
+    private prefersReducedMotion(): boolean {
+      try {
+        return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      } catch {
+        return false;
+      }
+    }
+
+    public setThemeDirect(
+      theme: ThemeName,
+      options: { useViewTransition?: boolean } = {},
+    ): void {
       const newTheme = theme;
       const isDark = newTheme === ThemeName.Dark;
 
@@ -65,40 +111,30 @@
       this.currentTheme = newTheme;
 
       window.requestAnimationFrame(() => {
-        const applyTheme = () => {
+        const runThemeUpdate = () => {
           document.documentElement.classList.add("theme-switching");
-          document.documentElement.setAttribute("data-theme", newTheme);
-          if (isDark) {
-            document.documentElement.classList.add(
-              "wplokerbjm-dark-mode-enable",
-            );
-          } else {
-            document.documentElement.classList.remove(
-              "wplokerbjm-dark-mode-enable",
-            );
-          }
-          this.updateMetaThemeColor(isDark);
+          this.applyTheme(newTheme, isDark);
         };
 
-        applyTheme();
-
-        // Defer storage write off the critical paint path so it cannot
-        // block rendering or cause forced reflow during theme toggles.
-        const write = () => {
-          try {
-            localStorage.setItem("wplokerbjm-theme", newTheme);
-          } catch (e) {
-            console.warn("Failed to write theme preference to localStorage", e);
-          }
-        };
-
-        requestAnimationFrame(() => {
-          document.documentElement.classList.remove("theme-switching");
-          requestIdleCallback(() => {
-            write();
-            headerManager.scheduleUpdate();
+        if (options.useViewTransition && !this.prefersReducedMotion()) {
+          const transition = document.startViewTransition?.(() => {
+            runThemeUpdate();
           });
-        });
+
+          if (transition) {
+            void transition.finished
+              ?.catch(() => {
+                console.error("Theme view transition failed");
+              })
+              .finally(() => {
+                this.queueThemeCleanup(newTheme);
+              });
+            return;
+          }
+        }
+
+        runThemeUpdate();
+        this.queueThemeCleanup(newTheme);
       });
     }
 
@@ -154,7 +190,7 @@
 
       // apply immediately for responsive UI, but keep debounced path for save/side-effects
       try {
-        this.setThemeDirect(theme);
+        this.setThemeDirect(theme, { useViewTransition: true });
       } catch {
         // fallback to debounced if direct fails for some reason
         this.debouncedSetTheme(theme);
@@ -343,6 +379,7 @@
     HeaderLogo?: string;
     themeData?: import("@/types").WPLokerBJMThemedData | null;
   } = $props();
+  
   let loginAdmin = $state(false);
   let _loginAdminPoll: number | null = null;
   const bookmarkJobs = $derived(bookmarkStore.jobs);

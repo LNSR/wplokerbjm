@@ -119,7 +119,6 @@ class WPGraphQL
             $headers['Access-Control-Max-Age'] = '86400';
         }
         $cacheControl = function ($extra) use (&$headers) {
-            // Force-set Cache-Control to ensure no stale directives like `no-store` remain.
             if (isset($headers['Cache-Control'])) {
                 unset($headers['Cache-Control']);
             }

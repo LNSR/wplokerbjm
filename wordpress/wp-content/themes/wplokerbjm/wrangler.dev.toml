@@ -13,6 +13,12 @@ id                  = "75fc8b0cd2d74548b6c05321296d4d45"
 [assets]
 directory = ".svelte-kit/cloudflare"
 binding = "ASSETS"
+
+[dev]
+local_protocol = "https"
+https_cert_path = "../../../../certs/localhost.crt"
+https_key_path = "../../../../certs/localhost.key"
+
 [env]
 [env.vars]
 PUBLIC_CMS_ORIGIN = "https://dev.lokerbanjarmasin.my.id"
