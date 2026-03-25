@@ -1,9 +1,5 @@
 // SearchForm filters taxonomy types
-export enum TaxonomyType {
-  lokasi = 'lokasi_pekerjaan',
-  gender = 'gender',
-  pendidikan = 'pendidikan'
-}
+export type TaxonomyType = 'lokasi_pekerjaan' | 'gender' | 'pendidikan'
 
 // WordPress custom post types from MetaBox
 export enum PostTypesMetabox {
@@ -34,23 +30,23 @@ export interface Taxonomies {
 export type PostTypes = PostTypesMetabox
 
 export interface CustomFields {
-  nama_perusahaan?: string | (null | undefined);
-  tentang_perusahaan?: string | (null | undefined);
-  deskripsi_pekerjaan?: string | (null | undefined);
-  umur_min?: number | (null | undefined);
-  umur_max?: number | (null | undefined);
-  pengalaman?: number | (null | undefined);
-  persyaratan?: string | (null | undefined);
-  cara_melamar?: string | (null | undefined);
-  benefit?: string | (null | undefined);
-  gaji_minimal?: number | (null | undefined);
-  gaji_maksimal?: number | (null | undefined);
-  deadline?: string | (null | undefined);
-  email_kontak?: string | (null | undefined);
-  nomor_kontak?: string | (null | undefined);
-  situs_kontak?: string | (null | undefined);
-  social_media?: string | (null | undefined);
-  status_pekerjaan?: (1 | 2 | 3) | (null | undefined);
+  nama_perusahaan: string | (null | undefined);
+  tentang_perusahaan: string | (null | undefined);
+  deskripsi_pekerjaan: string | (null | undefined);
+  umur_min: number | (null | undefined);
+  umur_max: number | (null | undefined);
+  pengalaman: number | (null | undefined);
+  persyaratan: string | (null | undefined);
+  cara_melamar: string | (null | undefined);
+  benefit: string | (null | undefined);
+  gaji_minimal: number | (null | undefined);
+  gaji_maksimal: number | (null | undefined);
+  deadline: string | (null | undefined);
+  email_kontak: string | (null | undefined);
+  nomor_kontak: string | (null | undefined);
+  situs_kontak: string | (null | undefined);
+  social_media: string | (null | undefined);
+  status_pekerjaan: (0 | 1 | 2 | 3) | (null | undefined);
 }
 
 export interface MetaBox extends Taxonomies, CustomFields { }

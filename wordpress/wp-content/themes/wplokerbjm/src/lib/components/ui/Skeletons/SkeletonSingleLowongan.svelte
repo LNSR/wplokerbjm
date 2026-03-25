@@ -1,3 +1,6 @@
+<script lang="ts">
+  
+</script>
 <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12">
   <!-- Header: Title + Summary (matches JobDetail header) -->
   <section class="overflow-hidden p-6 rounded-xl bg-[var(--wpl-global-color-5)] animate-pulse">

@@ -4,16 +4,13 @@
   import JobCarousel from "@components/ui/Homepage/JobCarousel.svelte";
   import JobGrid from "@components/ui/Homepage/JobGrid.svelte";
   import { page } from "$app/state";
-
+  import { schemaScriptAttach } from "@/utils";
 </script>
 
 <svelte:head>
   {#if page.url.pathname === "/"}
-    {@html page.data?.itemListSchema
-      ? `<script type="application/ld+json" data-ld-type="ItemList">${JSON.stringify(
-          page.data.itemListSchema,
-        )}</script>`
-      : ""}
+  {@const schemaItemList = page.data?.itemListSchema}
+  {@html schemaScriptAttach(schemaItemList, "ItemList")}
   {/if}
 </svelte:head>
 

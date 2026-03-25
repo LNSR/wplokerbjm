@@ -1,8 +1,8 @@
 <script module lang="ts">
   import JobCard from "@components/ui/Shared/JobCard.svelte";
-  import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import { isJobGridEl } from "$lib/utils/elements.svelte";
-  import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
+  import { routeStateStore } from "$lib/stores/Route.svelte";
   import { goto } from "$app/navigation";
   import type { CardJob } from "@/types";
   import { APIService } from "@/services/APIService";
@@ -165,7 +165,7 @@
           addSlidesBefore: 2,
           addSlidesAfter: 2,
           renderExternalUpdate: false,
-          renderExternal: (data: any) => {
+          renderExternal: (data) => {
             const next = {
               from: Number(data?.from ?? 0),
               to: Number(data?.to ?? -1),
@@ -505,7 +505,7 @@
       if (typeof window !== "undefined" && window.innerWidth >= 768) {
         // Desktop: open overlay
         const jobgridElement = isJobGridEl();
-        jobOverlay.openOverlay(slug, job, "carousel");
+        jobOverlayManager?.openOverlay(slug, job, "carousel");
         jobgridElement?.scrollIntoView({ behavior: "smooth", block: "start" });
       } else {
         // Mobile: mark visited for carousel then use SPA navigation to SingleLowongan.svelte route

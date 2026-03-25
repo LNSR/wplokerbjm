@@ -58,13 +58,13 @@
     return slugMatch && sourceMatch;
   });
 
-  const cardClass = $derived.by(() => {
-    return `card-base-${variant}${selected ? ` card-selected-${variant}` : ""}`;
-  });
+  const cardClass = $derived(
+    `card-base-${variant}${selected ? ` card-selected-${variant}` : ""}`
+  );
 
-  const bodyClass = $derived.by(() => {
-    return `card-body-${variant}`;
-  });
+  const bodyClass = $derived(
+    `card-body-${variant}`
+  );
 
   function handleClick(event: MouseEvent) {
     const { ctrlKey, metaKey, shiftKey, button } = event as MouseEvent;

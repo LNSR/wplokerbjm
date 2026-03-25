@@ -1,3 +1,5 @@
+<script lang="ts">
+</script>
 <section class="mx-auto p-4 text-center">
   <div class="max-w-4xl mx-auto">
     <h1 class="text-2xl md:text-3xl max-w-4xl mx-auto mt-4 font-bold mb-3">

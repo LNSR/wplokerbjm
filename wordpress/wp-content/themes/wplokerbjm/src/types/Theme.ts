@@ -8,8 +8,8 @@ export interface WPLokerBJMThemedData {
     logoHeight?: number;
   };
   disableTracking: boolean;
-  wpRestNonce?: string;
-  siteIconTags: string;
+  wpRestNonce?: string | null;
+  siteIconTags?: string;
 }
 
 export enum ThemeName {

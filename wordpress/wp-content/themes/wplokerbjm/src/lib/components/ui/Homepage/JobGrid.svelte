@@ -1,9 +1,8 @@
 <script module lang="ts">
-  import type { CardJob, JobGridProps, SearchState } from "@/types";
-  import { SearchContext, SearchTitle } from "@/types";
+  import type { CardJob, JobGridProps, SearchState, SearchContext, SearchTitle } from "@/types";
   import { goto } from "$app/navigation";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
-  import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
   import { Virtualization } from "$lib/utils/Virtualization.svelte";
   import { scrollY, innerHeight } from "svelte/reactivity/window";
@@ -45,7 +44,7 @@
           new URL(String(job.permalink), window.location.origin).pathname,
         ); // save state with the target path so it can be restored in sidepanel context
 
-        jobOverlay.openOverlay(job.slug ?? "", job, "featured");
+        jobOverlayManager?.openOverlay(job.slug ?? "", job, "featured");
         this.scrollToCard(job.slug ?? "");
       } else {
         MobileJobClick();
@@ -53,7 +52,7 @@
     }
 
     scrollToCard(slug: string): void {
-      jobOverlay.scrollToCard(slug, 300, false, "featured");
+      jobOverlayManager?.scrollToCard(slug, 300, false, "featured");
     }
   }
 
@@ -66,7 +65,7 @@
       if (isRefreshing) return;
       isRefreshing = true;
       try {
-        if (searchStore.context !== SearchContext.Search) {
+        if (searchStore.context !== "search") {
           const response = await APIService.fetchJobGridGraphQL({
             paged: 1,
             context: searchStore.context,
@@ -76,10 +75,10 @@
           });
           searchStore.jobs = response.jobs || [];
           searchStore.maxNumPages = response.maxNumPages || 1;
-          searchStore.context = response.context || SearchContext.Latest;
+          searchStore.context = response.context || "latest";
           searchStore.title =
-            (response.title as SearchTitle) || SearchTitle.Latest;
-          searchStore.totalJobs = response.totalJobs || 0;
+            (response.title) || "Lowongan Terbaru";
+          searchStore.totalJobs = response.total || 0;
           if (response.filters) {
             searchStore.setFilters(response.filters);
           }
@@ -102,14 +101,12 @@
       const routePath = window.location.pathname || "/";
 
       try {
-        const saved = routeStateStore.getSearchState(routePath) as
-          | SearchState
-          | undefined;
+        const saved = routeStateStore.getSearchState(routePath);
         if (saved) {
           if (Array.isArray(saved.jobs) && saved.jobs.length) {
             searchStore.jobs = [...saved.jobs];
           }
-          if (saved.filters) searchStore.filters = saved.filters as any;
+          if (saved.filters) searchStore.filters = saved.filters;
           if (typeof saved.page === "number") searchStore.page = saved.page;
           if (typeof saved.maxNumPages === "number")
             searchStore.maxNumPages = saved.maxNumPages;
@@ -144,15 +141,16 @@
     saveGridStates(path?: string): void {
       const routePath = path || "/";
       try {
-        const state: Partial<SearchState> = {
+        const state: SearchState = {
           jobs: searchStore.jobs || [],
           filters: searchStore.filters || {},
           page: searchStore.page || 1,
-          title: searchStore.title || SearchTitle.Latest,
-          context: searchStore.context || SearchContext.Latest,
+          title: searchStore.title || "Lowongan Terbaru",
+          context: searchStore.context || "latest",
           totalJobs: searchStore.totalJobs || 0,
+          maxNumPages: searchStore.maxNumPages || 1,
         };
-        routeStateStore.saveSearchState(routePath, state as SearchState);
+        routeStateStore.saveSearchState(routePath, state);
 
         // Save current scroll position
         routeStateStore.saveScrollPosition(routePath, window.scrollY);
@@ -178,7 +176,7 @@
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { onMount, tick } from "svelte";
 
-  const props: JobGridProps = $props();
+  const props = $props();
 
   const {
     jobs = [],
@@ -186,7 +184,7 @@
     context,
     filters,
     title,
-    totalJobs,
+    total: totalJobs,
   } = $derived<JobGridProps>(props);
 
   class VirtualizationManager {
@@ -237,7 +235,7 @@
     if (!loadMoreSentinel) return;
 
     const observer = new IntersectionObserver(
-      (entries) => {
+      async (entries) => {
         for (const entry of entries) {
           if (
             entry.isIntersecting &&
@@ -245,7 +243,7 @@
             !searchStore.nextPageLoadMoreCache &&
             !searchStore.isPrefetchingLoadMore
           ) {
-            void searchStore.prefetchNextPage();
+            await searchStore.prefetchNextPage();
           }
         }
       },
@@ -286,27 +284,29 @@
   /**
    * SSR initialization to populate searchStore with server-provided data on initial load. This ensures that the job grid is populated immediately with the correct data without waiting for client-side JS to fetch it, improving perceived performance and SEO. The check for routeStore.isInitialLoad ensures this only runs on the first load and not on client-side navigations where the state should be preserved/restored instead.
    */
-  function SSRInit(): void {
+  (() => {
     if (jobs && jobs.length > 0 && routeStore.isInitialLoad) {
       searchStore.jobs = [...jobs];
       if (typeof maxNumPages === "number" && maxNumPages > 0) {
         searchStore.maxNumPages = maxNumPages;
       }
       if (context) searchStore.context = context;
-      if (title) searchStore.title = title as SearchTitle;
+      if (title) searchStore.title = title;
       if (totalJobs !== undefined) searchStore.totalJobs = totalJobs;
       if (filters) searchStore.setFilters(filters);
     }
-  }
-
-  SSRInit();
+  })();
 
   onMount(() => {
     jobGridManager.init();
   });
 </script>
 
-<section class="relative mt-12" id="job-grid">
+<section
+  class="relative mt-12"
+  id="job-grid"
+  style={!isMobile() ? "view-transition-name: none;" : ""}
+>
   <div class="flex items-center justify-between mb-6">
     {#if displayJobs.length}
       <h2 class="text-xl md:text-2xl font-semibold">{displayTitle}</h2>
@@ -337,7 +337,7 @@
       <LoadingSpinner srLabel="Memuat grid..." size="md" />
     </div>
   {:else}
-    {#if displayJobs.length && searchStore.context !== SearchContext.Latest}
+    {#if displayJobs.length && searchStore.context !== "latest"}
       <div class="text-base font-medium mb-4">
         {displayTotalJobs} lowongan ditemukan
       </div>

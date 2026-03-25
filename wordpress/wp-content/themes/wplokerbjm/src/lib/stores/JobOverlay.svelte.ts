@@ -1,6 +1,6 @@
 import type { CardJob, JobCardProps, JobDetailResponse } from "@/types";
 import { isMobile } from "$lib/utils/elements.svelte";
-import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
+import { routeStateStore } from "$lib/stores/Route.svelte";
 import { SvelteURL } from "svelte/reactivity";
 import { goto } from "$app/navigation";
 /**
@@ -29,19 +29,7 @@ export class JobOverlayManager {
   // Scroll detection state to avoid interrupting user-initiated scrolling.
   private isScrolling: boolean = false;
   private scrollTimeout: ReturnType<typeof setTimeout> | null = null;
-
-  /**
-   * Create a JobOverlayManager instance.
-   *
-   * Registers a passive scroll listener used to detect when the user is
-   * actively scrolling so that methods like `scrollToCard` can optionally
-   * avoid interfering while the user scrolls.
-   */
-  constructor() {
-    if (typeof window !== "undefined") {
-      window.addEventListener("scroll", this.handleScroll, { passive: true });
-    }
-  }
+  private scrollListenerAdded: boolean = false;
 
   private handleScroll = (): void => {
     // Only set isScrolling when it transitions from false to true to avoid frequent reactive churn
@@ -51,6 +39,13 @@ export class JobOverlayManager {
       this.isScrolling = false;
     }, 500); // Adjust delay as needed
   };
+
+  public initEventListener(): void {
+    if (typeof window !== "undefined" && !isMobile() && !this.scrollListenerAdded) {
+      this.scrollListenerAdded = true;
+      window.addEventListener("scroll", this.handleScroll, { passive: true });
+    }
+  }
 
   /**
    * Open the overlay for a job.
@@ -70,12 +65,12 @@ export class JobOverlayManager {
     slug: string,
     job?: CardJob,
     source: JobCardProps["variant"] = "featured",
-    { gotoCB }: { gotoCB?: () => void } = {},
+    { gotoCB }: { gotoCB?: () => void | Promise<void> } = {},
   ): void {
     routeStateStore.MarkVisitedJob(slug, source);
     this.selectedJob = job ?? null;
 
-    requestAnimationFrame(async () => {
+    requestAnimationFrame(() => {
       // Handle page push and SEO for desktop
       const isDesktop = !isMobile();
 
@@ -84,7 +79,19 @@ export class JobOverlayManager {
         const path = url.pathname + url.search + url.hash;
 
         goto(path, { replaceState: true, noScroll: true, keepFocus: true }).then(() => {
-          if (gotoCB) gotoCB();
+          if (!gotoCB) return;
+          try {
+            const gotoResult = gotoCB();
+            if (typeof gotoResult?.then === "function" || gotoResult instanceof Promise) {
+              return Promise.resolve(gotoResult).catch(err => {
+                console.error("gotoCB Promise error:", err);
+              });
+            } else {
+              return void gotoResult;
+            }
+          } catch (err) {
+            console.error("gotoCB error:", err);
+          }
         });
       }
     });
@@ -195,4 +202,5 @@ export class JobOverlayManager {
     }, delay);
   }
 }
-export const jobOverlay = new JobOverlayManager();
+
+export const jobOverlayManager = new JobOverlayManager();

@@ -1,30 +1,23 @@
-import type { SortOption, CardJob, JobSummary, JobContactRow, MetaBox, WPBasePost, WPTaxonomyTerm, TaxonomyType } from '@/types';
+import type { SortOption, CardJob, JobSummary, JobContactRow, MetaBox, WPBasePost, WPTaxonomyTerm } from '@/types';
 
 // Base optional job filters
 type OptionalJobFilters = {
-  cari?: string
-  'lokasi_pekerjaan'?: string[]
-  gender?: string[]
-  pendidikan?: string[]
-  sort?: SortOption
-  context?: SearchContext
+  cari?: string | null
+  'lokasi_pekerjaan'?: string[] | (null | undefined)
+  gender?: string[] | (null | undefined)
+  pendidikan?: string[] | (null | undefined)
+  sort?: SortOption | null
+  context?: SearchContext | null
 }
 
 // Base filters for search operations
-export interface SearchFilters extends Pick<MetaBox, 'lokasi_pekerjaan' | 'gender' | 'pendidikan'> {
-  cari: string
-  'lokasi_pekerjaan'?: string[]
-  gender?: string[]
-  pendidikan?: string[]
-  sort: SortOption
-  context?: SearchContext
+export interface SearchFilters extends OptionalJobFilters {
+  cari: string | null
+  sort: SortOption | null
 }
 
 // Context type for search and loadMore operations
-export enum SearchContext {
-  Search = 'search',
-  Latest = 'latest'
-}
+export type SearchContext = 'search' | 'latest'
 
 // API response metadata from headers
 export interface ApiMeta {
@@ -41,16 +34,13 @@ export interface BaseJobSearchResponse {
 }
 
 // Extended response for initial search operations
-export interface SearchResponse extends BaseJobSearchResponse {
+export interface SearchResponse extends Omit<BaseJobSearchResponse, 'total'> {
   title?: SearchTitle
   shouldScroll?: boolean
   total: number
-} 
-
-export enum SearchTitle {
-  Latest = 'Lowongan Terbaru',
-  Search = 'Hasil Pencarian'
 }
+
+export type SearchTitle = 'Lowongan Terbaru' | 'Hasil Pencarian'
 
 // Response for pagination operations
 export interface LoadMoreResponse extends BaseJobSearchResponse { }
@@ -72,26 +62,30 @@ export interface TaxonomyTerm extends Pick<WPTaxonomyTerm, 'slug' | 'name' | 'pa
   children?: TaxonomyTerm[]
 }
 
-type TaxonomyTermsResponse = {
+export type TaxonomyTermsResponse = {
   lokasiTerms: TaxonomyTerm[]
   genderTerms: TaxonomyTerm[]
   pendidikanTerms: TaxonomyTerm[]
 }
 
-
-export interface TaxonomyApiInterface {
-  getAllTerms(): Promise<TaxonomyTermsResponse>
-  getTermsByType(type: TaxonomyType): Promise<TaxonomyTerm[]>
+export interface JobSchemaResponse {
+  schemas?: (string | null)[] | null
+  type: "ItemList" | "JobPosting"
 }
 
-export interface JobDetailResponse extends Pick<WPBasePost, 'id' | 'title' | 'post_time'>, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'> {
-  duplicateNonce?: string; // Nonce for plugin 'Duplicate post as draft'
+export interface JobDetailResponse extends Pick<WPBasePost, 'id' | 'title' | 'post_time' | 'slug'>, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'> {
+  duplicateNonce?: string | null; // Nonce for plugin 'Duplicate post as draft'
   ringkasanPekerjaan: JobSummary;
   contacts?: JobContactRow;
   post_time: string;
 }
 
-// RankMath head data interface
+
+/**
+ * @interface RankMathHeadData
+ * @internal isnt really used, but useful to recognize shape
+ * @remarks Rankmath API returns string in fact
+ */
 export interface RankMathHeadData {
   title?: string;
   description?: string;
@@ -158,5 +152,5 @@ export interface RankMathHeadData {
   yandex_verify?: string;
   pinterest_verify?: string;
   norton_verify?: string;
-  schema?: Record<string, any>;
+  schema?: Record<string, any> | Record<string, any>[];
 }

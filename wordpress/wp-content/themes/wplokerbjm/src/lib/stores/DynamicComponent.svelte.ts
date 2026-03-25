@@ -4,50 +4,48 @@ export type LoginModalComponent = typeof import("@components/ui/Shared/LoginModa
 
 class DynamicComponentStore {
 
-  BookmarkModal = $state<BookmarkModalComponent | null>(null);
+  BookmarkModal = $state<BookmarkModalComponent | undefined>(undefined);
 
-  CustomDropdown = $state<CustomDropdownComponent | null>(null);
-  LoginModal = $state<LoginModalComponent | null>(null);
+  CustomDropdown = $state<CustomDropdownComponent | undefined>(undefined);
+  LoginModal = $state<LoginModalComponent | undefined>(undefined);
   #componentLoading: boolean = false;
-
-
-  public async loadBookmarkModal(): Promise<BookmarkModalComponent> {
-    if (this.BookmarkModal) return this.BookmarkModal;
+  private async loadComponent<T>(
+    propName: keyof Pick<DynamicComponentStore, 'BookmarkModal' | 'CustomDropdown' | 'LoginModal'>,
+    importer: () => Promise<{ default: T }>
+  ): Promise<T> {
+    const current = (this as any)[propName];
+    if (current) return current;
     try {
       this.#componentLoading = true;
-      return this.BookmarkModal = (await import("@components/ui/Header/BookmarkModal.svelte")).default;
+      const comp = (await importer()).default;
+      return (this as any)[propName] = comp;
     } catch (error) {
-      console.error("Failed to load BookmarkModal:", error);
+      console.error(`Failed to load ${propName}:`, error);
       throw error;
     } finally {
       this.#componentLoading = false;
     }
   }
 
-  public async loadCustomDropdown(): Promise<CustomDropdownComponent> {
-    if (this.CustomDropdown) return this.CustomDropdown;
-    try {
-      this.#componentLoading = true;
-      return this.CustomDropdown = (await import("@components/ui/Homepage/CustomDropdown.svelte")).default;
-    } catch (error) {
-      console.error("Failed to load CustomDropdown:", error);
-      throw error;
-    } finally {
-      this.#componentLoading = false;
-    }
+  public loadBookmarkModal(): Promise<BookmarkModalComponent> {
+    return this.loadComponent<BookmarkModalComponent>(
+      'BookmarkModal',
+      () => import("@components/ui/Header/BookmarkModal.svelte")
+    );
   }
 
-  public async loadLoginModal(): Promise<LoginModalComponent> {
-    if (this.LoginModal) return this.LoginModal;
-    try {
-      this.#componentLoading = true;
-      return this.LoginModal = (await import("@components/ui/Shared/LoginModal.svelte")).default;
-    } catch (error) {
-      console.error("Failed to load LoginModal:", error);
-      throw error;
-    } finally {
-      this.#componentLoading = false;
-    }
+  public loadCustomDropdown(): Promise<CustomDropdownComponent> {
+    return this.loadComponent<CustomDropdownComponent>(
+      'CustomDropdown',
+      () => import("@components/ui/Homepage/CustomDropdown.svelte")
+    );
+  }
+
+  public loadLoginModal(): Promise<LoginModalComponent> {
+    return this.loadComponent<LoginModalComponent>(
+      'LoginModal',
+      () => import("@components/ui/Shared/LoginModal.svelte")
+    );
   }
 }
 

@@ -1,6 +1,7 @@
 import type { PageServerLoad } from "./$types";
 
 import { APIService } from "@/services/APIService";
+import type { JobSchemaResponse } from "@/types";
 import { getCmsOrigin } from "@/utils/environment";
 export const load: PageServerLoad = async ({ url, fetch }) => {
   try {
@@ -32,10 +33,9 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
             const hostOnly = cmsOrigin.replace(/^https?:\/\//, "").replace(/\/$/, "");
             const originRegex = new RegExp(`https?:\\/\\/${hostOnly}`, "g");
             const str = JSON.stringify(itemListSchema);
-            itemListSchema = JSON.parse(str.replace(originRegex, url.origin));
+            itemListSchema = str.replace(originRegex, url.origin);
           } catch (e) {
-            const str = JSON.stringify(itemListSchema);
-            itemListSchema = JSON.parse(str.split(cmsOrigin).join(url.origin));
+            console.warn("Failed to replace itemListSchema URLs, using original", e);
           }
         }
       } catch (e) {
@@ -46,7 +46,7 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
     return {
       carousel: carousel ?? { jobs: [], totalJobs: 0 },
       jobGrid: jobGrid ?? { jobs: [], maxNumPages: 1, totalJobs: 0 },
-      itemListSchema,
+      itemListSchema: itemListSchema as JobSchemaResponse["schemas"],
     };
   } catch (err) {
     console.error("+page.server load error (homepage):", err);

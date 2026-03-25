@@ -20,6 +20,10 @@
       "**/build": true,
       "**/uploads": true,
       "**/cache": true,
+      "**/.svelte-kit": true,
+      "**/node_modules": true,
+      "**/vendor": true,
+      "**/.wrangler": true,
     },
     "[svelte]": {
       "editor.defaultFormatter": "svelte.svelte-vscode",
@@ -33,9 +37,9 @@
       "strings": "on",
     },
     "eslint.options": {
-      "overrideConfigFile": "eslint.config.js",
+      "overrideConfigFile": "eslint.config.ts",
     },
-    "eslint.workingDirectories": ["${workspaceFolder:wplokerbjm-sveltekit}"],
+    "eslint.workingDirectories": ["${workspaceFolder:wplokerbjm-wp-theme}"],
     "php.stubs": ["all"],
     "[php]": {
       "editor.defaultFormatter": "DEVSENSE.phptools-vscode",
@@ -45,6 +49,11 @@
     "debug.console.fontSize": 12,
     "scm.inputFontSize": 12,
     "terminal.integrated.fontSize": 13,
+    "js/ts.tsdk.path": "wordpress/wp-content/themes/wplokerbjm/node_modules/typescript/lib",
+    "graphql-config.load.rootDir": "wordpress/wp-content/themes/wplokerbjm",
+    "js/ts.implicitProjectConfig.target": "ESNext",
+    "js/ts.tsserver.node.path": "/usr/bin/bun",
+    "js/ts.tsserver.maxMemory": 16392,
   },
   "extensions": {
     "recommendations": [
@@ -116,7 +125,7 @@
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "sveltekit:build",
@@ -126,7 +135,7 @@
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "sveltekit:preview",
@@ -136,7 +145,7 @@
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "sveltekit:prepare",
@@ -146,7 +155,7 @@
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "sveltekit:check",
@@ -156,7 +165,7 @@
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "sveltekit:check:watch",
@@ -166,7 +175,7 @@
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []
+        "problemMatcher": [],
       },
       {
         "label": "sveltekit:lint",
@@ -176,7 +185,8 @@
         "options": {
           "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
         },
-        "problemMatcher": []      },
+        "problemMatcher": [],
+      },
     ],
   },
 }

@@ -1,22 +1,37 @@
+import typia from "typia";
 import type { WPLokerBJMThemedData } from "@/types";
 
 class ThemeManager {
-  #themeProps: WPLokerBJMThemedData | undefined = $state(undefined);
+  #themeProps = $state<WPLokerBJMThemedData | undefined>(undefined);
 
   public get getThemeData(): WPLokerBJMThemedData {
-    return this.#themeProps!;
+    if (!this.#themeProps) throw new Error("Theme data is not set");
+    return typia.assertEquals<WPLokerBJMThemedData>(this.#themeProps);
   }
 
-  public get getNonce(): WPLokerBJMThemedData["wpRestNonce"] | undefined {
-    return this.#themeProps?.wpRestNonce;
+  public get getNonce(): WPLokerBJMThemedData["wpRestNonce"] {
+    try {
+      if (typia.is<string>(this.#themeProps?.wpRestNonce)) {
+        return typia.assertEquals<string>(this.#themeProps?.wpRestNonce);
+      }
+      return undefined;
+    } catch (err) {
+      console.warn("ThemeManager.getNonce: invalid theme data", err);
+      return undefined;
+    }
   }
 
-  public setThemeData(data: WPLokerBJMThemedData): WPLokerBJMThemedData {
-    return this.#themeProps = data;
+  public set setThemeData(data: WPLokerBJMThemedData) {
+    if (typia.validateEquals<WPLokerBJMThemedData>(data)) {
+      this.#themeProps = data;
+    }
   }
 
-  public setNonce(nonce: WPLokerBJMThemedData["wpRestNonce"]): WPLokerBJMThemedData["wpRestNonce"] {
-    return this.#themeProps!.wpRestNonce = nonce;
+  public set setNonce(nonce: WPLokerBJMThemedData["wpRestNonce"]) {
+    typia.assertEquals<string>(nonce);
+
+    if (!this.#themeProps) return;
+    this.#themeProps.wpRestNonce = nonce;
   }
 }
 

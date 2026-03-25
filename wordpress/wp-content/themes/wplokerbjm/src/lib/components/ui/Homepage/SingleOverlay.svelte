@@ -6,7 +6,7 @@
   import { themeManager } from "$lib/stores/Theme.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
-  import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import JobDetail from "@components/ui/Shared/JobDetail.svelte";
   import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
   import { getCmsOrigin } from "@/utils";
@@ -17,10 +17,7 @@
   const editPostId = $derived(data?.id ?? null);
 
   function isLoggedIn(): boolean {
-    if (themeManager.getNonce) {
-      return true;
-    }
-    return false;
+    return themeManager.getNonce ? true : false;
   }
 
   function getCloneHref(postId?: number | null): string {
@@ -47,7 +44,10 @@
   let drawerElement: HTMLElement;
 
   $effect(() => {
-    jobOverlay.overlayData = data; // Update the store with the current job data from SvelteKit's page store
+    if (jobOverlayManager) {
+      jobOverlayManager.initEventListener();
+      jobOverlayManager.overlayData = data;
+    }
     if (visible) {
       slideIn = false;
       // Reset drawer scroll on each job open/navigation.

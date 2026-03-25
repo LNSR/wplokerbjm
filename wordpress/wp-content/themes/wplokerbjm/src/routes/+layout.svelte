@@ -10,7 +10,7 @@
   import { updated } from "$app/state";
   import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
   import { themeManager } from "@/lib/stores/Theme.svelte";
-  import script from "@@/public/js/theme/InlineScript.html?raw";
+  import { inlineScript } from "@/utils";
   import type { OnNavigate } from "@sveltejs/kit";
 
   let initialPageviewSent = false;
@@ -23,7 +23,7 @@
     data?: {
       themeData?: WPLokerBJMThemedData;
       deviceType?: App.PageData["deviceType"];
-      rankMathHead?: RankMathHeadData;
+      rankMathHead?: Partial<RankMathHeadData>;
     };
   } = $props();
 
@@ -95,13 +95,13 @@
   });
 
   onMount(() => {
-    themeManager.setThemeData(themeData!);
-    routeStateStore.setInitialDevice(
-      data?.deviceType?.isMobile ? "mobile" : "desktop",
-    );
+    themeManager.setThemeData = themeData!;
+    routeStateStore.setInitialDevice = data?.deviceType?.isMobile
+      ? "mobile"
+      : "desktop";
 
     const cleanupObserveBreakpointChanges =
-      routeStateStore.observeBreakpointChanges();
+      routeStateStore.observeBreakpointChanges?.();
 
     return () => {
       cleanupObserveBreakpointChanges?.();
@@ -111,7 +111,7 @@
 
 <svelte:head>
   {#if routeStore.isInitialLoad}
-    {@html script}
+    {@html inlineScript}
   {/if}
   {#if themeData?.siteIconTags}
     {@html themeData.siteIconTags}
@@ -147,7 +147,7 @@
   /* Ensure smooth transitions for route changes */
   .route-container {
     min-height: 100vh;
-    transition: all 0.2s ease-in-out;
+    transition: all 0.1s ease-in-out;
     position: relative;
   }
 </style>

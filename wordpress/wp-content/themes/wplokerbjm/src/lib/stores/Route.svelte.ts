@@ -2,9 +2,10 @@ import type { SearchState, CarouselState, JobCardProps } from "@/types";
 import { isMobile } from "$lib/utils/elements.svelte";
 import { SvelteMap } from "svelte/reactivity";
 import { type CardJob } from "@/types";
-import { LRUCache } from "lru-cache";
-import { goto } from "$app/navigation";
+import { LRUCache, type BackgroundFetch } from "lru-cache";
+import typia from "typia";
 
+type Device = "desktop" | "mobile";
 
 class RouteManager {
   isInitialLoad = $state(true);
@@ -24,7 +25,7 @@ class RouteManager {
   }
 
 }
-type Device = "desktop" | "mobile";
+
 class RouteStateManager {
   scrollPositions = new LRUCache<string, number>({ max: 100 }); // Scroll position cache per route
   searchStates = new LRUCache<string, SearchState>({ max: 100 }); // Limit to 50 most recent search states
@@ -34,9 +35,9 @@ class RouteStateManager {
   skipScrollRestore = new LRUCache<string, boolean>({ max: 100 }); // Skip scroll restore for specific routes
   cardHeights = new LRUCache<string, Record<number, number>>({ max: 500 }); // Global cache for card heights
 
-  #currentDevice: Device = $derived.by(() => (isMobile() ? "mobile" : "desktop"));
-  #prevDevice: Device | undefined = undefined;
-  effectCleanup: (() => void) | undefined;
+  #currentDevice = $derived.by<Device>(() => (isMobile() ? "mobile" : "desktop"));
+  #prevDevice: Device | undefined;
+  effectCleanup: (() => void) | undefined = undefined;
 
   /**
    * track breakpoint for better DX during development
@@ -46,9 +47,9 @@ class RouteStateManager {
 
     // Set up the effect and store the cleanup function
     this.effectCleanup = $effect.root(() => {
+      $inspect("Previous device", this.#prevDevice, ", Current device", this.#currentDevice);
       $effect.pre(() => {
         if (this.#currentDevice !== this.#prevDevice) {
-          $inspect("Previous device", this.#prevDevice, ", Current device", this.#currentDevice);
           this.clearCachesForDevice();
           this.#prevDevice = this.#currentDevice;
         }
@@ -70,8 +71,17 @@ class RouteStateManager {
     };
   }
 
-  setInitialDevice(device: Device) {
-    this.#prevDevice = device;
+  set setInitialDevice(device: Device) {
+    const validate = typia.validateEquals<Device>(device);
+    if (!validate.success) {
+      console.warn("Invalid device type provided to setInitialDevice:", device);
+      return;
+    }
+    this.#currentDevice = device;
+  }
+
+  get getCurrentDevice(): Device {
+    return this.#currentDevice;
   }
 
   /**
@@ -95,7 +105,7 @@ class RouteStateManager {
     this.carouselState = undefined;
   }
 
-  saveSearchState(path: string, searchState: SearchState) {
+  saveSearchState(path: string, searchState: SearchState | BackgroundFetch<SearchState> | undefined): void {
     const key = `${this.#currentDevice}-${path}`;
     this.searchStates.set(key, searchState);
     if (typeof sessionStorage !== "undefined") {
@@ -117,7 +127,7 @@ class RouteStateManager {
       try {
         const stored = sessionStorage.getItem(`searchStates-${key}`);
         if (stored) {
-          const parsed = JSON.parse(stored) as SearchState;
+          const parsed = JSON.parse(stored);
           this.searchStates.set(key, parsed); // cache in memory
           state = parsed;
         }

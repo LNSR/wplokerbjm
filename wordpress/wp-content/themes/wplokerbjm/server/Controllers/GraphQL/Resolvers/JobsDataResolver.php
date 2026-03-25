@@ -157,12 +157,7 @@ class JobsDataResolver
 
             $job = $this->graphqlData->getJobDetailData($post->ID); // cached internally
 
-            $result = [
-                'job' => $job,
-            ];
-
-
-            return $result;
+            return $job;
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'JobsDataResolver::resolveJobDetail error: ' . $e->getMessage());
             return [

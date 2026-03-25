@@ -10,13 +10,10 @@ export class GoogleServices {
   /**
    * Checks if tracking is enabled (client-side and not logged-in).
    * @private
-   * @returns boolean True if tracking is enabled, false otherwise.
+   * @returns True if tracking is disabled, false otherwise.
    */
-  private static isTrackingEnabled(): boolean {
-    if (typeof window === "undefined") return false;
-    const themeData = themeManager.getThemeData;
-    if (themeData?.disableTracking) return false;
-    return !themeManager.getNonce;
+  private static get isTrackingDisabled(): boolean {
+    return themeManager.getThemeData.disableTracking;
   }
 
   /**
@@ -25,7 +22,7 @@ export class GoogleServices {
    * @private
    */
   private static async waitForPartytown(): Promise<boolean> {
-    if (typeof window === "undefined") return false;
+    if (typeof window === "undefined" || this.isTrackingDisabled) return false;
 
     return await Partytown.ensureBootOnInteraction();
   }
@@ -36,12 +33,11 @@ export class GoogleServices {
    */
   public static async injectGTMScript(): Promise<void> {
     if (
-      !this.isTrackingEnabled() ||
+      this.isTrackingDisabled ||
       this.gtmLoaded ||
       typeof document === "undefined"
     )
       return;
-
     await this.waitForPartytown();
 
     // Push the GTM start event before injecting the script
@@ -73,7 +69,7 @@ export class GoogleServices {
     path?: string,
     eventName: string = "page_view",
   ): void {
-    if (!this.isTrackingEnabled()) return;
+    if (this.isTrackingDisabled) return;
 
     try {
       const pagePath = path || window.location.pathname;

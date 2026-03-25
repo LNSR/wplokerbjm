@@ -1,3 +1,4 @@
+import typia from "typia";
 import type {
   SearchFilters,
   LoadMoreFilters,
@@ -6,13 +7,13 @@ import type {
   LoadMoreResponse,
   JobGridProps,
   CardJob,
+  JobSchemaResponse,
   JobDetailResponse,
   WPLokerBJMThemedData,
   SearchResponse,
-  TaxonomyApiInterface,
-  RankMathHeadData,
+  TaxonomyTermsResponse,
 } from "@/types";
-import { createClient, fetchExchange, type ClientOptions } from "urql";
+import { createClient, fetchExchange, type ClientOptions, type DocumentInput, type AnyVariables } from "urql";
 import { persistedExchange } from "@urql/exchange-persisted";
 import {
   GET_ALL_TERMS,
@@ -35,25 +36,20 @@ import {
 import { getCmsOrigin } from "@/utils";
 import { themeManager } from "$lib/stores/Theme.svelte";
 
-type BookmarkedJobsResponse = CardJob[];
-type JobSchemaResponse = Record<string, any>[];
-type AutoSuggestResponse = string[];
-
-type JWTResponse = string | null;
-
-
 class URQLClientManager {
   private static clients = new Map<string, ReturnType<typeof createClient>>();
 
   private static preferHTTPMethod(
     httpMethod?: ClientOptions["preferGetMethod"],
   ): ClientOptions["preferGetMethod"] {
-    return httpMethod ?? "within-url-limit";
+    return typia.assertEquals<ClientOptions["preferGetMethod"]>(httpMethod) ?? "within-url-limit";
   }
 
   private static urqlOptions(
     preferHTTPMethodOption?: ClientOptions["preferGetMethod"],
   ): ClientOptions {
+
+
     return {
       url: `${getCmsOrigin()}/graphql`,
       exchanges: [
@@ -62,6 +58,8 @@ class URQLClientManager {
             preferHTTPMethodOption,
           ),
           enforcePersistedQueries: false,
+          enableForMutation: true,
+          enableForSubscriptions: true,
         }),
         fetchExchange,
       ],
@@ -76,12 +74,14 @@ class URQLClientManager {
         },
       }),
     };
+
+
   }
 
   static getClient(
     preferHTTPMethodOption?: ClientOptions["preferGetMethod"],
     fetchFn?: typeof fetch,
-  ) {
+  ): ReturnType<typeof createClient> {
     if (fetchFn) {
       return createClient({ ...this.urqlOptions(preferHTTPMethodOption), fetch: fetchFn });
     }
@@ -93,55 +93,59 @@ class URQLClientManager {
     return client;
   }
 
-  static async runQuery<T = any>(
-    query: any,
-    variables?: any,
+  static async runQuery<T, V extends AnyVariables = AnyVariables>(
+    query: DocumentInput<T, V>,
+    variables: V,
     context?: any,
     httpMethodPref?: ClientOptions["preferGetMethod"],
     fetchFn?: typeof fetch,
   ): Promise<T> {
     const graphqlClient = this.getClient(httpMethodPref, fetchFn);
     const result = await graphqlClient
-      .query(query, variables, context)
+      .query<T, V>(query, variables, context)
       .toPromise();
     if (result.error) throw result.error;
-    return result.data;
+    return result.data as T;
   }
 
-  static async runMutation<T = any>(
-    mutation: any,
-    variables?: any,
+  static async runMutation<T, V extends AnyVariables = AnyVariables>(
+    mutation: DocumentInput<T, V>,
+    variables: V,
     context?: any,
     fetchFn?: typeof fetch,
   ): Promise<T> {
     const graphqlClient = this.getClient(undefined, fetchFn);
     const result = await graphqlClient
-      .mutation(mutation, variables, context)
+      .mutation<T, V>(mutation, variables, context)
       .toPromise();
     if (result.error) throw result.error;
-    return result.data;
+    return result.data as T;
   }
 
-  static mergedFetchOptionsContext(signal?: AbortSignal) {
+  static mergedFetchOptionsContext(signal?: AbortSignal): {
+    fetchOptions: (
+      clientFetchOptions?: RequestInit | (() => RequestInit) | undefined,
+    ) => RequestInit;
+  } {
     return {
-      fetchOptions: (clientFetchOptions?: any) => {
+      fetchOptions: (clientFetchOptions?: RequestInit | (() => RequestInit)) => {
         const defaultGetter = this.urqlOptions?.().fetchOptions;
         const baseDefaults =
           typeof defaultGetter === "function"
-            ? defaultGetter()
-            : undefined;
+            ? (defaultGetter() as RequestInit)
+            : (defaultGetter as RequestInit | undefined);
         const base =
           typeof clientFetchOptions === "function"
             ? clientFetchOptions()
-            : clientFetchOptions || baseDefaults || {};
-        const baseHeaders = base.headers instanceof Headers ? Object.fromEntries(base.headers.entries()) : base.headers || {};
+            : (clientFetchOptions as RequestInit) || baseDefaults || {};
+        const baseHeaders = base.headers instanceof Headers ? Object.fromEntries(base.headers.entries()) : (base.headers as Record<string, string> | undefined) || {};
         return {
           ...base,
           ...(signal ? { signal } : {}),
           headers: {
             ...baseHeaders,
           },
-        };
+        } as RequestInit;
       },
     };
   }
@@ -149,19 +153,23 @@ class URQLClientManager {
 
 export class APIService {
 
-  private static normalizeJob(job: any): any {
-    if (!job || typeof job !== "object") return job;
+  // Strip WP origin from permalink
+  private static normalizeJob<T extends Record<string, unknown> | null>(job: T): T {
+    if (!job || typeof job !== "object") 
+    {
+      return job;
+    }
     if (typeof job.permalink === "string") {
-      // drop trailing slash first then strip origin/domain
       let p = job.permalink.replace(/\/+$/g, "");
       try {
         const u = new URL(p);
         p = u.pathname;
-      } catch(e) {
+      } catch (e) {
         console.error("Invalid URL in job permalink:", job.permalink, e);
       }
       job.permalink = p;
     }
+    // trailing slash in slug can cause issues with job detail fetching, so normalize it as well
     if (typeof job.slug === "string") {
       job.slug = job.slug.replace(/\/+$/g, "");
     }
@@ -174,7 +182,7 @@ export class APIService {
   static async getAutoSuggestionsGraphQL(
     query: string,
     fetchFn?: typeof fetch,
-  ): Promise<AutoSuggestResponse> {
+  ): Promise<string[]> {
     const data = await URQLClientManager.runQuery(
       GET_AUTO_SUGGESTIONS,
       { query },
@@ -182,46 +190,71 @@ export class APIService {
       undefined,
       fetchFn,
     );
-    return data.autoSuggestions;
+    return (data.autoSuggestions ?? []).filter((s): s is string => s !== null);
   }
 
-  //* Taxonomy related (GraphQL versions)
-  static async fetchAllTermsGraphQL(): Promise<
-    TaxonomyApiInterface["getAllTerms"]
-  > {
+  /** 
+   * GraphQL Taxonomies use JSON Scalar so detect and parse JSON strings in the response 
+   * @param jsonString - The JSON string to parse from GraphQL response
+   * @returns Parsed object of type T
+   * @throws Error if the input is not a string or if JSON parsing fails
+   * @remarks This is necessary because the GraphQL API returns taxonomy terms as JSON-encoded strings, which need to be parsed back into objects for use in the application.
+  */
+  private static parseGQLJSON<T>(jsonString: unknown): T {
+    try {
+      typia.assertGuard<string>(jsonString);
+      return JSON.parse(jsonString) as T;
+    } catch (e) {
+      console.error("Failed to parse JSON from GraphQL response:", jsonString, e);
+      throw new Error("Invalid JSON format in GraphQL response");
+    }
+  }
+
+  static async fetchAllTermsGraphQL(): Promise<TaxonomyTermsResponse> {
     const data = await URQLClientManager.runQuery(GET_ALL_TERMS, {}, undefined, undefined);
-    return JSON.parse(data.taxonomyTerms);
+
+    const taxonomyTerms = data.taxonomyTerms as TaxonomyTermsResponse;
+    const keys = ["lokasiTerms", "genderTerms", "pendidikanTerms"] as const;
+
+    const parsedTerms = Object.fromEntries(
+      keys.map((key) => [
+        key,
+        APIService.parseGQLJSON<TaxonomyTermsResponse[typeof key]>(taxonomyTerms?.[key])
+      ])
+    );
+
+    return typia.assertEquals<TaxonomyTermsResponse>(parsedTerms);
   }
 
-  static async fetchLokasiTermsGraphQL(): Promise<
-    ReturnType<TaxonomyApiInterface["getTermsByType"]>
-  > {
-    const data = await URQLClientManager.runQuery(GET_LOKASI_TERMS, {}, undefined, undefined);
-    return JSON.parse(data.lokasiTerms);
+  static async fetchTaxonomyTermsByTypeGraphQL(
+    type: keyof TaxonomyTermsResponse,
+    fetchFn?: typeof fetch,
+  ): Promise<TaxonomyTermsResponse[typeof type]> {
+    const queryMap: Record<keyof TaxonomyTermsResponse, DocumentInput> = {
+      lokasiTerms: GET_LOKASI_TERMS,
+      genderTerms: GET_GENDER_TERMS,
+      pendidikanTerms: GET_PENDIDIKAN_TERMS,
+    };
+
+    const query = queryMap[type];
+    if (!query) {
+      throw new Error(`Unsupported taxonomy type: ${type}`);
+    }
+
+    const data = await URQLClientManager.runQuery(query, {}, undefined, undefined, fetchFn);
+    const terms = data[type];
+    return typia.assertEquals<TaxonomyTermsResponse[typeof type]>(APIService.parseGQLJSON(terms));
   }
 
-  static async fetchGenderTermsGraphQL(): Promise<
-    ReturnType<TaxonomyApiInterface["getTermsByType"]>
-  > {
-    const data = await URQLClientManager.runQuery(GET_GENDER_TERMS, {}, undefined, undefined);
-    return JSON.parse(data.genderTerms);
-  }
-
-  static async fetchPendidikanTermsGraphQL(): Promise<
-    ReturnType<TaxonomyApiInterface["getTermsByType"]>
-  > {
-    const data = await URQLClientManager.runQuery(GET_PENDIDIKAN_TERMS, {}, undefined, undefined);
-    return JSON.parse(data.pendidikanTerms);
-  }
 
   //* Jobs related
   static async fetchCarouselGraphQL(fetchFn?: typeof fetch): Promise<CarouselProps> {
     const data = await URQLClientManager.runQuery(GET_CAROUSEL, {}, undefined, undefined, fetchFn);
-    const carousel: CarouselProps = data.carousel;
+    const carousel = data.carousel;
     if (carousel?.jobs && Array.isArray(carousel.jobs)) {
-      carousel.jobs = carousel.jobs.map(APIService.normalizeJob);
+      carousel.jobs = carousel.jobs.map((j) => APIService.normalizeJob(j));
     }
-    return carousel;
+    return typia.assertEquals<CarouselProps>(carousel);
   }
 
   static async loadMoreJobsGraphQL(
@@ -236,30 +269,32 @@ export class APIService {
       undefined,
       fetchFn,
     );
-    const result: LoadMoreResponse = data.loadMore;
+    const result = data.loadMore;
     if (result?.jobs && Array.isArray(result.jobs)) {
-      result.jobs = result.jobs.map(APIService.normalizeJob);
+      result.jobs = result.jobs.map((j) => APIService.normalizeJob(j));
     }
-    return result;
+
+    return typia.assertEquals<LoadMoreResponse>(result);
   }
 
   static async fetchJobGridGraphQL(
     filters: JobGridFilters,
     fetchFn?: typeof fetch,
   ): Promise<JobGridProps> {
-    const { paged, context, title, total_jobs, ...filterFields } = filters;
+    const { sort, paged, context, title, total_jobs, ...filterFields } = filters;
     const data = await URQLClientManager.runQuery(
       GET_JOB_GRID,
-      { paged, context, title, total_jobs, filters: filterFields },
+      { sort, paged, context, title, total_jobs, filters: filterFields },
       undefined,
       undefined,
       fetchFn,
     );
-    const grid: JobGridProps = data.jobGrid;
+    const grid = data.jobGrid;
     if (grid?.jobs && Array.isArray(grid.jobs)) {
-      grid.jobs = grid.jobs.map(APIService.normalizeJob);
+      grid.jobs = grid.jobs.map((j) => APIService.normalizeJob(j));
     }
-    return grid;
+
+    return typia.assertEquals<JobGridProps>(grid);
   }
 
   static async fetchJobDetailGraphQL(
@@ -275,25 +310,30 @@ export class APIService {
       undefined,
       fetchFn,
     );
-    const job: JobDetailResponse = data.jobDetail.job;
-    return APIService.normalizeJob(job);
+    const job = data.jobDetail;
+
+    const normalizedJob = APIService.normalizeJob(job);
+    return typia.assertEquals<JobDetailResponse>(normalizedJob);
   }
 
+  /**
+   */
   static async fetchJobSchemasGraphQL(
     idsOrSlug?: number[] | string,
     signal?: AbortSignal,
-    type?: string,
+    type?: JobSchemaResponse["type"],
     fetchFn?: typeof fetch,
-  ): Promise<JobSchemaResponse> {
-    const variables: any = {};
+  ): Promise<JobSchemaResponse["schemas"]> {
 
-    if (typeof idsOrSlug === 'string') {
+    const variables: { slug?: string; ids?: number[]; type?: string } = {};
+
+    if (typia.is<string>(idsOrSlug)) {
       variables.slug = idsOrSlug;
-    } else if (Array.isArray(idsOrSlug)) {
+    } else if (typia.is<number[]>(idsOrSlug)) {
       variables.ids = idsOrSlug;
     }
 
-    if (type) variables.type = type;
+    if (type) variables.type = typia.assertEquals<typeof type>(type);
 
     const data = await URQLClientManager.runQuery(
       GET_JOB_SCHEMA,
@@ -303,7 +343,9 @@ export class APIService {
       fetchFn,
     );
 
-    return data.jobSchema.schemas.map((s: string) => JSON.parse(s));
+    const schemas = data.jobSchema?.schemas;
+
+    return schemas?.filter((s): s is string => s !== null).map((s) => JSON.parse(s));
   }
 
   //* Theme data related
@@ -318,33 +360,35 @@ export class APIService {
       undefined,
       fetchFn,
     );
-    return data.themeData.data;
+    return typia.assertEquals<WPLokerBJMThemedData>(data.themeData?.data);
   }
 
-    static async getJWTGraphQL(
+  static async getJWTGraphQL(
     options: {
       username?: string;
       password?: string;
       token?: string;
     },
     fetchFn?: typeof fetch,
-  ): Promise<JWTResponse> {
+  ): Promise<string | null> {
+    const assert = typia.createAssertEquals<typeof options>();
+    const validated = assert(options);
     const data = await URQLClientManager.runMutation(
       GET_JWT,
       {
-        username: options.username,
-        password: options.password,
-        token: options.token,
+        username: validated.username,
+        password: validated.password,
+        token: validated.token,
       },
       URQLClientManager.mergedFetchOptionsContext(),
       fetchFn,
     );
-    return data.jwt ?? null;
+    return typia.assertEquals<string | null>(data.jwt);
   }
 
   static async getThemeNonceGraphQL(): Promise<WPLokerBJMThemedData["wpRestNonce"]> {
-    const data = await URQLClientManager.runQuery(GET_THEME_NONCE, {}, undefined, undefined);
-    return data.themeData.data?.wpRestNonce ?? null;
+    const data = await URQLClientManager.runQuery(GET_THEME_NONCE, {}, undefined, false);
+    return typia.assertEquals<string | null>(data.themeData?.data?.wpRestNonce);
   }
 
   //* Jobs related
@@ -359,19 +403,21 @@ export class APIService {
       undefined,
       fetchFn,
     );
-    const resp: SearchResponse = data.searchJobs;
+    const resp = data.searchJobs;
     if (resp?.jobs && Array.isArray(resp.jobs)) {
-      resp.jobs = resp.jobs.map(APIService.normalizeJob);
+      resp.jobs = resp.jobs.map((j) => APIService.normalizeJob(j));
     }
-    return resp;
+    return typia.assertEquals<SearchResponse>(resp);
   }
 
   static async syncBookmarkGraphQL(
     ids: number[],
     fetchFn?: typeof fetch,
-  ): Promise<BookmarkedJobsResponse> {
+  ): Promise<CardJob[]> {
     const data = await URQLClientManager.runQuery(SYNC_BOOKMARK, { ids }, undefined, undefined, fetchFn);
-    return data.syncBookmark.map(APIService.normalizeJob);
+    const normalized = (data.syncBookmark)?.map((j) => APIService.normalizeJob(j));
+
+    return typia.assertEquals<CardJob[]>(normalized);
   }
 
   //* SEO related (GraphQL proxied version)
@@ -379,14 +425,15 @@ export class APIService {
     url: string,
     signal?: AbortSignal,
     fetchFn?: typeof fetch,
-  ): Promise<RankMathHeadData> {
+  ): Promise<string> {
     const data = await URQLClientManager.runQuery(
       GET_RANK_MATH_HEAD,
       { url },
       URQLClientManager.mergedFetchOptionsContext(signal),
-      "force",
+      undefined,
       fetchFn,
     );
-    return data.rankMathHead ?? null;
+
+    return typia.assertEquals<string>(data.rankMathHead ?? "");
   }
 }

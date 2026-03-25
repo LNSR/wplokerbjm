@@ -71,10 +71,6 @@ figure.aligncenter img,
   padding-left: 0.5rem;
   margin-top: 0.5rem;
 }
-.wysiwyg-content ol,
-.editor-styles-wrapper .wysiwyg-content ol {
-  margin: 0 0 1em 1em;
-}
 
 /* Make sure list items render marker even if upstream resets removed them */
 .wysiwyg-content li,

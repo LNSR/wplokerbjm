@@ -25,6 +25,7 @@ import {
     TwitterBrands,
     MapMarkerAltSolid,
 } from "svelte-awesome-icons";
+import typia from 'typia';
 
 interface SummaryRow {
     icon: Component
@@ -41,7 +42,7 @@ interface ContactRow {
 }
 class GeneralStore {
     #nowMS = $derived.by(() => SharedClock.now.getTime()); // in Milliseconds
-    
+
     public useDeadline(deadline: string | null | undefined): { text: string; style: string } {
         if (!deadline) {
             return { text: '', style: '' }
@@ -59,29 +60,36 @@ class GeneralStore {
         const days_left = Math.floor((deadlineDate.getTime() - now.getTime()) / msPerDay)
         let text = ''
         let style = ''
-        if (days_left > 1) {
-            text = `Sisa ${days_left} hari`
-            style = 'bg-blue-600 text-white border border-blue-800'
-        } else if (days_left === 1) {
-            text = 'Sisa 1 hari'
-            style = 'bg-yellow-400 text-black border border-yellow-600'
-        } else if (days_left === 0) {
-            text = 'Hari terakhir'
-            style = 'bg-red-600 text-white border border-red-800'
-        } else if (days_left === -1) {
-            text = 'Berakhir kemarin'
-            style = 'bg-gray-500 text-white border border-gray-700'
-        } else if (days_left < -1) {
-            text = `Berakhir ${Math.abs(days_left)} hari lalu`
-            style = 'bg-gray-400 text-black border border-gray-700'
-        } else {
-            text = 'Berakhir hari ini'
-            style = 'bg-red-600 text-white border border-red-800'
+
+        switch (true) {
+            case days_left > 1:
+                text = `Sisa ${days_left} hari`
+                style = 'bg-blue-600 text-white border border-blue-800'
+                break
+            case days_left === 1:
+                text = 'Sisa 1 hari'
+                style = 'bg-yellow-400 text-black border border-yellow-600'
+                break
+            case days_left === 0:
+                text = 'Hari terakhir'
+                style = 'bg-red-600 text-white border border-red-800'
+                break
+            case days_left === -1:
+                text = 'Berakhir kemarin'
+                style = 'bg-gray-500 text-white border border-gray-700'
+                break
+            case days_left < -1:
+                text = `Berakhir ${Math.abs(days_left)} hari lalu`
+                style = 'bg-gray-400 text-black border border-gray-700'
+                break
+            default:
+                text = 'Berakhir hari ini'
+                style = 'bg-red-600 text-white border border-red-800'
         }
         return { text, style }
     }
 
-    public useTimeAgo(postTime?: string): string {
+    public useTimeAgo(postTime: string): string {
         if (!postTime) return ''
 
         const postDate = new Date(postTime)
@@ -99,6 +107,7 @@ class GeneralStore {
     }
 
     public useStatusJob(status_pekerjaan: number): { label: string; color: string } {
+        if (typeof status_pekerjaan !== 'number') throw new Error('status_pekerjaan must be a number');
         switch (status_pekerjaan) {
             case 2:
                 return {
@@ -118,7 +127,8 @@ class GeneralStore {
         }
     }
 
-    public useSummaryJob(jobdata: JobSummary | null | undefined): SummaryRow[] {
+    public useSummaryJob(jobdata: JobSummary): SummaryRow[] {
+        if (typeof jobdata !== 'object' || jobdata === null) throw new Error('jobdata must be a non-null object');
         const rows: SummaryRow[] = []
         const data: JobSummary = (jobdata ?? {}) as JobSummary
 
@@ -139,23 +149,25 @@ class GeneralStore {
             return `${day} ${indonesianMonths[month]} ${year}`
         }
 
+        function arrayOrString<T>(value: T): string {
+            return typia.is<string>(value)
+                ? value
+                : typia.is<string[]>(value) ? value.join(', ') : ''
+        }
+
 
         if (data['jenis_pekerjaan']) {
             rows.push({
                 icon: ClockSolid,
                 label: 'Jenis Pekerjaan',
-                value: Array.isArray(data['jenis_pekerjaan'])
-                    ? data['jenis_pekerjaan'].join(', ')
-                    : String(data['jenis_pekerjaan'] ?? ''),
+                value: arrayOrString(data['jenis_pekerjaan']),
             })
         }
         if (data['pendidikan']) {
             rows.push({
                 icon: GraduationCapSolid,
                 label: 'Pendidikan',
-                value: Array.isArray(data['pendidikan'])
-                    ? data['pendidikan'].join(', ')
-                    : String(data['pendidikan'] ?? ''),
+                value: arrayOrString(data['pendidikan']),
             })
         }
         if (data['pengalaman']) {
@@ -169,9 +181,7 @@ class GeneralStore {
             rows.push({
                 icon: VenusMarsSolid,
                 label: 'Gender',
-                value: Array.isArray(data['gender'])
-                    ? data['gender'].join(', ')
-                    : String(data['gender'] ?? ''),
+                value: arrayOrString(data['gender']),
             })
         }
         const gaji_min = data['gaji_minimal'] ? Number(data['gaji_minimal']) : undefined
@@ -198,9 +208,7 @@ class GeneralStore {
             rows.push({
                 icon: MapMarkerAltSolid,
                 label: 'Lokasi',
-                value: Array.isArray(data['lokasi_pekerjaan'])
-                    ? data['lokasi_pekerjaan'].join(', ')
-                    : String(data['lokasi_pekerjaan'] ?? ''),
+                value: arrayOrString(data['lokasi_pekerjaan']),
             })
         }
 

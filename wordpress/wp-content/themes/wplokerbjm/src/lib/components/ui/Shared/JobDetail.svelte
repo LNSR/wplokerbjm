@@ -20,6 +20,7 @@
 </script>
 
 <script lang="ts">
+  import { schemaScriptAttach } from "@/utils";
   import { browser } from "$app/environment";
   import ViewerModule from "viewerjs";
   import "viewerjs/dist/viewer.min.css";
@@ -39,7 +40,7 @@
     AddressCardSolid,
     AddressBookSolid,
   } from "svelte-awesome-icons";
-  import type { JobDetailResponse } from "@/types";
+  import type { JobDetailResponse, JobSchemaResponse } from "@/types";
   import { SharedClock } from "$lib/utils/elements.svelte";
   import { page } from "$app/state";
 
@@ -107,7 +108,7 @@
       return opts as Viewer.Options;
     }
 
-    static async setupViewer(): Promise<void> {
+    static setupViewer(): void {
       if (!browser) return;
       if (!Viewer) {
         Viewer =
@@ -182,11 +183,13 @@
 </script>
 
 <svelte:head>
-  {#if page.data?.job && page.data.jobSchema}
-    {@const jobId = Number(page.data.job.id)}
-    {@html `<script type="application/ld+json" data-ld-type="JobPosting" data-ld-id="jobposting-${jobId}">${JSON.stringify(page.data.jobSchema)}</script>`}
+  {#if page.data?.job as JobDetailResponse && page.data.jobSchema as JobSchemaResponse}
+    {@const jobId = page.data.job.id}
+    {@const jobSchema = page.data.jobSchema}
+    {@html schemaScriptAttach(jobSchema, "JobPosting", `jobposting-${jobId}`)}
   {/if}
 </svelte:head>
+
 
 <article class="space-y-8" style="contain: layout paint;">
   <!-- Title + Summary -->

@@ -1,14 +1,13 @@
 import type { LayoutServerLoad } from "./$types";
 import { APIService } from "@/services/APIService";
-import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
+import type { WPLokerBJMThemedData } from "@/types";
 import { getCmsOrigin } from "@/utils/environment";
 export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
   try {
     let themeData: WPLokerBJMThemedData = locals.themeData;
-    // fetch RankMath head from CMS domain using the request URL path
     const origin = getCmsOrigin();
     const fullUrl = `${origin}${url.pathname}`;
-    let rankMathHead: RankMathHeadData | null = null;
+    let rankMathHead = null;
     try {
       rankMathHead = await APIService.getRankMathHeadGraphQL(
         fullUrl,
@@ -22,7 +21,7 @@ export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
           const originRegex = new RegExp(`https?:\\/\\/${hostOnly}`, "g");
           rankMathHead = JSON.parse(JSON.stringify(rankMathHead).replace(originRegex, url.origin));
         } catch (e) {
-          rankMathHead = JSON.parse(JSON.stringify(rankMathHead).split(origin).join(url.origin));
+          console.warn("layout load: failed to replace RankMath head URLs, using original", e);
         }
       }
     } catch (e) {
@@ -35,6 +34,7 @@ export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
       deviceType: locals.deviceType
     };
   } catch (err) {
+    console.error("Error in layout load function:", err);
     return {
       themeData: null,
       rankMathHead: null,

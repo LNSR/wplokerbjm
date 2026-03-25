@@ -1,13 +1,22 @@
 <script module lang="ts">
-  import type { SearchResponse, SortOption } from "@/types";
-  import { TaxonomyType } from "@/types";
-  import { SearchTitle, SearchContext } from "@/types";
+  import type {
+    SearchFilters,
+    TaxonomyType,
+    SearchResponse,
+    SortOption,
+  } from "@/types";
   import { searchStore, SearchUtils } from "$lib/stores/Search.svelte";
   import { isJobGridEl } from "$lib/utils/elements.svelte";
-  import {
-    dynamicComponentStore,
-    type CustomDropdownComponent,
-  } from "$lib/stores/DynamicComponent.svelte";
+  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
+
+  type SearchFormResultsPayload = SearchResponse & {
+    shouldScroll: boolean;
+    filters: SearchFilters;
+  };
+
+  type SearchResultsHandler = (payload: SearchFormResultsPayload) => void;
+  type SearchErrorHandler = (message: string) => void;
+  type DropdownUpdatePayload = string | string[] | undefined | null;
 
   type LocalSearchFormProps = {
     currentSearch?: string;
@@ -16,13 +25,13 @@
     currentPendidikan?: string | string[];
     currentSort?: SortOption;
     archiveLink?: string;
-    searchResults?: (payload: unknown) => unknown;
-    searchError?: (msg: string) => unknown;
+    searchResults?: SearchResultsHandler;
+    searchError?: SearchErrorHandler;
   };
 
   let selectedSuggestionIndex = -1;
 
-  const sortOptions = [
+  const sortOptions: SortOption[] = [
     { value: "desc", label: "Terbaru" },
     { value: "asc", label: "Terlama" },
   ];
@@ -63,7 +72,7 @@
     static async performSearch(): Promise<SearchResponse> {
       if (!searchStore.hasFilters)
         throw new Error("Terjadi kesalahan pada filter");
-      searchStore.filters.context = SearchContext.Search;
+      searchStore.filters.context = "search";
       if (selectedSuggestionIndex >= 0 && searchStore.hasSuggestions) {
         const suggestion = searchStore.suggestions[selectedSuggestionIndex];
         if (suggestion) {
@@ -77,17 +86,17 @@
     static async performReset(): Promise<SearchResponse> {
       searchStore.resetFilters();
       const response = await searchStore.searchJobs();
-      searchStore.title = SearchTitle.Latest;
-      searchStore.context = SearchContext.Latest;
-      response.title = SearchTitle.Latest;
-      response.context = SearchContext.Latest;
+      searchStore.title = "Lowongan Terbaru";
+      searchStore.context = "latest";
+      response.title = "Lowongan Terbaru";
+      response.context = "latest";
       return response;
     }
 
     static callSearchResults(
-      payload: any,
-      searchResults?: (payload: any) => any,
-    ) {
+      payload: SearchFormResultsPayload,
+      searchResults?: SearchResultsHandler,
+    ): void {
       try {
         if (typeof searchResults === "function") {
           searchResults(payload);
@@ -98,7 +107,10 @@
       }
     }
 
-    static callSearchError(payload: any, searchError?: (msg: string) => any) {
+    static callSearchError(
+      payload: string,
+      searchError?: SearchErrorHandler,
+    ): void {
       try {
         if (typeof searchError === "function") {
           searchError(payload);
@@ -111,9 +123,9 @@
 
     static async handleSubmit(
       e?: Event,
-      searchResults?: (payload: any) => any,
-      searchError?: (msg: string) => any,
-    ) {
+      searchResults?: SearchResultsHandler,
+      searchError?: SearchErrorHandler,
+    ): Promise<void> {
       e?.preventDefault?.();
       try {
         const response = await SearchFormController.performSearch();
@@ -139,9 +151,9 @@
     }
 
     static async resetFiltersAndSearch(
-      searchResults?: (payload: any) => any,
-      searchError?: (msg: string) => any,
-    ) {
+      searchResults?: SearchResultsHandler,
+      searchError?: SearchErrorHandler,
+    ): Promise<void> {
       try {
         const response = await SearchFormController.performReset();
         SuggestionController.hideSuggestionsImmediate();
@@ -162,7 +174,7 @@
     }
   }
 
-  let CustomDropdown: CustomDropdownComponent | null = $derived(
+  let CustomDropdown = $derived<typeof dynamicComponentStore.CustomDropdown>(
     dynamicComponentStore.CustomDropdown,
   );
 </script>
@@ -184,7 +196,6 @@
     SortAmountDownSolid,
   } from "svelte-awesome-icons";
 
-  const props = $props();
   const {
     currentSearch,
     currentLokasi,
@@ -194,7 +205,7 @@
     archiveLink = "/",
     searchResults = undefined,
     searchError = undefined,
-  } = $derived<LocalSearchFormProps>(props);
+  }: LocalSearchFormProps = $props();
 
   let isLokasiOpen = $state(false);
   let isGenderOpen = $state(false);
@@ -202,38 +213,38 @@
   let isSortOpen = $state(false);
 
   // UI function to remove a filter by key and value
-  function removeFilter(key: TaxonomyType | string, value: string) {
-    if (key === TaxonomyType.lokasi) {
-      const arr = Array.isArray(searchStore.filters[TaxonomyType.lokasi])
-        ? [...searchStore.filters[TaxonomyType.lokasi]]
+  function removeFilter(key: TaxonomyType, value: string): void {
+    if (key === "lokasi_pekerjaan") {
+      const arr = Array.isArray(searchStore.filters["lokasi_pekerjaan"])
+        ? [...searchStore.filters["lokasi_pekerjaan"]]
         : [];
       const idx = arr.indexOf(value);
       if (idx !== -1)
-        searchStore.filters[TaxonomyType.lokasi] = arr.filter(
+        searchStore.filters["lokasi_pekerjaan"] = arr.filter(
           (_, i) => i !== idx,
         );
       return;
     }
 
-    if (key === TaxonomyType.gender) {
-      const arr = Array.isArray(searchStore.filters[TaxonomyType.gender])
-        ? [...searchStore.filters[TaxonomyType.gender]]
+    if (key === "gender") {
+      const arr = Array.isArray(searchStore.filters["gender"])
+        ? [...searchStore.filters["gender"]]
         : [];
       const idx = arr.indexOf(value);
       if (idx !== -1)
-        searchStore.filters[TaxonomyType.gender] = arr.filter(
+        searchStore.filters["gender"] = arr.filter(
           (_, i) => i !== idx,
         );
       return;
     }
 
-    if (key === TaxonomyType.pendidikan) {
-      const arr = Array.isArray(searchStore.filters[TaxonomyType.pendidikan])
-        ? [...searchStore.filters[TaxonomyType.pendidikan]]
+    if (key === "pendidikan") {
+      const arr = Array.isArray(searchStore.filters["pendidikan"])
+        ? [...searchStore.filters["pendidikan"]]
         : [];
       const idx = arr.indexOf(value);
       if (idx !== -1)
-        searchStore.filters[TaxonomyType.pendidikan] = arr.filter(
+        searchStore.filters["pendidikan"] = arr.filter(
           (_, i) => i !== idx,
         );
       return;
@@ -241,7 +252,10 @@
   }
 
   // Function to update taxonomy filters
-  function updateTaxonomyFilter(taxonomyType: TaxonomyType, payload: unknown) {
+  function updateTaxonomyFilter(
+    taxonomyType: TaxonomyType,
+    payload: DropdownUpdatePayload,
+  ): void {
     if (!Array.isArray(payload) || payload.length === 0) {
       searchStore.filters[taxonomyType] = [];
       return;
@@ -250,7 +264,7 @@
   }
 
   // handle keyboard navigation for the main search input
-  function handleInputKeyDown(e: KeyboardEvent) {
+  function handleInputKeyDown(e: KeyboardEvent): void {
     const key = e.key;
     if (key === "Enter") {
       e.preventDefault();
@@ -274,38 +288,38 @@
   }
 
   const lokasiLabel = $derived.by(() => {
-    const arr = Array.isArray(searchStore.filters[TaxonomyType.lokasi])
-      ? searchStore.filters[TaxonomyType.lokasi].filter(
+    const arr = Array.isArray(searchStore.filters["lokasi_pekerjaan"])
+      ? searchStore.filters["lokasi_pekerjaan"].filter(
           (s) => typeof s === "string" && String(s).trim() !== "",
         )
       : [];
     if (!arr || arr.length === 0) return "Lokasi Belum Dipilih";
     if (arr.length === 1)
-      return taxonomyStore.getTermNameBySlug(TaxonomyType.lokasi, arr[0]);
+      return taxonomyStore.getTermNameBySlug("lokasi_pekerjaan", arr[0]);
     return `${arr.length} filter dipilih`;
   });
 
   const genderLabel = $derived.by(() => {
-    const arr = Array.isArray(searchStore.filters[TaxonomyType.gender])
-      ? searchStore.filters[TaxonomyType.gender].filter(
+    const arr = Array.isArray(searchStore.filters["gender"])
+      ? searchStore.filters["gender"].filter(
           (s) => typeof s === "string" && String(s).trim() !== "",
         )
       : [];
     if (!arr || arr.length === 0) return "Gender Belum Dipilih";
     if (arr.length === 1)
-      return taxonomyStore.getTermNameBySlug(TaxonomyType.gender, arr[0]);
+      return taxonomyStore.getTermNameBySlug("gender", arr[0]);
     return `${arr.length} filter dipilih`;
   });
 
   const pendidikanLabel = $derived.by(() => {
-    const arr = Array.isArray(searchStore.filters[TaxonomyType.pendidikan])
-      ? searchStore.filters[TaxonomyType.pendidikan].filter(
+    const arr = Array.isArray(searchStore.filters["pendidikan"])
+      ? searchStore.filters["pendidikan"].filter(
           (s) => typeof s === "string" && String(s).trim() !== "",
         )
       : [];
     if (!arr || arr.length === 0) return "Pendidikan Belum Dipilih";
     if (arr.length === 1)
-      return taxonomyStore.getTermNameBySlug(TaxonomyType.pendidikan, arr[0]);
+      return taxonomyStore.getTermNameBySlug("pendidikan", arr[0]);
     return `${arr.length} filter dipilih`;
   });
 
@@ -313,7 +327,7 @@
     () => (searchStore.filters.sort?.value ?? "") === "asc",
   );
 
-  const updateSortFilter = (payload: unknown) => {
+  const updateSortFilter = (payload: DropdownUpdatePayload): void => {
     const defaultSort: SortOption = {
       value: "desc",
       label: "Terbaru",
@@ -326,7 +340,7 @@
     const valStr = String(payload);
     if (valStr === "desc" || valStr === "asc") {
       searchStore.filters.sort = {
-        value: valStr as "desc" | "asc",
+        value: valStr as SortOption["value"],
         label: valStr === "desc" ? "Terbaru" : "Terlama",
       };
     } else {
@@ -350,17 +364,17 @@
   onMount(() => {
     searchStore.setFilters({
       cari: currentSearch ?? "",
-      [TaxonomyType.lokasi]: Array.isArray(currentLokasi)
+      ["lokasi_pekerjaan"]: Array.isArray(currentLokasi)
         ? currentLokasi
         : currentLokasi
           ? [currentLokasi]
           : [],
-      [TaxonomyType.gender]: Array.isArray(currentGender)
+      ["gender"]: Array.isArray(currentGender)
         ? currentGender
         : currentGender
           ? [currentGender]
           : [],
-      [TaxonomyType.pendidikan]: Array.isArray(currentPendidikan)
+      ["pendidikan"]: Array.isArray(currentPendidikan)
         ? currentPendidikan
         : currentPendidikan
           ? [currentPendidikan]
@@ -417,7 +431,7 @@
           >
             <div class="bg-[var(--wpl-global-color-5)] rounded-lg">
               <ul class="max-h-52 overflow-y-auto">
-                {#each searchStore.suggestions as suggestion, idx}
+                {#each searchStore.suggestions as suggestion, idx (suggestion + idx)}
                   <li>
                     <button
                       type="button"
@@ -469,9 +483,9 @@
           {#if isLokasiOpen && CustomDropdown}
             <CustomDropdown
               id="lokasi"
-              value={searchStore.filters[TaxonomyType.lokasi]}
+              value={searchStore.filters["lokasi_pekerjaan"]}
               update={(payload) =>
-                updateTaxonomyFilter(TaxonomyType.lokasi, payload)}
+                updateTaxonomyFilter("lokasi_pekerjaan", payload)}
               options={SearchUtils.mapTerms(
                 taxonomyStore.lokasiTerms,
                 "Semua lokasi",
@@ -508,9 +522,9 @@
           {#if isGenderOpen && CustomDropdown}
             <CustomDropdown
               id="gender"
-              value={searchStore.filters[TaxonomyType.gender]}
+              value={searchStore.filters["gender"]}
               update={(payload) =>
-                updateTaxonomyFilter(TaxonomyType.gender, payload)}
+                updateTaxonomyFilter("gender", payload)}
               options={SearchUtils.mapTerms(
                 taxonomyStore.genderTerms,
                 "Semua gender",
@@ -547,9 +561,9 @@
           {#if isPendidikanOpen && CustomDropdown}
             <CustomDropdown
               id="pendidikan"
-              value={searchStore.filters[TaxonomyType.pendidikan]}
+              value={searchStore.filters["pendidikan"]}
               update={(payload) =>
-                updateTaxonomyFilter(TaxonomyType.pendidikan, payload)}
+                updateTaxonomyFilter("pendidikan", payload)}
               options={SearchUtils.mapTerms(
                 taxonomyStore.pendidikanTerms,
                 "Semua pendidikan",
@@ -617,17 +631,17 @@
             ><FilterSolid class="mr-1 inline-block" aria-hidden="true" />Filter
             aktif:</span
           >
-          {#each searchStore.selectedFiltersWithNames as filter}
-            {#each filter.values as val, idx}
+          {#each searchStore.selectedFiltersWithNames as filter (filter.key)}
+            {#each filter.values as val, idx (val + idx)}
               <span
                 class="inline-flex items-center bg-gradient-to-r bg-[var(--wpl-global-color-5)] text-sm font-medium mr-2 px-3 py-1 rounded-full shadow-sm transition-all duration-150"
               >
-                {#if filter.key === TaxonomyType.lokasi}
+                {#if filter.key === "lokasi_pekerjaan"}
                   <MapMarkerAltSolid
                     class="mr-1 text-[var(--wpl-global-color-1)] inline-block"
                     aria-hidden="true"
                   />
-                {:else if filter.key === TaxonomyType.gender}
+                {:else if filter.key === "gender"}
                   <VenusMarsSolid
                     class="mr-1 text-pink-500 inline-block"
                     aria-hidden="true"
@@ -703,7 +717,7 @@
         <div class="mt-4">
           <span class="text-lg font-semibold"> Pencarian Terakhir: </span>
           <div class="flex flex-wrap font-semibold gap-2 mt-4">
-            {#each searchStore.recentSearches as item}
+            {#each searchStore.recentSearches as item (item)}
               <button
                 type="button"
                 class="px-3 py-1 text-xs bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-7)] rounded-full"

@@ -2,8 +2,6 @@ import {
   partytownSnippet,
   type PartytownConfig,
 } from "@qwik.dev/partytown/integration";
-import { isDevelopmentMode } from "@/utils";
-
 /**
  * to initialize globals and ensure Partytown is bootstrapped.
  */
@@ -22,8 +20,6 @@ class PartytownManager {
    * that the commonly-used globals exist.
    */
   private static initializeGlobals(): void {
-    if (typeof window === "undefined") return;
-
     window.dataLayer = window.dataLayer || [];
     window.gtag =
       window.gtag ||

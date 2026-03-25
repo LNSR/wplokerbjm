@@ -88,7 +88,7 @@ class GraphQLRegistration
                 'contacts' => ['type' => 'JobContacts'],
                 CustomFields::SOCIAL_MEDIA => ['type' => 'String'],
                 CustomFields::DEADLINE => ['type' => 'String'],
-                CustomFields::STATUS_PEKERJAAN => ['type' => 'String'],
+                CustomFields::STATUS_PEKERJAAN => ['type' => 'Int'],
                 'permalink' => ['type' => 'String'],
                 'post_time' => ['type' => 'String'],
                 'duplicateNonce' => ['type' => 'String'],
@@ -102,9 +102,9 @@ class GraphQLRegistration
                 Taxonomies::PENDIDIKAN => ['type' => 'String'],
                 Taxonomies::GENDER => ['type' => 'String'],
                 Taxonomies::LOKASI_PEKERJAAN => ['type' => 'String'],
-                CustomFields::PENGALAMAN => ['type' => 'String'],
-                CustomFields::GAJI_MINIMAL => ['type' => 'String'],
-                CustomFields::GAJI_MAKSIMAL => ['type' => 'String'],
+                CustomFields::PENGALAMAN => ['type' => 'Int'],
+                CustomFields::GAJI_MINIMAL => ['type' => 'Int'],
+                CustomFields::GAJI_MAKSIMAL => ['type' => 'Int'],
                 CustomFields::UMUR_MIN => ['type' => 'Int'],
                 CustomFields::UMUR_MAX => ['type' => 'Int'],
                 CustomFields::DEADLINE => ['type' => 'String'],
@@ -158,13 +158,6 @@ class GraphQLRegistration
                 'total' => ['type' => 'Int'],
                 'maxNumPages' => ['type' => 'Int'],
                 'filters' => ['type' => 'JobFilters'],
-            ],
-        ]);
-
-        register_graphql_object_type('JobDetailResponse', [
-            'description' => 'Job detail response',
-            'fields' => [
-                'job' => ['type' => 'Job'],
             ],
         ]);
 
@@ -345,7 +338,7 @@ class GraphQLRegistration
         ]);
 
         register_graphql_field('RootQuery', 'jobDetail', [
-            'type' => 'JobDetailResponse',
+            'type' => 'Job',
             'description' => 'Get job detail',
             'args' => [
                 'slug' => [

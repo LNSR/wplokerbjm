@@ -1,7 +1,9 @@
 import type { Handle } from "@sveltejs/kit";
 import type { IncomingRequestCfProperties } from "@cloudflare/workers-types";
+import type { WPLokerBJMThemedData } from "@/types";
 import { handleDeviceDetector } from "sveltekit-device-detector";
 import { APIService } from "@/services/APIService";
+import { isDevelopmentMode } from "@/utils";
 
 const deviceHandler: Handle = handleDeviceDetector({});
 
@@ -10,14 +12,14 @@ class hooksHelper {
     if (!cookies) return false;
 
     const wpAuthCookiePattern = /wordpress_logged_in|wordpress_sec|wordpress_\w+_?\d+/i;
-    
+
     if (/jwt-token=([^;]+)/.test(cookies)) return true;
     if (wpAuthCookiePattern.test(cookies)) return true;
 
     return false;
   }
 
-  static prependHeader(headers: Headers, name: string, value: string) {
+  static prependHeader(headers: Headers, name: string, value: string): void {
     const existing = headers.get(name);
     if (existing) {
       headers.set(name, `${value}, ${existing}`);
@@ -26,7 +28,7 @@ class hooksHelper {
     }
   }
 
-  static filterCookieString(raw: string, isMobile: boolean | null): string {
+  static filterCookieString(raw: string): string {
     const parts = raw.split(";").map(p => p.trim());
     const allowed = parts.filter(cook => {
       // name before first =
@@ -44,17 +46,15 @@ class hooksHelper {
 
 export const handle: Handle = async ({ event, resolve }) => {
 
-  const original = event.fetch;
+  const originalFetch = event.fetch;
   let response: Response;
-  event.fetch = (info, init: RequestInit = {}) => {
+
+  const wrappedFetch = ((info: RequestInfo | URL, init: RequestInit = {}) => {
     init.headers = new Headers(init.headers);
 
     const cookie = event.request.headers.get("cookie");
     if (cookie) {
-      const filtered = hooksHelper.filterCookieString(
-        cookie,
-        event.locals.deviceType?.isMobile ?? null
-      );
+      const filtered = hooksHelper.filterCookieString(cookie);
       if (filtered) {
         init.headers.set("cookie", filtered);
       }
@@ -68,8 +68,11 @@ export const handle: Handle = async ({ event, resolve }) => {
       }
     }
 
-    return original(info, init);
-  };
+    return originalFetch(info, init);
+  }) as unknown as typeof event.fetch;
+
+  Object.assign(wrappedFetch, originalFetch);
+  event.fetch = wrappedFetch;
 
   const cf = (event.request as Request & { cf?: IncomingRequestCfProperties }).cf;
   if (cf?.deviceType) {
@@ -81,7 +84,7 @@ export const handle: Handle = async ({ event, resolve }) => {
 
   // fetch theme data as early as possible so load functions can see it
   try {
-    const themeData = await APIService.getThemeDataGraphQL(undefined, event.fetch);
+    const themeData: WPLokerBJMThemedData | null = await APIService.getThemeDataGraphQL(undefined, event.fetch);
     event.locals.themeData = themeData;
   } catch (e) {
     console.warn("hooks.handle: failed to fetch theme data", e);
@@ -99,6 +102,7 @@ export const handle: Handle = async ({ event, resolve }) => {
       response = await deviceHandler({ event, resolve });
     }
   } catch (err) {
+    console.error("hooks.handle: error in device handler", err);
     response = await deviceHandler({ event, resolve });
   }
 
@@ -118,18 +122,19 @@ export const handle: Handle = async ({ event, resolve }) => {
   const contentType = response.headers.get("content-type") || "";
   const publicCache = "public, max-age=60, stale-while-revalidate=3600, s-maxage=5184000, stale-if-error=86400";
   const privateCache = "private, max-age=20, must-revalidate";
+  const DevModeCache = "private, no-cache, must-revalidate";
   // Set cache control headers
   if (contentType.startsWith("text/html")) {
     if (authenticated) {
       // Don't cache authenticated requests
       response.headers.set(
         "Cache-Control",
-        privateCache
+        isDevelopmentMode() ? DevModeCache : privateCache
       );
     } else {
       response.headers.set(
         "Cache-Control",
-        publicCache
+        isDevelopmentMode() ? DevModeCache : publicCache
       );
     }
 
@@ -153,11 +158,11 @@ export const handle: Handle = async ({ event, resolve }) => {
     response.headers.set("Cross-Origin-Embedder-Policy", "credentialless");
   } else if (contentType.includes("application/json") || contentType.includes("application/xml")) {
     if (authenticated) {
-      response.headers.set("Cache-Control", privateCache);
+      response.headers.set("Cache-Control", isDevelopmentMode() ? DevModeCache : privateCache);
     } else {
       response.headers.set(
         "Cache-Control",
-        publicCache
+        isDevelopmentMode() ? DevModeCache : publicCache
       );
     }
   }

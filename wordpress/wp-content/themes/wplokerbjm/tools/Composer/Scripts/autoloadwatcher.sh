@@ -30,6 +30,7 @@ inotifywait -m -r -e modify,create,delete --format '%w%f' "${watch_paths[@]}" \
       (
         sleep 1
         echo "[$(date +'%H:%M:%S')] running composer dump-autoload..."
+        docker compose restart wordpress redis
         composer dump-autoload --apcu -a -o
       ) &
       pending_pid=$!

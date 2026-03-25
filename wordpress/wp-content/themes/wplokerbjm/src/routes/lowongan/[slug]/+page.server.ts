@@ -2,8 +2,6 @@ import type { PageServerLoad } from "./$types";
 import { error } from '@sveltejs/kit';
 import { APIService } from "@/services/APIService";
 import { getCmsOrigin } from "@/utils/environment";
-export const ssr = true;
-export const csr = true;
 export const load: PageServerLoad = async ({ params, locals, url, fetch }) => {
   const slug = String(params.slug ?? "");
   if (!slug) throw error(410, "Lowongan tidak ditemukan");
@@ -42,10 +40,9 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) => {
         const hostOnly = cmsOrigin.replace(/^https?:\/\//, "").replace(/\/$/, "");
         const originRegex = new RegExp(`https?:\\/\\/${hostOnly}`, "g");
         const str = JSON.stringify(jobSchema);
-        jobSchema = JSON.parse(str.replace(originRegex, url.origin));
+        jobSchema = str.replace(originRegex, url.origin);
       } catch (e) {
-        const str = JSON.stringify(jobSchema);
-        jobSchema = JSON.parse(str.split(cmsOrigin).join(url.origin));
+        console.warn("Failed to replace job schema URLs, using original", e);
       }
     }
 
@@ -55,12 +52,12 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) => {
       return {
         carousel: carousel ?? { jobs: [], totalJobs: 0 },
         jobGrid: jobGrid ?? { jobs: [], maxNumPages: 1, totalJobs: 0 },
-        job: job ?? null,
+        job,
         jobSchema,
       };
     } else {
       if (!job) throw error(410, "Lowongan tidak ditemukan");
-      return { job: job ?? null, jobSchema };
+      return { job, jobSchema };
     }
   } catch (err) {
     console.error("+page.server load error for /lowongan/[slug]:", err);

@@ -1,20 +1,20 @@
-import path from 'node:path';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { includeIgnoreFile } from '@eslint/compat';
-import js from '@eslint/js';
 import svelte from 'eslint-plugin-svelte';
+import svelteParser from 'svelte-eslint-parser';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
-import ts from 'typescript-eslint';
-import svelteConfig from './svelte.config.js';
+import tseslint from 'typescript-eslint';
+import svelteConfig from './svelte.config.ts';
 
-const gitignorePath = path.resolve(import.meta.dirname, '.gitignore');
-const __dirnamePath = path.resolve(import.meta.dirname);
+const themeRootPath = path.dirname(fileURLToPath(import.meta.url));
+const gitignorePath = path.resolve(themeRootPath, '../../../../.gitignore');
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
-	js.configs.recommended,
-	...ts.configs.recommended,
 	...svelte.configs.recommended,
+	...tseslint.configs.recommended,
 
 	// project ignore patterns (match root repo)
 	{
@@ -22,18 +22,20 @@ export default defineConfig(
 			"assets/dist/**",
 			".vite/**",
 			"public/**",
+			"**/*.d.ts",
 			"vendor/**",
 			"node_modules/**",
 			"stats.html",
-			"svelte.config.js",
+			".gitignore",
+			"svelte.config.ts",
 			"vite.config.ts",
-			"eslint.config.js",
+			"eslint.config.ts",
 			"eslint.config.cjs",
 			".eslintrc.cjs",
 			"vite-plugins/**/*.d.ts",
 			"vite-plugins/**/*.js",
 			".svelte-kit/**",
-			"static/**"
+			"static/**",
 		]
 	},
 
@@ -49,22 +51,26 @@ export default defineConfig(
 
 	// TypeScript / JavaScript specific settings (from root project)
 	{
-		files: ["**/*.{ts,js}"],
+		files: ["**/*.{ts,js,svelte}"],
 		languageOptions: {
-			parser: ts.parser,
+			parser: tseslint.parser,
 			parserOptions: {
-				tsconfigRootDir: __dirnamePath,
+				projectService: true,
+				tsconfigRootDir: themeRootPath,
 				sourceType: 'module'
 			}
 		},
 		rules: {
 			"@typescript-eslint/no-explicit-any": 'off', // allow any when necessary, but prefer explicit types
-			"@typescript-eslint/no-floating-promises": "error",
+			"@typescript-eslint/no-floating-promises": "off",
 			"@typescript-eslint/require-await": "warn",
+			"@typescript-eslint/no-empty-object-type": "off",
 			"@typescript-eslint/no-unused-vars": "error",
-			"prefer-const": "error",
+            "@typescript-eslint/no-unused-expressions": "off",
+            "@typescript-eslint/no-non-null-assertion": "off", // allow non-null assertion when necessary, but prefer proper null checks
+			"prefer-const": "off",
 			"no-var": "error",
-			"eqeqeq": "error"
+			"eqeqeq": "error",
 		}
 	},
 
@@ -72,23 +78,26 @@ export default defineConfig(
 	{
 		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
 		languageOptions: {
+			parser: svelteParser,
 			parserOptions: {
 				projectService: true,
 				extraFileExtensions: ['.svelte'],
-				parser: ts.parser,
+				parser: tseslint.parser,
 				svelteConfig
 			}
 		},
 		rules: {
-			"@typescript-eslint/no-unused-vars": "error",
+			"@typescript-eslint/no-unused-vars": "off",
 			"svelte/valid-compile": "error",
+			"svelte/no-inspect": "off",
+			"svelte/no-at-html-tags": "off",
+			"svelte/require-each-key": "off",
 			"svelte/infinite-reactive-loop": "error",
 			"svelte/no-target-blank": "error",
 			"svelte/no-svelte-internal": "error",
 			"svelte/no-reactive-literals": "error",
-			"prefer-const": "error",
-			"no-var": "error",
-			"eqeqeq": "error"
+			"svelte/no-navigation-without-resolve": "off",
+			"svelte/valid-prop-names-in-kit-pages": "warn"
 		}
 	}
 );

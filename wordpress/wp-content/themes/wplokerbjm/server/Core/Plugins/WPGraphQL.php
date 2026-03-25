@@ -85,7 +85,7 @@ class WPGraphQL
     /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
-    #[Filter('graphql_response_headers_to_send', PHP_INT_MAX)]
+    #[Filter('graphql_response_headers_to_send', 11)]
     public static function ModifyHeaderGraphQL(array $headers): array
     {
         if (!SharedUtils::isPluginActive('wpgraphql')) {
@@ -101,6 +101,7 @@ class WPGraphQL
             'https://wp.lokerbanjarmasin.my.id',
             'https://localhost:3000',
             'https://localhost:5173',
+            'https://localhost:8787',
             'https://localhost:8173',
             'https://localhost:4173',
         ];
@@ -133,5 +134,24 @@ class WPGraphQL
         }
 
         return $headers;
+    }
+
+    /**
+     * @see \WPGraphQL\Router::prepare_headers;
+     */
+    #[Filter('graphql_response_status_code', 9, 2)]
+    public static function setGraphQLResponseStatusCode(
+        int $http_status_code,
+        mixed $graphql_response,
+    ): int {
+        
+        if ($graphql_response instanceof \GraphQL\Executor\ExecutionResult) {
+            $data = $graphql_response->data ?? null;
+            if (is_array($data) && array_key_exists('jwt', $data) && $data['jwt'] === null) {
+                return 401;
+            }
+        }
+
+        return $http_status_code;
     }
 }

@@ -1,17 +1,16 @@
 import { APIService } from '@/services/APIService'
 import { taxonomyStore } from './Taxonomy.svelte'
-import { debounce, validation } from '@/utils'
+import { debounce, type DebouncedFunction, validation } from '@/utils'
 import type {
     SearchFilters,
     CardJob,
+    JobGridProps,
     LoadMoreResponse,
     SearchResponse,
     TaxonomyTerm,
     SortOption,
 } from '@/types'
-import { SearchContext, SearchTitle } from '@/types'
-import { TaxonomyType } from '@/types'
-import type { DropdownOption } from '@/types'
+import type { SearchContext, SearchTitle, DropdownOption, TaxonomyType } from '@/types'
 
 export class SearchManager {
     // State
@@ -19,11 +18,11 @@ export class SearchManager {
     public suggestions = $state<string[]>([])
     public showSuggestions = $state(false)
     public jobs = $state<CardJob[]>([])
-    public context = $state<SearchContext>(SearchContext.Latest) // default context at initial load for jobgrid
-    public title = $state<SearchTitle>(SearchTitle.Latest) // default context at initial load for jobgrid
-    public totalJobs = $state(0)
-    public maxNumPages = $state(1)
-    public page = $state(1)
+    public context = $state<SearchContext>("latest") // default context at initial load for jobgrid
+    public title = $state<SearchTitle>("Lowongan Terbaru") // default context at initial load for jobgrid
+    public totalJobs = $state<JobGridProps["total"]>(0)
+    public maxNumPages = $state<JobGridProps["maxNumPages"]>(1)
+    public page = $state<number>(1)
 
     public loading = $state(false)
     public error = $state<string | null>(null)
@@ -35,10 +34,10 @@ export class SearchManager {
     public isPrefetchingLoadMore = $state(false)
 
     public filters = $state<SearchFilters>({
-        cari: '',
-        [TaxonomyType.lokasi]: [],
-        [TaxonomyType.gender]: [],
-        [TaxonomyType.pendidikan]: [],
+        cari: null,
+        'lokasi_pekerjaan': [],
+        'gender': [],
+        'pendidikan': [],
         sort: { value: 'desc', label: 'Terbaru' } as SortOption,
         context: this.context,
     })
@@ -48,10 +47,10 @@ export class SearchManager {
         const f = this.filters
         return !!(
             (typeof f.cari === 'string' && f.cari.trim() !== '') ||
-            (Array.isArray(f[TaxonomyType.lokasi]) && f[TaxonomyType.lokasi].length > 0) ||
-            (Array.isArray(f[TaxonomyType.gender]) && f[TaxonomyType.gender].length > 0) ||
-            (Array.isArray(f[TaxonomyType.pendidikan]) && f[TaxonomyType.pendidikan].length > 0) ||
-            f.sort.value === 'asc' || f.sort.value === 'desc'
+            (Array.isArray(f['lokasi_pekerjaan']) && f['lokasi_pekerjaan'].length > 0) ||
+            (Array.isArray(f['gender']) && f['gender'].length > 0) ||
+            (Array.isArray(f['pendidikan']) && f['pendidikan'].length > 0) ||
+            f.sort?.value === 'asc' || f.sort?.value === 'desc'
         )
     }
 
@@ -64,12 +63,12 @@ export class SearchManager {
     }
 
     public get hasMore(): boolean {
-        return this.page < this.maxNumPages
+        return this.page < this.maxNumPages!
     }
 
     // Debounced suggestions
-    private debouncedGetSuggestions = debounce(async (query: string) => {
-        const cleanQuery = validation.sanitizeString(query)
+    private debouncedGetSuggestions: DebouncedFunction<(query: SearchFilters['cari']) => Promise<void>> = debounce(async (query: SearchFilters['cari']) => {
+        const cleanQuery = validation.sanitizeString(String(query))
         if (validation.isValidQuery(cleanQuery)) {
             this.suggestionsLoading = true
             try {
@@ -94,9 +93,9 @@ export class SearchManager {
         if (typeof newFilters.cari === 'string') sanitized.cari = validation.sanitizeString(newFilters.cari)
 
         this.filters.cari = typeof sanitized.cari === 'string' ? sanitized.cari : this.filters.cari
-        this.filters[TaxonomyType.lokasi] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.lokasi]) ?? this.filters[TaxonomyType.lokasi]
-        this.filters[TaxonomyType.gender] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.gender]) ?? this.filters[TaxonomyType.gender]
-        this.filters[TaxonomyType.pendidikan] = SearchUtils.sanitizeArr(newFilters[TaxonomyType.pendidikan]) ?? this.filters[TaxonomyType.pendidikan]
+        this.filters['lokasi_pekerjaan'] = SearchUtils.sanitizeArr(newFilters['lokasi_pekerjaan']) ?? this.filters['lokasi_pekerjaan']
+        this.filters['gender'] = SearchUtils.sanitizeArr(newFilters['gender']) ?? this.filters['gender']
+        this.filters['pendidikan'] = SearchUtils.sanitizeArr(newFilters['pendidikan']) ?? this.filters['pendidikan']
         if (newFilters.sort && typeof newFilters.sort === 'object') {
             this.filters.sort = { value: newFilters.sort.value, label: newFilters.sort.label }
         }
@@ -105,11 +104,11 @@ export class SearchManager {
 
     public resetFilters(): void {
         this.filters.cari = ''
-        this.filters[TaxonomyType.lokasi] = []
-        this.filters[TaxonomyType.gender] = []
-        this.filters[TaxonomyType.pendidikan] = []
+        this.filters['lokasi_pekerjaan'] = []
+        this.filters['gender'] = []
+        this.filters['pendidikan'] = []
         this.filters.sort = { value: 'desc', label: 'Terbaru' }
-        this.filters.context = SearchContext.Latest
+        this.filters.context = "latest"
     }
 
     public addToHistory(query: string): void {
@@ -123,7 +122,7 @@ export class SearchManager {
         this.searchHistory = []
     }
 
-    public getSuggestions(query: string): void {
+    public getSuggestions(query: SearchFilters['cari']): void {
         this.debouncedGetSuggestions(query)
     }
 
@@ -146,8 +145,8 @@ export class SearchManager {
             const cleaned = SearchUtils.sanitizeFilters({ ...this.filters })
             const response = await APIService.searchJobsGraphQL(cleaned)
             this.jobs = [...(response.jobs || [])]
-            this.context = (response.context as SearchContext) || SearchContext.Search
-            this.title = response.title || SearchTitle.Search
+            this.context = (response.context) || "search"
+            this.title = response.title || "Hasil Pencarian"
             this.totalJobs = response.total || 0
             this.maxNumPages = response.maxNumPages || 1
             this.page = 1
@@ -162,7 +161,7 @@ export class SearchManager {
     }
 
     public async loadMore(retries = 2): Promise<LoadMoreResponse> {
-        if (this.loading || this.page >= this.maxNumPages) {
+        if (this.loading || this.page >= this.maxNumPages!) {
             throw new Error('Cannot load more: already loading or no more pages')
         }
 
@@ -190,7 +189,7 @@ export class SearchManager {
                 this.page = paged
                 this.maxNumPages = response.maxNumPages || this.maxNumPages
             } else {
-                this.page = this.maxNumPages
+                this.page = this.maxNumPages!
             }
             return response
         } catch (err) {
@@ -211,7 +210,7 @@ export class SearchManager {
     }
 
     public async prefetchNextPage(): Promise<void> {
-        if (this.isPrefetchingLoadMore || this.page >= this.maxNumPages || this.nextPageLoadMoreCache) {
+        if (this.isPrefetchingLoadMore || this.page >= this.maxNumPages! || this.nextPageLoadMoreCache) {
             return
         }
 
@@ -238,7 +237,7 @@ export class SearchManager {
                 resolve({ __timedOut: true })
             }, TIMEOUT_MS))
 
-            const response: any = await Promise.race([apiPromise, timeoutPromise])
+            const response: unknown = await Promise.race([apiPromise, timeoutPromise])
 
             if (timedOut) {
                 console.warn('SearchStore: Prefetch timed out, performing manual fetch')
@@ -251,21 +250,21 @@ export class SearchManager {
                         this.nextPageLoadMoreCache = newJobs
                         this.maxNumPages = manualResponse.maxNumPages || this.maxNumPages
                     } else {
-                        this.page = this.maxNumPages
+                        this.page = this.maxNumPages!
                     }
                 } catch (err) {
                     console.error('SearchStore: Manual prefetch fetch failed:', err)
                     this.error = err instanceof Error ? err.message : 'Prefetch manual fetch failed'
                 }
             } else {
-                if (response && Array.isArray(response.jobs) && response.jobs.length) {
-                    const newJobs = response.jobs.filter((newJob: any) =>
+                if (response && Array.isArray((response as LoadMoreResponse).jobs) && (response as LoadMoreResponse).jobs.length) {
+                    const newJobs = (response as LoadMoreResponse).jobs.filter((newJob: any) =>
                         !this.jobs.some(existingJob => existingJob.permalink === newJob.permalink)
                     )
                     this.nextPageLoadMoreCache = newJobs
-                    this.maxNumPages = response.maxNumPages || this.maxNumPages
+                    this.maxNumPages = (response as LoadMoreResponse).maxNumPages || this.maxNumPages
                 } else {
-                    this.page = this.maxNumPages
+                    this.page = this.maxNumPages!
                 }
             }
         } catch (err) {
@@ -295,38 +294,38 @@ export class SearchManager {
             names: string[]
         }[] = []
 
-        if (this.filters[TaxonomyType.lokasi] && this.filters[TaxonomyType.lokasi].length) {
-            const filtered = this.filters[TaxonomyType.lokasi].filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
+        if (this.filters['lokasi_pekerjaan'] && this.filters['lokasi_pekerjaan'].length) {
+            const filtered = this.filters['lokasi_pekerjaan'].filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
             if (filtered.length) {
                 filters.push({
-                    key: TaxonomyType.lokasi,
+                    key: 'lokasi_pekerjaan',
                     label: 'Lokasi',
                     values: filtered,
-                    names: filtered.map((slug) => taxonomyStore.getTermNameBySlug(TaxonomyType.lokasi, slug)),
+                    names: filtered.map((slug) => taxonomyStore.getTermNameBySlug('lokasi_pekerjaan', slug)),
                 })
             }
         }
 
-        if (this.filters[TaxonomyType.gender] && this.filters[TaxonomyType.gender].length) {
-            const filtered = this.filters[TaxonomyType.gender].filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
+        if (this.filters['gender'] && this.filters['gender'].length) {
+            const filtered = this.filters['gender'].filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
             if (filtered.length) {
                 filters.push({
-                    key: TaxonomyType.gender,
+                    key: 'gender',
                     label: 'Gender',
                     values: filtered,
-                    names: filtered.map((slug) => taxonomyStore.getTermNameBySlug(TaxonomyType.gender, slug)),
+                    names: filtered.map((slug) => taxonomyStore.getTermNameBySlug('gender', slug)),
                 })
             }
         }
 
-        if (this.filters[TaxonomyType.pendidikan] && this.filters[TaxonomyType.pendidikan].length) {
-            const filtered = this.filters[TaxonomyType.pendidikan].filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
+        if (this.filters['pendidikan'] && this.filters['pendidikan'].length) {
+            const filtered = this.filters['pendidikan'].filter((slug) => typeof slug === 'string' && String(slug).trim() !== '')
             if (filtered.length) {
                 filters.push({
-                    key: TaxonomyType.pendidikan,
+                    key: 'pendidikan',
                     label: 'Pendidikan',
                     values: filtered,
-                    names: filtered.map((slug) => taxonomyStore.getTermNameBySlug(TaxonomyType.pendidikan, slug)),
+                    names: filtered.map((slug) => taxonomyStore.getTermNameBySlug('pendidikan', slug)),
                 })
             }
         }
@@ -358,21 +357,21 @@ export class SearchUtils {
         return {
             ...f,
             cari: typeof f.cari === 'string' ? validation.sanitizeString(f.cari) : f.cari,
-            [TaxonomyType.lokasi]: Array.isArray(f[TaxonomyType.lokasi])
-                ? f[TaxonomyType.lokasi]
+            ['lokasi_pekerjaan']: Array.isArray(f['lokasi_pekerjaan'])
+                ? f['lokasi_pekerjaan']
                     .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
                     .filter((s) => String(s).trim() !== '')
-                : f[TaxonomyType.lokasi],
-            [TaxonomyType.gender]: Array.isArray(f[TaxonomyType.gender])
-                ? f[TaxonomyType.gender]
+                : f['lokasi_pekerjaan'],
+            ['gender']: Array.isArray(f['gender'])
+                ? f['gender']
                     .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
                     .filter((s) => String(s).trim() !== '')
-                : f[TaxonomyType.gender],
-            [TaxonomyType.pendidikan]: Array.isArray(f[TaxonomyType.pendidikan])
-                ? f[TaxonomyType.pendidikan]
+                : f['gender'],
+            ['pendidikan']: Array.isArray(f['pendidikan'])
+                ? f['pendidikan']
                     .map((v) => (typeof v === 'string' ? validation.sanitizeString(v) : String(v)))
                     .filter((s) => String(s).trim() !== '')
-                : f[TaxonomyType.pendidikan],
+                : f['pendidikan'],
             sort: f.sort ? { value: f.sort.value, label: f.sort.label } : f.sort,
             context: f.context,
         }

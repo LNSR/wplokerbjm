@@ -1,6 +1,5 @@
 import { APIService } from '@/services/APIService'
-import type { TaxonomyTerm } from '@/types'
-import { TaxonomyType } from '@/types'
+import type { TaxonomyTerm, TaxonomyType } from '@/types'
 import { SvelteMap } from 'svelte/reactivity'
 
 class TaxonomyManager {
@@ -45,8 +44,8 @@ class TaxonomyManager {
 
 	private buildSlugMap(type: TaxonomyType, terms: TaxonomyTerm[]): void {
 		let map: SvelteMap<string, string>
-		if (type === TaxonomyType.lokasi) map = this.lokasiSlugMap
-		else if (type === TaxonomyType.gender) map = this.genderSlugMap
+		if (type === "lokasi_pekerjaan") map = this.lokasiSlugMap
+		else if (type === "gender") map = this.genderSlugMap
 		else map = this.pendidikanSlugMap
 		map.clear()
 		function addToMap(termsList: TaxonomyTerm[]) {
@@ -67,10 +66,10 @@ class TaxonomyManager {
 		this.lokasiLoading = true
 		this.lokasiError = null
 		try {
-			const data = await APIService.fetchLokasiTermsGraphQL()
+			const data = await APIService.fetchTaxonomyTermsByTypeGraphQL("lokasiTerms")
 			this.lokasiTerms = data
 			this.lokasiLoaded = true
-			this.buildSlugMap(TaxonomyType.lokasi, data)
+			this.buildSlugMap("lokasi_pekerjaan", data)
 		} catch (err) {
 			this.lokasiError = err instanceof Error ? err.message : 'Failed to fetch lokasi terms'
 			this.lokasiLoaded = false
@@ -84,10 +83,10 @@ class TaxonomyManager {
 		this.genderLoading = true
 		this.genderError = null
 		try {
-			const data = await APIService.fetchGenderTermsGraphQL()
+			const data = await APIService.fetchTaxonomyTermsByTypeGraphQL("genderTerms")
 			this.genderTerms = data
 			this.genderLoaded = true
-			this.buildSlugMap(TaxonomyType.gender, data)
+			this.buildSlugMap("gender", data)
 		} catch (err) {
 			this.genderError = err instanceof Error ? err.message : 'Failed to fetch gender terms'
 			this.genderLoaded = false
@@ -101,10 +100,10 @@ class TaxonomyManager {
 		this.pendidikanLoading = true
 		this.pendidikanError = null
 		try {
-			const data = await APIService.fetchPendidikanTermsGraphQL()
+			const data = await APIService.fetchTaxonomyTermsByTypeGraphQL("pendidikanTerms")
 			this.pendidikanTerms = data
 			this.pendidikanLoaded = true
-			this.buildSlugMap(TaxonomyType.pendidikan, data)
+			this.buildSlugMap("pendidikan", data)
 		} catch (err) {
 			this.pendidikanError = err instanceof Error ? err.message : 'Failed to fetch pendidikan terms'
 			this.pendidikanLoaded = false
@@ -140,8 +139,8 @@ class TaxonomyManager {
 
 	public getTermNameBySlug(type: TaxonomyType, slug: string): string {
 		let map: SvelteMap<string, string>
-		if (type === TaxonomyType.lokasi) map = this.lokasiSlugMap
-		else if (type === TaxonomyType.gender) map = this.genderSlugMap
+		if (type === "lokasi_pekerjaan") map = this.lokasiSlugMap
+		else if (type === "gender") map = this.genderSlugMap
 		else map = this.pendidikanSlugMap
 		return map.get(slug) ?? slug
 	}

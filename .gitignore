@@ -1,4 +1,3 @@
-**/__pycache__
 wordpress/*
 !wordpress/wp-content
 wordpress/wp-content/*
@@ -11,7 +10,6 @@ wordpress/wp-content/themes/*
 **/.svelte-kit
 **/.wrangler
 **/build
-configs/caddy-early-hints.conf
 **/dist
 **/deploy-manual.sh
 **/.playwright-mcp
@@ -32,3 +30,4 @@ localhost-key.pem
 localhost.key
 localhost.crt
 worker-configuration.d.ts
+**/*graphql*

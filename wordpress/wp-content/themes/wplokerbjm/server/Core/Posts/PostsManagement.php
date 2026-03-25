@@ -79,7 +79,7 @@ class PostsManagement
     /**
      * Update job statuses based on deadlines:
      * - Set to normal (0) if past deadline
-     * - Set to urgent (2) if within 7 days of deadline
+     * - Set to urgent (2) if within 14 days of deadline
      * - Leave unchanged otherwise
      * @return void
      */
@@ -141,7 +141,7 @@ class PostsJobStatus
     }
 
     /**
-     * Set job status to urgent if the deadline is within 7 days
+     * Set job status to urgent if the deadline is within 14 days
      * @param int $post_id
      * @param string $deadline
      * @param int $current_status

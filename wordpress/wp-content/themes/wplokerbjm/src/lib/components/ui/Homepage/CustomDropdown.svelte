@@ -1,15 +1,33 @@
 <script module lang="ts">
   import type { DropdownOption } from "@/types";
   import { tick } from "svelte";
-  import { Virtualization } from "$lib/utils/Virtualization.svelte";
+  import {
+    Virtualization,
+    type ListVirtualizationState,
+  } from "$lib/utils/Virtualization.svelte";
+  import { SvelteMap } from "svelte/reactivity";
+
+  type DropdownSelectionValue = string | DropdownOption;
   type ValueProp =
-    | string
-    | string[]
-    | DropdownOption
-    | DropdownOption[]
-    | undefined;
-  type UpdatePayload = string | string[] | undefined;
+    | DropdownSelectionValue
+    | DropdownSelectionValue[]
+    | undefined
+    | null;
+  type UpdatePayload = string | string[] | undefined | null;
+  type HighlightPart = { text: string; match: boolean };
   type SelectedItem = { value: string; label: string };
+  type BreadcrumbDropdownOption = DropdownOption & {
+    __breadcrumbs?: string[];
+    __key?: string;
+  };
+  type VirtualizedDropdownOption = BreadcrumbDropdownOption & { id: number };
+  type SupportedKey =
+    | "ArrowDown"
+    | "ArrowUp"
+    | "ArrowRight"
+    | "ArrowLeft"
+    | "Enter"
+    | "Escape";
 
   interface Props {
     id?: string;
@@ -25,19 +43,21 @@
 
   class VirtualizationManager {
     static computeVirtualState(
-      filteredNonEmpty: DropdownOption[],
+      filteredNonEmpty: BreadcrumbDropdownOption[],
       scrollTop: number,
       itemHeight: number,
       containerHeight: number,
-    ) {
-      const jobsWithId = filteredNonEmpty.map((job, i) => ({ ...job, id: i }));
-      const cardHeights = new SvelteMap(
-        jobsWithId.map((job) => [job.id, itemHeight]),
+    ): ListVirtualizationState<VirtualizedDropdownOption> {
+      const jobsWithId: VirtualizedDropdownOption[] = filteredNonEmpty.map(
+        (job, id) => ({ ...job, id }),
+      );
+      const cardHeights = new SvelteMap<number, number>(
+        jobsWithId.map(({ id }) => [id, itemHeight]),
       );
       const opts = {
         displayJobs: jobsWithId,
         scrollY: scrollTop,
-        containerHeight: containerHeight,
+        containerHeight,
         cardHeights,
         fallbackHeight: itemHeight,
         gap: 0,
@@ -82,8 +102,23 @@
   }
 
   class CustomDropdownHelpers {
-    static highlightParts = (label: string, query: string) => {
-      const parts: { text: string; match: boolean }[] = [];
+    static isDropdownOption(value: unknown): value is DropdownOption {
+      return (
+        typeof value === "object" &&
+        value !== null &&
+        "value" in value &&
+        typeof value.value === "string"
+      );
+    }
+
+    static toStringValue(value: DropdownSelectionValue): string {
+      return CustomDropdownHelpers.isDropdownOption(value)
+        ? String(value.value)
+        : String(value);
+    }
+
+    static highlightParts = (label: string, query: string): HighlightPart[] => {
+      const parts: HighlightPart[] = [];
       if (!query) return [{ text: label, match: false }];
       const escapeRegex = (s: string) =>
         s.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
@@ -107,17 +142,17 @@
     static flattenOptions(
       optionsList: DropdownOption[],
       breadcrumbs: string[] = [],
-    ): DropdownOption[] {
-      return (optionsList ?? []).flatMap((opt): DropdownOption[] => {
+    ): BreadcrumbDropdownOption[] {
+      return (optionsList ?? []).flatMap((opt): BreadcrumbDropdownOption[] => {
         if (!opt) return [];
         const key = [opt.value, ...breadcrumbs].join(">");
-        const baseOption: DropdownOption = {
+        const baseOption: BreadcrumbDropdownOption = {
           ...opt,
           __breadcrumbs: breadcrumbs,
           __key: key,
           children: undefined,
         };
-        const nested: DropdownOption[] = opt.children?.length
+        const nested: BreadcrumbDropdownOption[] = opt.children?.length
           ? CustomDropdownHelpers.flattenOptions(opt.children, [
               ...breadcrumbs,
               opt.label,
@@ -130,16 +165,11 @@
     static normalizeToStringArray(incoming: ValueProp): string[] {
       if (!incoming) return [];
       if (Array.isArray(incoming)) {
-        return incoming.map((it) =>
-          typeof it === "object" && it !== null && "value" in it
-            ? String((it as DropdownOption).value)
-            : String(it),
+        return incoming.map((item) =>
+          CustomDropdownHelpers.toStringValue(item),
         );
       }
-      if (typeof incoming === "object" && "value" in incoming) {
-        return [String((incoming as DropdownOption).value)];
-      }
-      return [String(incoming)];
+      return [CustomDropdownHelpers.toStringValue(incoming)];
     }
 
     static isSelected(v: string, selectedValues: SelectedItem[]): boolean {
@@ -257,9 +287,10 @@
     static handleClickOutside(
       e: MouseEvent,
       dropdownRef: HTMLElement | null,
+      isOpen: boolean,
       close?: () => void,
     ): void {
-      if (!open) return;
+      if (!isOpen) return;
       if (dropdownRef && !dropdownRef.contains(e.target as Node)) {
         CustomDropdownController.callClose(close);
       }
@@ -292,13 +323,14 @@
     ArrowLeftSolid,
     TrashAltSolid,
   } from "svelte-awesome-icons";
-  import { SvelteMap } from "svelte/reactivity";
 
-  const {
+  let {
     id,
     value = undefined,
     options = [],
     multiple = false,
+    placeholder = "Cari...",
+    disabled = false,
     open = false,
     update = undefined,
     close = undefined,
@@ -320,45 +352,44 @@
   let listboxEl = $state<HTMLElement | null>(null);
   const listboxId = $derived(String(id ?? "custom-dropdown") + "-listbox");
 
-  const currentOptions = $derived.by(() =>
+  const currentOptions = $derived.by((): DropdownOption[] =>
     stack.length > 0 ? stack[stack.length - 1] : (options ?? []),
   );
 
-  const filteredOptions = $derived.by((): DropdownOption[] => {
+  const filteredOptions = $derived.by((): BreadcrumbDropdownOption[] => {
     if (String(search).trim()) {
       const q = String(search).trim().toLowerCase();
       return CustomDropdownHelpers.flattenOptions(options ?? []).filter(
-        (opt: DropdownOption) => opt.label.toLowerCase().includes(q),
+        (opt) => opt.label.toLowerCase().includes(q),
       );
     }
-    return (currentOptions ?? []).map((opt: DropdownOption) => ({
+    return (currentOptions ?? []).map((opt): BreadcrumbDropdownOption => ({
       ...opt,
       __key: String(opt.value) + (breadcrumbLabels.join(">") || ""),
     }));
   });
 
-  const filteredNonEmpty = $derived.by((): DropdownOption[] =>
-    (filteredOptions ?? []).filter(
-      (opt: DropdownOption) => String(opt.value).trim() !== "",
-    ),
+  const filteredNonEmpty = $derived.by((): BreadcrumbDropdownOption[] =>
+    (filteredOptions ?? []).filter((opt) => String(opt.value).trim() !== ""),
   );
 
   const selectedValues = $derived.by((): SelectedItem[] => {
-    const valArr = CustomDropdownHelpers.normalizeToStringArray(
-      value as ValueProp,
-    ).filter((v) => String(v).trim() !== "");
+    const valArr = CustomDropdownHelpers.normalizeToStringArray(value).filter(
+      (selectedValue) => String(selectedValue).trim() !== "",
+    );
     const flat = CustomDropdownHelpers.flattenOptions(options ?? []);
-    return valArr.map((v) => {
+    return valArr.map((selectedValue) => {
       const found =
-        flat.find((o) => o.value === v) ??
-        (options ?? []).find((o) => o.value === v);
+        flat.find((option) => option.value === selectedValue) ??
+        (options ?? []).find((option) => option.value === selectedValue);
       return found
         ? { value: String(found.value), label: String(found.label) }
-        : { value: v, label: v };
+        : { value: selectedValue, label: selectedValue };
     });
   });
 
-  const virtualState = $derived.by(() =>
+  const virtualState = $derived.by(
+    (): ListVirtualizationState<VirtualizedDropdownOption> =>
     VirtualizationManager.computeVirtualState(
       filteredNonEmpty,
       scrollTop,
@@ -367,7 +398,13 @@
     ),
   );
 
-  function updateContainerHeight() {
+  function resetNavigationState(): void {
+    CustomDropdownBreadcrumbController.resetBreadcrumb(stack, breadcrumbLabels);
+    activeIndex = 0;
+    search = "";
+  }
+
+  function updateContainerHeight(): void {
     containerHeight =
       VirtualizationManager.updateContainerHeight(scrollContainer);
   }
@@ -375,9 +412,9 @@
   const onKeyDown = (e: KeyboardEvent): void => {
     if (!open) return;
     isKeyboard = true;
-    const list = (filteredNonEmpty ?? []) as DropdownOption[];
+    const list = filteredNonEmpty ?? [];
 
-    const keyHandlers = {
+    const keyHandlers: Partial<Record<SupportedKey, () => void>> = {
       ArrowDown: () => {
         e.preventDefault();
         activeIndex = Math.min((activeIndex ?? 0) + 1, (list.length || 0) - 1);
@@ -391,7 +428,7 @@
       },
       ArrowRight: () => {
         e.preventDefault();
-        const opt = list[activeIndex as number];
+        const opt = list[activeIndex];
         if (opt && opt.children?.length && !search) {
           CustomDropdownBreadcrumbController.navigateChildren(
             opt.children,
@@ -412,7 +449,7 @@
       },
       Enter: () => {
         e.preventDefault();
-        const opt = list[activeIndex as number];
+        const opt = list[activeIndex];
         if (opt)
           CustomDropdownController.select(
             opt,
@@ -420,20 +457,13 @@
             value,
             update,
             close,
-            () => {
-              CustomDropdownBreadcrumbController.resetBreadcrumb(
-                stack,
-                breadcrumbLabels,
-              );
-              activeIndex = 0;
-              search = "";
-            },
+            resetNavigationState,
           );
       },
       Escape: () => CustomDropdownController.callClose(close),
     };
 
-    keyHandlers[e.key as keyof typeof keyHandlers]?.();
+    keyHandlers[e.key as SupportedKey]?.();
   };
 
   let ro: ResizeObserver | null = null;
@@ -510,7 +540,7 @@
 
 <svelte:document
   on:mousedown={(e) => {
-    CustomDropdownController.handleClickOutside(e, dropdownRef, close);
+    CustomDropdownController.handleClickOutside(e, dropdownRef, open, close);
   }}
 />
 
@@ -706,14 +736,7 @@
                     value,
                     update,
                     close,
-                    () => {
-                      CustomDropdownBreadcrumbController.resetBreadcrumb(
-                        stack,
-                        breadcrumbLabels,
-                      );
-                      activeIndex = 0;
-                      search = "";
-                    },
+                    resetNavigationState,
                   )}
               >
                 {#if multiple}
@@ -750,7 +773,7 @@
                   />
                 {/if}
                 {#if search && String(search).trim()}
-                  {#each CustomDropdownHelpers.highlightParts(option.label, String(search)) as part}
+                  {#each CustomDropdownHelpers.highlightParts(option.label, String(search)) as part, partIndex (part.text + part.match + partIndex)}
                     {#if part.match}
                       <span
                         class="bg-[var(--wpl-global-color-5)] font-bold rounded px-1"

@@ -1,4 +1,4 @@
-import type { SearchContext, SearchFilters, MetaBox, WPBasePost } from '@/types';
+import type { SearchTitle ,SearchContext, SearchFilters, MetaBox, WPBasePost } from '@/types';
 import type { Component } from 'svelte';
 export interface LayoutProps {
   logo: string;
@@ -23,7 +23,7 @@ export interface CardJob extends WPBasePost, Pick<MetaBox, 'jenis_pekerjaan' | '
   ringkasanPekerjaan?: JobSummary | null;
 }
 
-export type JobContactRow = Pick<MetaBox, 'email_kontak' | 'nomor_kontak' | 'situs_kontak'>;
+export type JobContactRow = Pick<MetaBox, 'email_kontak' | 'nomor_kontak' | 'situs_kontak'> | null | undefined;
 
 
 // Props for the JobCard component (shared type)
@@ -40,8 +40,8 @@ export interface JobGridProps {
   maxNumPages?: number;
   context?: SearchContext;
   filters?: Partial<SearchFilters>;
-  title?: string;
-  totalJobs?: number;
+  title?: SearchTitle;
+  total?: number;
 } 
 
 export interface CarouselProps {

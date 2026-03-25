@@ -5,7 +5,6 @@ import type {
   ExecutionContext,
   CacheStorage,
   IncomingRequestCfProperties,
-  DurableObjectNamespace,
   KVNamespace,
 } from "@cloudflare/workers-types";
 

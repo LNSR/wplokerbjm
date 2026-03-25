@@ -12,7 +12,7 @@
     PortalManager,
     SharedClock,
   } from "$lib/utils/elements.svelte";
-  import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { goto } from "$app/navigation";
   import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
@@ -148,7 +148,7 @@
     displayedSavedJobs = $derived.by(() => {
       return savedJobs.map((job) => ({
         ...job,
-        timeAgo: generalStore.useTimeAgo(job.post_time),
+        timeAgo: generalStore.useTimeAgo(job.post_time!),
         deadlineInfo: job.deadline
           ? generalStore.useDeadline(job.deadline)
           : { text: "", style: "" },
@@ -429,7 +429,7 @@
           "bookmarkModal",
         );
         // mark as "featured" for desktop
-        jobOverlay.openOverlay(job.slug ?? "", job, "featured", {
+        jobOverlayManager?.openOverlay(job.slug ?? "", job, "featured", {
           gotoCB: () => {
             this.closeModal();
           },

@@ -1,5 +1,6 @@
 <script module lang="ts">
-  import { debounce } from "@/utils";
+  import { onMount, onDestroy, tick } from "svelte";
+  import { debounce, type DebouncedFunction } from "@/utils";
   import { ThemeName } from "@/types";
   import { MediaQuery } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
@@ -26,7 +27,7 @@
 
   class ThemeColorManager {
     mediaQuery: MediaQuery | null = null;
-    debouncedSetTheme: (d: ThemeName) => void = () => {};
+    debouncedSetTheme!: DebouncedFunction<(d: ThemeName) => void>;
     public isDark = $state(false);
     public currentTheme = $state<ThemeName>(ThemeName.Light);
     #initialized = false;
@@ -197,9 +198,7 @@
       }
 
       // ensure a debounced call remains to avoid double-write races
-      if ((this.debouncedSetTheme as any)?.flush) {
-        (this.debouncedSetTheme as any).flush();
-      }
+      this.debouncedSetTheme.flush();
     }
   }
 
@@ -309,11 +308,12 @@
 
       loginLoading = true;
       loginError = "";
+      const token = await APIService.getJWTGraphQL({
+        username: loginUsername,
+        password: loginPassword,
+      });
+
       try {
-        const token = await APIService.getJWTGraphQL({
-          username: loginUsername,
-          password: loginPassword,
-        });
         loginPassword = "";
 
         if (!token) {
@@ -326,21 +326,32 @@
         loginError = "Terjadi kesalahan saat login.";
         loginPassword = "";
       } finally {
-        tick().then(async () => {
+        const useRIF =
+          typeof window.requestIdleCallback === "function"
+            ? window.requestIdleCallback.bind(window)
+            : (cb: IdleRequestCallback) => setTimeout(cb, 0);
+
+        useRIF(async () => {
           try {
+            if (!token) {
+              loginLoading = false;
+              return;
+            }
+            
             const nonce = await APIService.getThemeNonceGraphQL();
             if (nonce && nonce.length > 0) {
-              themeManager.setNonce(nonce);
+              themeManager.setNonce = nonce;
             }
           } catch (error) {
             console.error("Error refreshing nonce after login:", error);
           } finally {
             loginLoading = false;
+            await tick();
           }
         });
       }
     }
-    static async Logout(): Promise<void> {
+    static Logout(): void {
       window.location.reload();
     }
     static closeLogin() {
@@ -357,7 +368,6 @@
 </script>
 
 <script lang="ts">
-  import { onMount, onDestroy, tick } from "svelte";
   import type { HTMLImgAttributes } from "svelte/elements";
   import { goto } from "$app/navigation";
   import { headerStore } from "$lib/stores/HeaderStore.svelte";
@@ -379,7 +389,7 @@
     HeaderLogo?: string;
     themeData?: import("@/types").WPLokerBJMThemedData | null;
   } = $props();
-  
+
   let loginAdmin = $state(false);
   let _loginAdminPoll: number | null = null;
   const bookmarkJobs = $derived(bookmarkStore.jobs);
@@ -432,7 +442,7 @@
         get() {
           return internal;
         },
-        set(v: any) {
+        set(v: boolean) {
           internal = v;
           loginAdmin = !!v;
         },
@@ -442,13 +452,17 @@
         try {
           if ((w.loginadmin as boolean) !== loginAdmin)
             loginAdmin = !!w.loginadmin;
-        } catch {}
+        } catch (e) {
+          console.error("Error polling loginadmin property:", e);
+        }
       }, 300);
     }
   }
 
   updateLogo();
   onMount(() => {
+    bookmarkStore.init();
+
     try {
       themeColorManager.init();
     } catch {
