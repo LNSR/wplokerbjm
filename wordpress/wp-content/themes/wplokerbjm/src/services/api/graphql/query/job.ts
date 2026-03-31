@@ -38,7 +38,6 @@ export const FRAGMENT_JOB_CARD_FIELDS = graphql(`
     ringkasanPekerjaan {
       ...JobSummaryField
     }
-    deadline
     status_pekerjaan
     permalink
     post_time
@@ -98,7 +97,8 @@ export const GET_JOB_DETAIL = graphql(`
     jobDetail(slug: $slug) {
         id
         title
-        slug
+        # slug
+        # permalink
         nama_perusahaan
         tentang_perusahaan
         ringkasanPekerjaan {

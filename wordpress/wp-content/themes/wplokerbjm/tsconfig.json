@@ -31,7 +31,7 @@
         "scalars": {
           "JSON": "string"
         },
-        "trackFieldUsage": false,
+        "trackFieldUsage": false
       },
       {
         "transform": "typia/lib/transform"

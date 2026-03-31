@@ -64,6 +64,7 @@ export default defineConfig(
 			"@typescript-eslint/no-explicit-any": 'off', // allow any when necessary, but prefer explicit types
 			"@typescript-eslint/no-floating-promises": "off",
 			"@typescript-eslint/require-await": "warn",
+			
 			"@typescript-eslint/no-empty-object-type": "off",
 			"@typescript-eslint/no-unused-vars": "error",
             "@typescript-eslint/no-unused-expressions": "off",
@@ -87,7 +88,6 @@ export default defineConfig(
 			}
 		},
 		rules: {
-			"@typescript-eslint/no-unused-vars": "off",
 			"svelte/valid-compile": "error",
 			"svelte/no-inspect": "off",
 			"svelte/no-at-html-tags": "off",

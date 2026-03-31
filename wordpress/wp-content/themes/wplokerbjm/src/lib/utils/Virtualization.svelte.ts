@@ -1,4 +1,3 @@
-import { LRUCache } from 'lru-cache';
 import type { Attachment } from "svelte/attachments";
 import { SvelteMap } from "svelte/reactivity";
 
@@ -34,7 +33,7 @@ export type ListOptions<T = any> = {
     cardHeights: Map<number, number>;
     /** Fallback height for items that haven't been measured yet */
     fallbackHeight?: number;
-    /** Gap between items */
+    /** fallback Gap between items */
     gap?: number;
     /** Number of extra items to render outside visible area for smooth scrolling */
     buffer?: number;
@@ -48,8 +47,6 @@ export type ListOptions<T = any> = {
  * of the web model and not addressed here.
  */
 class VirtualizationService {
-    // Cache virtualization computations (exclude visibleJobs to keep cache small)
-    private listCache = new LRUCache<string, Omit<ListVirtualizationState<any>, 'visibleJobs'>>({ max: 100 });
 
     /**
      * Binary search helper for finding the insertion point in a sorted array.
@@ -85,25 +82,9 @@ class VirtualizationService {
             containerHeight,
             cardHeights,
             fallbackHeight = 200,
-            gap = 12,
+            gap: gap = 12,
             buffer = 12,
         } = opts;
-
-        // Round values for caching to reduce cache misses due to minor variations
-        const roundedScrollY = Math.round(scrollY / 50) * 50;
-        const roundedContainerHeight = Math.round(containerHeight / 100) * 100;
-        // Sort entries by numeric id to ensure stable cache keys (prevent lexicographic surprises)
-        const heightsString = Array.from(cardHeights.entries())
-            .sort((a, b) => Number(a[0]) - Number(b[0]))
-            .map(([id, h]) => `${id}:${h}`).join(',');
-
-        const key = `${roundedScrollY}-${roundedContainerHeight}-${fallbackHeight}-${gap}-${buffer}-${displayJobs.length}-${heightsString}`;
-
-        const cached = this.listCache.get(key);
-        if (cached) {
-            const vj = displayJobs.slice(cached.startIndex, cached.endIndex);
-            return { ...cached, visibleJobs: vj };
-        }
 
         if (displayJobs.length === 0) {
             return {
@@ -121,7 +102,7 @@ class VirtualizationService {
 
         for (let i = 0; i < displayJobs.length; i++) {
             const job = displayJobs[i];
-            const jobId = (job as any).id || 0;
+            const jobId = (job as unknown as { id: number }).id || 0;
             const height = cardHeights.get(jobId) || fallbackHeight;
             itemPositions.push(cumulativeHeight);
             cumulativeHeight += height + gap;
@@ -154,13 +135,12 @@ class VirtualizationService {
             itemPositions,
         };
 
-        this.listCache.set(key, state);
-
         return { ...state, visibleJobs };
     }
 
     /**
      * Creates a height measurement attachment for virtualized items.
+     * Also handle gap between cards in fact
      * This function measures the height of DOM elements and updates the cardHeights map,
      * triggering reactivity for virtualization calculations.
      * @param cardHeights - The SvelteMap to store measured heights
@@ -207,4 +187,4 @@ class VirtualizationService {
     }
 }
 
-export const Virtualization = new VirtualizationService();
+export const virtualizationService = new VirtualizationService();

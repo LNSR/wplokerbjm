@@ -12,5 +12,4 @@ export interface SearchState {
 
 export interface CarouselState {
   slideIndex: number
-  offset: number
 }

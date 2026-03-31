@@ -1,36 +1,9 @@
 <script module lang="ts">
-  function extractImages(html: string): string[] {
-    if (!html) return [];
-    if (typeof DOMParser !== "undefined") {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, "text/html");
-      const imgs = doc.querySelectorAll("img");
-      return Array.from(imgs)
-        .map((img) => img.src || img.getAttribute("data-src") || "")
-        .filter(Boolean);
-    }
-    const srcs: string[] = [];
-    const imgRe = /<img\s[^>]*?(?:src|data-src)=("|')([^"']+)\1/gi;
-    let match: RegExpExecArray | null;
-    while ((match = imgRe.exec(html))) {
-      if (match[2]) srcs.push(match[2]);
-    }
-    return srcs.filter(Boolean);
-  }
-</script>
-
-<script lang="ts">
-  import { schemaScriptAttach } from "@/utils";
-  import { browser } from "$app/environment";
-  import ViewerModule from "viewerjs";
-  import "viewerjs/dist/viewer.min.css";
-  import { SocialMediaPlatform } from "@/types";
-  import { generalStore } from "$lib/stores/General.svelte";
-  import { FormattingService } from "@/services/Formatting";
-  import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
-  import { onDestroy } from "svelte";
   import {
     ClockSolid,
+    EnvelopeSolid,
+    PhoneSolid,
+    GlobeSolid,
     UserTieSolid,
     MapPinSolid,
     CircleInfoSolid,
@@ -39,48 +12,231 @@
     HandHoldingHeartSolid,
     AddressCardSolid,
     AddressBookSolid,
+    TwitterBrands,
+    FacebookBrands,
+    InstagramBrands,
+    LinkedinBrands,
+    YoutubeBrands,
+    WhatsappBrands,
+    TiktokBrands,
+    ThreadsBrands,
+    TelegramBrands,
   } from "svelte-awesome-icons";
-  import type { JobDetailResponse, JobSchemaResponse } from "@/types";
-  import { SharedClock } from "$lib/utils/elements.svelte";
+  import { SvelteSet } from "svelte/reactivity";
+  import type { JobContactRow, SocialMediaItem, CustomFields, JobSummary } from "@/types";
+  import { SocialMediaPlatform } from "@/types";
+  import type { Component } from "svelte";
+  import { browser } from "$app/environment";
+  import ViewerModule from "viewerjs";
+  import "viewerjs/dist/viewer.min.css";
+  import { generalJobStore } from "$lib/stores/General.svelte";
+  import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
+  import { onDestroy } from "svelte";
+  import type { JobDetailResponse } from "@/types";
   import { page } from "$app/state";
 
-  const { job }: { job: JobDetailResponse } = $props();
+  interface ContactRow {
+    type: "email" | "phone" | "website";
+    icon: Component;
+    label: string;
+    value: string;
+    href: string;
+  }
 
-  let Viewer: any;
-
-  const ringkasanPekerjaan = $derived(
-    generalStore.useSummaryJob(job.ringkasanPekerjaan),
-  );
-  const contacts = $derived(generalStore.useContactsJob(job.contacts));
-  const socialMediaItems = $derived(
-    generalStore.useSocialMedia().socialMediaItems(job.social_media),
-  );
-  const timeAgo = $derived.by(() => {
-    return generalStore.useTimeAgo(job.post_time);
-  });
-
-  const allImages = $derived(
-    [
-      ...extractImages(job.tentang_perusahaan || ""),
-      ...extractImages(job.deskripsi_pekerjaan || ""),
-      ...extractImages(job.persyaratan || ""),
-      ...extractImages(job.cara_melamar || ""),
-      ...extractImages(job.benefit || ""),
-    ].filter((v, i, a) => a.indexOf(v) === i),
-  );
   let galleryRef = $state<HTMLElement>();
-  let viewer = $state<Viewer>();
 
-  class ViewerJSManager {
-    static #eventHandlers: WeakMap<
-      any,
-      {
-        onShown: () => void;
-        onHide: () => void;
-        onHidden: () => void;
+  class SocialMediaLinkBuilder {
+    public buildSocialMediaItems(
+      socialMediaData: CustomFields["social_media"],
+    ): SocialMediaItem[] {
+      const processedItems: SocialMediaItem[] = [];
+      const seen = new SvelteSet<string>();
+      if (!socialMediaData) return processedItems;
+
+      const items = socialMediaData
+        .split(";")
+        .map((s: string) => s.trim())
+        .filter(Boolean);
+
+      for (const item of items) {
+        const idx = item.indexOf(":");
+        if (idx === -1) continue;
+        const platform = item.slice(0, idx).trim() as SocialMediaPlatform;
+        const usernames = item.slice(idx + 1).trim();
+        if (!platform || !usernames) continue;
+        const usernameList = usernames
+          .split(",")
+          .map((u: string) => u.trim())
+          .filter((u) => u);
+        for (const username of usernameList) {
+          const linkData = this.socialMediaHelper.getLinkData(
+            platform,
+            username,
+          );
+          if (linkData) {
+            const key = linkData.platform + linkData.username;
+            if (!seen.has(key)) {
+              seen.add(key);
+              processedItems.push(linkData);
+            }
+          }
+        }
       }
-    > = new WeakMap();
-    static viewerOptions(): Viewer.Options {
+      return processedItems;
+    }
+    /**
+     * Helper class to parse social media platform and username into structured data
+     * it handles various edge cases for different platforms, such as WhatsApp phone numbers or LinkedIn company pages
+     */
+    private socialMediaHelper = new (class SocialMediaHelper {
+      #platforms: Record<
+        SocialMediaPlatform,
+        { icon: Component; base_url: string }
+      > = {
+        [SocialMediaPlatform["X / Twitter"]]: {
+          icon: TwitterBrands,
+          base_url: "https://twitter.com/",
+        },
+        [SocialMediaPlatform.Facebook]: {
+          icon: FacebookBrands,
+          base_url: "https://facebook.com/",
+        },
+        [SocialMediaPlatform.Instagram]: {
+          icon: InstagramBrands,
+          base_url: "https://instagram.com/",
+        },
+        [SocialMediaPlatform.LinkedIn]: {
+          icon: LinkedinBrands,
+          base_url: "https://linkedin.com/in/",
+        },
+        [SocialMediaPlatform.Youtube]: {
+          icon: YoutubeBrands,
+          base_url: "https://youtube.com/@",
+        },
+        [SocialMediaPlatform.WhatsApp]: {
+          icon: WhatsappBrands,
+          base_url: "https://wa.me/",
+        },
+        [SocialMediaPlatform.TikTok]: {
+          icon: TiktokBrands,
+          base_url: "https://tiktok.com/@",
+        },
+        [SocialMediaPlatform.Threads]: {
+          icon: ThreadsBrands,
+          base_url: "https://threads.net/@",
+        },
+        [SocialMediaPlatform.Telegram]: {
+          icon: TelegramBrands,
+          base_url: "https://t.me/",
+        },
+      };
+
+      public getLinkData(platform: SocialMediaPlatform, username: string) {
+        const config = this.#platforms[platform];
+        if (!config || !username) return null;
+        if (platform === SocialMediaPlatform.WhatsApp)
+          return this.getWhatsappLinkData(platform, config, username);
+        if (platform === SocialMediaPlatform.LinkedIn)
+          return this.getLinkedInLinkData(platform, config, username);
+        return this.getDefaultLinkData(platform, config, username);
+      }
+
+      private normalizeUrl(url: string): string {
+        return url.replace(/^http:\/\//i, "https://");
+      }
+
+      private formatPhone(number: string): string {
+        if (!number) return "";
+        number = number.replace(/[^\d+]/g, "");
+
+        const match = number.match(/^\+(\d{1,5})(\d{0,})$/);
+        if (match) {
+          const countryCode = "+" + match[1];
+          const rest = match[2] || "";
+          const formattedRest = rest.replace(/(.{4})/g, "$1 ").trim();
+          return (countryCode + " " + formattedRest).trim();
+        } else {
+          number = number.replace(/\D+/g, "");
+          return number.replace(/(.{4})/g, "$1 ").trim();
+        }
+      }
+
+      private getWhatsappLinkData(
+        platform: SocialMediaPlatform.WhatsApp,
+        config: { icon: Component; base_url: string },
+        username: string,
+      ): SocialMediaItem {
+        if (/^https?:\/\/wa\.me\/qr\/[A-Z0-9]+$/i.test(username)) {
+          const normalized = this.normalizeUrl(username);
+          return { platform, icon: config.icon, url: normalized, username };
+        }
+        const waMeMatch = /^(?:https?:\/\/)?wa\.me\/(\d+)$/i.exec(username);
+        if (waMeMatch) {
+          const number = this.formatPhone(waMeMatch[1]);
+          return {
+            platform,
+            icon: config.icon,
+            url: `https://wa.me/${number}`,
+            username: `+${number}`,
+          };
+        }
+        if (/^https?:\/\/((api|web)\.whatsapp\.com)/.test(username)) {
+          const normalized = this.normalizeUrl(username);
+          return { platform, icon: config.icon, url: normalized, username };
+        }
+        const cleanNumber = username.replace(/[^0-9]/g, "");
+        return {
+          platform,
+          icon: config.icon,
+          url: config.base_url + cleanNumber,
+          username,
+        };
+      }
+
+      private getLinkedInLinkData(
+        platform: SocialMediaPlatform.LinkedIn,
+        config: { icon: Component; base_url: string },
+        username: string,
+      ): SocialMediaItem {
+        if (/^https?:\/\//i.test(username)) {
+          const normalized = this.normalizeUrl(username);
+          return { platform, icon: config.icon, url: normalized, username };
+        }
+        const clean_username = username.replace(/^@/, "");
+        const companyMatch = /^company[:/](.+)$/i.exec(clean_username);
+        let url;
+        if (companyMatch) {
+          url = `https://linkedin.com/company/${companyMatch[1]}`;
+        } else {
+          url = config.base_url + clean_username;
+        }
+        return { platform, icon: config.icon, url, username };
+      }
+
+      private getDefaultLinkData(
+        platform: SocialMediaPlatform,
+        config: { icon: Component; base_url: string },
+        username: string,
+      ): SocialMediaItem {
+        if (/^https?:\/\//i.test(username)) {
+          const normalized = this.normalizeUrl(username);
+          return { platform, icon: config.icon, url: normalized, username };
+        }
+        const clean_username = username.replace(/^@/, "");
+        const url = config.base_url + clean_username;
+        return { platform, icon: config.icon, url, username };
+      }
+    })();
+  }
+
+  /**
+   * Manages the ViewerJS instance for displaying images in a gallery format
+   * it handles setup and teardown of the viewer
+   */
+  class ViewerJSManager {
+    #Viewer: typeof ViewerModule = ViewerModule;
+    public instance: InstanceType<typeof ViewerModule> | undefined;
+    public viewerOptions(): Viewer.Options {
       const container = browser
         ? ((document.querySelector("#app") as HTMLElement) ?? document.body)
         : undefined;
@@ -108,33 +264,123 @@
       return opts as Viewer.Options;
     }
 
-    static setupViewer(): void {
-      if (!browser) return;
-      if (!Viewer) {
-        Viewer =
-          (ViewerModule && (ViewerModule as any).default) ?? ViewerModule;
-      }
+    public setupViewer(): void {
+      if (!browser || !galleryRef || this.instance) return;
 
-      if (!galleryRef) return;
-
-      if (viewer) return;
-
-      viewer = new Viewer(galleryRef!, ViewerJSManager.viewerOptions());
+      this.instance = new this.#Viewer(galleryRef, this.viewerOptions());
     }
 
-    static destroyViewer(): void {
-      if (viewer) {
+    public destroyViewer(): void {
+      if (this.instance) {
         try {
-          viewer.destroy();
+          this.instance.destroy();
         } catch (e) {
-          // ignore - library sometimes throws when already torn down
+          console.error(
+            "ViewerJSManager: Error destroying viewer instance:",
+            e,
+          );
         }
-        viewer = undefined;
+        this.instance = undefined;
       }
     }
   }
+  const viewerJSManager = new ViewerJSManager();
+  const socialMediaBuilder = new SocialMediaLinkBuilder();
+</script>
 
-  async function onWysiwygImgClick(e: MouseEvent): Promise<void> {
+<script lang="ts">
+  const { job }: { job: JobDetailResponse } = $props();
+
+  function extractImages(html: string): string[] {
+    if (!html) return [];
+    if (typeof DOMParser !== "undefined") {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, "text/html");
+      const imgs = doc.querySelectorAll("img");
+      return Array.from(imgs)
+        .map((img) => img.src || img.getAttribute("data-src") || "")
+        .filter(Boolean);
+    }
+    const srcs: string[] = [];
+    const imgRe = /<img\s[^>]*?(?:src|data-src)=("|')([^"']+)\1/gi;
+    let match: RegExpExecArray | null;
+    while ((match = imgRe.exec(html))) {
+      if (match[2]) srcs.push(match[2]);
+    }
+    return srcs.filter(Boolean);
+  }
+
+  function getContactRows(jobData?: JobContactRow): ContactRow[] {
+    if (!jobData) return [];
+    const contacts: ContactRow[] = [];
+
+    const emails = jobData.email_kontak
+      ? jobData.email_kontak.split(",").map((e: string) => e.trim())
+      : [];
+    emails.forEach((email: string) => {
+      if (email) {
+        contacts.push({
+          type: "email",
+          icon: EnvelopeSolid,
+          label: "Email",
+          value: email,
+          href: `mailto:${email}`,
+        });
+      }
+    });
+
+    const phones = jobData.nomor_kontak
+      ? jobData.nomor_kontak.split(",").map((p: string) => p.trim())
+      : [];
+    phones.forEach((phone: string) => {
+      if (phone) {
+        contacts.push({
+          type: "phone",
+          icon: PhoneSolid,
+          label: "Telepon",
+          value: phone,
+          href: `tel:${phone}`,
+        });
+      }
+    });
+
+    const websiteUrls = jobData.situs_kontak
+      ? jobData.situs_kontak.split(",").map((s: string) => s.trim())
+      : [];
+    websiteUrls.forEach((siteUrl: string) => {
+      if (siteUrl) {
+        const href = siteUrl.replace(/^http:\/\//i, "https://");
+        contacts.push({
+          type: "website",
+          icon: GlobeSolid,
+          label: "Website",
+          value: siteUrl.replace(/^https?:\/\//i, ""),
+          href,
+        });
+      }
+    });
+
+    return contacts;
+  }
+
+  function extractUniqueImagesFromJob(
+    job: Partial<JobDetailResponse>,
+  ): string[] {
+    // WYSIWYG fields that may contain images
+    const fieldsToExtract = [
+      job.tentang_perusahaan,
+      job.deskripsi_pekerjaan,
+      job.persyaratan,
+      job.cara_melamar,
+      job.benefit,
+    ];
+    const allSrcs = fieldsToExtract.flatMap((field) =>
+      extractImages(field || ""),
+    );
+    return Array.from(new SvelteSet(allSrcs));
+  }
+
+  function onWysiwygImgClick(e: MouseEvent): void {
     const target = e.target as HTMLElement;
     if (target.tagName !== "IMG") return;
 
@@ -158,40 +404,44 @@
           ? dataSrc
           : img.currentSrc || href || img.src || dataSrc || "";
 
-    const imageIndex = allImages.indexOf(src);
+    const imageIndex = extractUniqueImagesFromJob(job).indexOf(src);
     if (imageIndex >= 0) {
-      await ViewerJSManager.setupViewer();
-      if (!viewer) return;
-      viewer!.show();
-      viewer!.view(imageIndex);
+      viewerJSManager.setupViewer();
+      if (!viewerJSManager.instance) return;
+      viewerJSManager.instance.show();
+      viewerJSManager.instance.view(imageIndex);
     }
   }
 
-  // run the time effect separately from viewer teardown.  the previous
-  // implementation destroyed the viewer on every tick because `now` is a
-  // reactive value; that explain why the gallery would show exactly once and
-  // then never again.
+  const ringkasanPekerjaan = $derived.by(() =>
+    generalJobStore.useSummaryJob(job.ringkasanPekerjaan as JobSummary),
+  );
+  const contacts = $derived.by(() => getContactRows(job.contacts));
+  const socialMediaItems = $derived.by(() =>
+    socialMediaBuilder.buildSocialMediaItems(job.social_media),
+  );
+  const timeAgo = $derived.by(() => {
+    return generalJobStore.useTimeAgo(job.post_time);
+  });
+
   $effect(() => {
-    const stopTime = SharedClock.timeEffect();
-    return () => stopTime();
+    const timeEffect = generalJobStore.useSharedClock();
+    return () => timeEffect();
   });
 
   // clean up the viewer when the component is removed from the DOM
   onDestroy(() => {
-    ViewerJSManager.destroyViewer();
+    viewerJSManager.destroyViewer();
   });
 </script>
 
 <svelte:head>
-  {#if page.data?.job as JobDetailResponse && page.data.jobSchema as JobSchemaResponse}
-    {@const jobId = page.data.job.id}
-    {@const jobSchema = page.data.jobSchema}
-    {@html schemaScriptAttach(jobSchema, "JobPosting", `jobposting-${jobId}`)}
+  {#if page.data?.jobSchemaScript}
+    {@html page.data.jobSchemaScript}
   {/if}
 </svelte:head>
 
-
-<article class="space-y-8" style="contain: layout paint;">
+<article class="space-y-8">
   <!-- Title + Summary -->
   {#if job.title || (ringkasanPekerjaan && ringkasanPekerjaan.length)}
     <section
@@ -445,11 +695,7 @@
                   rel="noopener noreferrer nofollow"
                   class="block font-semibold break-words max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
                 >
-                  {item.platform === SocialMediaPlatform.WhatsApp
-                    ? item.username
-                      ? FormattingService.formatPhone(item.username)
-                      : ""
-                    : (item.username ?? "")}
+                  {item.username}
                 </a>
               </div>
             </li>
@@ -459,9 +705,9 @@
     </section>
   {/if}
 </article>
-{#if allImages.length}
+{#if extractUniqueImagesFromJob(job).length}
   <div bind:this={galleryRef} class="hidden">
-    {#each allImages as img}
+    {#each extractUniqueImagesFromJob(job) as img (img)}
       <img src={img} alt="" />
     {/each}
   </div>

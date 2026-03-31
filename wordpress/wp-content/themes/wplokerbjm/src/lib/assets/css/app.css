@@ -76,7 +76,8 @@ html {
   scrollbar-gutter: stable;
 }
 
-header, footer {
+header,
+footer {
   contain: layout;
 }
 

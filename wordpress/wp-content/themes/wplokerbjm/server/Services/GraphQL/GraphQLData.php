@@ -40,18 +40,7 @@ class GraphQLData
                 CustomFields::NAMA_PERUSAHAAN => !empty($jobdata[Taxonomies::PERUSAHAAN])
                     ? html_entity_decode($jobdata[Taxonomies::PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') // prioritize taxonomy perusahaan first
                     : (isset($jobdata[CustomFields::NAMA_PERUSAHAAN]) ? html_entity_decode($jobdata[CustomFields::NAMA_PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),
-                'ringkasanPekerjaan' => [
-                    Taxonomies::JENIS_PEKERJAAN => $jobdata[Taxonomies::JENIS_PEKERJAAN] ?? null,
-                    Taxonomies::PENDIDIKAN => $jobdata[Taxonomies::PENDIDIKAN] ?? null,
-                    Taxonomies::GENDER => $jobdata[Taxonomies::GENDER] ?? null,
-                    Taxonomies::LOKASI_PEKERJAAN => $jobdata[Taxonomies::LOKASI_PEKERJAAN] ?? null,
-                    CustomFields::PENGALAMAN => $jobdata[CustomFields::PENGALAMAN] ?? null,
-                    CustomFields::GAJI_MINIMAL => $jobdata[CustomFields::GAJI_MINIMAL] ?? null,
-                    CustomFields::GAJI_MAKSIMAL => $jobdata[CustomFields::GAJI_MAKSIMAL] ?? null,
-                    CustomFields::UMUR_MIN => $jobdata[CustomFields::UMUR_MIN] ?? null,
-                    CustomFields::UMUR_MAX => $jobdata[CustomFields::UMUR_MAX] ?? null,
-                ],
-                CustomFields::DEADLINE => $jobdata[CustomFields::DEADLINE] ?? null,
+                'ringkasanPekerjaan' => self::getRingkasanPekerjaan($jobdata),
                 CustomFields::STATUS_PEKERJAAN => $jobdata[CustomFields::STATUS_PEKERJAAN] ?? null,
                 'permalink' => esc_url(get_permalink($post_id)),
                 'post_time' => get_post_time('c', false, $post_id),
@@ -101,23 +90,13 @@ class GraphQLData
             $data = [
                 'id' => $post_id,
                 'slug' => get_post_field('post_name', $post_id),
+                'permalink' => esc_url(get_permalink($post_id)),
                 'title' => html_entity_decode(get_the_title($post_id), ENT_QUOTES | ENT_HTML5, 'UTF-8'),
                 CustomFields::NAMA_PERUSAHAAN => !empty($jobdata[Taxonomies::PERUSAHAAN])
                     ? html_entity_decode($jobdata[Taxonomies::PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') // prioritize taxonomy perusahaan first
                     : (isset($jobdata[CustomFields::NAMA_PERUSAHAAN]) ? html_entity_decode($jobdata[CustomFields::NAMA_PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null),
                 CustomFields::TENTANG_PERUSAHAAN => isset($jobdata[CustomFields::TENTANG_PERUSAHAAN]) ? html_entity_decode($jobdata[CustomFields::TENTANG_PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
-                'ringkasanPekerjaan' => [
-                    Taxonomies::JENIS_PEKERJAAN => $jobdata[Taxonomies::JENIS_PEKERJAAN] ?? null,
-                    Taxonomies::PENDIDIKAN => $jobdata[Taxonomies::PENDIDIKAN] ?? null,
-                    Taxonomies::GENDER => $jobdata[Taxonomies::GENDER] ?? null,
-                    Taxonomies::LOKASI_PEKERJAAN => $jobdata[Taxonomies::LOKASI_PEKERJAAN] ?? null,
-                    CustomFields::PENGALAMAN => $jobdata[CustomFields::PENGALAMAN] ?? null,
-                    CustomFields::GAJI_MINIMAL => $jobdata[CustomFields::GAJI_MINIMAL] ?? null,
-                    CustomFields::GAJI_MAKSIMAL => $jobdata[CustomFields::GAJI_MAKSIMAL] ?? null,
-                    CustomFields::UMUR_MIN => $jobdata[CustomFields::UMUR_MIN] ?? null,
-                    CustomFields::UMUR_MAX => $jobdata[CustomFields::UMUR_MAX] ?? null,
-                    CustomFields::DEADLINE => $jobdata[CustomFields::DEADLINE] ?? null,
-                ],
+                'ringkasanPekerjaan' => self::getRingkasanPekerjaan($jobdata),
                 CustomFields::DESKRIPSI_PEKERJAAN => isset($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) ? html_entity_decode($jobdata[CustomFields::DESKRIPSI_PEKERJAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
                 CustomFields::PERSYARATAN => isset($jobdata[CustomFields::PERSYARATAN]) ? html_entity_decode($jobdata[CustomFields::PERSYARATAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
                 CustomFields::CARA_MELAMAR => isset($jobdata[CustomFields::CARA_MELAMAR]) ? html_entity_decode($jobdata[CustomFields::CARA_MELAMAR], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
@@ -144,6 +123,23 @@ class GraphQLData
             return [];
         }
     }
+
+    private static function getRingkasanPekerjaan(array $jobdata): array
+    {
+        return [
+            Taxonomies::JENIS_PEKERJAAN => $jobdata[Taxonomies::JENIS_PEKERJAAN] ?? null,
+            Taxonomies::PENDIDIKAN => $jobdata[Taxonomies::PENDIDIKAN] ?? null,
+            Taxonomies::GENDER => $jobdata[Taxonomies::GENDER] ?? null,
+            Taxonomies::LOKASI_PEKERJAAN => $jobdata[Taxonomies::LOKASI_PEKERJAAN] ?? null,
+            CustomFields::PENGALAMAN => $jobdata[CustomFields::PENGALAMAN] ?? null,
+            CustomFields::GAJI_MINIMAL => $jobdata[CustomFields::GAJI_MINIMAL] ?? null,
+            CustomFields::GAJI_MAKSIMAL => $jobdata[CustomFields::GAJI_MAKSIMAL] ?? null,
+            CustomFields::UMUR_MIN => $jobdata[CustomFields::UMUR_MIN] ?? null,
+            CustomFields::UMUR_MAX => $jobdata[CustomFields::UMUR_MAX] ?? null,
+            CustomFields::DEADLINE => $jobdata[CustomFields::DEADLINE] ?? null,
+        ];
+    }
+
 
     /**
      * Provides plugin-specific nonce for actions

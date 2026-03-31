@@ -1,26 +1,15 @@
-import { PostTypesMetabox } from '@/types';
-
-// Base WordPress post fields
+import { PostTypesMetabox } from './MetaBox';
+export enum WPPostType {
+    Lowongan = PostTypesMetabox.Lowongan,
+}
 export interface WPBasePost {
     id: number;
     title: string;
     slug?: string;
     post_type?: string;
     post_time?: string;
-    permalink?: string;
+    permalink?: string | null;
 }
-
-// WordPress inbuilt post routes
-export enum PostRouteName {
-    PasangIklanLoker = 'pasang-iklan-loker',
-    KebijakanPrivacy = 'kebijakan-privasi',
-}
-
-// WordPress post routes combined with custom post types(MetaBox)
-export const WPPostRoute = {
-    ...PostRouteName,
-    ...PostTypesMetabox,
-};
 
 // WordPress taxonomy term
 export interface WPTaxonomyTerm {

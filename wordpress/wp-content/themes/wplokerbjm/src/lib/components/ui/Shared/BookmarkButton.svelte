@@ -19,7 +19,10 @@
   let confirmationState: "saved" | "removed" | null = $state(null);
   let errorState: "save" | "remove" | null = $state(null);
   let isPending = $state(false);
-  let isTouchDevice = $state(false);
+  let isTouchDevice = $derived.by(() => {
+    if (typeof window === "undefined") return false;
+    return "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  });
 
   let preToggleSaved = $state(false);
   // synchronous lock to prevent same-tick re-entrancy from multiple rapid DOM clicks
@@ -34,7 +37,7 @@
     // If this tab is outdated (a newer build is open elsewhere), do a cache-reload fetch then force navigation.
     if (typeof window !== "undefined" && bookmarkStore.isOutdated) {
       fetch(window.location.href, { cache: "reload" }).then(() => {
-        window.location.reload;
+        window.location.reload();
       });
       return;
     }
@@ -133,10 +136,6 @@
       default:
         return "h-5 w-5 ";
     }
-  });
-
-  $effect(() => {
-    isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
   });
 
   $effect(() => {

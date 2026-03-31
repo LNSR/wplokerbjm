@@ -1,4 +1,3 @@
-import typia from "typia";
 import type { WPLokerBJMThemedData } from "@/types";
 
 class ThemeManager {
@@ -6,30 +5,19 @@ class ThemeManager {
 
   public get getThemeData(): WPLokerBJMThemedData {
     if (!this.#themeProps) throw new Error("Theme data is not set");
-    return typia.assertEquals<WPLokerBJMThemedData>(this.#themeProps);
+    return this.#themeProps;
   }
 
   public get getNonce(): WPLokerBJMThemedData["wpRestNonce"] {
-    try {
-      if (typia.is<string>(this.#themeProps?.wpRestNonce)) {
-        return typia.assertEquals<string>(this.#themeProps?.wpRestNonce);
-      }
-      return undefined;
-    } catch (err) {
-      console.warn("ThemeManager.getNonce: invalid theme data", err);
-      return undefined;
-    }
+    if (!this.#themeProps) return undefined;
+    return this.#themeProps.wpRestNonce;
   }
 
   public set setThemeData(data: WPLokerBJMThemedData) {
-    if (typia.validateEquals<WPLokerBJMThemedData>(data)) {
       this.#themeProps = data;
     }
-  }
 
   public set setNonce(nonce: WPLokerBJMThemedData["wpRestNonce"]) {
-    typia.assertEquals<string>(nonce);
-
     if (!this.#themeProps) return;
     this.#themeProps.wpRestNonce = nonce;
   }

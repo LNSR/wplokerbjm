@@ -2,15 +2,14 @@
   import { onMount, onDestroy } from "svelte";
   import { SvelteSet, SvelteMap } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
-  import { generalStore } from "$lib/stores/General.svelte";
+  import { generalJobStore } from "$lib/stores/General.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import { Virtualization } from "$lib/utils/Virtualization.svelte";
+  import { virtualizationService } from "$lib/utils/Virtualization.svelte";
   import type { CardJob } from "@/types";
   import {
     isMobile,
     isJobGridEl,
-    PortalManager,
-    SharedClock,
+    attachPortal,
   } from "$lib/utils/elements.svelte";
   import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
@@ -43,12 +42,10 @@
   );
 
   // Dragging state
-  let translateX = $state(0);
-  let translateY = $state(0);
+  let translate = $state({ x: 0, y: 0 });
   let isDragging = $state(false);
   let activePointerId: number | null = null;
-  let startClientX = $state(0);
-  let startClientY = $state(0);
+  let startClient = $state({ x: 0, y: 0 });
   let startHeight = $state(0);
 
   // loading mirrors the central store isSyncing to ensure UI reflects store activity
@@ -148,13 +145,13 @@
     displayedSavedJobs = $derived.by(() => {
       return savedJobs.map((job) => ({
         ...job,
-        timeAgo: generalStore.useTimeAgo(job.post_time!),
-        deadlineInfo: job.deadline
-          ? generalStore.useDeadline(job.deadline)
-          : { text: "", style: "" },
+        timeAgo: generalJobStore.useTimeAgo(job.post_time!),
+        deadlineInfo: job.ringkasanPekerjaan?.deadline
+          ? generalJobStore.useDeadline(job.ringkasanPekerjaan.deadline)
+          : { text: "", status: "unknown" },
         statusInfo: job.status_pekerjaan
-          ? generalStore.useStatusJob(Number(job.status_pekerjaan))
-          : { label: "", color: "" },
+          ? generalJobStore.useStatusJob(job.status_pekerjaan)
+          : { label: "", status: "none" },
       }));
     });
 
@@ -177,7 +174,7 @@
     #measureTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
     virtualizedJobs = $derived.by(() => {
-      return Virtualization.computeList({
+      return virtualizationService.computeList({
         displayJobs: bookmarkHandler.filteredDisplayedJobs,
         scrollY: containerScrollY,
         containerHeight: containerHeight,
@@ -189,7 +186,7 @@
     });
 
     measureHeight(jobId: number): Attachment<HTMLElement> {
-      return Virtualization.createMeasureHeight(cardHeights, jobId);
+      return virtualizationService.createMeasureHeight(cardHeights, jobId);
     }
 
     // Update container dimensions
@@ -363,8 +360,8 @@
       }
       activePointerId = e.pointerId;
       isDragging = true;
-      startClientX = e.clientX;
-      startClientY = e.clientY;
+      startClient.x = e.clientX;
+      startClient.y = e.clientY;
       if (isMobile()) {
         startHeight = modalBox?.clientHeight || 0;
       }
@@ -376,10 +373,10 @@
       if (activePointerId !== null && e.pointerId !== activePointerId) return;
       if (!modalBox) return;
       if (isMobile()) {
-        const dy = e.clientY - startClientY;
+        const dy = e.clientY - startClient.y;
         const newH = startHeight - dy;
-        translateX = 0;
-        translateY = 0;
+        translate.x = 0;
+        translate.y = 0;
         try {
           modalBox.style.setProperty("height", `${newH}px`, "important");
         } catch {
@@ -387,8 +384,8 @@
         }
         return;
       } else {
-        translateX = e.clientX - startClientX;
-        translateY = e.clientY - startClientY;
+        translate.x = e.clientX - startClient.x;
+        translate.y = e.clientY - startClient.y;
       }
     };
 
@@ -404,8 +401,8 @@
       activePointerId = null;
     };
     resetPosition(): void {
-      translateX = 0;
-      translateY = 0;
+      translate.x = 0;
+      translate.y = 0;
       try {
         if (modalBox) modalBox.style.removeProperty("height");
       } catch {
@@ -473,7 +470,7 @@
   const isMobileValue = $derived.by(() => isMobile());
 
   const modalStyle = $derived(
-    `transform: translate(${translateX}px, ${translateY}px); touch-action: ${isMobileValue ? "none" : "auto"};`,
+    `transform: translate(${translate.x}px, ${translate.y}px); touch-action: ${isMobileValue ? "none" : "auto"};`,
   );
 
   // Only collapse action buttons on small (mobile) layouts when search is active
@@ -484,7 +481,7 @@
   // Ensure we re-measure when the modal is opened so virtualization has correct container size
 
   $effect(() => {
-    const stopTime = SharedClock.timeEffect();
+    const timeEffect = generalJobStore.useSharedClock();
     // React to showDeleteConfirm changes to control the delete confirmation modal
     if (showDeleteConfirm) {
       if (!deleteConfirmModal?.open) deleteConfirmModal?.showModal();
@@ -492,7 +489,7 @@
       deleteConfirmModal?.close();
     }
     return () => {
-      stopTime();
+      timeEffect();
     };
   });
 
@@ -545,7 +542,7 @@
 
 <dialog
   bind:this={modalEl}
-  {@attach PortalManager.teleport("#app")}
+  {@attach attachPortal("#app")}
   class="modal modal-bottom sm:modal-middle"
   class:modal-open={open}
 >
@@ -824,10 +821,6 @@
                         <JobCard
                           jobdata={job}
                           variant="bookmark"
-                          isVisited={routeStateStore.hasVisitedJob(
-                            job.slug,
-                            "bookmark",
-                          )}
                           permalink={job.permalink as string}
                           onClick={() => modalHandler.handleJobClick(job)}
                         />
@@ -943,7 +936,7 @@
 <!-- Delete All Confirmation Modal -->
 <dialog
   bind:this={deleteConfirmModal}
-  {@attach PortalManager.teleport("#app")}
+  {@attach attachPortal("#app")}
   class="modal modal-bottom sm:modal-middle"
   class:modal-open={showDeleteConfirm}
 >

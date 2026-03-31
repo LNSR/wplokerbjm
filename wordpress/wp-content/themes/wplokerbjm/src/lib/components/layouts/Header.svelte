@@ -1,35 +1,33 @@
 <script module lang="ts">
   import { onMount, onDestroy, tick } from "svelte";
-  import { debounce, type DebouncedFunction } from "@/utils";
-  import { ThemeName } from "@/types";
+  import { debounce, type DebouncedFunction } from "@/utils/lodash";
+  import { type ThemeName, type WPLokerBJMThemedData } from "@/types";
   import { MediaQuery } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
+  import { isAppEl } from "@/utils/elements";
   import { themeManager } from "$lib/stores/Theme.svelte";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import { browser } from "$app/environment";
-  import { APIService } from "@/services/APIService";
+  import { APIServiceBrowser } from "@/services/APIService";
   const isMobileValue = $derived.by(() => isMobile());
-  let showBookmarkModal = $state(false);
 
-  let logoSrcset = $state("");
-  let logoSizes = $state("");
-  let logoWidth = $state<number | undefined>(undefined);
-  let logoHeight = $state<number | undefined>(undefined);
-  let logoDecoding = $state<HTMLImgAttributes["decoding"]>(undefined);
+  let showBookmarkModal = $state(false);
 
   let showThemeModal = $state(false);
   let showLoginModal = $state(false);
-  let loginUsername = $state("");
-  let loginPassword = $state("");
-  let loginError = $state("");
-  let loginLoading = $state(false);
+  let loginStates = $state({
+    username: "",
+    password: "",
+    error: "",
+    loading: false,
+  });
 
   class ThemeColorManager {
-    mediaQuery: MediaQuery | null = null;
-    debouncedSetTheme!: DebouncedFunction<(d: ThemeName) => void>;
+    public mediaQuery: MediaQuery | null = null;
+    public debouncedSetTheme!: DebouncedFunction<(d: ThemeName) => void>;
     public isDark = $state(false);
-    public currentTheme = $state<ThemeName>(ThemeName.Light);
+    public currentTheme = $state<ThemeName>("light");
     #initialized = false;
 
     private updateMetaThemeColor(dark: boolean): void {
@@ -92,20 +90,12 @@
       this.updateMetaThemeColor(dark);
     }
 
-    private prefersReducedMotion(): boolean {
-      try {
-        return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      } catch {
-        return false;
-      }
-    }
-
     public setThemeDirect(
       theme: ThemeName,
       options: { useViewTransition?: boolean } = {},
     ): void {
       const newTheme = theme;
-      const isDark = newTheme === ThemeName.Dark;
+      const isDark = newTheme === "dark";
 
       if (this.currentTheme === newTheme) return;
 
@@ -117,7 +107,10 @@
           this.applyTheme(newTheme, isDark);
         };
 
-        if (options.useViewTransition && !this.prefersReducedMotion()) {
+        if (
+          options.useViewTransition &&
+          window.matchMedia("(prefers-reduced-motion: no-preference)").matches
+        ) {
           const transition = document.startViewTransition?.(() => {
             runThemeUpdate();
           });
@@ -166,20 +159,20 @@
       })();
 
       switch (saved) {
-        case ThemeName.Dark:
-        case ThemeName.Lavender:
-        case ThemeName.Light:
+        case "dark":
+        case "lavender":
+        case "light":
           // persisted preference
-          this.isDark = saved === ThemeName.Dark;
+          this.isDark = saved === "dark";
           this.setThemeDirect(saved as ThemeName);
           break;
         default:
           if (systemPrefersDark) {
             this.isDark = true;
-            this.setThemeDirect(ThemeName.Dark);
+            this.setThemeDirect("dark");
           } else {
             this.isDark = false;
-            this.setThemeDirect(ThemeName.Light);
+            this.setThemeDirect("light");
           }
       }
     }
@@ -187,7 +180,7 @@
     public setTheme(theme: ThemeName): void {
       // update boolean flag early so UI icon flips, but DON'T set currentTheme yet
       // otherwise setThemeDirect will erroneously early-return without updating DOM
-      this.isDark = theme === ThemeName.Dark;
+      this.isDark = theme === "dark";
 
       // apply immediately for responsive UI, but keep debounced path for save/side-effects
       try {
@@ -204,12 +197,16 @@
 
   class HeaderManager {
     headerEl: HTMLElement | null = null;
+    headerHeight = $state(0);
+
+    appEl: HTMLElement | null = null;
     #lastOffsetUpdate = $state(0);
     rafId: number | null = null;
     mutationObserver: MutationObserver | null = null;
     headerResizeObserver: ResizeObserver | null = null;
 
     scheduleUpdate = () => {
+      if (!browser) return;
       if (this.rafId !== null) return;
       this.rafId = requestAnimationFrame(() => {
         this.rafId = null;
@@ -226,20 +223,19 @@
       this.headerEl = document.querySelector("header");
       try {
         this.updateHeaderHeight();
-      } catch {
-        headerStore.headerHeight = 0;
+      } catch(e) {
+        console.error("Error updating header height", e);
+        this.headerHeight = 0;
       }
     };
 
     private updateHeaderHeight = () => {
       if (this.headerEl) {
         const height = this.headerEl.offsetHeight;
-        headerStore.headerHeight = height;
-        headerStore.appEl?.style.setProperty(
-          "--site-header-height",
-          height + "px",
-        );
-        headerStore.appEl?.style.setProperty(
+
+        // Also store globally so any sibling/content section can consume it.
+        this.appEl?.style.setProperty("--site-header-height", height + "px");
+        this.appEl?.style.setProperty(
           "--site-scroll-padding-top",
           height + "px",
         );
@@ -262,6 +258,9 @@
 
     start = () => {
       if (!browser) return; // nothing to do on server
+      // resolve main app container for sibling-style updates
+      this.appEl = document.querySelector(isAppEl) as HTMLElement | null;
+
       // run immediately once
       this.scheduleUpdate();
 
@@ -290,8 +289,8 @@
         this.headerResizeObserver = null;
       }
 
-      headerStore.appEl?.style.removeProperty("--site-header-height");
-      headerStore.appEl?.style.removeProperty("--site-scroll-padding-top");
+      this.headerEl?.style.removeProperty("--site-header-height");
+      this.headerEl?.style.removeProperty("--site-scroll-padding-top");
     };
   }
 
@@ -306,25 +305,26 @@
         console.error("Element focus error during login", e);
       }
 
-      loginLoading = true;
-      loginError = "";
-      const token = await APIService.getJWTGraphQL({
-        username: loginUsername,
-        password: loginPassword,
+      loginStates.loading = true;
+      loginStates.error = "";
+      const token = await APIServiceBrowser.getJWTGraphQL({
+        username: loginStates.username,
+        password: loginStates.password,
       });
 
       try {
-        loginPassword = "";
+        loginStates.username = "";
+        loginStates.password = "";
 
         if (!token) {
-          loginError = "Login gagal — periksa kredensial Anda.";
+          loginStates.error = "Login gagal — periksa kredensial Anda.";
         } else {
           LoginManager.closeLogin();
         }
       } catch (e) {
         console.error("login error", e);
-        loginError = "Terjadi kesalahan saat login.";
-        loginPassword = "";
+        loginStates.error = "Terjadi kesalahan saat login.";
+        loginStates.password = "";
       } finally {
         const useRIF =
           typeof window.requestIdleCallback === "function"
@@ -334,18 +334,18 @@
         useRIF(async () => {
           try {
             if (!token) {
-              loginLoading = false;
+              loginStates.loading = false;
               return;
             }
-            
-            const nonce = await APIService.getThemeNonceGraphQL();
+
+            const nonce = await APIServiceBrowser.getThemeNonceGraphQL();
             if (nonce && nonce.length > 0) {
               themeManager.setNonce = nonce;
             }
           } catch (error) {
             console.error("Error refreshing nonce after login:", error);
           } finally {
-            loginLoading = false;
+            loginStates.loading = false;
             await tick();
           }
         });
@@ -356,10 +356,10 @@
     }
     static closeLogin() {
       showLoginModal = false;
-      loginUsername = "";
-      loginPassword = "";
-      loginError = "";
-      loginLoading = false;
+      loginStates.username = "";
+      loginStates.password = "";
+      loginStates.error = "";
+      loginStates.loading = false;
     }
   }
 
@@ -368,9 +368,7 @@
 </script>
 
 <script lang="ts">
-  import type { HTMLImgAttributes } from "svelte/elements";
   import { goto } from "$app/navigation";
-  import { headerStore } from "$lib/stores/HeaderStore.svelte";
   import { innerWidth } from "svelte/reactivity/window";
   import {
     SunSolid,
@@ -380,49 +378,13 @@
     ExternalLinkSolid,
     KeySolid,
   } from "svelte-awesome-icons";
-  import { PortalManager } from "$lib/utils/elements.svelte";
+  import { attachPortal } from "$lib/utils/elements.svelte";
 
-  let {
-    HeaderLogo = "",
-    themeData,
-  }: {
-    HeaderLogo?: string;
-    themeData?: import("@/types").WPLokerBJMThemedData | null;
-  } = $props();
+  let { themeData }: { themeData: WPLokerBJMThemedData } = $props();
 
   let loginAdmin = $state(false);
   let _loginAdminPoll: number | null = null;
   const bookmarkJobs = $derived(bookmarkStore.jobs);
-  function updateLogo(): void {
-    try {
-      const runtimeLogo = themeData?.logo?.logoUrl;
-      const runtimeLogoSrcset = themeData?.logo?.logoSrcset;
-      const runtimeLogoSizes = themeData?.logo?.logoSizes;
-      const runtimeLogoDecoding = themeData?.logo?.logoDecoding;
-      const runtimeLogoWidth = themeData?.logo?.logoWidth;
-      const runtimeLogoHeight = themeData?.logo?.logoHeight;
-
-      const parseDimension = (value: unknown): number | undefined => {
-        if (typeof value === "number" && value > 0) return value;
-        if (typeof value === "string" && value.trim()) {
-          const parsed = Number(value.trim());
-          if (!Number.isNaN(parsed) && parsed > 0) return parsed;
-        }
-        return undefined;
-      };
-
-      if (runtimeLogo) {
-        HeaderLogo = runtimeLogo as string;
-        logoSrcset = runtimeLogoSrcset || "";
-        logoSizes = runtimeLogoSizes || "";
-        logoDecoding = runtimeLogoDecoding;
-        logoWidth = parseDimension(runtimeLogoWidth);
-        logoHeight = parseDimension(runtimeLogoHeight);
-      }
-    } catch {
-      console.error("Error updating logo");
-    }
-  }
 
   // Open bookmark modal
   function openBookmarkModal(): void {
@@ -459,8 +421,8 @@
     }
   }
 
-  updateLogo();
   onMount(() => {
+    themeManager.setThemeData = themeData;
     bookmarkStore.init();
 
     try {
@@ -480,54 +442,64 @@
     }
   });
 
-  $effect(() => {
+  const hasStoredTheme = $derived.by(() => {
+    if (!browser) return true;
+    try {
+      return !!localStorage.getItem("wplokerbjm-theme");
+    } catch {
+      return false;
+    }
+  });
+
+  const prefersSystemDark = $derived.by(() => {
+    if (!browser) return false;
+
     if (!themeColorManager.mediaQuery) {
       themeColorManager.mediaQuery = new MediaQuery(
         "(prefers-color-scheme: dark)",
       );
     }
-    themeColorManager.mediaQuery!.current;
-    let hasStored = false;
-    try {
-      hasStored = !!localStorage.getItem("wplokerbjm-theme");
-    } catch {
-      hasStored = false;
-    }
-    if (!hasStored) {
-      themeColorManager.isDark = themeColorManager.mediaQuery!.current;
-      themeColorManager.setThemeDirect(
-        themeColorManager.mediaQuery!.current
-          ? ThemeName.Dark
-          : ThemeName.Light,
-      );
-    }
+
+    return themeColorManager.mediaQuery!.current;
   });
 
-  $effect(() => {
-    themeColorManager.currentTheme;
-    themeColorManager.debouncedSetTheme(themeColorManager.currentTheme);
-  });
+  const derivedTheme = $derived.by(() => {
+    if (!browser) return themeColorManager.currentTheme;
 
-  $effect.pre(() => {
-    if (showBookmarkModal && !dynamicComponentStore.BookmarkModal) {
-      void dynamicComponentStore.loadBookmarkModal();
+    const stored = hasStoredTheme;
+    const prefersDark = prefersSystemDark;
+
+    if (!stored) {
+      themeColorManager.isDark = prefersDark;
+      themeColorManager.setThemeDirect(prefersDark ? "dark" : "light");
     }
+
+    const theme = themeColorManager.currentTheme;
+    themeColorManager.debouncedSetTheme(theme);
+    return theme;
   });
 
-  $effect.pre(() => {
-    if (showLoginModal && !dynamicComponentStore.LoginModal) {
-      void dynamicComponentStore.loadLoginModal();
-    }
+  const bookmarkModalComponent = $derived.by(() => {
+    if (!showBookmarkModal) return undefined;
+    return dynamicComponentStore.loadBookmarkModal();
   });
 
-  $effect(() => {
-    innerWidth.current;
+  const loginModalComponent = $derived.by(() => {
+    if (!showLoginModal) return undefined;
+    return dynamicComponentStore.loadLoginModal();
+  });
+
+  const currentWindowWidth = $derived.by(() => {
+    if (!browser) return 0;
+    const width = innerWidth.current;
     headerManager.scheduleUpdate();
+    return width;
   });
 </script>
 
 <header
   class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b-3 border-base-300 min-h-auto z-[60]"
+  data-window-width={currentWindowWidth}
   style="view-transition-name: none;"
 >
   <div class="drawer drawer-end">
@@ -551,15 +523,15 @@
               void goto("/");
             }}
           >
-            {#if HeaderLogo}
+            {#if themeData.logo.logoUrl}
               <img
-                src={HeaderLogo}
-                srcset={logoSrcset}
-                sizes={logoSizes}
-                decoding={logoDecoding}
+                src={themeData.logo.logoUrl}
+                srcset={themeData.logo.logoSrcset}
+                sizes={themeData.logo.logoSizes}
+                decoding={themeData.logo.logoDecoding}
                 alt="Site logo"
-                width={logoWidth}
-                height={logoHeight}
+                width={themeData.logo.logoWidth}
+                height={themeData.logo.logoHeight}
                 fetchpriority="high"
                 class="h-12 w-auto mb-2 md:h-16 md:w-auto"
               />
@@ -577,7 +549,7 @@
             >
               {#if themeColorManager.isDark}
                 <MoonSolid class="w-5 h-5" style="color: var(--icon-color);" />
-              {:else if themeColorManager.currentTheme === ThemeName.Lavender}
+              {:else if themeColorManager.currentTheme === "lavender"}
                 <SunSolid class="w-5 h-5" style="color: var(--icon-color);" />
               {:else}
                 <SunSolid class="w-5 h-5" style="color: var(--icon-color);" />
@@ -586,7 +558,7 @@
           </div>
 
           {#if showThemeModal}
-            <div {@attach PortalManager.teleport("#app")}>
+            <div {@attach attachPortal("#app")}>
               <div class="modal modal-open z-[1100]">
                 <div class="modal-box">
                   <h3 class="font-semibold text-lg">Pilih Tema</h3>
@@ -596,10 +568,9 @@
                   <div class="flex gap-3 mt-3">
                     <button
                       class="btn flex-1"
-                      class:btn-primary={themeColorManager.currentTheme ===
-                        ThemeName.Light}
+                      class:btn-primary={derivedTheme === "light"}
                       onclick={() => {
-                        themeColorManager.setTheme(ThemeName.Light);
+                        themeColorManager.setTheme("light");
                         showThemeModal = false;
                       }}
                     >
@@ -607,10 +578,9 @@
                     </button>
                     <button
                       class="btn flex-1"
-                      class:btn-primary={themeColorManager.currentTheme ===
-                        ThemeName.Dark}
+                      class:btn-primary={derivedTheme === "dark"}
                       onclick={() => {
-                        themeColorManager.setTheme(ThemeName.Dark);
+                        themeColorManager.setTheme("dark");
                         showThemeModal = false;
                       }}
                     >
@@ -618,10 +588,9 @@
                     </button>
                     <button
                       class="btn flex-1"
-                      class:btn-primary={themeColorManager.currentTheme ===
-                        ThemeName.Lavender}
+                      class:btn-primary={derivedTheme === "lavender"}
                       onclick={() => {
-                        themeColorManager.setTheme(ThemeName.Lavender);
+                        themeColorManager.setTheme("lavender");
                         showThemeModal = false;
                       }}
                     >
@@ -743,20 +712,20 @@
       </div>
     {/if}
   </div>
-  {#if showBookmarkModal && dynamicComponentStore.BookmarkModal}
-    {#await dynamicComponentStore.BookmarkModal then BookmarkModal}
+  {#if bookmarkModalComponent}
+    {#await bookmarkModalComponent then BookmarkModal}
       <BookmarkModal bind:open={showBookmarkModal} />
     {/await}
   {/if}
 
-  {#if showLoginModal && dynamicComponentStore.LoginModal}
-    {#await dynamicComponentStore.LoginModal then LoginModal}
+  {#if loginModalComponent}
+    {#await loginModalComponent then LoginModal}
       <LoginModal
         bind:open={showLoginModal}
-        bind:username={loginUsername}
-        bind:password={loginPassword}
-        error={loginError}
-        loading={loginLoading}
+        bind:username={loginStates.username}
+        bind:password={loginStates.password}
+        error={loginStates.error}
+        loading={loginStates.loading}
         onClose={LoginManager.closeLogin}
         onLogin={LoginManager.Login}
       />

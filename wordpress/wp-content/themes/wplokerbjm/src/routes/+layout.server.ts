@@ -1,7 +1,8 @@
 import type { LayoutServerLoad } from "./$types";
-import { APIService } from "@/services/APIService";
+import { APIServiceServer } from "@/services/APIService";
 import type { WPLokerBJMThemedData } from "@/types";
 import { getCmsOrigin } from "@/utils/environment";
+import { inlineScript } from "$lib/server/utils/scripts.server";
 export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
   try {
     let themeData: WPLokerBJMThemedData = locals.themeData;
@@ -9,7 +10,7 @@ export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
     const fullUrl = `${origin}${url.pathname}`;
     let rankMathHead = null;
     try {
-      rankMathHead = await APIService.getRankMathHeadGraphQL(
+      rankMathHead = await APIServiceServer.getRankMathHeadGraphQL(
         fullUrl,
         undefined,
         fetch,
@@ -31,14 +32,16 @@ export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
     return {
       themeData,
       rankMathHead,
-      deviceType: locals.deviceType
+      deviceType: locals.deviceType,
+      inlineScript,
     };
   } catch (err) {
     console.error("Error in layout load function:", err);
     return {
       themeData: null,
       rankMathHead: null,
-      deviceType: locals.deviceType
+      deviceType: locals.deviceType,
+      inlineScript,
     };
   }
 };

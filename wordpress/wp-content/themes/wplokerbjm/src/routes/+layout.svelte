@@ -9,8 +9,6 @@
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
   import { updated } from "$app/state";
   import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
-  import { themeManager } from "@/lib/stores/Theme.svelte";
-  import { inlineScript } from "@/utils";
   import type { OnNavigate } from "@sveltejs/kit";
 
   let initialPageviewSent = false;
@@ -20,16 +18,18 @@
     data,
   }: {
     children: Snippet;
-    data?: {
-      themeData?: WPLokerBJMThemedData;
+    data: {
+      themeData: WPLokerBJMThemedData;
       deviceType?: App.PageData["deviceType"];
-      rankMathHead?: Partial<RankMathHeadData>;
+      rankMathHead?: Partial<RankMathHeadData> | string;
+      inlineScript?: string;
     };
   } = $props();
 
-  const { themeData, rankMathHead } = $derived({
+  const { themeData, rankMathHead, inlineScript } = $derived({
     themeData: data?.themeData,
     rankMathHead: data?.rankMathHead,
+    inlineScript: data?.inlineScript,
   });
 
   beforeNavigate(({ to, willUnload }) => {
@@ -95,7 +95,6 @@
   });
 
   onMount(() => {
-    themeManager.setThemeData = themeData!;
     routeStateStore.setInitialDevice = data?.deviceType?.isMobile
       ? "mobile"
       : "desktop";
@@ -110,7 +109,7 @@
 </script>
 
 <svelte:head>
-  {#if routeStore.isInitialLoad}
+  {#if routeStore.isInitialLoad && inlineScript}
     {@html inlineScript}
   {/if}
   {#if themeData?.siteIconTags}

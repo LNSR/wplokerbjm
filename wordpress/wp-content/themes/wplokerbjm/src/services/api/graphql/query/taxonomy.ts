@@ -1,7 +1,7 @@
-import { graphql } from 'gql.tada';
+import { gql } from 'urql';
 
 // GraphQL queries for taxonomy terms using JSON scalar
-export const GET_ALL_TERMS = graphql(`
+export const GET_ALL_TERMS = gql`
   query GetAllTerms {
     taxonomyTerms {
       lokasiTerms
@@ -9,22 +9,22 @@ export const GET_ALL_TERMS = graphql(`
       pendidikanTerms
     }
   }
-`);
+`;
 
-export const GET_LOKASI_TERMS = graphql(`
+export const GET_LOKASI_TERMS = gql`
   query GetLokasiTerms {
     lokasiTerms
   }
-`);
+`;
 
-export const GET_GENDER_TERMS = graphql(`
+export const GET_GENDER_TERMS = gql`
   query GetGenderTerms {
     genderTerms
   }
-`);
+`;
 
-export const GET_PENDIDIKAN_TERMS = graphql(`
+export const GET_PENDIDIKAN_TERMS = gql`
   query GetPendidikanTerms {
     pendidikanTerms
   }
-`);
+`;

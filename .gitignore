@@ -23,6 +23,7 @@ wordpress/wp-content/themes/*
 **/composer.lock
 **/stats.html
 **/~partytown
+**/*.log
 source.zsh
 mkcert
 localhost.pem
@@ -30,4 +31,5 @@ localhost-key.pem
 localhost.key
 localhost.crt
 worker-configuration.d.ts
-**/*graphql*
+**/*.d.ts
+**/*.graphql

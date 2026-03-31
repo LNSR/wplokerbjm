@@ -3,7 +3,7 @@ export type TaxonomyType = 'lokasi_pekerjaan' | 'gender' | 'pendidikan'
 
 // WordPress custom post types from MetaBox
 export enum PostTypesMetabox {
-  lowongan = 'lowongan',
+  Lowongan = 'lowongan',
 }
 
 export enum SocialMediaPlatform {
@@ -18,6 +18,10 @@ export enum SocialMediaPlatform {
   Telegram = 'Telegram',
 }
 
+export type StatusPekerjaanString = 'Normal' | 'Urgent' | 'Pinned';
+
+export type StatusPekerjaanNumber = 0 | 1 | 2 | 3;
+
 export interface Taxonomies {
   perusahaan?: string | string[] | (null | undefined);
   'kategori_lowongan'?: string | string[] | (null | undefined);
@@ -26,8 +30,6 @@ export interface Taxonomies {
   gender?: string | string[] | (null | undefined);
   pendidikan?: string | string[] | (null | undefined);
 }
-
-export type PostTypes = PostTypesMetabox
 
 export interface CustomFields {
   nama_perusahaan: string | (null | undefined);
@@ -46,7 +48,7 @@ export interface CustomFields {
   nomor_kontak: string | (null | undefined);
   situs_kontak: string | (null | undefined);
   social_media: string | (null | undefined);
-  status_pekerjaan: (0 | 1 | 2 | 3) | (null | undefined);
+  status_pekerjaan: StatusPekerjaanNumber | (null | undefined);
 }
 
 export interface MetaBox extends Taxonomies, CustomFields { }

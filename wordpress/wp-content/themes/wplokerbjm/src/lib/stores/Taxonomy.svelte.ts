@@ -1,4 +1,4 @@
-import { APIService } from '@/services/APIService'
+import { APIServiceBrowser } from '@/services/APIService'
 import type { TaxonomyTerm, TaxonomyType } from '@/types'
 import { SvelteMap } from 'svelte/reactivity'
 
@@ -29,18 +29,6 @@ class TaxonomyManager {
 		return this.lokasiLoading || this.genderLoading || this.pendidikanLoading
 	}
 
-	public get isLoaded(): boolean {
-		return this.lokasiLoaded && this.genderLoaded && this.pendidikanLoaded
-	}
-
-	public get hasTerms(): boolean {
-		return (
-			this.lokasiTerms.length > 0 ||
-			this.genderTerms.length > 0 ||
-			this.pendidikanTerms.length > 0
-		)
-	}
-
 
 	private buildSlugMap(type: TaxonomyType, terms: TaxonomyTerm[]): void {
 		let map: SvelteMap<string, string>
@@ -66,7 +54,7 @@ class TaxonomyManager {
 		this.lokasiLoading = true
 		this.lokasiError = null
 		try {
-			const data = await APIService.fetchTaxonomyTermsByTypeGraphQL("lokasiTerms")
+			const data = await APIServiceBrowser.fetchTaxonomyTermsByTypeGraphQL("lokasiTerms")
 			this.lokasiTerms = data
 			this.lokasiLoaded = true
 			this.buildSlugMap("lokasi_pekerjaan", data)
@@ -83,7 +71,7 @@ class TaxonomyManager {
 		this.genderLoading = true
 		this.genderError = null
 		try {
-			const data = await APIService.fetchTaxonomyTermsByTypeGraphQL("genderTerms")
+			const data = await APIServiceBrowser.fetchTaxonomyTermsByTypeGraphQL("genderTerms")
 			this.genderTerms = data
 			this.genderLoaded = true
 			this.buildSlugMap("gender", data)
@@ -100,7 +88,7 @@ class TaxonomyManager {
 		this.pendidikanLoading = true
 		this.pendidikanError = null
 		try {
-			const data = await APIService.fetchTaxonomyTermsByTypeGraphQL("pendidikanTerms")
+			const data = await APIServiceBrowser.fetchTaxonomyTermsByTypeGraphQL("pendidikanTerms")
 			this.pendidikanTerms = data
 			this.pendidikanLoaded = true
 			this.buildSlugMap("pendidikan", data)
@@ -110,31 +98,6 @@ class TaxonomyManager {
 		} finally {
 			this.pendidikanLoading = false
 		}
-	}
-
-	public clearTerms(): void {
-		this.lokasiTerms = []
-		this.genderTerms = []
-		this.pendidikanTerms = []
-		this.lokasiLoaded = false
-		this.genderLoaded = false
-		this.pendidikanLoaded = false
-		this.lokasiError = null
-		this.genderError = null
-		this.pendidikanError = null
-		this.lokasiSlugMap.clear()
-		this.genderSlugMap.clear()
-		this.pendidikanSlugMap.clear()
-	}
-
-	public resetLokasiError(): void {
-		this.lokasiError = null
-	}
-	public resetGenderError(): void {
-		this.genderError = null
-	}
-	public resetPendidikanError(): void {
-		this.pendidikanError = null
 	}
 
 	public getTermNameBySlug(type: TaxonomyType, slug: string): string {

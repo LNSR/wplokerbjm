@@ -4,6 +4,7 @@ import { SvelteMap } from "svelte/reactivity";
 import { type CardJob } from "@/types";
 import { LRUCache, type BackgroundFetch } from "lru-cache";
 import typia from "typia";
+import { dev } from "$app/environment";
 
 type Device = "desktop" | "mobile";
 
@@ -32,9 +33,7 @@ class RouteStateManager {
   lastVisitedJob: CardJob["slug"] | undefined = $state(undefined); // Remember the last visited job slug for mobile navigation
   lastVisitedJobSource: JobCardProps["variant"] | undefined = $state(undefined);
   carouselState: CarouselState | undefined = $state(undefined);
-  skipScrollRestore = new LRUCache<string, boolean>({ max: 100 }); // Skip scroll restore for specific routes
   cardHeights = new LRUCache<string, Record<number, number>>({ max: 500 }); // Global cache for card heights
-
   #currentDevice = $derived.by<Device>(() => (isMobile() ? "mobile" : "desktop"));
   #prevDevice: Device | undefined;
   effectCleanup: (() => void) | undefined = undefined;
@@ -42,10 +41,9 @@ class RouteStateManager {
   /**
    * track breakpoint for better DX during development
    */
-  observeBreakpointChanges(): (() => void) | undefined {
-    if (this.effectCleanup) return; // Skip if already observing
+  public observeBreakpointChanges(): (() => void) | undefined {
+    if (this.effectCleanup || !dev) return; // Skip if already observing or not in development mode
 
-    // Set up the effect and store the cleanup function
     this.effectCleanup = $effect.root(() => {
       $inspect("Previous device", this.#prevDevice, ", Current device", this.#currentDevice);
       $effect.pre(() => {
@@ -72,8 +70,7 @@ class RouteStateManager {
   }
 
   set setInitialDevice(device: Device) {
-    const validate = typia.validateEquals<Device>(device);
-    if (!validate.success) {
+    if (!typia.is<Device>(device)) {
       console.warn("Invalid device type provided to setInitialDevice:", device);
       return;
     }
@@ -91,7 +88,6 @@ class RouteStateManager {
     // Clear all LRU caches
     this.scrollPositions.clear();
     this.searchStates.clear();
-    this.skipScrollRestore.clear();
     this.cardHeights.clear();
 
     // Clear all sessionStorage
@@ -105,7 +101,7 @@ class RouteStateManager {
     this.carouselState = undefined;
   }
 
-  saveSearchState(path: string, searchState: SearchState | BackgroundFetch<SearchState> | undefined): void {
+  public saveSearchState(path: string, searchState: SearchState | BackgroundFetch<SearchState> | undefined): void {
     const key = `${this.#currentDevice}-${path}`;
     this.searchStates.set(key, searchState);
     if (typeof sessionStorage !== "undefined") {
@@ -120,7 +116,7 @@ class RouteStateManager {
     }
   }
 
-  getSearchState(path: string): SearchState | undefined {
+  public getSearchState(path: string): SearchState | undefined {
     const key = `${this.#currentDevice}-${path}`;
     let state = this.searchStates.get(key);
     if (!state && typeof sessionStorage !== "undefined") {
@@ -138,7 +134,7 @@ class RouteStateManager {
     return state;
   }
 
-  clearSearchState(path: string) {
+  public clearSearchState(path: string) {
     const key = `${this.#currentDevice}-${path}`;
     this.searchStates.delete(key);
     if (typeof sessionStorage !== "undefined") {
@@ -150,7 +146,7 @@ class RouteStateManager {
     }
   }
 
-  saveCarouselState(carouselState: CarouselState) {
+  public saveCarouselState(carouselState: CarouselState) {
     this.carouselState = carouselState;
     if (typeof sessionStorage !== "undefined") {
       try {
@@ -164,7 +160,7 @@ class RouteStateManager {
     }
   }
 
-  getCarouselState(): CarouselState | undefined {
+  public getCarouselState(): CarouselState | undefined {
     if (this.carouselState) return this.carouselState;
     if (typeof sessionStorage !== "undefined") {
       try {
@@ -172,7 +168,7 @@ class RouteStateManager {
           `carouselState-${this.#currentDevice}`,
         );
         if (stored) {
-          this.carouselState = JSON.parse(stored) as CarouselState;
+          this.carouselState = JSON.parse(stored);
           return this.carouselState;
         }
       } catch (e) {
@@ -182,7 +178,7 @@ class RouteStateManager {
     return undefined;
   }
 
-  clearCarouselState() {
+  public clearCarouselState() {
     if (!this.carouselState) return;
     this.carouselState = undefined;
     if (typeof sessionStorage !== "undefined") {
@@ -196,7 +192,7 @@ class RouteStateManager {
 
   // Mark a job slug as the last visited for mobile navigation.
   // `source` indicates where the user clicked the job (carousel or grid).
-  MarkVisitedJob(slug: CardJob["slug"], source?: JobCardProps["variant"]): void {
+  public MarkVisitedJob(slug: CardJob["slug"], source?: JobCardProps["variant"]): void {
     if (!slug) return;
     this.lastVisitedJob = slug;
     this.lastVisitedJobSource = source;
@@ -213,39 +209,7 @@ class RouteStateManager {
     }
   }
 
-  // Check if a job slug is the last visited for mobile navigation.
-  // If `source` is provided, only return true when the stored source matches.
-  hasVisitedJob(slug: CardJob["slug"], source?: JobCardProps["variant"]): boolean {
-    if (!slug) return false;
-    if (this.lastVisitedJob === slug) {
-      if (!source) return true;
-      return this.lastVisitedJobSource === source;
-    }
-    if (typeof sessionStorage !== "undefined") {
-      try {
-        const stored = sessionStorage.getItem(
-          `lastVisitedJob-${this.#currentDevice}`,
-        );
-        if (stored && stored === slug) {
-          this.lastVisitedJob = stored;
-          // Try to restore stored source if available
-          try {
-            const src = sessionStorage.getItem(
-              `lastVisitedJobSource-${this.#currentDevice}`,
-            ) as JobCardProps["variant"] | null;
-            if (src) this.lastVisitedJobSource = src;
-          } catch { }
-          if (!source) return true;
-          return this.lastVisitedJobSource === source;
-        }
-      } catch (e) {
-        console.warn("Failed to load last visited job from sessionStorage", e);
-      }
-    }
-    return false;
-  }
-
-  restoreVisitedJob(): CardJob["slug"] | undefined {
+  public restoreVisitedJob(): CardJob["slug"] | undefined {
     if (this.lastVisitedJob) return this.lastVisitedJob;
     if (typeof sessionStorage !== "undefined") {
       try {
@@ -271,7 +235,7 @@ class RouteStateManager {
     return undefined;
   }
 
-  saveCardHeights(
+  public saveCardHeights(
     heights: SvelteMap<number, number>,
     keyname: string = "global",
   ) {
@@ -290,7 +254,7 @@ class RouteStateManager {
     }
   }
 
-  getCardHeights(keyname: string = "global"): SvelteMap<number, number> {
+  public getCardHeights(keyname: string = "global"): SvelteMap<number, number> {
     const key = `${this.#currentDevice}-${keyname}`;
     let record = this.cardHeights.get(key);
     if (!record && typeof sessionStorage !== "undefined") {
@@ -315,7 +279,7 @@ class RouteStateManager {
   /**
    * Save the current scroll position for a route path
    */
-  saveScrollPosition(path: string, scrollY: number): void {
+  public saveScrollPosition(path: string, scrollY: number): void {
     const key = `${this.#currentDevice}-${path}`;
     this.scrollPositions.set(key, scrollY);
     if (typeof sessionStorage !== "undefined") {
@@ -330,7 +294,7 @@ class RouteStateManager {
   /**
    * Get the saved scroll position for a route path
    */
-  getScrollPosition(path: string): number | undefined {
+  public getScrollPosition(path: string): number | undefined {
     const key = `${this.#currentDevice}-${path}`;
     let position = this.scrollPositions.get(key);
     if (position === undefined && typeof sessionStorage !== "undefined") {
@@ -356,13 +320,7 @@ class RouteStateManager {
    * @param path - The route path
    * @param delay - Optional delay before scrolling (default: 0ms)
    */
-  restoreScrollPosition(path: string, delay: number = 0): void {
-    const key = `${this.#currentDevice}-${path}`;
-    if (this.skipScrollRestore.get(key) && routeStore.isInitialLoad) {
-      this.skipScrollRestore.delete(key);
-      return;
-    }
-
+  public restoreScrollPosition(path: string, delay: number = 0): void {
     const position = this.getScrollPosition(path);
     if (position !== undefined && typeof window !== "undefined") {
       setTimeout(() => {
@@ -375,17 +333,9 @@ class RouteStateManager {
   }
 
   /**
-   * Mark a route to skip scroll restoration on next visit
-   */
-  setSkipScrollRestore(path: string): void {
-    const key = `${this.#currentDevice}-${path}`;
-    this.skipScrollRestore.set(key, true);
-  }
-
-  /**
    * Clear scroll position for a route path
    */
-  clearScrollPosition(path: string): void {
+  public clearScrollPosition(path: string): void {
     const key = `${this.#currentDevice}-${path}`;
     this.scrollPositions.delete(key);
     if (typeof sessionStorage !== "undefined") {

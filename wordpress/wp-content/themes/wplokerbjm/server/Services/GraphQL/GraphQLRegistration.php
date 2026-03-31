@@ -87,7 +87,6 @@ class GraphQLRegistration
                 CustomFields::BENEFIT => ['type' => 'String'],
                 'contacts' => ['type' => 'JobContacts'],
                 CustomFields::SOCIAL_MEDIA => ['type' => 'String'],
-                CustomFields::DEADLINE => ['type' => 'String'],
                 CustomFields::STATUS_PEKERJAAN => ['type' => 'Int'],
                 'permalink' => ['type' => 'String'],
                 'post_time' => ['type' => 'String'],
@@ -185,17 +184,8 @@ class GraphQLRegistration
             'description' => 'Theme data object',
             'fields' => [
                 'logo' => ['type' => 'Logo'],
-                'disableTracking' => ['type' => 'Boolean'],
                 'wpRestNonce' => ['type' => 'String'],
-                // HTML string containing favicon <link> tags produced by site_icon_meta_tags filter
                 'siteIconTags' => ['type' => 'String'],
-            ],
-        ]);
-
-        register_graphql_object_type('ThemeDataResponse', [
-            'description' => 'Theme data response',
-            'fields' => [
-                'data' => ['type' => 'ThemeData'],
             ],
         ]);
 
@@ -370,7 +360,7 @@ class GraphQLRegistration
         ]);
 
         register_graphql_field('RootQuery', 'themeData', [
-            'type' => 'ThemeDataResponse',
+            'type' => 'ThemeData',
             'description' => 'Get theme data',
             'resolve' => fn() => $this->themeDataResolver->resolveThemeData(),
         ]);

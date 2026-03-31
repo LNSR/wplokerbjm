@@ -4,8 +4,8 @@
   import { isJobGridEl } from "$lib/utils/elements.svelte";
   import { routeStateStore } from "$lib/stores/Route.svelte";
   import { goto } from "$app/navigation";
-  import type { CardJob } from "@/types";
-  import { APIService } from "@/services/APIService";
+  import type { CardJob, JobCardProps } from "@/types";
+  import { APIServiceShared } from "@/services/APIService";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { onMount } from "svelte";
@@ -21,8 +21,6 @@
   import "swiper/css/navigation";
   import "swiper/css/pagination";
   import "swiper/css/virtual";
-
-  let lastBreakpoint = $state("");
 
   type SwiperVirtualExternalData = {
     from: number;
@@ -64,30 +62,31 @@
     title?: string;
   }>();
 
+  let lastBreakpoint = $state("");
+
   const breakpoint = $derived.by(() => {
     const w = innerWidth.current ?? 0;
     return w >= 1024 ? "lg" : w >= 640 ? "md" : "sm";
   });
 
   class SwiperManager {
-    pendingVirtualOffset: number | null = null;
-    virtualData = $state<SwiperVirtualExternalData>({
+    public virtualData = $state<SwiperVirtualExternalData>({
       from: 0,
       to: -1,
       offset: 0,
     });
-    swiperFailed = $state(false);
-    resizeTimer: ReturnType<typeof setTimeout> | null = null;
-    error = $state<string | null>(null);
-    isRefreshing = $state(false);
-    initialSlide = $state(0);
-    activeIndex = $state(0);
-    swiperInstance: Swiper | null = null;
-    isInitializing = $state(false);
-    swiperContainerEl = $state<HTMLElement | null>(null);
-    nextButtonEl = $state<HTMLElement | null>(null);
-    prevButtonEl = $state<HTMLElement | null>(null);
-    virtualIndexes = $derived.by(() => {
+    public swiperFailed = $state(false);
+    public resizeTimer: ReturnType<typeof setTimeout> | null = null;
+    public error = $state<string | null>(null);
+    public isRefreshing = $state(false);
+    public initialSlide = $state(0);
+    public activeIndex = $state(0);
+    public swiperInstance: Swiper | null = null;
+    public isInitializing = $state(false);
+    public swiperContainerEl = $state<HTMLElement | null>(null);
+    public nextButtonEl = $state<HTMLElement | null>(null);
+    public prevButtonEl = $state<HTMLElement | null>(null);
+    public virtualIndexes = $derived.by(() => {
       const total = jobs?.length ?? 0;
       if (total <= 0) return [] as number[];
 
@@ -102,29 +101,6 @@
       for (let i = from; i <= to; i += 1) idxs.push(i);
       return idxs;
     });
-
-    equalizeCardHeights() {
-      if (!this.swiperContainerEl) return;
-      const slides = this.swiperContainerEl.querySelectorAll(".swiper-slide");
-      let maxHeight = 0;
-      slides.forEach((slide) => {
-        const card = slide.querySelector(
-          ".card-base-carousel",
-        ) as HTMLElement | null;
-        if (card) {
-          card.style.height = "auto";
-          maxHeight = Math.max(maxHeight, card.offsetHeight);
-        }
-      });
-      slides.forEach((slide) => {
-        const card = slide.querySelector(
-          ".card-base-carousel",
-        ) as HTMLElement | null;
-        if (card) {
-          card.style.height = maxHeight + "px";
-        }
-      });
-    }
 
     private createSwiperConfig(
       paginationEl: HTMLElement | null,
@@ -212,8 +188,6 @@
         if (width > 0) return true;
         attempts += 1;
         if (attempts >= MAX_INIT_ATTEMPTS) {
-          el.classList.remove("invisible");
-          // If we timed out, mark swiper as failed to fall back to a static grid.
           this.swiperFailed = true;
           return false;
         }
@@ -261,15 +235,13 @@
       }
     }
 
-    createSwiper(): void {
-      const el = this.swiperContainerEl as HTMLElement | null;
+    public createSwiper(): void {
+      const el = this.swiperContainerEl;
       if (!el) return;
 
       if (this.isInitializing) return;
       this.isInitializing = true;
       this.swiperFailed = false;
-
-      el.classList.remove("invisible");
 
       const paginationEl = el.querySelector(
         ".swiper-pagination",
@@ -300,68 +272,39 @@
         this.initializeSwiperInstance(el, paginationEl, nextEl, prevEl);
 
         this.swiperFailed = false;
-        el.classList.remove("no-swiper");
-        this.equalizeCardHeights();
       } catch {
         this.swiperFailed = true;
-        el.classList.add("no-swiper");
       } finally {
-        el.classList.remove("invisible");
         this.isInitializing = false;
         requestIdleCallback(() => routeStateStore.clearCarouselState());
       }
     }
 
     // Destroy and recreate the swiper instance (used by refresh button)
-    reinitializeSwiper({ forceDestroy = false } = {}) {
+    public reinitializeSwiper({ forceDestroy = false } = {}) {
       // If we already have an instance, optionally destroy it first to ensure a
       // full re-measure on re-init.
       if (this.swiperInstance) {
-        try {
-          this.swiperInstance.destroy(forceDestroy, true);
-        } catch {
-          // ignore
-        }
+        this.swiperInstance.destroy(forceDestroy, false);
         this.swiperInstance = null;
       }
-
-      // Wait a tick to ensure DOM has a chance to render the carousel element.
-      // During a "refresh" the carousel DOM may be hidden (isRefreshing=true),
-      // so we need to wait until it is present and has layout before creating
-      // the Swiper instance.
       const MAX_DOM_ATTEMPTS = 12;
       let attempts = 0;
       while (
         (!this.swiperContainerEl ||
-          !(this.swiperContainerEl as HTMLElement).isConnected ||
-          (this.swiperContainerEl as HTMLElement).getBoundingClientRect()
-            .width === 0) &&
+          !this.swiperContainerEl.isConnected ||
+          this.swiperContainerEl.getBoundingClientRect().width === 0) &&
         attempts < MAX_DOM_ATTEMPTS
       ) {
         attempts += 1;
       }
 
-      const el = this.swiperContainerEl as HTMLElement | null;
-      if (!el) {
-        const possibleNode = document.querySelector(
-          ".job-carousel",
-        ) as HTMLElement | null;
-        if (possibleNode) possibleNode.classList.remove("invisible");
-        return;
-      }
-
       // Recreate the instance (this function lazy-loads Swiper JS)
       this.createSwiper();
-      this.equalizeCardHeights();
-
-      // After attempting to initialize, ensure the carousel is visible even if
-      // initialization failed. createSwiper removes "invisible" on success/failure
-      // but in case it returned early elsewhere ensure we remove it here.
-      el.classList.remove("invisible");
     }
 
     // Refresh handler: fetch fresh data and reinitialize the carousel
-    async refreshCarousel() {
+    public async refreshCarousel() {
       if (this.isRefreshing) return;
       this.isRefreshing = true;
       try {
@@ -378,7 +321,7 @@
           this.swiperInstance = null;
         }
         // Fetch fresh carousel data
-        const data = await APIService.fetchCarouselGraphQL();
+        const data = await APIServiceShared.fetchCarouselGraphQL();
         jobs = data?.jobs ?? null;
         this.error = null;
       } catch (e) {
@@ -391,7 +334,7 @@
     }
 
     // Keep Swiper in sync when job list updates
-    updateSwiperOnJobsChange(): void {
+    public updateSwiperOnJobsChange(): void {
       // When job list changes, ensure Swiper exists and is in sync.
       const count = jobs?.length ?? 0;
 
@@ -427,7 +370,7 @@
       }
     }
 
-    destroySwiper(): void {
+    public destroySwiper(): void {
       if (this.swiperInstance) {
         try {
           this.swiperInstance.destroy(true, true);
@@ -459,42 +402,12 @@
     ): void {
       if (!swiperManager.swiperInstance) return;
 
-      // Try to capture the current wrapper translateX so virtual positioning
-      // can be restored exactly after navigation. Falls back to 0 on errors.
-      let offset = 0;
-      const wrapper = swiperManager.swiperContainerEl?.querySelector(
-        ".swiper-wrapper",
-      ) as HTMLElement | null;
-      if (wrapper) {
-        const transform =
-          wrapper.style.transform || getComputedStyle(wrapper).transform || "";
-        // translate3d(xpx, ypx, zpx)
-        const t3 = transform.match(
-          /translate3d\((-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px,\s*(-?\d+(?:\.\d+)?)px\)/,
-        );
-        if (t3) {
-          offset = Number(t3[1]);
-        } else {
-          // matrix(a,b,c,d,tx,ty) -> tx is index 4
-          const m = transform.match(/matrix\(([^)]+)\)/);
-          if (m) {
-            const parts = m[1].split(",").map((s) => s.trim());
-            if (parts.length >= 6) {
-              offset = Number(parts[4]) || 0;
-            }
-          }
-        }
-      }
-
       const slideIndex =
         typeof clickedSlideIndex === "number"
           ? clickedSlideIndex
           : (swiperManager.swiperInstance?.activeIndex ?? 0);
 
-      routeStateStore.saveCarouselState({
-        slideIndex,
-        offset: offset,
-      });
+      routeStateStore.saveCarouselState({ slideIndex });
     }
 
     private static handlePlatformSpecificNavigation(
@@ -517,7 +430,7 @@
   }
   // Derive a simple jobs count to drive updates without reacting to every
   // internal jobs change. This lets us limit side-effectful $effect usage.
-  const jobsCount = $derived.by(() => jobs?.length ?? 0);
+  const jobsCount = $derived(jobs?.length ?? 0);
 
   // Keep Swiper in sync when job list updates — react to `jobsCount` only.
   $effect(() => {
@@ -537,12 +450,6 @@
     });
   });
 
-  // Equalize card heights when active slide changes (for virtualization updates)
-  $effect(() => {
-    swiperManager.activeIndex;
-    requestAnimationFrame(() => swiperManager.equalizeCardHeights());
-  });
-
   $effect(() => {
     breakpoint;
     const bp = breakpoint as string;
@@ -551,7 +458,6 @@
       if (swiperManager.resizeTimer) clearTimeout(swiperManager.resizeTimer);
       swiperManager.resizeTimer = setTimeout(() => {
         void swiperManager.reinitializeSwiper({ forceDestroy: true });
-        swiperManager.equalizeCardHeights();
       }, 50);
     }
   });
@@ -634,14 +540,14 @@
   {:else if jobs && jobs.length}
     <div
       bind:this={swiperManager.swiperContainerEl}
-      class="swiper job-carousel invisible"
+      class="swiper job-carousel"
       role="region"
       aria-label={title}
       aria-live="polite"
     >
       <div class="swiper-wrapper">
         {#each swiperManager.virtualIndexes as idx (jobs[idx]?.id ?? jobs[idx]?.permalink ?? idx)}
-          {@const job = jobs[idx]}
+          {@const job: JobCardProps['jobdata'] = jobs[idx]}
           <div
             class="swiper-slide"
             data-swiper-slide-index={idx}
@@ -649,18 +555,14 @@
           >
             <JobCard
               jobdata={job}
-              permalink={job.permalink}
+              permalink={job?.permalink}
               index={idx}
-              isVisited={routeStateStore.hasVisitedJob(
-                job.slug ?? "",
-                "carousel",
-              )}
               variant="carousel"
               onClick={(slug: string, _event: MouseEvent, index: number) =>
                 CarouselNavigationHandler.handleClickNavigateToJob(
                   slug,
-                  job.permalink ?? "",
-                  job,
+                  job?.permalink ?? "",
+                  job!,
                   index,
                 )}
             />
@@ -681,10 +583,6 @@
               <JobCard
                 jobdata={job}
                 permalink={job.permalink ?? ""}
-                isVisited={routeStateStore.hasVisitedJob(
-                  job.slug ?? "",
-                  "carousel",
-                )}
                 variant="carousel"
               />
             </div>
@@ -709,24 +607,15 @@
     user-select: none;
   }
 
-  :global(.job-carousel.no-swiper .swiper-wrapper) {
-    display: grid !important;
-    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 1rem;
+  /* Flexbox solution for equal card heights */
+  :global(.swiper-wrapper, .swiper-slide) {
+    display: flex;
   }
 
-  :global(.job-carousel.no-swiper .swiper-slide) {
-    width: auto !important;
-    transform: none !important;
+  :global(.swiper-slide) {
+    height: auto;
   }
 
-  :global(.job-carousel.no-swiper .job-carousel-next),
-  :global(.job-carousel.no-swiper .job-carousel-prev),
-  :global(.job-carousel.no-swiper .swiper-pagination) {
-    display: none !important;
-  }
-
-  /* Extra styles for the fallback grid items */
   :global(.job-carousel-fallback .fallback-item) {
     display: block;
   }

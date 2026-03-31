@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { PortalManager } from "$lib/utils/elements.svelte";
-  import { onMount } from "svelte";
-
+  import { attachPortal } from "$lib/utils/elements.svelte";
   let {
     open = $bindable(),
     username = $bindable(),
@@ -34,7 +32,7 @@
 <svelte:window on:keydown={(e) => handleKeydown(e)} />
 
 {#if open}
-  <div {@attach PortalManager.teleport("#app")}>
+  <div {@attach attachPortal("#app")}>
     <div class="modal modal-open z-[1100]">
       <div class="modal-box">
         <h3 class="font-bold text-lg">Masuk</h3>

@@ -3,19 +3,16 @@ import { graphql } from 'gql.tada';
 export const GET_THEME_DATA = graphql(`
   query GetThemeData {
     themeData {
-      data {
-        siteIconTags
-        logo {
-          logoUrl
-          logoSrcset
-          logoSizes
-          logoDecoding
-          logoWidth
-          logoHeight
+      siteIconTags
+      logo {
+        logoUrl
+        logoSrcset
+        logoSizes
+        logoDecoding
+        logoWidth
+        logoHeight
         }
-        disableTracking
-        wpRestNonce
-      }
+      wpRestNonce
     }
   }
 `);
@@ -23,9 +20,7 @@ export const GET_THEME_DATA = graphql(`
 export const GET_THEME_NONCE = graphql(`
   query GetThemeNonce {
     themeData {
-      data {
-        wpRestNonce
-      }
+      wpRestNonce
     }
   }
 `);

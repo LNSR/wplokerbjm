@@ -11,16 +11,6 @@ import { partytownVite, copyLibFiles } from "@qwik.dev/partytown/utils";
 
 export default defineConfig((configEnv: ConfigEnv): UserConfig => {
   const isDev = configEnv.mode === "development" || configEnv.mode === "preview";
-
-
-  const resolveFolder: UserConfig["resolve"] = {
-    alias: {
-      "@components": "src/lib/components",
-      "@css": "src/lib/assets/css",
-      "@": "src",
-      "@@": "/",
-    },
-  }
   
   const devServer: UserConfig["server"] = isDev
     ? {
@@ -40,12 +30,12 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
     : undefined;
 
   const plugins: UserConfig["plugins"] = [
+    tailwindcss(),
+    sveltekit(),
     UnpluginTypia({
       cache: true,
       log: true,
     }),
-    tailwindcss(),
-    sveltekit(),
     devtoolsJson(),
     partytownVite({
       dest: resolve(__dirname, "public", "~partytown"),
@@ -69,7 +59,6 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
   ];
 
   return {
-    resolve: resolveFolder,
     plugins,
     server: devServer,
   };

@@ -1,14 +1,13 @@
 import {
   debounce,
-  bookmarkIDB,
   type DebouncedFunction,
-} from "@/utils";
+} from "@/utils/lodash";
+import { bookmarkIDB } from "@/utils/indexedDB";
 import { SvelteSet, SvelteMap } from "svelte/reactivity";
-import { APIService } from "@/services/APIService";
+import { APIServiceBrowser } from "@/services/APIService";
 import type { CardJob } from "@/types";
 import { browser, version } from "$app/environment";
-import { SharedClock } from "$lib/utils/elements.svelte";
-import typia from "typia";
+import { generalJobStore } from "$lib/stores/General.svelte";
 
 interface BookmarkBroadcastMessage {
   type: "update" | "sync" | "reload";
@@ -28,7 +27,7 @@ export class BookmarkManager {
   public lastSyncTime = $state<number>(0);
 
   private channel: BroadcastChannel | null = null;
-  private readonly tabStartedAt = SharedClock.now.getTime(); // Timestamp to identify when this tab instance started for version conflict resolution
+  private readonly tabStartedAt = generalJobStore.now.getTime(); // Timestamp to identify when this tab instance started for version conflict resolution
   private debouncedSync: DebouncedFunction<() => void> | null = null;
   private pendingSyncIds = new SvelteSet<number>();
   #debouncedSaveCall: DebouncedFunction<() => Promise<void>> | null = null;
@@ -360,7 +359,7 @@ export class BookmarkManager {
         const ids = idsToSync || this.jobs.map((job) => Number(job.id) || 0);
         if (ids.length === 0) return;
 
-        const fetchedJobs = await APIService.syncBookmarkGraphQL(ids);
+        const fetchedJobs = await APIServiceBrowser.syncBookmarkGraphQL(ids);
         const plainFetchedJobs: CardJob[] = JSON.parse(
           JSON.stringify(fetchedJobs),
         );
@@ -398,7 +397,7 @@ export class BookmarkManager {
           this.deletedJobs = Array.from(previousIds).filter(
             (id) => !currentIds.has(id),
           );
-          this.lastSyncTime = SharedClock.now.getTime();
+          this.lastSyncTime = generalJobStore.now.getTime();
           if (this.channel) {
             this.channel.postMessage({
               type: "sync",
@@ -488,7 +487,7 @@ export class BookmarkManager {
     schedule(() => {
       this.loadFromStorage();
       // Only sync if data is stale (older than 5 minutes) or no sync has been done
-      const now = SharedClock.now.getTime();
+      const now = generalJobStore.now.getTime();
       const isStale = now - this.lastSyncTime > 5 * 60 * 1000; // 5 minutes
       if (isStale || this.lastSyncTime === 0) {
         // Run initial sync outside the queue to avoid blocking user interactions

@@ -13,11 +13,8 @@ class ThemeDataResolver
     {
         try {
             $themeData = $this->graphqlData->getThemeData(); // cached internally
-            $result = [
-                'data' => $themeData,
-            ];
 
-            return $result;
+            return $themeData;
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'ThemeDataResolver::resolveThemeData error: ' . $e->getMessage());
             return [

@@ -1,83 +1,31 @@
-import type { SortOption, CardJob, JobSummary, JobContactRow, MetaBox, WPBasePost, WPTaxonomyTerm } from '@/types';
+import type { MetaBox } from './wordpress/MetaBox';
+import type { WPBasePost } from './wordpress/Wordpress';
+import type { JobSummary, JobContactRow, BaseJobSearch } from './Shared';
+import type { SearchTitle } from './Search';
 
-// Base optional job filters
-type OptionalJobFilters = {
-  cari?: string | null
-  'lokasi_pekerjaan'?: string[] | (null | undefined)
-  gender?: string[] | (null | undefined)
-  pendidikan?: string[] | (null | undefined)
-  sort?: SortOption | null
-  context?: SearchContext | null
+// ! API response types
+
+type JobDetailPostMetaData = Omit<WPBasePost, keyof Pick<WPBasePost, 'permalink' | 'post_type'>>;
+export interface JobDetailResponse extends JobDetailPostMetaData, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'>
+{
+  duplicateNonce?: string | null; // Nonce for plugin 'Duplicate post as draft'
+  ringkasanPekerjaan?: JobSummary;
+  contacts?: JobContactRow;
+  post_time: string;
 }
 
-// Base filters for search operations
-export interface SearchFilters extends OptionalJobFilters {
-  cari: string | null
-  sort: SortOption | null
-}
-
-// Context type for search and loadMore operations
-export type SearchContext = 'search' | 'latest'
-
-// API response metadata from headers
-export interface ApiMeta {
-  links?: Record<string, string>
-}
-
-// * Base response for SearchResponse and LoadMoreResponse
-export interface BaseJobSearchResponse {
-  jobs: CardJob[]
-  maxNumPages?: number
-  total?: number
-  context?: SearchContext
-  filters?: SearchFilters
-}
-
-// Extended response for initial search operations
-export interface SearchResponse extends Omit<BaseJobSearchResponse, 'total'> {
-  title?: SearchTitle
-  shouldScroll?: boolean
-  total: number
-}
-
-export type SearchTitle = 'Lowongan Terbaru' | 'Hasil Pencarian'
-
-// Response for pagination operations
-export interface LoadMoreResponse extends BaseJobSearchResponse { }
-
-// Simplified load more filters - flattened structure
-export interface LoadMoreFilters extends OptionalJobFilters {
-  paged: number
-}
-
-// Filters for fetching job grid data
-export interface JobGridFilters extends OptionalJobFilters {
-  paged?: number
-  title?: string
-  total_jobs?: number
-}
-
-// Standardized taxonomy term interface
-export interface TaxonomyTerm extends Pick<WPTaxonomyTerm, 'slug' | 'name' | 'parent'> {
-  children?: TaxonomyTerm[]
-}
-
-export type TaxonomyTermsResponse = {
-  lokasiTerms: TaxonomyTerm[]
-  genderTerms: TaxonomyTerm[]
-  pendidikanTerms: TaxonomyTerm[]
-}
-
-export interface JobSchemaResponse {
-  schemas?: (string | null)[] | null
+export interface JobSchemaResponse
+{
+  schemas?: string | string[] | null
   type: "ItemList" | "JobPosting"
 }
 
-export interface JobDetailResponse extends Pick<WPBasePost, 'id' | 'title' | 'post_time' | 'slug'>, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'> {
-  duplicateNonce?: string | null; // Nonce for plugin 'Duplicate post as draft'
-  ringkasanPekerjaan: JobSummary;
-  contacts?: JobContactRow;
-  post_time: string;
+// Extended response for initial search operations
+export interface SearchResponse extends BaseJobSearch
+{
+  title?: SearchTitle
+  shouldScroll?: boolean
+  total: number
 }
 
 
@@ -86,7 +34,8 @@ export interface JobDetailResponse extends Pick<WPBasePost, 'id' | 'title' | 'po
  * @internal isnt really used, but useful to recognize shape
  * @remarks Rankmath API returns string in fact
  */
-export interface RankMathHeadData {
+export interface RankMathHeadData
+{
   title?: string;
   description?: string;
   canonical?: string;
