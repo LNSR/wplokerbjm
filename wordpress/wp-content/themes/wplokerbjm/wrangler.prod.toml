@@ -1,17 +1,19 @@
 name = "wplokerbjm-prod"
 main = ".svelte-kit/cloudflare/_worker.js"
-compatibility_flags = [ "nodejs_compat" ]
+compatibility_flags = ["nodejs_compat", "enable_nodejs_http_modules", "enable_nodejs_http_server_modules"]
 compatibility_date = "2026-02-22"
 account_id = "5996bc6e6329a2824240d44bc86bcc03"
 route = "lokerbanjarmasin.my.id/*"
-[[kv_namespaces]]
-binding             = "wplokerbjm"
-id                  = "75fc8b0cd2d74548b6c05321296d4d45"
 
 [assets]
 directory = ".svelte-kit/cloudflare"
 binding = "ASSETS"
 [env.production]
 name = "wplokerbjm-prod"
+
+[[env.production.kv_namespaces]]
+binding = "wplokerbjm"
+id = "75fc8b0cd2d74548b6c05321296d4d45"
+
 [env.production.vars]
 PUBLIC_CMS_ORIGIN = "https://wp.lokerbanjarmasin.my.id"

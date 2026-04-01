@@ -1,56 +1,53 @@
 <script lang="ts">
-  import { generalStore } from "$lib/stores/General.svelte";
+  import { generalJobStore } from "$lib/stores/General.svelte";
   import { onMount } from "svelte";
+  import { goto } from "$app/navigation";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
-  import { timeEffect, isMobile } from "$lib/utils/elements.svelte";
+  import JobStatusBadge from "@components/ui/Shared/JobStatusBadge.svelte";
+  import JobDeadlineBadge from "@components/ui/Shared/JobDeadlineBadge.svelte";
+  import { isMobile } from "$lib/utils/elements.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import {
-    GlobalNavigateTo,
-    routeStateStore,
-    routeStore,
-  } from "$lib/stores/Route.svelte";
-  import {
-    UserTieSolid,
-    CalendarSolid,
-    ExclamationTriangleSolid,
-    ThumbTackSolid,
-  } from "svelte-awesome-icons";
-  import { SvelteDate } from "svelte/reactivity";
-  import type { CardJob, JobCardProps } from "@/types";
-
-  const {
-    jobdata = {},
-    variant = "carousel",
-    permalink = "",
-    onClick,
-  } = $props<{
-    jobdata: CardJob;
+  import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
+  import { UserTieSolid } from "svelte-awesome-icons";
+  import type { JobCardProps } from "@/types";
+  interface Props {
+    jobdata: JobCardProps["jobdata"];
     variant: JobCardProps["variant"];
-    permalink?: string;
+    permalink: NonNullable<JobCardProps["jobdata"]>["permalink"];
+    index?: number;
     onClick?: (slug: string, event: MouseEvent, index: number) => void;
-    isVisited?: boolean;
-  }>();
+  }
+  const {
+    jobdata = undefined,
+    variant = undefined,
+    permalink = undefined,
+    index = 0,
+    onClick = undefined as unknown as (
+      slug: string,
+      event: MouseEvent,
+      index: number,
+    ) => void,
+  }: Props = $props();
 
   // show spinner overlay when mobile navigating for the card currently selected by slug
   const spinnerVisible = $derived.by(() => {
     return isMobile() && routeStore.isLoading && selected;
   });
 
-  const now = $state(new SvelteDate());
-
   // Derived UI helpers (keeps UI reactive to prop changes)
   const summaryRows = $derived.by(() =>
-    generalStore.useSummaryJob(jobdata?.ringkasanPekerjaan),
+    generalJobStore.showSummaryJob(jobdata?.ringkasanPekerjaan),
   );
+  // showStatusJob now returns a single status string
   const statusInfo = $derived.by(() =>
-    generalStore.useStatusJob(Number(jobdata?.status_pekerjaan ?? 0)),
+    generalJobStore.showStatusJob(jobdata?.status_pekerjaan ?? 0),
   );
-  const deadlineInfo = $derived.by(() =>
-    generalStore.useDeadline(jobdata?.deadline, now),
-  );
-  const timeAgo = $derived.by(() =>
-    generalStore.useTimeAgo(jobdata?.post_time, now),
-  );
+  const deadlineInfo = $derived.by(() => {
+    return generalJobStore.showDeadline(jobdata?.ringkasanPekerjaan?.deadline ?? "");
+  });
+  const timeAgo = $derived.by(() => {
+    return generalJobStore.showTimeAgo(jobdata?.post_time ?? "");
+  });
 
   const selected = $derived.by(() => {
     const slugMatch = routeStateStore.lastVisitedJob === jobdata?.slug;
@@ -59,13 +56,11 @@
     return slugMatch && sourceMatch;
   });
 
-  const cardClass = $derived.by(() => {
-    return `card-base-${variant}${selected ? ` card-selected-${variant}` : ""}`;
-  });
+  const cardClass = $derived(
+    `card-base-${variant}${selected ? ` card-selected-${variant}` : ""}`,
+  );
 
-  const bodyClass = $derived.by(() => {
-    return `card-body-${variant}`;
-  });
+  const bodyClass = $derived(`card-body-${variant}`);
 
   function handleClick(event: MouseEvent) {
     const { ctrlKey, metaKey, shiftKey, button } = event as MouseEvent;
@@ -75,16 +70,14 @@
     if (onClick) {
       event.preventDefault();
       const slug = jobdata?.slug ?? "";
-      onClick(slug, event, 0);
+      onClick(slug, event, index ?? 0);
       return;
     }
 
     if (isMobile()) {
       event.preventDefault();
       if (permalink)
-        void GlobalNavigateTo(
-          new URL(permalink, window.location.origin).pathname,
-        );
+        void goto(new URL(permalink, window.location.origin).pathname);
       return;
     }
 
@@ -93,10 +86,8 @@
   }
 
   $effect(() => {
-    const stopTime = timeEffect(now);
-    return () => {
-      stopTime();
-    };
+    const timeEffect = generalJobStore.useSharedClock();
+    return () => timeEffect();
   });
 
   onMount(() => {
@@ -168,34 +159,15 @@
       <div class="divider my-2"></div>
 
       <div class="flex items-center justify-between font-semibold gap-3">
-        {#if statusInfo.label}
-          <span
-            class={[
-              "flex items-center badge gap-1 px-3 py-1 font-semibold rounded",
-              statusInfo.color,
-            ].join(" ")}
-          >
-            {#if statusInfo.label === "Urgent"}
-              <ExclamationTriangleSolid class="h-4 w-4" aria-hidden="true" />
-            {:else if statusInfo.label === "Pinned"}
-              <ThumbTackSolid class="h-4 w-4" aria-hidden="true" />
-            {/if}
-          </span>
-        {/if}
-        {#if deadlineInfo.text}
-          <span
-            class={[
-              "flex items-center badge gap-1 px-3 py-1 font-semibold rounded",
-              deadlineInfo.style,
-            ].join(" ")}
-          >
-            <CalendarSolid class="h-4 w-4" aria-hidden="true" />
-            <span>{deadlineInfo.text}</span>
-          </span>
-        {/if}
+        <JobStatusBadge status={statusInfo} />
+
+        <JobDeadlineBadge
+          text={deadlineInfo.text}
+          status={deadlineInfo.status}
+        />
         <div class="flex items-center gap-1 ml-auto">
           {#if variant !== "bookmark"}
-            <BookmarkButton jobId={Number(jobdata.id)} {variant} />
+            <BookmarkButton jobId={Number(jobdata?.id)} {variant} />
           {/if}
         </div>
       </div>
@@ -240,7 +212,8 @@
     @apply card-body relative p-3 gap-0 flex flex-col min-h-[300px] h-full;
   }
 
-  .card-body-featured, .card-body-bookmark {
+  .card-body-featured,
+  .card-body-bookmark {
     @apply card-body relative p-4 gap-1 flex flex-col h-full;
   }
 </style>

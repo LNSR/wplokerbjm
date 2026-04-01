@@ -1,27 +1,28 @@
 import type { LayoutServerLoad } from "./$types";
-import { APIService } from "@/services/APIService";
+import { APIServiceServer } from "@/services/APIService";
 import type { WPLokerBJMThemedData } from "@/types";
 import { getCmsOrigin } from "@/utils/environment";
+import { inlineScript } from "$lib/server/utils/scripts.server";
 export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
   try {
     let themeData: WPLokerBJMThemedData = locals.themeData;
-    // fetch RankMath head from CMS domain using the request URL path
     const origin = getCmsOrigin();
     const fullUrl = `${origin}${url.pathname}`;
-    let rankMathHead: string | null = null;
+    let rankMathHead = null;
     try {
-      rankMathHead = await APIService.getRankMathHeadGraphQL(
+      rankMathHead = await APIServiceServer.getRankMathHeadGraphQL(
         fullUrl,
         undefined,
         fetch,
       );
+
       if (rankMathHead && url.origin) {
         try {
           const hostOnly = origin.replace(/^https?:\/\//, "").replace(/\/$/, "");
           const originRegex = new RegExp(`https?:\\/\\/${hostOnly}`, "g");
-          rankMathHead = rankMathHead.replace(originRegex, url.origin);
+          rankMathHead = JSON.parse(JSON.stringify(rankMathHead).replace(originRegex, url.origin));
         } catch (e) {
-          rankMathHead = rankMathHead.split(origin).join(url.origin);
+          console.warn("layout load: failed to replace RankMath head URLs, using original", e);
         }
       }
     } catch (e) {
@@ -31,13 +32,16 @@ export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
     return {
       themeData,
       rankMathHead,
-      deviceType: locals.deviceType
+      deviceType: locals.deviceType,
+      inlineScript,
     };
   } catch (err) {
+    console.error("Error in layout load function:", err);
     return {
       themeData: null,
       rankMathHead: null,
-      deviceType: locals.deviceType
+      deviceType: locals.deviceType,
+      inlineScript,
     };
   }
 };

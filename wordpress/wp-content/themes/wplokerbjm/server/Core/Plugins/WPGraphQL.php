@@ -101,6 +101,7 @@ class WPGraphQL
             'https://wp.lokerbanjarmasin.my.id',
             'https://localhost:3000',
             'https://localhost:5173',
+            'https://localhost:8787',
             'https://localhost:8173',
             'https://localhost:4173',
         ];
@@ -111,17 +112,18 @@ class WPGraphQL
 
         $headers['Access-Control-Allow-Credentials'] = 'true';
 
-        $headers['Access-Control-Allow-Headers'] = $headers['Access-Control-Allow-Headers'] . ', X-WP-Nonce, If-None-Match, If-Match, Cache-Control, If-Modified-Since';
-        $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag, Cache-Control, Last-Modified';
+        $headers['Access-Control-Allow-Headers'] = $headers['Access-Control-Allow-Headers'] . ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
+        $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag';
 
         if (isset($headers['Access-Control-Max-Age'])) {
             unset($headers['Access-Control-Max-Age']);
+            $headers['Access-Control-Max-Age'] = '86400';
         }
         $cacheControl = function ($extra) use (&$headers) {
             if (isset($headers['Cache-Control'])) {
                 unset($headers['Cache-Control']);
-                $headers['Cache-Control'] = $extra . ' , must-revalidate';
             }
+            $headers['Cache-Control'] = $extra . ', must-revalidate';
         };
         $loggedIn = is_user_logged_in();
         if ($loggedIn) {
@@ -132,5 +134,24 @@ class WPGraphQL
         }
 
         return $headers;
+    }
+
+    /**
+     * @see \WPGraphQL\Router::prepare_headers;
+     */
+    #[Filter('graphql_response_status_code', 9, 2)]
+    public static function setGraphQLResponseStatusCode(
+        int $http_status_code,
+        mixed $graphql_response,
+    ): int {
+        
+        if ($graphql_response instanceof \GraphQL\Executor\ExecutionResult) {
+            $data = $graphql_response->data ?? null;
+            if (is_array($data) && array_key_exists('jwt', $data) && $data['jwt'] === null) {
+                return 401;
+            }
+        }
+
+        return $http_status_code;
     }
 }

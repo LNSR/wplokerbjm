@@ -58,8 +58,8 @@ class JobsDataResolver
             }
 
             $argsQuery = match ($context) {
-                'search' => JobQuery::searchJobsArgs($filters, $paged, 27),
-                default => JobQuery::latestJobsArgs($paged, 27),
+                'search' => JobQuery::searchJobsArgs($filters, $paged, 99),
+                default => JobQuery::latestJobsArgs($paged, 99),
             };
 
             $result = $this->jobRepository->queryJob($argsQuery);
@@ -116,8 +116,8 @@ class JobsDataResolver
             }
 
             $query_args = match ($context) {
-                'search' => JobQuery::searchJobsArgs($filters, $paged, 27),
-                default => JobQuery::latestJobsArgs($paged, 27),
+                'search' => JobQuery::searchJobsArgs($filters, $paged, 99),
+                default => JobQuery::latestJobsArgs($paged, 99),
             };
 
             $props = $this->jobGridPresenter->getProps($query_args, $title, $context, $total_jobs);
@@ -157,12 +157,7 @@ class JobsDataResolver
 
             $job = $this->graphqlData->getJobDetailData($post->ID); // cached internally
 
-            $result = [
-                'job' => $job,
-            ];
-
-
-            return $result;
+            return $job;
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'JobsDataResolver::resolveJobDetail error: ' . $e->getMessage());
             return [
@@ -291,7 +286,7 @@ class JobsDataResolver
                 return $cached;
             }
 
-            $query_args = JobQuery::searchJobsArgs($searchFilters, 1, 27);
+            $query_args = JobQuery::searchJobsArgs($searchFilters, 1, 99);
 
             $result = $this->jobRepository->queryJob($query_args);
 

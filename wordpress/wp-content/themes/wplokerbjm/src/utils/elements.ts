@@ -1,11 +1,11 @@
 //* Universal utility functions for DOM manipulation not tied to a specific framework.
-import { isDevelopmentMode } from "@/utils";
+import { dev } from "$app/environment";
 
 export const isAppEl: string = ".route-container"; // Selector for the main application element
 
-export function parseProps(element: Element | Document, propAttr: string): Record<string, unknown> {
+export function parseProps(element: Element | Document, propAttr: string) {
     const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`);
-    let props: Record<string, unknown> = {};
+    let props = {};
 
     if (scriptElement) {
         const raw = scriptElement.textContent || scriptElement.innerHTML || "";
@@ -20,14 +20,8 @@ export function parseProps(element: Element | Document, propAttr: string): Recor
 }
 
 export function removePropsScriptFromElement(element: Element | Document, propAttr?: string): void {
-    const isDev = isDevelopmentMode();
-    if (isDev) return;
+    if (dev) return;
 
-    try {
-        const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`) as HTMLScriptElement | null;
-        if (scriptElement)
-            scriptElement.remove();
-    } catch {
-        // Ignore
-    }
+    const scriptElement = element.querySelector(`script[type="application/json"][${propAttr}]`) as HTMLScriptElement | null;
+    if (scriptElement) scriptElement.remove();
 }

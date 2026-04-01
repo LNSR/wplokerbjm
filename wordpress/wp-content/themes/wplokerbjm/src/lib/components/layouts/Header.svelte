@@ -1,35 +1,34 @@
 <script module lang="ts">
-  import { debounce } from "@/utils";
-  import { ThemeName } from "@/types";
+  import { onMount, onDestroy, tick } from "svelte";
+  import { debounce } from "es-toolkit";
+  import { type ThemeName, type WPLokerBJMThemedData } from "@/types";
   import { MediaQuery } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
-  import { nonceManager } from "$lib/utils/Nonce.svelte";
+  import { isAppEl } from "@/utils/elements";
+  import { themeManager } from "$lib/stores/Theme.svelte";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import { browser } from "$app/environment";
-  import { APIService } from "@/services/APIService";
+  import { APIServiceBrowser } from "@/services/APIService";
   const isMobileValue = $derived.by(() => isMobile());
-  let showBookmarkModal = $state(false);
 
-  let logoSrcset = $state("");
-  let logoSizes = $state("");
-  let logoWidth = $state<number | undefined>(undefined);
-  let logoHeight = $state<number | undefined>(undefined);
-  let logoDecoding = $state<HTMLImgAttributes["decoding"]>(undefined);
+  let showBookmarkModal = $state(false);
 
   let showThemeModal = $state(false);
   let showLoginModal = $state(false);
-  let loginUsername = $state("");
-  let loginPassword = $state("");
-  let loginError = $state("");
-  let loginLoading = $state(false);
+  let loginStates = $state({
+    username: "",
+    password: "",
+    error: "",
+    loading: false,
+  });
 
   class ThemeColorManager {
-    private mediaQuery: MediaQuery | null = null;
-    private debouncedSetTheme: (d: ThemeName) => void = () => {};
+    public mediaQuery: MediaQuery | null = null;
+    public debouncedSetTheme!: ReturnType<typeof debounce>;
     public isDark = $state(false);
-    public currentTheme = $state<ThemeName>(ThemeName.Light);
-    private _initialized = false;
+    public currentTheme = $state<ThemeName>("light");
+    #initialized = false;
 
     private updateMetaThemeColor(dark: boolean): void {
       try {
@@ -56,81 +55,86 @@
       }
     }
 
-    private setThemeDirect(theme: ThemeName): void {
+    private persistTheme(theme: ThemeName): void {
+      try {
+        localStorage.setItem("wplokerbjm-theme", theme);
+      } catch (e) {
+        console.warn("Failed to write theme preference to localStorage", e);
+      }
+    }
+
+    private queueThemeCleanup(theme: ThemeName): void {
+      const runIdle =
+        typeof window.requestIdleCallback === "function"
+          ? window.requestIdleCallback.bind(window)
+          : (callback: IdleRequestCallback) => window.setTimeout(callback, 0);
+
+      requestAnimationFrame(() => {
+        document.documentElement.classList.remove("theme-switching");
+        runIdle(() => {
+          this.persistTheme(theme);
+          headerManager.scheduleUpdate();
+        });
+      });
+    }
+
+    private applyTheme(theme: ThemeName, dark: boolean): void {
+      document.documentElement.setAttribute("data-theme", theme);
+      if (dark) {
+        document.documentElement.classList.add("wplokerbjm-dark-mode-enable");
+      } else {
+        document.documentElement.classList.remove(
+          "wplokerbjm-dark-mode-enable",
+        );
+      }
+      this.updateMetaThemeColor(dark);
+    }
+
+    public setThemeDirect(
+      theme: ThemeName,
+      options: { useViewTransition?: boolean } = {},
+    ): void {
       const newTheme = theme;
-      const isDark = newTheme === ThemeName.Dark;
+      const isDark = newTheme === "dark";
 
       if (this.currentTheme === newTheme) return;
 
       this.currentTheme = newTheme;
 
       window.requestAnimationFrame(() => {
-        const applyTheme = () => {
+        const runThemeUpdate = () => {
           document.documentElement.classList.add("theme-switching");
-          document.documentElement.setAttribute("data-theme", newTheme);
-          if (isDark) {
-            document.documentElement.classList.add(
-              "wplokerbjm-dark-mode-enable",
-            );
-          } else {
-            document.documentElement.classList.remove(
-              "wplokerbjm-dark-mode-enable",
-            );
-          }
-          this.updateMetaThemeColor(isDark);
+          this.applyTheme(newTheme, isDark);
         };
 
-        // apply immediately, no view transition
-        applyTheme();
+        if (
+          options.useViewTransition &&
+          window.matchMedia("(prefers-reduced-motion: no-preference)").matches
+        ) {
+          const transition = document.startViewTransition?.(() => {
+            runThemeUpdate();
+          });
 
-        try {
-          // Defer storage write off the critical paint path so it cannot
-          // block rendering or cause forced reflow during theme toggles.
-          const write = () => {
-            try {
-              localStorage.setItem("wplokerbjm-theme", newTheme);
-            } catch (e) {
-              console.warn(
-                "Failed to write theme preference to localStorage",
-                e,
-              );
-            }
-          };
-          if (typeof (window as any).requestIdleCallback === "function") {
-            (window as any).requestIdleCallback(write);
-          } else {
-            setTimeout(write, 0);
-          }
-        } catch {
-          console.error("Failed to schedule theme preference save");
-        }
-        setTimeout(() => {
-          document.documentElement.classList.remove("theme-switching");
-          // Give the browser a short moment to paint the theme change, then
-          // trigger a single header measurement. This avoids forcing layout
-          // during the theme toggle which causes long presentation delays.
-          try {
-            setTimeout(() => {
-              requestAnimationFrame(() => {
-                if (
-                  typeof headerManager !== "undefined" &&
-                  headerManager &&
-                  headerManager.scheduleUpdate
-                ) {
-                  headerManager.scheduleUpdate();
-                }
+          if (transition) {
+            void transition.finished
+              ?.catch(() => {
+                console.error("Theme view transition failed");
+              })
+              .finally(() => {
+                this.queueThemeCleanup(newTheme);
               });
-            }, 50);
-          } catch (e) {
-            console.warn("Failed to schedule header measurement", e);
+            return;
           }
-        }, 30);
+        }
+
+        runThemeUpdate();
+        this.queueThemeCleanup(newTheme);
       });
     }
 
     public init(): void {
-      if (this._initialized) return;
-      this._initialized = true;
+      if (this.#initialized) return;
+      this.#initialized = true;
       this.debouncedSetTheme = debounce(
         (theme: ThemeName) => this.setThemeDirect(theme),
         10,
@@ -154,81 +158,55 @@
         }
       })();
 
-      if (
-        saved === ThemeName.Dark ||
-        saved === ThemeName.Lavender ||
-        saved === ThemeName.Light
-      ) {
-        // persisted preference
-        this.isDark = saved === ThemeName.Dark;
-        this.setThemeDirect(saved as ThemeName);
-      } else if (!saved && systemPrefersDark) {
-        this.isDark = true;
-        this.setThemeDirect(ThemeName.Dark);
-      } else {
-        this.isDark = false;
-        this.setThemeDirect(ThemeName.Light);
-      }
-
-      try {
-        this.mediaQuery = new MediaQuery("(prefers-color-scheme: dark)");
-        $effect(() => {
-          this.mediaQuery!.current;
-          let hasStored = false;
-          try {
-            hasStored = !!localStorage.getItem("wplokerbjm-theme");
-          } catch {
-            hasStored = false;
+      switch (saved) {
+        case "dark":
+        case "lavender":
+        case "light":
+          // persisted preference
+          this.isDark = saved === "dark";
+          this.setThemeDirect(saved as ThemeName);
+          break;
+        default:
+          if (systemPrefersDark) {
+            this.isDark = true;
+            this.setThemeDirect("dark");
+          } else {
+            this.isDark = false;
+            this.setThemeDirect("light");
           }
-          if (!hasStored) {
-            this.isDark = this.mediaQuery!.current;
-            this.setThemeDirect(
-              this.mediaQuery!.current ? ThemeName.Dark : ThemeName.Light,
-            );
-          }
-        });
-      } catch {
-        this.mediaQuery = null;
       }
-
-      $effect(() => {
-        this.currentTheme;
-        this.debouncedSetTheme(this.currentTheme);
-      });
     }
 
     public setTheme(theme: ThemeName): void {
       // update boolean flag early so UI icon flips, but DON'T set currentTheme yet
       // otherwise setThemeDirect will erroneously early-return without updating DOM
-      this.isDark = theme === ThemeName.Dark;
+      this.isDark = theme === "dark";
 
       // apply immediately for responsive UI, but keep debounced path for save/side-effects
       try {
-        this.setThemeDirect(theme);
+        this.setThemeDirect(theme, { useViewTransition: true });
       } catch {
         // fallback to debounced if direct fails for some reason
         this.debouncedSetTheme(theme);
       }
 
       // ensure a debounced call remains to avoid double-write races
-      try {
-        if ((this.debouncedSetTheme as any)?.flush) {
-          (this.debouncedSetTheme as any).flush();
-        }
-      } catch {
-        // ignore
-      }
+      this.debouncedSetTheme.flush();
     }
   }
 
   class HeaderManager {
     headerEl: HTMLElement | null = null;
-    private _lastOffsetUpdate = $state(0);
+    headerHeight = $state(0);
+
+    appEl: HTMLElement | null = null;
+    #lastOffsetUpdate = $state(0);
     rafId: number | null = null;
     mutationObserver: MutationObserver | null = null;
     headerResizeObserver: ResizeObserver | null = null;
 
     scheduleUpdate = () => {
+      if (!browser) return;
       if (this.rafId !== null) return;
       this.rafId = requestAnimationFrame(() => {
         this.rafId = null;
@@ -239,26 +217,25 @@
     updateOffsets = () => {
       // Throttle expensive offset calculations to avoid layout thrash.
       const now = Date.now();
-      if (this._lastOffsetUpdate && now - this._lastOffsetUpdate < 100) return;
-      this._lastOffsetUpdate = now;
+      if (this.#lastOffsetUpdate && now - this.#lastOffsetUpdate < 100) return;
+      this.#lastOffsetUpdate = now;
 
       this.headerEl = document.querySelector("header");
       try {
         this.updateHeaderHeight();
-      } catch {
-        headerStore.headerHeight = 0;
+      } catch(e) {
+        console.error("Error updating header height", e);
+        this.headerHeight = 0;
       }
     };
 
     private updateHeaderHeight = () => {
       if (this.headerEl) {
         const height = this.headerEl.offsetHeight;
-        headerStore.headerHeight = height;
-        headerStore.appEl?.style.setProperty(
-          "--site-header-height",
-          height + "px",
-        );
-        headerStore.appEl?.style.setProperty(
+
+        // Also store globally so any sibling/content section can consume it.
+        this.appEl?.style.setProperty("--site-header-height", height + "px");
+        this.appEl?.style.setProperty(
           "--site-scroll-padding-top",
           height + "px",
         );
@@ -281,6 +258,9 @@
 
     start = () => {
       if (!browser) return; // nothing to do on server
+      // resolve main app container for sibling-style updates
+      this.appEl = document.querySelector(isAppEl) as HTMLElement | null;
+
       // run immediately once
       this.scheduleUpdate();
 
@@ -309,8 +289,8 @@
         this.headerResizeObserver = null;
       }
 
-      headerStore.appEl?.style.removeProperty("--site-header-height");
-      headerStore.appEl?.style.removeProperty("--site-scroll-padding-top");
+      this.headerEl?.style.removeProperty("--site-header-height");
+      this.headerEl?.style.removeProperty("--site-scroll-padding-top");
     };
   }
 
@@ -321,43 +301,65 @@
         if (active && active.matches(".drawer-toggle")) {
           active.blur();
         }
-      } catch(e) {
+      } catch (e) {
         console.error("Element focus error during login", e);
       }
 
-      loginLoading = true;
-      loginError = "";
+      loginStates.loading = true;
+      loginStates.error = "";
+      const token = await APIServiceBrowser.getJWTGraphQL({
+        username: loginStates.username,
+        password: loginStates.password,
+      });
+
       try {
-        const token = await APIService.getJWTGraphQL({
-          username: loginUsername,
-          password: loginPassword,
-        });
-        loginPassword = "";
+        loginStates.username = "";
+        loginStates.password = "";
 
         if (!token) {
-          loginError = "Login gagal — periksa kredensial Anda.";
+          loginStates.error = "Login gagal — periksa kredensial Anda.";
         } else {
           LoginManager.closeLogin();
         }
       } catch (e) {
         console.error("login error", e);
-        loginError = "Terjadi kesalahan saat login.";
-        loginPassword = "";
+        loginStates.error = "Terjadi kesalahan saat login.";
+        loginStates.password = "";
       } finally {
-        tick().then(() => {
-          Promise.all([nonceManager.getNonceFromAPI, (loginLoading = false)]);
+        const useRIF =
+          typeof window.requestIdleCallback === "function"
+            ? window.requestIdleCallback.bind(window)
+            : (cb: IdleRequestCallback) => setTimeout(cb, 0);
+
+        useRIF(async () => {
+          try {
+            if (!token) {
+              loginStates.loading = false;
+              return;
+            }
+
+            const nonce = await APIServiceBrowser.getThemeNonceGraphQL();
+            if (nonce && nonce.length > 0) {
+              themeManager.setNonce = nonce;
+            }
+          } catch (error) {
+            console.error("Error refreshing nonce after login:", error);
+          } finally {
+            loginStates.loading = false;
+            await tick();
+          }
         });
       }
     }
-    static async Logout(): Promise<void> {
+    static Logout(): void {
       window.location.reload();
     }
     static closeLogin() {
       showLoginModal = false;
-      loginUsername = "";
-      loginPassword = "";
-      loginError = "";
-      loginLoading = false;
+      loginStates.username = "";
+      loginStates.password = "";
+      loginStates.error = "";
+      loginStates.loading = false;
     }
   }
 
@@ -366,10 +368,7 @@
 </script>
 
 <script lang="ts">
-  import { onMount, onDestroy, tick } from "svelte";
-  import type { HTMLImgAttributes } from "svelte/elements";
-  import { GlobalNavigateTo } from "$lib/stores/Route.svelte";
-  import { headerStore } from "$lib/stores/HeaderStore.svelte";
+  import { goto } from "$app/navigation";
   import { innerWidth } from "svelte/reactivity/window";
   import {
     SunSolid,
@@ -379,48 +378,13 @@
     ExternalLinkSolid,
     KeySolid,
   } from "svelte-awesome-icons";
-  import { PortalManager } from "$lib/utils/elements.svelte";
+  import { attachPortal } from "$lib/utils/elements.svelte";
 
-  let {
-    HeaderLogo = "",
-    themeData,
-  }: {
-    HeaderLogo?: string;
-    themeData?: import("@/types").WPLokerBJMThemedData | null;
-  } = $props();
+  let { themeData }: { themeData: WPLokerBJMThemedData } = $props();
+
   let loginAdmin = $state(false);
   let _loginAdminPoll: number | null = null;
   const bookmarkJobs = $derived(bookmarkStore.jobs);
-  function updateLogo(): void {
-    try {
-      const runtimeLogo = themeData?.logo?.logoUrl;
-      const runtimeLogoSrcset = themeData?.logo?.logoSrcset;
-      const runtimeLogoSizes = themeData?.logo?.logoSizes;
-      const runtimeLogoDecoding = themeData?.logo?.logoDecoding;
-      const runtimeLogoWidth = themeData?.logo?.logoWidth;
-      const runtimeLogoHeight = themeData?.logo?.logoHeight;
-
-      const parseDimension = (value: unknown): number | undefined => {
-        if (typeof value === "number" && value > 0) return value;
-        if (typeof value === "string" && value.trim()) {
-          const parsed = Number(value.trim());
-          if (!Number.isNaN(parsed) && parsed > 0) return parsed;
-        }
-        return undefined;
-      };
-
-      if (runtimeLogo) {
-        HeaderLogo = runtimeLogo as string;
-        logoSrcset = runtimeLogoSrcset || "";
-        logoSizes = runtimeLogoSizes || "";
-        logoDecoding = runtimeLogoDecoding;
-        logoWidth = parseDimension(runtimeLogoWidth);
-        logoHeight = parseDimension(runtimeLogoHeight);
-      }
-    } catch {
-      console.error("Error updating logo");
-    }
-  }
 
   // Open bookmark modal
   function openBookmarkModal(): void {
@@ -428,7 +392,7 @@
   }
 
   function showButtonLogin(): void {
-    const w = window as any;
+    const w = window as Window & { loginadmin?: boolean };
     const initial = !!w.loginadmin;
     loginAdmin = initial;
     const desc = Object.getOwnPropertyDescriptor(w, "loginadmin");
@@ -440,7 +404,7 @@
         get() {
           return internal;
         },
-        set(v: any) {
+        set(v: boolean) {
           internal = v;
           loginAdmin = !!v;
         },
@@ -450,13 +414,17 @@
         try {
           if ((w.loginadmin as boolean) !== loginAdmin)
             loginAdmin = !!w.loginadmin;
-        } catch {}
+        } catch (e) {
+          console.error("Error polling loginadmin property:", e);
+        }
       }, 300);
     }
   }
 
-  updateLogo();
   onMount(() => {
+    themeManager.setThemeData = themeData;
+    bookmarkStore.init();
+
     try {
       themeColorManager.init();
     } catch {
@@ -474,28 +442,65 @@
     }
   });
 
-  $effect(() => {
-    if (showBookmarkModal && !dynamicComponentStore.BookmarkModal) {
-      dynamicComponentStore.loadBookmarkModal();
+  const hasStoredTheme = $derived.by(() => {
+    if (!browser) return true;
+    try {
+      return !!localStorage.getItem("wplokerbjm-theme");
+    } catch {
+      return false;
     }
   });
 
-  $effect(() => {
-    if (showLoginModal && !dynamicComponentStore.LoginModal) {
-      dynamicComponentStore.loadLoginModal();
+  const prefersSystemDark = $derived.by(() => {
+    if (!browser) return false;
+
+    if (!themeColorManager.mediaQuery) {
+      themeColorManager.mediaQuery = new MediaQuery(
+        "(prefers-color-scheme: dark)",
+      );
     }
+
+    return themeColorManager.mediaQuery!.current;
   });
 
-  $effect(() => {
-    // guard so this effect is a no-op during SSR
-    if (typeof window === "undefined") return;
-    innerWidth.current;
+  const derivedTheme = $derived.by(() => {
+    if (!browser) return themeColorManager.currentTheme;
+
+    const stored = hasStoredTheme;
+    const prefersDark = prefersSystemDark;
+
+    if (!stored) {
+      themeColorManager.isDark = prefersDark;
+      themeColorManager.setThemeDirect(prefersDark ? "dark" : "light");
+    }
+
+    const theme = themeColorManager.currentTheme;
+    themeColorManager.debouncedSetTheme(theme);
+    return theme;
+  });
+
+  const bookmarkModalComponent = $derived.by(() => {
+    if (!showBookmarkModal) return undefined;
+    return dynamicComponentStore.loadBookmarkModal();
+  });
+
+  const loginModalComponent = $derived.by(() => {
+    if (!showLoginModal) return undefined;
+    return dynamicComponentStore.loadLoginModal();
+  });
+
+  const currentWindowWidth = $derived.by(() => {
+    if (!browser) return 0;
+    const width = innerWidth.current;
     headerManager.scheduleUpdate();
+    return width;
   });
 </script>
 
 <header
-  class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b border-[var(--wpl-global-color-1)] min-h-auto z-[60]"
+  class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b-3 border-base-300 min-h-auto z-[60]"
+  data-window-width={currentWindowWidth}
+  style="view-transition-name: none;"
 >
   <div class="drawer drawer-end">
     <input
@@ -515,18 +520,18 @@
             class="focus:outline-none"
             onclick={(e) => {
               e.preventDefault();
-              GlobalNavigateTo("/");
+              void goto("/");
             }}
           >
-            {#if HeaderLogo}
+            {#if themeData.logo.logoUrl}
               <img
-                src={HeaderLogo}
-                srcset={logoSrcset}
-                sizes={logoSizes}
-                decoding={logoDecoding}
+                src={themeData.logo.logoUrl}
+                srcset={themeData.logo.logoSrcset}
+                sizes={themeData.logo.logoSizes}
+                decoding={themeData.logo.logoDecoding}
                 alt="Site logo"
-                width={logoWidth}
-                height={logoHeight}
+                width={themeData.logo.logoWidth}
+                height={themeData.logo.logoHeight}
                 fetchpriority="high"
                 class="h-12 w-auto mb-2 md:h-16 md:w-auto"
               />
@@ -544,7 +549,7 @@
             >
               {#if themeColorManager.isDark}
                 <MoonSolid class="w-5 h-5" style="color: var(--icon-color);" />
-              {:else if themeColorManager.currentTheme === ThemeName.Lavender}
+              {:else if themeColorManager.currentTheme === "lavender"}
                 <SunSolid class="w-5 h-5" style="color: var(--icon-color);" />
               {:else}
                 <SunSolid class="w-5 h-5" style="color: var(--icon-color);" />
@@ -553,7 +558,7 @@
           </div>
 
           {#if showThemeModal}
-            <div {@attach PortalManager.teleport("#app")}>
+            <div {@attach attachPortal("#app")}>
               <div class="modal modal-open z-[1100]">
                 <div class="modal-box">
                   <h3 class="font-semibold text-lg">Pilih Tema</h3>
@@ -563,10 +568,9 @@
                   <div class="flex gap-3 mt-3">
                     <button
                       class="btn flex-1"
-                      class:btn-primary={themeColorManager.currentTheme ===
-                        ThemeName.Light}
+                      class:btn-primary={derivedTheme === "light"}
                       onclick={() => {
-                        themeColorManager.setTheme(ThemeName.Light);
+                        themeColorManager.setTheme("light");
                         showThemeModal = false;
                       }}
                     >
@@ -574,10 +578,9 @@
                     </button>
                     <button
                       class="btn flex-1"
-                      class:btn-primary={themeColorManager.currentTheme ===
-                        ThemeName.Dark}
+                      class:btn-primary={derivedTheme === "dark"}
                       onclick={() => {
-                        themeColorManager.setTheme(ThemeName.Dark);
+                        themeColorManager.setTheme("dark");
                         showThemeModal = false;
                       }}
                     >
@@ -585,10 +588,9 @@
                     </button>
                     <button
                       class="btn flex-1"
-                      class:btn-primary={themeColorManager.currentTheme ===
-                        ThemeName.Lavender}
+                      class:btn-primary={derivedTheme === "lavender"}
                       onclick={() => {
-                        themeColorManager.setTheme(ThemeName.Lavender);
+                        themeColorManager.setTheme("lavender");
                         showThemeModal = false;
                       }}
                     >
@@ -640,10 +642,6 @@
           <a
             class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)] hover:bg-[var(--wpl-global-color-1)] hover:text-[var(--wpl-global-color-5)] hidden rounded-full md:inline-flex"
             href="/pasang-iklan-loker"
-            onclick={(e) => {
-              e.preventDefault();
-              GlobalNavigateTo("/pasang-iklan-loker");
-            }}
           >
             <ExternalLinkSolid
               class="h-6 w-6"
@@ -698,9 +696,7 @@
             <a
               href="/pasang-iklan-loker"
               class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] justify-center"
-              onclick={(e) => {
-                e.preventDefault();
-                GlobalNavigateTo("/pasang-iklan-loker");
+              onclick={() => {
                 document.getElementById("header-drawer")?.click();
               }}
             >
@@ -716,20 +712,20 @@
       </div>
     {/if}
   </div>
-  {#if showBookmarkModal && dynamicComponentStore.BookmarkModal}
-    {#await dynamicComponentStore.BookmarkModal then BookmarkModal}
+  {#if bookmarkModalComponent}
+    {#await bookmarkModalComponent then BookmarkModal}
       <BookmarkModal bind:open={showBookmarkModal} />
     {/await}
   {/if}
 
-  {#if showLoginModal && dynamicComponentStore.LoginModal}
-    {#await dynamicComponentStore.LoginModal then LoginModal}
+  {#if loginModalComponent}
+    {#await loginModalComponent then LoginModal}
       <LoginModal
         bind:open={showLoginModal}
-        bind:username={loginUsername}
-        bind:password={loginPassword}
-        error={loginError}
-        loading={loginLoading}
+        bind:username={loginStates.username}
+        bind:password={loginStates.password}
+        error={loginStates.error}
+        loading={loginStates.loading}
         onClose={LoginManager.closeLogin}
         onLogin={LoginManager.Login}
       />

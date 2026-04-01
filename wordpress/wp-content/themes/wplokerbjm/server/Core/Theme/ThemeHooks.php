@@ -227,8 +227,6 @@ class ThemeInject
             : CacheKey::THEME_DATA . '_anonymous';
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
-            // override disableTracking and wpRestNonce for logged-in state
-            $cached['disableTracking'] = $loggedIn;
             if ($loggedIn) {
                 $cached['wpRestNonce'] = wp_create_nonce('wp_rest');
             } else {
@@ -262,7 +260,6 @@ class ThemeInject
                 'logoWidth' => intval($logoData['width'] ?? 0),
                 'logoHeight' => intval($logoData['height'] ?? 0),
             ],
-            'disableTracking' => $loggedIn, // Disable Google Tag Manager
             'siteIconTags' => $siteIconTags,
         ];
 

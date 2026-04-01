@@ -1,7 +1,11 @@
 import adapter from "@sveltejs/adapter-cloudflare";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import type { Config } from "@sveltejs/kit";
 
+const isDev = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "preview";
+
 const config: Config = {
+  preprocess: vitePreprocess( { script: isDev } ),
   kit: {
     version: {
       name: Date.now().toString(),
@@ -21,9 +25,9 @@ const config: Config = {
   compilerOptions: {
     runes: true,
     modernAst: true,
-    hmr: true,
+    hmr: isDev,
     discloseVersion: false,
-    dev: true,
+    dev: isDev,
   },
 };
 

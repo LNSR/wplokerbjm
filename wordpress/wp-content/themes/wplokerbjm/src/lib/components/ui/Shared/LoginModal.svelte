@@ -1,7 +1,14 @@
 <script lang="ts">
-  import { PortalManager } from "$lib/utils/elements.svelte";
-  import { onMount } from "svelte";
-
+  import { attachPortal } from "$lib/utils/elements.svelte";
+  interface Props {
+    open: boolean;
+    username: string;
+    password: string;
+    error: string;
+    loading: boolean;
+    onClose: () => void;
+    onLogin: (e?: Event) => Promise<void>;
+  }
   let {
     open = $bindable(),
     username = $bindable(),
@@ -10,15 +17,7 @@
     loading,
     onClose,
     onLogin,
-  }: {
-    open: boolean;
-    username: string;
-    password: string;
-    error: string;
-    loading: boolean;
-    onClose: () => void;
-    onLogin: (e?: Event) => Promise<void>;
-  } = $props();
+  }: Props = $props();
 
   function handleKeydown(e: KeyboardEvent) {
     if (!open) return;
@@ -28,18 +27,12 @@
       } catch {}
     }
   }
-
-  onMount(() => {
-    document.addEventListener("keydown", handleKeydown);
-
-    return () => {
-      document.removeEventListener("keydown", handleKeydown);
-    };
-  });
 </script>
 
+<svelte:window on:keydown={(e) => handleKeydown(e)} />
+
 {#if open}
-  <div {@attach PortalManager.teleport("#app")}>
+  <div {@attach attachPortal("#app")}>
     <div class="modal modal-open z-[1100]">
       <div class="modal-box">
         <h3 class="font-bold text-lg">Masuk</h3>
@@ -99,7 +92,7 @@
             <button
               class="btn btn-ghost"
               type="button"
-              onclick={onClose}
+              onclick={() => onClose?.()}
               aria-label="Tutup"
             >
               Tutup
@@ -112,9 +105,9 @@
         role="button"
         tabindex="0"
         class="modal-backdrop"
-        onclick={onClose}
+        onclick={() => onClose?.()}
         onkeydown={(e: KeyboardEvent) => {
-          if (e.key === "Enter" || e.key === " ") onClose();
+          if (e.key === "Enter" || e.key === " ") onClose?.();
         }}
       ></div>
     </div>

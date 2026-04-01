@@ -1,25 +1,20 @@
 <script module lang="ts">
   import { onMount, onDestroy } from "svelte";
   import { SvelteSet, SvelteMap } from "svelte/reactivity";
-  import { timeEffect } from "$lib/utils/elements.svelte";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
-  import { generalStore } from "$lib/stores/General.svelte";
+  import { generalJobStore } from "$lib/stores/General.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import { Virtualization } from "$lib/utils/Virtualization.svelte";
+  import { virtualizationService } from "$lib/utils/Virtualization.svelte";
   import type { CardJob } from "@/types";
   import {
     isMobile,
     isJobGridEl,
-    PortalManager,
+    attachPortal,
   } from "$lib/utils/elements.svelte";
-  import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import {
-    GlobalNavigateTo,
-    routeStateStore,
-    routeStore,
-  } from "$lib/stores/Route.svelte";
-  import { SvelteDate } from "svelte/reactivity";
+  import { goto } from "$app/navigation";
+  import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
   import JobCard from "@components/ui/Shared/JobCard.svelte";
   import { fade } from "svelte/transition";
   import {
@@ -47,12 +42,10 @@
   );
 
   // Dragging state
-  let translateX = $state(0);
-  let translateY = $state(0);
+  let translate = $state({ x: 0, y: 0 });
   let isDragging = $state(false);
   let activePointerId: number | null = null;
-  let startClientX = $state(0);
-  let startClientY = $state(0);
+  let startClient = $state({ x: 0, y: 0 });
   let startHeight = $state(0);
 
   // loading mirrors the central store isSyncing to ensure UI reflects store activity
@@ -61,8 +54,7 @@
   const showCopySuccess = $state(false);
   let isOffline = $state(false);
   let showDeleteConfirm = $state(false);
-  const removingIds = $state(new SvelteSet<number>());
-  const now = new SvelteDate();
+  const removingIds = new SvelteSet<number>();
 
   // Store bindings
   const savedJobs = $derived(bookmarkStore.jobs);
@@ -153,13 +145,14 @@
     displayedSavedJobs = $derived.by(() => {
       return savedJobs.map((job) => ({
         ...job,
-        timeAgo: generalStore.useTimeAgo(job.post_time, now),
-        deadlineInfo: job.deadline
-          ? generalStore.useDeadline(job.deadline, now)
-          : { text: "", style: "" },
+        timeAgo: generalJobStore.showTimeAgo(job.post_time!),
+        deadlineInfo: job.ringkasanPekerjaan?.deadline
+          ? generalJobStore.showDeadline(job.ringkasanPekerjaan.deadline)
+          : { text: "", status: "unknown" },
+        // statusInfo is a single status string now (previously an object with identical label/status)
         statusInfo: job.status_pekerjaan
-          ? generalStore.useStatusJob(Number(job.status_pekerjaan))
-          : { label: "", color: "" },
+          ? generalJobStore.showStatusJob(job.status_pekerjaan)
+          : "none",
       }));
     });
 
@@ -182,7 +175,7 @@
     #measureTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
     virtualizedJobs = $derived.by(() => {
-      return Virtualization.computeList({
+      return virtualizationService.computeList({
         displayJobs: bookmarkHandler.filteredDisplayedJobs,
         scrollY: containerScrollY,
         containerHeight: containerHeight,
@@ -194,7 +187,7 @@
     });
 
     measureHeight(jobId: number): Attachment<HTMLElement> {
-      return Virtualization.createMeasureHeight(cardHeights, jobId);
+      return virtualizationService.createMeasureHeight(cardHeights, jobId);
     }
 
     // Update container dimensions
@@ -368,13 +361,11 @@
       }
       activePointerId = e.pointerId;
       isDragging = true;
-      startClientX = e.clientX;
-      startClientY = e.clientY;
+      startClient.x = e.clientX;
+      startClient.y = e.clientY;
       if (isMobile()) {
         startHeight = modalBox?.clientHeight || 0;
       }
-      window.addEventListener("pointermove", this.onPointerMove);
-      window.addEventListener("pointerup", this.onPointerUp);
       e.preventDefault();
     };
 
@@ -383,10 +374,10 @@
       if (activePointerId !== null && e.pointerId !== activePointerId) return;
       if (!modalBox) return;
       if (isMobile()) {
-        const dy = e.clientY - startClientY;
+        const dy = e.clientY - startClient.y;
         const newH = startHeight - dy;
-        translateX = 0;
-        translateY = 0;
+        translate.x = 0;
+        translate.y = 0;
         try {
           modalBox.style.setProperty("height", `${newH}px`, "important");
         } catch {
@@ -394,8 +385,8 @@
         }
         return;
       } else {
-        translateX = e.clientX - startClientX;
-        translateY = e.clientY - startClientY;
+        translate.x = e.clientX - startClient.x;
+        translate.y = e.clientY - startClient.y;
       }
     };
 
@@ -409,12 +400,10 @@
       }
       isDragging = false;
       activePointerId = null;
-      window.removeEventListener("pointermove", this.onPointerMove);
-      window.removeEventListener("pointerup", this.onPointerUp);
     };
     resetPosition(): void {
-      translateX = 0;
-      translateY = 0;
+      translate.x = 0;
+      translate.y = 0;
       try {
         if (modalBox) modalBox.style.removeProperty("height");
       } catch {
@@ -431,27 +420,18 @@
 
       const el: HTMLElement | null = isJobGridEl();
 
-      const waitUntilAfterNav = () => {
-        return new Promise<void>((resolve) => {
-          const check = async () => {
-            if (!this.transitioningRoute) {
-              resolve();
-            } else {
-              requestAnimationFrame(async () => await check());
-            }
-          };
-          void check();
-        });
-      };
-
       if (!isMobile() && el) {
         // Desktop: open overlay
         routeStateStore.saveCardHeights(
           new SvelteMap(cardHeights),
           "bookmarkModal",
         );
-        jobOverlay.openOverlay(job.slug ?? "", job);
-        this.closeModal();
+        // mark as "featured" for desktop
+        jobOverlayManager?.openOverlay(job.slug ?? "", job, "featured", {
+          gotoCB: () => {
+            this.closeModal();
+          },
+        });
       } else {
         // Mobile: navigate
         if (job.permalink) {
@@ -460,17 +440,9 @@
             "bookmarkModal",
           );
           const url = new URL(job.permalink, window.location.origin);
-          GlobalNavigateTo(url.pathname + url.search + url.hash);
-
-          // Wait until after any route transition completes before closing the modal to avoid jank during navigation
-          waitUntilAfterNav()
-            .then(() => {
-              this.closeModal();
-            })
-            .catch((e) => {
-              console.error("Error waiting for route transition:", e);
-              this.closeModal();
-            });
+          goto(url.pathname + url.search + url.hash).then(() => {
+            this.closeModal();
+          });
         }
       }
     }
@@ -499,7 +471,7 @@
   const isMobileValue = $derived.by(() => isMobile());
 
   const modalStyle = $derived(
-    `transform: translate(${translateX}px, ${translateY}px); touch-action: ${isMobileValue ? "none" : "auto"};`,
+    `transform: translate(${translate.x}px, ${translate.y}px); touch-action: ${isMobileValue ? "none" : "auto"};`,
   );
 
   // Only collapse action buttons on small (mobile) layouts when search is active
@@ -510,7 +482,7 @@
   // Ensure we re-measure when the modal is opened so virtualization has correct container size
 
   $effect(() => {
-    const stopTime = timeEffect(now);
+    const timeEffect = generalJobStore.useSharedClock();
     // React to showDeleteConfirm changes to control the delete confirmation modal
     if (showDeleteConfirm) {
       if (!deleteConfirmModal?.open) deleteConfirmModal?.showModal();
@@ -518,16 +490,11 @@
       deleteConfirmModal?.close();
     }
     return () => {
-      stopTime();
+      timeEffect();
     };
   });
 
   onMount(() => {
-    document.addEventListener("keydown", modalHandler.handleKeydown);
-    window.addEventListener(
-      "resize",
-      virtualizationManager.updateContainerDimensions,
-    );
     if (open) {
       bookmarkStore.flushSync();
       bookmarkHandler.scheduleFetchJobs();
@@ -552,14 +519,6 @@
   });
 
   onDestroy(() => {
-    document.removeEventListener("keydown", modalHandler.handleKeydown);
-    window.removeEventListener(
-      "resize",
-      virtualizationManager.updateContainerDimensions,
-    );
-    window.removeEventListener("pointermove", modalHandler.onPointerMove);
-    window.removeEventListener("pointerup", modalHandler.onPointerUp);
-
     try {
       if (dragHandle && activePointerId !== null)
         dragHandle.releasePointerCapture(activePointerId);
@@ -574,9 +533,17 @@
   });
 </script>
 
+<svelte:window
+  on:resize={virtualizationManager.updateContainerDimensions}
+  on:pointermove={modalHandler.onPointerMove}
+  on:pointerup={modalHandler.onPointerUp}
+/>
+
+<svelte:document on:keydown={modalHandler.handleKeydown} />
+
 <dialog
   bind:this={modalEl}
-  {@attach PortalManager.teleport("#app")}
+  {@attach attachPortal("#app")}
   class="modal modal-bottom sm:modal-middle"
   class:modal-open={open}
 >
@@ -645,7 +612,9 @@
                   isSearchOpen = !isSearchOpen;
                   if (isSearchOpen) setTimeout(() => searchInput?.focus(), 0);
                 }}
-                disabled={loading || virtualizationManager.measuring || isOutdated}
+                disabled={loading ||
+                  virtualizationManager.measuring ||
+                  isOutdated}
                 class="btn btn-ghost btn-sm mr-2"
                 aria-label="Cari dalam simpanan"
                 title="Cari"
@@ -697,7 +666,9 @@
               {#if !(loading || virtualizationManager.measuring) && savedJobs.length > 0}
                 <button
                   onclick={bookmarkHandler.handleDeleteAll}
-                  disabled={loading || virtualizationManager.measuring || isOutdated}
+                  disabled={loading ||
+                    virtualizationManager.measuring ||
+                    isOutdated}
                   class="btn btn-ghost btn-sm md:btn-md text-error w-auto whitespace-nowrap"
                   aria-label="hapus semua"
                   title="hapus semua"
@@ -707,7 +678,9 @@
                 </button>
                 <button
                   onclick={bookmarkHandler.handleRefresh}
-                  disabled={loading || virtualizationManager.measuring || isOutdated}
+                  disabled={loading ||
+                    virtualizationManager.measuring ||
+                    isOutdated}
                   class="btn btn-ghost btn-sm md:btn-md w-auto whitespace-nowrap"
                   aria-label="sync ke server"
                   title="sync ke server"
@@ -849,10 +822,6 @@
                         <JobCard
                           jobdata={job}
                           variant="bookmark"
-                          isVisited={routeStateStore.hasVisitedJob(
-                            job.slug,
-                            "bookmark",
-                          )}
                           permalink={job.permalink as string}
                           onClick={() => modalHandler.handleJobClick(job)}
                         />
@@ -968,7 +937,7 @@
 <!-- Delete All Confirmation Modal -->
 <dialog
   bind:this={deleteConfirmModal}
-  {@attach PortalManager.teleport("#app")}
+  {@attach attachPortal("#app")}
   class="modal modal-bottom sm:modal-middle"
   class:modal-open={showDeleteConfirm}
 >

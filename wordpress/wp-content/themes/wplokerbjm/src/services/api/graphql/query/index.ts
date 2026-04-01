@@ -1,3 +1,3 @@
-export * from './Taxonomy';
+export * from './taxonomy';
 export * from './job';
 export * from './theme';

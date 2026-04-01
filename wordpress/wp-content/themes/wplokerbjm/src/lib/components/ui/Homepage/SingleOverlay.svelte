@@ -1,27 +1,25 @@
-<script module lang="ts">
-  import { onMount, tick } from "svelte";
+<script lang="ts">
+  import { onDestroy } from "svelte";
   import { page } from "$app/state";
+  import { type Attachment } from "svelte/attachments";
   import type { JobDetailResponse } from "@/types";
   import { routeStore } from "@/lib/stores/Route.svelte";
-  import { nonceManager } from "$lib/utils/Nonce.svelte";
+  import { themeManager } from "$lib/stores/Theme.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
-  import { jobOverlay } from "$lib/stores/JobOverlay.svelte";
+  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import JobDetail from "@components/ui/Shared/JobDetail.svelte";
   import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
-  import { getCmsOrigin } from "@/utils";
-
-  let slideIn = $state(false);
+  import { getCmsOrigin } from "@/utils/environment";
 
   const data = $derived((page.data?.job as JobDetailResponse | null) ?? null);
-  const editPostId = $derived(data?.id ?? null);
+  const editPostId = $derived((data?.id as JobDetailResponse["id"]) ?? null);
 
-  function isLoggedIn(): boolean {
-    if (nonceManager.getNonce) {
-      return true;
-    }
-    return false;
-  }
+  const isSidePanelVisible = $derived.by(() =>
+    Boolean(data?.id || jobOverlayManager.selectedSlug),
+  );
+
+  const isLoggedIn = $derived(themeManager.getNonce ? true : false);
 
   function getCloneHref(postId?: number | null): string {
     if (!postId) return "#";
@@ -31,65 +29,58 @@
       const dup = data?.duplicateNonce;
       if (typeof dup === "string" && dup.length > 0)
         return `${base}&nonce=${encodeURIComponent(dup)}`;
-    } catch {
-      // Ignore errors and return base URL
+    } catch (e) {
+      console.error("Error constructing clone URL with nonce:", e);
     }
 
     return base;
   }
-</script>
 
-<script lang="ts">
-  const { visible } = $props<{
-    visible: boolean;
-  }>();
+  let innerScrollTimeout: ReturnType<typeof setTimeout> | null = null;
+  let drawerElement: Element | undefined = undefined;
 
-  $effect(() => {
-    jobOverlay.overlayData = data; // Update the store with the current job data from SvelteKit's page store
-    if (visible) {
-      slideIn = false;
-      tick().then(() => {
-        slideIn = true;
-      });
-    } else {
-      slideIn = false;
+  const drawerElementAttachment: Attachment = (node: Element) => {
+    data?.id; // re-run when job changes to reset scroll
+    drawerElement = node;
+
+    drawerElement.scrollTop = 0;
+    return () => {
+      drawerElement = undefined;
+    };
+  };
+
+  function handleWindowScroll(): void {
+    if (!jobOverlayManager.isScrolling) {
+      jobOverlayManager.setScrollState = true;
+    }
+
+    if (innerScrollTimeout) {
+      clearTimeout(innerScrollTimeout);
+    }
+
+    innerScrollTimeout = setTimeout(() => {
+      jobOverlayManager.setScrollState = false;
+      innerScrollTimeout = null;
+    }, 500);
+  }
+
+  onDestroy(() => {
+    if (innerScrollTimeout) {
+      clearTimeout(innerScrollTimeout);
+      innerScrollTimeout = null;
     }
   });
-
-  onMount(() => {
-    const timeoutId = setTimeout(() => {
-      isLoggedIn();
-    }, 2000);
-
-    return () => {
-      clearTimeout(timeoutId);
-    };
-  });
 </script>
 
-<!--
-  Keep the overlay DOM mounted at all times so that its internal scroll
-  position isn't lost when reopening.  The previous implementation used
-  `{#if visible}` which destroyed the element every time and caused
-  the user to lose their place inside the drawer.
--->
+<svelte:window on:scroll|passive={handleWindowScroll} />
 <div
   data-last-error=""
-  aria-hidden={!visible}
-  class={[
-    "min-h-screen flex flex-col ml-7 transition-transform duration-600 ease-in-out",
-    slideIn ? "transform translate-x-0" : "transform translate-x-full",
-    visible ? "pointer-events-auto" : "pointer-events-none",
-    !visible ? "opacity-0" : "opacity-100",
-  ]
-    .filter(Boolean)
-    .join(" ")}
+  aria-hidden={!isSidePanelVisible}
+  class="min-h-screen flex flex-col ml-7 translate-x-6"
 >
-  <!-- Overlay background (only in JobGrid area) -->
-  <div class="absolute top-0 left-0 right-0 bottom-0"></div>
-
   <!-- Drawer -->
   <aside
+    {@attach drawerElementAttachment}
     class="relative shadow-xl rounded-xl border-2 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)] w-full max-h-[calc(100vh-var(--site-scroll-padding-top)-var(--site-header-height))] overflow-y-auto flex flex-col z-50"
   >
     <div
@@ -98,7 +89,7 @@
       aria-label="Overlay controls"
     >
       <div class="flex items-center gap-2">
-        {#if !routeStore.isLoading && data && isLoggedIn() && editPostId}
+        {#if !routeStore.isLoading && data && isLoggedIn && editPostId}
           <a
             href={`${getCmsOrigin()}/wp-admin/post.php?post=${editPostId}&action=edit`}
             target="_blank"
@@ -112,7 +103,7 @@
       </div>
 
       <div class="flex items-center gap-2">
-        {#if !routeStore.isLoading && data && isLoggedIn() && editPostId}
+        {#if !routeStore.isLoading && data && isLoggedIn && editPostId}
           <a
             href={getCloneHref(editPostId)}
             target="_blank"

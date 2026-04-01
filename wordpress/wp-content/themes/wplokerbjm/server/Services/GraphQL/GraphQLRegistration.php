@@ -87,8 +87,7 @@ class GraphQLRegistration
                 CustomFields::BENEFIT => ['type' => 'String'],
                 'contacts' => ['type' => 'JobContacts'],
                 CustomFields::SOCIAL_MEDIA => ['type' => 'String'],
-                CustomFields::DEADLINE => ['type' => 'String'],
-                CustomFields::STATUS_PEKERJAAN => ['type' => 'String'],
+                CustomFields::STATUS_PEKERJAAN => ['type' => 'Int'],
                 'permalink' => ['type' => 'String'],
                 'post_time' => ['type' => 'String'],
                 'duplicateNonce' => ['type' => 'String'],
@@ -102,9 +101,9 @@ class GraphQLRegistration
                 Taxonomies::PENDIDIKAN => ['type' => 'String'],
                 Taxonomies::GENDER => ['type' => 'String'],
                 Taxonomies::LOKASI_PEKERJAAN => ['type' => 'String'],
-                CustomFields::PENGALAMAN => ['type' => 'String'],
-                CustomFields::GAJI_MINIMAL => ['type' => 'String'],
-                CustomFields::GAJI_MAKSIMAL => ['type' => 'String'],
+                CustomFields::PENGALAMAN => ['type' => 'Int'],
+                CustomFields::GAJI_MINIMAL => ['type' => 'Int'],
+                CustomFields::GAJI_MAKSIMAL => ['type' => 'Int'],
                 CustomFields::UMUR_MIN => ['type' => 'Int'],
                 CustomFields::UMUR_MAX => ['type' => 'Int'],
                 CustomFields::DEADLINE => ['type' => 'String'],
@@ -161,13 +160,6 @@ class GraphQLRegistration
             ],
         ]);
 
-        register_graphql_object_type('JobDetailResponse', [
-            'description' => 'Job detail response',
-            'fields' => [
-                'job' => ['type' => 'Job'],
-            ],
-        ]);
-
         register_graphql_object_type('JobSchemaResponse', [
             'description' => 'Job schema response',
             'fields' => [
@@ -192,17 +184,8 @@ class GraphQLRegistration
             'description' => 'Theme data object',
             'fields' => [
                 'logo' => ['type' => 'Logo'],
-                'disableTracking' => ['type' => 'Boolean'],
                 'wpRestNonce' => ['type' => 'String'],
-                // HTML string containing favicon <link> tags produced by site_icon_meta_tags filter
                 'siteIconTags' => ['type' => 'String'],
-            ],
-        ]);
-
-        register_graphql_object_type('ThemeDataResponse', [
-            'description' => 'Theme data response',
-            'fields' => [
-                'data' => ['type' => 'ThemeData'],
             ],
         ]);
 
@@ -345,7 +328,7 @@ class GraphQLRegistration
         ]);
 
         register_graphql_field('RootQuery', 'jobDetail', [
-            'type' => 'JobDetailResponse',
+            'type' => 'Job',
             'description' => 'Get job detail',
             'args' => [
                 'slug' => [
@@ -377,7 +360,7 @@ class GraphQLRegistration
         ]);
 
         register_graphql_field('RootQuery', 'themeData', [
-            'type' => 'ThemeDataResponse',
+            'type' => 'ThemeData',
             'description' => 'Get theme data',
             'resolve' => fn() => $this->themeDataResolver->resolveThemeData(),
         ]);

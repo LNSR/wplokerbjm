@@ -13,11 +13,8 @@ class ThemeDataResolver
     {
         try {
             $themeData = $this->graphqlData->getThemeData(); // cached internally
-            $result = [
-                'data' => $themeData,
-            ];
 
-            return $result;
+            return $themeData;
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'ThemeDataResolver::resolveThemeData error: ' . $e->getMessage());
             return [
@@ -115,7 +112,7 @@ class ThemeDataResolver
                         return null;
                     }
                     self::setJwtCookie($token);
-                    return $token;
+                    return 'ok';
                 }
                 // fallback to remote post
                 $response = wp_remote_post(
@@ -156,7 +153,7 @@ class ThemeDataResolver
                     return null;
                 }
                 self::setJwtCookie($token);
-                return $token;
+                return 'ok';
             }
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'ThemeDataResolver::resolveJWTorValidate error: ' . $e->getMessage());

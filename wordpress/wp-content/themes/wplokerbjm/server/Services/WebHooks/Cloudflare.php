@@ -4,6 +4,8 @@ namespace WPLokerBJM\Services\WebHooks;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Configs\CredentialConfig;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Cloudflare webhook helpers.
@@ -30,11 +32,17 @@ class Cloudflare
     #[Action('deleted_post_meta', 10, 4)]
     public static function purgeCache(...$args): bool
     {
+        if (SharedUtils::isDevelopment()) {
+            Logger::info('WebHook', 'Skipping Cloudflare purge in development environment.');
+            return false;
+        }
+
         $creds = CredentialConfig::CloudflareCredential();
         $token = $creds['token'] ?? '';
         $zone  = $creds['zone']  ?? '';
 
         if (! $token || ! $zone) {
+            Logger::warning('WebHook', 'Cloudflare credentials are missing.');
             return false;
         }
 
@@ -52,7 +60,7 @@ class Cloudflare
         ]);
 
         if (is_wp_error($response)) {
-            error_log('Cloudflare purge error: ' . $response->get_error_message());
+            Logger::error('WebHook', 'Cloudflare purge error: ' . $response->get_error_message());
             return false;
         }
 
@@ -63,7 +71,7 @@ class Cloudflare
             return true;
         }
 
-        error_log('Cloudflare purge failed ' . $code . ' body: ' . $data);
+        Logger::error('WebHook', 'Cloudflare purge failed ' . $code . ' body: ' . $data);
         return false;
     }
 }

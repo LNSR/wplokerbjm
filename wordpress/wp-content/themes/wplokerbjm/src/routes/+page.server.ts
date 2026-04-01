@@ -1,24 +1,25 @@
 import type { PageServerLoad } from "./$types";
-import { APIService } from "@/services/APIService";
+
+import { APIServiceServer, APIServiceShared } from "@/services/APIService";
+import type { JobSchemaResponse } from "@/types";
 import { getCmsOrigin } from "@/utils/environment";
-export const ssr = true;
-export const csr = true;
+import { schemaScriptAttach } from "$lib/server/utils/scripts.server";
 export const load: PageServerLoad = async ({ url, fetch }) => {
   try {
     const [carousel, jobGrid] = await Promise.all([
-      APIService.fetchCarouselGraphQL(fetch),
-      APIService.fetchJobGridGraphQL({ paged: 1 }, fetch),
+      APIServiceShared.fetchCarouselGraphQL(fetch),
+      APIServiceShared.fetchJobGridGraphQL({ paged: 1 }, fetch),
     ]);
 
     // compute initial ItemList schema for homepage using jobGrid IDs
-    let itemListSchema: any = null;
+    let itemListSchema: JobSchemaResponse["schemas"] | null = null;
     const ids = (jobGrid?.jobs || [])
       .map((j: any) => Number(j.id))
       .filter((n: number) => !isNaN(n));
 
     if (ids.length > 0) {
       try {
-        const schemas = await APIService.fetchJobSchemasGraphQL(
+        const schemas = await APIServiceServer.fetchJobSchemasGraphQL(
           ids,
           undefined,
           "ItemList",
@@ -33,10 +34,9 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
             const hostOnly = cmsOrigin.replace(/^https?:\/\//, "").replace(/\/$/, "");
             const originRegex = new RegExp(`https?:\\/\\/${hostOnly}`, "g");
             const str = JSON.stringify(itemListSchema);
-            itemListSchema = JSON.parse(str.replace(originRegex, url.origin));
+            itemListSchema = str.replace(originRegex, url.origin);
           } catch (e) {
-            const str = JSON.stringify(itemListSchema);
-            itemListSchema = JSON.parse(str.split(cmsOrigin).join(url.origin));
+            console.warn("Failed to replace itemListSchema URLs, using original", e);
           }
         }
       } catch (e) {
@@ -47,14 +47,16 @@ export const load: PageServerLoad = async ({ url, fetch }) => {
     return {
       carousel: carousel ?? { jobs: [], totalJobs: 0 },
       jobGrid: jobGrid ?? { jobs: [], maxNumPages: 1, totalJobs: 0 },
-      itemListSchema,
+      itemListSchemaScript: itemListSchema
+        ? schemaScriptAttach(itemListSchema, "ItemList")
+        : "",
     };
   } catch (err) {
     console.error("+page.server load error (homepage):", err);
     return {
       carousel: { jobs: [], totalJobs: 0 },
       jobGrid: { jobs: [], maxNumPages: 1, totalJobs: 0 },
-      itemListSchema: null,
+      itemListSchemaScript: "",
     };
   }
 };

@@ -76,25 +76,9 @@ html {
   scrollbar-gutter: stable;
 }
 
-/* Page transition styles */
-.page-transition {
-  transition: opacity 0.1s ease-in-out;
-  content-visibility: auto;
-  contain: layout style paint;
-  /* Reserve viewport space using header CSS vars to avoid layout shifts */
-  contain-intrinsic-size: auto
-    calc(
-      100vh -
-        (var(--site-header-height, 0px) + var(--site-scroll-padding-top, 0px))
-    );
-  opacity: 1;
-}
-
-/* Ensure smooth transitions for route changes */
-.route-container {
-  min-height: 100vh;
-  transition: all 0.2s ease-in-out;
-  position: relative;
+header,
+footer {
+  contain: layout;
 }
 
 .search-input {

@@ -4,10 +4,11 @@
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
 
-  const { jobId, variant = undefined } = $props<{
+  interface Props {
     jobId: WPBasePost["id"];
     variant: JobCardProps["variant"];
-  }>();
+  }
+  const { jobId, variant = undefined }: Props = $props();
 
   const isJobSaved = $derived(
     bookmarkStore.jobs.some((job) => Number(job.id) === jobId),
@@ -19,13 +20,16 @@
   let confirmationState: "saved" | "removed" | null = $state(null);
   let errorState: "save" | "remove" | null = $state(null);
   let isPending = $state(false);
-  let isTouchDevice = $state(false);
+  let isTouchDevice = $derived.by(() => {
+    if (typeof window === "undefined") return false;
+    return "ontouchstart" in window || navigator.maxTouchPoints > 0;
+  });
 
   let preToggleSaved = $state(false);
   // synchronous lock to prevent same-tick re-entrancy from multiple rapid DOM clicks
   let _clickLock = false;
 
-  async function handleToggleSave(e: MouseEvent) {
+  function handleToggleSave(e: MouseEvent) {
     // prevent parent handlers
     e.preventDefault();
     e.stopPropagation();
@@ -34,9 +38,14 @@
     // If this tab is outdated (a newer build is open elsewhere), do a cache-reload fetch then force navigation.
     if (typeof window !== "undefined" && bookmarkStore.isOutdated) {
       fetch(window.location.href, { cache: "reload" }).then(() => {
-        window.location.reload;
+        window.location.reload();
       });
       return;
+    }
+
+    // Preload bookmark modal for faster access when viewing bookmarks
+    if (!dynamicComponentStore.BookmarkModal) {
+      void dynamicComponentStore.loadBookmarkModal();
     }
 
     // protect against both reactive loading state and synchronous re-entry
@@ -49,19 +58,14 @@
     isPending = true;
     try {
       const wasSaved = isJobSaved;
-      await toggleSave(jobId);
-      isPending = false;
-
-      if (!wasSaved) {
-        confirmationState = "saved";
-      } else {
-        confirmationState = "removed";
-      }
-
-      // Preload bookmark modal for faster access when viewing bookmarks
-      if (!dynamicComponentStore.BookmarkModal) {
-        void dynamicComponentStore.loadBookmarkModal();
-      }
+      toggleSave(jobId).then(() => {
+        isPending = false;
+        if (!wasSaved) {
+          confirmationState = "saved";
+        } else {
+          confirmationState = "removed";
+        }
+      });
     } catch {
       isPending = false;
       const wasSaved = preToggleSaved;
@@ -133,10 +137,6 @@
       default:
         return "h-5 w-5 ";
     }
-  });
-
-  $effect(() => {
-    isTouchDevice = "ontouchstart" in window || navigator.maxTouchPoints > 0;
   });
 
   $effect(() => {

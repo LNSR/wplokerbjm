@@ -1,6 +1,5 @@
 <script module lang="ts">
   import { type SocialMediaItem, SocialMediaPlatform } from "@/types";
-  import { isJobGridEl, isMobile } from "$lib/utils/elements.svelte";
   import {
     ArrowUpSolid,
     HeadsetSolid,
@@ -30,105 +29,121 @@
       color: "text-black dark:text-white",
     },
   ];
+
+  export const btnClass: string =
+    "btn btn-sm border-1 border-[var(--wpl-global-color-1)] flex items-center gap-2 rounded-full px-4 py-3 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)]";
+  export const gridBtnClass: string =
+    "btn btn-sm border-1 border-[var(--wpl-global-color-1)] flex items-center gap-1 rounded-lg px-2 py-2 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)]";
+</script>
+
+<script lang="ts">
+  import { onMount, onDestroy } from "svelte";
+  import { isJobGridEl, isMobile } from "$lib/utils/elements.svelte";
+
   let show = $state(false);
   let hideAtBottom = $state(false);
   let dropdownOpen = $state(false);
   let dropdownRef = $state<HTMLElement | null>(null);
 
-  const btnClass: string =
-    "btn btn-sm border-1 border-[var(--wpl-global-color-1)] flex items-center gap-2 rounded-full px-4 py-3 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)]";
-  const gridBtnClass: string =
-    "btn btn-sm border-1 border-[var(--wpl-global-color-1)] flex items-center gap-1 rounded-lg px-2 py-2 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)]";
-
   let jobGridObserver: IntersectionObserver | null = null;
 
-  class FABHandler {
-    static scrollToTop(): void {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-      show = false;
+  /**
+   * Event handler helpers for mouse/keyboard interactions.
+   */
+  class MouseOrKeyboardEvent {
+    static handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        DropdownState.toggleDropdown();
+      }
+
+      if (event.key === "Escape") DropdownState.closeDropdown();
     }
 
-    static toggleDropdown(): void {
-      dropdownOpen = !dropdownOpen;
-      if (dropdownOpen) setTimeout(() => dropdownRef?.querySelector("a"));
+    static handleGlobalKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") DropdownState.closeDropdown();
     }
 
-    static closeDropdown(): void {
+    static handleClickOutside(event: MouseEvent) {
+      if (dropdownRef && !dropdownRef.contains(event.target as Node))
+        DropdownState.closeDropdown();
+    }
+  }
+
+  // Dropdown state management
+  class DropdownState {
+    static closeDropdown() {
       dropdownOpen = false;
     }
 
-    static handleClickOutside(event: MouseEvent): void {
-      if (dropdownRef && !dropdownRef.contains(event.target as Node))
-        FABHandler.closeDropdown();
+    static toggleDropdown() {
+      dropdownOpen = !dropdownOpen;
+      if (dropdownOpen)
+        setTimeout(() => dropdownRef?.querySelector("a")?.focus());
     }
-
-    static handleKeyDown(event: KeyboardEvent): void {
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        FABHandler.toggleDropdown();
-      }
-      if (event.key === "Escape") FABHandler.closeDropdown();
-    }
-
-    static handleScroll(): void {
-      const scrolledToBottom =
-        window.scrollY + window.innerHeight >= document.body.scrollHeight - 100;
-      hideAtBottom = scrolledToBottom && isMobile(); // show footer
-      const shouldShow = window.scrollY > 0;
-      if (show !== shouldShow) show = shouldShow;
-    }
-
-    static observeJobGrid(): void {
-      const jobGrid = isJobGridEl();
-      if (!jobGrid) return;
-      jobGridObserver = new IntersectionObserver(
-        (entries) => {
-          if (entries[0]?.isIntersecting) {
-            show = true;
-          }
-        },
-        { threshold: 0.1 },
-      );
-      jobGridObserver.observe(jobGrid);
-    }
-
-    static fabMounted = (): void => {
-      if (typeof window === "undefined") return;
-      document.addEventListener("mousedown", FABHandler.handleClickOutside);
-      FABHandler.observeJobGrid();
-      window.addEventListener("scroll", FABHandler.handleScroll);
-      FABHandler.handleScroll();
-    };
-
-    static fabDestroyed = (): void => {
-      if (typeof window === "undefined") return;
-      document.removeEventListener("mousedown", FABHandler.handleClickOutside);
-      if (jobGridObserver) jobGridObserver.disconnect();
-      window.removeEventListener("scroll", FABHandler.handleScroll);
-    };
   }
-</script>
 
-<script lang="ts">
-  import { onMount, onDestroy } from "svelte";
+  /**
+   * Scroll smoothly to the top of the page when the button is clicked, and hide the button afterward.
+   */
+  function scrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+    show = false;
+  }
+
+  /**
+   * Handle scroll events to determine when to show the scroll-to-top button and when to hide it at the bottom of the page on mobile devices.
+   */
+  function handleScroll() {
+    const scrolledToBottom =
+      window.scrollY + window.innerHeight >= document.body.scrollHeight - 100;
+    hideAtBottom = scrolledToBottom && isMobile();
+
+    const shouldShow = window.scrollY > 0;
+    if (show !== shouldShow) show = shouldShow;
+  }
+
+  /**
+   * Set up an IntersectionObserver to watch for the job grid element and show the scroll-to-top button when it comes into view.
+   */
+  function observeJobGrid() {
+    const jobGrid = isJobGridEl();
+    if (!jobGrid) return;
+
+    jobGridObserver = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          show = true;
+        }
+      },
+      { threshold: 0.1 },
+    );
+
+    jobGridObserver.observe(jobGrid);
+  }
 
   onMount(() => {
-    FABHandler.fabMounted();
+    observeJobGrid();
+    handleScroll();
   });
 
   onDestroy(() => {
-    FABHandler.fabDestroyed();
+    jobGridObserver?.disconnect();
   });
 </script>
 
+<svelte:window
+  on:scroll={handleScroll}
+  on:keydown={MouseOrKeyboardEvent.handleGlobalKeyDown}
+/>
+<svelte:document on:mousedown={MouseOrKeyboardEvent.handleClickOutside} />
+
 {#if !(hideAtBottom && isMobile())}
-  <aside
-    class="fixed bottom-3 right-3 z-30 flex flex-col items-end gap-4"
-  >
+  <aside class="fixed bottom-3 right-3 z-30 flex flex-col items-end gap-4" style="view-transition-name: none;">
     {#if show}
       <!-- Scroll to Top Button -->
       <button
-        onclick={FABHandler.scrollToTop}
+        onclick={scrollToTop}
         class={btnClass + " !h-2 !w-12 sm:h-2 sm:w-8"}
         title="Kembali ke Atas"
         aria-label="Kembali ke Atas"
@@ -144,9 +159,9 @@
         class={btnClass}
         onmousedown={(e) => {
           e.preventDefault();
-          FABHandler.toggleDropdown();
+          DropdownState.toggleDropdown();
         }}
-        onkeydown={FABHandler.handleKeyDown}
+        onkeydown={MouseOrKeyboardEvent.handleKeyDown}
         aria-haspopup="menu"
         title="Kontak Admin"
         tabindex="0"

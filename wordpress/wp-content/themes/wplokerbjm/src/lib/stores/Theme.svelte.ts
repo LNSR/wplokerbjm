@@ -1,19 +1,30 @@
 import type { WPLokerBJMThemedData } from "@/types";
 
-class ThemeManager {
-  themeProps: WPLokerBJMThemedData | undefined = $state(undefined);
-  public get getThemeData(): WPLokerBJMThemedData | undefined {
-    if (this.themeProps !== undefined) return this.themeProps;
+class ThemeManager
+{
+  #themeProps = $state<WPLokerBJMThemedData | undefined>( undefined );
 
-    return undefined;
+  public get getThemeData(): WPLokerBJMThemedData
+  {
+    if ( !this.#themeProps ) throw new Error( "Theme data is not set" );
+    return this.#themeProps;
   }
 
-  public setThemeData(data: WPLokerBJMThemedData): void {
-    this.themeProps = data;
+  public get getNonce(): WPLokerBJMThemedData[ "wpRestNonce" ]
+  {
+    if ( !this.#themeProps ) return undefined;
+    return this.#themeProps.wpRestNonce;
   }
 
-  public setNonce(nonce: WPLokerBJMThemedData["wpRestNonce"]): void {
-      this.themeProps!.wpRestNonce = nonce;
+  public set setThemeData( data: WPLokerBJMThemedData )
+  {
+    this.#themeProps = data;
+  }
+
+  public set setNonce( nonce: WPLokerBJMThemedData[ "wpRestNonce" ] )
+  {
+    if ( !this.#themeProps ) return;
+    this.#themeProps.wpRestNonce = nonce;
   }
 }
 

@@ -1,7 +1,10 @@
 import { mount, type Component } from 'svelte';
 import type { ComponentConfig } from '@/types';
-import { parseProps } from '@/utils';
-
+import { parseProps } from '@/utils/elements';
+/**
+ * SvelteMounter is responsible for mounting Svelte components onto specified DOM elements.
+ * @deprecated Migrated to SvelteKit, useful only for plain Svelte.
+ */
 export class SvelteMounter {
   private static targetProps = 'id="__wplokerbjm_data-props"';
   static mount(configs: ComponentConfig[]): void {

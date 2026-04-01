@@ -72,7 +72,7 @@ class LiteSpeedGraphQL
     /**
      * Set GraphQL Queries returned via HTTP GET requests to be cacheable
      */
-    #[Action('graphql_process_http_request_response', 6)]
+    #[Action('graphql_process_http_request_response', 2)]
     public static function setCacheable(): void
     {
         if (!SharedUtils::isPluginActive('litespeed')) {
@@ -82,13 +82,17 @@ class LiteSpeedGraphQL
             return;
         }
 
-        do_action('litespeed_control_set_cacheable');
+        if (is_user_logged_in()) {
+            do_action('litespeed_control_set_private');
+        } else {
+            do_action('litespeed_control_force_cacheable');
+        }
     }
 
     /**
      * Add LiteSpeed tags, unset the x-graphql-keys
      */
-    #[Filter('graphql_response_headers_to_send', 8)]
+    #[Filter('graphql_response_headers_to_send', 11)]
     public static function tagResponses(array $headers = []): array
     {
         if (!SharedUtils::isPluginActive('litespeed')) {
@@ -99,16 +103,16 @@ class LiteSpeedGraphQL
             $keys = $headers['X-GraphQL-Keys'];
 
             do_action('litespeed_tag_add', explode(' ', $keys));
-            unset($headers['X-LiteSpeed-Cache-Control']);
-            if (!headers_sent()) {
-                if (is_user_logged_in()) {
-                    header('X-LiteSpeed-Cache-Control: private, no-cache, must-revalidate');
-                } else {
-                    header('X-LiteSpeed-Cache-Control: public, must-revalidate, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400');
-                }
-            }
 
             unset($headers['X-GraphQL-Keys']);
+        }
+        if (isset($headers['X-LiteSpeed-Cache-Control'])) {
+            unset($headers['X-LiteSpeed-Cache-Control']);
+            if (is_user_logged_in()) {
+                header('X-LiteSpeed-Cache-Control: private, no-cache, must-revalidate');
+            } else {
+                header('X-LiteSpeed-Cache-Control: public, must-revalidate, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400');
+            }
         }
         return $headers;
     }

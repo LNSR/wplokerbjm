@@ -5,7 +5,6 @@ import type {
   ExecutionContext,
   CacheStorage,
   IncomingRequestCfProperties,
-  DurableObjectNamespace,
   KVNamespace,
 } from "@cloudflare/workers-types";
 
@@ -43,8 +42,6 @@ declare global {
 
   type DataLayerItem = Record<string, unknown> | unknown[];
 
-  // ViewTransition API removed from typings as the project no longer uses it
-  // (If you need it back, re-add interface definitions here.)
   interface Window {
     adsbygoogle?: unknown[];
     // Google Analytics / GTM helpers used by the frontend

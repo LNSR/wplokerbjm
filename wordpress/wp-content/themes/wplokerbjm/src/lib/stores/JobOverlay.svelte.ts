@@ -1,8 +1,8 @@
-import type { CardJob, JobCardProps, JobDetailResponse } from "@/types";
+import type { CardJob, JobCardProps } from "@/types";
 import { isMobile } from "$lib/utils/elements.svelte";
-import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
+import { routeStateStore } from "$lib/stores/Route.svelte";
 import { SvelteURL } from "svelte/reactivity";
-import { GlobalNavigateTo } from "$lib/stores/Route.svelte";
+import { goto } from "$app/navigation";
 /**
  * JobOverlayManager
  *
@@ -13,44 +13,37 @@ import { GlobalNavigateTo } from "$lib/stores/Route.svelte";
  * - Provide consistent scrolling to the associated job card
  * - Integrate with browser history and SEO updates for desktop
  */
-export class JobOverlayManager {
-  public selectedSlug = $derived(routeStateStore.lastVisitedJob);
-  public selectedJob = $state<CardJob | null>(null);
+export class JobOverlayManager
+{
+  // Current slug of the job that was last activated through routeStateStore
+  // This is derived from shared route state so other components can react.
+  public selectedSlug = $derived( routeStateStore.lastVisitedJob );
 
-  // Overlay detail state, synchronized from page.data.job in SingleOverlay.svelte
-  public overlayData = $state<JobDetailResponse | null>(null);
+  // Fully resolved job card element data from the UI list (optional).
+  // This allows immediate overlay content while the remote detail may still load.
+  public selectedJob = $state<CardJob | null>( null );
 
-  // Scroll detection
-  public isScrolling = false;
-  private scrollTimeout: ReturnType<typeof setTimeout> | null = null;
+  // Overlay detail payload from the server response, set by SingleOverlay.svelte.
+  // This is the canonical detail state for the overlay panel content.
+
+  // Scroll detection state to avoid interrupting user-initiated scrolling.
+  public isScrolling: boolean = false;
 
   /**
-   * Create a JobOverlayManager instance.
-   *
-   * Registers a passive scroll listener used to detect when the user is
-   * actively scrolling so that methods like `scrollToCard` can optionally
-   * avoid interfering while the user scrolls.
+   * Update scroll state used by `scrollToCard` to avoid interrupting
+   * user-initiated manual scrolling.
    */
-  constructor() {
-    if (typeof window !== "undefined") {
-      window.addEventListener("scroll", this.handleScroll, { passive: true });
-    }
+  public set setScrollState(value: boolean) {
+    this.isScrolling = value;
   }
-
-  private handleScroll = (): void => {
-    // Only set isScrolling when it transitions from false to true to avoid frequent reactive churn
-    if (!this.isScrolling) this.isScrolling = true;
-    if (this.scrollTimeout) clearTimeout(this.scrollTimeout);
-    this.scrollTimeout = setTimeout(() => {
-      this.isScrolling = false;
-    }, 500); // Adjust delay as needed
-  };
 
   /**
    * Open the overlay for a job.
    *
    * @param slug - The job slug to open
    * @param job - Optional job object to set as the selected job immediately
+   * @param source - The source of the job card interaction (e.g., "featured", "carousel") for analytics
+   * @param gotoCB - Optional callback to execute after navigation completes (desktop only)
    *
    * Notes:
    * - On desktop this will replace the current history entry with the
@@ -58,25 +51,49 @@ export class JobOverlayManager {
   * - Job detail data is provided by SvelteKit route load and synchronized
   *   to `overlayData` from SingleOverlay.svelte.
    */
-  public openOverlay(
+  public openOverlay (
     slug: string,
     job?: CardJob,
-    source: JobCardProps["variant"] = "featured",
-  ): void {
-    routeStateStore.MarkVisitedJob(slug, source);
+    source: JobCardProps[ "variant" ] = "featured",
+    { gotoCB }: { gotoCB?: () => void | Promise<void> } = {},
+  ): void
+  {
+    routeStateStore.MarkVisitedJob( slug, source );
     this.selectedJob = job ?? null;
 
-    requestAnimationFrame(async () => {
+    requestAnimationFrame( () =>
+    {
       // Handle page push and SEO for desktop
       const isDesktop = !isMobile();
 
-      if (job && job.permalink && isDesktop) {
-        const url = new SvelteURL(job.permalink, window.location.origin);
+      if ( job && job.permalink && isDesktop )
+      {
+        const url = new SvelteURL( job.permalink, window.location.origin );
         const path = url.pathname + url.search + url.hash;
 
-        GlobalNavigateTo(path, { replaceState: true, noScroll: true, keepFocus: true });
+        goto( path, { replaceState: true, noScroll: true, keepFocus: true } ).then( () =>
+        {
+          if ( !gotoCB ) return;
+          try
+          {
+            const gotoResult = gotoCB();
+            if ( typeof gotoResult?.then === "function" || gotoResult instanceof Promise )
+            {
+              return Promise.resolve( gotoResult ).catch( err =>
+              {
+                console.error( "gotoCB Promise error:", err );
+              } );
+            } else
+            {
+              return void gotoResult;
+            }
+          } catch ( err )
+          {
+            console.error( "gotoCB error:", err );
+          }
+        } );
       }
-    });
+    } );
   }
 
   /**
@@ -84,7 +101,7 @@ export class JobOverlayManager {
    *
    * @param slug - The job slug to scroll to; defaults to `this.selectedSlug`
    * @param skipIfScrolling - If true, skip scrolling if user is actively scrolling (default: true)
-   * @param preferredSource - Preferred source of the card ("carousel" or "featured") when multiple matches exist
+   * @param selectedSourceType - Preferred source of the card ("carousel" or "featured")
    *
    * Notes:
    * - If no slug is provided and `this.selectedSlug` is null, no action is taken.
@@ -93,95 +110,77 @@ export class JobOverlayManager {
    * - If no matching element is found, no scrolling occurs to avoid jumping
    *   to unrelated sections.
    */
-  public scrollToCard(
-    slug?: string,
-    delay: number = 300,
+  public scrollToCard (
+    slug: string,
     skipIfScrolling: boolean = true,
-    preferredSource?: JobCardProps["variant"],
-  ): void {
+    selectedSourceType: JobCardProps[ "variant" ] = "featured",
+  ): void
+  {
     const targetSlug = slug ?? this.selectedSlug;
-    if (!targetSlug) return;
+    if ( !targetSlug ) return;
 
-    if (typeof window === "undefined") return;
+    if ( typeof window === "undefined" ) return;
 
     // Skip if user is still scrolling and skipIfScrolling is true
-    if (skipIfScrolling && this.isScrolling) return;
+    if ( skipIfScrolling && this.isScrolling ) return;
 
-    setTimeout(() => {
-      try {
-        const safeSlug = String(targetSlug);
-        const selector = `div[data-job-slug="${safeSlug}"]`;
+    const performScroll = () =>
+    {
+      try
+      {
+        const safeSlug = String( targetSlug );
+        const selector = `div[data-job-slug="${ safeSlug }"]`;
         const candidates = Array.from(
-          document.querySelectorAll(selector),
+          document.querySelectorAll( selector ),
         ) as HTMLElement[];
         let cardElement: HTMLElement | null = null;
 
-        // If multiple elements match the slug (e.g., carousel + grid), prefer a
-        // candidate that matches the preferred source and is visible/close to the viewport.
-        if (candidates.length > 0) {
-          const visibleCandidates = candidates.filter((el) => {
-            const rect = el.getBoundingClientRect();
-            const style = window.getComputedStyle(el);
-            return (
-              rect.width > 0 &&
-              rect.height > 0 &&
-              style.display !== "none" &&
-              el.offsetParent !== null
-            );
-          });
-
-          if (preferredSource) {
-            // Prefer visible candidates from the requested source
-            const sourceVisible = visibleCandidates.filter(
-              (el) => el.dataset.jobSource === preferredSource,
-            );
-            if (sourceVisible.length > 0) {
-              sourceVisible.sort(
-                (a, b) =>
-                  Math.abs(a.getBoundingClientRect().top) -
-                  Math.abs(b.getBoundingClientRect().top),
-              );
-              cardElement = sourceVisible[0];
-            } else {
-              // No visible matches for the preferred source; prefer any element from that source
-              const sourceAny = candidates.filter(
-                (el) => el.dataset.jobSource === preferredSource,
-              );
-              if (sourceAny.length > 0) {
-                cardElement = sourceAny[0];
-              }
-            }
-          }
-
-          // If still no element chosen, fall back to the closest visible candidate, otherwise the first match
-          if (!cardElement) {
-            if (visibleCandidates.length > 0) {
-              visibleCandidates.sort(
-                (a, b) =>
-                  Math.abs(a.getBoundingClientRect().top) -
-                  Math.abs(b.getBoundingClientRect().top),
-              );
-              cardElement = visibleCandidates[0];
-            } else {
-              cardElement = candidates[0];
-            }
-          }
+        const isElementVisible = ( el: HTMLElement ) =>
+        {
+          const rect = el.getBoundingClientRect();
+          const style = window.getComputedStyle( el );
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.display !== "none" &&
+            el.offsetParent !== null
+          );
         }
 
-        if (cardElement) {
-          cardElement.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-            inline: "nearest",
-          });
-          return;
-        }
+        const visibleCandidates = candidates.filter( isElementVisible );
+        const sourceVisible = visibleCandidates
+          .filter( ( el ) => el.dataset.jobSource === selectedSourceType )
+          .sort(
+            ( a, b ) =>
+              Math.abs( a.getBoundingClientRect().top ) -
+              Math.abs( b.getBoundingClientRect().top ),
+          );
 
-        // No card element found — avoid jumping to unrelated sections.
-      } catch (err) {
-        console.error("scrollToCard error:", err);
+        const fallbackVisible = visibleCandidates.sort(
+          ( a, b ) =>
+            Math.abs( a.getBoundingClientRect().top ) -
+            Math.abs( b.getBoundingClientRect().top ),
+        );
+
+        cardElement = sourceVisible[ 0 ] || fallbackVisible[ 0 ] || null;
+
+        cardElement?.scrollIntoView( {
+          behavior: "smooth",
+          block: "start",
+          inline: "nearest",
+        } );
+      } catch ( err )
+      {
+        console.error( "scrollToCard error:", err );
       }
-    }, delay);
+    };
+    if ( typeof window.requestIdleCallback === "function" )
+    {
+      window.requestIdleCallback( performScroll, { timeout: 300 } );
+    } else
+    {
+      setTimeout( performScroll, 300 );
+    }
   }
 }
-export const jobOverlay = new JobOverlayManager();
+export const jobOverlayManager = new JobOverlayManager();
