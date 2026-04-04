@@ -23,7 +23,12 @@
     TelegramBrands,
   } from "svelte-awesome-icons";
   import { SvelteSet } from "svelte/reactivity";
-  import type { JobContactRow, SocialMediaItem, CustomFields, JobSummary } from "@/types";
+  import type {
+    JobContactRow,
+    SocialMediaItem,
+    CustomFields,
+    JobSummary,
+  } from "@/types";
   import { SocialMediaPlatform } from "@/types";
   import type { Component } from "svelte";
   import { browser } from "$app/environment";
@@ -46,7 +51,48 @@
   let galleryRef = $state<HTMLElement>();
 
   class SocialMediaLinkBuilder {
-    public buildSocialMediaItems(
+    static #platforms: Record<
+      SocialMediaPlatform,
+      { icon: Component; base_url: string }
+    > = {
+      [SocialMediaPlatform["X / Twitter"]]: {
+        icon: TwitterBrands,
+        base_url: "https://twitter.com/",
+      },
+      [SocialMediaPlatform.Facebook]: {
+        icon: FacebookBrands,
+        base_url: "https://facebook.com/",
+      },
+      [SocialMediaPlatform.Instagram]: {
+        icon: InstagramBrands,
+        base_url: "https://instagram.com/",
+      },
+      [SocialMediaPlatform.LinkedIn]: {
+        icon: LinkedinBrands,
+        base_url: "https://linkedin.com/in/",
+      },
+      [SocialMediaPlatform.Youtube]: {
+        icon: YoutubeBrands,
+        base_url: "https://youtube.com/@",
+      },
+      [SocialMediaPlatform.WhatsApp]: {
+        icon: WhatsappBrands,
+        base_url: "https://wa.me/",
+      },
+      [SocialMediaPlatform.TikTok]: {
+        icon: TiktokBrands,
+        base_url: "https://tiktok.com/@",
+      },
+      [SocialMediaPlatform.Threads]: {
+        icon: ThreadsBrands,
+        base_url: "https://threads.net/@",
+      },
+      [SocialMediaPlatform.Telegram]: {
+        icon: TelegramBrands,
+        base_url: "https://t.me/",
+      },
+    };
+    public static buildSocialMediaItems(
       socialMediaData: CustomFields["social_media"],
     ): SocialMediaItem[] {
       const processedItems: SocialMediaItem[] = [];
@@ -69,7 +115,7 @@
           .map((u: string) => u.trim())
           .filter((u) => u);
         for (const username of usernameList) {
-          const linkData = this.socialMediaHelper.getLinkData(
+          const linkData = SocialMediaLinkBuilder.getLinkData(
             platform,
             username,
           );
@@ -84,149 +130,105 @@
       }
       return processedItems;
     }
-    /**
-     * Helper class to parse social media platform and username into structured data
-     * it handles various edge cases for different platforms, such as WhatsApp phone numbers or LinkedIn company pages
-     */
-    private socialMediaHelper = new (class SocialMediaHelper {
-      #platforms: Record<
-        SocialMediaPlatform,
-        { icon: Component; base_url: string }
-      > = {
-        [SocialMediaPlatform["X / Twitter"]]: {
-          icon: TwitterBrands,
-          base_url: "https://twitter.com/",
-        },
-        [SocialMediaPlatform.Facebook]: {
-          icon: FacebookBrands,
-          base_url: "https://facebook.com/",
-        },
-        [SocialMediaPlatform.Instagram]: {
-          icon: InstagramBrands,
-          base_url: "https://instagram.com/",
-        },
-        [SocialMediaPlatform.LinkedIn]: {
-          icon: LinkedinBrands,
-          base_url: "https://linkedin.com/in/",
-        },
-        [SocialMediaPlatform.Youtube]: {
-          icon: YoutubeBrands,
-          base_url: "https://youtube.com/@",
-        },
-        [SocialMediaPlatform.WhatsApp]: {
-          icon: WhatsappBrands,
-          base_url: "https://wa.me/",
-        },
-        [SocialMediaPlatform.TikTok]: {
-          icon: TiktokBrands,
-          base_url: "https://tiktok.com/@",
-        },
-        [SocialMediaPlatform.Threads]: {
-          icon: ThreadsBrands,
-          base_url: "https://threads.net/@",
-        },
-        [SocialMediaPlatform.Telegram]: {
-          icon: TelegramBrands,
-          base_url: "https://t.me/",
-        },
-      };
 
-      public getLinkData(platform: SocialMediaPlatform, username: string) {
-        const config = this.#platforms[platform];
-        if (!config || !username) return null;
-        if (platform === SocialMediaPlatform.WhatsApp)
-          return this.getWhatsappLinkData(platform, config, username);
-        if (platform === SocialMediaPlatform.LinkedIn)
-          return this.getLinkedInLinkData(platform, config, username);
-        return this.getDefaultLinkData(platform, config, username);
+    private static getLinkData(
+      platform: SocialMediaPlatform,
+      username: string,
+    ) {
+      const config = this.#platforms[platform];
+      if (!config || !username) return null;
+      if (platform === SocialMediaPlatform.WhatsApp)
+        return this.getWhatsappLinkData(platform, config, username);
+      if (platform === SocialMediaPlatform.LinkedIn)
+        return this.getLinkedInLinkData(platform, config, username);
+      return this.getDefaultLinkData(platform, config, username);
+    }
+
+    private static normalizeUrl(url: string): string {
+      return url.replace(/^http:\/\//i, "https://");
+    }
+
+    private static formatPhone(number: string): string {
+      if (!number) return "";
+      number = number.replace(/[^\d+]/g, "");
+
+      const match = number.match(/^\+(\d{1,5})(\d{0,})$/);
+      if (match) {
+        const countryCode = "+" + match[1];
+        const rest = match[2] || "";
+        const formattedRest = rest.replace(/(.{4})/g, "$1 ").trim();
+        return (countryCode + " " + formattedRest).trim();
+      } else {
+        number = number.replace(/\D+/g, "");
+        return number.replace(/(.{4})/g, "$1 ").trim();
       }
+    }
 
-      private normalizeUrl(url: string): string {
-        return url.replace(/^http:\/\//i, "https://");
+    private static getWhatsappLinkData(
+      platform: SocialMediaPlatform.WhatsApp,
+      config: { icon: Component; base_url: string },
+      username: string,
+    ): SocialMediaItem {
+      if (/^https?:\/\/wa\.me\/qr\/[A-Z0-9]+$/i.test(username)) {
+        const normalized = this.normalizeUrl(username);
+        return { platform, icon: config.icon, url: normalized, username };
       }
-
-      private formatPhone(number: string): string {
-        if (!number) return "";
-        number = number.replace(/[^\d+]/g, "");
-
-        const match = number.match(/^\+(\d{1,5})(\d{0,})$/);
-        if (match) {
-          const countryCode = "+" + match[1];
-          const rest = match[2] || "";
-          const formattedRest = rest.replace(/(.{4})/g, "$1 ").trim();
-          return (countryCode + " " + formattedRest).trim();
-        } else {
-          number = number.replace(/\D+/g, "");
-          return number.replace(/(.{4})/g, "$1 ").trim();
-        }
-      }
-
-      private getWhatsappLinkData(
-        platform: SocialMediaPlatform.WhatsApp,
-        config: { icon: Component; base_url: string },
-        username: string,
-      ): SocialMediaItem {
-        if (/^https?:\/\/wa\.me\/qr\/[A-Z0-9]+$/i.test(username)) {
-          const normalized = this.normalizeUrl(username);
-          return { platform, icon: config.icon, url: normalized, username };
-        }
-        const waMeMatch = /^(?:https?:\/\/)?wa\.me\/(\d+)$/i.exec(username);
-        if (waMeMatch) {
-          const number = this.formatPhone(waMeMatch[1]);
-          return {
-            platform,
-            icon: config.icon,
-            url: `https://wa.me/${number}`,
-            username: `+${number}`,
-          };
-        }
-        if (/^https?:\/\/((api|web)\.whatsapp\.com)/.test(username)) {
-          const normalized = this.normalizeUrl(username);
-          return { platform, icon: config.icon, url: normalized, username };
-        }
-        const cleanNumber = username.replace(/[^0-9]/g, "");
+      const waMeMatch = /^(?:https?:\/\/)?wa\.me\/(\d+)$/i.exec(username);
+      if (waMeMatch) {
+        const number = this.formatPhone(waMeMatch[1]);
         return {
           platform,
           icon: config.icon,
-          url: config.base_url + cleanNumber,
-          username,
+          url: `https://wa.me/${number}`,
+          username: `+${number}`,
         };
       }
-
-      private getLinkedInLinkData(
-        platform: SocialMediaPlatform.LinkedIn,
-        config: { icon: Component; base_url: string },
-        username: string,
-      ): SocialMediaItem {
-        if (/^https?:\/\//i.test(username)) {
-          const normalized = this.normalizeUrl(username);
-          return { platform, icon: config.icon, url: normalized, username };
-        }
-        const clean_username = username.replace(/^@/, "");
-        const companyMatch = /^company[:/](.+)$/i.exec(clean_username);
-        let url;
-        if (companyMatch) {
-          url = `https://linkedin.com/company/${companyMatch[1]}`;
-        } else {
-          url = config.base_url + clean_username;
-        }
-        return { platform, icon: config.icon, url, username };
+      if (/^https?:\/\/((api|web)\.whatsapp\.com)/.test(username)) {
+        const normalized = this.normalizeUrl(username);
+        return { platform, icon: config.icon, url: normalized, username };
       }
+      const cleanNumber = username.replace(/[^0-9]/g, "");
+      return {
+        platform,
+        icon: config.icon,
+        url: config.base_url + cleanNumber,
+        username,
+      };
+    }
 
-      private getDefaultLinkData(
-        platform: SocialMediaPlatform,
-        config: { icon: Component; base_url: string },
-        username: string,
-      ): SocialMediaItem {
-        if (/^https?:\/\//i.test(username)) {
-          const normalized = this.normalizeUrl(username);
-          return { platform, icon: config.icon, url: normalized, username };
-        }
-        const clean_username = username.replace(/^@/, "");
-        const url = config.base_url + clean_username;
-        return { platform, icon: config.icon, url, username };
+    private static getLinkedInLinkData(
+      platform: SocialMediaPlatform.LinkedIn,
+      config: { icon: Component; base_url: string },
+      username: string,
+    ): SocialMediaItem {
+      if (/^https?:\/\//i.test(username)) {
+        const normalized = this.normalizeUrl(username);
+        return { platform, icon: config.icon, url: normalized, username };
       }
-    })();
+      const clean_username = username.replace(/^@/, "");
+      const companyMatch = /^company[:/](.+)$/i.exec(clean_username);
+      let url;
+      if (companyMatch) {
+        url = `https://linkedin.com/company/${companyMatch[1]}`;
+      } else {
+        url = config.base_url + clean_username;
+      }
+      return { platform, icon: config.icon, url, username };
+    }
+
+    private static getDefaultLinkData(
+      platform: SocialMediaPlatform,
+      config: { icon: Component; base_url: string },
+      username: string,
+    ): SocialMediaItem {
+      if (/^https?:\/\//i.test(username)) {
+        const normalized = this.normalizeUrl(username);
+        return { platform, icon: config.icon, url: normalized, username };
+      }
+      const clean_username = username.replace(/^@/, "");
+      const url = config.base_url + clean_username;
+      return { platform, icon: config.icon, url, username };
+    }
   }
 
   /**
@@ -240,8 +242,7 @@
       const container = browser
         ? ((document.querySelector("#app") as HTMLElement) ?? document.body)
         : undefined;
-      const opts: unknown = {
-        hidden: true,
+      const opts: Viewer.Options = {
         container,
         focus: false,
         toolbar: {
@@ -261,7 +262,7 @@
           flipVertical: false,
         },
       };
-      return opts as Viewer.Options;
+      return opts;
     }
 
     public setupViewer(): void {
@@ -285,7 +286,6 @@
     }
   }
   const viewerJSManager = new ViewerJSManager();
-  const socialMediaBuilder = new SocialMediaLinkBuilder();
 </script>
 
 <script lang="ts">
@@ -414,14 +414,14 @@
   }
 
   const ringkasanPekerjaan = $derived.by(() =>
-    generalJobStore.useSummaryJob(job.ringkasanPekerjaan as JobSummary),
+    generalJobStore.showSummaryJob(job.ringkasanPekerjaan as JobSummary),
   );
   const contacts = $derived.by(() => getContactRows(job.contacts));
   const socialMediaItems = $derived.by(() =>
-    socialMediaBuilder.buildSocialMediaItems(job.social_media),
+    SocialMediaLinkBuilder.buildSocialMediaItems(job.social_media),
   );
   const timeAgo = $derived.by(() => {
-    return generalJobStore.useTimeAgo(job.post_time);
+    return generalJobStore.showTimeAgo(job.post_time);
   });
 
   $effect(() => {

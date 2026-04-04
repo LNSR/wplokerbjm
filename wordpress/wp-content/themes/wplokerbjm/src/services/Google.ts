@@ -133,7 +133,7 @@ export class GoogleServices
    */
   private static get isTrackingDisabled (): boolean
   {
-    return !!themeManager.getThemeData.wpRestNonce;
+    return !!themeManager.getNonce;
   }
 
   /**

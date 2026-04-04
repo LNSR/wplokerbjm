@@ -11,7 +11,7 @@
   import { SearchUtils } from "@/utils/search";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import { APIServiceBrowser } from "@/services/APIService";
-  import { debounce } from "@/utils/lodash";
+  import { debounce } from "es-toolkit";
 
   type SearchFormResultsPayload = SearchResponse & {
     shouldScroll: boolean;

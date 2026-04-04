@@ -382,7 +382,7 @@ export class APIServiceBrowser
     {
       resp.jobs = resp.jobs.map( ( j ) => APIServiceHelper.normalizeJob( j ) );
     }
-    return typia.assertEquals<SearchResponse>( resp );
+    return typia.assert<SearchResponse>( resp );
   }
   static async loadMoreJobsGraphQL (
     filters: LoadMoreFilters,

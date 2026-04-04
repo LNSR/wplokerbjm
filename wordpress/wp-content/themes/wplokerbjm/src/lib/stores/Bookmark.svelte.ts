@@ -1,7 +1,4 @@
-import {
-  debounce,
-  type DebouncedFunction,
-} from "@/utils/lodash";
+import { debounce } from "es-toolkit";
 import { bookmarkIDB } from "@/utils/indexedDB";
 import { SvelteSet, SvelteMap } from "svelte/reactivity";
 import { APIServiceBrowser } from "@/services/APIService";
@@ -28,9 +25,9 @@ export class BookmarkManager {
 
   private channel: BroadcastChannel | null = null;
   private readonly tabStartedAt = generalJobStore.now.getTime(); // Timestamp to identify when this tab instance started for version conflict resolution
-  private debouncedSync: DebouncedFunction<() => void> | null = null;
+  private debouncedSync: ReturnType<typeof debounce> | null = null;
   private pendingSyncIds = new SvelteSet<number>();
-  #debouncedSaveCall: DebouncedFunction<() => Promise<void>> | null = null;
+  #debouncedSaveCall: ReturnType<typeof debounce> | null = null;
   #pendingSavePromise: Promise<void> | null = null;
   #pendingSaveResolve: (() => void) | null = null;
   #pendingSaveReject: ((reason?: any) => void) | null = null;

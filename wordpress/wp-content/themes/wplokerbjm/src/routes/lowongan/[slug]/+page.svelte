@@ -3,13 +3,14 @@
   import type { JobDetailResponse, CarouselProps, JobGridProps } from "@/types";
   import Homepage from "@/routes/+page.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
-  const props: {
+  interface Props {
     data: {
       job: JobDetailResponse;
       carousel?: CarouselProps;
       jobGrid?: JobGridProps;
     };
-  } = $props();
+  }
+  const props: Props = $props();
   const homepageDesktopData = $derived({
     data: {
       carousel: props.data.carousel,
@@ -26,7 +27,7 @@
     <main
       class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12"
     >
-      <JobDetail job={job} />
+      <JobDetail {job} />
     </main>
   {/if}
 {:else}

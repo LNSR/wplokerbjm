@@ -1,8 +1,9 @@
 <script module lang="ts">
   import { onMount, onDestroy, tick } from "svelte";
-  import { debounce, type DebouncedFunction } from "@/utils/lodash";
+  import { on } from "svelte/events";
+  import { debounce } from "es-toolkit";
   import { type ThemeName, type WPLokerBJMThemedData } from "@/types";
-  import { MediaQuery } from "svelte/reactivity";
+  import { createSubscriber } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { isMobile } from "$lib/utils/elements.svelte";
   import { isAppEl } from "@/utils/elements";
@@ -10,7 +11,8 @@
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import { browser } from "$app/environment";
   import { APIServiceBrowser } from "@/services/APIService";
-  const isMobileValue = $derived.by(() => isMobile());
+
+  const isMobileValue = $derived.by(isMobile);
 
   let showBookmarkModal = $state(false);
 
@@ -24,11 +26,29 @@
   });
 
   class ThemeColorManager {
-    public mediaQuery: MediaQuery | null = null;
-    public debouncedSetTheme!: DebouncedFunction<(d: ThemeName) => void>;
+    #mediaQuery: MediaQueryList | null = null;
+    #prefersDarkSubscriber = createSubscriber((update) => {
+      if (!browser) return;
+
+      this.#mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
+      const off = on(this.#mediaQuery, "change", update);
+      return () => off();
+    });
+
+    public debouncedSetTheme!: ReturnType<typeof debounce>;
     public isDark = $state(false);
     public currentTheme = $state<ThemeName>("light");
     #initialized = false;
+
+    public get prefersSystemDark(): boolean {
+      if (!browser) return false;
+      this.#prefersDarkSubscriber();
+      try {
+        return this.#mediaQuery?.matches ?? false;
+      } catch {
+        return false;
+      }
+    }
 
     private updateMetaThemeColor(dark: boolean): void {
       try {
@@ -73,7 +93,7 @@
         document.documentElement.classList.remove("theme-switching");
         runIdle(() => {
           this.persistTheme(theme);
-          headerManager.scheduleUpdate();
+          headerManager.scheduleUpdateHeight();
         });
       });
     }
@@ -147,22 +167,12 @@
         saved = "";
       }
 
-      const systemPrefersDark = ((): boolean => {
-        try {
-          return (
-            window.matchMedia &&
-            window.matchMedia("(prefers-color-scheme: dark)").matches
-          );
-        } catch {
-          return false;
-        }
-      })();
+      const systemPrefersDark = this.prefersSystemDark;
 
       switch (saved) {
         case "dark":
         case "lavender":
         case "light":
-          // persisted preference
           this.isDark = saved === "dark";
           this.setThemeDirect(saved as ThemeName);
           break;
@@ -178,119 +188,55 @@
     }
 
     public setTheme(theme: ThemeName): void {
-      // update boolean flag early so UI icon flips, but DON'T set currentTheme yet
-      // otherwise setThemeDirect will erroneously early-return without updating DOM
       this.isDark = theme === "dark";
 
       // apply immediately for responsive UI, but keep debounced path for save/side-effects
       try {
         this.setThemeDirect(theme, { useViewTransition: true });
       } catch {
-        // fallback to debounced if direct fails for some reason
         this.debouncedSetTheme(theme);
       }
 
-      // ensure a debounced call remains to avoid double-write races
       this.debouncedSetTheme.flush();
     }
   }
 
   class HeaderManager {
-    headerEl: HTMLElement | null = null;
+    headerEl = $state<HTMLElement | null>(null);
     headerHeight = $state(0);
 
     appEl: HTMLElement | null = null;
-    #lastOffsetUpdate = $state(0);
-    rafId: number | null = null;
-    mutationObserver: MutationObserver | null = null;
-    headerResizeObserver: ResizeObserver | null = null;
 
-    scheduleUpdate = () => {
+    scheduleUpdateHeight = () => {
       if (!browser) return;
-      if (this.rafId !== null) return;
-      this.rafId = requestAnimationFrame(() => {
-        this.rafId = null;
-        this.updateOffsets();
-      });
-    };
-
-    updateOffsets = () => {
-      // Throttle expensive offset calculations to avoid layout thrash.
-      const now = Date.now();
-      if (this.#lastOffsetUpdate && now - this.#lastOffsetUpdate < 100) return;
-      this.#lastOffsetUpdate = now;
-
-      this.headerEl = document.querySelector("header");
+      const el = this.headerEl;
+      if (!el) return;
       try {
-        this.updateHeaderHeight();
-      } catch(e) {
-        console.error("Error updating header height", e);
-        this.headerHeight = 0;
-      }
-    };
-
-    private updateHeaderHeight = () => {
-      if (this.headerEl) {
-        const height = this.headerEl.offsetHeight;
-
-        // Also store globally so any sibling/content section can consume it.
+        const height = el.offsetHeight;
+        this.headerHeight = height;
         this.appEl?.style.setProperty("--site-header-height", height + "px");
         this.appEl?.style.setProperty(
           "--site-scroll-padding-top",
           height + "px",
         );
+      } catch (e) {
+        console.error("Error updating header height", e);
+        this.headerHeight = 0;
       }
     };
 
-    attachMutationObserver() {
-      if (!browser) return;
-      const htmlEl = document.documentElement;
-      this.mutationObserver = new MutationObserver(() => {
-        if (document.documentElement.classList.contains("theme-switching"))
-          return;
-        this.scheduleUpdate();
-      });
-      this.mutationObserver.observe(htmlEl, {
-        attributes: true,
-        attributeFilter: ["class", "style"],
-      });
-    }
-
     start = () => {
-      if (!browser) return; // nothing to do on server
-      // resolve main app container for sibling-style updates
       this.appEl = document.querySelector(isAppEl) as HTMLElement | null;
-
-      // run immediately once
-      this.scheduleUpdate();
-
-      this.attachMutationObserver();
-
-      // Attach ResizeObserver for header height changes
-      if (this.headerEl && !this.headerResizeObserver) {
-        this.headerResizeObserver = new ResizeObserver(() => {
-          this.updateHeaderHeight();
-        });
-        this.headerResizeObserver.observe(this.headerEl);
-      }
+      this.scheduleUpdateHeight();
     };
 
     destroy = () => {
-      // cleanup listeners and observers
-      if (this.rafId !== null) cancelAnimationFrame(this.rafId);
-
-      if (this.mutationObserver) {
-        this.mutationObserver.disconnect();
-        this.mutationObserver = null;
+      // Clear CSS vars from the app container and drop reference
+      if (this.appEl) {
+        this.appEl.style.removeProperty("--site-header-height");
+        this.appEl.style.removeProperty("--site-scroll-padding-top");
       }
-
-      if (this.headerResizeObserver) {
-        this.headerResizeObserver.disconnect();
-        this.headerResizeObserver = null;
-      }
-
-      this.headerEl?.style.removeProperty("--site-header-height");
-      this.headerEl?.style.removeProperty("--site-scroll-padding-top");
+      this.headerEl = null;
     };
   }
 
@@ -442,41 +388,10 @@
     }
   });
 
-  const hasStoredTheme = $derived.by(() => {
-    if (!browser) return true;
-    try {
-      return !!localStorage.getItem("wplokerbjm-theme");
-    } catch {
-      return false;
-    }
-  });
-
+  // Pure derived: only compute values, avoid mutating shared managers here.
   const prefersSystemDark = $derived.by(() => {
     if (!browser) return false;
-
-    if (!themeColorManager.mediaQuery) {
-      themeColorManager.mediaQuery = new MediaQuery(
-        "(prefers-color-scheme: dark)",
-      );
-    }
-
-    return themeColorManager.mediaQuery!.current;
-  });
-
-  const derivedTheme = $derived.by(() => {
-    if (!browser) return themeColorManager.currentTheme;
-
-    const stored = hasStoredTheme;
-    const prefersDark = prefersSystemDark;
-
-    if (!stored) {
-      themeColorManager.isDark = prefersDark;
-      themeColorManager.setThemeDirect(prefersDark ? "dark" : "light");
-    }
-
-    const theme = themeColorManager.currentTheme;
-    themeColorManager.debouncedSetTheme(theme);
-    return theme;
+    return themeColorManager.prefersSystemDark;
   });
 
   const bookmarkModalComponent = $derived.by(() => {
@@ -489,17 +404,67 @@
     return dynamicComponentStore.loadLoginModal();
   });
 
-  const currentWindowWidth = $derived.by(() => {
-    if (!browser) return 0;
-    const width = innerWidth.current;
-    headerManager.scheduleUpdate();
-    return width;
+  $effect(() => {
+    const stored = !!localStorage.getItem("wplokerbjm-theme");
+    const prefersDark = prefersSystemDark;
+    const theme = themeColorManager.currentTheme;
+
+    if (!stored) {
+      themeColorManager.isDark = prefersDark;
+
+      themeColorManager.setThemeDirect(prefersDark ? "dark" : themeColorManager.currentTheme);
+      if (themeColorManager.debouncedSetTheme) {
+        themeColorManager.debouncedSetTheme(prefersDark ? "dark" : themeColorManager.currentTheme);
+      }
+      return;
+    }
+
+    // when a stored theme exists, ensure manager receives updates (debounced)
+    if (themeColorManager.debouncedSetTheme) {
+      themeColorManager.debouncedSetTheme(theme);
+    } else {
+      themeColorManager.setThemeDirect(theme);
+    }
+  });
+
+  // schedule header updates when window width changes
+  $effect(() => {
+    innerWidth.current;
+    headerManager.scheduleUpdateHeight?.();
+  });
+
+  // Observe header element size changes and sync a reactive headerHeight
+  $effect(() => {
+    const el = headerManager.headerEl;
+    if (!el) return;
+
+    const updateHeight = () => {
+      try {
+        const h = el.offsetHeight;
+        headerManager.headerHeight = h;
+        headerManager.appEl?.style.setProperty(
+          "--site-header-height",
+          h + "px",
+        );
+        headerManager.appEl?.style.setProperty(
+          "--site-scroll-padding-top",
+          h + "px",
+        );
+      } catch (e) {
+        console.error("Error updating header height from ResizeObserver", e);
+      }
+    };
+
+    updateHeight();
+    const ro = new ResizeObserver(updateHeight);
+    ro.observe(el);
+    return () => ro.disconnect();
   });
 </script>
 
 <header
+  bind:this={headerManager.headerEl}
   class="fixed top-0 left-0 w-full bg-[var(--wpl-global-color-4)] border-b-3 border-base-300 min-h-auto z-[60]"
-  data-window-width={currentWindowWidth}
   style="view-transition-name: none;"
 >
   <div class="drawer drawer-end">
@@ -566,36 +531,23 @@
                     Pilih tema yang ingin Anda gunakan.
                   </p>
                   <div class="flex gap-3 mt-3">
-                    <button
-                      class="btn flex-1"
-                      class:btn-primary={derivedTheme === "light"}
-                      onclick={() => {
-                        themeColorManager.setTheme("light");
-                        showThemeModal = false;
-                      }}
-                    >
-                      Light
-                    </button>
-                    <button
-                      class="btn flex-1"
-                      class:btn-primary={derivedTheme === "dark"}
-                      onclick={() => {
-                        themeColorManager.setTheme("dark");
-                        showThemeModal = false;
-                      }}
-                    >
-                      Dark
-                    </button>
-                    <button
-                      class="btn flex-1"
-                      class:btn-primary={derivedTheme === "lavender"}
-                      onclick={() => {
-                        themeColorManager.setTheme("lavender");
-                        showThemeModal = false;
-                      }}
-                    >
-                      Lavender
-                    </button>
+                    {#snippet themeButton(choosenTheme: ThemeName)}
+                      <button
+                        class="btn flex-1 capitalize"
+                        aria-label={`Set theme to ${choosenTheme}`}
+                        class:btn-primary={themeColorManager.currentTheme === choosenTheme}
+                        onclick={() => {
+                          themeColorManager.setTheme(choosenTheme);
+                          showThemeModal = false;
+                        }}
+                      >
+                        {choosenTheme}
+                      </button>
+                    {/snippet}
+
+                    {#each ["light", "dark", "lavender"] as choosenTheme (choosenTheme)}
+                      {@render themeButton(choosenTheme as ThemeName)}
+                    {/each}
                   </div>
                   <div class="modal-action">
                     <button class="btn" onclick={() => (showThemeModal = false)}

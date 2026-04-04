@@ -5,10 +5,7 @@ import type { StatusPekerjaanString } from "@/types/wordpress/MetaBox";
     ThumbTackSolid,
   } from "svelte-awesome-icons";
 
-  const { label = "", status = "none" } = $props<{
-    label?: string;
-    status?: StatusPekerjaanString | '';
-  }>();
+  const { status }: { status: StatusPekerjaanString | '' } = $props();
 
   function statusClass(): string {
     switch (status) {
@@ -22,7 +19,7 @@ import type { StatusPekerjaanString } from "@/types/wordpress/MetaBox";
   }
 </script>
 
-{#if label}
+{#if status}
   <span
     class={`flex items-center badge gap-1 px-3 py-1 font-semibold rounded ${statusClass()}`}
   >
@@ -31,7 +28,7 @@ import type { StatusPekerjaanString } from "@/types/wordpress/MetaBox";
     {:else if status === "Pinned"}
       <ThumbTackSolid class="h-4 w-4" aria-hidden="true" />
     {/if}
-    <span>{label}</span>
+    <span>{status}</span>
   </span>
 {/if}
 

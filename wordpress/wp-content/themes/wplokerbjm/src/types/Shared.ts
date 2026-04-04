@@ -17,7 +17,7 @@ export interface SortOption {
 
 export interface BaseJobSearch
 {
-  jobs: CardJob[]
+  jobs?: CardJob[] | null
   maxNumPages?: number
   context?: SearchContext
   filters?: SearchFilters

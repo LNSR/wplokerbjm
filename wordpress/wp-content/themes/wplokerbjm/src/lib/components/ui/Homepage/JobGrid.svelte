@@ -244,9 +244,9 @@
           if (
             response &&
             Array.isArray((response as LoadMoreResponse).jobs) &&
-            (response as LoadMoreResponse).jobs.length
+            (response as LoadMoreResponse).jobs!.length
           ) {
-            const newJobs = (response as LoadMoreResponse).jobs.filter(
+            const newJobs = (response as LoadMoreResponse).jobs!.filter(
               (newJob: any) =>
                 !searchStore.jobs.some(
                   (existingJob) => existingJob.permalink === newJob.permalink,
@@ -348,7 +348,7 @@
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { onMount, tick } from "svelte";
 
-  const props = $props();
+  const props: JobGridProps = $props();
 
   const {
     jobs = [],

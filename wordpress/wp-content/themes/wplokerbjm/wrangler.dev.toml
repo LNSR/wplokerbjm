@@ -19,6 +19,10 @@ local_protocol = "https"
 https-cert-path = "../../../../certs/localhost.crt"
 https-key-path = "../../../../certs/localhost.key"
 
+[[env.dev.kv_namespaces]]
+binding = "wplokerbjm"
+id = "75fc8b0cd2d74548b6c05321296d4d45"
+
 [env]
 [env.vars]
 PUBLIC_CMS_ORIGIN = "https://dev.lokerbanjarmasin.my.id"

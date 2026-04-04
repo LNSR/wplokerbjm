@@ -75,7 +75,7 @@ class VirtualizationService {
      * @param opts - The options for virtualization computation
      * @returns The computed virtualization state
      */
-    computeList<T = any>(opts: ListOptions<T>): ListVirtualizationState<T> {
+    public computeList<T>(opts: ListOptions<T>): ListVirtualizationState<T> {
         const {
             displayJobs,
             scrollY,
@@ -147,7 +147,7 @@ class VirtualizationService {
      * @param jobId - The optional job ID to associate with the height
      * @returns An attachment function for measuring element height
      */
-    createMeasureHeight(cardHeights: SvelteMap<number, number>, jobId?: number): Attachment<HTMLElement> {
+    public createMeasureHeight(cardHeights: SvelteMap<number, number>, jobId?: number): Attachment<HTMLElement> {
         return (node: HTMLElement) => {
             const applyHeight = (height: number) => {
                 if (typeof jobId === 'number' && height > 0 && cardHeights.get(jobId) !== height) {

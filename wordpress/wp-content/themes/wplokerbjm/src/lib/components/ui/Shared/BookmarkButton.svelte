@@ -4,10 +4,11 @@
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
 
-  const { jobId, variant = undefined } = $props<{
+  interface Props {
     jobId: WPBasePost["id"];
     variant: JobCardProps["variant"];
-  }>();
+  }
+  const { jobId, variant = undefined }: Props = $props();
 
   const isJobSaved = $derived(
     bookmarkStore.jobs.some((job) => Number(job.id) === jobId),

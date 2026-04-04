@@ -27,31 +27,39 @@ interface SummaryRow
 class GeneralJobStore
 {
     public now = new SvelteDate();
-    #refCount = 0;
+    /** IANA time zone used for formatting and comparisons (default: Makassar) */
+    #timeZone: string = 'Asia/Makassar';
+    #refCount = $state( 0 );
     #intervalId: ReturnType<typeof setInterval> | null = null;
+    #getNowDate = new Date( this.now.getTime() );
 
-    private getNowDate(): Date
-    {
-        return new Date( this.now.getTime() );
-    }
-
-    public useDeadline( deadline: string ): { text: string; status: 'upcoming' | 'soon' | 'last_day' | 'expired_yesterday' | 'expired' | 'today' | 'unknown' }
+    public showDeadline( deadline: string ): { text: string; status: 'upcoming' | 'soon' | 'last_day' | 'expired_yesterday' | 'expired' | 'today' | 'unknown' }
     {
         if ( !deadline )
         {
             return { text: '', status: 'unknown' }
         }
 
-        const deadlineDateRaw = new Date( deadline )
-        const nowDate = this.getNowDate()
-        const deadlineDate = new Date(
-            deadlineDateRaw.getFullYear(),
-            deadlineDateRaw.getMonth(),
-            deadlineDateRaw.getDate()
-        )
-        const now = new Date( nowDate.getFullYear(), nowDate.getMonth(), nowDate.getDate() )
-        const msPerDay = 1000 * 60 * 60 * 24
-        const days_left = Math.floor( ( deadlineDate.getTime() - now.getTime() ) / msPerDay )
+        const getYMDInTimeZone = ( date: Date, timeZone: string = this.#timeZone ) =>
+        {
+            const fmt = new Intl.DateTimeFormat( 'en-CA', { timeZone, year: 'numeric', month: 'numeric', day: 'numeric' } );
+            const parts = fmt.formatToParts( date ).reduce( ( acc: Record<string, string>, p ) => ( acc[ p.type ] = p.value, acc ), {} as Record<string, string> );
+            return {
+                year: Number( parts.year ),
+                month: Number( parts.month ),
+                day: Number( parts.day ),
+            };
+        }
+
+        const deadlineDateRaw = new Date( deadline );
+        const nowDate = this.#getNowDate;
+        // compute Y/M/D in target time zone then compare UTC midnights to get whole-day difference
+        const deadlineYMD = getYMDInTimeZone( deadlineDateRaw, this.#timeZone );
+        const nowYMD = getYMDInTimeZone( nowDate, this.#timeZone );
+        const msPerDay = 1000 * 60 * 60 * 24;
+        const deadlineMidUTC = Date.UTC( deadlineYMD.year, deadlineYMD.month - 1, deadlineYMD.day );
+        const nowMidUTC = Date.UTC( nowYMD.year, nowYMD.month - 1, nowYMD.day );
+        const days_left = Math.floor( ( deadlineMidUTC - nowMidUTC ) / msPerDay );
         let text = ''
         let status: 'upcoming' | 'soon' | 'last_day' | 'expired_yesterday' | 'expired' | 'today' | 'unknown' = 'unknown'
 
@@ -69,12 +77,8 @@ class GeneralJobStore
                 text = 'Hari terakhir'
                 status = 'last_day'
                 break
-            case days_left === -1:
-                text = 'Berakhir kemarin'
-                status = 'expired_yesterday'
-                break
-            case days_left < -1:
-                text = `Berakhir ${ Math.abs( days_left ) } hari lalu`
+            case days_left < 0:
+                text = 'Kadaluarsa'
                 status = 'expired'
                 break
             default:
@@ -84,52 +88,41 @@ class GeneralJobStore
         return { text, status }
     }
 
-    public useTimeAgo( postTime: string ): string
+    /**
+     * 
+     * @param postTime post_time received from API
+     * @returns 
+     */
+    public showTimeAgo( postTime: string ): string
     {
-        if ( !postTime ) return ''
-
-        const postDate = new Date( postTime )
-        if ( isNaN( postDate.getTime() ) ) return ''
-        const nowDate = this.getNowDate()
-        const diff = Math.floor( ( nowDate.getTime() - postDate.getTime() ) / 1000 )
-
-        if ( diff < 60 ) return 'Baru saja diposting'
-        if ( diff < 3600 ) return `${ Math.floor( diff / 60 ) } menit lalu`
-        if ( diff < 86400 ) return `${ Math.floor( diff / 3600 ) } jam lalu`
-        if ( diff < 604800 ) return `${ Math.floor( diff / 86400 ) } hari lalu`
-        if ( diff < 2592000 ) return `${ Math.floor( diff / 604800 ) } minggu lalu`
-        if ( diff < 31536000 ) return `${ Math.floor( diff / 2592000 ) } bulan lalu`
-        return `${ Math.floor( diff / 31536000 ) } tahun lalu`
+        if ( !postTime ) return '';
+        const postDate = new Date( postTime );
+        if ( isNaN( postDate.getTime() ) ) return '';
+        const nowDate = this.#getNowDate;
+        const seconds = Math.floor( ( nowDate.getTime() - postDate.getTime() ) / 1000 );
+        return this._formatHelper.formatTimeAgo( seconds );
     }
 
-    public useStatusJob( status_pekerjaan: StatusPekerjaanNumber ): { label: string; status: StatusPekerjaanString | '' }
+    // Return a single status string. Previously returned {label,status} where both values were identical.
+    public showStatusJob( status_pekerjaan: StatusPekerjaanNumber ): StatusPekerjaanString | ''
     {
         if ( typeof status_pekerjaan !== 'number' ) throw new Error( 'status_pekerjaan must be a number' );
         switch ( status_pekerjaan )
         {
             case 2:
-                return {
-                    label: 'Urgent',
-                    status: 'Urgent',
-                }
+                return 'Urgent'
             case 3:
-                return {
-                    label: 'Pinned',
-                    status: 'Pinned',
-                }
+                return 'Pinned'
             default:
-                return {
-                    label: '',
-                    status: '',
-                }
+                return ''
         }
     }
 
-    public useSummaryJob( jobdata?: JobSummary | null ): SummaryRow[]
+    public showSummaryJob( jobdata?: JobSummary | null ): SummaryRow[]
     {
         if ( typeof jobdata !== 'object' || jobdata === null ) throw new Error( 'jobdata must be a non-null object' );
         const rows: SummaryRow[] = []
-        const data: JobSummary = ( jobdata ?? {} ) as JobSummary
+        const data: JobSummary = ( jobdata ?? {} )
 
         const arrayOrString = ( value: unknown ): string =>
         {
@@ -206,7 +199,7 @@ class GeneralJobStore
             rows.push( {
                 icon: CalendarSolid,
                 label: 'Deadline',
-                value: this._formatHelper.deadlineFormat( data[ 'deadline' ] ),
+                value: this._formatHelper.deadlineFormat( data[ 'deadline' ], this.#timeZone ),
             } )
         }
 
@@ -215,13 +208,13 @@ class GeneralJobStore
 
     /**
  * Provides a shared reactive clock that updates every minute, allowing multiple components to synchronize time-based displays (e.g., "time ago", deadlines) without setting up individual intervals. Usage: Call `const stopClock = generalStore.useSharedClock();` in a component's effect, and call `stopClock()` in the cleanup function to avoid memory leaks.
- * @see this.useTimeAgo()
- * @see this.useDeadline()
+ * @see this.showTimeAgo()
+ * @see this.showDeadline()
  */
     public useSharedClock(): () => void
     {
 
-        const startTimeEffect = (): void =>
+        const startTimeEffect: () => void = (): void =>
         {
             this.#refCount += 1;
 
@@ -235,7 +228,7 @@ class GeneralJobStore
             }
         };
 
-        const stopTimeEffect = (): void =>
+        const stopTimeEffect: () => void = (): void =>
         {
             this.#refCount = Math.max( this.#refCount - 1, 0 );
             if ( this.#refCount === 0 && this.#intervalId )
@@ -269,20 +262,46 @@ class GeneralJobStore
     private _formatHelper = new ( class FormatHelper
     {
 
-        private readonly indonesianMonths = [
-            'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-            'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
-        ];
-
-        public deadlineFormat( dateStr?: string | null ): string
+        public deadlineFormat( dateStr?: string | null, timeZone?: string ): string
         {
+            const indonesianMonths = [
+                'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+                'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
+            ];
+
             if ( !dateStr ) return '';
             const date = new Date( dateStr );
             if ( isNaN( date.getTime() ) ) return dateStr;
-            const day = date.getDate();
-            const month = date.getMonth();
-            const year = date.getFullYear();
-            return `${ day } ${ this.indonesianMonths[ month ] } ${ year }`;
+            // If the deadline is already past (in the provided timezone), simplify to 'kadaluarsa'
+            try {
+                const getYMDInTimeZone = ( d: Date, tz: string = ( timeZone ?? 'Asia/Makassar' ) ) => {
+                    const fmt = new Intl.DateTimeFormat( 'en-CA', { timeZone: tz, year: 'numeric', month: 'numeric', day: 'numeric' } );
+                    const parts = fmt.formatToParts( d ).reduce( ( acc: Record<string, string>, p ) => ( acc[ p.type ] = p.value, acc ), {} as Record<string, string> );
+                    return {
+                        year: Number( parts.year ),
+                        month: Number( parts.month ),
+                        day: Number( parts.day ),
+                    };
+                };
+
+                const dateYMD = getYMDInTimeZone( date, timeZone );
+                const nowYMD = getYMDInTimeZone( new Date(), timeZone );
+                const msPerDay = 1000 * 60 * 60 * 24;
+                const dateMidUTC = Date.UTC( dateYMD.year, dateYMD.month - 1, dateYMD.day );
+                const nowMidUTC = Date.UTC( nowYMD.year, nowYMD.month - 1, nowYMD.day );
+                const days_left = Math.floor( ( dateMidUTC - nowMidUTC ) / msPerDay );
+
+                if ( days_left < 0 ) {
+                    return 'kadaluarsa';
+                }
+
+                return new Intl.DateTimeFormat( 'id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone } ).format( date );
+            } catch {
+                const day = date.getDate();
+                const month = date.getMonth();
+                const year = date.getFullYear();
+                return `${ day } ${ indonesianMonths[ month ] } ${ year }`;
+            }
         }
 
         public formatAge( umur_min?: number, umur_max?: number ): string | null
@@ -302,6 +321,24 @@ class GeneralJobStore
             {
                 return `Maksimal ${ umur_max } Tahun`;
             }
+        }
+
+        public formatTimeAgo( seconds: number )
+        {
+            const relativeTimeFormatter = new Intl.RelativeTimeFormat( 'id', { numeric: 'always' } );
+            const removeYangString = ( text: string ): string => text.replace( /\s+yang\s+/g, ' ' );
+
+            if ( seconds < 60 ) return 'Baru saja diposting';
+
+            const formatTime = ( divisor: number, unit: Intl.RelativeTimeFormatUnit ) =>
+                removeYangString( relativeTimeFormatter.format( -Math.floor( seconds / divisor ), unit ) );
+
+            if ( seconds < 3600 ) return formatTime( 60, 'minute' );
+            if ( seconds < 86400 ) return formatTime( 3600, 'hour' );
+            if ( seconds < 604800 ) return formatTime( 86400, 'day' );
+            if ( seconds < 2592000 ) return formatTime( 604800, 'week' );
+            if ( seconds < 31536000 ) return formatTime( 2592000, 'month' );
+            return formatTime( 31536000, 'year' );
         }
 
         public formatSalary( gaji_minimal?: number, gaji_maksimal?: number ): string | null

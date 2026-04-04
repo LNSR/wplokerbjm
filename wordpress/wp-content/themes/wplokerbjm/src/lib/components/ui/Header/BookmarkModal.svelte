@@ -145,13 +145,14 @@
     displayedSavedJobs = $derived.by(() => {
       return savedJobs.map((job) => ({
         ...job,
-        timeAgo: generalJobStore.useTimeAgo(job.post_time!),
+        timeAgo: generalJobStore.showTimeAgo(job.post_time!),
         deadlineInfo: job.ringkasanPekerjaan?.deadline
-          ? generalJobStore.useDeadline(job.ringkasanPekerjaan.deadline)
+          ? generalJobStore.showDeadline(job.ringkasanPekerjaan.deadline)
           : { text: "", status: "unknown" },
+        // statusInfo is a single status string now (previously an object with identical label/status)
         statusInfo: job.status_pekerjaan
-          ? generalJobStore.useStatusJob(job.status_pekerjaan)
-          : { label: "", status: "none" },
+          ? generalJobStore.showStatusJob(job.status_pekerjaan)
+          : "none",
       }));
     });
 

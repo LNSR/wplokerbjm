@@ -2,7 +2,7 @@ import type { SearchState, CarouselState, JobCardProps } from "@/types";
 import { isMobile } from "$lib/utils/elements.svelte";
 import { SvelteMap } from "svelte/reactivity";
 import { type CardJob } from "@/types";
-import { LRUCache, type BackgroundFetch } from "lru-cache";
+import { LRUCache } from "lru-cache";
 import typia from "typia";
 import { dev } from "$app/environment";
 
@@ -59,7 +59,7 @@ class RouteStateManager {
    */
     const cleanUpEffectObserveBreakpointChanges = () => {
       if (this.effectCleanup) {
-        void this.effectCleanup();
+        this.effectCleanup();
         this.effectCleanup = undefined;
       }
     }
@@ -101,7 +101,7 @@ class RouteStateManager {
     this.carouselState = undefined;
   }
 
-  public saveSearchState(path: string, searchState: SearchState | BackgroundFetch<SearchState> | undefined): void {
+  public saveSearchState(path: string, searchState: SearchState | undefined): void {
     const key = `${this.#currentDevice}-${path}`;
     this.searchStates.set(key, searchState);
     if (typeof sessionStorage !== "undefined") {

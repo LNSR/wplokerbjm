@@ -1,5 +1,14 @@
 <script lang="ts">
   import { attachPortal } from "$lib/utils/elements.svelte";
+  interface Props {
+    open: boolean;
+    username: string;
+    password: string;
+    error: string;
+    loading: boolean;
+    onClose: () => void;
+    onLogin: (e?: Event) => Promise<void>;
+  }
   let {
     open = $bindable(),
     username = $bindable(),
@@ -8,15 +17,7 @@
     loading,
     onClose,
     onLogin,
-  }: {
-    open: boolean;
-    username: string;
-    password: string;
-    error: string;
-    loading: boolean;
-    onClose: () => void;
-    onLogin: (e?: Event) => Promise<void>;
-  } = $props();
+  }: Props = $props();
 
   function handleKeydown(e: KeyboardEvent) {
     if (!open) return;
@@ -26,7 +27,6 @@
       } catch {}
     }
   }
-
 </script>
 
 <svelte:window on:keydown={(e) => handleKeydown(e)} />

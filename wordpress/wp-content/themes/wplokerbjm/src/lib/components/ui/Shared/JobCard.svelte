@@ -36,16 +36,17 @@
 
   // Derived UI helpers (keeps UI reactive to prop changes)
   const summaryRows = $derived.by(() =>
-    generalJobStore.useSummaryJob(jobdata?.ringkasanPekerjaan),
+    generalJobStore.showSummaryJob(jobdata?.ringkasanPekerjaan),
   );
+  // showStatusJob now returns a single status string
   const statusInfo = $derived.by(() =>
-    generalJobStore.useStatusJob(jobdata?.status_pekerjaan ?? 0),
+    generalJobStore.showStatusJob(jobdata?.status_pekerjaan ?? 0),
   );
   const deadlineInfo = $derived.by(() => {
-    return generalJobStore.useDeadline(jobdata?.ringkasanPekerjaan?.deadline ?? "");
+    return generalJobStore.showDeadline(jobdata?.ringkasanPekerjaan?.deadline ?? "");
   });
   const timeAgo = $derived.by(() => {
-    return generalJobStore.useTimeAgo(jobdata?.post_time ?? "");
+    return generalJobStore.showTimeAgo(jobdata?.post_time ?? "");
   });
 
   const selected = $derived.by(() => {
@@ -112,7 +113,7 @@
           </h3>
           <div class="flex items-center gap-2">
             <time
-              class="text-lg font-semibold text-center text-[var(--wpl-global-color-1)]"
+              class="text-shadow-md font-semibold text-center text-[var(--wpl-global-color-1)]"
               datetime={jobdata?.post_time}
             >
               {timeAgo}
@@ -157,8 +158,8 @@
 
       <div class="divider my-2"></div>
 
-      <div class="flex items-center justify-between font-semibold gap-3">
-        <JobStatusBadge label={statusInfo.label} status={statusInfo.status} />
+      <div class="flex items-start justify-between font-semibold gap-3">
+        <JobStatusBadge status={statusInfo} />
 
         <JobDeadlineBadge
           text={deadlineInfo.text}
