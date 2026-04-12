@@ -10,6 +10,7 @@
   import { updated } from "$app/state";
   import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
   import type { OnNavigate } from "@sveltejs/kit";
+  import { headerManager } from "$lib/components/layouts/Header.svelte";
 
   let initialPageviewSent = false;
 
@@ -98,13 +99,6 @@
     routeStateStore.setInitialDevice = data?.deviceType?.isMobile
       ? "mobile"
       : "desktop";
-
-    const cleanupObserveBreakpointChanges =
-      routeStateStore.observeBreakpointChanges?.();
-
-    return () => {
-      cleanupObserveBreakpointChanges?.();
-    };
   });
 </script>
 
@@ -121,7 +115,10 @@
 </svelte:head>
 
 <Header {themeData} />
-<div class="route-container pt-20">
+<div
+  class="route-container !pt-20"
+  style="--site-header-height: {headerManager.currentHeight}px; --site-scroll-padding-top: {headerManager.currentHeight}px; padding-top: {headerManager.currentHeight}px;"
+>
   <div class="page-transition">
     {@render children()}
   </div>

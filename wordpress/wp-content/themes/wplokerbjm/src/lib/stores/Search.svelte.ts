@@ -9,7 +9,8 @@ import type {
     SearchTitle,
 } from '@/types'
 import { SearchUtils } from '@/utils/search';
-
+import { SvelteMap } from 'svelte/reactivity';
+import { routeStateStore } from './Route.svelte';
 /**
  * 
  */
@@ -17,6 +18,7 @@ export class SearchManager
 {
     // State
     private searchHistory = $state<string[]>( [] )
+    public jobGridCardHeight = new SvelteMap( routeStateStore.getCardHeights( "jobGrid" ) );
 
     public jobs = $state<CardJob[]>( [] )
     public context = $state<SearchContext>( "latest" ) // default context at initial load for jobgrid
@@ -38,7 +40,7 @@ export class SearchManager
     } )
 
     // Computed helpers
-    public get hasFilters (): boolean
+    public get hasFilters(): boolean
     {
         const f = this.filters
         return !!(
@@ -50,18 +52,25 @@ export class SearchManager
         )
     }
 
-    public get recentSearches (): string[]
+    public get recentSearches(): string[]
     {
         return this.searchHistory.slice( 0, 5 )
     }
 
-    public get hasMore (): boolean
+    public get hasMore(): boolean
     {
         return this.page < this.maxNumPages!
     }
 
+    // Specific to job grid, can be used by other contexts if needed
+    public clearJobGridCardHeights(): void
+    {
+        this.jobGridCardHeight.clear();
+        routeStateStore.clearCardHeights( "jobGrid" );
+    }
+
     // Actions
-    public setFilters ( newFilters: Partial<SearchFilters> ): void
+    public setFilters( newFilters: Partial<SearchFilters> ): void
     {
         const sanitized: Partial<SearchFilters> = { ...newFilters }
         if ( typeof newFilters.cari === 'string' ) sanitized.cari = SearchUtils.sanitizeString( newFilters.cari )
@@ -77,7 +86,7 @@ export class SearchManager
         this.filters.context = newFilters.context ?? this.filters.context
     }
 
-    public resetFilters (): void
+    public resetFilters(): void
     {
         this.filters.cari = ''
         this.filters[ 'lokasi_pekerjaan' ] = []
@@ -87,7 +96,7 @@ export class SearchManager
         this.filters.context = "latest"
     }
 
-    private addToHistory ( query: string ): void
+    private addToHistory( query: string ): void
     {
         if ( query && !this.searchHistory.includes( query ) )
         {
@@ -96,7 +105,7 @@ export class SearchManager
         }
     }
 
-    public async searchJobs (): Promise<SearchResponse>
+    public async searchJobs(): Promise<SearchResponse>
     {
         this.loading = true
         this.error = null

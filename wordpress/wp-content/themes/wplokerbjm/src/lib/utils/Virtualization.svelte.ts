@@ -5,7 +5,8 @@ import { SvelteMap } from "svelte/reactivity";
  * Represents the state of a virtualized list, including visible items and positioning data.
  * This interface is used to manage the rendering of large lists efficiently by only showing items in view.
  */
-export interface ListVirtualizationState<T = any> {
+export interface ListVirtualizationState<T = any>
+{
     /** Array of jobs that are currently visible */
     visibleJobs: T[];
     /** Total height of the entire list */
@@ -46,7 +47,8 @@ export type ListOptions<T = any> = {
  * inherently contributes to Cumulative Layout Shift (CLS) due to dynamic content loading, which is a limitation
  * of the web model and not addressed here.
  */
-class VirtualizationService {
+class VirtualizationService
+{
 
     /**
      * Binary search helper for finding the insertion point in a sorted array.
@@ -55,14 +57,18 @@ class VirtualizationService {
      * @param target - The target position to find
      * @returns The index where the target would be inserted
      */
-    private binarySearch(arr: number[], target: number): number {
+    private binarySearch( arr: number[], target: number ): number
+    {
         let low = 0;
         let high = arr.length - 1;
-        while (low <= high) {
-            const mid = Math.floor((low + high) / 2);
-            if (arr[mid] < target) {
+        while ( low <= high )
+        {
+            const mid = Math.floor( ( low + high ) / 2 );
+            if ( arr[ mid ] < target )
+            {
                 low = mid + 1;
-            } else {
+            } else
+            {
                 high = mid - 1;
             }
         }
@@ -75,7 +81,8 @@ class VirtualizationService {
      * @param opts - The options for virtualization computation
      * @returns The computed virtualization state
      */
-    public computeList<T>(opts: ListOptions<T>): ListVirtualizationState<T> {
+    public computeList<T>( opts: ListOptions<T> ): ListVirtualizationState<T>
+    {
         const {
             displayJobs,
             scrollY,
@@ -86,7 +93,8 @@ class VirtualizationService {
             buffer = 12,
         } = opts;
 
-        if (displayJobs.length === 0) {
+        if ( displayJobs.length === 0 )
+        {
             return {
                 visibleJobs: [],
                 totalHeight: 0,
@@ -100,11 +108,12 @@ class VirtualizationService {
         const itemPositions: number[] = [];
         let cumulativeHeight = 0;
 
-        for (let i = 0; i < displayJobs.length; i++) {
-            const job = displayJobs[i];
-            const jobId = (job as unknown as { id: number }).id || 0;
-            const height = cardHeights.get(jobId) || fallbackHeight;
-            itemPositions.push(cumulativeHeight);
+        for ( let i = 0; i < displayJobs.length; i++ )
+        {
+            const job = displayJobs[ i ];
+            const jobId = ( job as unknown as { id: number } ).id || 0;
+            const height = cardHeights.get( jobId ) || fallbackHeight;
+            itemPositions.push( cumulativeHeight );
             cumulativeHeight += height + gap;
         }
 
@@ -112,26 +121,26 @@ class VirtualizationService {
 
         // Find visible items based on scroll position using binary search for performance
         const bufferHeight = 200; // Approximate height for buffer calculations
-        const startPos = Math.max(0, scrollY - buffer * bufferHeight);
-        const startCandidate = this.binarySearch(itemPositions, startPos);
-        const startIndex = Math.max(0, startCandidate - buffer);
+        const startPos = Math.max( 0, scrollY - buffer * bufferHeight );
+        const startCandidate = this.binarySearch( itemPositions, startPos );
+        const startIndex = Math.max( 0, startCandidate - buffer );
 
         // Find the end index
         const endPos = scrollY + containerHeight + buffer * bufferHeight;
-        const endCandidate = this.binarySearch(itemPositions, endPos + 1); // +1 to find first > endPos
+        const endCandidate = this.binarySearch( itemPositions, endPos + 1 ); // +1 to find first > endPos
         const endIndex = endCandidate === itemPositions.length
             ? displayJobs.length
-            : Math.min(displayJobs.length, endCandidate + buffer);
+            : Math.min( displayJobs.length, endCandidate + buffer );
 
         const visibleJobs = displayJobs.slice(
-            Math.max(0, startIndex),
-            Math.max(0, endIndex)
+            Math.max( 0, startIndex ),
+            Math.max( 0, endIndex )
         );
 
         const state: Omit<ListVirtualizationState<T>, 'visibleJobs'> = {
             totalHeight,
-            startIndex: Math.max(0, startIndex),
-            endIndex: Math.max(0, endIndex),
+            startIndex: Math.max( 0, startIndex ),
+            endIndex: Math.max( 0, endIndex ),
             itemPositions,
         };
 
@@ -147,41 +156,48 @@ class VirtualizationService {
      * @param jobId - The optional job ID to associate with the height
      * @returns An attachment function for measuring element height
      */
-    public createMeasureHeight(cardHeights: SvelteMap<number, number>, jobId?: number): Attachment<HTMLElement> {
-        return (node: HTMLElement) => {
-            const applyHeight = (height: number) => {
-                if (typeof jobId === 'number' && height > 0 && cardHeights.get(jobId) !== height) {
-                    cardHeights.set(jobId, height);
+    public createMeasureHeight( cardHeights: SvelteMap<number, number>, jobId?: number ): Attachment<HTMLElement>
+    {
+        return ( node: HTMLElement ) =>
+        {
+            const applyHeight = ( height: number ) =>
+            {
+                if ( typeof jobId === 'number' && height > 0 && cardHeights.get( jobId ) !== height )
+                {
+                    cardHeights.set( jobId, height );
                 }
             };
 
-            const updateHeight = () => {
+            const updateHeight = () =>
+            {
                 const height = node.offsetHeight;
-                applyHeight(height);
+                applyHeight( height );
             };
 
             updateHeight();
 
             let ro: ResizeObserver | null = null;
-            if (typeof ResizeObserver !== 'undefined') {
-                ro = new ResizeObserver((entries: ResizeObserverEntry[]) => {
-                    for (const entry of entries) {
-                        // Prefer contentRect when available; it's more accurate for layout box size
-                        const h = entry.contentRect?.height ?? (entry.target as HTMLElement).offsetHeight ?? node.offsetHeight;
-                        applyHeight(Math.round(h));
-                    }
-                });
-                ro.observe(node as Element);
-            }
+            ro = new ResizeObserver( ( entries: ResizeObserverEntry[] ) =>
+            {
+                for ( const entry of entries )
+                {
+                    // Prefer contentRect when available; it's more accurate for layout box size
+                    const h = entry.contentRect?.height ?? ( entry.target as HTMLElement ).offsetHeight ?? node.offsetHeight;
+                    applyHeight( Math.round( h ) );
+                }
+            } );
+            ro.observe( node as Element );
 
             // Safety timeout to re-measure after mount
-            const timeoutId = setTimeout(updateHeight, 500);
+            const timeoutId = setTimeout( updateHeight, 500 );
 
-            return () => {
-                if (ro) {
+            return () =>
+            {
+                if ( ro )
+                {
                     ro.disconnect();
                 }
-                clearTimeout(timeoutId);
+                clearTimeout( timeoutId );
             };
         };
     }

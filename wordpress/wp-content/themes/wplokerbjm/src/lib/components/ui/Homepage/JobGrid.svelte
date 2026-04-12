@@ -22,13 +22,10 @@
   const displayJobs = $derived(searchStore.jobs);
   const loading = $derived(searchStore.loading);
   const hasMore = $derived(searchStore.hasMore);
-  const isDesktop = $derived.by(() => !isMobile());
   const displayTotalJobs = $derived(searchStore.totalJobs);
   const displayTitle = $derived(searchStore.title);
-  const cardHeights = new SvelteMap(routeStateStore.getCardHeights("jobGrid"));
 
   let isRefreshing = $state(false);
-  let prevFilters = $state(""); // to track filter changes so card heights can be cleared
 
   class OverlayController {
     handleJobClick(job: CardJob): void {
@@ -38,7 +35,7 @@
       // Mobile navigation goes to SingleLowongan.svelte route
 
       // Save card heights before navigating/opening overlay
-      routeStateStore.saveCardHeights(cardHeights, "jobGrid");
+      routeStateStore.saveCardHeights(searchStore.jobGridCardHeight, "jobGrid");
 
       function MobileJobClick(): void {
         // Mark as last visited before navigating
@@ -49,7 +46,7 @@
         void goto(url.pathname + url.search + url.hash);
       }
 
-      if (isDesktop) {
+      if (!isMobile()) {
         jobGridManager.saveGridStates(
           new URL(String(job.permalink), window.location.origin).pathname,
         ); // save state with the target path so it can be restored in sidepanel context
@@ -77,6 +74,7 @@
       if (isRefreshing) return;
       isRefreshing = true;
       try {
+        searchStore.clearJobGridCardHeights();
         if (searchStore.context !== "search") {
           const response = await APIServiceShared.fetchJobGridGraphQL({
             paged: 1,
@@ -381,7 +379,10 @@
     }
 
     static measureHeight = (jobId?: number): Attachment<HTMLElement> => {
-      return virtualizationService.createMeasureHeight(cardHeights, jobId);
+      return virtualizationService.createMeasureHeight(
+        searchStore.jobGridCardHeight,
+        jobId,
+      );
     };
   }
 
@@ -390,12 +391,12 @@
   const fallbackGap = 32;
   const buffer = 3;
 
-  const virtualization = $derived.by(() =>
+  const virtualization = $derived(
     VirtualizationManager.computeListVirtualization(
       displayJobs,
       scrollY.current ?? 0,
       innerHeight.current ?? 800,
-      new SvelteMap(cardHeights),
+      new SvelteMap(searchStore.jobGridCardHeight),
       FALLBACK_ITEM_HEIGHT,
       fallbackGap,
       buffer,
@@ -428,36 +429,6 @@
     };
   }
 
-  // Clear virtualization measurements when filters change to avoid layout glitches
-  $effect(() => {
-    const current = JSON.stringify(searchStore.filters || {});
-
-    const schedule =
-      window.requestIdleCallback?.bind(window) ||
-      ((cb: IdleRequestCallback) => setTimeout(cb, 200));
-
-    schedule(() => {
-      if (!prevFilters) {
-        prevFilters = current;
-        return;
-      }
-      if (current !== prevFilters) {
-        prevFilters = current;
-        try {
-          // clear in-memory map used by virtualization
-          cardHeights.clear();
-          // persist empty heights so other components/tabs use fresh measurements
-          routeStateStore.saveCardHeights(new SvelteMap(), "jobGrid");
-        } catch (e) {
-          $inspect(
-            e,
-            "Failed to clear virtualization measurements on filter change",
-          );
-        }
-      }
-    });
-  });
-
   /**
    * SSR initialization to populate searchStore with server-provided data on initial load. This ensures that the job grid is populated immediately with the correct data without waiting for client-side JS to fetch it, improving perceived performance and SEO. The check for routeStore.isInitialLoad ensures this only runs on the first load and not on client-side navigations where the state should be preserved/restored instead.
    */
@@ -482,7 +453,7 @@
 <section
   class="relative mt-12"
   id="job-grid"
-  style={isDesktop ? "view-transition-name: none;" : ""}
+  style={!isMobile() ? "view-transition-name: none;" : ""}
 >
   <div class="flex items-center justify-between mb-6">
     {#if displayJobs.length}
@@ -616,7 +587,7 @@
         {/if}
       </div>
 
-      {#if isDesktop}
+      {#if !isMobile()}
         <div
           class="sticky self-start w-full"
           style:top="var(--site-header-height, 0px)"

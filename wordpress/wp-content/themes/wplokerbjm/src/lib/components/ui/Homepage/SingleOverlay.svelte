@@ -4,7 +4,7 @@
   import { type Attachment } from "svelte/attachments";
   import type { JobDetailResponse } from "@/types";
   import { routeStore } from "@/lib/stores/Route.svelte";
-  import { themeManager } from "$lib/stores/Theme.svelte";
+  import { themePropsStore } from "$lib/stores/Theme.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
   import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
@@ -19,7 +19,7 @@
     Boolean(data?.id || jobOverlayManager.selectedSlug),
   );
 
-  const isLoggedIn = $derived(themeManager.getNonce ? true : false);
+  const isLoggedIn = $derived(themePropsStore.getNonce ? true : false);
 
   function getCloneHref(postId?: number | null): string {
     if (!postId) return "#";

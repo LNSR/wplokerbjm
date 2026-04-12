@@ -2,6 +2,7 @@ import type { CardJob, JobCardProps } from "@/types";
 import { isMobile } from "$lib/utils/elements.svelte";
 import { routeStateStore } from "$lib/stores/Route.svelte";
 import { SvelteURL } from "svelte/reactivity";
+import { useRIC } from "$lib/utils/window.svelte";
 import { goto } from "$app/navigation";
 /**
  * JobOverlayManager
@@ -174,13 +175,7 @@ export class JobOverlayManager
         console.error( "scrollToCard error:", err );
       }
     };
-    if ( typeof window.requestIdleCallback === "function" )
-    {
-      window.requestIdleCallback( performScroll, { timeout: 300 } );
-    } else
-    {
-      setTimeout( performScroll, 300 );
-    }
+    useRIC(performScroll, { timeout: 300, fallbackDelay: 300 });
   }
 }
 export const jobOverlayManager = new JobOverlayManager();

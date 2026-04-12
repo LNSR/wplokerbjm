@@ -5,6 +5,8 @@ import { APIServiceBrowser } from "@/services/APIService";
 import type { CardJob } from "@/types";
 import { browser, version } from "$app/environment";
 import { generalJobStore } from "$lib/stores/General.svelte";
+import { useRIC } from "$lib/utils/window.svelte";
+import { on } from "svelte/events";
 
 interface BookmarkBroadcastMessage {
   type: "update" | "sync" | "reload";
@@ -24,7 +26,7 @@ export class BookmarkManager {
   public lastSyncTime = $state<number>(0);
 
   private channel: BroadcastChannel | null = null;
-  private readonly tabStartedAt = generalJobStore.now.getTime(); // Timestamp to identify when this tab instance started for version conflict resolution
+  private readonly tabStartedAt = generalJobStore.svelteDate.getTime(); // Timestamp to identify when this tab instance started for version conflict resolution
   private debouncedSync: ReturnType<typeof debounce> | null = null;
   private pendingSyncIds = new SvelteSet<number>();
   #debouncedSaveCall: ReturnType<typeof debounce> | null = null;
@@ -145,7 +147,7 @@ export class BookmarkManager {
     // Add visibility change listener: sync data when tab becomes visible again
     // This ensures we don't miss broadcasts while in the background
     if (browser) {
-      document.addEventListener("visibilitychange", () => {
+      const handler = () => {
         if (document.visibilityState === "visible" && !this.isOutdated) {
           void this.loadFromStorage();
           // Schedule a sync to pick up any changes from the API while we were away
@@ -156,7 +158,8 @@ export class BookmarkManager {
             }, 500);
           }
         }
-      });
+      };
+      on(document, "visibilitychange", handler);
     }
   }
 
@@ -394,7 +397,7 @@ export class BookmarkManager {
           this.deletedJobs = Array.from(previousIds).filter(
             (id) => !currentIds.has(id),
           );
-          this.lastSyncTime = generalJobStore.now.getTime();
+          this.lastSyncTime = generalJobStore.svelteDate.getTime();
           if (this.channel) {
             this.channel.postMessage({
               type: "sync",
@@ -476,21 +479,16 @@ export class BookmarkManager {
 
     this.#hasStarted = true;
 
-    const schedule =
-      typeof window.requestIdleCallback === "function"
-        ? window.requestIdleCallback.bind(window)
-        : (callback: IdleRequestCallback) => window.setTimeout(callback, 0);
-
-    schedule(() => {
+    useRIC(() => {
       this.loadFromStorage();
       // Only sync if data is stale (older than 5 minutes) or no sync has been done
-      const now = generalJobStore.now.getTime();
+      const now = generalJobStore.svelteDate.getTime();
       const isStale = now - this.lastSyncTime > 5 * 60 * 1000; // 5 minutes
       if (isStale || this.lastSyncTime === 0) {
         // Run initial sync outside the queue to avoid blocking user interactions
         void this.syncWithAPI();
       }
-    });
+    }, { fallbackDelay: 0 });
   }
 }
 

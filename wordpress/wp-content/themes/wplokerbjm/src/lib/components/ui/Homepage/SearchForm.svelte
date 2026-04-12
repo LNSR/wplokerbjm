@@ -85,7 +85,7 @@
 
     static navigateSuggestions(direction: number) {
       if (!showSuggestions || !this.hasSuggestions) return;
-      const maxIndex = this .hasSuggestions ? suggestions.length - 1 : 0;
+      const maxIndex = this.hasSuggestions ? suggestions.length - 1 : 0;
       if (direction > 0) {
         selectedSuggestionIndex =
           selectedSuggestionIndex < maxIndex ? selectedSuggestionIndex + 1 : 0;
@@ -138,6 +138,7 @@
     }
 
     private static async performReset(): Promise<SearchResponse> {
+      searchStore.clearJobGridCardHeights();
       searchStore.resetFilters();
       const response = await searchStore.searchJobs();
       searchStore.title = "Lowongan Terbaru";
@@ -181,6 +182,7 @@
       searchError?: SearchErrorHandler,
     ): Promise<void> {
       e?.preventDefault?.();
+      searchStore.clearJobGridCardHeights();
       try {
         const response = await this.performSearch();
         SuggestionController.hideSuggestionsImmediate();
@@ -414,21 +416,17 @@
     }
   }
 
-  const lokasiLabel = $derived.by(() =>
+  const lokasiLabel = $derived(
     taxonomyLabel("lokasi_pekerjaan", "Lokasi Belum Dipilih"),
   );
 
-  const genderLabel = $derived.by(() =>
-    taxonomyLabel("gender", "Gender Belum Dipilih"),
-  );
+  const genderLabel = $derived(taxonomyLabel("gender", "Gender Belum Dipilih"));
 
-  const pendidikanLabel = $derived.by(() =>
+  const pendidikanLabel = $derived(
     taxonomyLabel("pendidikan", "Pendidikan Belum Dipilih"),
   );
 
-  const sortIsAsc = $derived.by(
-    () => (searchStore.filters.sort?.value ?? "") === "asc",
-  );
+  const sortIsAsc = $derived(searchStore.filters.sort?.value === "asc");
 
   const CustomDropdown = $derived.by(() => {
     if (isGenderOpen || isLokasiOpen || isPendidikanOpen || isSortOpen) {

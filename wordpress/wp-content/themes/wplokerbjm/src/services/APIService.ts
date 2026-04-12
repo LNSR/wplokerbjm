@@ -17,7 +17,7 @@ import { createClient, fetchExchange } from "urql";
 import type { Client, ClientOptions, DocumentInput, AnyVariables } from "urql";
 import { persistedExchange } from "@urql/exchange-persisted";
 import { getCmsOrigin } from "@/utils/environment";
-import { themeManager } from "$lib/stores/Theme.svelte";
+import { themePropsStore } from "$lib/stores/Theme.svelte";
 import
 {
   GET_JOB_DETAIL,
@@ -67,8 +67,8 @@ class URQLClientManager
         credentials: "include",
         mode: "cors",
         headers: {
-          ...( themeManager.getNonce
-            ? { "X-WP-Nonce": themeManager.getNonce }
+          ...( themePropsStore.getNonce
+            ? { "X-WP-Nonce": themePropsStore.getNonce }
             : {} ),
         },
       } ),

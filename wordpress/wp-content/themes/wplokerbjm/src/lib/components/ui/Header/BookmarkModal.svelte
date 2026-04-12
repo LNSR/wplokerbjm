@@ -11,6 +11,7 @@
     isJobGridEl,
     attachPortal,
   } from "$lib/utils/elements.svelte";
+  import { useRIC } from "$lib/utils/window.svelte";
   import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { goto } from "$app/navigation";
@@ -135,11 +136,7 @@
 
     scheduleFetchJobs = () => {
       const runFetch = () => void bookmarkHandler.fetchJobs();
-      if (typeof requestIdleCallback === "function") {
-        requestIdleCallback(() => runFetch());
-      } else {
-        requestAnimationFrame(() => runFetch());
-      }
+      useRIC(runFetch, { fallback: "animationFrame" });
     };
 
     displayedSavedJobs = $derived.by(() => {
@@ -174,8 +171,8 @@
     #measurePollHandle: ReturnType<typeof setInterval> | null = null;
     #measureTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
 
-    virtualizedJobs = $derived.by(() => {
-      return virtualizationService.computeList({
+    virtualizedJobs = $derived(
+      virtualizationService.computeList({
         displayJobs: bookmarkHandler.filteredDisplayedJobs,
         scrollY: containerScrollY,
         containerHeight: containerHeight,
@@ -183,8 +180,8 @@
         fallbackHeight: 200,
         gap: 24,
         buffer: 1,
-      });
-    });
+      }),
+    );
 
     measureHeight(jobId: number): Attachment<HTMLElement> {
       return virtualizationService.createMeasureHeight(cardHeights, jobId);
@@ -482,16 +479,12 @@
   // Ensure we re-measure when the modal is opened so virtualization has correct container size
 
   $effect(() => {
-    const timeEffect = generalJobStore.useSharedClock();
     // React to showDeleteConfirm changes to control the delete confirmation modal
     if (showDeleteConfirm) {
       if (!deleteConfirmModal?.open) deleteConfirmModal?.showModal();
     } else {
       deleteConfirmModal?.close();
     }
-    return () => {
-      timeEffect();
-    };
   });
 
   onMount(() => {

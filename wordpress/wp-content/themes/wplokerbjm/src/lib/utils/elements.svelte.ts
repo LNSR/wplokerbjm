@@ -3,6 +3,7 @@ import { MediaQuery } from "svelte/reactivity";
 import { browser } from "$app/environment";
 import { page } from "$app/state";
 
+const mobileMq = new MediaQuery("(max-width: 767.98px)");
 export const isMobile = (): boolean => {
   if (!browser) {
     try {
@@ -11,8 +12,6 @@ export const isMobile = (): boolean => {
       return false;
     }
   }
-
-  const mobileMq = new MediaQuery("(max-width: 767.98px)");
   return mobileMq?.current ?? false;
 }
 

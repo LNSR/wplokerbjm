@@ -1,4 +1,4 @@
-import { themeManager } from "$lib/stores/Theme.svelte";
+import { themePropsStore } from "$lib/stores/Theme.svelte";
 import
 {
   partytownSnippet,
@@ -133,7 +133,7 @@ export class GoogleServices
    */
   private static get isTrackingDisabled (): boolean
   {
-    return !!themeManager.getNonce;
+    return !!themePropsStore.getNonce;
   }
 
   /**

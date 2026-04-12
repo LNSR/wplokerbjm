@@ -9,6 +9,7 @@
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { onMount } from "svelte";
+  import { useRIC } from "$lib/utils/window.svelte";
   import { innerWidth } from "svelte/reactivity/window";
   import SwiperCore, { type Swiper } from "swiper";
   import type { SwiperOptions } from "swiper/types";
@@ -276,7 +277,7 @@
         this.swiperFailed = true;
       } finally {
         this.isInitializing = false;
-        requestIdleCallback(() => routeStateStore.clearCarouselState());
+        useRIC(() => routeStateStore.clearCarouselState(), { fallbackDelay: 0 });
       }
     }
 

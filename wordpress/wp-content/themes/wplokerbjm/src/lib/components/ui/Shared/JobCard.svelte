@@ -29,32 +29,32 @@
     ) => void,
   }: Props = $props();
 
-  // show spinner overlay when mobile navigating for the card currently selected by slug
-  const spinnerVisible = $derived.by(() => {
-    return isMobile() && routeStore.isLoading && selected;
-  });
-
-  // Derived UI helpers (keeps UI reactive to prop changes)
-  const summaryRows = $derived.by(() =>
-    generalJobStore.showSummaryJob(jobdata?.ringkasanPekerjaan),
-  );
-  // showStatusJob now returns a single status string
-  const statusInfo = $derived.by(() =>
-    generalJobStore.showStatusJob(jobdata?.status_pekerjaan ?? 0),
-  );
-  const deadlineInfo = $derived.by(() => {
-    return generalJobStore.showDeadline(jobdata?.ringkasanPekerjaan?.deadline ?? "");
-  });
-  const timeAgo = $derived.by(() => {
-    return generalJobStore.showTimeAgo(jobdata?.post_time ?? "");
-  });
-
   const selected = $derived.by(() => {
     const slugMatch = routeStateStore.lastVisitedJob === jobdata?.slug;
     const expectedSource = variant;
     const sourceMatch = routeStateStore.lastVisitedJobSource === expectedSource;
     return slugMatch && sourceMatch;
   });
+
+  // show spinner overlay when mobile navigating for the card currently selected by slug
+  const spinnerVisible = $derived(
+    isMobile() && routeStore.isLoading && selected,
+  );
+
+  // Derived UI helpers (keeps UI reactive to prop changes)
+  const summaryRows = $derived(
+    generalJobStore.showSummaryJob(jobdata?.ringkasanPekerjaan),
+  );
+  // showStatusJob now returns a single status string
+  const statusInfo = $derived(
+    generalJobStore.showStatusJob(jobdata?.status_pekerjaan ?? 0),
+  );
+  const deadlineInfo = $derived(
+    generalJobStore.showDeadline(jobdata?.ringkasanPekerjaan?.deadline ?? ""),
+  );
+  const timeAgo = $derived(
+    generalJobStore.showTimeAgo(jobdata?.post_time ?? ""),
+  );
 
   const cardClass = $derived(
     `card-base-${variant}${selected ? ` card-selected-${variant}` : ""}`,
@@ -84,11 +84,6 @@
     // For desktop/tablet: prevent default and handle overlay
     event.preventDefault();
   }
-
-  $effect(() => {
-    const timeEffect = generalJobStore.useSharedClock();
-    return () => timeEffect();
-  });
 
   onMount(() => {
     if (routeStateStore.restoreVisitedJob()) {

@@ -413,21 +413,14 @@
     }
   }
 
-  const ringkasanPekerjaan = $derived.by(() =>
+  const ringkasanPekerjaan = $derived(
     generalJobStore.showSummaryJob(job.ringkasanPekerjaan as JobSummary),
   );
-  const contacts = $derived.by(() => getContactRows(job.contacts));
-  const socialMediaItems = $derived.by(() =>
+  const contacts = $derived(getContactRows(job.contacts));
+  const socialMediaItems = $derived(
     SocialMediaLinkBuilder.buildSocialMediaItems(job.social_media),
   );
-  const timeAgo = $derived.by(() => {
-    return generalJobStore.showTimeAgo(job.post_time);
-  });
-
-  $effect(() => {
-    const timeEffect = generalJobStore.useSharedClock();
-    return () => timeEffect();
-  });
+  const timeAgo = $derived(generalJobStore.showTimeAgo(job.post_time));
 
   // clean up the viewer when the component is removed from the DOM
   onDestroy(() => {

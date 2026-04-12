@@ -3,6 +3,7 @@
   import type { JobCardProps, WPBasePost } from "@/types";
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
+  import { useRIC } from "$lib/utils/window.svelte";
 
   interface Props {
     jobId: WPBasePost["id"];
@@ -27,7 +28,7 @@
 
   let preToggleSaved = $state(false);
   // synchronous lock to prevent same-tick re-entrancy from multiple rapid DOM clicks
-  let _clickLock = false;
+  let clicklock = false;
 
   function handleToggleSave(e: MouseEvent) {
     // prevent parent handlers
@@ -43,15 +44,18 @@
       return;
     }
 
-    // Preload bookmark modal for faster access when viewing bookmarks
-    if (!dynamicComponentStore.BookmarkModal) {
-      void dynamicComponentStore.loadBookmarkModal();
-    }
+    const preloadBookmarkModal = () => {
+      if (!dynamicComponentStore.BookmarkModal) {
+        void dynamicComponentStore.loadBookmarkModal();
+      }
+    };
+
+    useRIC(preloadBookmarkModal, { fallbackDelay: 200 });
 
     // protect against both reactive loading state and synchronous re-entry
-    if (isLoading || _clickLock) return;
+    if (isLoading || clicklock) return;
 
-    _clickLock = true;
+    clicklock = true;
 
     isLoading = true;
     preToggleSaved = isJobSaved;
@@ -72,7 +76,13 @@
       errorState = wasSaved ? "remove" : "save";
     } finally {
       isLoading = false;
-      _clickLock = false;
+      clicklock = false;
+      const duration =
+        confirmationState !== null ? 1000 : errorState !== null ? 3000 : 1000; // shorter duration if only showing error
+      setTimeout(() => {
+        confirmationState = null;
+        errorState = null;
+      }, duration);
     }
   }
 
@@ -96,7 +106,7 @@
     return { style: "text-red-700" };
   }
 
-  const bookmarkStyle = $derived.by(() =>
+  const bookmarkStyle = $derived(
     useBookmarkStyle(isJobSaved, confirmationState === "saved"),
   );
 
@@ -136,20 +146,6 @@
         return "h-5 w-5 ";
       default:
         return "h-5 w-5 ";
-    }
-  });
-
-  $effect(() => {
-    if (confirmationState !== null) {
-      const timeout = setTimeout(() => (confirmationState = null), 1000);
-      return () => clearTimeout(timeout);
-    }
-  });
-
-  $effect(() => {
-    if (errorState !== null) {
-      const timeout = setTimeout(() => (errorState = null), 3000);
-      return () => clearTimeout(timeout);
     }
   });
 </script>

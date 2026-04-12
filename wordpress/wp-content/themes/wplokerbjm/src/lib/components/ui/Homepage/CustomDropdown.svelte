@@ -280,7 +280,7 @@
 
   const normalizedSearch = $derived(String(search).trim());
 
-  const currentOptions = $derived.by((): DropdownOption[] =>
+  const currentOptions = $derived(
     stack.length > 0 ? stack[stack.length - 1] : (options ?? []),
   );
 

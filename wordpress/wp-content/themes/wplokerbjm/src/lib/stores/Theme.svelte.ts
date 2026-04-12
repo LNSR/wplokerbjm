@@ -1,6 +1,10 @@
 import type { WPLokerBJMThemedData } from "@/types";
 
-class ThemeManager
+/**
+ * Theme Props Manager
+ * Theme props state that come from Wordpress and can be used globally in the app
+ */
+class ThemePropsManager
 {
   #themeProps = $state<WPLokerBJMThemedData | undefined>( undefined );
 
@@ -28,4 +32,4 @@ class ThemeManager
   }
 }
 
-export const themeManager = new ThemeManager();
+export const themePropsStore = new ThemePropsManager();

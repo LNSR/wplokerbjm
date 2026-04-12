@@ -88,6 +88,7 @@ export default defineConfig(
 			}
 		},
 		rules: {
+			"@typescript-eslint/no-unused-vars": "off",
 			"svelte/valid-compile": "error",
 			"svelte/no-inspect": "off",
 			"svelte/no-at-html-tags": "off",
