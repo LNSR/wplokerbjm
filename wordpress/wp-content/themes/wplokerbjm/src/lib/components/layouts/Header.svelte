@@ -3,7 +3,7 @@
   import { type ThemeName, type WPLokerBJMThemedData } from "@/types";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { themePropsStore } from "$lib/stores/Theme.svelte";
-  import { APIServiceBrowser } from "@/services/APIService";
+  import { APIServiceBrowser } from "@/services/graphql/APIService";
   import { useRIC } from "$lib/utils/window.svelte";
   import { MediaQuery } from "svelte/reactivity";
 
@@ -119,7 +119,6 @@
       this.currentTheme = theme;
       window.requestAnimationFrame(() => {
         const runThemeUpdate = () => {
-          document.documentElement.classList.add("theme-switching");
           this.applyThemeAttribute(theme, isDark);
         };
 
@@ -189,24 +188,27 @@
         loginStates.error = "Terjadi kesalahan saat login.";
         loginStates.password = "";
       } finally {
-        useRIC(async () => {
-          try {
-            if (!token) {
-              loginStates.loading = false;
-              return;
-            }
+        useRIC(
+          async () => {
+            try {
+              if (!token) {
+                loginStates.loading = false;
+                return;
+              }
 
-            const nonce = await APIServiceBrowser.getThemeNonceGraphQL();
-            if (nonce && nonce.length > 0) {
-              themePropsStore.setNonce = nonce;
+              const nonce = await APIServiceBrowser.getThemeNonceGraphQL();
+              if (nonce && nonce.length > 0) {
+                themePropsStore.setNonce = nonce;
+              }
+            } catch (error) {
+              console.error("Error fetching theme nonce:", error);
+            } finally {
+              loginStates.loading = false;
+              await tick();
             }
-          } catch (error) {
-            console.error("Error fetching theme nonce:", error);
-          } finally {
-            loginStates.loading = false;
-            await tick();
-          }
-        }, { fallbackDelay: 0 });
+          },
+          { fallbackDelay: 0 },
+        );
       }
     }
     static Logout(): void {
@@ -234,57 +236,44 @@
     ExternalLinkSolid,
     KeySolid,
   } from "svelte-awesome-icons";
-  import { attachPortal } from "$lib/utils/elements.svelte";
-  import { isMobile } from "$lib/utils/elements.svelte";
+  import { teleportTo } from "$lib/utils/elements.svelte";
+  import { isMobile } from "$lib/utils/window.svelte";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
   import type { Attachment } from "svelte/attachments";
 
   let { themeData }: { themeData: WPLokerBJMThemedData } = $props();
 
-  const isMobileValue = $derived.by(isMobile);
-
   let showBookmarkModal = $state(false);
+  let showloginAdminModal = $state(false);
 
+  const isMobileValue = $derived(isMobile());
   const bookmarkJobs = $derived(bookmarkStore.jobs);
 
-  // Open bookmark modal
-  const openBookmarkModal = () => (showBookmarkModal = true);
-
-  // Pure derived components (avoid mutating shared managers here)
-  const bookmarkModalComponent = $derived.by(() => {
-    if (!showBookmarkModal) return undefined;
-    return dynamicComponentStore.loadBookmarkModal();
-  });
-
-  const loginModalComponent = $derived.by(() => {
-    if (!showLoginModal) return undefined;
-    return dynamicComponentStore.loadLoginModal();
-  });
-
-  let loginAdmin = $state(false);
-
-  function ButtonUIHandler(): Attachment<Window> {
+  export const ButtonUIHandler: Attachment<Window> = (() => {
     const handler: ProxyHandler<any> = {
       set(target: any, prop: string, value: any) {
         if (prop === "loginAdmin") {
-          loginAdmin = !!value;
+          showloginAdminModal = !!value;
         }
         return Reflect.set(target, prop, value);
       },
       get(target: any, prop: string) {
-        if (prop === "loginAdmin") return loginAdmin;
+        if (prop === "loginAdmin") return showloginAdminModal;
         return Reflect.get(target, prop);
       },
     };
 
-    return (w) => {
-      w = window as any;
-      (w as any).showUI = new Proxy({ loginAdmin }, handler);
+    return (w: Window) => {
+      w = window;
+      (w as any).showUI = new Proxy(
+        { loginAdmin: showloginAdminModal },
+        handler,
+      );
       return () => {
         delete (w as any).showUI;
       };
     };
-  }
+  })();
 
   onMount(() => {
     themePropsStore.setThemeData = themeData;
@@ -293,7 +282,7 @@
   });
 </script>
 
-<svelte:window {@attach ButtonUIHandler()} />
+<svelte:window {@attach ButtonUIHandler} />
 
 <svelte:head>
   <meta
@@ -357,7 +346,7 @@
           </div>
 
           {#if showThemeModal}
-            <div {@attach attachPortal("#app")}>
+            <div {@attach teleportTo("#app")}>
               <div class="modal modal-open z-[1100]">
                 <div class="modal-box">
                   <h3 class="font-semibold text-lg">Pilih Tema</h3>
@@ -395,7 +384,10 @@
           {/if}
 
           <button
-            onclick={openBookmarkModal}
+            onclick={() => {
+              dynamicComponentStore.loadComponentByName("BookmarkModal");
+              showBookmarkModal = true;
+            }}
             class="btn btn-circle md:flex relative border-[var(--wpl-global-color-1)] border-1 hover:border-2"
             aria-label="Lowongan tersimpan"
             title="Lowongan tersimpan"
@@ -415,10 +407,13 @@
           </button>
 
           <!-- Login button (desktop) -->
-          {#if loginAdmin}
+          {#if showloginAdminModal}
             <button
               class="btn rounded-full font-semibold bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)] relative border-1 border-[var(--wpl-global-color-1)] hover:border-2 ml-2 hidden md:flex"
-              onclick={() => (showLoginModal = true)}
+              onclick={() => {
+                dynamicComponentStore.loadComponentByName("LoginModal");
+                showLoginModal = true;
+              }}
               aria-label="Masuk"
               title="Masuk"
             >
@@ -461,11 +456,12 @@
         <ul
           class="menu bg-base-200 text-base-content min-h-full w-auto max-w-[90vw] p-4 px-2 gap-4"
         >
-          {#if loginAdmin}
+          {#if showloginAdminModal}
             <li>
               <button
                 class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] justify-center"
                 onclick={() => {
+                  dynamicComponentStore.loadComponentByName("LoginModal");
                   showLoginModal = true;
                   document.getElementById("header-drawer")?.click();
                 }}
@@ -499,23 +495,23 @@
       </div>
     {/if}
   </div>
-  {#if bookmarkModalComponent}
-    {#await bookmarkModalComponent then BookmarkModal}
-      <BookmarkModal bind:open={showBookmarkModal} />
-    {/await}
+  {#if showBookmarkModal}
+    {@const BookmarkModal =
+      dynamicComponentStore.getComponentByName("BookmarkModal")}
+    <BookmarkModal bind:open={showBookmarkModal} {@attach teleportTo("#app")} />
   {/if}
 
-  {#if loginModalComponent}
-    {#await loginModalComponent then LoginModal}
-      <LoginModal
-        bind:open={showLoginModal}
-        bind:username={loginStates.username}
-        bind:password={loginStates.password}
-        error={loginStates.error}
-        loading={loginStates.loading}
-        onClose={LoginManager.closeLogin}
-        onLogin={LoginManager.Login}
-      />
-    {/await}
-  {/if}
+  {#key showLoginModal}
+    {@const LoginModal = dynamicComponentStore.getComponentByName("LoginModal")}
+    <LoginModal
+      {@attach teleportTo("#app")}
+      bind:open={showLoginModal}
+      bind:username={loginStates.username}
+      bind:password={loginStates.password}
+      error={loginStates.error}
+      loading={loginStates.loading}
+      onClose={LoginManager.closeLogin}
+      onLogin={LoginManager.Login}
+    />
+  {/key}
 </header>

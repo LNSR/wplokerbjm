@@ -1,5 +1,5 @@
 import type { CardJob, JobCardProps } from "@/types";
-import { isMobile } from "$lib/utils/elements.svelte";
+import { isMobile } from "$lib/utils/window.svelte";
 import { routeStateStore } from "$lib/stores/Route.svelte";
 import { SvelteURL } from "svelte/reactivity";
 import { useRIC } from "$lib/utils/window.svelte";
@@ -34,7 +34,8 @@ export class JobOverlayManager
    * Update scroll state used by `scrollToCard` to avoid interrupting
    * user-initiated manual scrolling.
    */
-  public set setScrollState(value: boolean) {
+  public set setScrollState( value: boolean )
+  {
     this.isScrolling = value;
   }
 
@@ -52,7 +53,7 @@ export class JobOverlayManager
   * - Job detail data is provided by SvelteKit route load and synchronized
   *   to `overlayData` from SingleOverlay.svelte.
    */
-  public openOverlay (
+  public openOverlay(
     slug: string,
     job?: CardJob,
     source: JobCardProps[ "variant" ] = "featured",
@@ -75,22 +76,16 @@ export class JobOverlayManager
         goto( path, { replaceState: true, noScroll: true, keepFocus: true } ).then( () =>
         {
           if ( !gotoCB ) return;
-          try
+          const gotoResult = gotoCB();
+          if ( typeof gotoResult?.then === "function" || gotoResult instanceof Promise )
           {
-            const gotoResult = gotoCB();
-            if ( typeof gotoResult?.then === "function" || gotoResult instanceof Promise )
+            return Promise.resolve( gotoResult ).catch( err =>
             {
-              return Promise.resolve( gotoResult ).catch( err =>
-              {
-                console.error( "gotoCB Promise error:", err );
-              } );
-            } else
-            {
-              return void gotoResult;
-            }
-          } catch ( err )
+              console.error( "gotoCB Promise error:", err );
+            } );
+          } else
           {
-            console.error( "gotoCB error:", err );
+            return void gotoResult;
           }
         } );
       }
@@ -111,7 +106,7 @@ export class JobOverlayManager
    * - If no matching element is found, no scrolling occurs to avoid jumping
    *   to unrelated sections.
    */
-  public scrollToCard (
+  public scrollToCard(
     slug: string,
     skipIfScrolling: boolean = true,
     selectedSourceType: JobCardProps[ "variant" ] = "featured",
@@ -175,7 +170,7 @@ export class JobOverlayManager
         console.error( "scrollToCard error:", err );
       }
     };
-    useRIC(performScroll, { timeout: 300, fallbackDelay: 300 });
+    useRIC( performScroll, { timeout: 300, fallbackDelay: 300 } );
   }
 }
 export const jobOverlayManager = new JobOverlayManager();

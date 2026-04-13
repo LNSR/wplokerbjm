@@ -15,6 +15,9 @@
   const data = $derived((page.data?.job as JobDetailResponse | null) ?? null);
   const editPostId = $derived((data?.id as JobDetailResponse["id"]) ?? null);
 
+  let innerScrollTimeout: ReturnType<typeof setTimeout> | null = null;
+  let drawerElement: Element | undefined = undefined;
+
   const isSidePanelVisible = $derived.by(() =>
     Boolean(data?.id || jobOverlayManager.selectedSlug),
   );
@@ -36,19 +39,6 @@
     return base;
   }
 
-  let innerScrollTimeout: ReturnType<typeof setTimeout> | null = null;
-  let drawerElement: Element | undefined = undefined;
-
-  const drawerElementAttachment: Attachment = (node: Element) => {
-    data?.id; // re-run when job changes to reset scroll
-    drawerElement = node;
-
-    drawerElement.scrollTop = 0;
-    return () => {
-      drawerElement = undefined;
-    };
-  };
-
   function handleWindowScroll(): void {
     if (!jobOverlayManager.isScrolling) {
       jobOverlayManager.setScrollState = true;
@@ -63,6 +53,16 @@
       innerScrollTimeout = null;
     }, 500);
   }
+
+  const drawerElementAttachment: Attachment = (node: Element) => {
+    data?.id; // re-run when job changes to reset scroll
+    drawerElement = node;
+
+    drawerElement.scrollTop = 0;
+    return () => {
+      drawerElement = undefined;
+    };
+  };
 
   onDestroy(() => {
     if (innerScrollTimeout) {

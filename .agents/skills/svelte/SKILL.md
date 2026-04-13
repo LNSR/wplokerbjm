@@ -14,11 +14,12 @@ description: Best practices and conventions for using Svelte 5 in this workspace
   - Use `$derived(expression)` instead of `$effect` for derived values.
   - Use `$derived.by(...)` when the expression needs a function.
   - Writable; assigning to a derived value is allowed.
-
-- **`$effect`**: Avoid when possible.
-  - Use it only for side effects that can't be expressed with derived state.
+- **`$effect`**: Effects are an escape hatch and should mostly be avoided.
+  - Use it only for side effects that can't be expressed with derived state, binding attributes.
   - Don’t update state inside `$effect` unless absolutely necessary.
-  - Prefer `{@attach ...}` for syncing with external libraries instead of `$effect`.
+  - Prefer [`{@attach ...}`](references/@attach.md) for syncing with external libraries, Contextual operation to specific to targeted DOM instead of `$effect`.
+  - If you need to log values for debugging purposes, use [`$inspect`](references/$inspect.md)
+  - If you need to observe something external to Svelte, use [`createSubscriber`](references/svelte-reactivity.md)
 
 - **`$props`**: Treat props as dynamic.
   - Use `$derived` for values derived from props to ensure updates when props change.
@@ -38,7 +39,7 @@ description: Best practices and conventions for using Svelte 5 in this workspace
 
 ## Snippets & Reuse
 
-- Use `{#snippet ...}{/snippet}` and `{@render ...}` for reusable markup.
+- Use `{#snippet ...}{/snippet}` and [**`{@render ...}`**](references/@render.md) for reusable markup.
   - Snippets declared at top-level are available in `<script>`.
   - Snippets without state can be exported from a `<script module>`.
 
@@ -60,6 +61,43 @@ description: Best practices and conventions for using Svelte 5 in this workspace
 
 - Use **`createContext`** instead of `setContext`/`getContext` for type safety and scoped state.
 - Prefer component-local state or context over shared module state to avoid SSR leaks.
+
+## Bindings & Form Components
+
+- Use **`$bindable`** only when upward data flow is intentional and narrowly scoped.
+- Prefer `bind:` on native elements and use **function bindings** when you need validation or transformation.
+- Use `bind:group` for related radio/checkbox inputs and `bind:files` for file upload inputs.
+- Treat file bindings carefully in SSR code paths; leave file state uninitialized unless the component needs a default.
+
+## Attachments & External Libraries
+
+- Prefer [**`{@attach ...}`**](references/@attach.md) over `use:action` when syncing DOM or third-party libraries to reactive state.
+- Use attachment factories for reusable integrations, and convert legacy actions only when the library requires it.
+- Keep attachment setup cheap; move expensive work behind a child effect only when re-running is unavoidable.
+
+## Accessibility & Head
+
+- Prefer semantic HTML, keyboard-friendly controls, and explicit focus management over visual-only interactions.
+- Use `<svelte:head>` for page titles, meta tags, and SEO-critical markup.
+- Treat compiler accessibility warnings as real issues to fix, not noise to suppress.
+
+## Testing & Verification
+
+- Use `svelte-check` / the workspace `bun run check` task to catch type, template, and component errors early.
+- Add Vitest for logic-heavy units and Playwright when behavior crosses real DOM interactions.
+- Verify changes at the smallest meaningful scope first, then widen only if the touched slice passes.
+
+## SSR & Runtime Boundaries
+
+- Avoid shared module state for request-specific or user-specific data.
+- Keep browser-only APIs out of server execution paths; use event handlers, `<svelte:window>`, or `<svelte:document>` where appropriate.
+- Use `$state.raw` for large reassigned payloads, especially API responses or other data that is not mutated deeply.
+
+## TypeScript & Component Types
+
+- Type wrapper components with `svelte/elements` attribute types when forwarding props.
+- Add explicit typing for reusable props, snippets, and component APIs instead of relying on inference alone.
+- Keep `svelte-check` clean; template or typing warnings usually indicate a real regression.
 
 ## Async / Advanced
 

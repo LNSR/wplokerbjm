@@ -42,6 +42,13 @@ export class BookmarkIDB extends IDB
     return super.getWPLokerBJMDB()
   }
 
+  /**
+   * Save an array of bookmarked jobs to IndexedDB, replacing existing bookmarks.
+   * Handles quota exceeded errors by clearing old bookmarks and retrying once.
+   *
+   * @param jobs - Array of CardJob objects to save as bookmarks
+   * @throws Error if storage quota is exceeded after retrying
+   */
   public async saveBookmarks ( jobs: CardJob[] ): Promise<void>
   {
     try
@@ -67,6 +74,10 @@ export class BookmarkIDB extends IDB
     }
   }
 
+  /**
+   * Save individual bookmarked job to IndexedDB. 
+   * @param job 
+   */
   public async addBookmark ( job: CardJob ): Promise<void>
   {
     try

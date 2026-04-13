@@ -8,6 +8,7 @@ type OptionalJobFilters = JobFilterTaxonomy & {
   sort?: SortOption | null
   context?: SearchContext | null
 }
+export type TaxonomyGroup = Exclude<TaxonomyType, 'lokasi_pekerjaan'> | 'lokasi'; // Map internal WP 'lokasi_pekerjaan' to 'lokasi' for internal grouping
 
 export type JobFilterTaxonomy = Partial<Record<TaxonomyType, string[] | null | undefined>>;
 

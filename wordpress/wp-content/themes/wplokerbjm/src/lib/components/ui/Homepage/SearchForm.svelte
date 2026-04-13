@@ -4,13 +4,15 @@
     TaxonomyType,
     SearchResponse,
     SortOption,
+    TaxonomyGroup,
+    KeyboardKeysEvent,
   } from "@/types";
   import { WPPostType } from "@/types";
   import { searchStore } from "$lib/stores/Search.svelte";
   import { isJobGridEl } from "$lib/utils/elements.svelte";
   import { SearchUtils } from "@/utils/search";
   import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
-  import { APIServiceBrowser } from "@/services/APIService";
+  import { APIServiceBrowser } from "@/services/graphql/APIService";
   import { debounce } from "es-toolkit";
 
   type SearchFormResultsPayload = SearchResponse & {
@@ -48,7 +50,7 @@
     { value: "asc", label: "Terlama" },
   ];
 
-  export class SuggestionController {
+  class SuggestionController {
     static get hasSuggestions(): boolean {
       return suggestions.length > 0;
     }
@@ -122,7 +124,7 @@
     }
   }
 
-  export class SearchFormController {
+  class SearchFormController {
     private static async performSearch(): Promise<SearchResponse> {
       if (!searchStore.hasFilters)
         throw new Error("Terjadi kesalahan pada filter");
@@ -176,7 +178,7 @@
       }
     }
 
-    static async handleSubmit(
+    public static async handleSubmit(
       e?: Event,
       searchResults?: SearchResultsHandler,
       searchError?: SearchErrorHandler,
@@ -194,10 +196,14 @@
           },
           searchResults,
         );
-        setTimeout(() => {
-          const grid = isJobGridEl();
-          if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 100);
+        const grid = isJobGridEl;
+        useRIC(
+          () => {
+            if (grid)
+              grid.scrollIntoView({ behavior: "smooth", block: "start" });
+          },
+          { fallbackDelay: 300, fallback: "animationFrame" },
+        );
       } catch (err) {
         const errorMessage =
           err instanceof Error ? err.message : "Search failed";
@@ -206,8 +212,7 @@
       }
     }
 
-    static get selectedFiltersWithNames() {
-      // No empty-string sentinel anymore; ignore any blank values here
+    public static get selectedFiltersWithNames() {
       const filters: {
         key: TaxonomyType;
         label: string;
@@ -275,7 +280,7 @@
       return filters;
     }
 
-    static async resetFiltersAndSearch(
+    public static async resetFiltersAndSearch(
       searchResults?: SearchResultsHandler,
       searchError?: SearchErrorHandler,
     ): Promise<void> {
@@ -316,6 +321,8 @@
     SortAmountUpSolid,
     SortAmountDownSolid,
   } from "svelte-awesome-icons";
+  import typia from "typia";
+  import { useRIC } from "@/lib/utils/window.svelte";
 
   const {
     currentSearch,
@@ -345,10 +352,17 @@
     );
   }
 
+  /**
+   *
+   * @param type
+   * @param fetchFnApi type from APIService to fetch terms for the dropdown
+   */
   function toggleDropdown(
-    type: "lokasi" | "gender" | "pendidikan" | "sort",
+    type: TaxonomyGroup | "sort",
     fetchFnApi?: () => void,
   ): void {
+    if (!typia.is<typeof type>(type)) throw new Error("Invalid dropdown type");
+    dynamicComponentStore.loadComponentByName('CustomDropdown');
     const closeAllDropdowns = (): void => {
       isLokasiOpen = false;
       isGenderOpen = false;
@@ -392,29 +406,31 @@
     searchStore.filters[taxonomyType] = SearchUtils.sanitizeArr(payload) ?? [];
   }
 
-  // handle keyboard navigation for the main search input
-  function handleInputKeyDown(e: KeyboardEvent): void {
-    const key = e.key;
-    if (key === "Enter") {
-      e.preventDefault();
-      SearchFormController.handleSubmit(undefined, searchResults, searchError);
-      return;
-    }
-    if (key === "ArrowDown") {
-      e.preventDefault();
-      SuggestionController.navigateSuggestions(1);
-      return;
-    }
-    if (key === "ArrowUp") {
-      e.preventDefault();
-      SuggestionController.navigateSuggestions(-1);
-      return;
-    }
-    if (key === "Escape") {
-      SuggestionController.hideSuggestionsImmediate();
-      return;
-    }
-  }
+  const handleInputKeyDown = (event: KeyboardEvent): void => {
+    const keyHandlers: Partial<Record<KeyboardKeysEvent, () => void>> = {
+      Enter: () => {
+        event.preventDefault();
+        SearchFormController.handleSubmit(
+          undefined,
+          searchResults,
+          searchError,
+        );
+      },
+      ArrowDown: () => {
+        event.preventDefault();
+        SuggestionController.navigateSuggestions(1);
+      },
+      ArrowUp: () => {
+        event.preventDefault();
+        SuggestionController.navigateSuggestions(-1);
+      },
+      Escape: () => {
+        event.preventDefault();
+        SuggestionController.hideSuggestionsImmediate();
+      },
+    };
+    keyHandlers[event.key as KeyboardKeysEvent]?.();
+  };
 
   const lokasiLabel = $derived(
     taxonomyLabel("lokasi_pekerjaan", "Lokasi Belum Dipilih"),
@@ -428,13 +444,7 @@
 
   const sortIsAsc = $derived(searchStore.filters.sort?.value === "asc");
 
-  const CustomDropdown = $derived.by(() => {
-    if (isGenderOpen || isLokasiOpen || isPendidikanOpen || isSortOpen) {
-      return dynamicComponentStore.loadCustomDropdown();
-    }
-
-    return undefined;
-  });
+  const CustomDropdown = $derived(dynamicComponentStore.getComponentByName("CustomDropdown"));
 
   const updateSortFilter = (payload: DropdownUpdatePayload): void => {
     const defaultSort: SortOption = {
@@ -493,16 +503,17 @@
           onfocus={SuggestionController.handleFocus}
           onblur={() => SuggestionController.hideSuggestions()}
           onkeydown={handleInputKeyDown}
-          disabled={searchStore.loading || taxonomyStore.loading}
+          disabled={searchStore.loading || taxonomyStore.getLoadingStatus}
           autocomplete="off"
         />
         <button
           type="submit"
           class="rounded-full btn-circle border hover:border px-4"
-          class:opacity-75={searchStore.loading || taxonomyStore.loading}
-          disabled={searchStore.loading || taxonomyStore.loading}
+          class:opacity-75={searchStore.loading ||
+            taxonomyStore.getLoadingStatus}
+          disabled={searchStore.loading || taxonomyStore.getLoadingStatus}
         >
-          {#if searchStore.loading || taxonomyStore.loading}
+          {#if searchStore.loading || taxonomyStore.getLoadingStatus}
             <LoadingSpinner size="sm" srLabel="Memuat..." />
           {:else}
             <MagnifyingGlassSolid class="text-base" aria-hidden="true" />
@@ -556,25 +567,24 @@
             aria-expanded={isLokasiOpen}
             aria-controls="lokasi-listbox"
             onclick={() =>
-              toggleDropdown("lokasi", () => taxonomyStore.fetchLokasiTerms())}
-            ><span class="pl-8">{lokasiLabel}</span></button
+              toggleDropdown("lokasi", () =>
+                taxonomyStore.fetchTerms("lokasi_pekerjaan"),
+              )}><span class="pl-8">{lokasiLabel}</span></button
           >
           {#if isLokasiOpen}
-            {#await CustomDropdown then CustomDropdownComponent}
-              <CustomDropdownComponent
-                id="lokasi"
-                value={searchStore.filters["lokasi_pekerjaan"]}
-                update={(payload: DropdownUpdatePayload) =>
-                  updateTaxonomyFilter("lokasi_pekerjaan", payload)}
-                options={SearchUtils.mapTerms(
-                  taxonomyStore.lokasiTerms,
-                  "Semua lokasi",
-                )}
-                multiple={true}
-                open={isLokasiOpen}
-                close={() => (isLokasiOpen = false)}
-              />
-            {/await}
+            <CustomDropdown
+              id="lokasi"
+              value={searchStore.filters["lokasi_pekerjaan"]}
+              update={(payload: DropdownUpdatePayload) =>
+                updateTaxonomyFilter("lokasi_pekerjaan", payload)}
+              options={SearchUtils.mapTerms(
+                taxonomyStore.getTerms("lokasi_pekerjaan"),
+                "Semua lokasi",
+              )}
+              multiple={true}
+              open={isLokasiOpen}
+              close={() => (isLokasiOpen = false)}
+            />
           {/if}
         </div>
 
@@ -589,25 +599,24 @@
             aria-expanded={isGenderOpen}
             aria-controls="gender-listbox"
             onclick={() =>
-              toggleDropdown("gender", () => taxonomyStore.fetchGenderTerms())}
-            ><span class="pl-8">{genderLabel}</span></button
+              toggleDropdown("gender", () =>
+                taxonomyStore.fetchTerms("gender"),
+              )}><span class="pl-8">{genderLabel}</span></button
           >
           {#if isGenderOpen}
-            {#await CustomDropdown then CustomDropdownComponent}
-              <CustomDropdownComponent
-                id="gender"
-                value={searchStore.filters["gender"]}
-                update={(payload: DropdownUpdatePayload) =>
-                  updateTaxonomyFilter("gender", payload)}
-                options={SearchUtils.mapTerms(
-                  taxonomyStore.genderTerms,
-                  "Semua gender",
-                )}
-                multiple={true}
-                open={isGenderOpen}
-                close={() => (isGenderOpen = false)}
-              />
-            {/await}
+            <CustomDropdown
+              id="gender"
+              value={searchStore.filters["gender"]}
+              update={(payload: DropdownUpdatePayload) =>
+                updateTaxonomyFilter("gender", payload)}
+              options={SearchUtils.mapTerms(
+                taxonomyStore.getTerms("gender"),
+                "Semua gender",
+              )}
+              multiple={true}
+              open={isGenderOpen}
+              close={() => (isGenderOpen = false)}
+            />
           {/if}
         </div>
 
@@ -623,26 +632,24 @@
             aria-controls="pendidikan-listbox"
             onclick={() =>
               toggleDropdown("pendidikan", () =>
-                taxonomyStore.fetchPendidikanTerms(),
+                taxonomyStore.fetchTerms("pendidikan"),
               )}
             ><span class="pl-8">{pendidikanLabel}</span>
           </button>
           {#if isPendidikanOpen}
-            {#await CustomDropdown then CustomDropdownComponent}
-              <CustomDropdownComponent
-                id="pendidikan"
-                value={searchStore.filters["pendidikan"]}
-                update={(payload: DropdownUpdatePayload) =>
-                  updateTaxonomyFilter("pendidikan", payload)}
-                options={SearchUtils.mapTerms(
-                  taxonomyStore.pendidikanTerms,
-                  "Semua pendidikan",
-                )}
-                multiple={true}
-                open={isPendidikanOpen}
-                close={() => (isPendidikanOpen = false)}
-              />
-            {/await}
+            <CustomDropdown
+              id="pendidikan"
+              value={searchStore.filters["pendidikan"]}
+              update={(payload: DropdownUpdatePayload) =>
+                updateTaxonomyFilter("pendidikan", payload)}
+              options={SearchUtils.mapTerms(
+                taxonomyStore.getTerms("pendidikan"),
+                "Semua pendidikan",
+              )}
+              multiple={true}
+              open={isPendidikanOpen}
+              close={() => (isPendidikanOpen = false)}
+            />
           {/if}
         </div>
 
@@ -669,19 +676,17 @@
             ></button
           >
           {#if isSortOpen}
-            {#await CustomDropdown then CustomDropdownComponent}
-              <CustomDropdownComponent
-                id="sort"
-                value={searchStore.filters.sort}
-                update={(payload: DropdownUpdatePayload) => {
-                  updateSortFilter(payload);
-                }}
-                options={sortOptions}
-                multiple={false}
-                open={isSortOpen}
-                close={() => (isSortOpen = false)}
-              />
-            {/await}
+            <CustomDropdown
+              id="sort"
+              value={searchStore.filters.sort}
+              update={(payload: DropdownUpdatePayload) => {
+                updateSortFilter(payload);
+              }}
+              options={sortOptions}
+              multiple={false}
+              open={isSortOpen}
+              close={() => (isSortOpen = false)}
+            />
           {/if}
         </div>
       </div>
@@ -731,7 +736,7 @@
           <button
             type="button"
             class="btn btn-outline rounded-full bg-[var(--wpl-global-color-5)] hover:border-[var(--wpl-global-color-1)]"
-            disabled={searchStore.loading || taxonomyStore.loading}
+            disabled={searchStore.loading || taxonomyStore.getLoadingStatus}
             onclick={() =>
               SearchFormController.resetFiltersAndSearch(
                 searchResults,
@@ -743,18 +748,13 @@
         </div>
       {/if}
 
-      {#if searchStore.error || taxonomyStore.lokasiError || taxonomyStore.genderError || taxonomyStore.pendidikanError}
+      {#if searchStore.error || taxonomyStore.anyError}
         <div class="alert alert-error">
           <TriangleExclamationSolid
             class="mr-2 inline-block text-red-600"
             aria-hidden="true"
           />
-          <span
-            >{searchStore.error ||
-              taxonomyStore.lokasiError ||
-              taxonomyStore.genderError ||
-              taxonomyStore.pendidikanError}</span
-          >
+          <span>{searchStore.error || taxonomyStore.anyError}</span>
         </div>
       {/if}
 

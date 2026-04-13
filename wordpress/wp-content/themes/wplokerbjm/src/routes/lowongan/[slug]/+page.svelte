@@ -2,12 +2,12 @@
   import JobDetail from "$lib/components/ui/Shared/JobDetail.svelte";
   import type { JobDetailResponse, CarouselProps, JobGridProps } from "@/types";
   import Homepage from "@/routes/+page.svelte";
-  import { isMobile } from "$lib/utils/elements.svelte";
+  import { isMobile } from "$lib/utils/window.svelte";
   interface Props {
     data: {
       job: JobDetailResponse;
-      carousel?: CarouselProps;
-      jobGrid?: JobGridProps;
+      carousel: CarouselProps;
+      jobGrid: JobGridProps;
     };
   }
   const props: Props = $props();

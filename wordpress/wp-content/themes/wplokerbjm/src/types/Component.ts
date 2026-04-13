@@ -1,9 +1,6 @@
 import type { SearchTitle, SearchContext, SearchFilters } from './Search';
 import type { CardJob } from './Shared';
 import type { Component } from 'svelte';
-export interface LayoutProps {
-  logo: string;
-}
 
 export interface ComponentConfig {
   selector: string;

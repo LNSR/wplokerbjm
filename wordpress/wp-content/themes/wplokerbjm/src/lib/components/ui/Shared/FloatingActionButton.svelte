@@ -1,4 +1,5 @@
-<script module lang="ts">
+<script lang="ts">
+  import { onMount, onDestroy } from "svelte";
   import { type SocialMediaItem, SocialMediaPlatform } from "@/types";
   import {
     ArrowUpSolid,
@@ -8,37 +9,8 @@
     FacebookBrands,
     ThreadsBrands,
   } from "svelte-awesome-icons";
-
-  const socialLinks: SocialMediaItem[] = [
-    {
-      url: "https://www.instagram.com/loker_banjarmasin",
-      icon: InstagramBrands,
-      platform: SocialMediaPlatform.Instagram,
-      color: "text-pink-500 dark:text-pink-400",
-    },
-    {
-      url: "https://www.facebook.com/loker.banjarmasin.2025",
-      icon: FacebookBrands,
-      platform: SocialMediaPlatform.Facebook,
-      color: "text-[var(--wpl-global-color-1)] dark:text-blue-400",
-    },
-    {
-      url: "https://www.threads.net/@loker_banjarmasin",
-      icon: ThreadsBrands,
-      platform: SocialMediaPlatform.Threads,
-      color: "text-black dark:text-white",
-    },
-  ];
-
-  export const btnClass: string =
-    "btn btn-sm border-1 border-[var(--wpl-global-color-1)] flex items-center gap-2 rounded-full px-4 py-3 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)]";
-  export const gridBtnClass: string =
-    "btn btn-sm border-1 border-[var(--wpl-global-color-1)] flex items-center gap-1 rounded-lg px-2 py-2 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)]";
-</script>
-
-<script lang="ts">
-  import { onMount, onDestroy } from "svelte";
-  import { isJobGridEl, isMobile } from "$lib/utils/elements.svelte";
+  import { isJobGridEl } from "$lib/utils/elements.svelte";
+  import { isMobile } from "$lib/utils/window.svelte";
 
   let show = $state(false);
   let hideAtBottom = $state(false);
@@ -107,7 +79,7 @@
    * Set up an IntersectionObserver to watch for the job grid element and show the scroll-to-top button when it comes into view.
    */
   function observeJobGrid() {
-    const jobGrid = isJobGridEl();
+    const jobGrid = isJobGridEl;
     if (!jobGrid) return;
 
     jobGridObserver = new IntersectionObserver(
@@ -121,6 +93,32 @@
 
     jobGridObserver.observe(jobGrid);
   }
+
+  const socialLinks: SocialMediaItem[] = [
+    {
+      url: "https://www.instagram.com/loker_banjarmasin",
+      icon: InstagramBrands,
+      platform: SocialMediaPlatform.Instagram,
+      color: "text-pink-500 dark:text-pink-400",
+    },
+    {
+      url: "https://www.facebook.com/loker.banjarmasin.2025",
+      icon: FacebookBrands,
+      platform: SocialMediaPlatform.Facebook,
+      color: "text-[var(--wpl-global-color-1)] dark:text-blue-400",
+    },
+    {
+      url: "https://www.threads.net/@loker_banjarmasin",
+      icon: ThreadsBrands,
+      platform: SocialMediaPlatform.Threads,
+      color: "text-black dark:text-white",
+    },
+  ];
+
+  export const btnClass: string =
+    "btn btn-sm border-1 border-[var(--wpl-global-color-1)] flex items-center gap-2 rounded-full px-4 py-3 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)]";
+  export const gridBtnClass: string =
+    "btn btn-sm border-1 border-[var(--wpl-global-color-1)] flex items-center gap-1 rounded-lg px-2 py-2 cursor-pointer transform transition hover:scale-105 focus:ring-2 focus:ring-blue-400 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)]";
 
   onMount(() => {
     observeJobGrid();
@@ -139,7 +137,10 @@
 <svelte:document on:mousedown={MouseOrKeyboardEvent.handleClickOutside} />
 
 {#if !(hideAtBottom && isMobile())}
-  <aside class="fixed bottom-3 right-3 z-30 flex flex-col items-end gap-4" style="view-transition-name: none;">
+  <aside
+    class="fixed bottom-3 right-3 z-30 flex flex-col items-end gap-4"
+    style="view-transition-name: none;"
+  >
     {#if show}
       <!-- Scroll to Top Button -->
       <button

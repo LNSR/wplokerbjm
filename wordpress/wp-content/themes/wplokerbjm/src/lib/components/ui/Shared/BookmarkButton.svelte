@@ -14,7 +14,6 @@
   const isJobSaved = $derived(
     bookmarkStore.jobs.some((job) => Number(job.id) === jobId),
   );
-  const toggleSave = (id: number) => bookmarkStore.toggleSave(id);
 
   let isLoading = $state(false);
   let isHovered = $state(false);
@@ -27,8 +26,21 @@
   });
 
   let preToggleSaved = $state(false);
-  // synchronous lock to prevent same-tick re-entrancy from multiple rapid DOM clicks
+  let bookmarkModalLoaded = false;
   let clicklock = false;
+
+  /**
+   * Toggle saved state for a job id. If saved, remove it; otherwise add it.
+   */
+  function toggleSave(id: number): void {
+    if (bookmarkStore.bookmarkBroadcastChannel.markOutdated()) return;
+
+    if (bookmarkStore.jobs.some((job) => job.id === id)) {
+      return void bookmarkStore.removeJob(id);
+    }
+
+    return void bookmarkStore.addJob(id);
+  }
 
   function handleToggleSave(e: MouseEvent) {
     // prevent parent handlers
@@ -37,7 +49,10 @@
     if (isNaN(jobId) || jobId < 1) return;
 
     // If this tab is outdated (a newer build is open elsewhere), do a cache-reload fetch then force navigation.
-    if (typeof window !== "undefined" && bookmarkStore.isOutdated) {
+    if (
+      typeof window !== "undefined" &&
+      bookmarkStore.bookmarkBroadcastChannel.isOutdated
+    ) {
       fetch(window.location.href, { cache: "reload" }).then(() => {
         window.location.reload();
       });
@@ -45,12 +60,15 @@
     }
 
     const preloadBookmarkModal = () => {
-      if (!dynamicComponentStore.BookmarkModal) {
-        void dynamicComponentStore.loadBookmarkModal();
+      if (!dynamicComponentStore.getComponentByName("BookmarkModal")) {
+        void dynamicComponentStore.loadComponentByName("BookmarkModal");
       }
     };
 
-    useRIC(preloadBookmarkModal, { fallbackDelay: 200 });
+    if (!bookmarkModalLoaded) {
+      useRIC(preloadBookmarkModal, { fallbackDelay: 200 });
+      bookmarkModalLoaded = true;
+    }
 
     // protect against both reactive loading state and synchronous re-entry
     if (isLoading || clicklock) return;
@@ -62,14 +80,13 @@
     isPending = true;
     try {
       const wasSaved = isJobSaved;
-      toggleSave(jobId).then(() => {
-        isPending = false;
-        if (!wasSaved) {
-          confirmationState = "saved";
-        } else {
-          confirmationState = "removed";
-        }
-      });
+      toggleSave(jobId);
+      isPending = false;
+      if (!wasSaved) {
+        confirmationState = "saved";
+      } else {
+        confirmationState = "removed";
+      }
     } catch {
       isPending = false;
       const wasSaved = preToggleSaved;

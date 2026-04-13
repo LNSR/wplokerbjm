@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import type { DropdownOption } from "@/types";
+  import type { DropdownOption, KeyboardKeysEvent } from "@/types";
   import { SearchUtils } from "@/utils/search";
 
   type DropdownSelectionValue = string | DropdownOption;
@@ -16,14 +16,6 @@
     __key?: string;
   };
 
-  type SupportedKey =
-    | "ArrowDown"
-    | "ArrowUp"
-    | "ArrowRight"
-    | "ArrowLeft"
-    | "Enter"
-    | "Escape";
-
   interface Props {
     id?: string;
     value?: ValueProp;
@@ -35,28 +27,6 @@
   }
 
   class CustomDropdownHelpers {
-    static highlightParts = (label: string, query: string): HighlightPart[] => {
-      const parts: HighlightPart[] = [];
-      if (!query) return [{ text: label, match: false }];
-      const escapeRegex = (s: string) =>
-        s.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
-      const regex = new RegExp(escapeRegex(query), "gi");
-      let lastIndex = 0;
-      let m: RegExpExecArray | null;
-      while ((m = regex.exec(label))) {
-        const idx = m.index;
-        if (idx > lastIndex) {
-          parts.push({ text: label.slice(lastIndex, idx), match: false });
-        }
-        parts.push({ text: m[0], match: true });
-        lastIndex = regex.lastIndex;
-      }
-      if (lastIndex < label.length) {
-        parts.push({ text: label.slice(lastIndex), match: false });
-      }
-      return parts.length ? parts : [{ text: label, match: false }];
-    };
-
     static flattenOptions(
       optionsList: DropdownOption[],
       breadcrumbs: string[] = [],
@@ -170,6 +140,27 @@
   }
 
   class CustomDropdownController {
+    static highlightParts = (label: string, query: string): HighlightPart[] => {
+      const parts: HighlightPart[] = [];
+      if (!query) return [{ text: label, match: false }];
+      const escapeRegex = (s: string) =>
+        s.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&");
+      const regex = new RegExp(escapeRegex(query), "gi");
+      let lastIndex = 0;
+      let m: RegExpExecArray | null;
+      while ((m = regex.exec(label))) {
+        const idx = m.index;
+        if (idx > lastIndex) {
+          parts.push({ text: label.slice(lastIndex, idx), match: false });
+        }
+        parts.push({ text: m[0], match: true });
+        lastIndex = regex.lastIndex;
+      }
+      if (lastIndex < label.length) {
+        parts.push({ text: label.slice(lastIndex), match: false });
+      }
+      return parts.length ? parts : [{ text: label, match: false }];
+    };
     static callUpdate(
       payload: UpdatePayload,
       update?: (payload: UpdatePayload) => void,
@@ -256,6 +247,7 @@
     ArrowLeftSolid,
     TrashAltSolid,
   } from "svelte-awesome-icons";
+  import type { Attachment } from "svelte/attachments";
 
   let {
     id,
@@ -270,12 +262,12 @@
   let search = $state("");
   const breadcrumbLabels = $state<string[]>([]);
   const stack = $state<DropdownOption[][]>([]);
+  const itemsCount = $state([] as HTMLElement[]);
   let activeIndex = $state(0);
   let isKeyboard = $state(false);
 
   // DOM ref
   let dropdownRef: HTMLElement | null = null;
-  let listboxEl = $state<HTMLElement | null>(null);
   const listboxId = $derived(String(id ?? "custom-dropdown") + "-listbox");
 
   const normalizedSearch = $derived(String(search).trim());
@@ -318,17 +310,20 @@
     isKeyboard = true;
     const list = filteredNonEmpty ?? [];
 
-    const keyHandlers: Partial<Record<SupportedKey, () => void>> = {
+    const keyHandlers: Partial<Record<KeyboardKeysEvent, () => void>> = {
       ArrowDown: () => {
+        e.preventDefault();
         activeIndex = Math.min((activeIndex ?? 0) + 1, (list.length || 0) - 1);
       },
       ArrowUp: () => {
+        e.preventDefault();
         activeIndex =
           (activeIndex ?? 0) > 0
             ? (activeIndex ?? 0) - 1
             : (list.length || 1) - 1;
       },
       ArrowRight: () => {
+        e.preventDefault();
         const opt = list[activeIndex];
         if (opt && opt.children?.length && !normalizedSearch) {
           CustomDropdownBreadcrumbController.navigateChildren(
@@ -342,12 +337,14 @@
         }
       },
       ArrowLeft: () => {
+        e.preventDefault();
         if (breadcrumbLabels.length && !normalizedSearch) {
           CustomDropdownBreadcrumbController.goBack(stack, breadcrumbLabels);
           activeIndex = 0;
         }
       },
       Enter: () => {
+        e.preventDefault();
         const opt = list[activeIndex];
         if (opt)
           CustomDropdownController.select(
@@ -359,28 +356,25 @@
             resetNavigationState,
           );
       },
-      Escape: () => CustomDropdownController.callClose(close),
+      Escape: () => {
+        e.preventDefault();
+        CustomDropdownController.callClose(close);
+      },
     };
-    e.preventDefault();
-    keyHandlers[e.key as SupportedKey]?.();
+    keyHandlers[e.key as KeyboardKeysEvent]?.();
   };
 
-  $effect(() => {
-    // Explicit dependency tracking for scroll behavior
+  /**
+   * Attachment to track active index element for keyboard navigation and scroll it into view when it changes
+   */
+  function trackActiveIndexOnKey(): Attachment | undefined {
     const currentActiveIndex = activeIndex;
-    const isKeyboardNav = isKeyboard;
 
-    if (!isKeyboardNav) return;
-    const el = listboxEl;
-    if (!el) return;
-    try {
-      const items = el.querySelectorAll("li");
-      const node = items[currentActiveIndex] as HTMLElement | undefined;
-      if (node) node.scrollIntoView({ block: "nearest" });
-    } catch (e) {
-      void e;
-    }
-  });
+    if (!isKeyboard) return;
+    const currentItem = itemsCount[currentActiveIndex];
+    if (itemsCount.length > 0)
+      currentItem?.scrollIntoView({ block: "nearest" });
+  }
 </script>
 
 <svelte:document
@@ -420,7 +414,7 @@
       </div>
 
       <!-- Taxonomy loading shown inside dropdown to avoid parent re-renders -->
-      {#if taxonomyStore.loading}
+      {#if taxonomyStore.getLoadingStatus}
         <div class="px-5 py-2 text-center text-sm text-gray-500">
           <div class="inline-flex items-center justify-center">
             <LoadingSpinner size="sm" srLabel="Memuat..." />
@@ -531,13 +525,14 @@
       <!-- Options list (scrollable) -->
       <div class="max-h-96 overflow-y-auto pt-2">
         <ul
+          {@attach trackActiveIndexOnKey()}
           id={listboxId}
           role="listbox"
-          bind:this={listboxEl}
           class="!pt-0 !pb-2"
         >
           {#each filteredNonEmpty as option, index (option.__key)}
             <li
+              bind:this={itemsCount[index]}
               class={[
                 "flex items-center px-5 py-2 cursor-pointer select-none transition rounded text-left",
                 index === activeIndex
@@ -600,7 +595,7 @@
                   />
                 {/if}
                 {#if normalizedSearch}
-                  {#each CustomDropdownHelpers.highlightParts(option.label, normalizedSearch) as part, partIndex (part.text + part.match + partIndex)}
+                  {#each CustomDropdownController.highlightParts(option.label, normalizedSearch) as part, partIndex (part.text + part.match + partIndex)}
                     {#if part.match}
                       <span
                         class="bg-[var(--wpl-global-color-5)] font-bold rounded px-1"

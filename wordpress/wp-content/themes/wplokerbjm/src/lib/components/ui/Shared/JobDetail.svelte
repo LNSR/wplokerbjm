@@ -34,7 +34,7 @@
   import { browser } from "$app/environment";
   import ViewerModule from "viewerjs";
   import "viewerjs/dist/viewer.min.css";
-  import { generalJobStore } from "$lib/stores/General.svelte";
+  import { generalJobStore } from "@/lib/stores/GeneralJob.svelte";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import { onDestroy } from "svelte";
   import type { JobDetailResponse } from "@/types";

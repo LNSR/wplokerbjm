@@ -3,32 +3,37 @@
     CardJob,
     JobGridProps,
     LoadMoreResponse,
+    SearchResponse,
     SearchState,
-    SearchContext,
-    SearchTitle,
   } from "@/types";
   import { goto } from "$app/navigation";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
   import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import { searchStore } from "$lib/stores/Search.svelte";
-  import { APIServiceBrowser } from "@/services/APIService";
+  import { APIServiceBrowser } from "@/services/graphql/APIService";
   import { SearchUtils } from "@/utils/search";
-  import { isMobile } from "$lib/utils/elements.svelte";
-  import { virtualizationService } from "$lib/utils/Virtualization.svelte";
-  import { SvelteMap } from "svelte/reactivity";
+  import { isMobile } from "$lib/utils/window.svelte";
+  import { useVirtualization } from "@/lib/utils/virtualization.svelte";
   import { scrollY, innerHeight } from "svelte/reactivity/window";
   import { browser } from "$app/environment";
 
-  const displayJobs = $derived(searchStore.jobs);
-  const loading = $derived(searchStore.loading);
-  const hasMore = $derived(searchStore.hasMore);
-  const displayTotalJobs = $derived(searchStore.totalJobs);
-  const displayTitle = $derived(searchStore.title);
-
-  let isRefreshing = $state(false);
-
-  class OverlayController {
-    handleJobClick(job: CardJob): void {
+  /**
+   * Decide navigation behavior when a job card is clicked, either opening the overlay (desktop) or navigating to the job detail page (mobile). Also handles saving the current grid state before navigation to allow for proper restoration when coming back. The separation of mobile and desktop logic ensures an optimized experience for each device type while maintaining state consistency across navigations.
+   */
+  class NavigationController {
+    /**
+     * Handle job click on mobile
+     */
+    private static MobileJobClick(
+      job: Parameters<typeof this.handleJobClick>[0],
+    ): void {
+      routeStateStore.MarkVisitedJob(job.slug ?? "", "featured");
+      // navigate to SingleLowongan.svelte route
+      const url = new URL(String(job.permalink), window.location.origin);
+      jobGridManager.saveGridStates();
+      void goto(url.pathname + url.search + url.hash);
+    }
+    public static handleJobClick(job: CardJob): void {
       if (!job.permalink) return;
 
       // NOTE: Overlay feature is for desktop only (window.innerWidth >= 768)
@@ -36,15 +41,6 @@
 
       // Save card heights before navigating/opening overlay
       routeStateStore.saveCardHeights(searchStore.jobGridCardHeight, "jobGrid");
-
-      function MobileJobClick(): void {
-        // Mark as last visited before navigating
-        routeStateStore.MarkVisitedJob(job.slug ?? "", "featured");
-        // use SPA navigation to SingleLowongan.svelte route
-        const url = new URL(String(job.permalink), window.location.origin);
-        jobGridManager.saveGridStates();
-        void goto(url.pathname + url.search + url.hash);
-      }
 
       if (!isMobile()) {
         jobGridManager.saveGridStates(
@@ -57,7 +53,7 @@
           },
         });
       } else {
-        MobileJobClick();
+        this.MobileJobClick(job);
       }
     }
   }
@@ -66,44 +62,26 @@
     // Load more cache for CLS-free loading, avoid dynamically append list cards to DOM which triggered unfair CLS assessment
     public nextPageLoadMoreCache = $state<CardJob[] | null>(null);
     public isPrefetchingLoadMore = $state(false);
+    public isRefreshing = $state(false);
+
+    public async refreshGrid(): Promise<
+      JobGridProps | SearchResponse | undefined
+    > {
+      try {
+        if (this.isRefreshing) return;
+        this.isRefreshing = true;
+        return await searchStore.refreshJobGrid();
+      } catch (err) {
+        console.error("Failed to refresh job grid:", err);
+      } finally {
+        this.isRefreshing = false;
+      }
+    }
+
     /**
      * Refresh the job grid based on the current search context and filters
      * Refresh button initialized in the UI to allow users to manually refresh the grid when they want to see updated results without changing filters or search terms
      */
-    async refreshJobGrid() {
-      if (isRefreshing) return;
-      isRefreshing = true;
-      try {
-        searchStore.clearJobGridCardHeights();
-        if (searchStore.context !== "search") {
-          const response = await APIServiceShared.fetchJobGridGraphQL({
-            paged: 1,
-            context: searchStore.context,
-            title: searchStore.title,
-            total_jobs: 0,
-            ...searchStore.filters,
-          });
-          searchStore.jobs = response.jobs || [];
-          searchStore.maxNumPages = response.maxNumPages || 1;
-          searchStore.context = response.context || "latest";
-          searchStore.title = response.title || "Lowongan Terbaru";
-          searchStore.totalJobs = response.total || 0;
-          if (response.filters) {
-            searchStore.setFilters(response.filters);
-          }
-          searchStore.page = 1;
-          searchStore.error = null;
-        } else {
-          await searchStore.searchJobs();
-        }
-      } catch (err) {
-        console.error("Failed to refresh job grid:", err);
-        searchStore.error = "Failed to refresh job grid";
-      } finally {
-        isRefreshing = false;
-      }
-    }
-
     public async loadMore(retries = 2): Promise<LoadMoreResponse> {
       if (searchStore.loading || searchStore.page >= searchStore.maxNumPages!) {
         throw new Error("Cannot load more: already loading or no more pages");
@@ -148,7 +126,6 @@
 
         if (retries > 0) {
           console.log(`Retrying loadMore, attempts left: ${retries}`);
-          await new Promise((resolve) => setTimeout(resolve, 1000));
           return this.loadMore(retries - 1);
         }
 
@@ -193,70 +170,41 @@
       const TIMEOUT_MS = 6000;
 
       try {
-        let timedOut = false;
         const apiPromise =
           APIServiceBrowser.loadMoreJobsGraphQL(loadMoreFilters);
-        const timeoutPromise = new Promise((resolve) =>
+        const timeoutPromise = new Promise<{ __timedOut: true }>((resolve) =>
           setTimeout(() => {
-            timedOut = true;
             resolve({ __timedOut: true });
           }, TIMEOUT_MS),
         );
 
-        const response: unknown = await Promise.race([
+        const raceResult = (await Promise.race([
           apiPromise,
           timeoutPromise,
-        ]);
+        ])) as LoadMoreResponse | { __timedOut: true };
 
-        if (timedOut) {
+        let response: LoadMoreResponse | undefined;
+
+        if ("__timedOut" in raceResult) {
           console.warn(
             "SearchStore: Prefetch timed out, performing manual fetch",
           );
-          try {
-            const manualResponse: LoadMoreResponse =
-              await APIServiceBrowser.loadMoreJobsGraphQL(loadMoreFilters);
-            if (
-              Array.isArray(manualResponse.jobs) &&
-              manualResponse.jobs.length
-            ) {
-              const newJobs = manualResponse.jobs.filter(
-                (newJob: any) =>
-                  !searchStore.jobs.some(
-                    (existingJob) => existingJob.permalink === newJob.permalink,
-                  ),
-              );
-              this.nextPageLoadMoreCache = newJobs;
-              searchStore.maxNumPages =
-                manualResponse.maxNumPages || searchStore.maxNumPages;
-            } else {
-              searchStore.page = searchStore.maxNumPages!;
-            }
-          } catch (err) {
-            console.error("SearchStore: Manual prefetch fetch failed:", err);
-            searchStore.error =
-              err instanceof Error
-                ? err.message
-                : "Prefetch manual fetch failed";
-          }
+          response = await APIServiceBrowser.loadMoreJobsGraphQL(loadMoreFilters);
         } else {
-          if (
-            response &&
-            Array.isArray((response as LoadMoreResponse).jobs) &&
-            (response as LoadMoreResponse).jobs!.length
-          ) {
-            const newJobs = (response as LoadMoreResponse).jobs!.filter(
-              (newJob: any) =>
-                !searchStore.jobs.some(
-                  (existingJob) => existingJob.permalink === newJob.permalink,
-                ),
-            );
-            this.nextPageLoadMoreCache = newJobs;
-            searchStore.maxNumPages =
-              (response as LoadMoreResponse).maxNumPages ||
-              searchStore.maxNumPages;
-          } else {
-            searchStore.page = searchStore.maxNumPages!;
-          }
+          response = raceResult;
+        }
+
+        if (response?.jobs && response.jobs.length) {
+          const newJobs = response.jobs.filter(
+            (newJob: any) =>
+              !searchStore.jobs.some(
+                (existingJob) => existingJob.permalink === newJob.permalink,
+              ),
+          );
+          this.nextPageLoadMoreCache = newJobs;
+          searchStore.maxNumPages = response.maxNumPages || searchStore.maxNumPages;
+        } else {
+          searchStore.page = searchStore.maxNumPages!;
         }
       } catch (err) {
         console.error("SearchStore: Prefetch failed:", err);
@@ -270,7 +218,7 @@
     /**
      * Initialize restore and autosave for the current route's search state.
      */
-    init(): void {
+    public init(): void {
       const routePath = window.location.pathname || "/";
 
       try {
@@ -283,12 +231,9 @@
           if (typeof saved.page === "number") searchStore.page = saved.page;
           if (typeof saved.maxNumPages === "number")
             searchStore.maxNumPages = saved.maxNumPages;
-          if (saved.title)
-            searchStore.title =
-              (saved.title as SearchTitle) || searchStore.title;
+          if (saved.title) searchStore.title = saved.title || searchStore.title;
           if (saved.context)
-            searchStore.context =
-              (saved.context as SearchContext) || searchStore.context;
+            searchStore.context = saved.context || searchStore.context;
           if (typeof saved.totalJobs === "number")
             searchStore.totalJobs = saved.totalJobs;
         }
@@ -333,13 +278,11 @@
     }
   }
 
-  export const overlayManager = new OverlayController();
   export const jobGridManager = new GridJobManager();
 </script>
 
 <script lang="ts">
   import type { Attachment } from "svelte/attachments";
-  import { APIServiceShared } from "@/services/APIService";
   import JobCard from "@components/ui/Shared/JobCard.svelte";
   import SingleOverlay from "@components/ui/Homepage/SingleOverlay.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
@@ -347,6 +290,20 @@
   import { onMount, tick } from "svelte";
 
   const props: JobGridProps = $props();
+
+  const displayJobs = $derived(searchStore.jobs);
+  const loading = $derived(searchStore.loading);
+  const hasMore = $derived(searchStore.hasMore);
+  const displayTotalJobs = $derived(searchStore.totalJobs);
+  const displayTitle = $derived(searchStore.title);
+
+  // virtualization parameters
+  const FALLBACK_ITEM_HEIGHT = 420;
+  const fallbackGap = 32;
+  const buffer = 6;
+  const currentHeightY = $derived(scrollY.current);
+  const innerHeightValue = $derived(innerHeight.current);
+  const cardHeightsJobCard = $derived(searchStore.jobGridCardHeight);
 
   const {
     jobs = [],
@@ -357,92 +314,61 @@
     total: totalJobs,
   } = $derived<JobGridProps>(props);
 
-  class VirtualizationManager {
-    static computeListVirtualization(
-      displayJobs: CardJob[],
-      scrollY: number,
-      containerHeight: number,
-      cardHeights: Map<number, number>,
-      fallbackHeight: number,
-      gap: number,
-      buffer: number,
-    ) {
-      return virtualizationService.computeList({
-        displayJobs,
-        scrollY,
-        containerHeight,
-        cardHeights,
-        fallbackHeight,
-        gap,
-        buffer,
-      });
-    }
-
-    static measureHeight = (jobId?: number): Attachment<HTMLElement> => {
-      return virtualizationService.createMeasureHeight(
-        searchStore.jobGridCardHeight,
-        jobId,
-      );
-    };
-  }
-
-  // fallback height used until measurements are available
-  const FALLBACK_ITEM_HEIGHT = 420;
-  const fallbackGap = 32;
-  const buffer = 3;
-
   const virtualization = $derived(
-    VirtualizationManager.computeListVirtualization(
+    useVirtualization.computeList({
       displayJobs,
-      scrollY.current ?? 0,
-      innerHeight.current ?? 800,
-      new SvelteMap(searchStore.jobGridCardHeight),
-      FALLBACK_ITEM_HEIGHT,
-      fallbackGap,
+      scrollY: currentHeightY ?? 0,
+      containerHeight: innerHeightValue ?? 800,
+      cardHeights: cardHeightsJobCard,
+      fallbackHeight: FALLBACK_ITEM_HEIGHT,
+      gap: fallbackGap,
       buffer,
-    ),
+    }),
   );
 
-  function observeLoadMoreSentinel(node: HTMLElement) {
+  const observeLoadMoreSentinel: Attachment<HTMLElement> | undefined = (() => {
     if (!browser) return;
-
-    const observer = new IntersectionObserver(
-      async (entries) => {
-        for (const entry of entries) {
-          if (
-            entry.isIntersecting &&
-            hasMore &&
-            !jobGridManager.nextPageLoadMoreCache &&
-            !jobGridManager.isPrefetchingLoadMore
-          ) {
-            await jobGridManager.prefetchNextPage();
+    let observerSentinel: IntersectionObserver;
+    return (node: Element) => {
+      observerSentinel ??= new IntersectionObserver(
+        async (entries) => {
+          for (const entry of entries) {
+            if (
+              entry.isIntersecting &&
+              hasMore &&
+              !jobGridManager.nextPageLoadMoreCache &&
+              !jobGridManager.isPrefetchingLoadMore
+            ) {
+              await jobGridManager.prefetchNextPage();
+            }
           }
-        }
-      },
-      { root: null, rootMargin: "5000px" },
-    );
+        },
+        { root: null, rootMargin: "5000px" },
+      );
 
-    observer.observe(node);
+      if (observerSentinel instanceof IntersectionObserver)
+        observerSentinel.observe(node);
 
-    return () => {
-      observer.disconnect();
+      return () => {
+        if (observerSentinel instanceof IntersectionObserver)
+          observerSentinel.disconnect();
+      };
     };
-  }
+  })();
 
   /**
    * SSR initialization to populate searchStore with server-provided data on initial load. This ensures that the job grid is populated immediately with the correct data without waiting for client-side JS to fetch it, improving perceived performance and SEO. The check for routeStore.isInitialLoad ensures this only runs on the first load and not on client-side navigations where the state should be preserved/restored instead.
    */
   (() => {
-    if (jobs && jobs.length > 0 && routeStore.isInitialLoad) {
-      searchStore.jobs = [...jobs];
-      if (typeof maxNumPages === "number" && maxNumPages > 0) {
-        searchStore.maxNumPages = maxNumPages;
-      }
-      if (context) searchStore.context = context;
-      if (title) searchStore.title = title;
-      if (totalJobs !== undefined) searchStore.totalJobs = totalJobs;
-      if (filters) searchStore.setFilters(filters);
+    if (!jobs || jobs.length === 0 || !routeStore.isInitialLoad) return;
+    searchStore.jobs = [...jobs];
+    if (typeof maxNumPages === "number" && maxNumPages > 0) {
+      searchStore.maxNumPages = maxNumPages;
     }
+    if (context) searchStore.context = context;
+    if (title) searchStore.title = title;
+    if (totalJobs !== undefined) searchStore.totalJobs = totalJobs;
+    if (filters) searchStore.setFilters(filters);
   })();
 
   onMount(() => {
@@ -466,18 +392,20 @@
       class="job-grid-refresh btn btn-lg rounded-full h-10 w-10 p-0 flex items-center justify-center text-current bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-1)] overflow-visible focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--wpl-global-color-1)]"
       aria-label="Segarkan lowongan"
       title="Segarkan"
-      onclick={() => void jobGridManager.refreshJobGrid()}
-      disabled={isRefreshing || loading}
+      onclick={() => void jobGridManager.refreshGrid()}
+      disabled={jobGridManager.isRefreshing || loading}
       tabindex="0"
     >
-      <RefreshSpinner size="h-5 w-5" spin={isRefreshing} />
+      <RefreshSpinner size="h-5 w-5" spin={jobGridManager.isRefreshing} />
       <span class="sr-only"
-        >{isRefreshing ? "Sedang menyegarkan" : "Segarkan"}</span
+        >{jobGridManager.isRefreshing
+          ? "Sedang menyegarkan"
+          : "Segarkan"}</span
       >
     </button>
   </div>
 
-  {#if isRefreshing}
+  {#if jobGridManager.isRefreshing}
     <div
       class="flex justify-center items-center min-h-[200px]"
       aria-live="polite"
@@ -505,12 +433,15 @@
                   ]}
                 <div
                   style="position: absolute; transform: translate3d(0, {absoluteTop}px, 0); width: 100%; contain: layout;"
-                  {@attach VirtualizationManager.measureHeight(job.id)}
+                  {@attach useVirtualization.createMeasureHeight(
+                    cardHeightsJobCard,
+                    job.id,
+                  )}
                   class="transition-opacity duration-600 ease-in-out"
                   onkeydown={(event) => {
                     if (event.key === "Enter" || event.key === " ") {
                       event.preventDefault();
-                      void overlayManager.handleJobClick(job);
+                      void NavigationController.handleJobClick(job);
                     }
                   }}
                   role="button"
@@ -522,7 +453,7 @@
                     variant="featured"
                     permalink={job.permalink ?? ""}
                     onClick={() => {
-                      void overlayManager.handleJobClick(job);
+                      void NavigationController.handleJobClick(job);
                     }}
                   />
                 </div>
@@ -546,7 +477,7 @@
                   variant="featured"
                   permalink={job.permalink ?? ""}
                   onClick={() => {
-                    void overlayManager.handleJobClick(job);
+                    void NavigationController.handleJobClick(job);
                   }}
                 />
               </div>

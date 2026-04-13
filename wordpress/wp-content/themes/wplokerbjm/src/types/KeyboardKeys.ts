@@ -1,0 +1,1 @@
+export type KeyboardKeysEvent = "Enter" | "Escape" | "Esc" | "ArrowDown" | "ArrowUp" | "ArrowRight" | "ArrowLeft";

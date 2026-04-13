@@ -1,18 +1,18 @@
-<script module lang="ts">
+<script lang="ts">
   import JobCard from "@components/ui/Shared/JobCard.svelte";
   import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
   import { isJobGridEl } from "$lib/utils/elements.svelte";
   import { routeStateStore } from "$lib/stores/Route.svelte";
   import { goto } from "$app/navigation";
   import type { CardJob, JobCardProps } from "@/types";
-  import { APIServiceShared } from "@/services/APIService";
+  import { APIServiceShared } from "@/services/graphql/APIService";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import { onMount } from "svelte";
+  import { onMount, tick } from "svelte";
   import { useRIC } from "$lib/utils/window.svelte";
   import { innerWidth } from "svelte/reactivity/window";
   import SwiperCore, { type Swiper } from "swiper";
-  import type { SwiperOptions } from "swiper/types";
+  import type { SwiperOptions, VirtualData } from "swiper/types";
   import { Navigation, Pagination, Autoplay, Virtual } from "swiper/modules";
   import {
     ChevronCircleLeftSolid,
@@ -23,14 +23,6 @@
   import "swiper/css/pagination";
   import "swiper/css/virtual";
 
-  type SwiperVirtualExternalData = {
-    from: number;
-    to: number;
-    offset: number;
-  };
-</script>
-
-<script lang="ts">
   /*
     JobCarousel uses Swiper's Virtual module (renderExternal) to efficiently
     render very large lists (100+ items). Implementation notes and reasoning:
@@ -58,29 +50,26 @@
     - If switching to a different virtual strategy, preserve `data-swiper-slide-index`
       so Swiper internals map indexes correctly.
   */
-  let { jobs, title = "Lowongan Darurat" } = $props<{
+  let {
+    jobs,
+    title = "Lowongan Darurat",
+  }: {
     jobs?: CardJob[];
     title?: string;
-  }>();
-
-  let lastBreakpoint = $state("");
-
-  const breakpoint = $derived.by(() => {
-    const w = innerWidth.current ?? 0;
-    return w >= 1024 ? "lg" : w >= 640 ? "md" : "sm";
-  });
-
+  } = $props();
   class SwiperManager {
-    public virtualData = $state<SwiperVirtualExternalData>({
+    public virtualData = $state<Omit<VirtualData<any>, "slides">>({
       from: 0,
       to: -1,
       offset: 0,
     });
     public swiperFailed = $state(false);
-    public resizeTimer: ReturnType<typeof setTimeout> | null = null;
     public error = $state<string | null>(null);
     public isRefreshing = $state(false);
     public initialSlide = $state(0);
+    #slides = $derived(
+      Array.from({ length: jobs?.length ?? 0 }, (_, index) => index),
+    );
     public activeIndex = $state(0);
     public swiperInstance: Swiper | null = null;
     public isInitializing = $state(false);
@@ -131,23 +120,23 @@
           nextEl: nextEl ?? undefined,
           prevEl: prevEl ?? undefined,
         },
-        watchSlidesProgress: false,
+        watchSlidesProgress: true,
         passiveListeners: true,
         touchStartPreventDefault: false,
         touchStartForcePreventDefault: false,
         initialSlide: this.initialSlide ?? 0,
         virtual: {
           enabled: true,
-          slides: Array.from({ length: jobs.length }, (_, i) => i),
+          slides: this.#slides,
           addSlidesBefore: 2,
           addSlidesAfter: 2,
           renderExternalUpdate: false,
-          renderExternal: (data) => {
+          renderExternal: (data: VirtualData<any>) => {
             const next = {
               from: Number(data?.from ?? 0),
               to: Number(data?.to ?? -1),
               offset: Number(data?.offset ?? 0),
-            } satisfies SwiperVirtualExternalData;
+            };
 
             // Avoid excessive state writes during Swiper's internal loops.
             if (
@@ -157,7 +146,10 @@
             ) {
               return;
             }
-            this.virtualData = next;
+            requestAnimationFrame(() => {
+              this.virtualData = next;
+              this.syncWithSvelte();
+            });
           },
         },
         on: {
@@ -178,7 +170,18 @@
       };
     }
 
-    private waitForSlidesAndWidth(el: HTMLElement | null): boolean {
+    private syncWithSvelte() {
+      tick().then(() => {
+        this.swiperInstance?.updateSlides();
+        this.swiperInstance?.updateSize();
+        this.swiperInstance?.updateProgress();
+        this.swiperInstance?.updateSlidesClasses();
+      }).catch((e) => {
+        console.error("Error syncing Swiper with Svelte:", e);
+      });
+    }
+
+    private waitForSlidesAndWidth = $derived((el: HTMLElement | null) => {
       if (!el) return false;
       const MAX_INIT_ATTEMPTS = 12;
       let attempts = 0;
@@ -193,7 +196,7 @@
           return false;
         }
       }
-    }
+    });
 
     private initializeSwiperInstance(
       el: HTMLElement,
@@ -226,10 +229,10 @@
         if (savedState && typeof savedState.slideIndex === "number") {
           this.swiperInstance?.slideTo(clampedIndex, 0);
           this.activeIndex = clampedIndex;
-          this.swiperInstance?.update?.();
-          this.swiperInstance?.updateSlides?.();
-          this.swiperInstance?.updateProgress?.();
-          this.swiperInstance?.updateSlidesClasses?.();
+          requestAnimationFrame(() => {
+            this.swiperInstance?.update?.();
+            this.syncWithSvelte();
+          });
         }
       } catch {
         throw new Error("Failed to initialize Swiper");
@@ -277,7 +280,9 @@
         this.swiperFailed = true;
       } finally {
         this.isInitializing = false;
-        useRIC(() => routeStateStore.clearCarouselState(), { fallbackDelay: 0 });
+        useRIC(() => routeStateStore.clearCarouselState(), {
+          fallbackDelay: 0,
+        });
       }
     }
 
@@ -332,6 +337,7 @@
         this.isRefreshing = false;
       }
       this.reinitializeSwiper({ forceDestroy: true });
+      this.updateSwiperOnJobsChange();
     }
 
     // Keep Swiper in sync when job list updates
@@ -386,8 +392,6 @@
     }
   }
 
-  const swiperManager = new SwiperManager();
-
   class CarouselNavigationHandler {
     public static handleClickNavigateToJob(
       slug: string,
@@ -416,9 +420,9 @@
       permalink: CardJob["permalink"],
       job: CardJob,
     ): void {
-      if (typeof window !== "undefined" && window.innerWidth >= 768) {
+      if (innerWidth.current! >= 768) {
         // Desktop: open overlay
-        const jobgridElement = isJobGridEl();
+        const jobgridElement = isJobGridEl;
         jobOverlayManager?.openOverlay(slug, job, "carousel");
         jobgridElement?.scrollIntoView({ behavior: "smooth", block: "start" });
       } else {
@@ -429,44 +433,12 @@
       }
     }
   }
-  // Derive a simple jobs count to drive updates without reacting to every
-  // internal jobs change. This lets us limit side-effectful $effect usage.
-  const jobsCount = $derived(jobs?.length ?? 0);
 
-  // Keep Swiper in sync when job list updates — react to `jobsCount` only.
-  $effect(() => {
-    jobsCount;
-    void swiperManager.updateSwiperOnJobsChange();
-  });
-
-  // When Swiper Virtual asks us to render a new range, wait for Svelte to paint
-  // those slides, then notify Swiper so it can correctly measure/update classes.
-  $effect(() => {
-    swiperManager.virtualData;
-    if (!swiperManager.swiperInstance) return;
-    requestAnimationFrame(() => {
-      swiperManager.swiperInstance?.updateSlides();
-      swiperManager.swiperInstance?.updateProgress();
-      swiperManager.swiperInstance?.updateSlidesClasses();
-    });
-  });
-
-  $effect(() => {
-    breakpoint;
-    const bp = breakpoint as string;
-    if (bp !== lastBreakpoint) {
-      lastBreakpoint = bp;
-      if (swiperManager.resizeTimer) clearTimeout(swiperManager.resizeTimer);
-      swiperManager.resizeTimer = setTimeout(() => {
-        void swiperManager.reinitializeSwiper({ forceDestroy: true });
-      }, 50);
-    }
-  });
+  const swiperManager = new SwiperManager();
 
   onMount(() => {
     swiperManager.createSwiper();
     return () => {
-      if (swiperManager.resizeTimer) clearTimeout(swiperManager.resizeTimer);
       swiperManager.destroySwiper();
     };
   });
@@ -503,7 +475,7 @@
           class="btn btn-ghost ml-2"
           onclick={() => {
             swiperManager.swiperFailed = false;
-            void swiperManager.reinitializeSwiper({ forceDestroy: true });
+            swiperManager.reinitializeSwiper({ forceDestroy: true });
           }}
         >
           Coba lagi
@@ -516,7 +488,7 @@
         class="job-carousel-refresh btn btn-lg rounded-full ml-2 h-10 w-10 p-0 flex items-center justify-center text-current bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-1)] overflow-visible focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--wpl-global-color-1)]"
         aria-label="Segarkan lowongan"
         title="Segarkan"
-        onclick={() => void swiperManager.refreshCarousel()}
+        onclick={async () => await swiperManager.refreshCarousel()}
         disabled={swiperManager.isRefreshing}
         aria-disabled={swiperManager.isRefreshing}
         tabindex="0"

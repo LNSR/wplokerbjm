@@ -10,13 +10,74 @@ import type {
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
-declare global {
-  namespace App {
+declare global
+{
+  interface DeviceType
+  {
+    isMobile: boolean;
+    isBrowser: boolean;
+    isAndroid: boolean;
+    isIOS: boolean;
+    isSmartTV: boolean;
+    isConsole: boolean;
+    isWearable: boolean;
+    isEmbedded: boolean;
+    isMobileSafari: boolean;
+    isChromium: boolean;
+    isTablet: boolean;
+    isDesktop: boolean;
+    isWinPhone: boolean;
+    isChrome: boolean;
+    isFirefox: boolean;
+    isSafari: boolean;
+    isOpera: boolean;
+    isIE: boolean;
+    osVersion: string;
+    fullBrowserVersion: string;
+    browserVersion: string;
+    mobileVendor: string;
+    mobileModel: string;
+    getUA: string;
+    isEdge: boolean;
+    isYandex: boolean;
+    isIOS13: boolean;
+    isIPad13: boolean;
+    isIPhone13: boolean;
+    isIPod13: boolean;
+    isElectron: boolean;
+    isEdgeChromium: boolean;
+    isLegacyEdge: boolean;
+    isWindows: boolean;
+    isMacOs: boolean;
+    isMIUI: boolean;
+    isSamsungBrowser: boolean;
+    isWebView: boolean;
+    isCrawler: boolean;
+  }
+
+  interface DevicePayload extends DeviceType
+  {
+    browserMajorVersion?: string;
+    browserFullVersion?: string;
+    browserName?: string;
+    engineName?: string;
+    engineVersion?: string;
+    osName?: string;
+    osVersion: string;
+    userAgent?: string;
+    vendor?: string;
+    model?: string;
+    os?: string;
+    ua?: string;
+  }
+  namespace App
+  {
     // interface Error {}
     // interface Locals {}
     // interface PageData {}
     // interface PageState {}
-    interface Locals {
+    interface Locals
+    {
       deviceType: DevicePayload;
       jwtToken: string | null;
 
@@ -26,7 +87,8 @@ declare global {
 
     interface PageData { deviceType: DevicePayload }
 
-    interface Platform {
+    interface Platform
+    {
       env?: {
         wplokerbjm: KVNamespace;
       };
@@ -36,13 +98,14 @@ declare global {
       cf?: IncomingRequestCfProperties;
     }
 
-    interface PrivateEnv {}
-    interface PublicEnv {}
+    interface PrivateEnv { }
+    interface PublicEnv { }
   }
 
   type DataLayerItem = Record<string, unknown> | unknown[];
 
-  interface Window {
+  interface Window
+  {
     adsbygoogle?: unknown[];
     // Google Analytics / GTM helpers used by the frontend
     // `gtag` may be injected by a GA4 snippet. Keep it optional as it may not
@@ -60,4 +123,4 @@ declare global {
   }
 }
 
-export {};
+export { };

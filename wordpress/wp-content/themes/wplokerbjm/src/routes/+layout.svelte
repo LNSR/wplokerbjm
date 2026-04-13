@@ -4,9 +4,9 @@
   import Header from "$lib/components/layouts/Header.svelte";
   import Footer from "$lib/components/layouts/Footer.svelte";
   import FloatingActionButton from "$lib/components/ui/Shared/FloatingActionButton.svelte";
-  import { onMount, type Snippet } from "svelte";
+  import { type Snippet } from "svelte";
   import { afterNavigate, onNavigate, beforeNavigate } from "$app/navigation";
-  import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
+  import { routeStore } from "$lib/stores/Route.svelte";
   import { updated } from "$app/state";
   import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
   import type { OnNavigate } from "@sveltejs/kit";
@@ -21,7 +21,6 @@
     children: Snippet;
     data: {
       themeData: WPLokerBJMThemedData;
-      deviceType?: App.PageData["deviceType"];
       rankMathHead?: Partial<RankMathHeadData> | string;
       inlineScript?: string;
     };
@@ -54,11 +53,11 @@
       return;
 
     return new Promise((resolve, reject) => {
-      const transition = document.startViewTransition(() => {
-        resolve();
-      });
+      const transition = document.startViewTransition();
       try {
-        transition;
+        transition.ready.then(() => {
+          resolve();
+        });
       } catch (error) {
         console.error("Error during onNavigate:", error);
         reject(error);
@@ -93,12 +92,6 @@
         GoogleServices.sendPageView();
       }
     }
-  });
-
-  onMount(() => {
-    routeStateStore.setInitialDevice = data?.deviceType?.isMobile
-      ? "mobile"
-      : "desktop";
   });
 </script>
 

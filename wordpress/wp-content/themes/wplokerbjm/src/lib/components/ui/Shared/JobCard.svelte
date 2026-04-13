@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { generalJobStore } from "$lib/stores/General.svelte";
+  import { generalJobStore } from "@/lib/stores/GeneralJob.svelte";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import JobStatusBadge from "@components/ui/Shared/JobStatusBadge.svelte";
   import JobDeadlineBadge from "@components/ui/Shared/JobDeadlineBadge.svelte";
-  import { isMobile } from "$lib/utils/elements.svelte";
+  import { isMobile } from "$lib/utils/window.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
   import { UserTieSolid } from "svelte-awesome-icons";
@@ -86,9 +86,7 @@
   }
 
   onMount(() => {
-    if (routeStateStore.restoreVisitedJob()) {
-      routeStateStore.restoreVisitedJob();
-    }
+    routeStateStore.restoreVisitedJob();
   });
 </script>
 
