@@ -2,7 +2,7 @@
   import JobDetail from "$lib/components/ui/Shared/JobDetail.svelte";
   import type { JobDetailResponse, CarouselProps, JobGridProps } from "@/types";
   import Homepage from "@/routes/+page.svelte";
-  import { isMobile } from "$lib/utils/window.svelte";
+  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
   interface Props {
     data: {
       job: JobDetailResponse;
@@ -17,13 +17,14 @@
       jobGrid: props.data.jobGrid,
     },
   });
+  const isMobile = $derived(deviceDetector.isPlatformMobile);
   let job: JobDetailResponse | null = $derived(props.data.job ?? null);
 </script>
 
 {#if job}
-  {#if !isMobile()}
+  {#if !isMobile}
     <Homepage {...homepageDesktopData} />
-  {:else if isMobile()}
+  {:else if isMobile}
     <main
       class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12"
     >

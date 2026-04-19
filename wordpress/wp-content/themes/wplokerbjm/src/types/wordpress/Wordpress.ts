@@ -5,7 +5,7 @@ export enum WPPostType {
 export interface WPBasePost {
     id: number;
     title: string;
-    slug?: string;
+    slug?: string | null;
     post_type?: string;
     post_time?: string;
     permalink?: string | null;

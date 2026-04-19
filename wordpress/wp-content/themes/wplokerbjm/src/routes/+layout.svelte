@@ -11,6 +11,7 @@
   import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
   import type { OnNavigate } from "@sveltejs/kit";
   import { headerManager } from "$lib/components/layouts/Header.svelte";
+  import { deviceDetector, type DeviceDetectorInternal } from "$lib/features/DeviceDetector.svelte";
 
   let initialPageviewSent = false;
 
@@ -23,20 +24,22 @@
       themeData: WPLokerBJMThemedData;
       rankMathHead?: Partial<RankMathHeadData> | string;
       inlineScript?: string;
+      deviceType: DevicePayload;
     };
   } = $props();
 
-  const { themeData, rankMathHead, inlineScript } = $derived({
+  const { themeData, rankMathHead, inlineScript, deviceType } = $derived({
     themeData: data?.themeData,
     rankMathHead: data?.rankMathHead,
     inlineScript: data?.inlineScript,
+    deviceType: data?.deviceType,
   });
 
   beforeNavigate(({ to, willUnload }) => {
     try {
-      if (updated.current && !willUnload && to?.url) {
+      if (updated.current && !willUnload && to?.url)
         location.href = to.url.href;
-      }
+
       routeStore.setIsInitialLoad(false);
       routeStore.setIsLoading(true);
       routeStore.setIsTransitioningRoute(true);
@@ -76,23 +79,32 @@
   afterNavigate(() => {
     routeStore.setIsLoading(false);
     routeStore.setIsTransitioningRoute(false);
-    if (routeStore.isInitialLoad && !initialPageviewSent) {
-      GoogleServices.injectGTMScript()
-        .then(() => {
-          if (GoogleServices.gtmLoaded) {
-            GoogleServices.sendPageView();
-            initialPageviewSent = true;
-          }
-        })
-        .catch(() => {
-          console.error("Failed to inject GTM script on initial load");
-        });
-    } else {
-      if (GoogleServices.gtmLoaded) {
-        GoogleServices.sendPageView();
-      }
-    }
+    if (
+      !routeStore.isInitialLoad &&
+      initialPageviewSent &&
+      GoogleServices.gtmLoaded
+    )
+      return GoogleServices.sendPageView();
+
+    GoogleServices.injectGTMScript()
+      .then(() => {
+        if (GoogleServices.gtmLoaded) {
+          GoogleServices.sendPageView();
+          initialPageviewSent ||= true;
+        }
+      })
+      .catch(() => {
+        console.error("Failed to inject GTM script on initial load");
+      });
   });
+
+  // IIFE to avoid closure Svelte warning; set initialDeviceSSR for DeviceDetector during SSR
+  (() => {
+    if (deviceType)
+      ((deviceDetector as DeviceDetectorInternal).initialDeviceSSR = deviceType.isMobile
+        ? "mobile"
+        : "desktop");
+  })();
 </script>
 
 <svelte:head>

@@ -1,7 +1,5 @@
 <script lang="ts">
   import JobCard from "@components/ui/Shared/JobCard.svelte";
-  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
-  import { isJobGridEl } from "$lib/utils/elements.svelte";
   import { routeStateStore } from "$lib/stores/Route.svelte";
   import { goto } from "$app/navigation";
   import type { CardJob, JobCardProps } from "@/types";
@@ -22,6 +20,8 @@
   import "swiper/css/navigation";
   import "swiper/css/pagination";
   import "swiper/css/virtual";
+  import { useSidePanel } from "$lib/composables/SidePanel.svelte";
+  import type { Attachment } from "svelte/attachments";
 
   /*
     JobCarousel uses Swiper's Virtual module (renderExternal) to efficiently
@@ -38,10 +38,6 @@
 
     - After Svelte paints (tick), we call a few Swiper update helpers to let
       Swiper recompute sizes/classes. Keep these minimal to avoid thrashing.
-
-    - The previous `Virtualization.computeCarousel` helper was removed from
-      this component in favor of Swiper Virtual. See
-      `src/app/lib/utils/Virtualization.svelte.ts` for a deprecation note.
 
     TODOs for future maintainers:
     - If you change how Swiper Virtual is configured (breakpoints / slidesPerView),
@@ -66,18 +62,13 @@
     public swiperFailed = $state(false);
     public error = $state<string | null>(null);
     public isRefreshing = $state(false);
-    public initialSlide = $state(0);
-    #slides = $derived(
-      Array.from({ length: jobs?.length ?? 0 }, (_, index) => index),
-    );
-    public activeIndex = $state(0);
+    public jobCount = $derived(jobs?.length ?? 0);
     public swiperInstance: Swiper | null = null;
-    public isInitializing = $state(false);
     public swiperContainerEl = $state<HTMLElement | null>(null);
     public nextButtonEl = $state<HTMLElement | null>(null);
     public prevButtonEl = $state<HTMLElement | null>(null);
     public virtualIndexes = $derived.by(() => {
-      const total = jobs?.length ?? 0;
+      const total = this.jobCount;
       if (total <= 0) return [] as number[];
 
       const from = Math.max(0, Math.min(total - 1, this.virtualData.from ?? 0));
@@ -91,6 +82,11 @@
       for (let i = from; i <= to; i += 1) idxs.push(i);
       return idxs;
     });
+    #initialSlide = $state(0);
+    #slides = $derived(
+      Array.from({ length: this.jobCount }, (_, index) => index),
+    );
+    #isInitializing = $state(false);
 
     private createSwiperConfig(
       paginationEl: HTMLElement | null,
@@ -124,13 +120,14 @@
         passiveListeners: true,
         touchStartPreventDefault: false,
         touchStartForcePreventDefault: false,
-        initialSlide: this.initialSlide ?? 0,
+        initialSlide: this.#initialSlide ?? 0,
         virtual: {
           enabled: true,
           slides: this.#slides,
+
           addSlidesBefore: 2,
           addSlidesAfter: 2,
-          renderExternalUpdate: false,
+          renderExternalUpdate: true,
           renderExternal: (data: VirtualData<any>) => {
             const next = {
               from: Number(data?.from ?? 0),
@@ -146,15 +143,11 @@
             ) {
               return;
             }
-            requestAnimationFrame(() => {
+            queueMicrotask(async () => {
               this.virtualData = next;
-              this.syncWithSvelte();
+              await tick();
+              this.swiperInstance?.updateSlides();
             });
-          },
-        },
-        on: {
-          slideChange: (swiper: Swiper) => {
-            this.activeIndex = swiper.activeIndex;
           },
         },
         breakpoints: {
@@ -170,34 +163,14 @@
       };
     }
 
-    private syncWithSvelte() {
-      tick().then(() => {
-        this.swiperInstance?.updateSlides();
-        this.swiperInstance?.updateSize();
-        this.swiperInstance?.updateProgress();
-        this.swiperInstance?.updateSlidesClasses();
-      }).catch((e) => {
-        console.error("Error syncing Swiper with Svelte:", e);
-      });
-    }
-
-    private waitForSlidesAndWidth = $derived((el: HTMLElement | null) => {
-      if (!el) return false;
-      const MAX_INIT_ATTEMPTS = 12;
-      let attempts = 0;
-      while (true) {
-        const width = el.getBoundingClientRect().width;
-        // With Swiper Virtual + renderExternal we may have 0 slides in DOM until
-        // Swiper calls renderExternal; width is the primary readiness signal.
-        if (width > 0) return true;
-        attempts += 1;
-        if (attempts >= MAX_INIT_ATTEMPTS) {
-          this.swiperFailed = true;
-          return false;
-        }
-      }
-    });
-
+    /**
+     * Setup process to initialize Swiper instance with retries and error handling.
+     * @param el The main Swiper container element.
+     * @param paginationEl The pagination element for Swiper.
+     * @param nextEl The next navigation button element.
+     * @param prevEl The previous navigation button element.
+     * @throws Will throw an error if Swiper initialization fails after retries.
+     */
     private initializeSwiperInstance(
       el: HTMLElement,
       paginationEl: HTMLElement | null,
@@ -212,11 +185,11 @@
         const savedState = routeStateStore.getCarouselState();
         const targetSlideIndex = savedState?.slideIndex;
         const clampedIndex =
-          typeof targetSlideIndex === "number" && jobs?.length
-            ? Math.max(0, Math.min((jobs?.length ?? 1) - 1, targetSlideIndex))
+          typeof targetSlideIndex === "number" && this.jobCount > 0
+            ? Math.max(0, Math.min(this.jobCount - 1, targetSlideIndex))
             : 0;
 
-        this.initialSlide = clampedIndex;
+        this.#initialSlide = clampedIndex;
 
         const cfg = this.createSwiperConfig(paginationEl, nextEl, prevEl);
         const finalCfg = {
@@ -226,14 +199,16 @@
 
         this.swiperInstance = new SwiperCore(el, finalCfg);
 
-        if (savedState && typeof savedState.slideIndex === "number") {
-          this.swiperInstance?.slideTo(clampedIndex, 0);
-          this.activeIndex = clampedIndex;
-          requestAnimationFrame(() => {
-            this.swiperInstance?.update?.();
-            this.syncWithSvelte();
+        requestAnimationFrame(() => {
+          if (this.swiperInstance?.virtual)
+            this.swiperInstance.virtual.update(false);
+          this.swiperInstance?.update();
+          if (savedState && typeof savedState.slideIndex === "number")
+            this.swiperInstance?.slideTo(clampedIndex, 0);
+          useRIC(() => routeStateStore.clearCarouselState(), {
+            fallbackDelay: 0,
           });
-        }
+        });
       } catch {
         throw new Error("Failed to initialize Swiper");
       }
@@ -243,8 +218,8 @@
       const el = this.swiperContainerEl;
       if (!el) return;
 
-      if (this.isInitializing) return;
-      this.isInitializing = true;
+      if (this.#isInitializing) return;
+      this.#isInitializing = true;
       this.swiperFailed = false;
 
       const paginationEl = el.querySelector(
@@ -260,53 +235,22 @@
           ".job-carousel-prev",
         )) as HTMLElement | null;
 
-      // Wait until there are slides and the container has width
-      const ready = this.waitForSlidesAndWidth(el);
-      if (!ready) {
-        this.isInitializing = false;
-        return;
-      }
-
-      if (this.swiperInstance) {
-        this.swiperInstance.destroy(true, true);
-        this.swiperInstance = null;
-      }
-
       try {
         this.initializeSwiperInstance(el, paginationEl, nextEl, prevEl);
 
         this.swiperFailed = false;
-      } catch {
-        this.swiperFailed = true;
+      } catch (e) {
+        let attempt = 0;
+        console.error(
+          `Error initializing Swiper, retrying for attempt ${attempt++}`,
+          e,
+        );
+        if (attempt < 3) {
+          this.createSwiper();
+        }
       } finally {
-        this.isInitializing = false;
-        useRIC(() => routeStateStore.clearCarouselState(), {
-          fallbackDelay: 0,
-        });
+        this.#isInitializing = false;
       }
-    }
-
-    // Destroy and recreate the swiper instance (used by refresh button)
-    public reinitializeSwiper({ forceDestroy = false } = {}) {
-      // If we already have an instance, optionally destroy it first to ensure a
-      // full re-measure on re-init.
-      if (this.swiperInstance) {
-        this.swiperInstance.destroy(forceDestroy, false);
-        this.swiperInstance = null;
-      }
-      const MAX_DOM_ATTEMPTS = 12;
-      let attempts = 0;
-      while (
-        (!this.swiperContainerEl ||
-          !this.swiperContainerEl.isConnected ||
-          this.swiperContainerEl.getBoundingClientRect().width === 0) &&
-        attempts < MAX_DOM_ATTEMPTS
-      ) {
-        attempts += 1;
-      }
-
-      // Recreate the instance (this function lazy-loads Swiper JS)
-      this.createSwiper();
     }
 
     // Refresh handler: fetch fresh data and reinitialize the carousel
@@ -314,73 +258,30 @@
       if (this.isRefreshing) return;
       this.isRefreshing = true;
       try {
-        // Stop and remove any existing instance so we re-create from scratch
-        if (this.swiperInstance) {
-          try {
-            this.swiperInstance.destroy(true, true);
-          } catch (e) {
-            console.error(
-              "Error destroying Swiper instance during refresh:",
-              e,
-            );
-          }
-          this.swiperInstance = null;
-        }
-        // Fetch fresh carousel data
+        this.swiperInstance?.disable();
         const data = await APIServiceShared.fetchCarouselGraphQL();
         jobs = data?.jobs ?? null;
         this.error = null;
+        // Obligatory RAF
+        requestAnimationFrame(async () => {
+          await tick();
+          this.swiperInstance?.virtual?.update(true);
+          this.swiperInstance?.enable();
+        });
       } catch (e) {
         console.error("Error refreshing carousel:", e);
         this.error = "Failed to refresh carousel";
       } finally {
         this.isRefreshing = false;
       }
-      this.reinitializeSwiper({ forceDestroy: true });
-      this.updateSwiperOnJobsChange();
     }
 
-    // Keep Swiper in sync when job list updates
-    public updateSwiperOnJobsChange(): void {
-      // When job list changes, ensure Swiper exists and is in sync.
-      const count = jobs?.length ?? 0;
-
-      if (count === 0) {
-        // No jobs: destroy any existing instance
-        if (this.swiperInstance) {
-          this.swiperInstance.destroy(true, true);
-          this.swiperInstance = null;
-        }
-        return;
-      }
-
-      // If no instance yet, create one (ensures initialization after async data)
-      if (!this.swiperInstance) {
-        // small delay to allow DOM to render and then try to initialize
-        requestAnimationFrame(() => this.createSwiper());
-        return;
-      }
-
-      // Update Swiper Virtual slides in-place (much cheaper than re-init for 100+ items).
-      try {
-        if (this.swiperInstance?.virtual) {
-          this.swiperInstance.virtual.slides = Array.from(
-            { length: count },
-            (_, i) => i,
-          );
-          this.swiperInstance.virtual.update(true);
-        }
-        this.swiperInstance?.update();
-      } catch {
-        // As a safe fallback, try a full re-init.
-        requestAnimationFrame(() => this.reinitializeSwiper());
-      }
-    }
-
-    public destroySwiper(): void {
+    public destroySwiper(
+      ...options: NonNullable<Parameters<Swiper["destroy"]>>
+    ): void {
       if (this.swiperInstance) {
         try {
-          this.swiperInstance.destroy(true, true);
+          this.swiperInstance.destroy(...options);
         } catch (e) {
           console.error("Error destroying Swiper instance:", e);
         }
@@ -392,6 +293,10 @@
     }
   }
 
+  /**
+   * Handles navigation actions within the carousel, including saving state
+   * and platform-specific navigation behavior.
+   */
   class CarouselNavigationHandler {
     public static handleClickNavigateToJob(
       slug: string,
@@ -422,9 +327,9 @@
     ): void {
       if (innerWidth.current! >= 768) {
         // Desktop: open overlay
-        const jobgridElement = isJobGridEl;
-        jobOverlayManager?.openOverlay(slug, job, "carousel");
-        jobgridElement?.scrollIntoView({ behavior: "smooth", block: "start" });
+        useSidePanel.openSidePanel(slug, job, "carousel", () => {
+          useSidePanel.scrollToJobGridCard(slug, true, "featured"); // jump to featured
+        });
       } else {
         // Mobile: mark visited for carousel then use SPA navigation to SingleLowongan.svelte route
         routeStateStore.MarkVisitedJob(slug, "carousel");
@@ -434,12 +339,45 @@
     }
   }
 
+  /**
+   * Create/destroy Swiper instance based on carousel visibility.
+   * Keeps the DOM-focused initialization scoped to the carousel element.
+   */
+  const observeIntersectionCarousel: Attachment<HTMLElement> = (() => {
+    let observer: IntersectionObserver | null = null;
+
+    function handleIntersection(entries: IntersectionObserverEntry[]) {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) swiperManager.swiperInstance?.enable();
+
+        if (!entry.isIntersecting && swiperManager.swiperInstance)
+          swiperManager.swiperInstance.disable();
+      });
+    }
+
+    return (el: HTMLElement) => {
+      observer ??= new IntersectionObserver(handleIntersection, {
+        threshold: 0.03,
+        rootMargin: "2000px",
+      });
+
+      observer.observe(el);
+
+      return () => {
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+      };
+    };
+  })();
+
   const swiperManager = new SwiperManager();
 
   onMount(() => {
     swiperManager.createSwiper();
     return () => {
-      swiperManager.destroySwiper();
+      swiperManager.destroySwiper(true, true);
     };
   });
 </script>
@@ -475,7 +413,7 @@
           class="btn btn-ghost ml-2"
           onclick={() => {
             swiperManager.swiperFailed = false;
-            swiperManager.reinitializeSwiper({ forceDestroy: true });
+            swiperManager.createSwiper();
           }}
         >
           Coba lagi
@@ -503,23 +441,27 @@
     </div>
   </div>
 
-  {#if swiperManager.isRefreshing}
+  {#if jobs && jobs.length}
+    {#if swiperManager.isRefreshing}
+      <div
+        class="flex justify-center items-center min-h-[200px]"
+        aria-live="polite"
+      >
+        <LoadingSpinner srLabel="Memuat carousel..." size="md" />
+      </div>
+    {/if}
     <div
-      class="flex justify-center items-center min-h-[200px]"
-      aria-live="polite"
-    >
-      <LoadingSpinner srLabel="Memuat carousel..." size="md" />
-    </div>
-  {:else if jobs && jobs.length}
-    <div
+      {@attach observeIntersectionCarousel}
       bind:this={swiperManager.swiperContainerEl}
       class="swiper job-carousel"
       role="region"
+      style:visibility={swiperManager.isRefreshing ? "hidden" : "visible"}
+      aria-hidden={swiperManager.isRefreshing}
       aria-label={title}
       aria-live="polite"
     >
       <div class="swiper-wrapper">
-        {#each swiperManager.virtualIndexes as idx (jobs[idx]?.id ?? jobs[idx]?.permalink ?? idx)}
+        {#each swiperManager.virtualIndexes as idx}
           {@const job: JobCardProps['jobdata'] = jobs[idx]}
           <div
             class="swiper-slide"
@@ -580,13 +522,10 @@
     user-select: none;
   }
 
-  /* Flexbox solution for equal card heights */
-  :global(.swiper-wrapper, .swiper-slide) {
-    display: flex;
-  }
-
   :global(.swiper-slide) {
     height: auto;
+    width: auto;
+    display: flex;
   }
 
   :global(.job-carousel-fallback .fallback-item) {

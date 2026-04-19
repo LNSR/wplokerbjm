@@ -1,6 +1,7 @@
 <script module lang="ts">
   import { onMount, tick } from "svelte";
   import { type ThemeName, type WPLokerBJMThemedData } from "@/types";
+  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { themePropsStore } from "$lib/stores/Theme.svelte";
   import { APIServiceBrowser } from "@/services/graphql/APIService";
@@ -9,40 +10,38 @@
 
   let showThemeModal = $state(false);
   let showLoginModal = $state(false);
-  let loginStates = $state({
-    username: "",
-    password: "",
-    error: "",
-    loading: false,
-  });
 
   class ThemeColorManager {
     readonly #key = "wplokerbjm-theme";
     public currentTheme = $state<ThemeName>("light");
-    public metaColor: string | undefined = $state(undefined);
+    public metaColor = $derived.by(() => {
+      switch (this.currentTheme) {
+        case "light":
+          return "#f2f7ff";
+        case "dark":
+          return "#212a37";
+        case "lavender":
+          return "#f6f5ff";
+        default:
+          return undefined;
+      }
+    });
     #mediaQuery: MediaQuery = new MediaQuery("(prefers-color-scheme: dark)");
-    #initialized = false;
-
-    get systemPrefersDark(): boolean {
-      $inspect("System Prefers Dark", this.#mediaQuery?.current);
-      return this.#mediaQuery?.current ?? false;
-    }
+    public systemPrefersDark = $derived(this.#mediaQuery?.current ?? false);
 
     /**
      * Initializes the theme based on saved preference or system setting. This should be called once on onMount.
      */
     public init(): void {
-      if (this.#initialized) return;
-      this.#initialized = true;
-
-      let savedTheme = "";
+      let savedTheme: ThemeName;
       try {
-        savedTheme = localStorage.getItem(this.#key) || "";
+        savedTheme = localStorage.getItem(this.#key) as ThemeName;
       } catch {
-        savedTheme = "";
+        console.warn("Failed to read theme preference from localStorage");
+        return;
       }
 
-      const theme: ThemeName =
+      const theme =
         savedTheme === "light" ||
         savedTheme === "dark" ||
         savedTheme === "lavender"
@@ -51,36 +50,17 @@
             ? "dark"
             : "light";
 
-      this.setThemeHelper(theme);
+      this.setTheme(theme);
     }
 
     public setTheme(theme: ThemeName): void {
       try {
         this.setThemeHelper(theme, { useViewTransition: true });
       } catch {
+        console.error(
+          "Failed to set theme with view transition, falling back to normal theme change",
+        );
         this.setThemeHelper(theme);
-      }
-    }
-
-    private updateMetaThemeColor(): void {
-      try {
-        const theme: ThemeName = this.currentTheme;
-        // according to --wpl-global-color-4 in app.css
-        switch (theme) {
-          case "light":
-            this.metaColor = "#f2f7ff";
-            break;
-          case "dark":
-            this.metaColor = "#212a37";
-            break;
-          case "lavender":
-            this.metaColor = "#f6f5ff";
-            break;
-          default:
-            this.metaColor = undefined;
-        }
-      } catch {
-        console.error("Failed to update theme color meta tag");
       }
     }
 
@@ -106,7 +86,6 @@
           "wplokerbjm-dark-mode-enable",
         );
       }
-      this.updateMetaThemeColor();
     }
 
     private setThemeHelper(
@@ -150,14 +129,20 @@
 
   class HeaderManager {
     headerHeight = $state<number | undefined>(undefined);
-    get currentHeight(): number {
-      $inspect("Header Height", this.headerHeight);
-      return this.headerHeight ?? 0;
-    }
+    currentHeight = $derived(this.headerHeight);
   }
 
   class LoginManager {
-    static async Login(): Promise<void> {
+    #loginStates = $state({
+      username: "",
+      password: "",
+      error: "",
+      loading: false,
+    });
+
+    public loginStates = $derived(this.#loginStates);
+
+    public async Login(): Promise<void> {
       try {
         const active = document.activeElement as HTMLElement | null;
         if (active && active.matches(".drawer-toggle")) {
@@ -167,32 +152,32 @@
         console.error("Element focus error during login", e);
       }
 
-      loginStates.loading = true;
-      loginStates.error = "";
+      this.#loginStates.loading = true;
+      this.#loginStates.error = "";
       const token = await APIServiceBrowser.getJWTGraphQL({
-        username: loginStates.username,
-        password: loginStates.password,
+        username: this.#loginStates.username,
+        password: this.#loginStates.password,
       });
 
       try {
-        loginStates.username = "";
-        loginStates.password = "";
+        this.#loginStates.username = "";
+        this.#loginStates.password = "";
 
         if (!token) {
-          loginStates.error = "Login gagal — periksa kredensial Anda.";
+          this.#loginStates.error = "Login gagal — periksa kredensial Anda.";
         } else {
-          LoginManager.closeLogin();
+          this.closeLogin();
         }
       } catch (e) {
         console.error("login error", e);
-        loginStates.error = "Terjadi kesalahan saat login.";
-        loginStates.password = "";
+        this.#loginStates.error = "Terjadi kesalahan saat login.";
+        this.#loginStates.password = "";
       } finally {
         useRIC(
           async () => {
             try {
               if (!token) {
-                loginStates.loading = false;
+                this.#loginStates.loading = false;
                 return;
               }
 
@@ -203,7 +188,7 @@
             } catch (error) {
               console.error("Error fetching theme nonce:", error);
             } finally {
-              loginStates.loading = false;
+              this.#loginStates.loading = false;
               await tick();
             }
           },
@@ -211,19 +196,20 @@
         );
       }
     }
-    static Logout(): void {
+    public Logout(): void {
       window.location.reload();
     }
-    static closeLogin() {
+    public closeLogin() {
       showLoginModal = false;
-      loginStates.username = "";
-      loginStates.password = "";
-      loginStates.error = "";
-      loginStates.loading = false;
+      this.#loginStates.username = "";
+      this.#loginStates.password = "";
+      this.#loginStates.error = "";
+      this.#loginStates.loading = false;
     }
   }
 
-  export const themeColorManager = new ThemeColorManager();
+  const themeColorManager = new ThemeColorManager();
+  const loginManager = new LoginManager();
   export const headerManager = new HeaderManager();
 </script>
 
@@ -236,9 +222,7 @@
     ExternalLinkSolid,
     KeySolid,
   } from "svelte-awesome-icons";
-  import { teleportTo } from "$lib/utils/elements.svelte";
-  import { isMobile } from "$lib/utils/window.svelte";
-  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
+  import { componentRegistry } from "@/lib/stores/ComponentRegistry.svelte";
   import type { Attachment } from "svelte/attachments";
 
   let { themeData }: { themeData: WPLokerBJMThemedData } = $props();
@@ -246,8 +230,8 @@
   let showBookmarkModal = $state(false);
   let showloginAdminModal = $state(false);
 
-  const isMobileValue = $derived(isMobile());
-  const bookmarkJobs = $derived(bookmarkStore.jobs);
+  const isMobile = $derived(deviceDetector.isPlatformMobile);
+  const bookmarkJobCount = $derived(bookmarkStore.jobs.length);
 
   export const ButtonUIHandler: Attachment<Window> = (() => {
     const handler: ProxyHandler<any> = {
@@ -275,9 +259,8 @@
     };
   })();
 
+  themePropsStore.setThemeData = (() => themeData)();
   onMount(() => {
-    themePropsStore.setThemeData = themeData;
-    bookmarkStore.init();
     themeColorManager.init();
   });
 </script>
@@ -336,6 +319,7 @@
               aria-label="Choose color theme"
               title="Pilih tema warna"
               onclick={() => (showThemeModal = true)}
+              popovertarget="theme-switcher"
             >
               {#if themeColorManager.currentTheme === "dark"}
                 <MoonSolid class="w-5 h-5" style="color: var(--icon-color);" />
@@ -346,38 +330,44 @@
           </div>
 
           {#if showThemeModal}
-            <div {@attach teleportTo("#app")}>
-              <div class="modal modal-open z-[1100]">
-                <div class="modal-box">
-                  <h3 class="font-semibold text-lg">Pilih Tema</h3>
-                  <p class="py-2 text-sm text-muted">
-                    Pilih tema yang ingin Anda gunakan.
-                  </p>
-                  <div class="flex gap-3 mt-3">
-                    {#snippet themeButton(choosenTheme: ThemeName)}
-                      <button
-                        class="btn flex-1 capitalize"
-                        aria-label={`Set theme to ${choosenTheme}`}
-                        class:btn-primary={themeColorManager.currentTheme ===
-                          choosenTheme}
-                        onclick={() => {
-                          themeColorManager.setTheme(choosenTheme);
-                          showThemeModal = false;
-                        }}
-                      >
-                        {choosenTheme}
-                      </button>
-                    {/snippet}
-
-                    {#each ["light", "dark", "lavender"] as choosenTheme (choosenTheme)}
-                      {@render themeButton(choosenTheme as ThemeName)}
-                    {/each}
-                  </div>
-                  <div class="modal-action">
-                    <button class="btn" onclick={() => (showThemeModal = false)}
-                      >Close</button
+            <div
+              id="theme-switcher"
+              class="modal pointer-events-none"
+              class:modal-open={showThemeModal}
+              popover="auto"
+              hidden={!showThemeModal}
+              ontoggle={(e) =>
+                (showThemeModal = e.newState === "open" ? true : false)}
+            >
+              <div class="modal-box pointer-events-auto">
+                <h3 class="font-semibold text-lg">Pilih Tema</h3>
+                <p class="py-2 text-sm text-muted">
+                  Pilih tema yang ingin Anda gunakan.
+                </p>
+                <div class="flex gap-3 mt-3">
+                  {#snippet themeButton(choosenTheme: ThemeName)}
+                    <button
+                      class="btn flex-1 capitalize"
+                      aria-label={`Set theme to ${choosenTheme}`}
+                      class:btn-primary={themeColorManager.currentTheme ===
+                        choosenTheme}
+                      onclick={() => {
+                        themeColorManager.setTheme(choosenTheme);
+                        showThemeModal = false;
+                      }}
                     >
-                  </div>
+                      {choosenTheme}
+                    </button>
+                  {/snippet}
+
+                  {#each ["light", "dark", "lavender"] as choosenTheme (choosenTheme)}
+                    {@render themeButton(choosenTheme as ThemeName)}
+                  {/each}
+                </div>
+                <div class="modal-action">
+                  <button class="btn" onclick={() => (showThemeModal = false)}
+                    >Close</button
+                  >
                 </div>
               </div>
             </div>
@@ -385,7 +375,7 @@
 
           <button
             onclick={() => {
-              dynamicComponentStore.loadComponentByName("BookmarkModal");
+              componentRegistry.loadComponentByName("BookmarkModal");
               showBookmarkModal = true;
             }}
             class="btn btn-circle md:flex relative border-[var(--wpl-global-color-1)] border-1 hover:border-2"
@@ -397,11 +387,11 @@
               aria-hidden="true"
               focusable="false"
             />
-            {#if bookmarkJobs.length > 0}
+            {#if bookmarkJobCount > 0}
               <span
                 class="absolute -top-2 -right-1 bg-[var(--wpl-global-color-1)] text-white text-xs rounded-full px-2 py-0.1 z-10"
               >
-                {bookmarkJobs.length}
+                {bookmarkJobCount}
               </span>
             {/if}
           </button>
@@ -411,7 +401,7 @@
             <button
               class="btn rounded-full font-semibold bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)] relative border-1 border-[var(--wpl-global-color-1)] hover:border-2 ml-2 hidden md:flex"
               onclick={() => {
-                dynamicComponentStore.loadComponentByName("LoginModal");
+                componentRegistry.loadComponentByName("LoginModal");
                 showLoginModal = true;
               }}
               aria-label="Masuk"
@@ -433,7 +423,7 @@
             Pasang Iklan Loker
           </a>
           <!-- Drawer toggle button, shown only on mobile -->
-          {#if isMobileValue}
+          {#if isMobile}
             <label
               for="header-drawer"
               class="btn btn-ghost btn-sm md:btn-md"
@@ -446,7 +436,7 @@
       </div>
     </div>
     <!-- Mobile drawer side. margin-top reads the same CSS var we set in JS (--site-header-top) -->
-    {#if isMobileValue}
+    {#if isMobile}
       <div id="header-drawer-side" class="drawer-side z-50">
         <label
           for="header-drawer"
@@ -461,7 +451,7 @@
               <button
                 class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] justify-center"
                 onclick={() => {
-                  dynamicComponentStore.loadComponentByName("LoginModal");
+                  componentRegistry.loadComponentByName("LoginModal");
                   showLoginModal = true;
                   document.getElementById("header-drawer")?.click();
                 }}
@@ -497,21 +487,26 @@
   </div>
   {#if showBookmarkModal}
     {@const BookmarkModal =
-      dynamicComponentStore.getComponentByName("BookmarkModal")}
-    <BookmarkModal bind:open={showBookmarkModal} {@attach teleportTo("#app")} />
+      componentRegistry.getComponentByName("BookmarkModal")}
+    <BookmarkModal bind:open={showBookmarkModal} />
   {/if}
 
-  {#key showLoginModal}
-    {@const LoginModal = dynamicComponentStore.getComponentByName("LoginModal")}
+  {#if showLoginModal}
+    {@const LoginModal = componentRegistry.getComponentByName("LoginModal")}
     <LoginModal
-      {@attach teleportTo("#app")}
       bind:open={showLoginModal}
-      bind:username={loginStates.username}
-      bind:password={loginStates.password}
-      error={loginStates.error}
-      loading={loginStates.loading}
-      onClose={LoginManager.closeLogin}
-      onLogin={LoginManager.Login}
+      bind:username={loginManager.loginStates.username}
+      bind:password={loginManager.loginStates.password}
+      error={loginManager.loginStates.error}
+      loading={loginManager.loginStates.loading}
+      onClose={() => loginManager.closeLogin()}
+      onLogin={() => loginManager.Login()}
     />
-  {/key}
+  {/if}
 </header>
+
+<style lang="postcss">
+  #theme-switcher:not(:popover-open) {
+    display: none !important;
+  }
+</style>

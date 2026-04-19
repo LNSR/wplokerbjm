@@ -34,64 +34,90 @@
   import { browser } from "$app/environment";
   import ViewerModule from "viewerjs";
   import "viewerjs/dist/viewer.min.css";
-  import { generalJobStore } from "@/lib/stores/GeneralJob.svelte";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
-  import { onDestroy } from "svelte";
+  import { onMount } from "svelte";
   import type { JobDetailResponse } from "@/types";
   import { page } from "$app/state";
+  import { showSummaryJob, showTimeAgo } from "@/lib/composables/JobUI.svelte";
 
   interface ContactRow {
     type: "email" | "phone" | "website";
     icon: Component;
     label: string;
-    value: string;
+    value?: string;
     href: string;
   }
 
-  let galleryRef = $state<HTMLElement>();
-
   class SocialMediaLinkBuilder {
-    static #platforms: Record<
+    static #platforms = new Map<
       SocialMediaPlatform,
       { icon: Component; base_url: string }
-    > = {
-      [SocialMediaPlatform["X / Twitter"]]: {
-        icon: TwitterBrands,
-        base_url: "https://twitter.com/",
-      },
-      [SocialMediaPlatform.Facebook]: {
-        icon: FacebookBrands,
-        base_url: "https://facebook.com/",
-      },
-      [SocialMediaPlatform.Instagram]: {
-        icon: InstagramBrands,
-        base_url: "https://instagram.com/",
-      },
-      [SocialMediaPlatform.LinkedIn]: {
-        icon: LinkedinBrands,
-        base_url: "https://linkedin.com/in/",
-      },
-      [SocialMediaPlatform.Youtube]: {
-        icon: YoutubeBrands,
-        base_url: "https://youtube.com/@",
-      },
-      [SocialMediaPlatform.WhatsApp]: {
-        icon: WhatsappBrands,
-        base_url: "https://wa.me/",
-      },
-      [SocialMediaPlatform.TikTok]: {
-        icon: TiktokBrands,
-        base_url: "https://tiktok.com/@",
-      },
-      [SocialMediaPlatform.Threads]: {
-        icon: ThreadsBrands,
-        base_url: "https://threads.net/@",
-      },
-      [SocialMediaPlatform.Telegram]: {
-        icon: TelegramBrands,
-        base_url: "https://t.me/",
-      },
-    };
+    >([
+      [
+        SocialMediaPlatform["X / Twitter"],
+        {
+          icon: TwitterBrands,
+          base_url: "https://x.com/",
+        },
+      ],
+      [
+        SocialMediaPlatform.Facebook,
+        {
+          icon: FacebookBrands,
+          base_url: "https://facebook.com/",
+        },
+      ],
+      [
+        SocialMediaPlatform.Instagram,
+        {
+          icon: InstagramBrands,
+          base_url: "https://instagram.com/",
+        },
+      ],
+      [
+        SocialMediaPlatform.LinkedIn,
+        {
+          icon: LinkedinBrands,
+          base_url: "https://linkedin.com/in/",
+        },
+      ],
+      [
+        SocialMediaPlatform.Youtube,
+        {
+          icon: YoutubeBrands,
+          base_url: "https://youtube.com/@",
+        },
+      ],
+      [
+        SocialMediaPlatform.WhatsApp,
+        {
+          icon: WhatsappBrands,
+          base_url: "https://wa.me/",
+        },
+      ],
+      [
+        SocialMediaPlatform.TikTok,
+        {
+          icon: TiktokBrands,
+          base_url: "https://tiktok.com/@",
+        },
+      ],
+      [
+        SocialMediaPlatform.Threads,
+        {
+          icon: ThreadsBrands,
+          base_url: "https://threads.net/@",
+        },
+      ],
+      [
+        SocialMediaPlatform.Telegram,
+        {
+          icon: TelegramBrands,
+          base_url: "https://t.me/",
+        },
+      ],
+    ]);
+
     public static buildSocialMediaItems(
       socialMediaData: CustomFields["social_media"],
     ): SocialMediaItem[] {
@@ -135,7 +161,7 @@
       platform: SocialMediaPlatform,
       username: string,
     ) {
-      const config = this.#platforms[platform];
+      const config = this.#platforms.get(platform);
       if (!config || !username) return null;
       if (platform === SocialMediaPlatform.WhatsApp)
         return this.getWhatsappLinkData(platform, config, username);
@@ -230,15 +256,66 @@
       return { platform, icon: config.icon, url, username };
     }
   }
+</script>
+
+<script lang="ts">
+  const { job }: { job: JobDetailResponse } = $props();
 
   /**
-   * Manages the ViewerJS instance for displaying images in a gallery format
-   * it handles setup and teardown of the viewer
+   * Handler class to manage ViewerJS instance and image extraction from WYSIWYG content
    */
-  class ViewerJSManager {
+  class ViewerJSHandler {
     #Viewer: typeof ViewerModule = ViewerModule;
-    public instance: InstanceType<typeof ViewerModule> | undefined;
-    public viewerOptions(): Viewer.Options {
+    #instance?: InstanceType<typeof ViewerModule>;
+    public images = $derived(this.extractUniqueImagesFromJob(job));
+    public galleryRef = $state<HTMLElement>();
+
+    public onWysiwygImgClick = (e: MouseEvent): void => {
+      const target = e.target as HTMLElement;
+      if (target.tagName !== "IMG") return;
+
+      const img = target as HTMLImageElement;
+      const anchor = img.closest("a") as HTMLAnchorElement | null;
+
+      anchor && e.preventDefault();
+
+      const href = anchor?.href ?? "";
+      const dataSrc = img.getAttribute("data-src") ?? "";
+
+      const isImageUrl = (url: string | undefined | null): url is string =>
+        typeof url === "string" &&
+        /\.(avif|webp|jpe?g|png|gif|svg|bmp|tiff)(\?.*)?$/i.test(url);
+
+      const src = isImageUrl(href)
+        ? href
+        : isImageUrl(img.src)
+          ? img.src
+          : isImageUrl(dataSrc)
+            ? dataSrc
+            : img.currentSrc || href || img.src || dataSrc || "";
+
+      const imageIndex = this.images.indexOf(src);
+      if (imageIndex >= 0 && this.#instance) {
+        this.#instance.show();
+        this.#instance.view(imageIndex);
+      }
+    };
+
+    public initialize() {
+      if (this.images.length > 0) {
+        this.setupViewer();
+      }
+    }
+
+    public destroyViewer(): void {
+      if (this.#instance) {
+        this.galleryRef = undefined;
+        this.#instance.destroy();
+        this.#instance = undefined;
+      }
+    }
+
+    private viewerOptions(): Viewer.Options {
       const container = browser
         ? ((document.querySelector("#app") as HTMLElement) ?? document.body)
         : undefined;
@@ -265,97 +342,96 @@
       return opts;
     }
 
-    public setupViewer(): void {
-      if (!browser || !galleryRef || this.instance) return;
+    private setupViewer(): void {
+      if (!browser || !this.galleryRef || this.#instance) return;
 
-      this.instance = new this.#Viewer(galleryRef, this.viewerOptions());
+      this.#instance = new this.#Viewer(this.galleryRef, this.viewerOptions());
     }
 
-    public destroyViewer(): void {
-      if (this.instance) {
-        try {
-          this.instance.destroy();
-        } catch (e) {
-          console.error(
-            "ViewerJSManager: Error destroying viewer instance:",
-            e,
-          );
-        }
-        this.instance = undefined;
+    private extractImages(html: string): string[] {
+      if (!html) return [];
+      if (typeof DOMParser !== "undefined") {
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(html, "text/html");
+        const imgs = doc.querySelectorAll("img");
+        return Array.from(imgs)
+          .map((img) => img.src || img.getAttribute("data-src") || "")
+          .filter(Boolean);
       }
+      const srcs: string[] = [];
+      const imgRe = /<img\s[^>]*?(?:src|data-src)=("|')([^"']+)\1/gi;
+      let match: RegExpExecArray | null;
+      while ((match = imgRe.exec(html))) {
+        if (match[2]) srcs.push(match[2]);
+      }
+      return srcs.filter(Boolean);
+    }
+
+    private extractUniqueImagesFromJob(
+      job: Partial<JobDetailResponse>,
+    ): string[] {
+      // WYSIWYG fields that may contain images
+      const fieldsToExtract = [
+        job.tentang_perusahaan,
+        job.deskripsi_pekerjaan,
+        job.persyaratan,
+        job.cara_melamar,
+        job.benefit,
+      ];
+      const allSrcs = fieldsToExtract
+        .filter((field): field is string => Boolean(field))
+        .flatMap((field) => this.extractImages(field));
+      return [...new Set(allSrcs)];
     }
   }
-  const viewerJSManager = new ViewerJSManager();
-</script>
+  const viewerJSHandler = new ViewerJSHandler();
 
-<script lang="ts">
-  const { job }: { job: JobDetailResponse } = $props();
-
-  function extractImages(html: string): string[] {
-    if (!html) return [];
-    if (typeof DOMParser !== "undefined") {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, "text/html");
-      const imgs = doc.querySelectorAll("img");
-      return Array.from(imgs)
-        .map((img) => img.src || img.getAttribute("data-src") || "")
-        .filter(Boolean);
-    }
-    const srcs: string[] = [];
-    const imgRe = /<img\s[^>]*?(?:src|data-src)=("|')([^"']+)\1/gi;
-    let match: RegExpExecArray | null;
-    while ((match = imgRe.exec(html))) {
-      if (match[2]) srcs.push(match[2]);
-    }
-    return srcs.filter(Boolean);
-  }
-
-  function getContactRows(jobData?: JobContactRow): ContactRow[] {
+  function buildContactRows(jobData?: JobContactRow): ContactRow[] {
     if (!jobData) return [];
     const contacts: ContactRow[] = [];
 
-    const emails = jobData.email_kontak
-      ? jobData.email_kontak.split(",").map((e: string) => e.trim())
-      : [];
-    emails.forEach((email: string) => {
-      if (email) {
-        contacts.push({
-          type: "email",
-          icon: EnvelopeSolid,
-          label: "Email",
-          value: email,
-          href: `mailto:${email}`,
-        });
-      }
-    });
+    const contactFields: ContactRow[] = [
+      {
+        type: "email",
+        icon: EnvelopeSolid,
+        label: "Email",
+        value: jobData.email_kontak ?? undefined,
+        href: `mailto:${jobData.email_kontak}`,
+      },
+      {
+        type: "phone",
+        icon: PhoneSolid,
+        label: "Telepon",
+        value: jobData.nomor_kontak ?? undefined,
+        href: `tel:${jobData.nomor_kontak}`,
+      },
+      {
+        type: "website",
+        icon: GlobeSolid,
+        label: "Website",
+        value: jobData.situs_kontak ?? undefined,
+        href: jobData.situs_kontak
+          ? jobData.situs_kontak.replace(/^http:\/\//i, "https://")
+          : "",
+      },
+    ];
 
-    const phones = jobData.nomor_kontak
-      ? jobData.nomor_kontak.split(",").map((p: string) => p.trim())
-      : [];
-    phones.forEach((phone: string) => {
-      if (phone) {
-        contacts.push({
-          type: "phone",
-          icon: PhoneSolid,
-          label: "Telepon",
-          value: phone,
-          href: `tel:${phone}`,
-        });
-      }
-    });
-
-    const websiteUrls = jobData.situs_kontak
-      ? jobData.situs_kontak.split(",").map((s: string) => s.trim())
-      : [];
-    websiteUrls.forEach((siteUrl: string) => {
-      if (siteUrl) {
-        const href = siteUrl.replace(/^http:\/\//i, "https://");
-        contacts.push({
-          type: "website",
-          icon: GlobeSolid,
-          label: "Website",
-          value: siteUrl.replace(/^https?:\/\//i, ""),
-          href,
+    contactFields.forEach((field) => {
+      if (field.value) {
+        const values = field.value
+          .split(",")
+          .map((v) => v.trim())
+          .filter((v) => v);
+        values.forEach((value) => {
+          if (value) {
+            contacts.push({
+              type: field.type,
+              icon: field.icon,
+              label: field.label,
+              value,
+              href: field.href,
+            });
+          }
         });
       }
     });
@@ -363,68 +439,20 @@
     return contacts;
   }
 
-  function extractUniqueImagesFromJob(
-    job: Partial<JobDetailResponse>,
-  ): string[] {
-    // WYSIWYG fields that may contain images
-    const fieldsToExtract = [
-      job.tentang_perusahaan,
-      job.deskripsi_pekerjaan,
-      job.persyaratan,
-      job.cara_melamar,
-      job.benefit,
-    ];
-    const allSrcs = fieldsToExtract.flatMap((field) =>
-      extractImages(field || ""),
-    );
-    return Array.from(new SvelteSet(allSrcs));
-  }
-
-  function onWysiwygImgClick(e: MouseEvent): void {
-    const target = e.target as HTMLElement;
-    if (target.tagName !== "IMG") return;
-
-    const img = target as HTMLImageElement;
-    const anchor = img.closest("a") as HTMLAnchorElement | null;
-
-    anchor && e.preventDefault();
-
-    const href = anchor?.href ?? "";
-    const dataSrc = img.getAttribute("data-src") ?? "";
-
-    const isImageUrl = (url: string | undefined | null): url is string =>
-      typeof url === "string" &&
-      /\.(avif|webp|jpe?g|png|gif|svg|bmp|tiff)(\?.*)?$/i.test(url);
-
-    const src = isImageUrl(href)
-      ? href
-      : isImageUrl(img.src)
-        ? img.src
-        : isImageUrl(dataSrc)
-          ? dataSrc
-          : img.currentSrc || href || img.src || dataSrc || "";
-
-    const imageIndex = extractUniqueImagesFromJob(job).indexOf(src);
-    if (imageIndex >= 0) {
-      viewerJSManager.setupViewer();
-      if (!viewerJSManager.instance) return;
-      viewerJSManager.instance.show();
-      viewerJSManager.instance.view(imageIndex);
-    }
-  }
-
   const ringkasanPekerjaan = $derived(
-    generalJobStore.showSummaryJob(job.ringkasanPekerjaan as JobSummary),
+    showSummaryJob(job.ringkasanPekerjaan as JobSummary),
   );
-  const contacts = $derived(getContactRows(job.contacts));
+  const contacts = $derived(buildContactRows(job.contacts));
   const socialMediaItems = $derived(
     SocialMediaLinkBuilder.buildSocialMediaItems(job.social_media),
   );
-  const timeAgo = $derived(generalJobStore.showTimeAgo(job.post_time));
+  const timeAgo = $derived(showTimeAgo(job.post_time));
 
-  // clean up the viewer when the component is removed from the DOM
-  onDestroy(() => {
-    viewerJSManager.destroyViewer();
+  onMount(() => {
+    viewerJSHandler.initialize();
+    return () => {
+      viewerJSHandler.destroyViewer();
+    };
   });
 </script>
 
@@ -523,7 +551,7 @@
           >Tentang Perusahaan</span
         >
       </h2>
-      <div onclick={onWysiwygImgClick} role="presentation">
+      <div onclick={viewerJSHandler.onWysiwygImgClick} role="presentation">
         {@html job.tentang_perusahaan}
       </div>
     </section>
@@ -541,7 +569,7 @@
           >Deskripsi Pekerjaan</span
         >
       </h2>
-      <div onclick={onWysiwygImgClick} role="presentation">
+      <div onclick={viewerJSHandler.onWysiwygImgClick} role="presentation">
         {@html job.deskripsi_pekerjaan}
       </div>
     </section>
@@ -559,7 +587,7 @@
           >Persyaratan</span
         >
       </h2>
-      <div onclick={onWysiwygImgClick} role="presentation">
+      <div onclick={viewerJSHandler.onWysiwygImgClick} role="presentation">
         {@html job.persyaratan}
       </div>
     </section>
@@ -577,7 +605,7 @@
           >Cara Melamar</span
         >
       </h2>
-      <div onclick={onWysiwygImgClick} role="presentation">
+      <div onclick={viewerJSHandler.onWysiwygImgClick} role="presentation">
         {@html job.cara_melamar}
       </div>
     </section>
@@ -595,7 +623,7 @@
           >Benefit</span
         >
       </h2>
-      <div onclick={onWysiwygImgClick} role="presentation">
+      <div onclick={viewerJSHandler.onWysiwygImgClick} role="presentation">
         {@html job.benefit}
       </div>
     </section>
@@ -698,9 +726,9 @@
     </section>
   {/if}
 </article>
-{#if extractUniqueImagesFromJob(job).length}
-  <div bind:this={galleryRef} class="hidden">
-    {#each extractUniqueImagesFromJob(job) as img (img)}
+{#if viewerJSHandler.images.length > 0}
+  <div bind:this={viewerJSHandler.galleryRef} style="display: none;">
+    {#each viewerJSHandler.images as img (img)}
       <img src={img} alt="" />
     {/each}
   </div>

@@ -168,84 +168,111 @@ server/
 ## 🎨 Frontend Structure
 
 ```sh
-src/
-├── app/                       # App-level components and logic
-│   ├── components/            # Reusable UI components
-│   │   ├── layouts/           # Layout components
+src                         # SvelteKit frontend entrypoint and app shell
+├── app.html                 # SvelteKit HTML template
+├── hooks.server.ts          # Server hook entrypoint for SvelteKit
+├── lib                     # App libraries, shared components, stores, and helpers
+│   ├── assets              # Static frontend assets and CSS
+│   │   ├── css
+│   │   │   ├── app.css
+│   │   │   └── wordpress.css
+│   │   └── favicon.svg
+│   ├── components          # UI components
+│   │   ├── layouts         # Layout components for consistent page structure
 │   │   │   ├── Footer.svelte
 │   │   │   └── Header.svelte
-│   │   └── ui/                # UI component groups
-│   │       ├── Header/
-│   │       │   └── BookmarkModal.svelte
-│   │       ├── Homepage/
-│   │       │   ├── CustomDropdown.svelte
-│   │       │   ├── JobCard.svelte
+│   │   └── ui
+│   │       ├── Header # subcomponents related to Header
+│   │       │   ├── BookmarkModal.svelte
+│   │       │   └── LoginModal.svelte
+│   │       ├── Homepage # subcomponents related to homepage
+│   │       │   ├── Hero.svelte
 │   │       │   ├── JobCarousel.svelte
+│   │       │   ├── JobGrid # subcomponents related to JobGrid
+│   │       │   │   └── SingleSidePanel.svelte
 │   │       │   ├── JobGrid.svelte
+│   │       │   ├── SearchForm # subcomponents related to SearchForm
+│   │       │   │   └── CustomDropdown.svelte
 │   │       │   ├── SearchForm.svelte
-│   │       │   └── SingleOverlay.svelte
-│   │       ├── Shared/
+│   │       │   └── JobCard.svelte
+│   │       ├── Shared # shared UI components used across components
 │   │       │   ├── BookmarkButton.svelte
 │   │       │   ├── FloatingActionButton.svelte
+│   │       │   ├── JobCard # subcomponents related to JobCard
+│   │       │   │   ├── JobDeadlineBadge.svelte
+│   │       │   │   └── JobStatusBadge.svelte
+│   │       │   ├── JobCard.svelte
 │   │       │   ├── JobDetail.svelte
 │   │       │   ├── LoadingSpinner.svelte
 │   │       │   └── RefreshSpinner.svelte
-│   │       └── Skeletons/
+│   │       └── Skeletons # skeleton loading components
 │   │           └── SkeletonSingleLowongan.svelte
-│   ├── lib/                   # App libraries and utilities
-│   │   ├── stores/            # Svelte stores for state management
-│   │   │   ├── Bookmark.svelte.ts
-│   │   │   ├── DynamicComponent.svelte.ts
-│   │   │   ├── General.svelte.ts
-│   │   │   ├── HeaderStore.svelte.ts
-│   │   │   ├── JobOverlay.svelte.ts
-│   │   │   ├── Route.svelte.ts
-│   │   │   ├── Search.svelte.ts
-│   │   │   └── Taxonomy.svelte.ts
-│   │   └── utils/             # Library utilities
-│   │       ├── elements.svelte.ts
-│   │       ├── SEO.svelte.ts
-│   │       └── Virtualization.svelte.ts
-│   └── routes/                # Route components
-│       ├── Homepage.svelte
-│       ├── PasangIklanLoker.svelte
-│       └── SingleLowongan.svelte
-├── app.svelte                 # Main Svelte app boot component
-├── assets/                    # Static assets
-│   └── css/                   # Stylesheets
-│       ├── app.css
-│       └── theme.css
-├── global.d.ts                # Global TypeScript declarations
-├── main.ts                    # Svelte app entry point
-├── services/                  # Service classes (API, Auth, etc.)
-│   ├── APIService.ts
-│   ├── Formatting.ts
+│   ├── composables         # Composable logic and reusable view helpers (Adopted from Vue composition API pattern)
+│   │   ├── JobUI.svelte.ts
+│   │   └── SidePanel.svelte.ts
+│   ├── features            # Feature modules encapsulating specific functionality
+│   ├── server              # Server-only constants and utilities
+│   │   ├── constants
+│   │   │   ├── constants.ts
+│   │   │   └── index.ts
+│   │   └── utils                # Server-only utility scripts
+│   │       └── scripts.server.ts
+│   ├── stores              # Shared Svelte stores for application state
+│   │   ├── Bookmark.svelte.ts
+│   │   ├── DynamicComponent.svelte.ts
+│   │   ├── JobListingStore.svelte.ts
+│   │   ├── Route.svelte.ts
+│   │   ├── Taxonomy.svelte.ts
+│   │   ├── Theme.svelte.ts
+│   │   └── Time.svelte.ts
+│   └── utils               # Shared utilities leveraging Svelte features
+│       ├── elements.svelte.ts
+│       └── window.svelte.ts
+├── routes                  # SvelteKit page routes and server endpoints
+│   ├── kebijakan-privasi
+│   │   └── +page.svelte
+│   ├── +layout.server.ts
+│   ├── +layout.svelte
+│   ├── lowongan
+│   │   └── [slug]
+│   │       ├── +page.server.ts
+│   │       └── +page.svelte
+│   ├── main-sitemap.xsl
+│   │   └── +server.ts
+│   ├── +page.server.ts
+│   ├── +page.svelte
+│   ├── pasang-iklan-loker
+│   │   └── +page.svelte
+│   ├── robots.txt
+│   │   └── +server.ts
+│   └── [...sitemap].xml
+│       └── +server.ts
+├── services                # API and browser agnostic service utilities
+│   ├── BroadcastChannel.ts
 │   ├── Google.ts
-│   ├── Mounter.ts
-│   └── api/                   # API-related services
-│       └── graphql/
-│           └── query/
-│               ├── index.ts
-│               ├── job.ts
-│               ├── Taxonomy.ts
-│               └── theme.ts
-├── types/                     # TypeScript type definitions
+│   ├── graphql # GraphQL queries and API service
+│   │   ├── APIService.ts
+│   │   └── query
+│   │       ├── job.ts
+│   │       ├── taxonomy.ts
+│   │       └── theme.ts
+│   ├── IndexedDB.ts
+├── types                   # Shared TypeScript type definitions
 │   ├── API.ts
 │   ├── Component.ts
 │   ├── index.ts
-│   ├── MetaBox.ts
+│   ├── KeyboardKeys.ts
 │   ├── SavedState.ts
+│   ├── Search.ts
+│   ├── Shared.ts
 │   ├── Theme.ts
-│   └── Wordpress.ts
-└── utils/                     # Agnostic utility functions
+│   └── wordpress
+│       ├── MetaBox.ts
+│       └── Wordpress.ts
+└── utils                   # agnostic utilities and helpers
     ├── elements.ts
     ├── environment.ts
-    ├── index.ts
-    ├── indexedDB.ts
-    ├── lodash.ts
-    ├── Nonce.ts
-    ├── partytown.ts
-    └── validation.ts
+    └── search.ts
 ```
 
 ---

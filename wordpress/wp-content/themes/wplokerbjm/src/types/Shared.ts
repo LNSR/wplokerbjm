@@ -2,7 +2,7 @@ import type { SearchContext, SearchFilters } from './Search';
 import type { MetaBox } from './wordpress/MetaBox';
 import type { WPBasePost } from './wordpress/Wordpress';
 
-export interface JobSummary extends Pick<MetaBox, 'jenis_pekerjaan' | 'pendidikan' | 'lokasi_pekerjaan' | 'gender' | 'pengalaman' | 'gaji_minimal' | 'gaji_maksimal' | 'umur_min' | 'umur_max' | 'deadline'> {}
+export type JobSummary = Pick<MetaBox, 'jenis_pekerjaan' | 'pendidikan' | 'lokasi_pekerjaan' | 'gender' | 'pengalaman' | 'gaji_minimal' | 'gaji_maksimal' | 'umur_min' | 'umur_max' | 'deadline'>;
 
 export interface CardJob extends WPBasePost, Pick<MetaBox, 'jenis_pekerjaan' | 'pendidikan' | 'lokasi_pekerjaan' | 'gender' | 'nama_perusahaan' | 'deadline' | 'status_pekerjaan'> {
   ringkasanPekerjaan?: JobSummary | null;
@@ -18,20 +18,19 @@ export interface SortOption {
 export interface BaseJobSearch
 {
   jobs?: CardJob[] | null
-  maxNumPages?: number
+  maxNumPages?: number | null
   context?: SearchContext
   filters?: SearchFilters
   total?: number | null
 }
   
 
-export type DropdownOption = {
+export interface DropdownOption {
   value: string
   label: string
   children?: DropdownOption[]
   isLoading?: boolean
-  hasMoreChildren?: boolean
   loadChildren?: () => Promise<DropdownOption[]>
-  __breadcrumbs?: string[]
-  __key?: string
+  breadcrumbs?: string[]
+  key?: string
 }

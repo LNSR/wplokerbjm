@@ -8,11 +8,11 @@ class ThemePropsManager
 {
   #themeProps = $state<WPLokerBJMThemedData | undefined>( undefined );
 
-  public get getThemeData(): WPLokerBJMThemedData
-  {
-    if ( !this.#themeProps ) throw new Error( "Theme data is not set" );
-    return this.#themeProps;
-  }
+  // public get getThemeData(): WPLokerBJMThemedData
+  // {
+  //   if ( !this.#themeProps ) throw new Error( "Theme data is not set" );
+  //   return this.#themeProps;
+  // }
 
   public get getNonce(): WPLokerBJMThemedData[ "wpRestNonce" ]
   {

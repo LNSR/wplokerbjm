@@ -1,11 +1,14 @@
 import type { SearchState, CarouselState, JobCardProps, CardHeightKey } from "@/types";
-import { isMobile } from "$lib/utils/window.svelte";
-import { SvelteMap, createSubscriber } from "svelte/reactivity";
+import { SvelteMap } from "svelte/reactivity";
 import { type CardJob } from "@/types";
-import { LRUCache } from "lru-cache";
-import { on } from "svelte/events";
+import typia from "typia";
+import { useVirtualization } from "$lib/features/Virtualization.svelte";
+import { deviceDetector, type DeviceDetectorInternal } from "$lib/features/DeviceDetector.svelte";
 
-type Device = "desktop" | "mobile";
+type LastVisitedJobState = {
+  slug: CardJob[ "slug" ];
+  source?: JobCardProps[ "variant" ];
+};
 
 class RouteManager
 {
@@ -32,66 +35,31 @@ class RouteManager
 
 class RouteStateManager
 {
-  scrollPositions = new LRUCache<string, number>({ max: 100 }); // Scroll position cache per route
-  searchStates = new LRUCache<string, SearchState>({ max: 100 }); // Limit to 50 most recent search states
-  lastVisitedJob: CardJob[ "slug" ] | undefined = $state(undefined); // Remember the last visited job slug for mobile navigation
-  lastVisitedJobSource: JobCardProps[ "variant" ] | undefined = $state(undefined);
-  carouselState: CarouselState | undefined = $state(undefined);
-  cardHeights = new LRUCache<string, Record<number, number>>({ max: 500 }); // Global cache for card heights
+  #scrollPositionsMap = new SvelteMap<string, number>();
+  #searchMap = new SvelteMap<string, SearchState | undefined>();
+  #visitedJobsMap = new SvelteMap<string, LastVisitedJobState>();
+  #carouselMap = new SvelteMap<string, CarouselState>();
+  #cardHeightsMap = new SvelteMap<string, SvelteMap<number, number>>();
+  public lastVisitedJob = $derived<LastVisitedJobState>(this.#visitedJobsMap.get(`${deviceDetector.currentDevice}`) ?? { slug: undefined, source: undefined });
+  #carouselState = $derived<CarouselState | undefined>(this.#carouselMap.get(`${deviceDetector.currentDevice}`));
 
-  #deviceSubscriber = createSubscriber((update) =>
+  constructor()
   {
-    if (typeof window === "undefined") return;
-    const mq: MediaQueryList = window.matchMedia("(max-width: 767px)");
-    const handler = () =>
-    {
-      this.clearCachesForDevice();
-      update();
-    }
-    const off = on(mq, "change", handler);
-    return () => off();
-  });
-
-  public currentDevice = $derived.by<Device>(() =>
-  {
-    this.#deviceSubscriber();
-    return isMobile() ? "mobile" : "desktop";
-  });
-
-  /**
-   * When using simulation of mobile/desktop in devtools, clear caches to prevent cross-device data issues
-   */
-  private clearCachesForDevice()
-  {
-    console.log("Device type changed, clearing route state caches to prevent cross-device data issues.");
-    // Clear all LRU caches
-    this.scrollPositions.clear();
-    this.searchStates.clear();
-    this.cardHeights.clear();
-
-    // Clear all sessionStorage
-    if (typeof sessionStorage !== "undefined")
-    {
-      sessionStorage.clear();
-    }
-
-    // Clear state properties
-    this.lastVisitedJob = undefined;
-    this.lastVisitedJobSource = undefined;
-    this.carouselState = undefined;
+    //* pass the cache clearing method to the device detector so it can call it when device type changes
+    (deviceDetector as DeviceDetectorInternal).setCallbackOnDeviceChange = this.#clearCachesForDevice.bind(this);
   }
 
-  public saveSearchState(path: string, searchState: SearchState | undefined): void
+  public saveSearchState(path: string, searchState?: SearchState): void
   {
-    const key = `${this.currentDevice}-${path}`;
-    this.searchStates.set(key, searchState);
+    const key = `${deviceDetector.currentDevice}-${path}`;
+    this.#searchMap.set(key, searchState);
     if (typeof sessionStorage !== "undefined")
     {
       try
       {
         sessionStorage.setItem(
           `searchStates-${key}`,
-          JSON.stringify(searchState),
+          typia.json.stringify<typeof searchState>(searchState),
         );
       } catch (e)
       {
@@ -102,8 +70,8 @@ class RouteStateManager
 
   public getSearchState(path: string): SearchState | undefined
   {
-    const key = `${this.currentDevice}-${path}`;
-    let state = this.searchStates.get(key);
+    const key = `${deviceDetector.currentDevice}-${path}`;
+    let state = this.#searchMap.get(key);
     if (!state && typeof sessionStorage !== "undefined")
     {
       try
@@ -111,8 +79,8 @@ class RouteStateManager
         const stored = sessionStorage.getItem(`searchStates-${key}`);
         if (stored)
         {
-          const parsed = JSON.parse(stored);
-          this.searchStates.set(key, parsed); // cache in memory
+          const parsed = typia.json.assertParse<SearchState | undefined>(stored);
+          this.#searchMap.set(key, parsed); // cache in memory
           state = parsed;
         }
       } catch (e)
@@ -125,8 +93,8 @@ class RouteStateManager
 
   public clearSearchState(path: string)
   {
-    const key = `${this.currentDevice}-${path}`;
-    this.searchStates.delete(key);
+    const key = `${deviceDetector.currentDevice}-${path}`;
+    this.#searchMap.delete(key);
     if (typeof sessionStorage !== "undefined")
     {
       try
@@ -141,14 +109,16 @@ class RouteStateManager
 
   public saveCarouselState(carouselState: CarouselState)
   {
-    this.carouselState = carouselState;
+    const key = `${deviceDetector.currentDevice}`;
+    this.#carouselMap.set(key, carouselState);
     if (typeof sessionStorage !== "undefined")
     {
       try
       {
+        const serialized = typia.json.stringify<typeof carouselState>(carouselState);
         sessionStorage.setItem(
-          `carouselState-${this.currentDevice}`,
-          JSON.stringify(carouselState),
+          `carouselState-${key}`,
+          serialized,
         );
       } catch (e)
       {
@@ -159,18 +129,20 @@ class RouteStateManager
 
   public getCarouselState(): CarouselState | undefined
   {
-    if (this.carouselState) return this.carouselState;
+    const key = `${deviceDetector.currentDevice}`;
+    if (this.#carouselState?.slideIndex) return this.#carouselState;
     if (typeof sessionStorage !== "undefined")
     {
       try
       {
         const stored = sessionStorage.getItem(
-          `carouselState-${this.currentDevice}`,
+          `carouselState-${key}`,
         );
         if (stored)
         {
-          this.carouselState = JSON.parse(stored);
-          return this.carouselState;
+          const parsed = typia.json.assertParse<CarouselState>(stored);
+          this.#carouselMap.set(key, parsed);
+          return this.#carouselState;
         }
       } catch (e)
       {
@@ -182,13 +154,13 @@ class RouteStateManager
 
   public clearCarouselState()
   {
-    if (!this.carouselState) return;
-    this.carouselState = undefined;
+    const key = `${deviceDetector.currentDevice}`;
+    this.#carouselMap.delete(key);
     if (typeof sessionStorage !== "undefined")
     {
       try
       {
-        sessionStorage.removeItem(`carouselState-${this.currentDevice}`);
+        sessionStorage.removeItem(`carouselState-${key}`);
       } catch (e)
       {
         console.warn("Failed to clear carousel state from sessionStorage", e);
@@ -200,16 +172,16 @@ class RouteStateManager
   // `source` indicates where the user clicked the job (carousel or grid).
   public MarkVisitedJob(slug: CardJob[ "slug" ], source?: JobCardProps[ "variant" ]): void
   {
-    if (!slug) return;
-    this.lastVisitedJob = slug;
-    this.lastVisitedJobSource = source;
+    if (!slug || !deviceDetector) return;
+    const key = `${deviceDetector.currentDevice}`;
+    this.#visitedJobsMap.set(key, { slug, source });
     if (typeof sessionStorage !== "undefined")
     {
       try
       {
-        sessionStorage.setItem(`lastVisitedJob-${this.currentDevice}`, slug);
+        sessionStorage.setItem(`lastVisitedJob-${key}`, slug);
         sessionStorage.setItem(
-          `lastVisitedJobSource-${this.currentDevice}`,
+          `lastVisitedJobSource-${key}`,
           source ?? "",
         );
       } catch (e)
@@ -221,22 +193,25 @@ class RouteStateManager
 
   public restoreVisitedJob(): CardJob[ "slug" ] | undefined
   {
-    if (this.lastVisitedJob) return this.lastVisitedJob;
+    const key = `${deviceDetector.currentDevice}`;
+    if (this.lastVisitedJob.slug) return this.lastVisitedJob.slug;
     if (typeof sessionStorage !== "undefined")
     {
       try
       {
         const stored = sessionStorage.getItem(
-          `lastVisitedJob-${this.currentDevice}`,
+          `lastVisitedJob-${key}` as NonNullable<CardJob[ "slug" ]>,
         );
         if (stored)
         {
-          this.lastVisitedJob = stored;
           const src = sessionStorage.getItem(
-            `lastVisitedJobSource-${this.currentDevice}`,
+            `lastVisitedJobSource-${key}`,
           ) as JobCardProps[ "variant" ] | null;
-          if (src) this.lastVisitedJobSource = src;
-          return this.lastVisitedJob;
+          this.#visitedJobsMap.set(key, {
+            slug: stored,
+            source: src ?? undefined,
+          });
+          return this.lastVisitedJob.slug;
         }
       } catch (e)
       {
@@ -259,13 +234,13 @@ class RouteStateManager
     const record = Object.fromEntries(
       heights as Iterable<readonly [ number, number ]>,
     );
-    const key = `${this.currentDevice}-${keyname}`;
-    this.cardHeights.set(key, record);
+    const key = `${deviceDetector.currentDevice}-${keyname}`;
+    this.#cardHeightsMap.set(key, heights);
     if (typeof sessionStorage !== "undefined")
     {
       try
       {
-        sessionStorage.setItem(`cardHeights-${key}`, JSON.stringify(record));
+        sessionStorage.setItem(`cardHeights-${key}`, typia.json.stringify<typeof record>(record));
       } catch (e)
       {
         console.warn("Failed to save cardHeights to sessionStorage", e);
@@ -275,8 +250,10 @@ class RouteStateManager
 
   public clearCardHeights(keyname: CardHeightKey)
   {
-    const key = `${this.currentDevice}-${keyname}`;
-    this.cardHeights.delete(key);
+    const key = `${deviceDetector.currentDevice}-${keyname}`;
+    const cardHeights = this.getCardHeights(keyname);
+    useVirtualization.invalidateCardHeightsCache(cardHeights);
+    cardHeights.clear();
     if (typeof sessionStorage !== "undefined")
     {
       try
@@ -289,19 +266,33 @@ class RouteStateManager
     }
   }
 
+  /**
+   * 
+   */
   public getCardHeights(keyname: CardHeightKey): SvelteMap<number, number>
   {
-    const key = `${this.currentDevice}-${keyname}`;
-    let record = this.cardHeights.get(key);
-    if (!record && typeof sessionStorage !== "undefined")
+    if (!deviceDetector) return new SvelteMap<number, number>();
+    const key = `${deviceDetector.currentDevice}-${keyname}`;
+    let cardHeights = this.#cardHeightsMap.get(key);
+    if (cardHeights) return cardHeights;
+
+    cardHeights = new SvelteMap<number, number>();
+
+    if (typeof sessionStorage !== "undefined")
     {
       try
       {
         const stored = sessionStorage.getItem(`cardHeights-${key}`);
         if (stored)
         {
-          record = JSON.parse(stored);
-          this.cardHeights.set(key, record);
+          const record = typia.json.assertParse<Record<number, number> | undefined>(stored);
+          if (record)
+          {
+            for (const [ recordKey, height ] of Object.entries(record))
+            {
+              cardHeights.set(Number(recordKey), height);
+            }
+          }
         }
       } catch (e)
       {
@@ -309,11 +300,9 @@ class RouteStateManager
       }
     }
 
-    const entries: Array<[ number, number ]> = record
-      ? Object.entries(record).map(([ k, v ]) => [ Number(k), Number(v) ])
-      : [];
+    this.#cardHeightsMap.set(key, cardHeights);
 
-    return new SvelteMap<number, number>(entries);
+    return cardHeights;
   }
 
   /**
@@ -321,8 +310,8 @@ class RouteStateManager
    */
   public saveScrollPosition(path: string, scrollY: number): void
   {
-    const key = `${this.currentDevice}-${path}`;
-    this.scrollPositions.set(key, scrollY);
+    const key = `${deviceDetector.currentDevice}-${path}`;
+    this.#scrollPositionsMap.set(key, scrollY);
     if (typeof sessionStorage !== "undefined")
     {
       try
@@ -340,8 +329,8 @@ class RouteStateManager
    */
   public getScrollPosition(path: string): number | undefined
   {
-    const key = `${this.currentDevice}-${path}`;
-    let position = this.scrollPositions.get(key);
+    const key = `${deviceDetector.currentDevice}-${path}`;
+    let position = this.#scrollPositionsMap.get(key);
     if (position === undefined && typeof sessionStorage !== "undefined")
     {
       try
@@ -352,7 +341,7 @@ class RouteStateManager
           position = Number(stored);
           if (!isNaN(position))
           {
-            this.scrollPositions.set(key, position);
+            this.#scrollPositionsMap.set(key, position);
           } else
           {
             position = undefined;
@@ -391,8 +380,8 @@ class RouteStateManager
    */
   public clearScrollPosition(path: string): void
   {
-    const key = `${this.currentDevice}-${path}`;
-    this.scrollPositions.delete(key);
+    const key = `${deviceDetector.currentDevice}-${path}`;
+    this.#scrollPositionsMap.delete(key);
     if (typeof sessionStorage !== "undefined")
     {
       try
@@ -404,6 +393,29 @@ class RouteStateManager
       }
     }
   }
+
+  /**
+ * Clear all cache if device type changes to prevent cross-device data issues
+ * @internal
+ */
+  #clearCachesForDevice(): void
+  {
+    console.log("Device type changed, clearing route state caches to prevent cross-device data issues");
+
+    this.#scrollPositionsMap.clear();
+    this.#searchMap.clear();
+    this.#visitedJobsMap.clear();
+    this.#carouselMap.clear();
+    this.#cardHeightsMap.clear();
+
+    // Clear all sessionStorage
+    if (typeof sessionStorage !== "undefined")
+    {
+      sessionStorage.clear();
+    }
+  }
+
 }
-export const routeStateStore = new RouteStateManager();
+
 export const routeStore = new RouteManager();
+export const routeStateStore = new RouteStateManager();

@@ -5,7 +5,7 @@ import type { Config } from "@sveltejs/kit";
 const isDev = process.env.NODE_ENV === "development" || process.env.NODE_ENV === "preview";
 
 const config: Config = {
-  preprocess: vitePreprocess( { script: isDev } ),
+  preprocess: vitePreprocess( { script: true } ),
   kit: {
     version: {
       name: Date.now().toString(),

@@ -21,6 +21,8 @@ import { themePropsStore } from "$lib/stores/Theme.svelte";
 import { GET_JOB_DETAIL, GET_AUTO_SUGGESTIONS, GET_CAROUSEL, GET_JOB_GRID, GET_JOB_SCHEMA, GET_LOAD_MORE, GET_RANK_MATH_HEAD, GET_SEARCH_JOBS, SYNC_BOOKMARK } from "@/services/graphql/query/job"
 import { GET_THEME_DATA, GET_THEME_NONCE, GET_JWT } from "@/services/graphql/query/theme";
 import { GET_LOKASI_TERMS, GET_GENDER_TERMS, GET_PENDIDIKAN_TERMS } from "@/services/graphql/query/taxonomy";
+import { FRAGMENT_JOB_CARD_FIELDS } from "@/services/graphql/query/job";
+import { type FragmentOf, readFragment } from "gql.tada";
 
 type BookmarkResponse = CardJob[];
 class URQLClientManager
@@ -143,36 +145,27 @@ class URQLClientManager
     };
   }
 }
-
 export class APIServiceHelper
 {
-  // Strip WP origin from permalink
-  public static normalizeJob<T extends Record<string, unknown> | null>(job: T): T
+  /**
+   * Normalize job data by stripping WP origin from permalink and removing trailing slashes from slug
+   */
+  public static normalizeJob<J extends FragmentOf<typeof FRAGMENT_JOB_CARD_FIELDS> | null>(job: J): J
   {
     if (!job || typeof job !== "object") 
     {
       return job;
     }
-    if (typeof job.permalink === "string")
-    {
-      let p = job.permalink.replace(/\/+$/g, "");
-      try
-      {
-        const u = new URL(p);
-        p = u.pathname;
-      } catch (e)
-      {
-        console.error("Invalid URL in job permalink:", job.permalink, e);
-      }
-      job.permalink = p;
-    }
-    // trailing slash in slug can cause issues with job detail fetching, so normalize it as well
-    if (typeof job.slug === "string")
-    {
-      job.slug = job.slug.replace(/\/+$/g, "");
-    }
-    return job;
-  }
+    const unwrap = readFragment(FRAGMENT_JOB_CARD_FIELDS, job);
+
+    // shallow merge normalized fields back into original job object
+    //* gql.tada type fragments are immutable so we need to create a new object with normalized fields
+    return {
+      ...job,
+      permalink: APIServiceHelper.normalizePermalink(unwrap.permalink) ?? unwrap.permalink,
+      slug: APIServiceHelper.normalizeSlug(unwrap.slug) ?? unwrap.slug,
+    };
+  };
   /** 
    * GraphQL Taxonomies use JSON Scalar so detect and parse JSON strings in the response 
    * @param jsonString - The JSON string to parse from GraphQL response
@@ -192,6 +185,39 @@ export class APIServiceHelper
       throw new Error("Invalid JSON format in GraphQL response");
     }
   }
+
+  /**
+ * Normalize permalink by stripping WP origin and trailing slashes
+ * @param permalink 
+ * @returns 
+ */
+  private static normalizePermalink(permalink: CardJob[ 'permalink' ]): string | undefined
+  {
+    if (!typia.is<string>(permalink)) return undefined;
+    let p = permalink.replace(/\/+$/g, "");
+    try
+    {
+      if (p.startsWith("http://") || p.startsWith("https://"))
+      {
+        p = new URL(p).pathname;
+      }
+      return p;
+    } catch (e)
+    {
+      console.error("Invalid URL in job permalink:", permalink, e);
+      return permalink;
+    }
+  }
+
+  /**
+   * Normalize slug by stripping trailing slashes
+   */
+  private static normalizeSlug(slug: CardJob[ 'slug' ]): string | undefined
+  {
+    if (!typia.is<string>(slug)) return undefined;
+    return slug.replace(/\/+$/g, "");
+  }
+
 }
 
 /**
@@ -215,8 +241,7 @@ export class APIServiceServer
     );
     const job = data.jobDetail;
 
-    const normalizedJob = APIServiceHelper.normalizeJob(job);
-    return typia.assertEquals<JobDetailResponse>(normalizedJob);
+    return typia.assertEquals<JobDetailResponse>(job);
   }
   //* SEO related (GraphQL proxied version)
   static async getRankMathHeadGraphQL(
@@ -367,7 +392,7 @@ export class APIServiceBrowser
     {
       resp.jobs = resp.jobs.map((j) => APIServiceHelper.normalizeJob(j));
     }
-    return typia.assert<SearchResponse>(resp);
+    return typia.assertEquals<SearchResponse>(resp);
   }
   static async loadMoreJobsGraphQL(
     filters: LoadMoreFilters,

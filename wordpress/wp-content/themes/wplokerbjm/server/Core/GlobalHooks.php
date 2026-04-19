@@ -21,6 +21,24 @@ class GlobalHooks
      ======================================================================*/
 
     /**
+     * Skip redirect logic for ACME challenge requests and AutoSSL probe user agents.
+     */
+    private static function shouldBypassAutoSsl(): bool
+    {
+        $requestUri = $_SERVER['REQUEST_URI'] ?? '';
+        if ($requestUri !== '' && str_starts_with($requestUri, '/.well-known/acme-challenge/')) {
+            return true;
+        }
+
+        $userAgent = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        if ($userAgent === '') {
+            return false;
+        }
+
+        return stripos($userAgent, 'litespeed') !== false || stripos($userAgent, 'quic-cloud') !== false;
+    }
+
+    /**
      * Return 410 Gone for old job posts that have been trashed due to age.
      * * For deleted job posts (404 on single lowongan), return 410 Gone.
      * ! Notify search engines with 410 Gone for removed job posts.
@@ -29,6 +47,7 @@ class GlobalHooks
     public function oldPost410Redirect(): void
     {
         if (
+            self::shouldBypassAutoSsl() ||
             !is_404() ||
             is_preview() ||
             is_admin() ||
@@ -66,6 +85,7 @@ class GlobalHooks
     {
         // Avoid redirecting during admin, AJAX, REST API, cron, or preview requests
         if (
+            self::shouldBypassAutoSsl() ||
             (defined('REST_REQUEST') && REST_REQUEST) ||
             wp_doing_ajax() ||
             wp_doing_cron() ||
@@ -91,6 +111,7 @@ class GlobalHooks
     {
         // Avoid redirecting during admin, AJAX, REST API, cron, preview, or CLI requests
         if (
+            self::shouldBypassAutoSsl() ||
             is_admin() ||
             (defined('REST_REQUEST') && REST_REQUEST) ||
             (defined('DOING_AJAX') && DOING_AJAX) ||
@@ -293,8 +314,6 @@ class GlobalHooks
      *   without arguments (no post context) and it will only purge global caches.
      * - For meta/taxonomy hooks we pass the `object_id` (post id) when available.
      *
-     * @param int|null $post_id Optional post ID when available (null for term-level hooks).
-     * @param \WP_Post|null $post Optional WP_Post object when available.
      * @return void
      */
     #[Action('save_post', 10, 2)]

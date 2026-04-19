@@ -7,7 +7,7 @@ class IDB
   protected DB_VERSION: number = 1
   protected STORE_NAME: string = ''
 
-  constructor ( DB_NAME: string, DB_VERSION: number, STORE_NAME: string )
+  constructor(DB_NAME: string, DB_VERSION: number, STORE_NAME: string)
   {
     this.DB_NAME = DB_NAME
     this.DB_VERSION = DB_VERSION
@@ -16,30 +16,30 @@ class IDB
 
   private dbPromise: Promise<IDBPDatabase<CardJob>> | null = null
 
-  protected async getWPLokerBJMDB (): Promise<IDBPDatabase<CardJob>>
+  protected async getWPLokerBJMDB(): Promise<IDBPDatabase<CardJob>>
   {
-    if ( !this.dbPromise )
+    if (!this.dbPromise)
     {
-      this.dbPromise = openDB<CardJob>( this.DB_NAME, this.DB_VERSION, {
-        upgrade: ( db ) =>
+      this.dbPromise = openDB<CardJob>(this.DB_NAME, this.DB_VERSION, {
+        upgrade: (db) =>
         {
-          if ( !db.objectStoreNames.contains( this.STORE_NAME ) )
+          if (!db.objectStoreNames.contains(this.STORE_NAME))
           {
-            db.createObjectStore( this.STORE_NAME )
+            db.createObjectStore(this.STORE_NAME)
           }
         }
-      } )
+      })
     }
-    return this.dbPromise
+    return await this.dbPromise
   }
 }
 
 export class BookmarkIDB extends IDB
 {
 
-  private async getBookmarkDB (): Promise<IDBPDatabase<CardJob>>
+  private async getBookmarkDB(): Promise<IDBPDatabase<CardJob>>
   {
-    return super.getWPLokerBJMDB()
+    return await super.getWPLokerBJMDB()
   }
 
   /**
@@ -49,26 +49,26 @@ export class BookmarkIDB extends IDB
    * @param jobs - Array of CardJob objects to save as bookmarks
    * @throws Error if storage quota is exceeded after retrying
    */
-  public async saveBookmarks ( jobs: CardJob[] ): Promise<void>
+  public async saveBookmarks(jobs: CardJob[]): Promise<void>
   {
     try
     {
       const db = await this.getBookmarkDB()
-      const tx = db.transaction( this.STORE_NAME, 'readwrite' )
+      const tx = db.transaction(this.STORE_NAME, 'readwrite')
       await tx.store.clear()
-      for ( const job of jobs )
+      for (const job of jobs)
       {
-        await tx.store.put( job, ( Number( job.id ) ) )
+        void tx.store.put(job, (Number(job.id)))
       }
       await tx.done
-    } catch ( error )
+    } catch (error)
     {
-      if ( error instanceof DOMException && error.name === 'QuotaExceededError' )
+      if (error instanceof DOMException && error.name === 'QuotaExceededError')
       {
-        console.error( 'IndexedDB quota exceeded. Clearing old bookmarks to free space.' )
+        console.error('IndexedDB quota exceeded. Clearing old bookmarks to free space.')
         // Attempt to clear and retry once
         await this.clearBookmarks()
-        throw new Error( 'Storage quota exceeded. Please refresh and try again.' )
+        throw new Error('Storage quota exceeded. Please refresh and try again.')
       }
       throw error
     }
@@ -78,62 +78,83 @@ export class BookmarkIDB extends IDB
    * Save individual bookmarked job to IndexedDB. 
    * @param job 
    */
-  public async addBookmark ( job: CardJob ): Promise<void>
+  public async addBookmark(job: CardJob): Promise<void>
   {
     try
     {
       const db = await this.getBookmarkDB()
-      await db.put( this.STORE_NAME, job, Number( job.id ) )
-    } catch ( error )
+      await db.put(this.STORE_NAME, job, Number(job.id))
+    } catch (error)
     {
-      if ( error instanceof DOMException && error.name === 'QuotaExceededError' )
+      if (error instanceof DOMException && error.name === 'QuotaExceededError')
       {
-        console.error( 'IndexedDB quota exceeded. Clearing old bookmarks to free space.' )
+        console.error('IndexedDB quota exceeded. Clearing old bookmarks to free space.')
         await this.clearBookmarks()
-        throw new Error( 'Storage quota exceeded. Please refresh and try again.' )
+        throw new Error('Storage quota exceeded. Please refresh and try again.')
       }
       throw error
     }
   }
 
-  public async removeBookmark ( id: CardJob[ 'id' ] ): Promise<void>
+  public async batchAddBookmarks(jobs: CardJob['id'][]): Promise<void>
   {
     try
     {
       const db = await this.getBookmarkDB()
-      await db.delete( this.STORE_NAME, id )
-    } catch ( error )
+      const tx = db.transaction(this.STORE_NAME, 'readwrite')
+      for (const jobId of jobs)
+      {
+        void tx.store.put(jobId, Number(jobId))
+      }
+      await tx.done
+    } catch (error)
     {
-      console.error( 'Failed to remove bookmark from IndexedDB:', error )
+      if (error instanceof DOMException && error.name === 'QuotaExceededError')
+      {
+        console.error('IndexedDB quota exceeded. Clearing old bookmarks to free space.')
+        await this.clearBookmarks()
+        throw new Error('Storage quota exceeded. Please refresh and try again.')
+      }
       throw error
     }
   }
 
-  public async loadBookmarks (): Promise<CardJob[]>
+  public async removeBookmark(id: CardJob[ 'id' ]): Promise<void>
   {
     try
     {
       const db = await this.getBookmarkDB()
-      return await db.getAll( this.STORE_NAME )
-    } catch ( error )
+      await db.delete(this.STORE_NAME, id)
+    } catch (error)
     {
-      console.error( 'Failed to load bookmarks from IndexedDB:', error )
+      console.error('Failed to remove bookmark from IndexedDB:', error)
+      throw error
+    }
+  }
+
+  public async loadBookmarks(): Promise<CardJob[]>
+  {
+    try
+    {
+      const db = await this.getBookmarkDB()
+      return await db.getAll(this.STORE_NAME)
+    } catch (error)
+    {
+      console.error('Failed to load bookmarks from IndexedDB:', error)
       return []
     }
   }
 
-  public async clearBookmarks (): Promise<void>
+  public async clearBookmarks(): Promise<void>
   {
     try
     {
       const db = await this.getBookmarkDB()
-      await db.clear( this.STORE_NAME )
-    } catch ( error )
+      await db.clear(this.STORE_NAME)
+    } catch (error)
     {
-      console.error( 'Failed to clear bookmarks from IndexedDB:', error )
+      console.error('Failed to clear bookmarks from IndexedDB:', error)
       throw error
     }
   }
 }
-
-export const bookmarkIDB = new BookmarkIDB( 'JobBookmarks', 1, 'bookmarks' )

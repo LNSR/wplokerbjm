@@ -6,29 +6,29 @@ import typia from 'typia'
 class TaxonomyManager
 {
 	// State
-	public terms = $state( {
-		lokasi: [] as TaxonomyTerm[],
-		gender: [] as TaxonomyTerm[],
-		pendidikan: [] as TaxonomyTerm[],
-	} )
+	public terms = $state<Record<TaxonomyGroup, TaxonomyTerm[]>>({
+		lokasi: [],
+		gender: [],
+		pendidikan: [],
+	})
 
-	private loaded = $state( {
+	private loaded = $state({
 		lokasi: false,
 		gender: false,
 		pendidikan: false,
-	} )
+	})
 
-	public loading = $state( {
+	public loading = $state({
 		lokasi: false,
 		gender: false,
 		pendidikan: false,
-	} )
+	})
 
-	public error = $state( {
+	public error = $state({
 		lokasi: null as string | null,
 		gender: null as string | null,
 		pendidikan: null as string | null,
-	} )
+	})
 
 	public get anyError(): string | null
 	{
@@ -46,44 +46,44 @@ class TaxonomyManager
 		return this.loading.lokasi || this.loading.gender || this.loading.pendidikan
 	}
 
-	private getGroupFromType( type: TaxonomyType ): TaxonomyGroup
+	private getGroupFromType(type: TaxonomyType): TaxonomyGroup
 	{
-		if ( type === 'lokasi_pekerjaan' ) return 'lokasi'
-		if ( type === 'gender' ) return 'gender'
+		if (type === 'lokasi_pekerjaan') return 'lokasi' // WP use lokasi_pekerjaan internally, lokasi for UI
+		if (type === 'gender') return 'gender'
 		return 'pendidikan'
 	}
 
-	public getTerms( type: TaxonomyType ): TaxonomyTerm[]
+	public getTerms(type: TaxonomyType): TaxonomyTerm[]
 	{
-		return this.terms[ this.getGroupFromType( type ) ]
+		return this.terms[ this.getGroupFromType(type) ]
 	}
 
 
-	private buildSlugMap( type: TaxonomyType, terms: TaxonomyTerm[] ): void
+	private buildSlugMap(type: TaxonomyType, terms: TaxonomyTerm[]): void
 	{
-		const map = this.slugMaps[ this.getGroupFromType( type ) ]
+		const map = this.slugMaps[ this.getGroupFromType(type) ]
 		map.clear()
-		function addToMap( termsList: TaxonomyTerm[] )
+		function addToMap(termsList: TaxonomyTerm[])
 		{
-			for ( const t of termsList )
+			for (const t of termsList)
 			{
-				map.set( t.slug, t.name )
-				if ( t.children && t.children.length )
+				map.set(t.slug, t.name)
+				if (t.children && t.children.length)
 				{
-					addToMap( t.children )
+					addToMap(t.children)
 				}
 			}
 		}
-		addToMap( terms )
+		addToMap(terms)
 	}
 
-	public async fetchTerms( type: TaxonomyType ): Promise<void>
+	public async fetchTerms(type: TaxonomyType): Promise<void>
 	{
-		if ( !typia.is<TaxonomyType>( type ) ) return;
-		this.loading[ this.getGroupFromType( type ) ] = true
-		this.error[ this.getGroupFromType( type ) ] = null
+		if (!typia.is<TaxonomyType>(type)) return;
+		this.loading[ this.getGroupFromType(type) ] = true
+		this.error[ this.getGroupFromType(type) ] = null
 		let keyAPI: keyof TaxonomyTermsResponse
-		switch ( type )
+		switch (type)
 		{
 			case 'lokasi_pekerjaan':
 				keyAPI = 'lokasiTerms'
@@ -95,29 +95,29 @@ class TaxonomyManager
 				keyAPI = 'pendidikanTerms'
 				break
 			default:
-				throw new Error( `Unsupported taxonomy type: ${ type }` )
+				throw new Error(`Unsupported taxonomy type: ${type}`)
 		}
 
 		try
 		{
-			const data = await APIServiceBrowser.fetchTaxonomyTermsByTypeGraphQL( keyAPI )
-			this.terms[ this.getGroupFromType( type ) ] = data
-			this.loaded[ this.getGroupFromType( type ) ] = true
-			this.buildSlugMap( type, data )
-		} catch ( err )
+			const data = await APIServiceBrowser.fetchTaxonomyTermsByTypeGraphQL(keyAPI)
+			this.terms[ this.getGroupFromType(type) ] = data
+			this.loaded[ this.getGroupFromType(type) ] = true
+			this.buildSlugMap(type, data)
+		} catch (err)
 		{
-			this.error[ this.getGroupFromType( type ) ] = err instanceof Error ? err.message : `Failed to fetch ${ keyAPI }`
-			this.loaded[ this.getGroupFromType( type ) ] = false
+			this.error[ this.getGroupFromType(type) ] = err instanceof Error ? err.message : `Failed to fetch ${keyAPI}`
+			this.loaded[ this.getGroupFromType(type) ] = false
 		} finally
 		{
-			this.loading[ this.getGroupFromType( type ) ] = false
+			this.loading[ this.getGroupFromType(type) ] = false
 		}
 	}
 
-	public getTermNameBySlug( type: TaxonomyType, slug: string ): string
+	public getTermNameBySlug(type: TaxonomyType, slug: string): string
 	{
-		const map = this.slugMaps[ this.getGroupFromType( type ) ]
-		return map.get( slug ) ?? slug
+		const map = this.slugMaps[ this.getGroupFromType(type) ]
+		return map.get(slug) ?? slug
 	}
 }
 

@@ -1,15 +1,18 @@
 <script lang="ts">
-  import { generalJobStore } from "@/lib/stores/GeneralJob.svelte";
   import { onMount } from "svelte";
   import { goto } from "$app/navigation";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
-  import JobStatusBadge from "@components/ui/Shared/JobStatusBadge.svelte";
-  import JobDeadlineBadge from "@components/ui/Shared/JobDeadlineBadge.svelte";
-  import { isMobile } from "$lib/utils/window.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
-  import { UserTieSolid } from "svelte-awesome-icons";
-  import type { JobCardProps } from "@/types";
+  import {
+    CalendarSolid,
+    ExclamationTriangleSolid,
+    ThumbTackSolid,
+    UserTieSolid,
+  } from "svelte-awesome-icons";
+  import type { DeadlineStatus, JobCardProps, StatusPekerjaanString } from "@/types";
+  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  import { showDeadline, showStatusJob, showSummaryJob, showTimeAgo } from "@/lib/composables/JobUI.svelte";
   interface Props {
     jobdata: JobCardProps["jobdata"];
     variant: JobCardProps["variant"];
@@ -29,32 +32,63 @@
     ) => void,
   }: Props = $props();
 
+  const isMobile = $derived(deviceDetector.isPlatformMobile);
+
   const selected = $derived.by(() => {
-    const slugMatch = routeStateStore.lastVisitedJob === jobdata?.slug;
+    const slugMatch = routeStateStore.lastVisitedJob.slug === jobdata?.slug;
     const expectedSource = variant;
-    const sourceMatch = routeStateStore.lastVisitedJobSource === expectedSource;
+    const sourceMatch = routeStateStore.lastVisitedJob.source === expectedSource;
     return slugMatch && sourceMatch;
   });
 
   // show spinner overlay when mobile navigating for the card currently selected by slug
   const spinnerVisible = $derived(
-    isMobile() && routeStore.isLoading && selected,
+    isMobile && routeStore.isLoading && selected,
   );
 
   // Derived UI helpers (keeps UI reactive to prop changes)
   const summaryRows = $derived(
-    generalJobStore.showSummaryJob(jobdata?.ringkasanPekerjaan),
+    showSummaryJob(jobdata?.ringkasanPekerjaan),
   );
   // showStatusJob now returns a single status string
-  const statusInfo = $derived(
-    generalJobStore.showStatusJob(jobdata?.status_pekerjaan ?? 0),
+  const statusInfo: StatusPekerjaanString | "" = $derived(
+    showStatusJob(jobdata?.status_pekerjaan ?? 0),
   );
-  const deadlineInfo = $derived(
-    generalJobStore.showDeadline(jobdata?.ringkasanPekerjaan?.deadline ?? ""),
+  const deadlineInfo: { text: string; status: DeadlineStatus } = $derived(
+    showDeadline(jobdata?.ringkasanPekerjaan?.deadline ?? ""),
   );
   const timeAgo = $derived(
-    generalJobStore.showTimeAgo(jobdata?.post_time ?? ""),
+    showTimeAgo(jobdata?.post_time ?? ""),
   );
+
+  const statusClass = $derived.by(() => {
+    switch (statusInfo) {
+      case "Urgent":
+        return "job-status-urgent";
+      case "Pinned":
+        return "job-status-pinned";
+      default:
+        return "";
+    }
+  });
+
+  const deadlineClass = $derived.by(() => {
+    switch (deadlineInfo.status) {
+      case "upcoming":
+        return "job-deadline-upcoming";
+      case "soon":
+        return "job-deadline-soon";
+      case "last_day":
+      case "today":
+        return "job-deadline-last-day";
+      case "expired_yesterday":
+        return "job-deadline-expired-yesterday";
+      case "expired":
+        return "job-deadline-expired";
+      default:
+        return "";
+    }
+  });
 
   const cardClass = $derived(
     `card-base-${variant}${selected ? ` card-selected-${variant}` : ""}`,
@@ -74,7 +108,7 @@
       return;
     }
 
-    if (isMobile()) {
+    if (isMobile) {
       event.preventDefault();
       if (permalink)
         void goto(new URL(permalink, window.location.origin).pathname);
@@ -152,12 +186,27 @@
       <div class="divider my-2"></div>
 
       <div class="flex items-start justify-between font-semibold gap-3">
-        <JobStatusBadge status={statusInfo} />
+        {#if statusInfo}
+          <span
+            class={`flex items-center badge gap-1 px-3 py-1 font-semibold rounded ${statusClass}`}
+          >
+            {#if statusInfo === "Urgent"}
+              <ExclamationTriangleSolid class="h-4 w-4" aria-hidden="true" />
+            {:else if statusInfo === "Pinned"}
+              <ThumbTackSolid class="h-4 w-4" aria-hidden="true" />
+            {/if}
+            <span>{statusInfo}</span>
+          </span>
+        {/if}
 
-        <JobDeadlineBadge
-          text={deadlineInfo.text}
-          status={deadlineInfo.status}
-        />
+        {#if deadlineInfo.text}
+          <span
+            class={`flex badge gap-1 px-3 py-1 font-semibold rounded ${deadlineClass}`}
+          >
+            <CalendarSolid class="h-4 w-4" aria-hidden="true" />
+            <span>{deadlineInfo.text}</span>
+          </span>
+        {/if}
         <div class="flex items-center gap-1 ml-auto">
           {#if variant !== "bookmark"}
             <BookmarkButton jobId={Number(jobdata?.id)} {variant} />
@@ -208,5 +257,33 @@
   .card-body-featured,
   .card-body-bookmark {
     @apply card-body relative p-4 gap-1 flex flex-col h-full;
+  }
+
+  .job-status-urgent {
+    @apply bg-red-600 text-white border border-red-700 shadow-sm text-xs;
+  }
+
+  .job-status-pinned {
+    @apply bg-yellow-400 text-black border border-yellow-600 shadow-sm text-xs;
+  }
+
+  .job-deadline-upcoming {
+    @apply bg-blue-600 text-white border border-blue-800 text-xs;
+  }
+
+  .job-deadline-soon {
+    @apply bg-yellow-400 text-black border border-yellow-600 text-xs;
+  }
+
+  .job-deadline-last-day {
+    @apply bg-red-600 text-white border border-red-800 text-xs;
+  }
+
+  .job-deadline-expired-yesterday {
+    @apply bg-gray-500 text-white border border-gray-700 text-xs;
+  }
+
+  .job-deadline-expired {
+    @apply bg-gray-400 text-black border border-gray-700 text-xs;
   }
 </style>

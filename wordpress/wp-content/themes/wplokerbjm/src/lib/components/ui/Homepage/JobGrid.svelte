@@ -8,15 +8,30 @@
   } from "@/types";
   import { goto } from "$app/navigation";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
-  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
-  import { searchStore } from "$lib/stores/Search.svelte";
+  import { jobListingStore } from "$lib/stores/JobListingStore.svelte";
   import { APIServiceBrowser } from "@/services/graphql/APIService";
+  import { withTimeout } from "es-toolkit";
   import { SearchUtils } from "@/utils/search";
-  import { isMobile } from "$lib/utils/window.svelte";
-  import { useVirtualization } from "@/lib/utils/virtualization.svelte";
+  import { useVirtualization } from "@/lib/features/Virtualization.svelte";
   import { scrollY, innerHeight } from "svelte/reactivity/window";
   import { browser } from "$app/environment";
+  import { useSidePanel } from "$lib/composables/SidePanel.svelte";
+  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
 
+  const isMobile = $derived(deviceDetector.isPlatformMobile);
+  const displayJobs = $derived(jobListingStore.jobs);
+  const loading = $derived(jobListingStore.loading);
+  const hasMore = $derived(jobListingStore.hasMore);
+  const displayTotalJobs = $derived(jobListingStore.totalJobs);
+  const displayTitle = $derived(jobListingStore.title);
+
+  // virtualization parameters
+  const FALLBACK_ITEM_HEIGHT = 420;
+  const fallbackGap = 24;
+  const buffer = 3;
+  const currentHeightY = $derived(scrollY.current);
+  const innerHeightValue = $derived(innerHeight.current);
+  const cardHeightsJobCard = routeStateStore.getCardHeights("jobGrid");
   /**
    * Decide navigation behavior when a job card is clicked, either opening the overlay (desktop) or navigating to the job detail page (mobile). Also handles saving the current grid state before navigation to allow for proper restoration when coming back. The separation of mobile and desktop logic ensures an optimized experience for each device type while maintaining state consistency across navigations.
    */
@@ -40,17 +55,15 @@
       // Mobile navigation goes to SingleLowongan.svelte route
 
       // Save card heights before navigating/opening overlay
-      routeStateStore.saveCardHeights(searchStore.jobGridCardHeight, "jobGrid");
+      routeStateStore.saveCardHeights(cardHeightsJobCard, "jobGrid");
 
-      if (!isMobile()) {
+      if (!isMobile) {
         jobGridManager.saveGridStates(
           new URL(String(job.permalink), window.location.origin).pathname,
         ); // save state with the target path so it can be restored in sidepanel context
 
-        jobOverlayManager?.openOverlay(job.slug ?? "", job, "featured", {
-          gotoCB() {
-            jobOverlayManager?.scrollToCard(job.slug ?? "", true, "featured");
-          },
+        useSidePanel.openSidePanel(job.slug ?? "", job, "featured", () => {
+          useSidePanel.scrollToJobGridCard(job.slug ?? "", true, "featured");
         });
       } else {
         this.MobileJobClick(job);
@@ -63,6 +76,7 @@
     public nextPageLoadMoreCache = $state<CardJob[] | null>(null);
     public isPrefetchingLoadMore = $state(false);
     public isRefreshing = $state(false);
+    public errorMessage = $state<string | null>(null);
 
     public async refreshGrid(): Promise<
       JobGridProps | SearchResponse | undefined
@@ -70,7 +84,7 @@
       try {
         if (this.isRefreshing) return;
         this.isRefreshing = true;
-        return await searchStore.refreshJobGrid();
+        return await jobListingStore.refreshJobGrid();
       } catch (err) {
         console.error("Failed to refresh job grid:", err);
       } finally {
@@ -83,16 +97,21 @@
      * Refresh button initialized in the UI to allow users to manually refresh the grid when they want to see updated results without changing filters or search terms
      */
     public async loadMore(retries = 2): Promise<LoadMoreResponse> {
-      if (searchStore.loading || searchStore.page >= searchStore.maxNumPages!) {
+      if (
+        jobListingStore.loading ||
+        jobListingStore.page >= jobListingStore.maxNumPages!
+      ) {
         throw new Error("Cannot load more: already loading or no more pages");
       }
 
-      searchStore.loading = true;
-      searchStore.error = null;
+      jobListingStore.loading = true;
+      jobListingStore.error = null;
       try {
-        const paged = searchStore.page + 1;
-        const context = searchStore.context;
-        const filters = SearchUtils.sanitizeFilters({ ...searchStore.filters });
+        const paged = jobListingStore.page + 1;
+        const context = jobListingStore.context;
+        const filters = SearchUtils.sanitizeFilters({
+          ...jobListingStore.filters,
+        });
 
         const loadMoreFilters = {
           paged,
@@ -106,32 +125,33 @@
         if (Array.isArray(response.jobs) && response.jobs.length) {
           const newJobs = response.jobs.filter(
             (newJob) =>
-              !searchStore.jobs.some(
+              !jobListingStore.jobs.some(
                 (existingJob) => existingJob.permalink === newJob.permalink,
               ),
           );
-          searchStore.jobs.push(...newJobs);
-          searchStore.page = paged;
-          searchStore.maxNumPages =
-            response.maxNumPages || searchStore.maxNumPages;
+          jobListingStore.jobs.push(...newJobs);
+          jobListingStore.page = paged;
+          jobListingStore.maxNumPages =
+            response.maxNumPages || jobListingStore.maxNumPages;
         } else {
-          searchStore.page = searchStore.maxNumPages!;
+          jobListingStore.page = jobListingStore.maxNumPages!;
         }
 
         return response;
       } catch (err) {
         console.error("SearchStore: Load more failed:", err);
-        searchStore.error =
+        jobListingStore.error =
           err instanceof Error ? err.message : "Load more failed";
 
         if (retries > 0) {
           console.log(`Retrying loadMore, attempts left: ${retries}`);
           return this.loadMore(retries - 1);
         }
-
+        this.errorMessage =
+          "Terjadi kesalahan saat memuat lebih banyak lowongan";
         throw err;
       } finally {
-        searchStore.loading = false;
+        jobListingStore.loading = false;
       }
     }
 
@@ -140,26 +160,28 @@
         return;
       }
 
-      searchStore.jobs.push(...this.nextPageLoadMoreCache);
-      searchStore.page++;
+      jobListingStore.jobs.push(...this.nextPageLoadMoreCache);
+      jobListingStore.page++;
       this.nextPageLoadMoreCache = null;
     }
 
     public async prefetchNextPage(): Promise<void> {
       if (
         this.isPrefetchingLoadMore ||
-        searchStore.page >= searchStore.maxNumPages! ||
+        jobListingStore.page >= jobListingStore.maxNumPages! ||
         this.nextPageLoadMoreCache
       ) {
         return;
       }
 
       this.isPrefetchingLoadMore = true;
-      searchStore.error = null;
+      jobListingStore.error = null;
 
-      const paged = searchStore.page + 1;
-      const context = searchStore.context;
-      const filters = SearchUtils.sanitizeFilters({ ...searchStore.filters });
+      const paged = jobListingStore.page + 1;
+      const context = jobListingStore.context;
+      const filters = SearchUtils.sanitizeFilters({
+        ...jobListingStore.filters,
+      });
 
       const loadMoreFilters = {
         paged,
@@ -170,45 +192,48 @@
       const TIMEOUT_MS = 6000;
 
       try {
-        const apiPromise =
-          APIServiceBrowser.loadMoreJobsGraphQL(loadMoreFilters);
-        const timeoutPromise = new Promise<{ __timedOut: true }>((resolve) =>
-          setTimeout(() => {
-            resolve({ __timedOut: true });
-          }, TIMEOUT_MS),
-        );
-
-        const raceResult = (await Promise.race([
-          apiPromise,
-          timeoutPromise,
-        ])) as LoadMoreResponse | { __timedOut: true };
-
+        // Use es-toolkit's withTimeout to avoid manual Promise.race and clearer semantics
         let response: LoadMoreResponse | undefined;
 
-        if ("__timedOut" in raceResult) {
-          console.warn(
-            "SearchStore: Prefetch timed out, performing manual fetch",
+        try {
+          response = await withTimeout(
+            () => APIServiceBrowser.loadMoreJobsGraphQL(loadMoreFilters),
+            TIMEOUT_MS,
           );
-          response = await APIServiceBrowser.loadMoreJobsGraphQL(loadMoreFilters);
-        } else {
-          response = raceResult;
+        } catch (err) {
+          const isTimeout =
+            (err as Error)?.name === "TimeoutError" ||
+            String((err as Error)?.message ?? "")
+              .toLowerCase()
+              .includes("time");
+
+          if (isTimeout) {
+            console.warn(
+              "SearchStore: Prefetch timed out, performing manual fetch",
+            );
+            response =
+              await APIServiceBrowser.loadMoreJobsGraphQL(loadMoreFilters);
+          } else {
+            throw err;
+          }
         }
 
         if (response?.jobs && response.jobs.length) {
           const newJobs = response.jobs.filter(
             (newJob: any) =>
-              !searchStore.jobs.some(
+              !jobListingStore.jobs.some(
                 (existingJob) => existingJob.permalink === newJob.permalink,
               ),
           );
           this.nextPageLoadMoreCache = newJobs;
-          searchStore.maxNumPages = response.maxNumPages || searchStore.maxNumPages;
+          jobListingStore.maxNumPages =
+            response.maxNumPages || jobListingStore.maxNumPages;
         } else {
-          searchStore.page = searchStore.maxNumPages!;
+          jobListingStore.page = jobListingStore.maxNumPages!;
         }
       } catch (err) {
         console.error("SearchStore: Prefetch failed:", err);
-        searchStore.error =
+        jobListingStore.error =
           err instanceof Error ? err.message : "Prefetch failed";
       } finally {
         this.isPrefetchingLoadMore = false;
@@ -225,25 +250,24 @@
         const saved = routeStateStore.getSearchState(routePath);
         if (saved) {
           if (Array.isArray(saved.jobs) && saved.jobs.length) {
-            searchStore.jobs = [...saved.jobs];
+            jobListingStore.jobs = [...saved.jobs];
           }
-          if (saved.filters) searchStore.filters = saved.filters;
-          if (typeof saved.page === "number") searchStore.page = saved.page;
+          if (saved.filters) jobListingStore.filters = saved.filters;
+          if (typeof saved.page === "number") jobListingStore.page = saved.page;
           if (typeof saved.maxNumPages === "number")
-            searchStore.maxNumPages = saved.maxNumPages;
-          if (saved.title) searchStore.title = saved.title || searchStore.title;
+            jobListingStore.maxNumPages = saved.maxNumPages;
+          if (saved.title)
+            jobListingStore.title = saved.title || jobListingStore.title;
           if (saved.context)
-            searchStore.context = saved.context || searchStore.context;
+            jobListingStore.context = saved.context || jobListingStore.context;
           if (typeof saved.totalJobs === "number")
-            searchStore.totalJobs = saved.totalJobs;
+            jobListingStore.totalJobs = saved.totalJobs;
         }
 
         if (routeStore.isInitialLoad) {
           tick().then(() => {
             requestAnimationFrame(() =>
-              requestAnimationFrame(() =>
-                routeStateStore.restoreScrollPosition(routePath),
-              ),
+              useRIC(() => routeStateStore.restoreScrollPosition(routePath)),
             );
 
             setTimeout(() => {
@@ -256,17 +280,17 @@
       }
     }
 
-    saveGridStates(path?: string): void {
+    public saveGridStates(path?: string): void {
       const routePath = path || "/";
       try {
         const state: SearchState = {
-          jobs: searchStore.jobs || [],
-          filters: searchStore.filters || {},
-          page: searchStore.page || 1,
-          title: searchStore.title || "Lowongan Terbaru",
-          context: searchStore.context || "latest",
-          totalJobs: searchStore.totalJobs || 0,
-          maxNumPages: searchStore.maxNumPages || 1,
+          jobs: jobListingStore.jobs || [],
+          filters: jobListingStore.filters || {},
+          page: jobListingStore.page || 1,
+          title: jobListingStore.title || "Lowongan Terbaru",
+          context: jobListingStore.context || "latest",
+          totalJobs: jobListingStore.totalJobs || 0,
+          maxNumPages: jobListingStore.maxNumPages || 1,
         };
         routeStateStore.saveSearchState(routePath, state);
 
@@ -284,26 +308,13 @@
 <script lang="ts">
   import type { Attachment } from "svelte/attachments";
   import JobCard from "@components/ui/Shared/JobCard.svelte";
-  import SingleOverlay from "@components/ui/Homepage/SingleOverlay.svelte";
+  import SingleSidePanel from "@components/ui/Homepage/JobGrid/SingleSidePanel.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { onMount, tick } from "svelte";
+  import { useRIC } from "@/lib/utils/window.svelte";
 
   const props: JobGridProps = $props();
-
-  const displayJobs = $derived(searchStore.jobs);
-  const loading = $derived(searchStore.loading);
-  const hasMore = $derived(searchStore.hasMore);
-  const displayTotalJobs = $derived(searchStore.totalJobs);
-  const displayTitle = $derived(searchStore.title);
-
-  // virtualization parameters
-  const FALLBACK_ITEM_HEIGHT = 420;
-  const fallbackGap = 32;
-  const buffer = 6;
-  const currentHeightY = $derived(scrollY.current);
-  const innerHeightValue = $derived(innerHeight.current);
-  const cardHeightsJobCard = $derived(searchStore.jobGridCardHeight);
 
   const {
     jobs = [],
@@ -329,6 +340,7 @@
   const observeLoadMoreSentinel: Attachment<HTMLElement> | undefined = (() => {
     if (!browser) return;
     let observerSentinel: IntersectionObserver;
+
     return (node: Element) => {
       observerSentinel ??= new IntersectionObserver(
         async (entries) => {
@@ -361,14 +373,14 @@
    */
   (() => {
     if (!jobs || jobs.length === 0 || !routeStore.isInitialLoad) return;
-    searchStore.jobs = [...jobs];
+    jobListingStore.jobs = [...jobs];
     if (typeof maxNumPages === "number" && maxNumPages > 0) {
-      searchStore.maxNumPages = maxNumPages;
+      jobListingStore.maxNumPages = maxNumPages;
     }
-    if (context) searchStore.context = context;
-    if (title) searchStore.title = title;
-    if (totalJobs !== undefined) searchStore.totalJobs = totalJobs;
-    if (filters) searchStore.setFilters(filters);
+    if (context) jobListingStore.context = context;
+    if (title) jobListingStore.title = title;
+    if (totalJobs !== undefined) jobListingStore.totalJobs = totalJobs;
+    if (filters) jobListingStore.setFilters(filters);
   })();
 
   onMount(() => {
@@ -379,7 +391,7 @@
 <section
   class="relative mt-12"
   id="job-grid"
-  style={!isMobile() ? "view-transition-name: none;" : ""}
+  style={!isMobile ? "view-transition-name: none;" : ""}
 >
   <div class="flex items-center justify-between mb-6">
     {#if displayJobs.length}
@@ -398,9 +410,7 @@
     >
       <RefreshSpinner size="h-5 w-5" spin={jobGridManager.isRefreshing} />
       <span class="sr-only"
-        >{jobGridManager.isRefreshing
-          ? "Sedang menyegarkan"
-          : "Segarkan"}</span
+        >{jobGridManager.isRefreshing ? "Sedang menyegarkan" : "Segarkan"}</span
       >
     </button>
   </div>
@@ -413,7 +423,7 @@
       <LoadingSpinner srLabel="Memuat grid..." size="md" />
     </div>
   {:else}
-    {#if displayJobs.length && searchStore.context !== "latest"}
+    {#if displayJobs.length && jobListingStore.context !== "latest"}
       <div class="text-base font-medium mb-4">
         {displayTotalJobs} lowongan ditemukan
       </div>
@@ -426,7 +436,7 @@
             <div
               style="height: {virtualization.totalHeight}px; position: relative;"
             >
-              {#each virtualization.visibleJobs as job, index (job.permalink)}
+              {#each virtualization.visibleJobs as job, index}
                 {@const absoluteTop =
                   virtualization.itemPositions[
                     virtualization.startIndex + index
@@ -464,7 +474,7 @@
                 style="position: absolute; left:0; width:1px; height:1px; transform: translate3d(0, {Math.max(
                   0,
                   (virtualization.totalHeight || 0) - 1,
-                )}px, 0); pointer-events:none; opacity:0; contain: layout size;"
+                )}px, 0); pointer-events:none; opacity:0;"
                 aria-hidden="true"
               ></div>
             </div>
@@ -502,7 +512,7 @@
             >
               {jobGridManager.nextPageLoadMoreCache
                 ? "Muat Lebih Banyak"
-                : "Mempersiapkan..."}
+                : (jobGridManager.errorMessage ?? "Mempersiapkan...")}
             </button>
           </div>
         {/if}
@@ -518,12 +528,12 @@
         {/if}
       </div>
 
-      {#if !isMobile()}
+      {#if !isMobile}
         <div
           class="sticky self-start w-full"
           style:top="var(--site-header-height, 0px)"
         >
-          <SingleOverlay />
+          <SingleSidePanel />
         </div>
       {/if}
     </div>

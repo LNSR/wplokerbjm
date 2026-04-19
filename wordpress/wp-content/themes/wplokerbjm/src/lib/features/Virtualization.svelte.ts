@@ -6,7 +6,7 @@ import { LRUCache } from "lru-cache";
  * Represents the state of a virtualized list, including visible items and positioning data.
  * This interface is used to manage the rendering of large lists efficiently by only showing items in view.
  */
-export interface ListVirtualizationState<T = any>
+export interface ListVirtualizationState<T>
 {
     /** Array of jobs that are currently visible */
     visibleJobs: T[];
@@ -24,7 +24,7 @@ export interface ListVirtualizationState<T = any>
  * Options for configuring the list virtualization computation.
  * These parameters control how the virtualized list behaves, including scroll position, container size, and item measurements.
  */
-export type ListOptions<T = any> = {
+export type ListOptions<T> = {
     /** Array of jobs to be displayed in the list */
     displayJobs: T[];
     /** Current vertical scroll position */
@@ -32,7 +32,7 @@ export type ListOptions<T = any> = {
     /** Height of the container */
     containerHeight: number;
     /** Map of job ID to measured card height */
-    cardHeights: Map<number, number>;
+    cardHeights: SvelteMap<number, number>;
     /** Fallback height for items that haven't been measured yet */
     fallbackHeight?: number;
     /** fallback Gap between items */
@@ -48,16 +48,16 @@ interface CachedListLayout
 }
 
 /**
- * Service for handling list virtualization logic.
+ * listing virtualization.
  * This class computes which items should be visible based on scroll position and container size,
  * using caching and binary search for performance. Note: Window-based virtualization with infinite scroll
  * inherently contributes to Cumulative Layout Shift (CLS) due to dynamic content loading, which is a limitation
  * of the web model and not addressed here.
  */
-class VirtualizationService
+class Virtualization
 {
     private readonly listLayoutCache = new LRUCache<string, CachedListLayout>({
-        max: 100,
+        max: 200,
     });
 
     private readonly displayJobsIds = new WeakMap<object, number>();
@@ -76,12 +76,12 @@ class VirtualizationService
         return nextId;
     }
 
-    private getCardHeightsVersion(cardHeights: Map<number, number>): number
+    private getCardHeightsVersion(cardHeights: SvelteMap<number, number>): number
     {
         return this.cardHeightsVersions.get(cardHeights as object) ?? 0;
     }
 
-    public invalidateCardHeightsCache(cardHeights: Map<number, number>): void
+    public invalidateCardHeightsCache(cardHeights: SvelteMap<number, number>): void
     {
         const currentVersion = this.getCardHeightsVersion(cardHeights);
         this.cardHeightsVersions.set(cardHeights as object, currentVersion + 1);
@@ -131,7 +131,7 @@ class VirtualizationService
             containerHeight,
             cardHeights,
             fallbackHeight = 200,
-            gap: gap = 12,
+            gap = 12,
             buffer = 12,
         } = opts;
 
@@ -263,7 +263,6 @@ class VirtualizationService
 
     /**
      * Creates a height measurement attachment for virtualized items.
-     * Also handle gap between cards in fact
      * This function measures the height of DOM elements and updates the cardHeights map,
      * triggering reactivity for virtualization calculations.
      * @param cardHeights - The SvelteMap to store measured heights
@@ -307,8 +306,6 @@ class VirtualizationService
 
             updateHeight();
 
-            const timeoutId = setTimeout(updateHeight, 500);
-
             return () =>
             {
                 if (typeof jobId === 'number')
@@ -323,11 +320,9 @@ class VirtualizationService
                         this.resizeObserverRegistry.delete(cardHeights);
                     }
                 }
-
-                clearTimeout(timeoutId);
             };
         };
     }
 }
 
-export const useVirtualization = new VirtualizationService();
+export const useVirtualization = new Virtualization();

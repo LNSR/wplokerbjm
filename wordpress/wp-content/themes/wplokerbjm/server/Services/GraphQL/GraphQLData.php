@@ -177,8 +177,8 @@ class GraphQLData
     }
 
     /**
-     * Return an ItemList schema id for post ID
-     * @param int $post_id
+     * Return an ItemList schema id for post IDs
+     * @param array<int> $post_ids
      * @return array
      */
     public function ItemListJobPostings(array $post_ids): array

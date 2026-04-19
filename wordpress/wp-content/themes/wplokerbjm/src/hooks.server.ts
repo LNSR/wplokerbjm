@@ -52,6 +52,10 @@ class hooksHelper
 
 export const handle: Handle = async ( { event, resolve } ) =>
 {
+  if ( event.url.pathname.startsWith( "/.well-known/acme-challenge/" ) )
+  {
+    return resolve( event ); // bypass all custom logic for ACME challenge requests to allow Let's Encrypt to verify domain ownership
+  }
 
   const originalFetch = event.fetch;
   let response: Response;

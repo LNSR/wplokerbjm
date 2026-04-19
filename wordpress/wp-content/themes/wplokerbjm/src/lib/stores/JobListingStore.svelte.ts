@@ -9,18 +9,15 @@ import type {
     SearchTitle,
 } from '@/types'
 import { SearchUtils } from '@/utils/search';
-import { SvelteMap } from 'svelte/reactivity';
-import { routeStateStore } from './Route.svelte';
-import { useVirtualization } from '@/lib/utils/virtualization.svelte';
+import { routeStateStore } from '$lib/stores/Route.svelte';
 /**
- * 
+ * Handle state and actions related to job search and job grid display.
+ * Both components need each other to function properly, so they are combined into a single store for better state management
  */
-export class SearchManager
+class JobListingStore
 {
     // State
     private searchHistory = $state<string[]>([])
-    public jobGridCardHeight = new SvelteMap(routeStateStore.getCardHeights("jobGrid"));
-
     public jobs = $state<CardJob[]>([])
     public context = $state<SearchContext>("latest") // default context at initial load for jobgrid
     public title = $state<SearchTitle>("Lowongan Terbaru") // default context at initial load for jobgrid
@@ -63,13 +60,6 @@ export class SearchManager
         return this.page < this.maxNumPages!
     }
 
-    // Specific to job grid, can be used by other contexts if needed
-    public clearJobGridCardHeights(): void
-    {
-        this.jobGridCardHeight.clear();
-        useVirtualization.invalidateCardHeightsCache(this.jobGridCardHeight);
-        routeStateStore.clearCardHeights("jobGrid");
-    }
 
     // Actions
     public setFilters(newFilters: Partial<SearchFilters>): void
@@ -107,10 +97,14 @@ export class SearchManager
         }
     }
 
+    /**
+     * Execute a job search based on the current filters
+     */
     public async searchJobs(): Promise<SearchResponse>
     {
         this.loading = true
         this.error = null
+        routeStateStore.clearCardHeights("jobGrid");
         try
         {
             const cleaned = SearchUtils.sanitizeFilters({ ...this.filters })
@@ -139,7 +133,7 @@ export class SearchManager
     public async refreshJobGrid(): Promise<JobGridProps | SearchResponse>
     {
         let response: JobGridProps | SearchResponse
-        this.clearJobGridCardHeights()
+        routeStateStore.clearCardHeights("jobGrid");
         try
         {
             if (this.context === "search")
@@ -175,4 +169,4 @@ export class SearchManager
         }
     }
 }
-export const searchStore = new SearchManager();
+export const jobListingStore = new JobListingStore();
