@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
 import { error } from '@sveltejs/kit';
-import { APIServiceServer, APIServiceShared } from "@/services/APIService";
+import { APIServiceServer, APIServiceShared } from "@/services/graphql/APIService";
 import { getCmsOrigin } from "@/utils/environment";
 import { schemaScriptAttach } from "$lib/server/utils/scripts.server";
 export const load: PageServerLoad = async ( { params, locals, url, fetch } ) =>

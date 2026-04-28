@@ -10,9 +10,11 @@ type OptionalJobFilters = JobFilterTaxonomy & {
 }
 
 export type JobFilterTaxonomy = Partial<Record<TaxonomyType, string[] | null | undefined>>;
+export type TaxonomyGroup = Exclude<TaxonomyType, 'lokasi_pekerjaan'> | 'lokasi'; // Map internal WP 'lokasi_pekerjaan' to 'lokasi' for internal grouping
 
 // Base filters for search operations
-export interface SearchFilters extends OptionalJobFilters {
+export interface SearchFilters extends OptionalJobFilters
+{
   cari: string | null
   sort: SortOption | null
 }
@@ -23,22 +25,25 @@ export type SearchContext = 'search' | 'latest'
 export type SearchTitle = 'Lowongan Terbaru' | 'Hasil Pencarian'
 
 // Response for pagination operations
-export interface LoadMoreResponse extends BaseJobSearch { }
+export type LoadMoreResponse = BaseJobSearch
 
 // Simplified load more filters - flattened structure
-export interface LoadMoreFilters extends OptionalJobFilters {
+export interface LoadMoreFilters extends OptionalJobFilters
+{
   paged: number
 }
 
 // Filters for fetching job grid data
-export interface JobGridFilters extends OptionalJobFilters {
+export interface JobGridFilters extends OptionalJobFilters
+{
   paged?: number
   title?: string
   total_jobs?: number
 }
 
 // Standardized taxonomy term interface
-export interface TaxonomyTerm extends Pick<WPTaxonomyTerm, 'slug' | 'name' | 'parent'> {
+export interface TaxonomyTerm extends Pick<WPTaxonomyTerm, 'slug' | 'name' | 'parent'>
+{
   children?: TaxonomyTerm[]
 }
 

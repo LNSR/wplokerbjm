@@ -1,17 +1,16 @@
 import type { SearchTitle, SearchContext, SearchFilters } from './Search';
 import type { CardJob } from './Shared';
 import type { Component } from 'svelte';
-export interface LayoutProps {
-  logo: string;
-}
 
-export interface ComponentConfig {
+export interface ComponentConfig
+{
   selector: string;
   component: Component | Promise<Component>;
 }
 
 
-export interface SocialMediaItem {
+export interface SocialMediaItem
+{
   platform: string;
   username?: string;
   icon?: Component;
@@ -20,21 +19,26 @@ export interface SocialMediaItem {
 }
 
 // Props for the JobCard component (shared type)
-export interface JobCardProps {
+export interface JobCardProps
+{
   jobdata?: CardJob;
   variant?: 'featured' | 'carousel' | 'bookmark' | 'detail';
 }
 
-export interface JobGridProps {
+export interface JobGridProps
+{
   jobs?: CardJob[];
   maxNumPages?: number;
   context?: SearchContext;
   filters?: Partial<SearchFilters>;
   title?: SearchTitle;
   total?: number;
-} 
+}
 
-export interface CarouselProps {
+export interface CarouselProps
+{
   jobs: CardJob[];
   totalJobs?: number;
 }
+
+export type DeadlineStatus = 'upcoming' | 'soon' | 'last_day' | 'expired_yesterday' | 'expired' | 'today' | 'unknown';

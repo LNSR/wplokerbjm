@@ -29,6 +29,7 @@ Output dari skill ini harus memberikan konten yang digunakan pada field berikut
 
 1. **`title`**
    - Judul lowongan (contoh: `Barista & Kitchen`, `Operator Produksi`, `Office Admin`)
+   - Gunakan `|` sebagai separator jika ada beberapa posisi dalam flyer (contoh: `Crew & Kasir | Warung Bakso`)
 
 2. **`nama_perusahaan`** *(formal)*
    - Nama resmi / brand lengkap (misal: `PT Next Carwash Indonesia`, `Ketemu Studio`, `Everyday Vacuum`)

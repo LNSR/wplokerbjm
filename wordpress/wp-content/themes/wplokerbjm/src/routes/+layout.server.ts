@@ -1,5 +1,5 @@
 import type { LayoutServerLoad } from "./$types";
-import { APIServiceServer } from "@/services/APIService";
+import { APIServiceServer } from "@/services/graphql/APIService";
 import type { WPLokerBJMThemedData } from "@/types";
 import { getCmsOrigin } from "@/utils/environment";
 import { inlineScript } from "$lib/server/utils/scripts.server";

@@ -7,8 +7,8 @@
   import type { CarouselProps, JobGridProps } from "@/types";
   const props: {
     data: {
-      carousel?: CarouselProps;
-      jobGrid?: JobGridProps;
+      carousel: CarouselProps;
+      jobGrid: JobGridProps;
       itemListSchemaScript?: string;
     };
   } = $props();

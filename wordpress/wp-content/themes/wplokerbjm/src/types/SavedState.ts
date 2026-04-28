@@ -13,3 +13,5 @@ export interface SearchState {
 export interface CarouselState {
   slideIndex: number
 }
+
+export type CardHeightKey = "jobGrid" | "bookmarkModal";

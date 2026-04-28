@@ -1,6 +1,6 @@
-import { graphql } from 'gql.tada';
+import { graphql } from "@/services/graphql/config/tada";
 
-const FRAGMENT_JOB_SUMMARY_FIELDS = graphql(`
+export const FRAGMENT_JOB_SUMMARY_FIELDS = graphql(`
   fragment JobSummaryField on JobSummary {
     jenis_pekerjaan
     pendidikan
@@ -15,7 +15,7 @@ const FRAGMENT_JOB_SUMMARY_FIELDS = graphql(`
   }
 `);
 
-const FRAGMENT_JOB_FILTER_FIELDS = graphql(`
+export const FRAGMENT_JOB_FILTER_FIELDS = graphql(`
   fragment JobFilterFields on JobFilters {
     cari
     lokasi_pekerjaan

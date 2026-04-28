@@ -2,40 +2,37 @@
   "extends": "./.svelte-kit/tsconfig.json",
   "compilerOptions": {
     "rewriteRelativeImportExtensions": true,
+    "assumeChangesOnlyAffectDirectDependencies": true,
     "allowJs": false,
+    "module": "preserve",
+    "target": "esnext",
     "checkJs": false,
     "esModuleInterop": true,
+    "incremental": true,
     "noUncheckedSideEffectImports": false,
     "forceConsistentCasingInFileNames": true,
     "resolveJsonModule": true,
     "noImplicitAny": true,
+    "strictNullChecks": true,
     "verbatimModuleSyntax": true,
     "skipLibCheck": true,
     "sourceMap": true,
     "strict": true,
     "disableSizeLimit": true,
     "moduleResolution": "bundler",
-    "types": [
-      "node",
-      "bun",
-      "@cloudflare/workers-types"
-    ],
+    "types": ["node", "bun", "@cloudflare/workers-types", "es-toolkit"],
     "plugins": [
+      {
+        "transform": "typia/lib/transform"
+      },
       {
         "name": "gql.tada/ts-plugin",
         "schema": "./schema.graphql",
         "tadaOutputLocation": "./src/graphql-env.d.ts",
         "tadaTurboLocation": "./src/graphql-env-cache.d.ts",
         "shouldCheckForColocatedFragments": false,
-        "scalars": {
-          "JSON": "string"
-        },
         "trackFieldUsage": false
-      },
-      {
-        "transform": "typia/lib/transform"
       }
-    ],
-    "strictNullChecks": true
+    ]
   }
 }

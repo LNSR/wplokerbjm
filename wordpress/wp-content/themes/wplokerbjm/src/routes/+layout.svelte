@@ -4,12 +4,14 @@
   import Header from "$lib/components/layouts/Header.svelte";
   import Footer from "$lib/components/layouts/Footer.svelte";
   import FloatingActionButton from "$lib/components/ui/Shared/FloatingActionButton.svelte";
-  import { onMount, type Snippet } from "svelte";
+  import { type Snippet } from "svelte";
   import { afterNavigate, onNavigate, beforeNavigate } from "$app/navigation";
-  import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
+  import { routeStore } from "$lib/stores/Route.svelte";
   import { updated } from "$app/state";
   import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
   import type { OnNavigate } from "@sveltejs/kit";
+  import { headerManager } from "$lib/components/layouts/Header.svelte";
+  import { deviceDetector, type DeviceDetectorInternal } from "$lib/features/DeviceDetector.svelte";
 
   let initialPageviewSent = false;
 
@@ -20,23 +22,24 @@
     children: Snippet;
     data: {
       themeData: WPLokerBJMThemedData;
-      deviceType?: App.PageData["deviceType"];
       rankMathHead?: Partial<RankMathHeadData> | string;
       inlineScript?: string;
+      deviceType: DevicePayload;
     };
   } = $props();
 
-  const { themeData, rankMathHead, inlineScript } = $derived({
+  const { themeData, rankMathHead, inlineScript, deviceType } = $derived({
     themeData: data?.themeData,
     rankMathHead: data?.rankMathHead,
     inlineScript: data?.inlineScript,
+    deviceType: data?.deviceType,
   });
 
   beforeNavigate(({ to, willUnload }) => {
     try {
-      if (updated.current && !willUnload && to?.url) {
+      if (updated.current && !willUnload && to?.url)
         location.href = to.url.href;
-      }
+
       routeStore.setIsInitialLoad(false);
       routeStore.setIsLoading(true);
       routeStore.setIsTransitioningRoute(true);
@@ -53,11 +56,11 @@
       return;
 
     return new Promise((resolve, reject) => {
-      const transition = document.startViewTransition(() => {
-        resolve();
-      });
+      const transition = document.startViewTransition();
       try {
-        transition;
+        transition.ready.then(() => {
+          resolve();
+        });
       } catch (error) {
         console.error("Error during onNavigate:", error);
         reject(error);
@@ -76,36 +79,32 @@
   afterNavigate(() => {
     routeStore.setIsLoading(false);
     routeStore.setIsTransitioningRoute(false);
-    if (routeStore.isInitialLoad && !initialPageviewSent) {
-      GoogleServices.injectGTMScript()
-        .then(() => {
-          if (GoogleServices.gtmLoaded) {
-            GoogleServices.sendPageView();
-            initialPageviewSent = true;
-          }
-        })
-        .catch(() => {
-          console.error("Failed to inject GTM script on initial load");
-        });
-    } else {
-      if (GoogleServices.gtmLoaded) {
-        GoogleServices.sendPageView();
-      }
-    }
+    if (
+      !routeStore.isInitialLoad &&
+      initialPageviewSent &&
+      GoogleServices.gtmLoaded
+    )
+      return GoogleServices.sendPageView();
+
+    GoogleServices.injectGTMScript()
+      .then(() => {
+        if (GoogleServices.gtmLoaded) {
+          GoogleServices.sendPageView();
+          initialPageviewSent ||= true;
+        }
+      })
+      .catch(() => {
+        console.error("Failed to inject GTM script on initial load");
+      });
   });
 
-  onMount(() => {
-    routeStateStore.setInitialDevice = data?.deviceType?.isMobile
-      ? "mobile"
-      : "desktop";
-
-    const cleanupObserveBreakpointChanges =
-      routeStateStore.observeBreakpointChanges?.();
-
-    return () => {
-      cleanupObserveBreakpointChanges?.();
-    };
-  });
+  // IIFE to avoid closure Svelte warning; set initialDeviceSSR for DeviceDetector during SSR
+  (() => {
+    if (deviceType)
+      ((deviceDetector as DeviceDetectorInternal).initialDeviceSSR = deviceType.isMobile
+        ? "mobile"
+        : "desktop");
+  })();
 </script>
 
 <svelte:head>
@@ -121,7 +120,10 @@
 </svelte:head>
 
 <Header {themeData} />
-<div class="route-container pt-20">
+<div
+  class="route-container !pt-20"
+  style="--site-header-height: {headerManager.currentHeight}px; --site-scroll-padding-top: {headerManager.currentHeight}px; padding-top: {headerManager.currentHeight}px;"
+>
   <div class="page-transition">
     {@render children()}
   </div>

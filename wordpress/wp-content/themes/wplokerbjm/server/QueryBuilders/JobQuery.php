@@ -18,7 +18,7 @@ class JobQuery
 	 * Get WP_Query args for latest jobs.
 	 *
 	 * @param int $paged
-	 * @param int $per_page
+	 * @param int $posts_per_page
 	 * @return array
 	 */
 	public static function latestJobsArgs(int $paged = 1, $posts_per_page = 9): array

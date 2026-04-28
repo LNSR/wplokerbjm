@@ -49,11 +49,18 @@
     "debug.console.fontSize": 12,
     "scm.inputFontSize": 12,
     "terminal.integrated.fontSize": 13,
-    "js/ts.tsdk.path": "wplokerbjm-root/wordpress/wp-content/themes/wplokerbjm/node_modules/typescript/lib",
+    "js/ts.tsdk.path": "wplokerbjm-wp-theme/node_modules/typescript/lib",
+    "js/ts.experimental.useTsgo": true,
     "graphql-config.load.rootDir": "wordpress/wp-content/themes/wplokerbjm",
     "js/ts.implicitProjectConfig.target": "ESNext",
-    "js/ts.tsserver.node.path": "/usr/bin/bun",
+    "js/ts.tsserver.node.path": "/bin/bun",
     "js/ts.tsserver.maxMemory": 16392,
+    "css.enabledLanguages": [
+      "html",
+      "typescript",
+      "javascript",
+      "svelte"
+    ],
   },
   "extensions": {
     "recommendations": [

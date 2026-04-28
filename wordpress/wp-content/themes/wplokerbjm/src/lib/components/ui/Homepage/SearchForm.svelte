@@ -1,305 +1,5 @@
-<script module lang="ts">
-  import type {
-    SearchFilters,
-    TaxonomyType,
-    SearchResponse,
-    SortOption,
-  } from "@/types";
-  import { WPPostType } from "@/types";
-  import { searchStore } from "$lib/stores/Search.svelte";
-  import { isJobGridEl } from "$lib/utils/elements.svelte";
-  import { SearchUtils } from "@/utils/search";
-  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
-  import { APIServiceBrowser } from "@/services/APIService";
-  import { debounce } from "es-toolkit";
-
-  type SearchFormResultsPayload = SearchResponse & {
-    shouldScroll: boolean;
-    filters: SearchFilters;
-  };
-
-  type SearchResultsHandler = (payload: SearchFormResultsPayload) => void;
-  type SearchErrorHandler = (message: string) => void;
-  type DropdownUpdatePayload = string | string[] | undefined | null;
-
-  type LocalSearchFormProps = {
-    currentSearch?: string;
-    currentLokasi?: string | string[];
-    currentGender?: string | string[];
-    currentPendidikan?: string | string[];
-    currentSort?: SortOption;
-    archiveLink?: string;
-    searchResults?: SearchResultsHandler;
-    searchError?: SearchErrorHandler;
-  };
-
-  let isLokasiOpen = $state(false);
-  let isGenderOpen = $state(false);
-  let isPendidikanOpen = $state(false);
-  let isSortOpen = $state(false);
-
-  let selectedSuggestionIndex = -1;
-  let suggestionsLoading = $state(false);
-  let showSuggestions = $state(false);
-  let suggestions = $state<string[]>([]);
-
-  const sortOptions: SortOption[] = [
-    { value: "desc", label: "Terbaru" },
-    { value: "asc", label: "Terlama" },
-  ];
-
-  export class SuggestionController {
-    static get hasSuggestions(): boolean {
-      return suggestions.length > 0;
-    }
-    static debouncedGetSuggestions = debounce(
-      async (query: SearchFilters["cari"]) => {
-        const cleanQuery = SearchUtils.sanitizeString(String(query));
-        if (SearchUtils.isValidQuery(cleanQuery)) {
-          suggestionsLoading = true;
-          try {
-            const data =
-              await APIServiceBrowser.getAutoSuggestionsGraphQL(cleanQuery);
-            suggestions = data || [];
-            showSuggestions = suggestions.length > 0;
-          } catch {
-            suggestions = [];
-            showSuggestions = false;
-          } finally {
-            suggestionsLoading = false;
-          }
-        } else {
-          suggestions = [];
-          showSuggestions = false;
-        }
-      },
-      500,
-    );
-
-    static handleFocus() {
-      if (this.hasSuggestions) {
-        showSuggestions = true;
-        selectedSuggestionIndex = -1;
-      }
-    }
-
-    static navigateSuggestions(direction: number) {
-      if (!showSuggestions || !this.hasSuggestions) return;
-      const maxIndex = this .hasSuggestions ? suggestions.length - 1 : 0;
-      if (direction > 0) {
-        selectedSuggestionIndex =
-          selectedSuggestionIndex < maxIndex ? selectedSuggestionIndex + 1 : 0;
-      } else {
-        selectedSuggestionIndex =
-          selectedSuggestionIndex > 0 ? selectedSuggestionIndex - 1 : maxIndex;
-      }
-    }
-
-    static selectSuggestion(suggestion: string): void {
-      searchStore.filters.cari = SearchUtils.sanitizeString(suggestion);
-      showSuggestions = false;
-      suggestions = [];
-    }
-
-    static selectSuggestionUI(suggestion: string, onSubmit: () => void) {
-      SuggestionController.selectSuggestion(suggestion);
-      selectedSuggestionIndex = -1;
-      onSubmit();
-    }
-
-    static hideSuggestionsImmediate() {
-      showSuggestions = false;
-      selectedSuggestionIndex = -1;
-    }
-    static getSuggestions(query: SearchFilters["cari"]): void {
-      SuggestionController.debouncedGetSuggestions(query);
-    }
-
-    static hideSuggestions(): void {
-      setTimeout(() => {
-        showSuggestions = false;
-      }, 150);
-    }
-  }
-
-  export class SearchFormController {
-    private static async performSearch(): Promise<SearchResponse> {
-      if (!searchStore.hasFilters)
-        throw new Error("Terjadi kesalahan pada filter");
-      searchStore.filters.context = "search";
-      if (selectedSuggestionIndex >= 0 && SuggestionController.hasSuggestions) {
-        const suggestion = suggestions[selectedSuggestionIndex];
-        if (suggestion) {
-          SuggestionController.selectSuggestion(suggestion);
-          return await searchStore.searchJobs();
-        }
-      }
-      return await searchStore.searchJobs();
-    }
-
-    private static async performReset(): Promise<SearchResponse> {
-      searchStore.resetFilters();
-      const response = await searchStore.searchJobs();
-      searchStore.title = "Lowongan Terbaru";
-      searchStore.context = "latest";
-      response.title = "Lowongan Terbaru";
-      response.context = "latest";
-      return response;
-    }
-
-    private static callSearchResults(
-      payload: SearchFormResultsPayload,
-      searchResults?: SearchResultsHandler,
-    ): void {
-      try {
-        if (typeof searchResults === "function") {
-          searchResults(payload);
-          return;
-        }
-      } catch (err) {
-        console.error("SearchForm searchResults handler error", err);
-      }
-    }
-
-    private static callSearchError(
-      payload: string,
-      searchError?: SearchErrorHandler,
-    ): void {
-      try {
-        if (typeof searchError === "function") {
-          searchError(payload);
-          return;
-        }
-      } catch (err) {
-        console.error("SearchForm searchError handler error", err);
-      }
-    }
-
-    static async handleSubmit(
-      e?: Event,
-      searchResults?: SearchResultsHandler,
-      searchError?: SearchErrorHandler,
-    ): Promise<void> {
-      e?.preventDefault?.();
-      try {
-        const response = await this.performSearch();
-        SuggestionController.hideSuggestionsImmediate();
-        this.callSearchResults(
-          {
-            ...response,
-            shouldScroll: true,
-            filters: { ...searchStore.filters },
-          },
-          searchResults,
-        );
-        setTimeout(() => {
-          const grid = isJobGridEl();
-          if (grid) grid.scrollIntoView({ behavior: "smooth", block: "start" });
-        }, 100);
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Search failed";
-        searchStore.error = errorMessage;
-        this.callSearchError(errorMessage, searchError);
-      }
-    }
-
-    static get selectedFiltersWithNames() {
-      // No empty-string sentinel anymore; ignore any blank values here
-      const filters: {
-        key: TaxonomyType;
-        label: string;
-        values: string[];
-        names: string[];
-      }[] = [];
-
-      if (
-        searchStore.filters["lokasi_pekerjaan"] &&
-        searchStore.filters["lokasi_pekerjaan"].length
-      ) {
-        const filtered = searchStore.filters["lokasi_pekerjaan"].filter(
-          (slug) => typeof slug === "string" && String(slug).trim() !== "",
-        );
-        if (filtered.length) {
-          filters.push({
-            key: "lokasi_pekerjaan",
-            label: "Lokasi",
-            values: filtered,
-            names: filtered.map((slug) =>
-              taxonomyStore.getTermNameBySlug("lokasi_pekerjaan", slug),
-            ),
-          });
-        }
-      }
-
-      if (
-        searchStore.filters["gender"] &&
-        searchStore.filters["gender"].length
-      ) {
-        const filtered = searchStore.filters["gender"].filter(
-          (slug) => typeof slug === "string" && String(slug).trim() !== "",
-        );
-        if (filtered.length) {
-          filters.push({
-            key: "gender",
-            label: "Gender",
-            values: filtered,
-            names: filtered.map((slug) =>
-              taxonomyStore.getTermNameBySlug("gender", slug),
-            ),
-          });
-        }
-      }
-
-      if (
-        searchStore.filters["pendidikan"] &&
-        searchStore.filters["pendidikan"].length
-      ) {
-        const filtered = searchStore.filters["pendidikan"].filter(
-          (slug) => typeof slug === "string" && String(slug).trim() !== "",
-        );
-        if (filtered.length) {
-          filters.push({
-            key: "pendidikan",
-            label: "Pendidikan",
-            values: filtered,
-            names: filtered.map((slug) =>
-              taxonomyStore.getTermNameBySlug("pendidikan", slug),
-            ),
-          });
-        }
-      }
-
-      return filters;
-    }
-
-    static async resetFiltersAndSearch(
-      searchResults?: SearchResultsHandler,
-      searchError?: SearchErrorHandler,
-    ): Promise<void> {
-      try {
-        const response = await this.performReset();
-        SuggestionController.hideSuggestionsImmediate();
-        this.callSearchResults(
-          {
-            ...response,
-            shouldScroll: false,
-            filters: { ...searchStore.filters },
-          },
-          searchResults,
-        );
-      } catch (err) {
-        const errorMessage =
-          err instanceof Error ? err.message : "Search failed";
-        searchStore.error = errorMessage;
-        this.callSearchError(errorMessage, searchError);
-      }
-    }
-  }
-</script>
-
 <script lang="ts">
-  import { onMount } from "svelte";
+  import { onMount, type Component } from "svelte";
   import { taxonomyStore } from "$lib/stores/Taxonomy.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import {
@@ -314,7 +14,47 @@
     SortAmountUpSolid,
     SortAmountDownSolid,
   } from "svelte-awesome-icons";
+  import { useRIC } from "$lib/utils/window.svelte";
+  import type {
+    SearchFilters,
+    TaxonomyType,
+    SearchResponse,
+    SortOption,
+    TaxonomyGroup,
+    KeyboardKeysEvent,
+  } from "@/types";
+  import { WPPostType } from "@/types";
+  import { jobListingStore } from "$lib/stores/JobListingStore.svelte";
+  import { isJobGridEl } from "$lib/utils/elements.svelte";
+  import { SearchUtils } from "@/utils/search";
+  import { componentRegistry } from "@/lib/stores/ComponentRegistry.svelte";
+  import { APIServiceBrowser } from "@/services/graphql/APIService";
+  import { debounce } from "es-toolkit";
+  import typia from "typia";
 
+  interface SearchFormResultsPayload extends SearchResponse {
+    shouldScroll: boolean;
+    filters: SearchFilters;
+  }
+
+  type LocalSearchFormProps = {
+    currentSearch?: string;
+    currentLokasi?: string | string[];
+    currentGender?: string | string[];
+    currentPendidikan?: string | string[];
+    currentSort?: SortOption;
+    archiveLink?: string;
+    searchResults?: (payload: SearchFormResultsPayload) => void;
+    searchError?: (message: string) => void;
+  };
+
+  const sortOptions: SortOption[] = [
+    { value: "desc", label: "Terbaru" },
+    { value: "asc", label: "Terlama" },
+  ];
+
+  // unused
+  // props that can be passed from the server
   const {
     currentSearch,
     currentLokasi,
@@ -326,141 +66,478 @@
     searchError = undefined,
   }: LocalSearchFormProps = $props();
 
-  function removeFilter(key: TaxonomyType, value: string): void {
-    const current = SearchUtils.sanitizeTaxonomyValue(searchStore.filters[key]);
-    const idx = current.indexOf(value);
-    if (idx !== -1) {
-      searchStore.filters[key] = current.filter((_, i) => i !== idx);
+  /**
+   * Handles search suggestions logic,
+   * including fetching suggestions based on user input,
+   * navigating through suggestions with keyboard,
+   * and selecting suggestions to populate the search input.
+   */
+  class SuggestionHandler {
+    public selectedSuggestionIndex = $state(-1);
+    public suggestionsLoading = $state(false);
+    public showSuggestions = $state(false);
+    public suggestions = $state<string[]>([]);
+    public get hasSuggestions(): boolean {
+      return this.suggestions.length > 0;
     }
-  }
 
-  function taxonomyLabel(key: TaxonomyType, emptyLabel: string): string {
-    return SearchUtils.getTaxonomyLabel(
-      key,
-      searchStore.filters[key],
-      taxonomyStore,
-      emptyLabel,
+    #debouncedFetchSuggestions = debounce(
+      async (query: SearchFilters["cari"]) => {
+        const cleanQuery = SearchUtils.sanitizeString(String(query));
+        if (SearchUtils.isValidQuery(cleanQuery)) {
+          this.suggestionsLoading = true;
+          try {
+            const data =
+              await APIServiceBrowser.getAutoSuggestionsGraphQL(cleanQuery);
+            this.suggestions = data || [];
+            this.showSuggestions = this.suggestions.length > 0;
+          } catch {
+            this.suggestions = [];
+            this.showSuggestions = false;
+          } finally {
+            this.suggestionsLoading = false;
+            return;
+          }
+        }
+        this.suggestions = [];
+        this.showSuggestions = false;
+      },
+      500,
     );
+
+    /**
+     * Show the suggestion panel when the input receives focus.
+     * Resets the selection index so the first suggestion is not pre-selected.
+     */
+    public handleFocus() {
+      if (this.hasSuggestions) {
+        this.showSuggestions = true;
+        this.selectedSuggestionIndex = -1;
+      }
+    }
+
+    /**
+     * Move the highlighted suggestion up or down in the suggestion list.
+     * Wraps around when reaching the start or end of the list.
+     * @param direction Positive to move down, negative to move up.
+     */
+    public navigateSuggestions(direction: number) {
+      if (!this.showSuggestions || !this.hasSuggestions) return;
+      const maxIndex = this.hasSuggestions ? this.suggestions.length - 1 : 0;
+      if (direction > 0) {
+        this.selectedSuggestionIndex =
+          this.selectedSuggestionIndex < maxIndex
+            ? this.selectedSuggestionIndex + 1
+            : 0;
+        return;
+      }
+      this.selectedSuggestionIndex =
+        this.selectedSuggestionIndex > 0
+          ? this.selectedSuggestionIndex - 1
+          : maxIndex;
+    }
+
+    /**
+     * Apply the selected suggestion to the search input and close the suggestion panel.
+     * @param suggestion The suggestion text to apply.
+     */
+    public selectSuggestion(suggestion: string): void {
+      jobListingStore.filters.cari = SearchUtils.sanitizeString(suggestion);
+      this.showSuggestions = false;
+      this.suggestions = [];
+    }
+
+    /**
+     * Select the given suggestion and then invoke the provided submission callback.
+     * This is used when a suggestion is clicked by the user.
+     * @param suggestion The suggestion to select.
+     * @param onSubmit Callback to execute after selection.
+     * Delegate to @see SearchFormHandler.submitSuggestionSearch for handling the actual submission logic.
+     */
+    public async submitSuggestion(
+      suggestion: string,
+      onSubmit: () => Promise<void>,
+    ) {
+      this.selectSuggestion(suggestion);
+      this.selectedSuggestionIndex = -1;
+      await onSubmit();
+    }
+
+    /**
+     * Immediately hide the suggestion list and reset the selection index.
+     */
+    public hideSuggestionsImmediate() {
+      this.showSuggestions = false;
+      this.selectedSuggestionIndex = -1;
+    }
+
+    /**
+     * Request suggestions for the current query using a debounce timer.
+     * @param query The current search query from the input field.
+     */
+    public getSuggestions(query: SearchFilters["cari"]): void {
+      this.#debouncedFetchSuggestions(query);
+    }
+
+    /**
+     * Hide the suggestion list after a short delay to allow click events
+     * within the suggestion panel to complete.
+     */
+    public hideSuggestions(): void {
+      setTimeout(() => {
+        this.showSuggestions = false;
+      }, 150);
+    }
   }
 
-  function toggleDropdown(
-    type: "lokasi" | "gender" | "pendidikan" | "sort",
-    fetchFnApi?: () => void,
-  ): void {
-    const closeAllDropdowns = (): void => {
-      isLokasiOpen = false;
-      isGenderOpen = false;
-      isPendidikanOpen = false;
-      isSortOpen = false;
-    };
+  class DropdownHandler {
+    public isLokasiOpen = $state(false);
+    public isGenderOpen = $state(false);
+    public isPendidikanOpen = $state(false);
+    public isSortOpen = $state(false);
 
-    const currentOpenState =
-      type === "lokasi"
-        ? isLokasiOpen
-        : type === "gender"
-          ? isGenderOpen
-          : type === "pendidikan"
-            ? isPendidikanOpen
-            : isSortOpen;
-
-    if (currentOpenState) {
-      closeAllDropdowns();
-      return;
+    /**
+     * Get the display label for a taxonomy filter based on current selection, with a fallback if no selection is made.
+     * @param key The taxonomy type
+     * @param emptyLabel The label to display if no selection is made
+     * @returns The display label
+     */
+    public taxonomyLabel(key: TaxonomyType, emptyLabel: string): string {
+      return SearchUtils.getTaxonomyLabel(
+        key,
+        jobListingStore.filters[key],
+        taxonomyStore,
+        emptyLabel,
+      );
     }
 
-    closeAllDropdowns();
-
-    if (type === "lokasi") isLokasiOpen = true;
-    if (type === "gender") isGenderOpen = true;
-    if (type === "pendidikan") isPendidikanOpen = true;
-    if (type === "sort") isSortOpen = true;
-
-    fetchFnApi?.();
-  }
-
-  // Function to update taxonomy filters
-  function updateTaxonomyFilter(
-    taxonomyType: TaxonomyType,
-    payload: DropdownUpdatePayload,
-  ): void {
-    if (!Array.isArray(payload) || payload.length === 0) {
-      searchStore.filters[taxonomyType] = [];
-      return;
-    }
-    searchStore.filters[taxonomyType] = SearchUtils.sanitizeArr(payload) ?? [];
-  }
-
-  // handle keyboard navigation for the main search input
-  function handleInputKeyDown(e: KeyboardEvent): void {
-    const key = e.key;
-    if (key === "Enter") {
-      e.preventDefault();
-      SearchFormController.handleSubmit(undefined, searchResults, searchError);
-      return;
-    }
-    if (key === "ArrowDown") {
-      e.preventDefault();
-      SuggestionController.navigateSuggestions(1);
-      return;
-    }
-    if (key === "ArrowUp") {
-      e.preventDefault();
-      SuggestionController.navigateSuggestions(-1);
-      return;
-    }
-    if (key === "Escape") {
-      SuggestionController.hideSuggestionsImmediate();
-      return;
-    }
-  }
-
-  const lokasiLabel = $derived.by(() =>
-    taxonomyLabel("lokasi_pekerjaan", "Lokasi Belum Dipilih"),
-  );
-
-  const genderLabel = $derived.by(() =>
-    taxonomyLabel("gender", "Gender Belum Dipilih"),
-  );
-
-  const pendidikanLabel = $derived.by(() =>
-    taxonomyLabel("pendidikan", "Pendidikan Belum Dipilih"),
-  );
-
-  const sortIsAsc = $derived.by(
-    () => (searchStore.filters.sort?.value ?? "") === "asc",
-  );
-
-  const CustomDropdown = $derived.by(() => {
-    if (isGenderOpen || isLokasiOpen || isPendidikanOpen || isSortOpen) {
-      return dynamicComponentStore.loadCustomDropdown();
+    /**
+     * Clear a specific value from a taxonomy filter in the search store, effectively removing that filter and triggering a new search if needed.
+     * @param key The taxonomy type
+     * @param value The value to remove from the filter
+     */
+    public clearDropdownFilter(key: TaxonomyType, value: string): void {
+      const current = SearchUtils.sanitizeTaxonomyValue(
+        jobListingStore.filters[key],
+      );
+      const idx = current.indexOf(value);
+      if (idx !== -1) {
+        jobListingStore.filters[key] = current.filter((_, i) => i !== idx);
+      }
     }
 
-    return undefined;
-  });
-
-  const updateSortFilter = (payload: DropdownUpdatePayload): void => {
-    const defaultSort: SortOption = {
-      value: "desc",
-      label: "Terbaru",
-    };
-    if (!payload || Array.isArray(payload)) {
-      searchStore.filters.sort = defaultSort;
-      return;
+    public closeDropdowns(): void {
+      this.isLokasiOpen &&= false;
+      this.isGenderOpen &&= false;
+      this.isPendidikanOpen &&= false;
+      this.isSortOpen &&= false;
     }
-    // payload is the underlying value (string)
-    const valStr = String(payload);
-    if (valStr === "desc" || valStr === "asc") {
-      searchStore.filters.sort = {
-        value: valStr as SortOption["value"],
-        label: valStr === "desc" ? "Terbaru" : "Terlama",
+
+    /**
+     * Compute the currently selected filters along with their display names for all taxonomy groups.
+     * This is used to show active filters in the UI and provide a way to clear them.
+     */
+    public get selectedFiltersWithNames() {
+      const filters: {
+        key: TaxonomyType;
+        label: string;
+        values: string[];
+        names: string[];
+      }[] = [];
+
+      interface TaxonomyItem {
+        key: TaxonomyType;
+        label: Capitalize<TaxonomyGroup>;
+      }
+
+      const TaxonomyGroups: TaxonomyItem[] = [
+        { key: "lokasi_pekerjaan", label: "Lokasi" },
+        { key: "gender", label: "Gender" },
+        { key: "pendidikan", label: "Pendidikan" },
+      ];
+
+      return TaxonomyGroups.reduce((acc, { key, label }) => {
+        const values = SearchUtils.sanitizeTaxonomyValue(
+          jobListingStore.filters[key],
+        );
+        if (values && values.length > 0) {
+          const names = values.map((slug) =>
+            taxonomyStore.getTermNameBySlug(key, slug),
+          );
+          acc.push({ key, label, values, names });
+        }
+        return acc;
+      }, filters);
+    }
+
+    /**
+     * Toggle dropdown visibility based on type, ensuring only one dropdown is open at a time.
+     * @param type The dropdown type
+     * @param fetchFnApi APIService function to fetch terms for the dropdown
+     */
+    public toggleDropdown(
+      type: TaxonomyGroup | "sort",
+      fetchtype?: TaxonomyType,
+    ): void {
+      void componentRegistry.loadComponentByName("CustomDropdown");
+
+      this.closeDropdowns();
+
+      switch (type) {
+        case "lokasi":
+          this.isLokasiOpen = true;
+          break;
+        case "gender":
+          this.isGenderOpen = true;
+          break;
+        case "pendidikan":
+          this.isPendidikanOpen = true;
+          break;
+        case "sort":
+          this.isSortOpen = true;
+          break;
+      }
+
+      if (fetchtype) taxonomyStore.fetchTerms(fetchtype);
+    }
+
+    /**
+     * Update the search store filters for a given taxonomy type based on dropdown selection, handling both single and multiple selection cases.
+     * @param taxonomyType The taxonomy type to update
+     * @param payload The selected value(s) from the dropdown
+     */
+    public updateTaxonomyFilter(
+      taxonomyType: TaxonomyType,
+      payload: unknown,
+    ): void {
+      if (!Array.isArray(payload) || payload.length === 0) {
+        jobListingStore.filters[taxonomyType] = [];
+        return;
+      }
+      jobListingStore.filters[taxonomyType] =
+        SearchUtils.sanitizeArr(payload) ?? [];
+    }
+
+    /**
+     * Normalize and apply the selected sort option to the search filters.
+     * Falls back to the default sort option when the payload is invalid.
+     * @param payload The raw dropdown value or selection payload.
+     */
+    public updateSortFilter = (payload: unknown): void => {
+      const defaultSort: SortOption = {
+        value: "desc",
+        label: "Terbaru",
       };
-    } else {
-      searchStore.filters.sort = defaultSort;
+      if (!payload || Array.isArray(payload)) {
+        jobListingStore.filters.sort = defaultSort;
+        return;
+      }
+      // payload is the underlying value (string)
+      const valStr = String(payload);
+      if (typia.is<SortOption["value"]>(valStr)) {
+        jobListingStore.filters.sort = {
+          value: valStr as SortOption["value"],
+          label: valStr === "desc" ? "Terbaru" : "Terlama",
+        };
+        return;
+      }
+      jobListingStore.filters.sort = defaultSort;
+    };
+  }
+
+  /**
+   * search form controller for submit, reset, and callback orchestration.
+   *
+   * Mediate between Suggestion and Dropdown handlers that share $props callbacks to execute searches.
+   *
+   * The controller is static because its doesn't have it's own state;
+   */
+  class SearchFormController {
+    /**
+     * Handle the search form submission event.
+     * Prevents default form navigation and invokes the search logic.
+     * @param e Optional submit event to prevent default browser behavior.
+     */
+    public static async handleSubmit(e?: Event): Promise<void> {
+      e?.preventDefault?.();
+      try {
+        const response = await SearchFormController.performSearch();
+        suggestionHandler.hideSuggestionsImmediate();
+        SearchFormController.callSearchResults({
+          ...response,
+          shouldScroll: true,
+          filters: { ...jobListingStore.filters },
+        });
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Search failed";
+        jobListingStore.error = errorMessage;
+        SearchFormController.callSearchIsError(errorMessage);
+      }
     }
-  };
+
+    /**
+     * Submit a search based on a selected suggestion, ensuring the suggestion is applied to the search filters before executing the search logic.
+     * @param suggestion The suggestion text to apply and search for.
+     * @returns void
+     */
+    public static async submitSuggestionSearch(
+      suggestion: string,
+    ): Promise<void> {
+      await suggestionHandler.submitSuggestion(
+        suggestion,
+        SearchFormController.handleSubmit,
+      );
+    }
+
+    /**
+     * Scroll the job grid into view after a search submission if shouldScroll is true.
+     * @param shouldScroll Whether the grid should be scrolled into view.
+     */
+    private static scrollAfterSubmit(
+      shouldScroll: SearchFormResultsPayload["shouldScroll"],
+    ): void {
+      const grid = isJobGridEl();
+      if (grid && shouldScroll) {
+        useRIC(
+          () => {
+            try {
+              grid.scrollIntoView({ behavior: "smooth", block: "start" });
+            } catch (err) {
+              console.error(
+                "Scroll into view failed, fallback to instant scroll",
+                err,
+              );
+            }
+          },
+          { fallbackDelay: 300, fallback: "timeout" },
+        );
+      }
+    }
+
+    /**
+     * Reset search filters to defaults and execute a fresh search.
+     * The result is forwarded to the parent callback without scrolling.
+     */
+    public static async resetFiltersAndSearch(): Promise<void> {
+      try {
+        const response = await SearchFormController.performReset();
+        suggestionHandler.hideSuggestionsImmediate();
+        SearchFormController.callSearchResults({
+          ...response,
+          shouldScroll: false,
+          filters: { ...jobListingStore.filters },
+        });
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : "Search failed";
+        jobListingStore.error = errorMessage;
+        SearchFormController.callSearchIsError(errorMessage);
+      }
+    }
+
+    /**
+     * Execute the active search using the current filters and suggestion state.
+     * If a suggestion is currently highlighted, select it before searching.
+     * @throws Error when filters are invalid or missing.
+     * @returns The search response from the job listing store.
+     */
+    private static async performSearch(): Promise<SearchResponse> {
+      if (!jobListingStore.hasFilters)
+        throw new Error("Terjadi kesalahan pada filter");
+      jobListingStore.filters.context = "search";
+      if (
+        suggestionHandler.selectedSuggestionIndex >= 0 &&
+        suggestionHandler.hasSuggestions
+      ) {
+        const suggestion =
+          suggestionHandler.suggestions[
+            suggestionHandler.selectedSuggestionIndex
+          ];
+        if (suggestion) {
+          suggestionHandler.selectSuggestion(suggestion);
+          return await jobListingStore.searchJobs();
+        }
+      }
+      return await jobListingStore.searchJobs();
+    }
+
+    /**
+     * Refresh all filters and load the latest job results.
+     * Also updates the store and response metadata to the default "latest" state.
+     * @returns The search response after resetting filters.
+     */
+    private static async performReset(): Promise<SearchResponse> {
+      jobListingStore.resetFilters();
+      const response = await jobListingStore.searchJobs();
+      jobListingStore.title = "Lowongan Terbaru";
+      jobListingStore.context = "latest";
+      response.title = "Lowongan Terbaru";
+      response.context = "latest";
+      return response;
+    }
+
+    /**
+     * Forward search result payload to the optional parent callback.
+     * If scrolling is requested, schedule it after render.
+     * @param payload The search results payload to pass to the handler.
+     */
+    private static callSearchResults(payload: SearchFormResultsPayload): void {
+      try {
+        searchResults?.(payload);
+        if (payload.shouldScroll) {
+          SearchFormController.scrollAfterSubmit(payload.shouldScroll);
+        }
+      } catch (err) {
+        console.error("SearchForm searchResults handler error", err);
+      }
+    }
+
+    /**
+     * Handle keyboard events inside the search input field.
+     * Supports submission, suggestion navigation, and closing the suggestion list.
+     * @param event The keyboard event from the input field.
+     */
+    public static handleInputKeyDown = (event: KeyboardEvent): void => {
+      const keyHandlers: Partial<Record<KeyboardKeysEvent, () => void>> = {
+        Enter: () => {
+          event.preventDefault();
+          SearchFormController.handleSubmit(undefined);
+        },
+        ArrowDown: () => {
+          event.preventDefault();
+          suggestionHandler.navigateSuggestions(1);
+        },
+        ArrowUp: () => {
+          event.preventDefault();
+          suggestionHandler.navigateSuggestions(-1);
+        },
+        Escape: () => {
+          event.preventDefault();
+          suggestionHandler.hideSuggestionsImmediate();
+        },
+      };
+      keyHandlers[event.key as KeyboardKeysEvent]?.();
+    };
+
+    /**
+     * Forward error payload to the optional parent error callback.
+     * @param payload Error message string from the search flow.
+     */
+    private static callSearchIsError(payload: string): void {
+      try {
+        searchError?.(payload);
+      } catch (err) {
+        console.error("SearchForm searchError handler error", err);
+      }
+    }
+  }
+
+  const suggestionHandler = new SuggestionHandler();
+  const dropdownHandler = new DropdownHandler();
 
   onMount(() => {
-    searchStore.setFilters({
+    jobListingStore.setFilters({
       cari: currentSearch ?? "",
       ["lokasi_pekerjaan"]: SearchUtils.normalizeStringOrArray(currentLokasi),
       ["gender"]: SearchUtils.normalizeStringOrArray(currentGender),
@@ -470,6 +547,51 @@
   });
 </script>
 
+{#snippet taxonomyDropdownButton(
+  groupKey: TaxonomyGroup, // normalized internal WP for UI grouping, e.g. "lokasi"
+  storeKey: TaxonomyType, // internal WP taxonomy name, e.g. "lokasi_pekerjaan"
+  Icon: Component, // icon component to display inside the button
+  emptyLabel: string, // initial and fallback label when no selection is made
+  aria: {
+    expanded: boolean;
+    controls: string;
+  },
+  CustomDropdown = componentRegistry.getComponentByName("CustomDropdown"),
+)}
+  <div class="relative">
+    <Icon
+      class="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10"
+      aria-hidden="true"
+    />
+    <button
+      type="button"
+      class="w-full text-left px-4 py-3 border rounded-full h-12 bg-[var(--wpl-global-color-5)]"
+      aria-expanded={aria.expanded}
+      aria-controls={aria.controls}
+      onclick={() => dropdownHandler.toggleDropdown(groupKey, storeKey)}
+    >
+      <span class="pl-8"
+        >{dropdownHandler.taxonomyLabel(storeKey, emptyLabel)}</span
+      >
+    </button>
+    {#if aria.expanded}
+      <CustomDropdown
+        id={aria.controls}
+        value={jobListingStore.filters[storeKey]}
+        update={(payload: unknown) =>
+          dropdownHandler.updateTaxonomyFilter(storeKey, payload)}
+        options={SearchUtils.mapTerms(
+          taxonomyStore.getTerms(storeKey),
+          emptyLabel,
+        )}
+        multiple={true}
+        open={aria.expanded}
+        close={() => dropdownHandler.closeDropdowns()}
+      />
+    {/if}
+  </div>
+{/snippet}
+
 <section class="mx-auto p-4 text-center mb-16">
   <div
     class="lg:mx-[calc(50vw-50%)] border-2 border-[var(--wpl-global-color-1)] rounded-xl p-5 min-h-[220px] sm:min-h-[306px] md:min-h-[204px]"
@@ -478,33 +600,34 @@
       class="space-y-4"
       action={archiveLink}
       method="get"
-      onsubmit={(e) =>
-        SearchFormController.handleSubmit(e, searchResults, searchError)}
+      onsubmit={(e) => SearchFormController.handleSubmit(e)}
     >
       <input type="hidden" name="post_type" value={WPPostType.Lowongan} />
 
+      <!-- Search Input -->
       <div class="flex gap-2 relative">
         <input
           type="text"
           placeholder="Masukkan Pekerjaan atau Perusahaan"
           class="input input-bordered w-full search-input bg-[var(--wpl-global-color-5)] sm:rounded-full"
           name="cari"
-          bind:value={searchStore.filters.cari}
+          bind:value={jobListingStore.filters.cari}
           oninput={() =>
-            SuggestionController.getSuggestions(searchStore.filters.cari)}
-          onfocus={SuggestionController.handleFocus}
-          onblur={() => SuggestionController.hideSuggestions()}
-          onkeydown={handleInputKeyDown}
-          disabled={searchStore.loading || taxonomyStore.loading}
+            suggestionHandler.getSuggestions(jobListingStore.filters.cari)}
+          onfocus={() => suggestionHandler.handleFocus()}
+          onblur={() => suggestionHandler.hideSuggestions()}
+          onkeydown={SearchFormController.handleInputKeyDown}
+          disabled={jobListingStore.loading || taxonomyStore.getLoadingStatus}
           autocomplete="off"
         />
         <button
           type="submit"
           class="rounded-full btn-circle border hover:border px-4"
-          class:opacity-75={searchStore.loading || taxonomyStore.loading}
-          disabled={searchStore.loading || taxonomyStore.loading}
+          class:opacity-75={jobListingStore.loading ||
+            taxonomyStore.getLoadingStatus}
+          disabled={jobListingStore.loading || taxonomyStore.getLoadingStatus}
         >
-          {#if searchStore.loading || taxonomyStore.loading}
+          {#if jobListingStore.loading || taxonomyStore.getLoadingStatus}
             <LoadingSpinner size="sm" srLabel="Memuat..." />
           {:else}
             <MagnifyingGlassSolid class="text-base" aria-hidden="true" />
@@ -512,28 +635,23 @@
           <span class="sr-only">Cari</span>
         </button>
 
-        {#if showSuggestions && SuggestionController.hasSuggestions}
+        {#if suggestionHandler.showSuggestions && suggestionHandler.hasSuggestions}
           <div
-            class="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 min-w-[12rem] w-full sm:w-auto max-w-full sm:max-w-xs md:max-w-md z-20"
+            class="absolute left-0 sm:left-1/2 sm:-translate-x-1/2 top-full mt-2 w-full sm:w-auto sm:max-w-xs md:max-w-md z-30"
           >
             <div class="bg-[var(--wpl-global-color-5)] rounded-lg">
-              <ul class="max-h-52 overflow-y-auto">
-                {#each suggestions as suggestion, idx (suggestion + idx)}
+              <ul class="max-h-60 overflow-y-auto">
+                {#each suggestionHandler.suggestions as suggestion, idx (suggestion + idx)}
                   <li>
                     <button
                       type="button"
-                      class="w-full text-justify text-sm px-4 py-2 transition-colors cursor-pointer whitespace-nowrap"
-                      onclick={() =>
-                        SuggestionController.selectSuggestionUI(
+                      class="w-full text-justify text-sm px-4 py-2 transition-colors cursor-pointer"
+                      onclick={async () =>
+                        await SearchFormController.submitSuggestionSearch(
                           suggestion,
-                          () =>
-                            SearchFormController.handleSubmit(
-                              undefined,
-                              searchResults,
-                              searchError,
-                            ),
                         )}
-                      onmouseenter={() => (selectedSuggestionIndex = idx)}
+                      onmouseenter={() =>
+                        (suggestionHandler.selectedSuggestionIndex = idx)}
                       aria-label={`Pilih saran ${suggestion}`}
                     >
                       {suggestion}
@@ -546,110 +664,44 @@
         {/if}
       </div>
 
+      <!-- Taxonomy Filters -->
       <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div class="relative">
-          <MapMarkerAltSolid
-            class="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10"
-            aria-hidden="true"
-          />
-          <button
-            type="button"
-            class="w-full text-left px-4 py-3 border rounded-full h-12 bg-[var(--wpl-global-color-5)]"
-            aria-expanded={isLokasiOpen}
-            aria-controls="lokasi-listbox"
-            onclick={() =>
-              toggleDropdown("lokasi", () => taxonomyStore.fetchLokasiTerms())}
-            ><span class="pl-8">{lokasiLabel}</span></button
-          >
-          {#if isLokasiOpen}
-            {#await CustomDropdown then CustomDropdownComponent}
-              <CustomDropdownComponent
-                id="lokasi"
-                value={searchStore.filters["lokasi_pekerjaan"]}
-                update={(payload: DropdownUpdatePayload) =>
-                  updateTaxonomyFilter("lokasi_pekerjaan", payload)}
-                options={SearchUtils.mapTerms(
-                  taxonomyStore.lokasiTerms,
-                  "Semua lokasi",
-                )}
-                multiple={true}
-                open={isLokasiOpen}
-                close={() => (isLokasiOpen = false)}
-              />
-            {/await}
-          {/if}
-        </div>
+        {@render taxonomyDropdownButton(
+          "lokasi",
+          "lokasi_pekerjaan",
+          MapMarkerAltSolid,
+          "Semua lokasi",
+          {
+            expanded: dropdownHandler.isLokasiOpen,
+            controls: "lokasi-listbox",
+          },
+        )}
 
-        <div class="relative">
-          <VenusMarsSolid
-            class="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10"
-            aria-hidden="true"
-          />
-          <button
-            type="button"
-            class="w-full text-left px-4 py-3 border rounded-full h-12 bg-[var(--wpl-global-color-5)]"
-            aria-expanded={isGenderOpen}
-            aria-controls="gender-listbox"
-            onclick={() =>
-              toggleDropdown("gender", () => taxonomyStore.fetchGenderTerms())}
-            ><span class="pl-8">{genderLabel}</span></button
-          >
-          {#if isGenderOpen}
-            {#await CustomDropdown then CustomDropdownComponent}
-              <CustomDropdownComponent
-                id="gender"
-                value={searchStore.filters["gender"]}
-                update={(payload: DropdownUpdatePayload) =>
-                  updateTaxonomyFilter("gender", payload)}
-                options={SearchUtils.mapTerms(
-                  taxonomyStore.genderTerms,
-                  "Semua gender",
-                )}
-                multiple={true}
-                open={isGenderOpen}
-                close={() => (isGenderOpen = false)}
-              />
-            {/await}
-          {/if}
-        </div>
+        {@render taxonomyDropdownButton(
+          "gender",
+          "gender",
+          VenusMarsSolid,
+          "Semua gender",
+          {
+            expanded: dropdownHandler.isGenderOpen,
+            controls: "gender-listbox",
+          },
+        )}
 
-        <div class="relative">
-          <GraduationCapSolid
-            class="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10"
-            aria-hidden="true"
-          />
-          <button
-            type="button"
-            class="w-full text-left px-4 py-3 border rounded-full h-12 bg-[var(--wpl-global-color-5)]"
-            aria-expanded={isPendidikanOpen}
-            aria-controls="pendidikan-listbox"
-            onclick={() =>
-              toggleDropdown("pendidikan", () =>
-                taxonomyStore.fetchPendidikanTerms(),
-              )}
-            ><span class="pl-8">{pendidikanLabel}</span>
-          </button>
-          {#if isPendidikanOpen}
-            {#await CustomDropdown then CustomDropdownComponent}
-              <CustomDropdownComponent
-                id="pendidikan"
-                value={searchStore.filters["pendidikan"]}
-                update={(payload: DropdownUpdatePayload) =>
-                  updateTaxonomyFilter("pendidikan", payload)}
-                options={SearchUtils.mapTerms(
-                  taxonomyStore.pendidikanTerms,
-                  "Semua pendidikan",
-                )}
-                multiple={true}
-                open={isPendidikanOpen}
-                close={() => (isPendidikanOpen = false)}
-              />
-            {/await}
-          {/if}
-        </div>
+        {@render taxonomyDropdownButton(
+          "pendidikan",
+          "pendidikan",
+          GraduationCapSolid,
+          "Semua pendidikan",
+          {
+            expanded: dropdownHandler.isPendidikanOpen,
+            controls: "pendidikan-listbox",
+          },
+        )}
 
+        <!-- Sort Dropdown (not a taxonomy but shares similar UI), not included in taxonomyDropdownButton -->
         <div class="relative">
-          {#if sortIsAsc}
+          {#if jobListingStore.filters.sort?.value === "asc"}
             <SortAmountUpSolid
               class="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10 w-5 h-5 transform transition-transform duration-150"
               aria-hidden="true"
@@ -663,39 +715,39 @@
           <button
             type="button"
             class="w-full text-left px-4 py-3 border rounded-full h-12 bg-[var(--wpl-global-color-5)]"
-            aria-expanded={isSortOpen}
+            aria-expanded={dropdownHandler.isSortOpen}
             aria-controls="sort-listbox"
-            onclick={() => toggleDropdown("sort")}
+            onclick={() => dropdownHandler.toggleDropdown("sort")}
             ><span class="pl-8"
-              >{searchStore.filters.sort?.label ?? "Urutkan"}</span
+              >{jobListingStore.filters.sort?.label ?? "Urutkan"}</span
             ></button
           >
-          {#if isSortOpen}
-            {#await CustomDropdown then CustomDropdownComponent}
-              <CustomDropdownComponent
-                id="sort"
-                value={searchStore.filters.sort}
-                update={(payload: DropdownUpdatePayload) => {
-                  updateSortFilter(payload);
-                }}
-                options={sortOptions}
-                multiple={false}
-                open={isSortOpen}
-                close={() => (isSortOpen = false)}
-              />
-            {/await}
+          {#if dropdownHandler.isSortOpen}
+            {@const CustomDropdown =
+              componentRegistry.getComponentByName("CustomDropdown")}
+            <CustomDropdown
+              id="sort"
+              value={jobListingStore.filters.sort}
+              update={(payload: unknown) => {
+                dropdownHandler.updateSortFilter(payload);
+              }}
+              options={sortOptions}
+              multiple={false}
+              open={dropdownHandler.isSortOpen}
+              close={() => (dropdownHandler.isSortOpen = false)}
+            />
           {/if}
         </div>
       </div>
 
-      {#if SearchFormController.selectedFiltersWithNames && SearchFormController.selectedFiltersWithNames.length}
+      {#if dropdownHandler.selectedFiltersWithNames && dropdownHandler.selectedFiltersWithNames.length}
         <div class="mb-4 flex flex-wrap items-center gap-2 animate-fade-in">
           <span
             class="font-semibold text-[var(--wpl-global-color-1)] flex items-center justify-center w-full mr-2"
             ><FilterSolid class="mr-1 inline-block" aria-hidden="true" />Filter
             aktif:</span
           >
-          {#each SearchFormController.selectedFiltersWithNames as filter (filter.key)}
+          {#each dropdownHandler.selectedFiltersWithNames as filter (filter.key)}
             {#each filter.values as val, idx (val + idx)}
               <span
                 class="badge badge-lg gap-2 bg-[var(--wpl-global-color-5)] shadow-sm transition-all duration-150"
@@ -717,7 +769,8 @@
                 <button
                   type="button"
                   class="btn btn-ghost btn-xs btn-circle text-[var(--wpl-global-color-1)] hover:text-red-600 transition-colors duration-150 ml-1"
-                  onclick={() => removeFilter(filter.key, val)}
+                  onclick={() =>
+                    dropdownHandler.clearDropdownFilter(filter.key, val)}
                   aria-label="Hapus filter"
                 >
                   <XmarkSolid class="text-xs" aria-hidden="true" />
@@ -728,56 +781,49 @@
         </div>
       {/if}
 
-      {#if searchStore.context === "search"}
+      {#if jobListingStore.context === "search"}
         <div class="flex justify-end mt-2">
           <button
             type="button"
             class="btn btn-outline rounded-full bg-[var(--wpl-global-color-5)] hover:border-[var(--wpl-global-color-1)]"
-            disabled={searchStore.loading || taxonomyStore.loading}
-            onclick={() =>
-              SearchFormController.resetFiltersAndSearch(
-                searchResults,
-                searchError,
-              )}
+            disabled={jobListingStore.loading || taxonomyStore.getLoadingStatus}
+            onclick={() => SearchFormController.resetFiltersAndSearch()}
           >
             <RotateLeftSolid class="mr-2" aria-hidden="true" />Reset Filter
           </button>
         </div>
       {/if}
 
-      {#if searchStore.error || taxonomyStore.lokasiError || taxonomyStore.genderError || taxonomyStore.pendidikanError}
+      {#if jobListingStore.error || taxonomyStore.anyError}
         <div class="alert alert-error">
           <TriangleExclamationSolid
             class="mr-2 inline-block text-red-600"
             aria-hidden="true"
           />
-          <span
-            >{searchStore.error ||
-              taxonomyStore.lokasiError ||
-              taxonomyStore.genderError ||
-              taxonomyStore.pendidikanError}</span
-          >
+          <span>{jobListingStore.error || taxonomyStore.anyError}</span>
         </div>
       {/if}
 
-      {#if searchStore.loading || suggestionsLoading}
+      {#if jobListingStore.loading || suggestionHandler.suggestionsLoading}
         <div class="text-center py-4 flex flex-col items-center justify-center">
           <LoadingSpinner srLabel="Memuat..." size="md" />
           <span class="mt-2"
-            >{suggestionsLoading ? "Mencari saran..." : "Mencari..."}</span
+            >{suggestionHandler.suggestionsLoading
+              ? "Mencari saran..."
+              : "Mencari..."}</span
           >
         </div>
       {/if}
 
-      {#if searchStore.recentSearches && searchStore.recentSearches.length}
+      {#if jobListingStore.recentSearches && jobListingStore.recentSearches.length}
         <div class="mt-4">
           <span class="text-lg font-semibold"> Pencarian Terakhir: </span>
           <div class="flex flex-wrap font-semibold gap-2 mt-4">
-            {#each searchStore.recentSearches as item (item)}
+            {#each jobListingStore.recentSearches as item (item)}
               <button
                 type="button"
                 class="px-3 py-1 text-xs bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-7)] rounded-full"
-                onclick={() => searchStore.setFilters({ cari: item })}
+                onclick={() => jobListingStore.setFilters({ cari: item })}
                 >{item}</button
               >
             {/each}

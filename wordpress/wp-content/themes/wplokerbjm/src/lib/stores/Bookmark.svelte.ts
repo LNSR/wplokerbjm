@@ -1,497 +1,606 @@
 import { debounce } from "es-toolkit";
-import { bookmarkIDB } from "@/utils/indexedDB";
-import { SvelteSet, SvelteMap } from "svelte/reactivity";
-import { APIServiceBrowser } from "@/services/APIService";
+import { SvelteDate, SvelteMap, SvelteSet } from "svelte/reactivity";
+import { BookmarkIDB } from "@/services/IndexedDB";
+import { APIServiceBrowser } from "@/services/graphql/APIService";
 import type { CardJob } from "@/types";
-import { browser, version } from "$app/environment";
-import { generalJobStore } from "$lib/stores/General.svelte";
+import { BaseBroadcastChannel } from "@/services/BroadcastChannel";
+import typia from "typia";
+import { TaskController } from "@/utils/mutex";
 
-interface BookmarkBroadcastMessage {
-  type: "update" | "sync" | "reload";
+interface BookmarkBroadcastMessage
+{
+  type: "sync" | "reload";
   deleted?: number[];
-  version?: string;
-  tabStartedAt?: number;
+  version: string;
+  tabStartedAt: number;
+  broadcasterIdentifierId: string;
 }
-export class BookmarkManager {
-  private CURRENT_VERSION = $derived(version);
-  public jobs = $state<CardJob[]>([]);
-  public isInitialized = $state(false);
-  public isSyncing = $state(false);
-  public warning = $state("");
-  public isOutdated = $state(false);
-  private cache = new SvelteMap<number, CardJob>();
-  public deletedJobs = $state<number[]>([]);
-  public lastSyncTime = $state<number>(0);
 
-  private channel: BroadcastChannel | null = null;
-  private readonly tabStartedAt = generalJobStore.now.getTime(); // Timestamp to identify when this tab instance started for version conflict resolution
-  private debouncedSync: ReturnType<typeof debounce> | null = null;
-  private pendingSyncIds = new SvelteSet<number>();
-  #debouncedSaveCall: ReturnType<typeof debounce> | null = null;
-  #pendingSavePromise: Promise<void> | null = null;
-  #pendingSaveResolve: (() => void) | null = null;
-  #pendingSaveReject: ((reason?: any) => void) | null = null;
-  #saveInProgress = false;
-  #retryTimer: ReturnType<typeof setTimeout> | null = null;
-  #hasStarted = false; // this Instance
-  private operationQueue: Promise<any> = Promise.resolve();
 
-  constructor() {
-    if (!browser) {
-      return;
-    }
-    this.crossTabChannel();
-    this.debouncedSync = debounce(() => this.syncPending(), 1000);
-  }
+class BookmarkManager
+{
 
-  /**
-   * Run operation in sequence to avoid race conditions on IndexedDB and ensure predictable state updates. Each operation waits for the previous one to complete before starting.
-   * A timeout is included to prevent the queue from getting stuck indefinitely due to unforeseen issues. If an operation fails or times out, it logs a warning but allows subsequent operations to continue.
-   * @param operation The asynchronous operation to run in the queue.
-   * @param timeoutMs The maximum time to wait for the operation to complete before timing out.
-   * @returns A promise that resolves with the operation's result or rejects if it times out.
-   */
-  private async runQueued<T>(
-    operation: () => Promise<T>,
-    timeoutMs: number = 10000,
-  ): Promise<T> {
-    try {
-      await this.operationQueue;
-    } catch (err) {
-      console.warn("Previous queued operation failed, continuing", err);
-    }
+  //* === Instance fields ===
+  #bookmarkTaskController: TaskController;
+  #bookmarkRepository: BookmarkRepository;
+  #bookmarkBroadcastChannel: BookmarkBroadcastChannel;
+  #bookmarkSyncEngine: SyncOperation;
 
-    let timeoutHandle: ReturnType<typeof setTimeout> | null = null;
-    const opPromise = (async () => {
-      try {
-        return await Promise.race([
-          operation(),
-          new Promise<T>((_, reject) => {
-            timeoutHandle = setTimeout(() => {
-              reject(new Error("Queued operation timed out"));
-            }, timeoutMs);
-          }),
-        ]);
-      } finally {
-        if (timeoutHandle) clearTimeout(timeoutHandle);
-      }
-    })();
+  //* === Public derived state ===
+  public jobs;
+  public outdatedStatus;
+  public expiredJobIds;
+  public globalWarning;
+  public isSyncingStatus;
+  public lastSyncTime;
 
-    // keep the internal queue reference safe-from-rejection so future ops aren't blocked
-    this.operationQueue = opPromise.then(
-      () => { },
-      (err) => {
-        console.warn("Queued operation failed or timed out:", err);
-      },
+  //* === Bookmark store fields ===
+  #storeWarning = $state<string>("");
+
+
+  constructor(
+    bookmarkRepository: BookmarkRepository = new BookmarkRepository(),
+    bookmarkTaskController: TaskController,
+    bookmarkBroadcastChannel: BookmarkBroadcastChannel = new BookmarkBroadcastChannel(
+      this.#loadFromStorageIDB.bind(this),
+      bookmarkRepository
+    ),
+    bookmarkSyncEngine: SyncOperation = new SyncOperation(
+      bookmarkRepository,
+      bookmarkTaskController,
+      bookmarkBroadcastChannel,
+    )
+  )
+  {
+    //* === Initialize dependencies ===
+    this.#bookmarkTaskController = bookmarkTaskController;
+    this.#bookmarkRepository = bookmarkRepository;
+    this.#bookmarkBroadcastChannel = bookmarkBroadcastChannel;
+    this.#bookmarkSyncEngine = bookmarkSyncEngine;
+    //* === Derived state for UI components ===
+    this.isSyncingStatus = $derived(bookmarkSyncEngine.isSyncing);
+    this.lastSyncTime = $derived(bookmarkSyncEngine.lastSyncTime);
+    this.jobs = $derived(
+      // Sort by ID descending to show newest bookmarks first, convert to array for easier mapping in UI
+      Array.from(bookmarkRepository.cacheJobs.values()).toSorted((a, b) => Number(b.id) - Number(a.id)),
     );
+    this.globalWarning = $derived(
+      (bookmarkSyncEngine.warningFromSync || this.#storeWarning || bookmarkBroadcastChannel.broadcastWarning) || undefined,
+    );
+    this.outdatedStatus = $derived(bookmarkBroadcastChannel.isOutdated);
+    this.expiredJobIds = $derived(bookmarkRepository.expiredJobs);
 
-    return opPromise;
+    //* Initialize the bookmark manager by loading data from IndexedDB and setting up necessary listeners and states
+    this.#init();
+  }
+
+  //* === Public methods for UI components to interact with bookmark data ===
+  public async addJob(id: CardJob[ 'id' ]): Promise<void>
+  {
+    if (this.#bookmarkBroadcastChannel.isOutdated) return;
+
+    return this.#bookmarkTaskController.runQueued(async () =>
+    {
+      try
+      {
+        const job = { id, title: "" } as CardJob; // skeleton job with minimal data to show loading state
+        this.#bookmarkSyncEngine.queueIdsForSync([ id ]); // queue for sync to get real data and update cache/IndexedDB
+        await this.#bookmarkRepository.addBookmark(job);
+      } catch (error)
+      {
+        console.error("Failed to add job:", error);
+        this.#storeWarning = "Gagal menambahkan bookmark. Silakan coba lagi.";
+      }
+    });
+  }
+
+
+  public async clearAll(): Promise<void>
+  {
+    if (this.#bookmarkBroadcastChannel.isOutdated) return;
+    return this.#bookmarkTaskController.runQueued(async () =>
+    {
+      try
+      {
+        await this.#bookmarkRepository.clearAll();
+      } catch (error)
+      {
+        console.error("Failed to clear all bookmarks:", error);
+        this.#storeWarning = "Gagal menghapus semua bookmark. Silakan coba lagi.";
+      }
+    });
+  }
+
+  public async removeJob(id: CardJob[ 'id' ]): Promise<void>
+  {
+    if (this.#bookmarkBroadcastChannel.isOutdated) return;
+
+    return this.#bookmarkTaskController.runQueued(async () =>
+    {
+      try
+      {
+        await this.#bookmarkRepository.removeBookmark(id);
+        this.#bookmarkBroadcastChannel.postMessage("sync", true); // notify other tabs to sync and update their cache with the new job
+      } catch (error)
+      {
+        console.error("Failed to remove job:", error);
+        this.#storeWarning = "Gagal menghapus bookmark. Silakan coba lagi.";
+      }
+    });
+  }
+
+  /*
+   * Global/full refresh bookmark, will perform full sync with API and update all tabs
+   * Since it's public facing, no need to worry about API hammering and let max-age or CDN caching handle it
+   */
+  public async refreshBookmark(): ReturnType<SyncOperation[ "syncToServer" ]>
+  {
+    const result = await this.#bookmarkSyncEngine.syncToServer();
+    if (result?.success && result.type === "full") this.#bookmarkBroadcastChannel.postMessage("sync", true);
+  }
+
+  public clearAllExpiredJobs(): void
+  {
+    this.#bookmarkRepository.clearExpiredJobs(undefined, true);
+  }
+
+  public removeExpiredJob(id: CardJob[ 'id' ]): void
+  {
+    this.#bookmarkRepository.clearExpiredJobs(id);
+  }
+
+  //* === Internal helper methods across bookmark management and shared workers ===
+
+  /**
+   * Emergency method to reset warnings from sync and broadcast channel
+   */
+  // public resetWarning = (): void =>
+  // {
+  //   this.#bookmarkSyncEngine.warningFromSync = "";
+  //   this.#bookmarkBroadcastChannel.broadcastWarning = "";
+  // }
+
+  /**
+   * Load bookmarks from IndexedDB into the cache, used for initial load and after receiving sync messages from other tabs. This method is queued to prevent multiple simultaneous loads and ensure data consistency. If loading fails, it will clear the cache to prevent showing stale data and log the error for debugging.
+   */
+  #loadFromStorageIDB(): ReturnType<BookmarkRepository[ "loadFromStorageIDB" ]>
+  {
+    return this.#bookmarkTaskController.runQueued(async () =>
+    {
+      await this.#bookmarkRepository.loadFromStorageIDB();
+    });
   }
 
   /**
-   * Setup cross-tab synchronization using BroadcastChannel.
-   *
-   * This enables bookmarks to sync across multiple tabs/windows of the same origin.
-   * - Only visible tabs process messages to avoid background interference.
-   * - Version checking ensures only tabs with matching theme versions (from server) sync.
-   * - If a newer version is detected, older tabs are forced to reload to prevent API conflicts.
-   * - Messages include 'update' (for add/remove), 'sync' (for full sync), and 'reload' (force refresh).
+   * @internal
    */
-  private crossTabChannel(): void {
-    this.channel = new BroadcastChannel("bookmark-sync");
-    this.channel.onmessage = (event: MessageEvent): void => {
-      const data = event.data as BookmarkBroadcastMessage;
+  #init(): void
+  {
+    if (typeof window === "undefined") return;
+    void this.#loadFromStorageIDB().catch((error: unknown) =>
+    {
+      console.error("Failed to load bookmarks from IndexedDB:", error);
+    });
+  }
+}
 
-      // Version mismatch: ignore messages from different builds/versions.
-      // If the incoming message is from a newer tab instance, mark this tab as outdated.
-      if (data.version !== undefined && data.version !== this.CURRENT_VERSION) {
-        const incomingTabTs = typeof data.tabStartedAt === "number" ? data.tabStartedAt : 0;
-        if (incomingTabTs > this.tabStartedAt) {
-          // Prevent new data mutations in outdated tabs and instruct user to refresh.
-          this.isOutdated = true;
-          this.warning =
-            "Versi baru tersedia di tab lain. Tutup tab lama dan muat ulang untuk melanjutkan.";
+
+class BookmarkBroadcastChannel extends BaseBroadcastChannel
+{
+
+  public broadcastWarning? = $state<string>();
+  public isOutdated = $state(false);
+  #tabStartedAt = new Date().getTime();
+  #tabInstanceID = `${this.currentVersion}-${this.#tabStartedAt}`;
+  #warningOutdated = "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
+  // * === Injected dependencies ===
+  #reloadStorageIDB: BookmarkRepository[ "loadFromStorageIDB" ];
+  #expiredJobs: BookmarkRepository[ 'expiredJobs' ];
+  constructor(
+    reloadStorageIDB: BookmarkRepository[ "loadFromStorageIDB" ],
+    bookmarkRepository: BookmarkRepository,
+  )
+  {
+    super("bookmark-sync"); // channel name
+    //* === Injected dependencies ===
+    this.#reloadStorageIDB = reloadStorageIDB;
+    this.#expiredJobs = bookmarkRepository.expiredJobs;
+
+    // Initialize cross-tab communication and event listeners
+    this.#init();
+
+  }
+
+  public postMessage(type: BookmarkBroadcastMessage[ 'type' ], withDelete: boolean = false): void
+  {
+    if (!this.getChannel) return;
+    const message: BookmarkBroadcastMessage = {
+      type,
+      ...(withDelete && { deleted: [ ...this.#expiredJobs ] }),
+      version: this.currentVersion,
+      tabStartedAt: this.#tabStartedAt,
+      broadcasterIdentifierId: this.#tabInstanceID,
+    };
+    this.getChannel.postMessage(message);
+  }
+
+  /**
+   * Handle incoming messages based on their type to perform appropriate actions 
+   * @param data The message data received from other tabs
+   */
+  #handleMessageType(data: BookmarkBroadcastMessage): void
+  {
+    if (data.broadcasterIdentifierId === this.#tabInstanceID) return; // ignore own messages 
+
+    const refreshStoreOnMessage = async () =>
+    {
+      data.deleted && data.deleted.forEach((id) => this.#expiredJobs.add(id)); // update expired jobs with deleted IDs from other tab
+      await this.#reloadStorageIDB();
+    }
+
+    switch (data.type)
+    {
+      //! this reload every tab
+      case "reload":
+        this.#reloadPage();
+        break;
+      case "sync":
+        refreshStoreOnMessage();
+        break;
+    }
+  }
+  #reloadPage(): void
+  {
+    fetch(location.href, { cache: "reload" }).then(() => location.reload());
+  }
+
+  /**
+  * Sets up cross-tab communication by listening for messages from other tabs
+  */
+  #setupCrossTabCommunication(): void
+  {
+    if (!this.getChannel) return;
+
+    /**
+     * Every postMessage call will trigger version check
+     */
+    this.getChannel.onmessage ??= (event: MessageEvent): void =>
+    {
+      const checkData = typia.validateEquals<BookmarkBroadcastMessage>(event.data);
+      if (!checkData.success)
+      {
+        console.warn("Received invalid message on bookmark channel:", checkData.errors);
+      }
+
+      const data: BookmarkBroadcastMessage = event.data;
+
+      if (data.version !== this.currentVersion)
+      {
+        // different tab with different version
+        const incomingTabTs = data.tabStartedAt;
+
+        // if different(fresh) tab has newer timestamp, mark current tab as outdated and reload
+        if (incomingTabTs > this.#tabStartedAt)
+        {
+          this.#markOutdated();
         }
-        location.replace(location.href); // Force reload to ensure all tabs are on the same version
+
         return;
       }
 
-      // Handle different message types using type-safe switch
-      switch (data.type) {
-        case "sync":
-          // Full sync: load from storage and update deleted jobs
-          void this.loadFromStorage();
-          this.deletedJobs = data.deleted ?? [];
-          break;
-        case "reload":
-          // Explicit reload from newer tabs: force a refresh to align versions
-          if (browser) location.replace(location.href);
-          break;
-        case "update":
-        default:
-          // Update message: load from storage and schedule API sync retry
-          void this.loadFromStorage();
-          // schedule a single retry (avoid stacking many scheduled syncs)
-          if (!this.#retryTimer) {
-            this.#retryTimer = setTimeout(() => {
-              this.#retryTimer = null;
-              void this.syncWithAPI();
-            }, 1000);
-          }
-          break;
-      }
+      this.#handleMessageType(data);
+    };
+  }
+
+  #initEventListener(): void
+  {
+    const handler = () =>
+    {
+      if (document.visibilityState === "visible" && !this.isOutdated) void this.#reloadStorageIDB();
     };
 
-    // Add visibility change listener: sync data when tab becomes visible again
-    // This ensures we don't miss broadcasts while in the background
-    if (browser) {
-      document.addEventListener("visibilitychange", () => {
-        if (document.visibilityState === "visible" && !this.isOutdated) {
-          void this.loadFromStorage();
-          // Schedule a sync to pick up any changes from the API while we were away
-          if (!this.#retryTimer) {
-            this.#retryTimer = setTimeout(() => {
-              this.#retryTimer = null;
-              void this.syncWithAPI();
-            }, 500);
-          }
-        }
-      });
-    }
+    document.addEventListener("visibilitychange", handler);
   }
 
-  private async loadFromStorage(): Promise<void> {
-    try {
-      this.cache.clear();
-      const stored = await bookmarkIDB.loadBookmarks();
-      stored.forEach((job) => this.cache.set(Number(job.id)!, job));
-      this.jobs = Array.from(this.cache.values()).sort(
-        (a, b) => (Number(b.id) || 0) - (Number(a.id) || 0),
-      );
-    } catch {
-      this.jobs = [];
-    } finally {
-      if (!this.isInitialized) this.isInitialized = true;
-    }
-  }
-
-  // immediate low-level save that actually writes to IndexedDB
-  private async saveToStorageImmediate(): Promise<void> {
-    if (this.#saveInProgress) {
-      // if a save is already in progress, avoid overlapping writes
-      return;
-    }
-    this.#saveInProgress = true;
-    try {
-      // Avoid deep clone to save memory on mobile; assume jobs are serializable
-      await bookmarkIDB.saveBookmarks(Array.from(this.cache.values()));
-    } catch (error) {
-      console.error("Failed to save bookmarks to IndexedDB:", error);
-      throw error;
-    } finally {
-      this.#saveInProgress = false;
-    }
+  #init(): void
+  {
+    if (typeof window === "undefined") return;
+    this.#setupCrossTabCommunication();
+    this.#initEventListener();
   }
 
   /**
-   * Public save method used by callers. This coalesces frequent save requests
-   * into a single physical write using a debounced function while returning
-   * a Promise that resolves when the actual write completes. Callers can
-   * await this method to be notified when the save finished.
+   * Marks the current tab as outdated if it receives a message from another tab with a different version
    */
-  private async saveToStorage(): Promise<void> {
-    if (!this.#debouncedSaveCall) {
-      this.#debouncedSaveCall = debounce(async () => {
-        try {
-          await this.saveToStorageImmediate();
-          // resolve any pending promise waiting on this save
-          if (this.#pendingSaveResolve) {
-            this.#pendingSaveResolve();
-          }
-        } catch (error) {
-          // forward the error to awaiting callers so callers can revert
-          if (this.#pendingSaveReject) this.#pendingSaveReject(error);
-        } finally {
-          this.#pendingSaveResolve = null;
-          this.#pendingSaveReject = null;
-          this.#pendingSavePromise = null;
-        }
-      }, 300);
-    }
-
-    if (!this.#pendingSavePromise) {
-      this.#pendingSavePromise = new Promise<void>((resolve, reject) => {
-        this.#pendingSaveResolve = resolve;
-        this.#pendingSaveReject = reject;
-      });
-    }
-
-    // schedule (or reschedule) the debounced save
-    this.#debouncedSaveCall();
-    return this.#pendingSavePromise!;
+  #markOutdated(): void
+  {
+    this.isOutdated ||= true;
+    this.broadcastWarning = this.#warningOutdated;
+    setTimeout(() => this.#reloadPage(), 6000);
   }
 
-  public async addJob(id: number): Promise<void> {
-    if (this.isOutdated) {
-      this.warning =
-        "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
-      return;
-    }
+};
 
-    return this.runQueued(async () => {
-      try {
-        const job: Pick<CardJob, 'id' | 'title'> = { id, title: "" };
-        const clonedJob = JSON.parse(JSON.stringify(job));
-        this.cache.set(clonedJob.id!, clonedJob);
-        this.jobs = Array.from(this.cache.values()).sort(
-          (a, b) => (b.id || 0) - (a.id || 0),
-        );
-        // Persist sync results immediately to ensure authoritative data is saved
-        await bookmarkIDB.addBookmark(clonedJob);
-        if (this.channel)
-          this.channel.postMessage({
-            type: "update",
-            version: this.CURRENT_VERSION,
-          } as BookmarkBroadcastMessage); // Broadcast update with version for cross-tab sync
-        // Sync only the new job to get full data
-        this.pendingSyncIds.add(id);
-        this.debouncedSync?.();
-      } catch (error) {
-        console.error("Failed to add job:", error);
-        this.warning = "Gagal menambahkan bookmark. Silakan coba lagi.";
-        // Revert cache
-        this.cache.delete(id);
-        this.jobs = Array.from(this.cache.values()).sort(
-          (a, b) => (b.id || 0) - (a.id || 0),
-        );
-      }
+class BookmarkRepository
+{
+  // fow now direct access on module scope
+  public bookmarkIDB: BookmarkIDB;
+  public cacheJobs = new SvelteMap<number, CardJob>();
+  public expiredJobs = new SvelteSet<CardJob[ 'id' ]>();
+  constructor(bookmarkIDB: BookmarkIDB = new BookmarkIDB('JobBookmarks', 1, 'bookmarks'))
+  {
+    this.bookmarkIDB = bookmarkIDB;
+  }
+
+  public async clearAll(): Promise<void>
+  {
+    await this.bookmarkIDB.clearBookmarks().then(() =>
+    {
+      this.cacheJobs.clear();
+      this.expiredJobs.clear();
+    }).catch((error) =>
+    {
+      console.error("Failed to clear bookmarks from IndexedDB:", error);
     });
   }
 
-  public async removeJob(id: number): Promise<void> {
-    if (this.isOutdated) {
-      this.warning =
-        "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
-      return;
-    }
+  public clearExpiredJobs(id?: CardJob[ 'id' ], clearAll: boolean = false): void 
+  {
+    if (clearAll) this.expiredJobs.clear();
+    if (id) this.expiredJobs.delete(id);
+  }
 
-    return this.runQueued(async () => {
-      try {
-        this.cache.delete(id);
-        this.jobs = Array.from(this.cache.values()).sort(
-          (a, b) => (b.id || 0) - (a.id || 0),
-        );
-        this.deletedJobs = this.deletedJobs.filter((i) => i !== id);
-        // Persist deletions immediately to avoid accidental reappearance
-        await bookmarkIDB.removeBookmark(id);
-        if (this.channel)
-          this.channel.postMessage({
-            type: "update",
-            version: this.CURRENT_VERSION,
-          } as BookmarkBroadcastMessage); // Broadcast update with version for cross-tab sync
-      } catch (error) {
-        console.error("Failed to remove job:", error);
-        this.warning = "Gagal menghapus bookmark. Silakan coba lagi.";
-      }
+  /**
+   */
+  public async addBookmark(job: CardJob): Promise<void>
+  {
+    this.cacheJobs.set(Number(job.id), job);
+    await this.bookmarkIDB.addBookmark(job).catch((error) =>
+    {
+      console.error("Failed to add bookmark to IndexedDB:", error);
+      this.cacheJobs.delete(Number(job.id)); // rollback cache if IDB operation fails to prevent stale data
+    });
+  }
+
+  public async removeBookmark(id: CardJob[ 'id' ]): Promise<void>
+  {
+    this.cacheJobs.delete(Number(id));
+    this.expiredJobs.add(id); // temporarly mark as expired so other tabs can know it's deleted
+    await this.bookmarkIDB.removeBookmark(Number(id)).catch((error) =>
+    {
+      console.error("Failed to remove bookmark from IndexedDB:", error);
+      this.expiredJobs.delete(id);
+    }).finally(() =>
+    {
+      this.expiredJobs.delete(id);
     });
   }
 
   /**
-   * Toggle saved state for a job id. If saved, remove it; otherwise add it.
+   * Load bookmarks from IndexedDB into the cache, used for initial load and after receiving sync messages from other tabs. This method is queued to prevent multiple simultaneous loads and ensure data consistency. If loading fails, it will clear the cache to prevent showing stale data and log the error for debugging.
    */
-  public async toggleSave(id: number): Promise<void> {
-    if (this.isOutdated) {
-      this.warning =
-        "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
-      return;
-    }
-
-    return this.runQueued(async () => {
-      if (this.isSaved(id)) {
-        await this.removeJob(id);
-      } else {
-        await this.addJob(id);
-      }
+  public async loadFromStorageIDB(): Promise<void>
+  {
+    if (typeof window === "undefined") return;
+    await this.bookmarkIDB.loadBookmarks().then((jobs) =>
+    {
+      if (this.cacheJobs.size) this.cacheJobs.clear();
+      jobs.forEach((job) => this.cacheJobs.set(Number(job.id), job));
+    }).catch((error) =>
+    {
+      console.error("Failed to load bookmarks from IndexedDB:", error);
+      this.cacheJobs.clear(); // clear cache to prevent showing stale data if loading fails
     });
   }
+}
 
-  public isSaved(id: number): boolean {
-    return this.jobs.some((job) => job.id === id);
+class SyncOperation
+{
+
+  public isSyncing = $state(false);
+  public warningFromSync = $state<string>(""); // Specific warning for API issues
+  public lastSyncTime = new SvelteDate();
+  #pendingSyncIds = new Set<number>(); // unique IDs pending sync
+  #debouncedSync = debounce(() => this.#syncPending(), 2200);
+  #localStorageKey = "bookmarkLastSync";
+  //* === Injected dependencies ===
+  #bookmarkRepository: Pick<BookmarkRepository, "cacheJobs" | "expiredJobs" | "bookmarkIDB">;
+  #bookmarkTaskController: TaskController;
+  #isOutdated: BookmarkBroadcastChannel[ 'isOutdated' ];
+  get #getLatestJobIds(): CardJob[ 'id' ][] { return [...this.#bookmarkRepository.cacheJobs.keys()]; }
+
+  constructor(
+    bookmarkRepository: BookmarkRepository,
+    bookmarkTaskController: TaskController,
+    bookmarkBroadcastChannel: Pick<BookmarkBroadcastChannel, "isOutdated">,
+  )
+  {
+    this.#bookmarkRepository = bookmarkRepository;
+    this.#bookmarkTaskController = bookmarkTaskController;
+
+    //* === Computed state from dependencies ===
+    this.#isOutdated = $derived(bookmarkBroadcastChannel.isOutdated);
+    this.#init();
   }
 
-  public async syncWithAPI(idsToSync?: number[]): Promise<void> {
-    if (this.isOutdated) {
-      this.warning =
-        "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
-      return;
-    }
+  /**
+   * @param idsToSync debounced sync from pending IDs
+   * @internal queueing mechanism to prevent multiple simultaneous syncs
+   * * if idsToSync not provided, global full sync will be performed by taking snapshot of current job IDs in cache
+   * ! Every sync will trigger version check, so if tab is outdated it will stop syncing and show warning instead of doing unnecessary API calls
+   */
+  public async syncToServer(idsToSync?: CardJob[ 'id' ][]): Promise<void | { success: boolean; type: "partial" | "full" }>
+  {
+    if (this.#isOutdated || document.visibilityState !== "visible") return;
 
-    // Only sync when running in browser and tab is visible to avoid background interference
-    if (!browser || document.visibilityState !== "visible") return;
+    const syncError = (error: unknown, idsToSync?: CardJob[ 'id' ][]): void =>
+    {
+      console.error("Failed to sync bookmarks with API:", error);
+      this.warningFromSync = "Gagal menyinkronkan bookmark. Silakan coba lagi.";
+      // If specific IDs failed to sync, remove them from cache to prevent stuck loading states and mark as expired for user feedback
+      if (idsToSync) idsToSync.forEach((id) => this.#bookmarkRepository.cacheJobs.delete(id));
+    };
 
-    return this.runQueued(async () => {
-      if (this.isSyncing) {
-        // if already syncing, set a warning and ensure we only schedule one retry
-        this.warning = "Data tidak sinkron. Tolong refresh ulang.";
-        if (!this.#retryTimer) {
-          this.#retryTimer = setTimeout(() => {
-            this.#retryTimer = null;
-            void this.syncWithAPI(idsToSync);
-          }, 3000);
-        }
-        return;
-      }
-      // clear any pending retry as we're starting a real sync now
-      if (this.#retryTimer) {
-        clearTimeout(this.#retryTimer);
-        this.#retryTimer = null;
-      }
-      this.warning = "";
-      // Only set global syncing for full sync, not individual job refresh
-      if (!idsToSync) {
-        this.isSyncing = true;
-      }
+    return this.#bookmarkTaskController.runQueued(async () =>
+    {
+      interface SyncResult { success: boolean; type: "partial" | "full" };
 
-      const performSync = async () => {
-        const ids = idsToSync || this.jobs.map((job) => Number(job.id) || 0);
-        if (ids.length === 0) return;
-
-        const fetchedJobs = await APIServiceBrowser.syncBookmarkGraphQL(ids);
-        const plainFetchedJobs: CardJob[] = JSON.parse(
-          JSON.stringify(fetchedJobs),
-        );
-
-        // Update cache with fetched jobs
-        plainFetchedJobs.forEach((job: CardJob) =>
-          this.cache.set(Number(job.id)!, job),
-        );
-
-        // Remove jobs that were requested but not returned to prevent stuck skeletons
-        const returnedIds = new SvelteSet(
-          plainFetchedJobs.map((j) => Number(j.id)),
-        );
-        const requestedIds =
-          idsToSync || this.jobs.map((j) => Number(j.id) || 0);
-        requestedIds.forEach((id) => {
-          if (!returnedIds.has(id)) {
-            this.cache.delete(id);
-          }
-        });
-
-        this.jobs = Array.from(this.cache.values()).sort(
-          (a, b) => (Number(b.id) || 0) - (Number(a.id) || 0),
-        );
-        await this.saveToStorage();
-
-        // Handle full sync metadata
-        if (!idsToSync) {
-          const previousIds = new SvelteSet<number>(
-            this.jobs.map((job) => Number(job.id) || 0),
-          );
-          const currentIds = new SvelteSet<number>(
-            this.jobs.map((job) => Number(job.id) || 0),
-          );
-          this.deletedJobs = Array.from(previousIds).filter(
-            (id) => !currentIds.has(id),
-          );
-          this.lastSyncTime = generalJobStore.now.getTime();
-          if (this.channel) {
-            this.channel.postMessage({
-              type: "sync",
-              deleted: JSON.parse(JSON.stringify(this.deletedJobs)),
-              version: this.CURRENT_VERSION,
-              tabStartedAt: this.tabStartedAt,
-            }); // Broadcast full sync with version
-          }
-        }
+      if (this.isSyncing)
+      {
+        await this.#scheduleSyncRetry(idsToSync);
+        return; // yield to retry task without proceeding to performSync
       };
 
-      try {
-        await performSync();
-      } catch (error) {
-        console.error("Failed to sync bookmarks with API:", error);
-        // If syncing specific ids failed, remove the placeholders to prevent stuck skeletons
-        if (idsToSync) {
-          idsToSync.forEach((id) => this.cache.delete(id));
-          this.jobs = Array.from(this.cache.values()).sort(
-            (a, b) => (b.id || 0) - (a.id || 0),
-          );
-        }
-      } finally {
-        // Only reset global syncing for full sync
-        if (!idsToSync) {
+      // clear any pending retry as we're starting a real sync now
+      this.#bookmarkTaskController.cancelRetry();
+
+      if (!idsToSync) this.isSyncing = true;
+
+      return await this.#executeSync(idsToSync).then(() =>
+      {
+
+        return {
+          success: true,
+          type: idsToSync ? "partial" : "full",
+        } satisfies SyncResult;
+
+      }).catch((error: unknown) =>
+      {
+
+        syncError(error, idsToSync);
+        return {
+          success: false,
+          type: idsToSync ? "partial" : "full",
+        } satisfies SyncResult;
+
+      }).finally(() =>
+      {
+        if (!idsToSync)
+        {
           this.isSyncing = false;
         }
-      }
+      });
     }, 60000);
   }
 
-  private async syncPending(): Promise<void> {
-    const ids = Array.from(this.pendingSyncIds);
-    this.pendingSyncIds.clear();
-    if (ids.length > 0) {
-      await this.syncWithAPI(ids);
-    }
-  }
-
-  public flushSync(): void {
-    if (this.debouncedSync) this.debouncedSync.flush();
+  /**
+  * 
+  * @param ids IDs to be queued for syncing, will be debounced to batch multiple rapid calls into one sync operation
+  */
+  public queueIdsForSync(ids: Parameters<typeof this.syncToServer>[ 0 ]): void
+  {
+    if (!ids || ids.length === 0) return;
+    ids.forEach((id) => this.#pendingSyncIds.add(id));
+    this.#debouncedSync?.();
   }
 
   /**
-   * Cancel any pending scheduled sync.
+   * Perform the actual sync operation for pending IDs, @see SyncOperation.queueIdsForSync
    */
-  public cancelSync(): void {
-    if (this.debouncedSync) this.debouncedSync.cancel();
-  }
-
-  public async clearAll(): Promise<void> {
-    return this.runQueued(async () => {
-      try {
-        this.jobs = [];
-        this.cache.clear();
-        this.deletedJobs = [];
-        await bookmarkIDB.clearBookmarks();
-        if (this.channel)
-          this.channel.postMessage({
-            type: "update",
-            version: this.CURRENT_VERSION,
-            tabStartedAt: this.tabStartedAt,
-          }); // Broadcast clear with version
-      } catch (error) {
-        console.error("Failed to clear all bookmarks:", error);
-        this.warning = "Gagal menghapus semua bookmark. Silakan coba lagi.";
-      }
-    });
-  }
-
-  public clearDeleted(): void {
-    this.deletedJobs = [];
-  }
-
-  public init(): void {
-    if (!browser || this.#hasStarted) {
-      return;
+  #syncPending(): void
+  {
+    const ids = [ ...this.#pendingSyncIds ];
+    if (ids.length > 0)
+    {
+      this.syncToServer(ids).then(() =>
+      {
+        this.#saveLastSyncTimeToLocalStorage();
+      }).catch((error) =>
+        console.error("Failed to sync pending bookmarks:", error)
+      ).finally(() =>
+      {
+        this.#pendingSyncIds.clear();
+      });
     }
-
-    this.#hasStarted = true;
-
-    const schedule =
-      typeof window.requestIdleCallback === "function"
-        ? window.requestIdleCallback.bind(window)
-        : (callback: IdleRequestCallback) => window.setTimeout(callback, 0);
-
-    schedule(() => {
-      this.loadFromStorage();
-      // Only sync if data is stale (older than 5 minutes) or no sync has been done
-      const now = generalJobStore.now.getTime();
-      const isStale = now - this.lastSyncTime > 5 * 60 * 1000; // 5 minutes
-      if (isStale || this.lastSyncTime === 0) {
-        // Run initial sync outside the queue to avoid blocking user interactions
-        void this.syncWithAPI();
-      }
-    });
   }
-}
 
-export const bookmarkStore = new BookmarkManager();
+  /**
+   * Helper of @see syncToServer to perform the actual sync logic
+   */
+  async #executeSync(idsToSync?: Parameters<typeof this.syncToServer>[ 0 ]): Promise<void>
+  {
+    const snapshotBeforeSync = new Set(idsToSync ?? this.#getLatestJobIds); // requestedIds to server or snapshot if full sync
+    if (snapshotBeforeSync.size === 0) return; // no jobs to sync, skip API call
+
+    const fetchedJobs = await APIServiceBrowser.syncBookmarkGraphQL([ ...snapshotBeforeSync ]);
+    if (fetchedJobs.length === 0) return;
+
+    this.#reconcileCacheWithServer(snapshotBeforeSync, fetchedJobs);
+
+    // persist the successfully synced jobs to IndexedDB, jobs repo are reactive so it will reflect the latest state after reconciliation
+    const jobToPersist = this.#bookmarkRepository.cacheJobs.values();
+    await this.#bookmarkRepository.bookmarkIDB.saveBookmarks([ ...jobToPersist ]);
+
+    // Handle global full sync metadata broadcast
+    if (!idsToSync) this.#prepareGlobalSync(snapshotBeforeSync);
+  }
+
+  /**
+   * Prepare the result of a global full sync
+   * @param snapshotBeforeSync Metadata of the sync operation
+   */
+  #prepareGlobalSync(snapshotBeforeSync: Set<CardJob[ 'id' ]>): void
+  {
+    this.#pendingSyncIds.clear();
+    //* get latest snapshot from reactive source after reconciliation
+    const snapshotAfterSync = new Set(this.#getLatestJobIds);
+    const diff = snapshotBeforeSync.difference(snapshotAfterSync);
+    diff.forEach((id) => this.#bookmarkRepository.expiredJobs.add(id));
+    this.#saveLastSyncTimeToLocalStorage();
+  }
+
+  /**
+   * @param requestedIds IDs that were requested to be synced with the server, used to compare with server response and determine if any jobs were deleted on the server and need to be removed from cache and marked as expired for user feedback
+   * @param fetchedJobs Jobs returned from the server for the requested IDs, used to update the cache with the latest data from the server and ensure consistency across tabs after sync operations
+   */
+  #reconcileCacheWithServer(requestedIds: Set<CardJob[ 'id' ]>, fetchedJobs: CardJob[]): void
+  {
+
+    const serverReturnedIds = new Set(fetchedJobs.map((job) => Number(job.id)));
+    const diff = requestedIds.difference(serverReturnedIds); // IDs that were requested but not returned by server, likely deleted on server
+    diff.forEach((id) =>
+    {
+      this.#bookmarkRepository.cacheJobs.delete(Number(id));
+      this.#bookmarkRepository.expiredJobs.add(Number(id));
+    });
+
+    // Update cache with fetched jobs
+    fetchedJobs.forEach((job: CardJob) =>
+      this.#bookmarkRepository.cacheJobs.set(Number(job.id), job),
+    );
+  }
+
+  /**
+   * @param idsToSync IDs that failed to sync, will be retried after a delay with debouncing to prevent multiple rapid retries
+   */
+  #scheduleSyncRetry(idsToSync: Parameters<typeof this.syncToServer>[ 0 ]): void
+  {
+    this.warningFromSync = "Sedang mencoba menyinkronkan ulang.";
+    if (!this.#bookmarkTaskController.isRetryScheduled)
+    {
+      this.#bookmarkTaskController.scheduleRetryTask(3000, async () =>
+      {
+        await this.syncToServer(idsToSync);
+      });
+    }
+  }
+
+  #saveLastSyncTimeToLocalStorage(): void
+  {
+    this.lastSyncTime.setTime(Date.now());
+    localStorage.setItem(this.#localStorageKey, this.lastSyncTime.getTime().toString());
+  }
+
+  #init(): void
+  {
+    if (typeof window === "undefined") return;
+    const localStorageSyncTime = localStorage.getItem(this.#localStorageKey);
+    if (localStorageSyncTime) this.lastSyncTime.setTime(Number(localStorageSyncTime));
+  }
+
+};
+
+export const bookmarkStore = new BookmarkManager(
+  new BookmarkRepository(),
+  new TaskController(),
+);

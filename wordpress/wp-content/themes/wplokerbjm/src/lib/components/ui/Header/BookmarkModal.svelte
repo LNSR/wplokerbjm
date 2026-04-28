@@ -1,540 +1,430 @@
-<script module lang="ts">
-  import { onMount, onDestroy } from "svelte";
+<script lang="ts">
+  import { onMount } from "svelte";
   import { SvelteSet, SvelteMap } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
-  import { generalJobStore } from "$lib/stores/General.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import { virtualizationService } from "$lib/utils/Virtualization.svelte";
-  import type { CardJob } from "@/types";
-  import {
-    isMobile,
-    isJobGridEl,
-    attachPortal,
-  } from "$lib/utils/elements.svelte";
-  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
+  import { useVirtualization } from "$lib/features/Virtualization.svelte";
+  import type { ListVirtualizationState } from "@/lib/features/Virtualization.svelte";
+  import type { CardJob, DeadlineStatus } from "@/types";
+  import { isJobGridEl } from "$lib/utils/elements.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { goto } from "$app/navigation";
-  import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
+  import { routeStateStore } from "$lib/stores/Route.svelte";
   import JobCard from "@components/ui/Shared/JobCard.svelte";
-  import { fade } from "svelte/transition";
+  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
   import {
     BookmarkSolid,
     XmarkSolid,
     TrashAltSolid,
     ExclamationTriangleSolid,
     ExclamationCircleSolid,
-    CheckCircleSolid,
     MagnifyingGlassSolid,
   } from "svelte-awesome-icons";
   import type { Attachment } from "svelte/attachments";
+  import type { KeyboardKeysEvent } from "@/types";
+  import {
+    showDeadline,
+    showStatusJob,
+    showTimeAgo,
+  } from "$lib/composables/JobUI.svelte";
+  import { useSidePanel } from "$lib/composables/SidePanel.svelte";
 
+  let { open = $bindable() }: { open: boolean } = $props();
+
+  // This component scope state properties
   let modalEl: HTMLDialogElement;
-  let deleteConfirmModal: HTMLDialogElement;
   let modalBox: HTMLElement;
-  let dragHandle = $state<HTMLElement | undefined>();
-  let contentContainer = $state<HTMLDivElement | undefined>();
-
-  // Virtualization state
-  let containerScrollY = $state(0);
-  let containerHeight = $state(0);
-  let cardHeights = new SvelteMap(
-    routeStateStore.getCardHeights("bookmarkModal"),
-  );
-
-  // Dragging state
-  let translate = $state({ x: 0, y: 0 });
-  let isDragging = $state(false);
-  let activePointerId: number | null = null;
-  let startClient = $state({ x: 0, y: 0 });
-  let startHeight = $state(0);
-
-  // loading mirrors the central store isSyncing to ensure UI reflects store activity
-  let loading = $derived(bookmarkStore.isSyncing);
-  let error = $state("");
-  const showCopySuccess = $state(false);
-  let isOffline = $state(false);
-  let showDeleteConfirm = $state(false);
-  const removingIds = new SvelteSet<number>();
-
-  // Store bindings
-  const savedJobs = $derived(bookmarkStore.jobs);
-  const warning = $derived(bookmarkStore.warning);
-  const isOutdated = $derived(bookmarkStore.isOutdated);
-  const deletedJobs = $derived(bookmarkStore.deletedJobs);
-  const lastSyncTime = $derived(bookmarkStore.lastSyncTime);
-
-  const STALE_THRESHOLD = 5 * 60 * 1000;
+  let contentRect = $state<DOMRectReadOnly | null>(null);
 
   // Search state for filtering saved jobs (title and company)
-  let searchQuery = $state("");
-  let isSearchOpen = $state(false);
-  let searchInput = $state<HTMLInputElement | null>(null);
+  const isMobile = $derived(deviceDetector.isPlatformMobile);
 
-  // Bookmark for medium-heavy data operations
-  class BookmarkHandler {
-    async fetchJobs(forceRefresh = false): Promise<void> {
-      if (!forceRefresh && savedJobs.length === 0) {
-        return;
-      }
-      const now = Date.now();
-      const isStale = now - lastSyncTime > STALE_THRESHOLD;
-      if (!forceRefresh && !isStale && savedJobs.length > 0) return;
-      if (loading) return;
-      loading = true;
-      error = "";
-      isOffline = false;
-      try {
-        await bookmarkStore.syncWithAPI();
-      } catch {
-        error = "Gagal memuat data. Silakan coba lagi.";
-        isOffline = !navigator.onLine;
-      } finally {
-        loading = false;
-      }
-    }
+  class SearchQueryController {
+    searchQuery = $state("");
+    isSearchOpen = $state(false);
+    #searchInputEl: HTMLInputElement | null = null;
 
-    async removeBookmark(id: number): Promise<void> {
-      removingIds.add(id);
-      await new Promise((resolve) => setTimeout(resolve, 200));
-      await bookmarkStore.removeJob(id);
-      removingIds.delete(id);
-    }
+    public toggleInputSearch = (): void => {
+      this.isSearchOpen = !this.isSearchOpen;
+    };
 
-    handleDeleteAll(): void {
-      showDeleteConfirm = true;
-    }
+    public closeSearch = (): void => {
+      this.isSearchOpen = false;
+      this.searchQuery = "";
+    };
 
-    async confirmDeleteAll(): Promise<void> {
-      showDeleteConfirm = false;
-      savedJobs.forEach((job) => {
-        if (job.id) removingIds.add(job.id);
-      });
-      loading = true;
-      try {
-        await bookmarkStore.clearAll();
-        removingIds.clear();
-      } catch {
-        error = "Gagal menghapus semua bookmark. Silakan coba lagi.";
-        removingIds.clear();
-      } finally {
-        loading = false;
-      }
-    }
-
-    cancelDeleteAll(): void {
-      showDeleteConfirm = false;
-    }
-
-    handleClearDeleted(): void {
-      bookmarkStore.clearDeleted();
-    }
-
-    handleRefresh(): Promise<void> {
-      return bookmarkHandler.fetchJobs(true);
-    }
-
-    scheduleFetchJobs = () => {
-      const runFetch = () => void bookmarkHandler.fetchJobs();
-      if (typeof requestIdleCallback === "function") {
-        requestIdleCallback(() => runFetch());
-      } else {
-        requestAnimationFrame(() => runFetch());
+    public onKeydownSearch = (e: KeyboardEvent): void => {
+      const keys: KeyboardKeysEvent = e.key as KeyboardKeysEvent;
+      if (keys === "Escape") {
+        this.closeSearch();
       }
     };
 
-    displayedSavedJobs = $derived.by(() => {
-      return savedJobs.map((job) => ({
+    /**
+     * during onMount
+     */
+    public initializeOpenOnDesktop = (): void => {
+      if (open && !isMobile && !this.isSearchOpen) {
+        this.isSearchOpen = true;
+      }
+    };
+
+    public observeSearchInputFocus(): Attachment<HTMLInputElement> {
+      return (inputEl: HTMLInputElement) => {
+        if (inputEl !== this.#searchInputEl) this.#searchInputEl = inputEl;
+        if (this.isSearchOpen) this.#searchInputEl?.focus();
+        return () => {
+          this.#searchInputEl?.blur();
+        };
+      };
+    }
+  }
+
+  class BookmarkUIHandler {
+    public showDeleteConfirm = $state(false);
+    public removingIds = new SvelteSet<number>(); // track ids of jobs being removed to apply exit animation
+    public getRefreshTime = $derived(bookmarkStore.lastSyncTime.getTime());
+    public error = $state("");
+
+    public refreshBookmark(): void {
+      if (bookmarkStore.isSyncingStatus) return;
+      this.error = "";
+      try {
+        void bookmarkStore.refreshBookmark();
+      } catch {
+        this.error = "Gagal memuat data. Silakan coba lagi.";
+      }
+    }
+
+    public async removeBookmark(id: number): Promise<void> {
+      this.removingIds.add(id);
+      await new Promise((resolve) => setTimeout(resolve, 300));
+      bookmarkStore
+        .removeJob(id)
+        .then(() => {
+          this.removingIds.delete(id);
+        })
+        .catch(() => {
+          this.error = `Gagal menghapus bookmark ID ${id}. Silakan coba lagi.`;
+        });
+    }
+
+    public showDeleteAllConfirmation(): void {
+      this.showDeleteConfirm = true;
+    }
+
+    public deleteAllApproved(): void {
+      this.showDeleteConfirm = false;
+      bookmarkStore.jobs.forEach((job) => {
+        if (job.id) this.removingIds.add(job.id);
+      });
+      bookmarkStore
+        .clearAll()
+        .then(() => {
+          this.removingIds.clear();
+        })
+        .catch(() => {
+          this.error = "Gagal menghapus semua bookmark. Silakan coba lagi.";
+          this.removingIds.clear();
+        });
+    }
+
+    public removeExpiredJob(id: number): void {
+      bookmarkStore.removeExpiredJob(id);
+    }
+
+    public cancelDeleteAll(): void {
+      this.showDeleteConfirm = false;
+    }
+
+    public emptyListofExpired(): void {
+      bookmarkStore.clearAllExpiredJobs();
+    }
+
+    #displayedSavedJobs = $derived(
+      bookmarkStore.jobs.map((job) => ({
         ...job,
-        timeAgo: generalJobStore.showTimeAgo(job.post_time!),
+        timeAgo: showTimeAgo(job.post_time!),
         deadlineInfo: job.ringkasanPekerjaan?.deadline
-          ? generalJobStore.showDeadline(job.ringkasanPekerjaan.deadline)
-          : { text: "", status: "unknown" },
+          ? showDeadline(job.ringkasanPekerjaan.deadline)
+          : { text: "", status: "unknown" as DeadlineStatus },
         // statusInfo is a single status string now (previously an object with identical label/status)
         statusInfo: job.status_pekerjaan
-          ? generalJobStore.showStatusJob(job.status_pekerjaan)
+          ? showStatusJob(job.status_pekerjaan)
           : "none",
-      }));
-    });
-
-    filteredDisplayedJobs = $derived.by(() => {
-      const q = String(searchQuery || "")
+      })),
+    );
+    public filteredDisplayedJobs = $derived.by(() => {
+      const q = String(useSearchQuery.searchQuery || "")
         .trim()
         .toLowerCase();
-      if (!q) return this.displayedSavedJobs;
-      return this.displayedSavedJobs.filter((job) => {
+      if (!q) return this.#displayedSavedJobs;
+      return this.#displayedSavedJobs.filter((job) => {
         const title = String(job.title || "").toLowerCase();
         const company = String(job.nama_perusahaan || "").toLowerCase();
         return title.includes(q) || company.includes(q);
       });
     });
+
+    public formattedLastSync = $derived(
+      bookmarkStore.lastSyncTime.toLocaleString("en-GB", {
+        year: "numeric",
+        month: "numeric",
+        day: "numeric",
+        hour: "numeric",
+        minute: "numeric",
+        hour12: true,
+      }),
+    );
+    public observeOpenCloseDialog(): Attachment<HTMLDialogElement> {
+      return (dialog: HTMLDialogElement) => {
+        if (
+          bookmarkHandlerUI.showDeleteConfirm &&
+          !dialog.open &&
+          dialog.isConnected
+        ) {
+          dialog.showModal();
+        } else if (!bookmarkHandlerUI.showDeleteConfirm && dialog.open) {
+          dialog.close();
+        }
+
+        return () => {
+          dialog.close();
+        };
+      };
+    }
   }
 
   class VirtualizationManager {
-    public measuring = $state(false); // measuring: true while card heights are being measured in background to avoid INP
-    #measurePollHandle: ReturnType<typeof setInterval> | null = null;
-    #measureTimeoutHandle: ReturnType<typeof setTimeout> | null = null;
+    public measuring: boolean = $state(true); // show spinner until we measure heights of visible items to prevent INP
+    public containerScrollY = $state(0);
+    public cardHeights = routeStateStore.getCardHeights("bookmarkModal");
+    #polling: ReturnType<typeof $effect.root> | null = null;
 
-    virtualizedJobs = $derived.by(() => {
-      return virtualizationService.computeList({
-        displayJobs: bookmarkHandler.filteredDisplayedJobs,
-        scrollY: containerScrollY,
-        containerHeight: containerHeight,
-        cardHeights: cardHeights,
+    public virtualizedJobs: ListVirtualizationState<CardJob> = $derived(
+      useVirtualization.computeList({
+        displayJobs: bookmarkHandlerUI.filteredDisplayedJobs,
+        scrollY: this.containerScrollY,
+        containerHeight: contentRect?.height || 0,
+        cardHeights: this.cardHeights,
         fallbackHeight: 200,
         gap: 24,
-        buffer: 1,
-      });
-    });
+        buffer: 2,
+      }),
+    );
 
-    measureHeight(jobId: number): Attachment<HTMLElement> {
-      return virtualizationService.createMeasureHeight(cardHeights, jobId);
-    }
-
-    // Update container dimensions
-    updateContainerDimensions(): void {
-      if (!contentContainer) return;
-
-      // Measure on next animation frame to ensure layout is complete (dialog might be animating)
-      requestAnimationFrame(() => {
-        try {
-          const height =
-            contentContainer?.clientHeight ||
-            contentContainer?.getBoundingClientRect().height ||
-            0;
-          if (height !== containerHeight) {
-            containerHeight = height;
-          }
-
-          // Also capture current scroll position so virtualization can compute visible items immediately
-          const scrollTop = contentContainer?.scrollTop || 0;
-          if (scrollTop !== containerScrollY) {
-            containerScrollY = scrollTop;
-          }
-        } catch (e) {
-          console.error("Error measuring container dimensions:", e);
-        }
-      });
+    public measureHeight(jobId: number): Attachment<HTMLElement> {
+      return useVirtualization.createMeasureHeight(this.cardHeights, jobId);
     }
 
     // Clear card heights that are no longer displayed
-    get clearCardHeights() {
+    public clearCardHeights() {
       const currentJobIds = new SvelteSet(
-        bookmarkHandler.filteredDisplayedJobs.map(
+        bookmarkHandlerUI.filteredDisplayedJobs.map(
           (job: CardJob) => job.id || 0,
         ),
       );
       const heightsToKeep = new SvelteMap<number, number>();
-      for (const [jobId, height] of cardHeights) {
+      for (const [jobId, height] of this.cardHeights) {
         if (currentJobIds.has(jobId)) {
           heightsToKeep.set(jobId, height);
         }
       }
-      if (heightsToKeep.size !== cardHeights.size) {
-        cardHeights = heightsToKeep;
+      if (heightsToKeep.size !== this.cardHeights.size) {
+        this.cardHeights.clear();
+        for (const [k, v] of heightsToKeep) {
+          this.cardHeights.set(k, v);
+        }
       }
-      return cardHeights;
+      return this.cardHeights;
     }
 
-    // Start background measurement: poll cardHeights until visible items measured or timeout
-    startBackgroundMeasure() {
-      // clear any existing handles
-      if (this.#measurePollHandle) {
-        clearInterval(this.#measurePollHandle);
-        this.#measurePollHandle = null;
+    /**
+     * Start background measurement: poll cardHeights until visible items measured
+     * * Prevent INP by deferring measurement by showing loading state until heights are measured
+     * !One time measurement
+     * */
+    public startBackgroundMeasure() {
+      let timeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
+        this.stopBackgroundMeasure();
+      }, 1300);
+
+      function stopTimeout() {
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = null;
+        }
       }
-      if (this.#measureTimeoutHandle) {
-        clearTimeout(this.#measureTimeoutHandle);
-        this.#measureTimeoutHandle = null;
-      }
+      this.#polling ??= $effect.root(() => {
+        $effect.pre(() => {
+          // use closure to prevent stale values of virtualizedJobs and cardHeights in this polling effect
+          const visibleJobs = () => this.virtualizedJobs.visibleJobs;
+          const measured = () => this.cardHeights.size;
 
-      this.measuring = true;
-
-      // ensure dimensions are measured first
-      this.updateContainerDimensions();
-
-      const maxWait = 1000; // ms
-      const interval = 80; // ms
-      let elapsed = 0;
-
-      this.#measurePollHandle = setInterval(() => {
-        try {
-          const visible =
-            (this.virtualizedJobs && this.virtualizedJobs.visibleJobs) || [];
-          const needed = visible.length;
-
-          // Count measured heights for visible IDs
-          let measured = 0;
-          for (const [id] of cardHeights) {
-            if (visible.some((v: any) => Number(v.id) === Number(id)))
-              measured++;
-          }
-
-          if (needed === 0 || measured >= needed) {
-            if (this.#measurePollHandle) {
-              clearInterval(this.#measurePollHandle);
-              this.#measurePollHandle = null;
-            }
-            if (this.#measureTimeoutHandle) {
-              clearTimeout(this.#measureTimeoutHandle);
-              this.#measureTimeoutHandle = null;
-            }
+          if (visibleJobs().length === 0) {
+            stopTimeout();
             this.measuring = false;
+            return;
           }
-        } catch (e) {
-          console.error("Error during background measure polling:", e);
-        }
-
-        elapsed += interval;
-        if (elapsed >= maxWait) {
-          if (this.#measurePollHandle) {
-            clearInterval(this.#measurePollHandle);
-            this.#measurePollHandle = null;
+          if (this.measuring && measured() >= visibleJobs().length) {
+            this.stopBackgroundMeasure();
           }
-          this.measuring = false;
-        }
-      }, interval);
-
-      // fallback timeout to stop measuring
-      this.#measureTimeoutHandle = setTimeout(() => {
-        if (this.#measurePollHandle) {
-          clearInterval(this.#measurePollHandle);
-          this.#measurePollHandle = null;
-        }
-        this.measuring = false;
-        this.#measureTimeoutHandle = null;
-      }, maxWait + 200);
-    }
-
-    stopBackgroundMeasure() {
-      if (this.#measurePollHandle) {
-        clearInterval(this.#measurePollHandle);
-        this.#measurePollHandle = null;
-      }
-      if (this.#measureTimeoutHandle) {
-        clearTimeout(this.#measureTimeoutHandle);
-        this.#measureTimeoutHandle = null;
-      }
-      this.measuring = false;
-    }
-  }
-
-  class BookmarkUtilities {
-    static get formattedLastSync() {
-      const val = lastSyncTime;
-      const n = Number(val);
-      if (!n || Number.isNaN(n)) return "";
-      try {
-        return new Date(n).toLocaleString("en-GB", {
-          year: "numeric",
-          month: "numeric",
-          day: "numeric",
-          hour: "numeric",
-          minute: "numeric",
-          hour12: true,
         });
-      } catch {
-        return "";
-      }
+
+        return () => {
+          stopTimeout();
+        };
+      });
+    }
+
+    public stopBackgroundMeasure() {
+      if (this.#polling) this.#polling();
+      this.#polling &&= null;
+      this.measuring &&= false;
     }
   }
-
-  export const bookmarkHandler = new BookmarkHandler();
-  export const virtualizationManager = new VirtualizationManager();
-</script>
-
-<script lang="ts">
-  let { open = $bindable() } = $props<{ open: boolean }>();
 
   /**
    * UI Specific Modal Handler
    */
-  class ModalHandler {
-    transitioningRoute = $derived(routeStore.isTransitioningRoute);
-    startDrag = (e: PointerEvent): void => {
+  class MainModalHandler {
+    public drag = $state({
+      handle: undefined as HTMLElement | undefined,
+      isDragging: false,
+      activePointerId: null as number | null,
+      translate: { x: 0, y: 0 },
+      startClient: { x: 0, y: 0 },
+      startHeight: 0,
+      modalHeight: null as string | null,
+    });
+    public startDrag = (e: PointerEvent): void => {
       if (e.button && e.button !== 0) return;
-      if (!modalBox || !dragHandle) return;
-      if (!dragHandle.contains(e.target as Node)) return;
+      if (!modalBox || !this.drag.handle) return;
+      if (!this.drag.handle.contains(e.target as Node)) return;
       try {
-        dragHandle.setPointerCapture(e.pointerId);
+        this.drag.handle.setPointerCapture(e.pointerId);
       } catch {
         // ignore
       }
-      activePointerId = e.pointerId;
-      isDragging = true;
-      startClient.x = e.clientX;
-      startClient.y = e.clientY;
-      if (isMobile()) {
-        startHeight = modalBox?.clientHeight || 0;
+      this.drag.activePointerId = e.pointerId;
+      this.drag.isDragging = true;
+      this.drag.startClient.x = e.clientX;
+      this.drag.startClient.y = e.clientY;
+      if (isMobile) {
+        this.drag.startHeight = modalBox?.clientHeight || 0;
       }
       e.preventDefault();
     };
 
-    onPointerMove = (e: PointerEvent): void => {
-      if (!isDragging) return;
-      if (activePointerId !== null && e.pointerId !== activePointerId) return;
+    public onPointerMove = (e: PointerEvent): void => {
+      if (!this.drag.isDragging) return;
+      if (
+        this.drag.activePointerId !== null &&
+        e.pointerId !== this.drag.activePointerId
+      )
+        return;
       if (!modalBox) return;
-      if (isMobile()) {
-        const dy = e.clientY - startClient.y;
-        const newH = startHeight - dy;
-        translate.x = 0;
-        translate.y = 0;
-        try {
-          modalBox.style.setProperty("height", `${newH}px`, "important");
-        } catch {
-          modalBox.style.height = `${newH}px`;
-        }
+      if (isMobile) {
+        const dy = e.clientY - this.drag.startClient.y;
+        const newH = this.drag.startHeight - dy;
+        this.drag.translate.x = 0;
+        this.drag.translate.y = 0;
+        this.drag.modalHeight = `${newH}px`;
         return;
       } else {
-        translate.x = e.clientX - startClient.x;
-        translate.y = e.clientY - startClient.y;
+        this.drag.translate.x = e.clientX - this.drag.startClient.x;
+        this.drag.translate.y = e.clientY - this.drag.startClient.y;
       }
     };
 
-    onPointerUp = (e: PointerEvent): void => {
-      if (!isDragging) return;
+    public onPointerUp = (e: PointerEvent): void => {
+      if (!this.drag.isDragging) return;
       try {
         if (typeof e.pointerId !== "undefined")
-          dragHandle?.releasePointerCapture(e.pointerId);
+          this.drag.handle?.releasePointerCapture(e.pointerId);
       } catch (err) {
         void err;
       }
-      isDragging = false;
-      activePointerId = null;
+      this.drag.isDragging = false;
+      this.drag.activePointerId = null;
     };
-    resetPosition(): void {
-      translate.x = 0;
-      translate.y = 0;
-      try {
-        if (modalBox) modalBox.style.removeProperty("height");
-      } catch {
-        // ignore
-      }
+    public resetPosition(): void {
+      this.drag.translate.x = 0;
+      this.drag.translate.y = 0;
+      this.drag.modalHeight = null;
     }
 
-    handleKeydown = (e: KeyboardEvent): void => {
+    public handleKeydown = (e: KeyboardEvent): void => {
       if (e.key === "Escape" && open) this.closeModal();
     };
 
-    handleJobClick(job: CardJob): void {
+    public handleJobClick(job: CardJob): void {
       routeStateStore.MarkVisitedJob(job.slug ?? "", "bookmark");
 
       const el: HTMLElement | null = isJobGridEl();
 
-      if (!isMobile() && el) {
+      if (!isMobile && el) {
         // Desktop: open overlay
         routeStateStore.saveCardHeights(
-          new SvelteMap(cardHeights),
+          virtualizationManager.cardHeights,
           "bookmarkModal",
         );
-        // mark as "featured" for desktop
-        jobOverlayManager?.openOverlay(job.slug ?? "", job, "featured", {
-          gotoCB: () => {
-            this.closeModal();
-          },
+        // mark as "bookmark" for desktop
+        useSidePanel.openSidePanel(job.slug ?? "", job, "bookmark", () => {
+          this.closeModal();
         });
-      } else {
+      } else if (job.permalink) {
         // Mobile: navigate
-        if (job.permalink) {
-          routeStateStore.saveCardHeights(
-            new SvelteMap(cardHeights),
-            "bookmarkModal",
-          );
-          const url = new URL(job.permalink, window.location.origin);
-          goto(url.pathname + url.search + url.hash).then(() => {
-            this.closeModal();
-          });
-        }
+        routeStateStore.saveCardHeights(
+          virtualizationManager.cardHeights,
+          "bookmarkModal",
+        );
+        const url = new URL(job.permalink, window.location.origin);
+        goto(url.pathname + url.search + url.hash).then(() => {
+          this.closeModal();
+        });
       }
     }
 
-    closeModal(): void {
+    public closeModal(): void {
       open = false;
-      virtualizationManager.stopBackgroundMeasure();
     }
-
-    get layoutBreakpoint() {
-      const w = window.innerWidth;
-      if (w < 640) return "mobile";
-      if (w < 1024) return "tablet";
-      return "desktop";
-    }
-
-    // Handle scroll events on the content container
-    handleContentScroll = (e: Event): void => {
-      const target = e.target as HTMLDivElement;
-      containerScrollY = target.scrollTop;
-    };
   }
 
-  const modalHandler = new ModalHandler();
-
-  const isMobileValue = $derived.by(() => isMobile());
+  const useSearchQuery = new SearchQueryController();
+  const bookmarkHandlerUI = new BookmarkUIHandler();
+  const virtualizationManager = new VirtualizationManager();
+  const modalHandler = new MainModalHandler();
 
   const modalStyle = $derived(
-    `transform: translate(${translate.x}px, ${translate.y}px); touch-action: ${isMobileValue ? "none" : "auto"};`,
+    `transform: translate(${modalHandler.drag.translate.x}px, ${modalHandler.drag.translate.y}px); touch-action: ${isMobile ? "none" : "auto"};`,
   );
+  const loadingUI = $derived(
+    bookmarkStore.isSyncingStatus || virtualizationManager.measuring,
+  );
+  const isBusy = $derived(bookmarkStore.isSyncingStatus || loadingUI);
 
   // Only collapse action buttons on small (mobile) layouts when search is active
-  const shouldCollapseActions = $derived.by(() => {
-    return isSearchOpen && modalHandler.layoutBreakpoint === "mobile";
-  });
-
-  // Ensure we re-measure when the modal is opened so virtualization has correct container size
-
-  $effect(() => {
-    const timeEffect = generalJobStore.useSharedClock();
-    // React to showDeleteConfirm changes to control the delete confirmation modal
-    if (showDeleteConfirm) {
-      if (!deleteConfirmModal?.open) deleteConfirmModal?.showModal();
-    } else {
-      deleteConfirmModal?.close();
-    }
-    return () => {
-      timeEffect();
-    };
-  });
-
+  const shouldCollapseActions = $derived(
+    useSearchQuery.searchQuery && isMobile,
+  );
   onMount(() => {
-    if (open) {
-      bookmarkStore.flushSync();
-      bookmarkHandler.scheduleFetchJobs();
+    virtualizationManager.startBackgroundMeasure();
+    if (open) modalEl.showModal();
 
-      if (!modalEl?.open) modalEl?.showModal();
-      if (isMobileValue && modalBox) {
-        const vh = window.innerHeight;
-        const initialHeight = Math.round(vh * 0.6);
-        modalBox.style.setProperty("height", `${initialHeight}px`, "important");
-      }
-      // Start measuring container + card heights in background to avoid blocking interaction
-      virtualizationManager.startBackgroundMeasure();
-    } else {
-      modalEl?.close();
+    // Focus search input when opening modal on desktop if not already open
+    useSearchQuery.initializeOpenOnDesktop();
+    // Start measuring container + card heights in background to avoid blocking interaction
+    return () => {
+      if (open) modalEl.close();
       modalHandler.resetPosition();
-    }
-
-    if (open && modalHandler.layoutBreakpoint === "desktop" && !isSearchOpen) {
-      isSearchOpen = true;
-      searchInput?.focus();
-    }
-  });
-
-  onDestroy(() => {
-    try {
-      if (dragHandle && activePointerId !== null)
-        dragHandle.releasePointerCapture(activePointerId);
-    } catch (e) {
-      void e;
-    }
-
-    modalHandler.resetPosition();
-    virtualizationManager.stopBackgroundMeasure();
-
-    virtualizationManager.clearCardHeights;
+      virtualizationManager.clearCardHeights();
+      virtualizationManager.stopBackgroundMeasure();
+    };
   });
 </script>
 
 <svelte:window
-  on:resize={virtualizationManager.updateContainerDimensions}
   on:pointermove={modalHandler.onPointerMove}
   on:pointerup={modalHandler.onPointerUp}
 />
@@ -543,23 +433,22 @@
 
 <dialog
   bind:this={modalEl}
-  {@attach attachPortal("#app")}
-  class="modal modal-bottom sm:modal-middle"
-  class:modal-open={open}
+  class="modal modal-open modal-bottom sm:modal-middle"
 >
   <div
     bind:this={modalBox}
     role="dialog"
     tabindex="0"
     class="modal-box p-0 flex flex-col relative max-h-[80vh] rounded-t-xl overflow-hidden md:mx-auto md:!max-w-3xl md:z-60 md:rounded-b-xl"
-    class:mobile-sheet={isMobileValue}
+    class:mobile-sheet={isMobile}
     style={modalStyle}
+    style:height={modalHandler.drag.modalHeight}
     onpointerdown={modalHandler.startDrag}
   >
     <!-- Drag Handle -->
-    {#if isMobileValue}
+    {#if isMobile}
       <div
-        bind:this={dragHandle}
+        bind:this={modalHandler.drag.handle}
         class="drag-handle !w-12 !h-2 bg-base-content/20 rounded-full mx-auto mt-3 mb-2 cursor-grab active:cursor-grabbing touch-none select-none transition-colors duration-200 hover:bg-base-content/30 active:bg-base-content/40 md:bg-base-content/15 md:hover:bg-base-content/25 md:active:bg-base-content/35"
         onpointerdown={modalHandler.startDrag}
         aria-label="Drag to resize modal"
@@ -581,10 +470,10 @@
                 aria-hidden="true"
               />
               Lowongan Tersimpan
-              {#if !(loading || virtualizationManager.measuring) && savedJobs.length > 0}
+              {#if !isBusy && bookmarkStore.jobs.length > 0}
                 <span
                   class="bg-[var(--wpl-global-color-1)] text-[var(--wpl-global-color-5)] text-sm rounded-full px-2 py-0.1 z-10"
-                  >{savedJobs.length}</span
+                  >{bookmarkStore.jobs.length}</span
                 >
               {/if}
             </h3>
@@ -606,15 +495,10 @@
         >
           <!-- Left: search control that expands; when open, action buttons collapse to the right -->
           <div class="flex-1 flex items-center min-w-0">
-            {#if !(loading || virtualizationManager.measuring)}
+            {#if !isBusy}
               <button
-                onclick={() => {
-                  isSearchOpen = !isSearchOpen;
-                  if (isSearchOpen) setTimeout(() => searchInput?.focus(), 0);
-                }}
-                disabled={loading ||
-                  virtualizationManager.measuring ||
-                  isOutdated}
+                onclick={useSearchQuery.toggleInputSearch}
+                disabled={isBusy || bookmarkStore.outdatedStatus}
                 class="btn btn-ghost btn-sm mr-2"
                 aria-label="Cari dalam simpanan"
                 title="Cari"
@@ -623,37 +507,25 @@
               </button>
             {/if}
 
-            {#if !(loading || virtualizationManager.measuring) && isSearchOpen}
+            {#if !isBusy && useSearchQuery.isSearchOpen}
               <input
+                {@attach useSearchQuery.observeSearchInputFocus()}
                 id="bookmark-search"
                 name="bookmark_search"
-                bind:this={searchInput}
-                bind:value={searchQuery}
-                disabled={isOutdated}
+                bind:value={useSearchQuery.searchQuery}
+                disabled={bookmarkStore.outdatedStatus}
                 class="input input-sm w-full md:w-96 min-w-0 flex-grow"
                 placeholder="Cari judul atau perusahaan"
-                onkeydown={(e) => {
-                  if (e.key === "Escape") {
-                    isSearchOpen = false;
-                  }
-                }}
+                onkeydown={useSearchQuery.onKeydownSearch}
               />
             {/if}
           </div>
 
           <!-- Right: action buttons or close-search button when search open -->
           <div class="flex items-center gap-2 flex-shrink-0">
-            {#if !(loading || virtualizationManager.measuring) && isSearchOpen}
+            {#if !isBusy && useSearchQuery.isSearchOpen}
               <button
-                onclick={() => {
-                  isSearchOpen = false;
-                  searchQuery = "";
-                  try {
-                    searchInput?.blur();
-                  } catch (e) {
-                    console.error(e);
-                  }
-                }}
+                onclick={() => useSearchQuery.closeSearch()}
                 class="btn btn-ghost btn-sm"
                 aria-label="Tutup pencarian"
                 title="Tutup pencarian"
@@ -663,12 +535,10 @@
             {/if}
 
             {#if !shouldCollapseActions}
-              {#if !(loading || virtualizationManager.measuring) && savedJobs.length > 0}
+              {#if !isBusy && bookmarkStore.jobs.length > 0}
                 <button
-                  onclick={bookmarkHandler.handleDeleteAll}
-                  disabled={loading ||
-                    virtualizationManager.measuring ||
-                    isOutdated}
+                  onclick={() => bookmarkHandlerUI.showDeleteAllConfirmation()}
+                  disabled={isBusy || bookmarkStore.outdatedStatus}
                   class="btn btn-ghost btn-sm md:btn-md text-error w-auto whitespace-nowrap"
                   aria-label="hapus semua"
                   title="hapus semua"
@@ -677,18 +547,13 @@
                   Hapus Semua
                 </button>
                 <button
-                  onclick={bookmarkHandler.handleRefresh}
-                  disabled={loading ||
-                    virtualizationManager.measuring ||
-                    isOutdated}
+                  onclick={() => bookmarkHandlerUI.refreshBookmark()}
+                  disabled={isBusy || bookmarkStore.outdatedStatus}
                   class="btn btn-ghost btn-sm md:btn-md w-auto whitespace-nowrap"
                   aria-label="sync ke server"
                   title="sync ke server"
                 >
-                  <RefreshSpinner
-                    size="h-4 w-4 mr-2"
-                    spin={loading || virtualizationManager.measuring}
-                  />
+                  <RefreshSpinner size="h-4 w-4 mr-2" spin={isBusy} />
                   Sync/Refresh
                 </button>
               {/if}
@@ -700,38 +565,41 @@
 
     <!-- Content -->
     <div
-      bind:this={contentContainer}
+      bind:contentRect
       class="flex-1 overflow-y-auto max-h-full px-6 py-4"
-      onscroll={modalHandler.handleContentScroll}
+      onscroll={(e: UIEvent) => {
+        const target = e.target as HTMLElement;
+        virtualizationManager.containerScrollY = target.scrollTop;
+      }}
     >
       <!-- Loading / initial measuring State -->
-      {#if loading || virtualizationManager.measuring}
+      {#if isBusy}
         <div class="flex items-center justify-center py-12">
           <LoadingSpinner srLabel="Memuat..." size="md" />
         </div>
 
         <!-- Error State -->
-      {:else if error}
+      {:else if bookmarkHandlerUI.error}
         <div class="alert alert-error">
           <ExclamationTriangleSolid
             class="h-6 w-6 shrink-0 text-error"
             aria-hidden="true"
           />
-          <span>{error}</span>
+          <span>{bookmarkHandlerUI.error}</span>
         </div>
 
         <!-- Warning State -->
-      {:else if warning}
+      {:else if bookmarkStore.globalWarning}
         <div class="alert alert-warning">
           <ExclamationTriangleSolid
             class="h-6 w-6 shrink-0 text-warning"
             aria-hidden="true"
           />
-          <span>{warning}</span>
+          <span>{bookmarkStore.globalWarning}</span>
         </div>
 
         <!-- Empty State -->
-      {:else if savedJobs.length === 0 && deletedJobs.length === 0}
+      {:else if bookmarkStore.jobs.length === 0 && bookmarkStore.expiredJobIds.size === 0}
         <div class="text-center py-12">
           <BookmarkSolid
             class="h-16 w-16 mx-auto text-base-300 mb-4"
@@ -745,20 +613,20 @@
 
         <!-- Saved Jobs -->
       {:else}
-        {#if savedJobs.length > 0}
+        {#if bookmarkStore.jobs.length > 0}
           <div class="mb-6">
             <div
               class="flex flex-row items-center justify-between break-words whitespace-normal mb-2"
             >
               <h4 class="font-semibold text-md">
-                Tersedia ({savedJobs.length})
+                Tersedia ({bookmarkStore.jobs.length})
               </h4>
-              {#if lastSyncTime > 0 && !loading}
+              {#if bookmarkHandlerUI.getRefreshTime > 0 && !isBusy}
                 <div class="text-xs font-semibold flex flex-col">
                   <span class="mb-1 flex items-center gap-1"
                     >Terakhir sync:</span
                   >
-                  <span>{BookmarkUtilities.formattedLastSync}</span>
+                  <span>{bookmarkHandlerUI.formattedLastSync}</span>
                 </div>
               {/if}
             </div>
@@ -777,11 +645,12 @@
                   ] || 0}
                 <div
                   class="card bg-[var(--wpl-global-color-5)] border-2 border-[var(--wpl-global-color-1)] shadow-sm hover:shadow-md absolute left-0 right-0"
-                  class:scale-0={removingIds.has(job.id || 0)}
+                  class:scale-0={bookmarkHandlerUI.removingIds.has(job.id || 0)}
                   style="transform: translate3d(0, {topPosition}px, 0);"
                   {@attach virtualizationManager.measureHeight(job.id || 0)}
                 >
                   {#if job.title === ""}
+                    <!-- Skeleton -->
                     <div class="card-body animate-pulse">
                       <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 min-w-1">
@@ -832,10 +701,9 @@
                       >
                         <button
                           onclick={() =>
-                            bookmarkHandler.removeBookmark(job.id || 0)}
-                          disabled={loading ||
-                            virtualizationManager.measuring ||
-                            removingIds.has(job.id || 0)}
+                            bookmarkHandlerUI.removeBookmark(job.id || 0)}
+                          disabled={isBusy ||
+                            bookmarkHandlerUI.removingIds.has(job.id || 0)}
                           class="btn btn-xs btn-ghost text-error"
                           title="Hapus bookmark"
                           aria-label="Hapus bookmark untuk {job.title}"
@@ -852,25 +720,22 @@
         {/if}
 
         <!-- Deleted Jobs -->
-        {#if deletedJobs.length > 0}
+        {#if bookmarkStore.expiredJobIds.size > 0}
           <div class="space-y-3">
             <div class="flex items-center justify-between">
               <h4 class="font-semibold text-sm text-base-content/70">
-                Tidak Tersedia ({deletedJobs.length})
+                Tidak Tersedia ({bookmarkStore.expiredJobIds.size})
               </h4>
               <button
-                onclick={bookmarkHandler.handleClearDeleted}
+                onclick={() => bookmarkHandlerUI.emptyListofExpired()}
                 class="btn btn-xs btn-ghost text-error"
                 aria-label="Clear all deleted jobs"
               >
                 Hapus Semua
               </button>
             </div>
-            {#each deletedJobs as id (id)}
-              <div
-                class="card bg-base-300 opacity-60"
-                out:fade={{ duration: 200 }}
-              >
+            {#each bookmarkStore.expiredJobIds as id (id)}
+              <div class="card bg-base-300 opacity-60">
                 <div class="card-body p-4">
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-2">
@@ -883,7 +748,7 @@
                       >
                     </div>
                     <button
-                      onclick={() => bookmarkHandler.removeBookmark(id)}
+                      onclick={() => bookmarkHandlerUI.removeBookmark(id)}
                       class="btn btn-xs btn-ghost"
                       title="Hapus dari daftar"
                       aria-label="Remove from deleted list"
@@ -894,30 +759,6 @@
                 </div>
               </div>
             {/each}
-          </div>
-        {/if}
-
-        <!-- Copy Success Toast -->
-        {#if showCopySuccess}
-          <div class="toast toast-top toast-center z-50">
-            <div class="alert alert-success">
-              <CheckCircleSolid
-                class="h-6 w-6 stroke-current shrink-0"
-                aria-hidden="true"
-              />
-              <span>Link berhasil disalin!</span>
-            </div>
-          </div>
-        {/if}
-
-        <!-- Offline Notice -->
-        {#if isOffline}
-          <div class="alert alert-warning mt-4">
-            <ExclamationTriangleSolid
-              class="h-6 w-6 stroke-current shrink-0 text-warning"
-              aria-hidden="true"
-            />
-            <span>Mode offline - menampilkan data tersimpan</span>
           </div>
         {/if}
       {/if}
@@ -935,48 +776,53 @@
 </dialog>
 
 <!-- Delete All Confirmation Modal -->
-<dialog
-  bind:this={deleteConfirmModal}
-  {@attach attachPortal("#app")}
-  class="modal modal-bottom sm:modal-middle"
-  class:modal-open={showDeleteConfirm}
->
-  <div class="modal-box">
-    <h3 class="font-bold text-lg flex items-center gap-2">
-      <ExclamationTriangleSolid class="h-6 w-6 text-error" aria-hidden="true" />
-      Konfirmasi Hapus Semua
-    </h3>
-    <p class="py-4">
-      Apakah Anda yakin ingin menghapus semua bookmark? Tindakan ini tidak dapat
-      dibatalkan dan akan menghapus semua lowongan yang telah Anda simpan.
-    </p>
-    <div class="modal-action">
-      <button
-        onclick={bookmarkHandler.cancelDeleteAll}
-        class="btn btn-ghost"
-        disabled={loading || virtualizationManager.measuring}
-      >
-        Batal
-      </button>
-      <button
-        onclick={bookmarkHandler.confirmDeleteAll}
-        class="btn btn-error"
-        disabled={loading || virtualizationManager.measuring}
-      >
-        {#if loading}
-          <LoadingSpinner size="sm" srLabel="Menghapus semua..." />
-        {/if}
-        Hapus Semua
-      </button>
+{#if bookmarkHandlerUI.showDeleteConfirm}
+  <dialog
+    {@attach bookmarkHandlerUI.observeOpenCloseDialog()}
+    class="modal modal-open modal-bottom sm:modal-middle"
+  >
+    <div class="modal-box">
+      <h3 class="font-bold text-lg flex items-center gap-2">
+        <ExclamationTriangleSolid
+          class="h-6 w-6 text-error"
+          aria-hidden="true"
+        />
+        Konfirmasi Hapus Semua
+      </h3>
+      <p class="py-4">
+        Apakah Anda yakin ingin menghapus semua bookmark? Tindakan ini tidak
+        dapat dibatalkan dan akan menghapus semua lowongan yang telah Anda
+        simpan.
+      </p>
+      <div class="modal-action">
+        <button
+          onclick={() => bookmarkHandlerUI.cancelDeleteAll()}
+          class="btn btn-ghost"
+          disabled={isBusy}
+        >
+          Batal
+        </button>
+        <button
+          onclick={() => bookmarkHandlerUI.deleteAllApproved()}
+          class="btn btn-error"
+          disabled={isBusy}
+        >
+          {#if bookmarkStore.isSyncingStatus}
+            <LoadingSpinner size="sm" srLabel="Menghapus semua..." />
+          {/if}
+          Hapus Semua
+        </button>
+      </div>
     </div>
-  </div>
-  <div
-    role="button"
-    tabindex="0"
-    class="modal-backdrop"
-    onclick={bookmarkHandler.cancelDeleteAll}
-    onkeydown={(e) => {
-      if (e.key === "Enter" || e.key === " ") bookmarkHandler.cancelDeleteAll();
-    }}
-  ></div>
-</dialog>
+    <div
+      role="button"
+      tabindex="0"
+      class="modal-backdrop"
+      onclick={() => bookmarkHandlerUI.cancelDeleteAll()}
+      onkeydown={(e: KeyboardEvent) => {
+        if (e.key === "Enter" || e.key === " ")
+          bookmarkHandlerUI.cancelDeleteAll();
+      }}
+    ></div>
+  </dialog>
+{/if}

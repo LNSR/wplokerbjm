@@ -1,8 +1,7 @@
 import type { Handle } from "@sveltejs/kit";
-import type { IncomingRequestCfProperties } from "@cloudflare/workers-types";
 import type { WPLokerBJMThemedData } from "@/types";
 import { handleDeviceDetector } from "sveltekit-device-detector";
-import { APIServiceServer } from "@/services/APIService";
+import { APIServiceServer } from "@/services/graphql/APIService";
 import { dev } from "$app/environment";
 
 const deviceHandler: Handle = handleDeviceDetector( {} );
@@ -53,6 +52,10 @@ class hooksHelper
 
 export const handle: Handle = async ( { event, resolve } ) =>
 {
+  if ( event.url.pathname.startsWith( "/.well-known/acme-challenge/" ) )
+  {
+    return resolve( event ); // bypass all custom logic for ACME challenge requests to allow Let's Encrypt to verify domain ownership
+  }
 
   const originalFetch = event.fetch;
   let response: Response;
@@ -87,19 +90,6 @@ export const handle: Handle = async ( { event, resolve } ) =>
   Object.assign( wrappedFetch, originalFetch );
   event.fetch = wrappedFetch;
 
-  const headerDeviceType = event.request.headers.get( "CF-Device-Type" );
-  const cf = ( event.request as Request & { cf?: IncomingRequestCfProperties } ).cf;
-  const cfDeviceType = cf?.deviceType as string | undefined;
-  const deviceType = headerDeviceType || cfDeviceType;
-
-  if ( deviceType )
-  {
-    event.locals.deviceType = {
-      isMobile: deviceType === "mobile",
-      deviceType,
-    };
-  }
-
   // fetch theme data as early as possible so load functions can see it
   try
   {
@@ -117,13 +107,7 @@ export const handle: Handle = async ( { event, resolve } ) =>
 
   try
   {
-    if ( deviceType )
-    {
-      response = await resolve( event );
-    } else
-    {
-      response = await deviceHandler( { event, resolve } );
-    }
+    response = await deviceHandler( { event, resolve } );
   } catch ( err )
   {
     console.error( "hooks.handle: error in device handler", err );
@@ -139,7 +123,7 @@ export const handle: Handle = async ( { event, resolve } ) =>
     response.headers.set( "Vary", varyValueWithCookie );
     try
     {
-      const dt = event.locals.deviceType.deviceType || ( event.locals.deviceType.isMobile ? "mobile" : "desktop" );
+      const dt = event.locals.deviceType.isMobile ? "mobile" : "desktop";
       response.headers.set( "Device-Type", dt );
     } catch ( e )
     {

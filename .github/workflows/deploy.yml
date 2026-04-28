@@ -12,8 +12,6 @@ on:
 
 env:
   THEME_DIR: wordpress/wp-content/themes/wplokerbjm
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
-
 jobs:
   build-and-deploy:
     name: Build and deploy
@@ -28,6 +26,10 @@ jobs:
       RCLONE_TPSLIMIT: "2"
 
     steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: latest
+          check-latest: true
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -50,8 +52,6 @@ jobs:
         run: |
           echo "Contents of .svelte-kit/cloudflare:";
           ls -al .svelte-kit/cloudflare || true
-
-
       - name: Setup deployment
         uses: ./.github/actions/setup-deployment
         with:

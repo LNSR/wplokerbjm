@@ -1,6 +1,6 @@
 import type { PageServerLoad } from "./$types";
 
-import { APIServiceServer, APIServiceShared } from "@/services/APIService";
+import { APIServiceServer, APIServiceShared } from "@/services/graphql/APIService";
 import type { JobSchemaResponse } from "@/types";
 import { getCmsOrigin } from "@/utils/environment";
 import { schemaScriptAttach } from "$lib/server/utils/scripts.server";

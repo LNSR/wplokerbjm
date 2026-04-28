@@ -51,7 +51,7 @@ export default defineConfig(
 
 	// TypeScript / JavaScript specific settings (from root project)
 	{
-		files: ["**/*.{ts,js,svelte}"],
+		files: [ "**/*.{ts,js,svelte}" ],
 		languageOptions: {
 			parser: tseslint.parser,
 			parserOptions: {
@@ -64,11 +64,15 @@ export default defineConfig(
 			"@typescript-eslint/no-explicit-any": 'off', // allow any when necessary, but prefer explicit types
 			"@typescript-eslint/no-floating-promises": "off",
 			"@typescript-eslint/require-await": "warn",
-			
-			"@typescript-eslint/no-empty-object-type": "off",
-			"@typescript-eslint/no-unused-vars": "error",
-            "@typescript-eslint/no-unused-expressions": "off",
-            "@typescript-eslint/no-non-null-assertion": "off", // allow non-null assertion when necessary, but prefer proper null checks
+
+			"@typescript-eslint/no-empty-object-type": "warn",
+			"@typescript-eslint/no-unused-vars": [ "warn", {
+				argsIgnorePattern: "^_",
+				caughtErrorsIgnorePattern: "^_",
+				varsIgnorePattern: "^_",
+			} ],
+			"@typescript-eslint/no-unused-expressions": "off",
+			"@typescript-eslint/no-non-null-assertion": "off", // allow non-null assertion when necessary, but prefer proper null checks
 			"prefer-const": "off",
 			"no-var": "error",
 			"eqeqeq": "error",
@@ -77,19 +81,25 @@ export default defineConfig(
 
 	// Svelte file override — keep projectService and add root rules
 	{
-		files: ['**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js'],
+		files: [ '**/*.svelte', '**/*.svelte.ts', '**/*.svelte.js' ],
 		languageOptions: {
 			parser: svelteParser,
 			parserOptions: {
 				projectService: true,
-				extraFileExtensions: ['.svelte'],
+				extraFileExtensions: [ '.svelte' ],
 				parser: tseslint.parser,
 				svelteConfig
 			}
 		},
 		rules: {
+			"@typescript-eslint/no-unused-vars": [ "warn", {
+				argsIgnorePattern: "^_",
+				caughtErrorsIgnorePattern: "^_",
+				varsIgnorePattern: "^_",
+			} ],
+			"svelte/prefer-svelte-reactive": "warn",
 			"svelte/valid-compile": "error",
-			"svelte/no-inspect": "off",
+			"svelte/no-inspect": "warn",
 			"svelte/no-at-html-tags": "off",
 			"svelte/require-each-key": "off",
 			"svelte/infinite-reactive-loop": "error",

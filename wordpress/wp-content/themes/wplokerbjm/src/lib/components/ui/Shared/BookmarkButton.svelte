@@ -2,7 +2,10 @@
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import type { JobCardProps, WPBasePost } from "@/types";
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
-  import { dynamicComponentStore } from "$lib/stores/DynamicComponent.svelte";
+  import { componentRegistry } from "@/lib/stores/ComponentRegistry.svelte";
+  import { useRIC } from "$lib/utils/window.svelte";
+  import { onDestroy } from "svelte";
+  import { deviceDetector } from "@/lib/features/DeviceDetector.svelte";
 
   interface Props {
     jobId: WPBasePost["id"];
@@ -13,21 +16,46 @@
   const isJobSaved = $derived(
     bookmarkStore.jobs.some((job) => Number(job.id) === jobId),
   );
-  const toggleSave = (id: number) => bookmarkStore.toggleSave(id);
+  const isDesktop = $derived(deviceDetector.isPlatformDesktop);
 
   let isLoading = $state(false);
   let isHovered = $state(false);
   let confirmationState: "saved" | "removed" | null = $state(null);
   let errorState: "save" | "remove" | null = $state(null);
   let isPending = $state(false);
-  let isTouchDevice = $derived.by(() => {
-    if (typeof window === "undefined") return false;
-    return "ontouchstart" in window || navigator.maxTouchPoints > 0;
-  });
 
   let preToggleSaved = $state(false);
-  // synchronous lock to prevent same-tick re-entrancy from multiple rapid DOM clicks
-  let _clickLock = false;
+  let bookmarkModalLoaded = false;
+  let clicklock = false;
+
+  /**
+   * Toggle saved state for a job id. If saved, remove it; otherwise add it.
+   */
+  function toggleSave(id: number): void {
+    if (bookmarkStore.jobs.some((job) => job.id === id)) {
+      return void bookmarkStore.removeJob(id);
+    }
+
+    return void bookmarkStore.addJob(id);
+  }
+
+  function preloadBookmarkModal() {
+    if (bookmarkModalLoaded) return;
+    useRIC(
+      async () => {
+        if (!componentRegistry.getComponentByName("BookmarkModal")) {
+          await componentRegistry.loadComponentByName("BookmarkModal");
+          bookmarkModalLoaded = true;
+        }
+      },
+      { fallbackDelay: 200, fallback: "timeout", timeout: 2000 },
+    );
+  }
+
+  function resetConfirmation() {
+    confirmationState = null;
+    errorState = null;
+  }
 
   function handleToggleSave(e: MouseEvent) {
     // prevent parent handlers
@@ -36,43 +64,58 @@
     if (isNaN(jobId) || jobId < 1) return;
 
     // If this tab is outdated (a newer build is open elsewhere), do a cache-reload fetch then force navigation.
-    if (typeof window !== "undefined" && bookmarkStore.isOutdated) {
-      fetch(window.location.href, { cache: "reload" }).then(() => {
-        window.location.reload();
-      });
+    if (typeof window !== "undefined" && bookmarkStore.outdatedStatus) {
       return;
     }
 
-    // Preload bookmark modal for faster access when viewing bookmarks
-    if (!dynamicComponentStore.BookmarkModal) {
-      void dynamicComponentStore.loadBookmarkModal();
-    }
+    const startingOperation = () => {
+      clicklock = true;
+      isLoading = true;
+      preToggleSaved = isJobSaved;
+      isPending = true;
+    };
 
-    // protect against both reactive loading state and synchronous re-entry
-    if (isLoading || _clickLock) return;
+    const saveOperation = () => {
+      toggleSave(jobId);
+      isPending = false;
+      if (!isJobSaved) {
+        confirmationState = "saved";
+      } else {
+        confirmationState = "removed";
+      }
+    };
 
-    _clickLock = true;
-
-    isLoading = true;
-    preToggleSaved = isJobSaved;
-    isPending = true;
-    try {
-      const wasSaved = isJobSaved;
-      toggleSave(jobId).then(() => {
-        isPending = false;
-        if (!wasSaved) {
-          confirmationState = "saved";
-        } else {
-          confirmationState = "removed";
-        }
-      });
-    } catch {
+    const saveFailed = (err: unknown) => {
       isPending = false;
       const wasSaved = preToggleSaved;
       errorState = wasSaved ? "remove" : "save";
-    } finally {
+      console.error(
+        `Failed to ${wasSaved ? "remove bookmark for" : "save bookmark for"} job ${jobId}:`,
+        err,
+      );
+    };
+
+    const finishOperation = () => {
       isLoading = false;
-      _clickLock = false;
+      clicklock = false;
+      const duration =
+        confirmationState !== null ? 400 : errorState !== null ? 1000 : 400; // shorter duration if only showing error
+      setTimeout(() => {
+        resetConfirmation();
+      }, duration);
+    };
+
+    // protect against both reactive loading state and synchronous re-entry
+    if (isLoading || clicklock) return;
+    preloadBookmarkModal();
+
+    startingOperation();
+    try {
+      saveOperation();
+    } catch (err) {
+      saveFailed(err);
+    } finally {
+      finishOperation();
     }
   }
 
@@ -87,18 +130,11 @@
     }
   });
 
-  function useBookmarkStyle(
-    saved: boolean,
-    showConfirmation: boolean,
-  ): { style: string } {
-    if (!saved) return { style: "text-gray-600" };
-    if (showConfirmation) return { style: "text-green-700" };
-    return { style: "text-red-700" };
-  }
-
-  const bookmarkStyle = $derived.by(() =>
-    useBookmarkStyle(isJobSaved, confirmationState === "saved"),
-  );
+  const bookmarkStyle = $derived.by(() => {
+    if (!isJobSaved) return "text-gray-600";
+    if (confirmationState === "saved") return "text-green-700";
+    return "text-red-700";
+  });
 
   // New reactive icon spec: name and optional classes (color override)
   const displayedIconSpec = $derived.by(() => {
@@ -138,19 +174,8 @@
         return "h-5 w-5 ";
     }
   });
-
-  $effect(() => {
-    if (confirmationState !== null) {
-      const timeout = setTimeout(() => (confirmationState = null), 1000);
-      return () => clearTimeout(timeout);
-    }
-  });
-
-  $effect(() => {
-    if (errorState !== null) {
-      const timeout = setTimeout(() => (errorState = null), 3000);
-      return () => clearTimeout(timeout);
-    }
+  onDestroy(() => {
+    resetConfirmation();
   });
 </script>
 
@@ -164,7 +189,7 @@
       buttonSizeClass +
       borderIconSpec +
       (isLoading ? " !opacity-50 cursor-not-allowed " : "") +
-      bookmarkStyle.style}
+      bookmarkStyle}
     disabled={isLoading}
     title={isJobSaved ? "Hapus bookmark" : "Simpan lowongan"}
     aria-label="Bookmark job"
@@ -183,7 +208,7 @@
     {/if}
   </button>
 
-  {#if !isTouchDevice && isHovered && !isLoading}
+  {#if isDesktop && isHovered && !isLoading}
     {@const hapus = isJobSaved}
     <div class="absolute -top-8 right-0 flex items-center pointer-events-none">
       <div

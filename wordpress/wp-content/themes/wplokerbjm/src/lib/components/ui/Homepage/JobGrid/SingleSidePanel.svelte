@@ -1,25 +1,27 @@
 <script lang="ts">
-  import { onDestroy } from "svelte";
   import { page } from "$app/state";
   import { type Attachment } from "svelte/attachments";
   import type { JobDetailResponse } from "@/types";
   import { routeStore } from "@/lib/stores/Route.svelte";
-  import { themeManager } from "$lib/stores/Theme.svelte";
+  import { themePropsStore } from "$lib/stores/Theme.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
-  import { jobOverlayManager } from "$lib/stores/JobOverlay.svelte";
+  import { useSidePanel } from "@/lib/composables/SidePanel.svelte";
   import JobDetail from "@components/ui/Shared/JobDetail.svelte";
   import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
   import { getCmsOrigin } from "@/utils/environment";
+  import { useRIC } from "@/lib/utils/window.svelte";
 
   const data = $derived((page.data?.job as JobDetailResponse | null) ?? null);
   const editPostId = $derived((data?.id as JobDetailResponse["id"]) ?? null);
 
+  let drawerElement: Element | undefined = undefined;
+
   const isSidePanelVisible = $derived.by(() =>
-    Boolean(data?.id || jobOverlayManager.selectedSlug),
+    Boolean(data?.id || useSidePanel.selectedSlug),
   );
 
-  const isLoggedIn = $derived(themeManager.getNonce ? true : false);
+  const isLoggedIn = $derived(themePropsStore.getNonce ? true : false);
 
   function getCloneHref(postId?: number | null): string {
     if (!postId) return "#";
@@ -36,40 +38,27 @@
     return base;
   }
 
-  let innerScrollTimeout: ReturnType<typeof setTimeout> | null = null;
-  let drawerElement: Element | undefined = undefined;
-
-  const drawerElementAttachment: Attachment = (node: Element) => {
-    data?.id; // re-run when job changes to reset scroll
-    drawerElement = node;
-
-    drawerElement.scrollTop = 0;
-    return () => {
-      drawerElement = undefined;
-    };
-  };
-
   function handleWindowScroll(): void {
-    if (!jobOverlayManager.isScrolling) {
-      jobOverlayManager.setScrollState = true;
-    }
+    if (!useSidePanel.isScrolling) useSidePanel.setScrollState = true;
 
-    if (innerScrollTimeout) {
-      clearTimeout(innerScrollTimeout);
-    }
-
-    innerScrollTimeout = setTimeout(() => {
-      jobOverlayManager.setScrollState = false;
-      innerScrollTimeout = null;
-    }, 500);
+    queueMicrotask(() => {
+      useRIC(() => {
+        useSidePanel.setScrollState = false;
+      });
+    });
   }
 
-  onDestroy(() => {
-    if (innerScrollTimeout) {
-      clearTimeout(innerScrollTimeout);
-      innerScrollTimeout = null;
-    }
-  });
+  function drawerElementAttachment(): Attachment {
+    return (node: Element) => {
+      data?.id; // re-run when job changes to reset scroll
+      drawerElement = node;
+
+      drawerElement.scrollTop = 0;
+      return () => {
+        drawerElement = undefined;
+      };
+    };
+  }
 </script>
 
 <svelte:window on:scroll|passive={handleWindowScroll} />
@@ -80,7 +69,7 @@
 >
   <!-- Drawer -->
   <aside
-    {@attach drawerElementAttachment}
+    {@attach drawerElementAttachment()}
     class="relative shadow-xl rounded-xl border-2 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)] w-full max-h-[calc(100vh-var(--site-scroll-padding-top)-var(--site-header-height))] overflow-y-auto flex flex-col z-50"
   >
     <div
