@@ -8,6 +8,10 @@
       "name": "wplokerbjm-wp-theme",
       "path": "wordpress/wp-content/themes/wplokerbjm",
     },
+    {
+      "name": "wplokerbjm-scrapper",
+      "path": "scrapper",
+    },
   ],
   "settings": {
     "php.version": "8.5",
@@ -53,14 +57,9 @@
     "js/ts.experimental.useTsgo": true,
     "graphql-config.load.rootDir": "wordpress/wp-content/themes/wplokerbjm",
     "js/ts.implicitProjectConfig.target": "ESNext",
-    "js/ts.tsserver.node.path": "/bin/bun",
+    "js/ts.tsserver.node.path": "/usr/bin/node",
     "js/ts.tsserver.maxMemory": 16392,
-    "css.enabledLanguages": [
-      "html",
-      "typescript",
-      "javascript",
-      "svelte"
-    ],
+    "css.enabledLanguages": ["html", "typescript", "javascript", "svelte"],
   },
   "extensions": {
     "recommendations": [

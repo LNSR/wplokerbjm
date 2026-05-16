@@ -576,7 +576,7 @@
 <svelte:body onmousedown={interactionController.handleMouseDown} />
 
 <div
-  class="relative"
+  class="relative min-w-0"
   role="combobox"
   aria-haspopup="listbox"
   aria-controls={listboxId}
@@ -588,10 +588,10 @@
 >
   {#if open}
     <div
-      class="absolute left-0 right-0 mt-2 rounded-lg shadow-lg z-30 pt-2 bg-[var(--wpl-global-color-5)] transition-all duration-300"
+      class="absolute left-0 right-0 z-30 mt-2 max-w-full min-w-0 overflow-hidden rounded-lg bg-[var(--wpl-global-color-5)] pt-2 shadow-lg transition-all duration-300"
     >
       <!-- Search input (static header above scrollable options) -->
-      <div class="px-5 py-2 bg-[var(--wpl-global-color-5)]">
+      <div class="bg-[var(--wpl-global-color-5)] px-3 py-2 sm:px-5">
         <input
           bind:value={catalogHandler.searchQuery}
           type="text"
@@ -604,7 +604,7 @@
 
       <!-- Taxonomy loading shown inside dropdown to avoid parent re-renders -->
       {#if taxonomyStore.getLoadingStatus}
-        <div class="px-5 py-2 text-center text-sm text-gray-500">
+        <div class="px-3 py-2 text-center text-sm text-gray-500 sm:px-5">
           <div class="inline-flex items-center justify-center">
             <LoadingSpinner size="sm" srLabel="Memuat..." />
             <span class="ml-2">Memuat data...</span>
@@ -619,15 +619,17 @@
         >
           <!-- breadcrumb header (static under search) -->
           <div
-            class="px-5 py-2 pb-2 flex items-center text-sm text-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)] z-40"
+            class="z-40 flex min-w-0 items-center bg-[var(--wpl-global-color-5)] px-3 py-2 pb-2 text-sm text-[var(--wpl-global-color-1)] sm:px-5"
           >
-            <div class="flex items-center min-w-0 overflow-x-auto pb-2">
+            <div
+              class="flex min-w-0 max-w-full flex-wrap items-center gap-y-1 pb-2"
+            >
               <SitemapSolid class="mr-3 shrink-0" aria-hidden="true" />
               {#each breadcrumbHandler.breadcrumbTrail as crumb, idx (crumb + idx)}
                 {#if idx < breadcrumbHandler.breadcrumbTrail.length - 1}
                   <button
                     type="button"
-                    class="cursor-pointer hover:underline font-medium flex items-center whitespace-nowrap"
+                    class="flex min-w-0 max-w-full cursor-pointer items-center break-words text-left font-medium hover:underline"
                     onmousedown={(event) => {
                       event.preventDefault();
                       event.stopPropagation();
@@ -644,7 +646,7 @@
                   >
                 {:else}
                   <span
-                    class="font-bold flex items-center text-[var(--wpl-global-color-1)] whitespace-nowrap"
+                    class="flex min-w-0 max-w-full items-center break-words text-left font-bold text-[var(--wpl-global-color-1)]"
                     ><FolderSolid
                       class="mr-1"
                       aria-hidden="true"
@@ -657,7 +659,7 @@
 
           <!-- controls (static below breadcrumb) -->
           <div
-            class="flex justify-between items-center px-5 py-2 z-10 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)] bg-opacity-100 border-t"
+            class="z-10 flex min-w-0 flex-wrap items-center justify-between gap-2 border-t bg-[var(--wpl-global-color-5)] bg-opacity-100 px-3 py-2 text-[var(--wpl-global-color-1)] sm:px-5"
           >
             <!-- Back button (always available when breadcrumb is present) -->
             <button
@@ -690,7 +692,7 @@
         </div>
       {:else if multiple && catalogHandler.selectedItems.length > 0}
         <div
-          class="flex justify-end items-center px-5 py-1 z-40 bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)] bg-opacity-100 border-t"
+          class="z-40 flex min-w-0 flex-wrap items-center justify-end gap-2 border-t bg-[var(--wpl-global-color-5)] bg-opacity-100 px-3 py-1 text-[var(--wpl-global-color-1)] sm:px-5"
         >
           <button
             type="button"
@@ -714,7 +716,7 @@
             <li
               bind:this={interactionController.optionElements[index]}
               class={[
-                "flex items-center px-5 py-2 cursor-pointer select-none transition rounded text-left",
+                "flex min-w-0 items-start px-3 py-2 cursor-pointer select-none transition rounded text-left sm:px-5",
                 index === activeOptionIndex
                   ? "bg-[var(--wpl-global-color-1)]/15"
                   : "",
@@ -723,7 +725,7 @@
             >
               <button
                 type="button"
-                class="flex-1 text-left flex items-center min-w-0 pr-12 break-words whitespace-normal"
+                class="flex min-w-0 flex-1 items-start pr-2 text-left"
                 onmouseenter={() =>
                   interactionController.handleOptionMouseEnter(index)}
                 onclick={() =>
@@ -745,46 +747,53 @@
                 {/if}
                 {#if option.children?.length}
                   <FolderSolid
-                    class="mr-2 flex-shrink-0 text-yellow-400"
+                    class="mr-2 mt-0.5 shrink-0 text-yellow-400"
                     aria-hidden="true"
                   />
                 {:else}
                   <FileSolid
-                    class="mr-2 flex-shrink-0 text-gray-400"
+                    class="mr-2 mt-0.5 shrink-0 text-gray-400"
                     aria-hidden="true"
                   />
                 {/if}
-                {#if catalogHandler.normalizedSearchQuery}
-                  {#each catalogHandler.highlightParts(option.label, catalogHandler.normalizedSearchQuery) as part, partIndex (part.text + part.match + partIndex)}
-                    {#if part.match}
-                      <span
-                        class="bg-[var(--wpl-global-color-5)] font-bold rounded px-1"
-                        >{part.text}</span
-                      >
+                <span
+                  class="min-w-0 flex-1 break-words whitespace-normal"
+                >
+                  <span class="block min-w-0">
+                    {#if catalogHandler.normalizedSearchQuery}
+                      {#each catalogHandler.highlightParts(option.label, catalogHandler.normalizedSearchQuery) as part, partIndex (part.text + part.match + partIndex)}
+                        {#if part.match}
+                          <span
+                            class="rounded bg-[var(--wpl-global-color-5)] px-1 font-bold"
+                            >{part.text}</span
+                          >
+                        {:else}
+                          {part.text}
+                        {/if}
+                      {/each}
                     {:else}
-                      {part.text}
+                      {option.label}
                     {/if}
-                  {/each}
-                {:else}
-                  {option.label}
-                {/if}
-                {#if option.breadcrumbs && catalogHandler.searchQuery}
-                  <span class="ml-2 text-xs text-gray-400 italic"
-                    >({option.breadcrumbs.join(" / ")})</span
-                  >
-                {/if}
-                {#if option.isLoading}
-                  <span
-                    class="ml-2 text-xs text-gray-400 italic flex items-center"
-                  >
-                    <LoadingSpinner size="sm" srLabel="Memuat..." />
-                    <span class="ml-2">Memuat...</span>
                   </span>
-                {/if}
+                  {#if option.breadcrumbs && catalogHandler.searchQuery}
+                    <span
+                      class="mt-1 block min-w-0 break-words text-xs italic text-gray-400"
+                      >({option.breadcrumbs.join(" / ")})</span
+                    >
+                  {/if}
+                  {#if option.isLoading}
+                    <span
+                      class="mt-1 flex min-w-0 flex-wrap items-center text-xs italic text-gray-400"
+                    >
+                      <LoadingSpinner size="sm" srLabel="Memuat..." />
+                      <span class="ml-2">Memuat...</span>
+                    </span>
+                  {/if}
+                </span>
               </button>
               {#if option.children?.length && !catalogHandler.normalizedSearchQuery}
                 <button
-                  class="ml-2 flex items-center justify-center w-10 h-10 rounded relative transition"
+                  class="relative ml-2 flex h-10 w-10 shrink-0 items-center justify-center rounded transition"
                   onclick={(event) => {
                     // stop propagation so the parent row's click/select handler does not run
                     event.stopPropagation();
@@ -822,6 +831,7 @@
 <style lang="postcss">
   @reference "@css/app.css";
   .dropdown-btn {
-    @apply flex items-center px-2 p-1 border rounded-full text-sm font-medium;
+    @apply flex max-w-full min-w-0 items-center rounded-full border p-1 px-2 text-left text-sm font-medium whitespace-normal;
+    overflow-wrap: anywhere;
   }
 </style>

@@ -1,7 +1,7 @@
 import type { CardJob, JobCardProps } from "@/types";
 import { routeStateStore } from "$lib/stores/Route.svelte";
 import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
-import { useRIC } from "$lib/utils/window.svelte";
+import { useRIC } from "@/utils/window";
 import { goto } from "$app/navigation";
 /**
  * SidePanelManager
@@ -10,20 +10,8 @@ import { goto } from "$app/navigation";
  */
 class SidePanelManager
 {
-  public selectedSlug = $derived(routeStateStore.lastVisitedJob.slug);
-  #isDesktop = $derived(deviceDetector.isPlatformDesktop);
+  public get selectedSlug() { return routeStateStore.lastVisitedJob.slug; }
   public isScrolling: boolean = false;
-
-  /**
-   * Update scroll state used by `scrollToCard` to avoid interrupting
-   * user-initiated manual scrolling.
-   * 
-   * @note rely on this instead mutating `isScrolling` directly for better predictability
-   */
-  public set setScrollState(value: boolean)
-  {
-    this.isScrolling = value;
-  }
 
   /**
    * Open the side panel for a job.
@@ -50,7 +38,7 @@ class SidePanelManager
     {
       // Handle page push and SEO for desktop
 
-      if (job && job.permalink && this.#isDesktop)
+      if (job && job.permalink && deviceDetector.isPlatformDesktop)
       {
         const url = new URL(job.permalink, window.location.origin);
         const path = url.pathname + url.search + url.hash;
@@ -71,77 +59,80 @@ class SidePanelManager
    * Smoothly scroll to the job card for the given slug.
    *
    * @param slug - The job slug to scroll to; defaults to `this.selectedSlug`
-   * @param skipIfScrolling - If true, skip scrolling if user is actively scrolling (default: true)
    * @param selectedSourceType - Choose source card to jump
    *
    */
   public scrollToJobGridCard(
     slug: string,
-    skipIfScrolling: boolean = true,
     selectedSourceType: JobCardProps[ "variant" ] = "featured", // default to "featured"
   ): void
   {
     const targetSlug = slug ?? this.selectedSlug;
     if (!targetSlug) return;
-
-    // Skip if user is still scrolling and skipIfScrolling is true
-    if (skipIfScrolling && this.isScrolling) return;
-
-    const performScroll = () =>
-    {
-      try
-      {
-        const safeSlug = String(targetSlug);
-        const selector = `div[data-job-slug="${safeSlug}"]`;
-        const candidates = Array.from(
-          document.querySelectorAll(selector),
-        ) as HTMLElement[];
-        let cardElement: HTMLElement | null = null;
-
-        const isElementVisible = (el: HTMLElement) =>
-        {
-          const rect = el.getBoundingClientRect();
-          const style = window.getComputedStyle(el);
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            style.display !== "none" &&
-            el.offsetParent !== null
-          );
-        }
-
-        const visibleCandidates = candidates.filter(isElementVisible);
-        const sourceVisible = visibleCandidates
-          .filter((el) => el.dataset.jobSource === selectedSourceType)
-          .sort(
-            (a, b) =>
-              Math.abs(a.getBoundingClientRect().top) -
-              Math.abs(b.getBoundingClientRect().top),
-          );
-
-        const fallbackVisible = visibleCandidates.sort(
-          (a, b) =>
-            Math.abs(a.getBoundingClientRect().top) -
-            Math.abs(b.getBoundingClientRect().top),
-        );
-
-        cardElement = sourceVisible[ 0 ] || fallbackVisible[ 0 ] || null;
-
-        cardElement?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-          inline: "nearest",
-        });
-      } catch (err)
-      {
-        console.error("scrollToCard error:", err);
-      }
-    };
+    if (this.isScrolling) return;
 
     requestAnimationFrame(() =>
     {
-      useRIC(performScroll, { timeout: 300, fallbackDelay: 300, fallback: "timeout" });
+      try
+      {
+        useRIC(() => this.#performScroll(targetSlug, selectedSourceType), { timeout: 300, fallbackDelay: 300, fallback: "timeout" });
+      } catch (error)
+      {
+        console.error("Error during scroll:", error);
+      }
+    });
+  }
+
+  /**
+   * Perform the actual scrolling to the job card element.
+   *
+   * @param targetSlug - The slug of the job to scroll to
+   * @param selectedSourceType - The source type of the job card
+   */
+  #performScroll(targetSlug: string, selectedSourceType: JobCardProps[ "variant" ]): void
+  {
+    const safeSlug = String(targetSlug);
+    const selector = `div[data-job-slug="${safeSlug}"]`;
+    const candidates = Array.from(
+      document.querySelectorAll(selector),
+    ) as HTMLElement[];
+    let cardElement: HTMLElement | null = null;
+
+    const isElementVisible = (el: HTMLElement) =>
+    {
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== "none" &&
+        el.offsetParent !== null
+      );
+    }
+
+    const visibleCandidates = candidates.filter(isElementVisible);
+    const sourceVisible = visibleCandidates
+      .filter((el) => el.dataset.jobSource === selectedSourceType)
+      .sort(
+        (a, b) =>
+          Math.abs(a.getBoundingClientRect().top) -
+          Math.abs(b.getBoundingClientRect().top),
+      );
+
+    const fallbackVisible = visibleCandidates.sort(
+      (a, b) =>
+        Math.abs(a.getBoundingClientRect().top) -
+        Math.abs(b.getBoundingClientRect().top),
+    );
+
+    cardElement = sourceVisible[ 0 ] || fallbackVisible[ 0 ] || null;
+
+    cardElement?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+      inline: "nearest",
     });
   }
 }
+
 export const useSidePanel = new SidePanelManager();

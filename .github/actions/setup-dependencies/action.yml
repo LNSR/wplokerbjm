@@ -22,6 +22,11 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Install latest node
+      uses: actions/setup-node@v6
+      with:
+        node-version: latest
+        check-latest: true
     - name: Compute APT cache key
       if: ${{ inputs.enable-apt-cache == 'true' }}
       id: compute-apt-key
@@ -54,68 +59,14 @@ runs:
         restore-keys: |
           ${{ runner.os }}-apt-
 
-    - name: Setup jq for JSON parsing
-      if: ${{ inputs.install-jq == 'true' }}
-      run: |
-        # Restore APT cache if available
-        if [ "${{ steps.apt-cache.outputs.cache-hit }}" == "true" ]; then
-          echo "✅ APT cache restored - copying to system locations"
-          # Create user cache directories if they don't exist
-          mkdir -p ~/.apt-cache/lists ~/.apt-cache/archives
-          # Copy cached lists to system location
-          sudo mkdir -p /var/lib/apt/lists
-          sudo cp -a ~/.apt-cache/lists/* /var/lib/apt/lists/ 2>/dev/null || true
-          # Copy cached archives to system location
-          sudo mkdir -p /var/cache/apt/archives
-          sudo cp -a ~/.apt-cache/archives/* /var/cache/apt/archives/ 2>/dev/null || true
-          echo "✅ Using cached APT data - skipping apt-get update"
-        fi
-
-        if ! command -v jq &> /dev/null; then
-          echo "Installing jq..."
-          
-          # Create user cache directories if they don't exist
-          mkdir -p ~/.apt-cache/lists ~/.apt-cache/archives
-          
-          # If cache wasn't restored, we need to refresh package lists
-          if [ "${{ steps.apt-cache.outputs.cache-hit }}" != "true" ]; then
-            echo "❌ APT cache miss - running apt-get update"
-            # Retry apt-get update a few times to avoid transient network errors
-            n=0
-            until [ $n -ge 3 ]; do
-              sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq && break
-              n=$((n+1))
-              echo "apt-get update failed, retrying ($n/3)..."; sleep $((n*2))
-            done
-            # Copy updated lists to user cache for future runs
-            cp -a /var/lib/apt/lists/* ~/.apt-cache/lists/ 2>/dev/null || true
-          else
-            # Validate that restored lists are not empty; if they look empty, do an update
-            if [ -z "$(ls -A /var/lib/apt/lists 2>/dev/null)" ]; then
-              echo "Restored APT lists appear empty; running apt-get update"
-              sudo DEBIAN_FRONTEND=noninteractive apt-get update -qq || true
-            fi
-          fi
-          
-          # Use noninteractive and no-install-recommends to speed and reduce size
-          # Retry apt-get install with backoff for robustness
-          n=0
-          until [ $n -ge 3 ]; do
-            sudo DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends jq && break
-            n=$((n+1))
-            echo "apt-get install failed, retrying ($n/3)..."; sleep $((n*2))
-          done
-        else
-          echo "✅ jq already installed: $(jq --version)"
-        fi
-      shell: bash
-
-
     - name: Setup Bun
       uses: oven-sh/setup-bun@v1
+      with:
+        bun-version: latest
 
-    - name: Verify Bun
+    - name: Update and verify Bun installation
       run: |
+        bun upgrade --canary
         echo "Bun: $(bun --version || echo 'bun not found')"
       shell: bash
 
@@ -144,34 +95,6 @@ runs:
         # ensure bun is available
         echo "Bun: $(bun --version || echo 'bun not found')"
         bun install
-      shell: bash
-
-    - name: Cache Playwright browsers
-      if: ${{ inputs.install-playwright == 'true' }}
-      uses: actions/cache@v4
-      id: playwright-cache
-      with:
-        path: |
-          /home/runner/.cache/ms-playwright
-          ~/.cache/ms-playwright
-        key: ${{ runner.os }}-playwright-v2-${{ hashFiles('**/bun.lock', '**/package.json') }}
-        restore-keys: |
-          ${{ runner.os }}-playwright-v2-
-          ${{ runner.os }}-playwright-chromium-
-
-    - name: Setup Playwright
-      if: ${{ inputs.install-playwright == 'true' }}
-      working-directory: ${{ inputs.theme-dir }}
-      run: |
-        # Only install Chromium (Chrome) browser for faster setup
-        if [ "${{ steps.playwright-cache.outputs.cache-hit }}" != "true" ]; then
-          echo "❌ Playwright cache miss - installing Chromium with dependencies..."
-          bunx playwright install --with-deps chromium
-        else
-          echo "✅ Playwright cache hit - using cached browsers"
-          # Still need to install system dependencies even when browsers are cached
-          bunx playwright install-deps chromium
-        fi
       shell: bash
 
     - name: Sync system APT data back to user cache for upload

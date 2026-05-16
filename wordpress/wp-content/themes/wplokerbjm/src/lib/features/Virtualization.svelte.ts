@@ -56,40 +56,35 @@ interface CachedListLayout
  */
 class Virtualization
 {
-    private readonly listLayoutCache = new LRUCache<string, CachedListLayout>({
+    readonly #listLayoutCache = new LRUCache<string, CachedListLayout>({
         max: 200,
     });
 
-    private readonly displayJobsIds = new WeakMap<object, number>();
+    readonly #displayJobsIds = new WeakMap<{}, number>();
 
-    private readonly cardHeightsVersions = new WeakMap<object, number>();
+    readonly #cardHeightsVersions = new WeakMap<{}, number>();
 
-    private displayJobsSequence = 0;
+    #displayJobsSequence = 0;
 
-    private getDisplayJobsCacheId(displayJobs: readonly unknown[]): number
+    #getDisplayJobsCacheId(displayJobs: readonly unknown[]): number
     {
-        const cachedId = this.displayJobsIds.get(displayJobs as object);
+        const cachedId = this.#displayJobsIds.get(displayJobs);
         if (typeof cachedId === "number") return cachedId;
 
-        const nextId = ++this.displayJobsSequence;
-        this.displayJobsIds.set(displayJobs as object, nextId);
+        const nextId = ++this.#displayJobsSequence;
+        this.#displayJobsIds.set(displayJobs, nextId);
         return nextId;
     }
 
-    private getCardHeightsVersion(cardHeights: SvelteMap<number, number>): number
+    #getCardHeightsVersion(cardHeights: SvelteMap<number, number>): number
     {
-        return this.cardHeightsVersions.get(cardHeights as object) ?? 0;
+        return this.#cardHeightsVersions.get(cardHeights) ?? 0;
     }
 
     public invalidateCardHeightsCache(cardHeights: SvelteMap<number, number>): void
     {
-        const currentVersion = this.getCardHeightsVersion(cardHeights);
-        this.cardHeightsVersions.set(cardHeights as object, currentVersion + 1);
-    }
-
-    public clearLayoutCache(): void
-    {
-        this.listLayoutCache.clear();
+        const currentVersion = this.#getCardHeightsVersion(cardHeights);
+        this.#cardHeightsVersions.set(cardHeights, currentVersion + 1);
     }
 
     /**
@@ -99,7 +94,7 @@ class Virtualization
      * @param target - The target position to find
      * @returns The index where the target would be inserted
      */
-    private binarySearch(arr: number[], target: number): number
+    #binarySearch(arr: number[], target: number): number
     {
         let low = 0;
         let high = arr.length - 1;
@@ -116,6 +111,12 @@ class Virtualization
         }
         return low;
     }
+    
+    public clearLayoutCache(): void
+    {
+        this.#listLayoutCache.clear();
+    }
+
 
     /**
      * Computes the virtualization state for a list based on the provided options.
@@ -147,14 +148,14 @@ class Virtualization
         }
 
         const layoutCacheKey = [
-            this.getDisplayJobsCacheId(displayJobs as readonly unknown[]),
+            this.#getDisplayJobsCacheId(displayJobs as readonly unknown[]),
             displayJobs.length,
-            this.getCardHeightsVersion(cardHeights),
+            this.#getCardHeightsVersion(cardHeights),
             fallbackHeight,
             gap,
         ].join(":");
 
-        let layout = this.listLayoutCache.get(layoutCacheKey);
+        let layout = this.#listLayoutCache.get(layoutCacheKey);
 
         if (!layout)
         {
@@ -175,7 +176,7 @@ class Virtualization
                 totalHeight: cumulativeHeight,
             };
 
-            this.listLayoutCache.set(layoutCacheKey, layout);
+            this.#listLayoutCache.set(layoutCacheKey, layout);
         }
 
         const { itemPositions, totalHeight } = layout;
@@ -183,12 +184,12 @@ class Virtualization
         // Find visible items based on scroll position using binary search for performance
         const bufferHeight = 200; // Approximate height for buffer calculations
         const startPos = Math.max(0, scrollY - buffer * bufferHeight);
-        const startCandidate = this.binarySearch(itemPositions, startPos);
+        const startCandidate = this.#binarySearch(itemPositions, startPos);
         const startIndex = Math.max(0, startCandidate - buffer);
 
         // Find the end index
         const endPos = scrollY + containerHeight + buffer * bufferHeight;
-        const endCandidate = this.binarySearch(itemPositions, endPos + 1); // +1 to find first > endPos
+        const endCandidate = this.#binarySearch(itemPositions, endPos + 1); // +1 to find first > endPos
         const endIndex = endCandidate === itemPositions.length
             ? displayJobs.length
             : Math.min(displayJobs.length, endCandidate + buffer);

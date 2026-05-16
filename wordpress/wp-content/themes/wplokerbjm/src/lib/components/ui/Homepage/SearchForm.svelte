@@ -14,7 +14,7 @@
     SortAmountUpSolid,
     SortAmountDownSolid,
   } from "svelte-awesome-icons";
-  import { useRIC } from "$lib/utils/window.svelte";
+  import { useRIC } from "@/utils/window";
   import type {
     SearchFilters,
     TaxonomyType,
@@ -558,19 +558,20 @@
   },
   CustomDropdown = componentRegistry.getComponentByName("CustomDropdown"),
 )}
-  <div class="relative">
+  <div class="relative min-w-0">
     <Icon
       class="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10"
       aria-hidden="true"
     />
     <button
       type="button"
-      class="w-full text-left px-4 py-3 border rounded-full h-12 bg-[var(--wpl-global-color-5)]"
+      class="min-h-12 h-auto w-full min-w-0 rounded-full border bg-[var(--wpl-global-color-5)] px-4 py-3 text-left"
       aria-expanded={aria.expanded}
       aria-controls={aria.controls}
       onclick={() => dropdownHandler.toggleDropdown(groupKey, storeKey)}
     >
-      <span class="pl-8"
+      <span
+        class="block min-w-0 break-words pl-8 leading-tight"
         >{dropdownHandler.taxonomyLabel(storeKey, emptyLabel)}</span
       >
     </button>
@@ -592,9 +593,9 @@
   </div>
 {/snippet}
 
-<section class="mx-auto p-4 text-center mb-16">
+<section class="mx-auto mb-16 p-2 text-center sm:p-4">
   <div
-    class="lg:mx-[calc(50vw-50%)] border-2 border-[var(--wpl-global-color-1)] rounded-xl p-5 min-h-[220px] sm:min-h-[306px] md:min-h-[204px]"
+    class="min-w-0 rounded-xl border-2 border-[var(--wpl-global-color-1)] p-3 sm:min-h-[260px] sm:p-5 md:min-h-[300px] lg:mx-[calc(50vw-50%)]"
   >
     <form
       class="space-y-4"
@@ -605,11 +606,11 @@
       <input type="hidden" name="post_type" value={WPPostType.Lowongan} />
 
       <!-- Search Input -->
-      <div class="flex gap-2 relative">
+      <div class="relative grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
         <input
           type="text"
           placeholder="Masukkan Pekerjaan atau Perusahaan"
-          class="input input-bordered w-full search-input bg-[var(--wpl-global-color-5)] sm:rounded-full"
+          class="input input-bordered search-input min-w-0 w-full bg-[var(--wpl-global-color-5)] sm:rounded-full"
           name="cari"
           bind:value={jobListingStore.filters.cari}
           oninput={() =>
@@ -622,7 +623,7 @@
         />
         <button
           type="submit"
-          class="rounded-full btn-circle border hover:border px-4"
+          class="rounded-full btn-circle border hover:border p-2 sm:px-4 sm:py-2"
           class:opacity-75={jobListingStore.loading ||
             taxonomyStore.getLoadingStatus}
           disabled={jobListingStore.loading || taxonomyStore.getLoadingStatus}
@@ -645,7 +646,7 @@
                   <li>
                     <button
                       type="button"
-                      class="w-full text-justify text-sm px-4 py-2 transition-colors cursor-pointer"
+                      class="w-full cursor-pointer break-words px-4 py-2 text-justify text-sm transition-colors"
                       onclick={async () =>
                         await SearchFormController.submitSuggestionSearch(
                           suggestion,
@@ -665,7 +666,7 @@
       </div>
 
       <!-- Taxonomy Filters -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="grid min-w-0 grid-cols-1 gap-4 md:grid-cols-2">
         {@render taxonomyDropdownButton(
           "lokasi",
           "lokasi_pekerjaan",
@@ -700,7 +701,7 @@
         )}
 
         <!-- Sort Dropdown (not a taxonomy but shares similar UI), not included in taxonomyDropdownButton -->
-        <div class="relative">
+        <div class="relative min-w-0">
           {#if jobListingStore.filters.sort?.value === "asc"}
             <SortAmountUpSolid
               class="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--wpl-global-color-1)] pointer-events-none z-10 w-5 h-5 transform transition-transform duration-150"
@@ -714,11 +715,12 @@
           {/if}
           <button
             type="button"
-            class="w-full text-left px-4 py-3 border rounded-full h-12 bg-[var(--wpl-global-color-5)]"
+            class="min-h-12 h-auto w-full min-w-0 rounded-full border bg-[var(--wpl-global-color-5)] px-4 py-3 text-left"
             aria-expanded={dropdownHandler.isSortOpen}
             aria-controls="sort-listbox"
             onclick={() => dropdownHandler.toggleDropdown("sort")}
-            ><span class="pl-8"
+            ><span
+              class="block min-w-0 break-words pl-8 leading-tight"
               >{jobListingStore.filters.sort?.label ?? "Urutkan"}</span
             ></button
           >
@@ -741,7 +743,7 @@
       </div>
 
       {#if dropdownHandler.selectedFiltersWithNames && dropdownHandler.selectedFiltersWithNames.length}
-        <div class="mb-4 flex flex-wrap items-center gap-2 animate-fade-in">
+        <div class="mb-4 flex min-w-0 flex-wrap items-start gap-2 animate-fade-in">
           <span
             class="font-semibold text-[var(--wpl-global-color-1)] flex items-center justify-center w-full mr-2"
             ><FilterSolid class="mr-1 inline-block" aria-hidden="true" />Filter
@@ -750,25 +752,31 @@
           {#each dropdownHandler.selectedFiltersWithNames as filter (filter.key)}
             {#each filter.values as val, idx (val + idx)}
               <span
-                class="badge badge-lg gap-2 bg-[var(--wpl-global-color-5)] shadow-sm transition-all duration-150"
+                class="grid w-full min-w-0 max-w-full grid-cols-[auto_minmax(0,1fr)_auto] items-start gap-2 rounded-2xl bg-[var(--wpl-global-color-5)] px-3 py-2 text-left shadow-sm transition-all duration-150 sm:w-auto"
               >
                 {#if filter.key === "lokasi_pekerjaan"}
                   <MapMarkerAltSolid
-                    class="text-[var(--wpl-global-color-1)]"
+                    class="mt-0.5 shrink-0 text-[var(--wpl-global-color-1)]"
                     aria-hidden="true"
                   />
                 {:else if filter.key === "gender"}
-                  <VenusMarsSolid class="text-pink-500" aria-hidden="true" />
+                  <VenusMarsSolid
+                    class="mt-0.5 shrink-0 text-pink-500"
+                    aria-hidden="true"
+                  />
                 {:else}
                   <GraduationCapSolid
-                    class="text-green-500"
+                    class="mt-0.5 shrink-0 text-green-500"
                     aria-hidden="true"
                   />
                 {/if}
-                {filter.label}: {filter.names[idx]}
+                <span
+                  class="min-w-0 break-words leading-tight"
+                  >{filter.names[idx]}</span
+                >
                 <button
                   type="button"
-                  class="btn btn-ghost btn-xs btn-circle text-[var(--wpl-global-color-1)] hover:text-red-600 transition-colors duration-150 ml-1"
+                  class="btn btn-ghost btn-xs btn-circle self-start text-[var(--wpl-global-color-1)] transition-colors duration-150 hover:text-red-600"
                   onclick={() =>
                     dropdownHandler.clearDropdownFilter(filter.key, val)}
                   aria-label="Hapus filter"

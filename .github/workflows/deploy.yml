@@ -26,10 +26,6 @@ jobs:
       RCLONE_TPSLIMIT: "2"
 
     steps:
-      - uses: actions/setup-node@v6
-        with:
-          node-version: latest
-          check-latest: true
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -88,7 +84,7 @@ jobs:
           bash "$GITHUB_WORKSPACE/.github/scripts/deploy/rclone-sync.sh" &
           RCLONE_PID=$!
 
-          bun wrangler deploy --env ${{ env.WRANGLER_ENV }} -c wrangler.prod.toml &
+          bun wrangler deploy --env ${{ env.WRANGLER_ENV }} &
           WRANGLER_PID=$!
 
           wait $RCLONE_PID

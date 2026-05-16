@@ -10,15 +10,6 @@
     PhoneSolid,
     CircleCheckSolid,
   } from "svelte-awesome-icons";
-
-  const sectionClass =
-    "rounded-xl border-2 border-[var(--wpl-global-color-1)] shadow-md p-4 sm:p-6 md:p-8 mb-12 bg-[var(--wpl-global-color-5)]";
-
-  const baseIconClass =
-    "flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full mr-4 shadow-sm";
-
-  const linkClass =
-    "!text-[var(--wpl-global-color-1)] dark:!text-blue-400 font-medium hover:underline break-words";
 </script>
 
 <main class="container mx-auto max-w-[90vw] lg:max-w-[50vw] space-y-8 mt-12">
@@ -31,7 +22,7 @@
   </div>
 
   <!-- Benefit Section -->
-  <section class={sectionClass} aria-labelledby="section-benefit">
+  <section class="sectionClass" aria-labelledby="section-benefit">
     <h2
       id="section-benefit"
       class="text-2xl text-center font-bold text-[var(--wpl-global-color-1)] mb-4 break-words"
@@ -62,7 +53,7 @@
   </section>
 
   <!-- About Us Section -->
-  <section class={sectionClass} aria-labelledby="section-about">
+  <section class="sectionClass" aria-labelledby="section-about">
     <h2
       id="section-about"
       class="text-2xl text-center font-bold text-[var(--wpl-global-color-1)] mb-4 break-words"
@@ -90,7 +81,7 @@
   </section>
 
   <!-- Cara Memasang Section -->
-  <section class={sectionClass} aria-labelledby="section-cara">
+  <section class="sectionClass" aria-labelledby="section-cara">
     <h2
       id="section-cara"
       class="text-2xl font-bold mb-6 text-center text-[var(--wpl-global-color-1)] break-words"
@@ -123,7 +114,7 @@
             <ul class="space-y-4">
               <li class="flex items-center">
                 <span
-                  class={`${baseIconClass} bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 dark:from-purple-700 dark:via-pink-600 dark:to-orange-500`}
+                  class="baseIconClass bg-gradient-to-r from-purple-600 via-pink-500 to-orange-400 dark:from-purple-700 dark:via-pink-600 dark:to-orange-500"
                 >
                   <InstagramBrands
                     class="text-xl text-white"
@@ -139,7 +130,7 @@
                     href="https://instagram.com/loker_banjarmasin"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class={linkClass}
+                    class="linkClass"
                   >
                     @loker_banjarmasin
                   </a>
@@ -147,7 +138,7 @@
               </li>
               <li class="flex items-center">
                 <span
-                  class={`${baseIconClass} bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-600 dark:to-pink-600`}
+                  class="baseIconClass bg-gradient-to-r from-purple-500 to-pink-500 dark:from-purple-600 dark:to-pink-600"
                 >
                   <ThreadsBrands
                     class="text-xl text-white"
@@ -163,14 +154,14 @@
                     href="https://threads.com/@loker_banjarmasin"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class={linkClass}
+                    class="linkClass"
                   >
                     @loker_banjarmasin
                   </a>
                 </div>
               </li>
               <li class="flex items-center">
-                <span class={`${baseIconClass} bg-[#25D366] dark:bg-[#128C7E]`}>
+                <span class="baseIconClass bg-[#25D366] dark:bg-[#128C7E]">
                   <WhatsappBrands
                     class="text-xl text-white"
                     aria-hidden="true"
@@ -185,14 +176,14 @@
                     href="https://wa.me/6283862447271"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class={linkClass}
+                    class="linkClass"
                   >
                     +62 838-6244-7271
                   </a>
                 </div>
               </li>
               <li class="flex items-center">
-                <span class={`${baseIconClass} bg-[#1877F2] dark:bg-blue-600`}>
+                <span class="baseIconClass bg-[#1877F2] dark:bg-blue-600">
                   <FacebookBrands
                     class="text-xl text-white"
                     aria-hidden="true"
@@ -207,7 +198,7 @@
                     href="https://facebook.com/loker.banjarmasin.2025/"
                     target="_blank"
                     rel="noopener noreferrer"
-                    class={linkClass}
+                    class="linkClass"
                   >
                     facebook.com/loker.banjarmasin.2025/
                   </a>
@@ -283,7 +274,7 @@
   </section>
 
   <!-- Syarat Section -->
-  <section class={sectionClass} aria-labelledby="section-syarat">
+  <section class="sectionClass" aria-labelledby="section-syarat">
     <h2
       id="section-syarat"
       class="text-2xl font-bold text-center mb-4 text-[var(--wpl-global-color-1)] break-words"
@@ -317,3 +308,13 @@
     </div>
   </section>
 </main>
+
+<style lang="postcss">
+  @reference "@css/app.css";
+  .baseIconClass {
+    @apply flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full mr-4 shadow-sm;
+  }
+  .linkClass {
+    @apply !text-[var(--wpl-global-color-1)] dark:!text-blue-400 font-medium hover:underline break-words;
+  }
+</style>

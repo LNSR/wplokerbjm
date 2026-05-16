@@ -1,16 +1,38 @@
+<script module lang="ts">
+  import type { CardJob, CarouselProps, JobCardProps } from "@/types";
+  import type { SwiperOptions, VirtualData } from "swiper/types";
+  function sortJobsByDeadline(jobs: CardJob[] | null): CardJob[] {
+    if (!jobs) return [];
+    const items = [...jobs];
+    const sorted = items.sort((a, b) => {
+      const deadlineA = Date.parse(
+        a?.ringkasanPekerjaan?.deadline ?? "9999-12-31",
+      );
+      const deadlineB = Date.parse(
+        b?.ringkasanPekerjaan?.deadline ?? "9999-12-31",
+      );
+
+      if (deadlineA === deadlineB) {
+        return (Number(a?.id) ?? 0) - (Number(b?.id) ?? 0);
+      }
+
+      return deadlineA - deadlineB;
+    });
+    return sorted;
+  }
+</script>
+
 <script lang="ts">
   import JobCard from "@components/ui/Shared/JobCard.svelte";
   import { routeStateStore } from "$lib/stores/Route.svelte";
   import { goto } from "$app/navigation";
-  import type { CardJob, JobCardProps } from "@/types";
   import { APIServiceShared } from "@/services/graphql/APIService";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import { onMount, tick } from "svelte";
-  import { useRIC } from "$lib/utils/window.svelte";
+  import { flushSync, onMount } from "svelte";
+  import { useRIC } from "@/utils/window";
   import { innerWidth } from "svelte/reactivity/window";
   import SwiperCore, { type Swiper } from "swiper";
-  import type { SwiperOptions, VirtualData } from "swiper/types";
   import { Navigation, Pagination, Autoplay, Virtual } from "swiper/modules";
   import {
     ChevronCircleLeftSolid,
@@ -22,37 +44,12 @@
   import "swiper/css/virtual";
   import { useSidePanel } from "$lib/composables/SidePanel.svelte";
   import type { Attachment } from "svelte/attachments";
+  import { browser } from "$app/environment";
 
-  /*
-    JobCarousel uses Swiper's Virtual module (renderExternal) to efficiently
-    render very large lists (100+ items). Implementation notes and reasoning:
+  let { jobs }: CarouselProps = $props();
+  const title = "Lowongan Darurat";
+  const sortedJobs = $derived(sortJobsByDeadline(jobs ?? null));
 
-    - Swiper Virtual is configured with an index array (0..n-1) and calls
-      `renderExternal` with { from, to, offset } when it needs DOM updates.
-      We store that in `virtualData` and render only `jobs[from..to]`.
-
-    - We apply `style="transform: translate3d(${virtualData.offset}px, 0, 0)"` on each rendered
-      `.swiper-slide` so Swiper's expected positioning matches Svelte's DOM.
-      This avoids the common "blank slides" issue where Swiper expects slides
-      at certain positions but the framework hasn't applied offsets yet.
-
-    - After Svelte paints (tick), we call a few Swiper update helpers to let
-      Swiper recompute sizes/classes. Keep these minimal to avoid thrashing.
-
-    TODOs for future maintainers:
-    - If you change how Swiper Virtual is configured (breakpoints / slidesPerView),
-      ensure `addSlidesBefore`/`addSlidesAfter` are sufficient to prevent
-      visible white-space during fast swipes.
-    - If switching to a different virtual strategy, preserve `data-swiper-slide-index`
-      so Swiper internals map indexes correctly.
-  */
-  let {
-    jobs,
-    title = "Lowongan Darurat",
-  }: {
-    jobs?: CardJob[];
-    title?: string;
-  } = $props();
   class SwiperManager {
     public virtualData = $state<Omit<VirtualData<any>, "slides">>({
       from: 0,
@@ -65,6 +62,7 @@
     public jobCount = $derived(jobs?.length ?? 0);
     public swiperInstance: Swiper | null = null;
     public swiperContainerEl = $state<HTMLElement | null>(null);
+    public paginationEl = $state<HTMLElement | null>(null);
     public nextButtonEl = $state<HTMLElement | null>(null);
     public prevButtonEl = $state<HTMLElement | null>(null);
     public virtualIndexes = $derived.by(() => {
@@ -96,9 +94,9 @@
       return {
         loop: false,
         rewind: false,
-        slidesPerView: 1.1,
+        slidesPerView: 1,
         centeredSlides: false,
-        spaceBetween: 16,
+        spaceBetween: 12,
         autoplay: {
           delay: 5000,
           disableOnInteraction: false,
@@ -113,8 +111,8 @@
             }
           : { clickable: true, dynamicBullets: true, dynamicMainBullets: 4 },
         navigation: {
-          nextEl: nextEl ?? undefined,
-          prevEl: prevEl ?? undefined,
+          nextEl: nextEl,
+          prevEl: prevEl,
         },
         watchSlidesProgress: true,
         passiveListeners: true,
@@ -127,7 +125,7 @@
 
           addSlidesBefore: 2,
           addSlidesAfter: 2,
-          renderExternalUpdate: true,
+          renderExternalUpdate: false,
           renderExternal: (data: VirtualData<any>) => {
             const next = {
               from: Number(data?.from ?? 0),
@@ -143,17 +141,21 @@
             ) {
               return;
             }
-            queueMicrotask(async () => {
-              this.virtualData = next;
-              await tick();
-              this.swiperInstance?.updateSlides();
-            });
+
+            this.virtualData = next;
+            flushSync();
+            this.swiperInstance?.virtual?.update(true);
+            this.swiperInstance?.updateSlides();
           },
         },
         breakpoints: {
+          480: {
+            slidesPerView: 1.15,
+            spaceBetween: 16,
+          },
           640: {
             slidesPerView: 2,
-            spaceBetween: 24,
+            spaceBetween: 20,
           },
           1024: {
             slidesPerView: 4,
@@ -201,52 +203,61 @@
 
         requestAnimationFrame(() => {
           if (this.swiperInstance?.virtual)
-            this.swiperInstance.virtual.update(false);
+            this.swiperInstance.virtual.update(true);
           this.swiperInstance?.update();
           if (savedState && typeof savedState.slideIndex === "number")
             this.swiperInstance?.slideTo(clampedIndex, 0);
-          useRIC(() => routeStateStore.clearCarouselState(), {
-            fallbackDelay: 0,
-          });
+        });
+        useRIC(() => routeStateStore.clearCarouselState(), {
+          fallbackDelay: 0,
+          fallback: "timeout",
+          timeout: 1300,
         });
       } catch {
         throw new Error("Failed to initialize Swiper");
       }
     }
 
-    public createSwiper(): void {
-      const el = this.swiperContainerEl;
+    /**
+     * @param attempt The current retry attempt count for initializing Swiper. Used internally for retry logic and error handling.
+     *
+     * */
+    public createSwiper(attempt = 0): void {
+      const containerEl: Element | null =
+        document.querySelector(".job-carousel");
+      const el =
+        containerEl instanceof HTMLElement
+          ? containerEl
+          : this.swiperContainerEl;
       if (!el) return;
 
       if (this.#isInitializing) return;
       this.#isInitializing = true;
       this.swiperFailed = false;
 
-      const paginationEl = el.querySelector(
-        ".swiper-pagination",
-      ) as HTMLElement | null;
+      const paginationEl =
+        (document.querySelector(".swiper-pagination") as HTMLElement | null) ??
+        this.paginationEl;
 
-      const nextEl = (this.nextButtonEl ??
-        el.parentElement?.querySelector(
-          ".job-carousel-next",
-        )) as HTMLElement | null;
-      const prevEl = (this.prevButtonEl ??
-        el.parentElement?.querySelector(
-          ".job-carousel-prev",
-        )) as HTMLElement | null;
+      const nextEl =
+        (document.querySelector(".job-carousel-next") as HTMLElement | null) ??
+        this.nextButtonEl;
+
+      const prevEl =
+        (document.querySelector(".job-carousel-prev") as HTMLElement | null) ??
+        this.prevButtonEl;
 
       try {
         this.initializeSwiperInstance(el, paginationEl, nextEl, prevEl);
 
         this.swiperFailed = false;
       } catch (e) {
-        let attempt = 0;
         console.error(
-          `Error initializing Swiper, retrying for attempt ${attempt++}`,
+          `Error initializing Swiper, retrying for attempt ${++attempt}:`,
           e,
         );
         if (attempt < 3) {
-          this.createSwiper();
+          this.createSwiper(attempt);
         }
       } finally {
         this.#isInitializing = false;
@@ -258,13 +269,16 @@
       if (this.isRefreshing) return;
       this.isRefreshing = true;
       try {
+        if (!this.swiperInstance || !this.swiperContainerEl) {
+          this.createSwiper();
+        }
         this.swiperInstance?.disable();
         const data = await APIServiceShared.fetchCarouselGraphQL();
         jobs = data?.jobs ?? null;
         this.error = null;
         // Obligatory RAF
-        requestAnimationFrame(async () => {
-          await tick();
+        requestAnimationFrame(() => {
+          flushSync();
           this.swiperInstance?.virtual?.update(true);
           this.swiperInstance?.enable();
         });
@@ -279,17 +293,48 @@
     public destroySwiper(
       ...options: NonNullable<Parameters<Swiper["destroy"]>>
     ): void {
-      if (this.swiperInstance) {
-        try {
-          this.swiperInstance.destroy(...options);
-        } catch (e) {
-          console.error("Error destroying Swiper instance:", e);
-        }
-        this.swiperInstance = null;
-        this.swiperContainerEl = null;
-        this.nextButtonEl = null;
-        this.prevButtonEl = null;
+      if (!this.swiperInstance) return;
+      try {
+        this.swiperInstance.destroy(...options);
+      } catch (e) {
+        console.error("Error destroying Swiper instance:", e);
       }
+      this.swiperInstance = null;
+      this.swiperContainerEl = null;
+      this.nextButtonEl = null;
+      this.prevButtonEl = null;
+    }
+
+    /**
+     * Create/disable Swiper instance based on carousel visibility.
+     * Keeps the DOM-focused initialization scoped to the carousel element.
+     */
+    public observeIntersectionCarousel(): Attachment<HTMLElement> {
+      let observer: IntersectionObserver | null = null;
+
+      const handleIntersection = (entries: IntersectionObserverEntry[]) => {
+        entries.forEach((entry) => {
+          if (!this.swiperInstance) return;
+          if (entry.isIntersecting) this.swiperInstance.enable();
+          if (!entry.isIntersecting) this.swiperInstance.disable();
+        });
+      };
+
+      return (el: HTMLElement) => {
+        observer ??= new IntersectionObserver(handleIntersection, {
+          threshold: 0.03,
+          rootMargin: "2000px",
+        });
+
+        observer.observe(this.swiperContainerEl ?? el);
+
+        return () => {
+          if (observer) {
+            observer.disconnect();
+            observer = null;
+          }
+        };
+      };
     }
   }
 
@@ -328,7 +373,7 @@
       if (innerWidth.current! >= 768) {
         // Desktop: open overlay
         useSidePanel.openSidePanel(slug, job, "carousel", () => {
-          useSidePanel.scrollToJobGridCard(slug, true, "featured"); // jump to featured
+          useSidePanel.scrollToJobGridCard(slug, "featured"); // jump to featured
         });
       } else {
         // Mobile: mark visited for carousel then use SPA navigation to SingleLowongan.svelte route
@@ -338,39 +383,6 @@
       }
     }
   }
-
-  /**
-   * Create/destroy Swiper instance based on carousel visibility.
-   * Keeps the DOM-focused initialization scoped to the carousel element.
-   */
-  const observeIntersectionCarousel: Attachment<HTMLElement> = (() => {
-    let observer: IntersectionObserver | null = null;
-
-    function handleIntersection(entries: IntersectionObserverEntry[]) {
-      entries.forEach((entry) => {
-        if (entry.isIntersecting) swiperManager.swiperInstance?.enable();
-
-        if (!entry.isIntersecting && swiperManager.swiperInstance)
-          swiperManager.swiperInstance.disable();
-      });
-    }
-
-    return (el: HTMLElement) => {
-      observer ??= new IntersectionObserver(handleIntersection, {
-        threshold: 0.03,
-        rootMargin: "2000px",
-      });
-
-      observer.observe(el);
-
-      return () => {
-        if (observer) {
-          observer.disconnect();
-          observer = null;
-        }
-      };
-    };
-  })();
 
   const swiperManager = new SwiperManager();
 
@@ -382,15 +394,21 @@
   });
 </script>
 
-<section class="min-h-[450px] md:min-h-[400px] lg:min-h-[500px] mt-12">
-  <div class="flex items-center justify-between mb-6">
-    <h2 class="text-lg md:text-2xl font-semibold mt-4">{title}</h2>
-    <div class="flex items-center gap-1">
-      <div class="hidden sm:flex gap-1">
+<section
+  class="mt-12 min-w-0 overflow-hidden md:min-h-[500px] lg:min-h-[600px]"
+>
+  <div class="mb-6 flex min-w-0 flex-wrap items-center justify-between gap-3">
+    <h2
+      class="mt-4 min-w-0 break-words text-lg font-semibold leading-tight md:text-2xl"
+    >
+      {title}
+    </h2>
+    <div class="flex shrink-0 items-center gap-1">
+      <div class="hidden gap-1 sm:flex">
         <button
           type="button"
           bind:this={swiperManager.prevButtonEl}
-          class="job-carousel-prev btn rounded-full bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-1)]"
+          class="job-carousel-prev btn btn-circle rounded-full bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-1)]"
           aria-label="Sebelumnya"
           disabled={swiperManager.isRefreshing}
           aria-disabled={swiperManager.isRefreshing}
@@ -400,7 +418,7 @@
         <button
           type="button"
           bind:this={swiperManager.nextButtonEl}
-          class="job-carousel-next btn btn-md rounded-full bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-1)]"
+          class="job-carousel-next btn btn-circle rounded-full bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-1)]"
           aria-label="Berikutnya"
           disabled={swiperManager.isRefreshing}
           aria-disabled={swiperManager.isRefreshing}
@@ -423,7 +441,7 @@
       <!-- Refresh button is available on all sizes and placed to the far right -->
       <button
         type="button"
-        class="job-carousel-refresh btn btn-lg rounded-full ml-2 h-10 w-10 p-0 flex items-center justify-center text-current bg-[var(--wpl-global-color-5)] hover:bg-[var(--wpl-global-color-1)] overflow-visible focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[var(--wpl-global-color-1)]"
+        class="job-carousel-refresh btn btn-circle ml-2 flex h-10 w-10 items-center justify-center overflow-visible rounded-full bg-[var(--wpl-global-color-5)] p-0 text-current hover:bg-[var(--wpl-global-color-1)] focus:outline-none focus:ring-2 focus:ring-[var(--wpl-global-color-1)] focus:ring-offset-2"
         aria-label="Segarkan lowongan"
         title="Segarkan"
         onclick={async () => await swiperManager.refreshCarousel()}
@@ -450,51 +468,84 @@
         <LoadingSpinner srLabel="Memuat carousel..." size="md" />
       </div>
     {/if}
-    <div
-      {@attach observeIntersectionCarousel}
-      bind:this={swiperManager.swiperContainerEl}
-      class="swiper job-carousel"
-      role="region"
-      style:visibility={swiperManager.isRefreshing ? "hidden" : "visible"}
-      aria-hidden={swiperManager.isRefreshing}
-      aria-label={title}
-      aria-live="polite"
-    >
-      <div class="swiper-wrapper">
-        {#each swiperManager.virtualIndexes as idx}
-          {@const job: JobCardProps['jobdata'] = jobs[idx]}
+    {#if browser}
+      <div
+        {@attach swiperManager.observeIntersectionCarousel()}
+        bind:this={swiperManager.swiperContainerEl}
+        class="swiper job-carousel min-w-0"
+        role="region"
+        style:visibility={swiperManager.isRefreshing ? "hidden" : "visible"}
+        aria-hidden={swiperManager.isRefreshing}
+        aria-label={title}
+        aria-live="polite"
+      >
+        <div class="swiper-wrapper">
+          {#each swiperManager.virtualIndexes as idx}
+            {@const job: JobCardProps['jobdata'] = sortedJobs[idx]}
+            <div
+              class="swiper-slide min-w-0"
+              data-swiper-slide-index={idx}
+              style={`transform: translate3d(${swiperManager.virtualData.offset ?? 0}px, 0, 0); `}
+            >
+              <JobCard
+                jobdata={job}
+                permalink={job?.permalink}
+                variant="carousel"
+                onclick={() => {
+                  if (!job) return;
+                  CarouselNavigationHandler.handleClickNavigateToJob(
+                    job.slug ?? "",
+                    job.permalink ?? "",
+                    job,
+                    idx,
+                  );
+                }}
+              />
+            </div>
+          {/each}
+        </div>
+        <div class="mt-16 flex justify-center sm:mt-20 lg:mt-24">
           <div
-            class="swiper-slide"
-            data-swiper-slide-index={idx}
-            style={`transform: translate3d(${swiperManager.virtualData.offset ?? 0}px, 0, 0); `}
-          >
-            <JobCard
-              jobdata={job}
-              permalink={job?.permalink}
-              index={idx}
-              variant="carousel"
-              onClick={(slug: string, _event: MouseEvent, index: number) =>
-                CarouselNavigationHandler.handleClickNavigateToJob(
-                  slug,
-                  job?.permalink ?? "",
-                  job!,
-                  index,
-                )}
-            />
-          </div>
-        {/each}
+            bind:this={swiperManager.paginationEl}
+            class="swiper-pagination"
+          ></div>
+        </div>
       </div>
-      <div class="flex justify-center mt-24">
-        <div class="swiper-pagination"></div>
+    {:else}
+      <!-- SSR rendering -->
+      <div class="min-w-0 overflow-hidden">
+        <!-- Please match according Swiper breakpoints -->
+        <div class="flex w-full gap-3 min-[480px]:gap-4 sm:gap-5 lg:gap-8">
+          {#each sortedJobs as job, idx (Number(job.id) ?? job.permalink ?? idx)}
+            <div
+              class="flex min-w-0 shrink-0 grow-0 basis-full min-[480px]:basis-[calc((100%-2.4px)/1.15)] sm:basis-[calc((100%-20px)/2)] lg:basis-[calc((100%-96px)/4)]"
+            >
+              <JobCard
+                jobdata={job}
+                permalink={job.permalink ?? ""}
+                variant="carousel"
+                onclick={() => {
+                  CarouselNavigationHandler.handleClickNavigateToJob(
+                    job.slug ?? "",
+                    job.permalink ?? "",
+                    job,
+                    idx,
+                  );
+                }}
+              />
+            </div>
+          {/each}
+        </div>
       </div>
-    </div>
+    {/if}
     {#if swiperManager.swiperFailed}
-      <div class="job-carousel-fallback mt-6">
-        <div
-          class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
-        >
-          {#each jobs as job, idx (Number(job.id) ?? job.permalink ?? idx)}
-            <div class="fallback-item">
+      <div class="min-w-0 overflow-hidden">
+        <!-- Please match according Swiper breakpoints -->
+        <div class="flex w-full gap-3 min-[480px]:gap-4 sm:gap-5 lg:gap-8">
+          {#each sortedJobs as job, idx (Number(job.id) ?? job.permalink ?? idx)}
+            <div
+              class="flex min-w-0 shrink-0 grow-0 basis-full min-[480px]:basis-[calc((100%-2.4px)/1.15)] sm:basis-[calc((100%-20px)/2)] lg:basis-[calc((100%-96px)/4)]"
+            >
               <JobCard
                 jobdata={job}
                 permalink={job.permalink ?? ""}
@@ -512,23 +563,17 @@
   {/if}
 </section>
 
-<style>
-  /* Prefer browser native gestures for vertical scrolling to avoid blocking touchstart */
+<style lang="postcss">
+  @reference "@css/app.css";
+
   :global(.job-carousel),
   :global(.job-carousel .swiper-wrapper),
   :global(.job-carousel .swiper-slide) {
-    touch-action: pan-y;
+    @apply touch-pan-y select-none;
     -ms-touch-action: pan-y;
-    user-select: none;
   }
 
   :global(.swiper-slide) {
-    height: auto;
-    width: auto;
-    display: flex;
-  }
-
-  :global(.job-carousel-fallback .fallback-item) {
-    display: block;
+    @apply flex h-auto min-w-0;
   }
 </style>

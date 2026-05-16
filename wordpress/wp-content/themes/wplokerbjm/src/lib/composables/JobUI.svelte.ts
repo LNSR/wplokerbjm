@@ -1,5 +1,6 @@
-import { timeIntervalStore } from '$lib/stores/Time.svelte';
+//TODO: Migrate to Temporal from Old Date API
 import { type DeadlineStatus, type JobSummary, type StatusPekerjaanNumber, type StatusPekerjaanString } from "@/types";
+import { createSubscriber } from "svelte/reactivity";
 import type { Component } from 'svelte';
 import
 {
@@ -17,13 +18,72 @@ import typia from 'typia';
 interface SummaryRow
 {
     icon: Component
-    label: string
+    label: "Jenis Pekerjaan" | "Pendidikan" | "Pengalaman" | "Gender" | "Gaji" | "Usia" | "Lokasi" | "Deadline"
     value: string
 }
 
-const nowDate = $derived(timeIntervalStore.getNowReactiveDate)
+/**
+ * A self-correcting time interval that updates a date object every minute, aligned to the minute boundary
+ */
+const timeInterval = function()
+{
+    const date = new Date();
+    let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let stack: DisposableStack | null = new DisposableStack();
 
-function showSummaryJob(jobdata?: JobSummary | null): SummaryRow[]
+    const subscribeToTime = createSubscriber((update) =>
+    {
+        if (typeof window === 'undefined') return;
+
+        function clearedTimeout()
+        {
+            timeoutId && clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+
+        function syncMinuteTick()
+        {
+            function scheduleLoop()
+            {
+                clearedTimeout();
+                syncMinuteTick();
+                update();
+            }
+
+            const msUntilNextMinute = 60000 - (Date.now() % 60000);
+            timeoutId ??= setTimeout(scheduleLoop, msUntilNextMinute);
+            date.setTime(Date.now());
+
+            return {
+                [ Symbol.dispose ]()
+                {
+                    clearedTimeout();
+                    date.setTime(Date.now());
+                }
+            }
+        };
+
+        // self correct according to the next minute boundary to avoid drift
+        stack?.use(syncMinuteTick());
+
+        return () =>
+        {
+            stack?.dispose();
+            stack = null;
+        }
+    });
+
+    return {
+        get reactiveDate(): Date
+        {
+            stack ??= new DisposableStack();
+            subscribeToTime();
+            return date;
+        }
+    };
+}();
+
+export function showSummaryJob(jobdata?: JobSummary | null): SummaryRow[]
 {
     if (!typia.is<JobSummary>(jobdata)) throw new Error('jobdata must be a non-null object');
     const rows: SummaryRow[] = []
@@ -57,7 +117,7 @@ function showSummaryJob(jobdata?: JobSummary | null): SummaryRow[]
         { key: 'gaji', label: 'Gaji', icon: MoneyBillWaveSolid, value: gaji_display ?? '' },
         { key: 'umur', label: 'Usia', icon: CakeCandlesSolid, value: umur_display ?? '' },
         { key: 'lokasi_pekerjaan', label: 'Lokasi', icon: MapMarkerAltSolid, value: arrayOrString(data[ 'lokasi_pekerjaan' ]) },
-        { key: 'deadline', label: 'Deadline', icon: CalendarSolid, value: data[ 'deadline' ] ? FormatHelper.deadlineFormat(data[ 'deadline' ], undefined, nowDate) : '' },
+        { key: 'deadline', label: 'Deadline', icon: CalendarSolid, value: data[ 'deadline' ] ? FormatHelper.deadlineFormat(data[ 'deadline' ], timeInterval.reactiveDate.getTime()) : '' },
     ]
 
     dataSummaryFields.forEach(field =>
@@ -67,7 +127,7 @@ function showSummaryJob(jobdata?: JobSummary | null): SummaryRow[]
 
     return rows
 }
-function showStatusJob(status_pekerjaan: StatusPekerjaanNumber): StatusPekerjaanString | ''
+export function showStatusJob(status_pekerjaan: StatusPekerjaanNumber): StatusPekerjaanString | ''
 {
     if (typeof status_pekerjaan !== 'number') throw new Error('status_pekerjaan must be a number');
     switch (status_pekerjaan)
@@ -81,17 +141,21 @@ function showStatusJob(status_pekerjaan: StatusPekerjaanNumber): StatusPekerjaan
     }
 }
 
-function showDeadline(deadline: string): { text: string; status: DeadlineStatus }
+/**
+ * 
+ * @param deadline timestamp from job deadline
+ */
+export function showDeadline(deadline: string): { text: string; status: DeadlineStatus }
 {
     if (!deadline)
     {
         return { text: '', status: 'unknown' }
     }
 
-    const deadlineDateRaw = new Date(deadline);
+    const deadlineDateRaw = Date.parse(deadline);
     // compute Y/M/D in target time zone then compare UTC midnights to get whole-day difference
     const deadlineYMD = FormatHelper.getYMDInTimeZone(deadlineDateRaw);
-    const nowYMD = FormatHelper.getYMDInTimeZone(nowDate);
+    const nowYMD = FormatHelper.getYMDInTimeZone(timeInterval.reactiveDate.getTime());
     const msPerDay = 1000 * 60 * 60 * 24;
     const deadlineMidUTC = Date.UTC(deadlineYMD.year, deadlineYMD.month - 1, deadlineYMD.day);
     const nowMidUTC = Date.UTC(nowYMD.year, nowYMD.month - 1, nowYMD.day);
@@ -126,15 +190,14 @@ function showDeadline(deadline: string): { text: string; status: DeadlineStatus 
 
 /**
   * 
-  * @param postTime post_time received from API
+  * @param postTime post_time timestamp received from API
   * @returns 
   */
-function showTimeAgo(postTime: string): string
+export function showTimeAgo(postTime: string): string
 {
-    if (!postTime) return '';
-    const postDate = new Date(postTime);
-    if (isNaN(postDate.getTime())) return '';
-    const seconds = Math.floor((nowDate.getTime() - postDate.getTime()) / 1000);
+    const postDate = Date.parse(postTime);
+    if (isNaN(postDate)) return '';
+    const seconds = Math.floor((timeInterval.reactiveDate.getTime() - postDate) / 1000);
     return FormatHelper.formatTimeAgo(seconds);
 }
 
@@ -144,11 +207,16 @@ function showTimeAgo(postTime: string): string
 class FormatHelper
 {
     static #timeZone = 'Asia/Makassar'
+    static #date = new Date();
+    static #relativeTimeFormatter = new Intl.RelativeTimeFormat('id', { numeric: 'always' })
+    //* For easy-to-parse ISO-like date format (YYYY-MM-DD), so use 'en-CA' locale which uses that format, but with the target time zone to get correct Y/M/D in that zone
+    static #dateTimeFormatter = new Intl.DateTimeFormat('en-CA', { timeZone: this.#timeZone, year: 'numeric', month: 'numeric', day: 'numeric' })
+    static #localTimeFormatter = new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone: this.#timeZone })
 
-    public static getYMDInTimeZone(date: Date, timeZone: string = this.#timeZone)
+    public static getYMDInTimeZone(date: number)
     {
-        const fmt = new Intl.DateTimeFormat('en-CA', { timeZone, year: 'numeric', month: 'numeric', day: 'numeric' })
-        const parts = fmt.formatToParts(date).reduce((acc: Record<string, string>, p) => (acc[ p.type ] = p.value, acc), {} as Record<string, string>)
+        this.#date.setTime(date);
+        const parts = this.#dateTimeFormatter.formatToParts(this.#date).reduce((acc: Record<string, string>, p) => (acc[ p.type ] = p.value, acc), {} as Record<string, string>)
         return {
             year: Number(parts.year),
             month: Number(parts.month),
@@ -156,37 +224,41 @@ class FormatHelper
         }
     }
 
-    public static deadlineFormat(dateStr?: string | null, timeZone?: string, nowDate?: Date): string
+    /**
+     * 
+     * @param dateStr Date come from API
+     * @param nowDate from @see timeInterval.reactiveDate to make it reactive to time changes
+     * @returns 
+     */
+    public static deadlineFormat(dateStr: string | null, nowDate: number): string
     {
         const indonesianMonths = [
             'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
             'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember'
         ]
 
-        if (!dateStr) return ''
-        const date = new Date(dateStr)
-        if (isNaN(date.getTime())) return dateStr
+        if (!dateStr || dateStr.trim() === '') return ''
+        const date = Date.parse(dateStr)
+        if (isNaN(date)) return dateStr
 
         try
         {
-            const dateYMD = this.getYMDInTimeZone(date, timeZone)
-            const nowYMD = this.getYMDInTimeZone(nowDate ?? new Date(), timeZone)
+            const dateYMD = this.getYMDInTimeZone(date)
+            const nowYMD = this.getYMDInTimeZone(nowDate)
             const msPerDay = 1000 * 60 * 60 * 24
             const dateMidUTC = Date.UTC(dateYMD.year, dateYMD.month - 1, dateYMD.day)
             const nowMidUTC = Date.UTC(nowYMD.year, nowYMD.month - 1, nowYMD.day)
             const days_left = Math.floor((dateMidUTC - nowMidUTC) / msPerDay)
 
-            if (days_left < 0)
-            {
-                return 'kadaluarsa'
-            }
+            if (days_left < 0) return 'Kadaluarsa';
 
-            return new Intl.DateTimeFormat('id-ID', { day: 'numeric', month: 'long', year: 'numeric', timeZone }).format(date)
-        } catch
+            return this.#localTimeFormatter.format(date)
+        } catch (e)
         {
-            const day = date.getDate()
-            const month = date.getMonth()
-            const year = date.getFullYear()
+            const day = timeInterval.reactiveDate.getDate()
+            const month = timeInterval.reactiveDate.getMonth()
+            const year = timeInterval.reactiveDate.getFullYear()
+            console.warn('Failed to format deadline date, falling back to manual formatting. Error:', e)
             return `${day} ${indonesianMonths[ month ]} ${year}`
         }
     }
@@ -209,13 +281,12 @@ class FormatHelper
 
     public static formatTimeAgo(seconds: number): string
     {
-        const relativeTimeFormatter = new Intl.RelativeTimeFormat('id', { numeric: 'always' })
         const removeYangString = (text: string): string => text.replace(/\s+yang\s+/g, ' ')
 
         if (seconds < 60) return 'Baru saja diposting'
 
         const formatTime = (divisor: number, unit: Intl.RelativeTimeFormatUnit) =>
-            removeYangString(relativeTimeFormatter.format(-Math.floor(seconds / divisor), unit))
+            removeYangString(this.#relativeTimeFormatter.format(-Math.floor(seconds / divisor), unit))
 
         if (seconds < 3600) return formatTime(60, 'minute')
         if (seconds < 86400) return formatTime(3600, 'hour')
@@ -250,5 +321,3 @@ class FormatHelper
         }
     }
 }
-
-export { showSummaryJob, showStatusJob, showDeadline, showTimeAgo }; 

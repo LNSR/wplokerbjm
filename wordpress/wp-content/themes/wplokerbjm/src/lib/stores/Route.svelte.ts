@@ -16,17 +16,17 @@ class RouteManager
   isLoading = $state(false);
   isTransitioningRoute = $state(false);
 
-  setIsInitialLoad(value: boolean)
+  set setIsInitialLoad(value: boolean)
   {
     this.isInitialLoad = value;
   }
 
-  setIsLoading(loading: boolean)
+  set setIsLoading(loading: boolean)
   {
     this.isLoading = loading;
   }
 
-  setIsTransitioningRoute(transitioning: boolean)
+  set setIsTransitioningRoute(transitioning: boolean)
   {
     this.isTransitioningRoute = transitioning;
   }
@@ -35,136 +35,124 @@ class RouteManager
 
 class RouteStateManager
 {
+  #deviceDetector = deviceDetector as DeviceDetectorInternal; // Access to internal methods
   #scrollPositionsMap = new SvelteMap<string, number>();
   #searchMap = new SvelteMap<string, SearchState | undefined>();
   #visitedJobsMap = new SvelteMap<string, LastVisitedJobState>();
   #carouselMap = new SvelteMap<string, CarouselState>();
   #cardHeightsMap = new SvelteMap<string, SvelteMap<number, number>>();
-  public lastVisitedJob = $derived<LastVisitedJobState>(this.#visitedJobsMap.get(`${deviceDetector.currentDevice}`) ?? { slug: undefined, source: undefined });
-  #carouselState = $derived<CarouselState | undefined>(this.#carouselMap.get(`${deviceDetector.currentDevice}`));
+  public get lastVisitedJob() { return this.#visitedJobsMap.get(`${this.#deviceDetector.currentDevice}`) ?? { slug: undefined, source: undefined }; }
+  get #carouselState() { return this.#carouselMap.get(`${this.#deviceDetector.currentDevice}`); }
 
   constructor()
   {
     //* pass the cache clearing method to the device detector so it can call it when device type changes
-    (deviceDetector as DeviceDetectorInternal).setCallbackOnDeviceChange = this.#clearCachesForDevice.bind(this);
+    this.#deviceDetector.setCallbackOnDeviceChange = this.#clearCachesForDevice.bind(this);
   }
 
   public saveSearchState(path: string, searchState?: SearchState): void
   {
-    const key = `${deviceDetector.currentDevice}-${path}`;
+    const key = `${this.#deviceDetector.currentDevice}-${path}`;
     this.#searchMap.set(key, searchState);
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        sessionStorage.setItem(
-          `searchStates-${key}`,
-          typia.json.stringify<typeof searchState>(searchState),
-        );
-      } catch (e)
-      {
-        console.warn("Failed to save search state to sessionStorage", e);
-      }
+      sessionStorage.setItem(
+        `searchStates-${key}`,
+        typia.json.stringify<typeof searchState>(searchState),
+      );
+    } catch (e)
+    {
+      console.warn("Failed to save search state to sessionStorage", e);
     }
   }
 
   public getSearchState(path: string): SearchState | undefined
   {
-    const key = `${deviceDetector.currentDevice}-${path}`;
+    const key = `${this.#deviceDetector.currentDevice}-${path}`;
     let state = this.#searchMap.get(key);
-    if (!state && typeof sessionStorage !== "undefined")
+    if (state) return state;
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
+      const stored = sessionStorage.getItem(`searchStates-${key}`);
+      if (stored)
       {
-        const stored = sessionStorage.getItem(`searchStates-${key}`);
-        if (stored)
-        {
-          const parsed = typia.json.assertParse<SearchState | undefined>(stored);
-          this.#searchMap.set(key, parsed); // cache in memory
-          state = parsed;
-        }
-      } catch (e)
-      {
-        console.warn("Failed to load search state from sessionStorage", e);
+        const parsed = typia.json.assertParse<SearchState | undefined>(stored);
+        this.#searchMap.set(key, parsed); // cache in memory
+        return state = parsed;
       }
+    } catch (e)
+    {
+      console.warn("Failed to load search state from sessionStorage", e);
     }
-    return state;
   }
 
   public clearSearchState(path: string)
   {
-    const key = `${deviceDetector.currentDevice}-${path}`;
+    const key = `${this.#deviceDetector.currentDevice}-${path}`;
     this.#searchMap.delete(key);
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        sessionStorage.removeItem(`searchStates-${key}`);
-      } catch (e)
-      {
-        console.warn("Failed to clear search state from sessionStorage", e);
-      }
+      sessionStorage.removeItem(`searchStates-${key}`);
+    } catch (e)
+    {
+      console.warn("Failed to clear search state from sessionStorage", e);
     }
   }
 
   public saveCarouselState(carouselState: CarouselState)
   {
-    const key = `${deviceDetector.currentDevice}`;
+    const key = `${this.#deviceDetector.currentDevice}`;
     this.#carouselMap.set(key, carouselState);
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        const serialized = typia.json.stringify<typeof carouselState>(carouselState);
-        sessionStorage.setItem(
-          `carouselState-${key}`,
-          serialized,
-        );
-      } catch (e)
-      {
-        console.warn("Failed to save carousel state to sessionStorage", e);
-      }
+      const serialized = typia.json.stringify<typeof carouselState>(carouselState);
+      sessionStorage.setItem(
+        `carouselState-${key}`,
+        serialized,
+      );
+    } catch (e)
+    {
+      console.warn("Failed to save carousel state to sessionStorage", e);
     }
   }
 
   public getCarouselState(): CarouselState | undefined
   {
-    const key = `${deviceDetector.currentDevice}`;
+    const key = `${this.#deviceDetector.currentDevice}`;
     if (this.#carouselState?.slideIndex) return this.#carouselState;
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        const stored = sessionStorage.getItem(
-          `carouselState-${key}`,
-        );
-        if (stored)
-        {
-          const parsed = typia.json.assertParse<CarouselState>(stored);
-          this.#carouselMap.set(key, parsed);
-          return this.#carouselState;
-        }
-      } catch (e)
-      {
-        console.warn("Failed to load carousel state from sessionStorage", e);
-      }
+      const stored = sessionStorage.getItem(
+        `carouselState-${key}`,
+      );
+
+      if (!stored) return;
+
+      const parsed = typia.json.assertParse<CarouselState>(stored);
+      this.#carouselMap.set(key, parsed);
+      return this.#carouselState;
+    } catch (e)
+    {
+      console.warn("Failed to load carousel state from sessionStorage", e);
     }
-    return undefined;
   }
 
   public clearCarouselState()
   {
-    const key = `${deviceDetector.currentDevice}`;
+    const key = `${this.#deviceDetector.currentDevice}`;
     this.#carouselMap.delete(key);
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        sessionStorage.removeItem(`carouselState-${key}`);
-      } catch (e)
-      {
-        console.warn("Failed to clear carousel state from sessionStorage", e);
-      }
+      sessionStorage.removeItem(`carouselState-${key}`);
+    } catch (e)
+    {
+      console.warn("Failed to clear carousel state from sessionStorage", e);
     }
   }
 
@@ -172,57 +160,50 @@ class RouteStateManager
   // `source` indicates where the user clicked the job (carousel or grid).
   public MarkVisitedJob(slug: CardJob[ "slug" ], source?: JobCardProps[ "variant" ]): void
   {
-    if (!slug || !deviceDetector) return;
-    const key = `${deviceDetector.currentDevice}`;
+    if (!slug || !this.#deviceDetector) return;
+    const key = `${this.#deviceDetector.currentDevice}`;
     this.#visitedJobsMap.set(key, { slug, source });
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        sessionStorage.setItem(`lastVisitedJob-${key}`, slug);
-        sessionStorage.setItem(
-          `lastVisitedJobSource-${key}`,
-          source ?? "",
-        );
-      } catch (e)
-      {
-        console.warn("Failed to save last visited job to sessionStorage", e);
-      }
+      sessionStorage.setItem(`lastVisitedJob-${key}`, slug);
+      sessionStorage.setItem(
+        `lastVisitedJobSource-${key}`,
+        source ?? "",
+      );
+    } catch (e)
+    {
+      console.warn("Failed to save last visited job to sessionStorage", e);
     }
   }
 
   public restoreVisitedJob(): CardJob[ "slug" ] | undefined
   {
-    const key = `${deviceDetector.currentDevice}`;
+    const key = `${this.#deviceDetector.currentDevice}`;
     if (this.lastVisitedJob.slug) return this.lastVisitedJob.slug;
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        const stored = sessionStorage.getItem(
-          `lastVisitedJob-${key}` as NonNullable<CardJob[ "slug" ]>,
-        );
-        if (stored)
-        {
-          const src = sessionStorage.getItem(
-            `lastVisitedJobSource-${key}`,
-          ) as JobCardProps[ "variant" ] | null;
-          this.#visitedJobsMap.set(key, {
-            slug: stored,
-            source: src ?? undefined,
-          });
-          return this.lastVisitedJob.slug;
-        }
-      } catch (e)
-      {
-        console.error(
-          "Failed to load last visited job from sessionStorage:",
-          e,
-        );
-        return undefined;
-      }
+      const stored = sessionStorage.getItem(
+        `lastVisitedJob-${key}` as NonNullable<CardJob[ "slug" ]>,
+      );
+      if (!stored) return;
+      const src = sessionStorage.getItem(
+        `lastVisitedJobSource-${key}`,
+      ) as JobCardProps[ "variant" ] | null;
+      this.#visitedJobsMap.set(key, {
+        slug: stored,
+        source: src ?? undefined,
+      });
+      return this.lastVisitedJob.slug;
+    } catch (e)
+    {
+      console.error(
+        "Failed to load last visited job from sessionStorage:",
+        e,
+      );
+      return undefined;
     }
-    return undefined;
   }
 
   public saveCardHeights(
@@ -234,75 +215,67 @@ class RouteStateManager
     const record = Object.fromEntries(
       heights as Iterable<readonly [ number, number ]>,
     );
-    const key = `${deviceDetector.currentDevice}-${keyname}`;
+    const key = `${this.#deviceDetector.currentDevice}-${keyname}`;
     this.#cardHeightsMap.set(key, heights);
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        sessionStorage.setItem(`cardHeights-${key}`, typia.json.stringify<typeof record>(record));
-      } catch (e)
-      {
-        console.warn("Failed to save cardHeights to sessionStorage", e);
-      }
+      sessionStorage.setItem(`cardHeights-${key}`, typia.json.stringify<typeof record>(record));
+    } catch (e)
+    {
+      console.warn("Failed to save cardHeights to sessionStorage", e);
     }
   }
 
   public clearCardHeights(keyname: CardHeightKey)
   {
-    const key = `${deviceDetector.currentDevice}-${keyname}`;
+    const key = `${this.#deviceDetector.currentDevice}-${keyname}`;
     const cardHeights = this.getCardHeights(keyname);
     useVirtualization.invalidateCardHeightsCache(cardHeights);
     cardHeights.clear();
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        sessionStorage.removeItem(`cardHeights-${key}`);
-      } catch (e)
-      {
-        console.warn("Failed to clear cardHeights from sessionStorage", e);
-      }
+      sessionStorage.removeItem(`cardHeights-${key}`);
+    } catch (e)
+    {
+      console.warn("Failed to clear cardHeights from sessionStorage", e);
     }
   }
 
   /**
-   * 
+   * Get the card heights for a specific keyname
    */
   public getCardHeights(keyname: CardHeightKey): SvelteMap<number, number>
   {
-    if (!deviceDetector) return new SvelteMap<number, number>();
-    const key = `${deviceDetector.currentDevice}-${keyname}`;
+    if (!this.#deviceDetector) return new SvelteMap<number, number>();
+    const key = `${this.#deviceDetector.currentDevice}-${keyname}`;
     let cardHeights = this.#cardHeightsMap.get(key);
-    if (cardHeights) return cardHeights;
+    if (cardHeights && cardHeights.size > 0) return cardHeights;
 
     cardHeights = new SvelteMap<number, number>();
 
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return cardHeights;
+
+    try
     {
-      try
+      const stored = sessionStorage.getItem(`cardHeights-${key}`);
+      if (!stored) return cardHeights;
+
+      const record = typia.json.assertParse<Record<number, number> | undefined>(stored);
+      if (!record) return cardHeights;
+
+      for (const [ recordKey, height ] of Object.entries(record))
       {
-        const stored = sessionStorage.getItem(`cardHeights-${key}`);
-        if (stored)
-        {
-          const record = typia.json.assertParse<Record<number, number> | undefined>(stored);
-          if (record)
-          {
-            for (const [ recordKey, height ] of Object.entries(record))
-            {
-              cardHeights.set(Number(recordKey), height);
-            }
-          }
-        }
-      } catch (e)
-      {
-        console.warn("Failed to load cardHeights from sessionStorage", e);
+        cardHeights.set(Number(recordKey), height);
       }
+    } catch (e)
+    {
+      console.warn("Failed to load cardHeights from sessionStorage", e);
     }
 
     this.#cardHeightsMap.set(key, cardHeights);
-
-    return cardHeights;
+    return this.#cardHeightsMap.get(key) ?? cardHeights;
   }
 
   /**
@@ -310,17 +283,15 @@ class RouteStateManager
    */
   public saveScrollPosition(path: string, scrollY: number): void
   {
-    const key = `${deviceDetector.currentDevice}-${path}`;
+    const key = `${this.#deviceDetector.currentDevice}-${path}`;
     this.#scrollPositionsMap.set(key, scrollY);
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        sessionStorage.setItem(`scrollPosition-${key}`, String(scrollY));
-      } catch (e)
-      {
-        console.warn("Failed to save scroll position to sessionStorage", e);
-      }
+      sessionStorage.setItem(`scrollPosition-${key}`, String(scrollY));
+    } catch (e)
+    {
+      console.warn("Failed to save scroll position to sessionStorage", e);
     }
   }
 
@@ -329,30 +300,29 @@ class RouteStateManager
    */
   public getScrollPosition(path: string): number | undefined
   {
-    const key = `${deviceDetector.currentDevice}-${path}`;
+    const key = `${this.#deviceDetector.currentDevice}-${path}`;
     let position = this.#scrollPositionsMap.get(key);
-    if (position === undefined && typeof sessionStorage !== "undefined")
+    if (position) return position;
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
+      const stored = sessionStorage.getItem(`scrollPosition-${key}`);
+      if (stored)
       {
-        const stored = sessionStorage.getItem(`scrollPosition-${key}`);
-        if (stored)
+        position = Number(stored);
+        if (!isNaN(position))
         {
-          position = Number(stored);
-          if (!isNaN(position))
-          {
-            this.#scrollPositionsMap.set(key, position);
-          } else
-          {
-            position = undefined;
-          }
+          this.#scrollPositionsMap.set(key, position);
+          return this.#scrollPositionsMap.get(key);
+        } else
+        {
+          return undefined;
         }
-      } catch (e)
-      {
-        console.warn("Failed to load scroll position from sessionStorage", e);
       }
+    } catch (e)
+    {
+      console.warn("Failed to load scroll position from sessionStorage", e);
     }
-    return position;
   }
 
   /**
@@ -380,17 +350,15 @@ class RouteStateManager
    */
   public clearScrollPosition(path: string): void
   {
-    const key = `${deviceDetector.currentDevice}-${path}`;
+    const key = `${this.#deviceDetector.currentDevice}-${path}`;
     this.#scrollPositionsMap.delete(key);
-    if (typeof sessionStorage !== "undefined")
+    if (typeof sessionStorage === "undefined") return;
+    try
     {
-      try
-      {
-        sessionStorage.removeItem(`scrollPosition-${key}`);
-      } catch (e)
-      {
-        console.warn("Failed to clear scroll position from sessionStorage", e);
-      }
+      sessionStorage.removeItem(`scrollPosition-${key}`);
+    } catch (e)
+    {
+      console.warn("Failed to clear scroll position from sessionStorage", e);
     }
   }
 

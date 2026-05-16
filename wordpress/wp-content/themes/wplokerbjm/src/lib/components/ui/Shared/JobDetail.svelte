@@ -38,7 +38,7 @@
   import { onMount } from "svelte";
   import type { JobDetailResponse } from "@/types";
   import { page } from "$app/state";
-  import { showSummaryJob, showTimeAgo } from "@/lib/composables/JobUI.svelte";
+  import { showSummaryJob, showTimeAgo } from "$lib/composables/JobUI.svelte";
 
   interface ContactRow {
     type: "email" | "phone" | "website";
@@ -489,7 +489,7 @@
               {#if job.nama_perusahaan}
                 <div class="items-center gap-2 mb-2">
                   <UserTieSolid
-                    class="text-[var(--wpl-global-color-1)] inline-block w-4 h-4"
+                    class="text-[var(--wpl-global-color-1)] inline-block w-4 h-4 sm:w-5 sm:h-5 shrink-0"
                     aria-hidden="true"
                   />
                   <span class="font-bold ml-1">{job.nama_perusahaan}</span>
@@ -498,7 +498,7 @@
               {#if job.post_time}
                 <div class="items-center gap-2 mb-2">
                   <ClockSolid
-                    class="text-[var(--wpl-global-color-1)] inline-block w-4 h-4"
+                    class="text-[var(--wpl-global-color-1)] inline-block w-4 h-4 sm:w-5 sm:h-5 shrink-0"
                     aria-hidden="true"
                   />
                   <time class="font-bold ml-1" datetime={job.post_time}
@@ -512,21 +512,21 @@
 
         {#if ringkasanPekerjaan && ringkasanPekerjaan.length}
           <div
-            class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm md:text-base"
+            class="mt-2 min-w-0 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 text-sm md:text-base"
           >
             {#each ringkasanPekerjaan as row (row.label)}
               {@const Icon = row.icon}
-              <div class="flex items-start gap-2">
+              <div class="max-w-full flex items-start gap-2">
                 {#if Icon}
                   <Icon
-                    class="text-[var(--wpl-global-color-1)] inline-block w-5 h-5"
+                    class="text-[var(--wpl-global-color-1)] inline-block w-5 h-5 md:w-6 md:h-6 shrink-0"
                     aria-hidden="true"
                   />
                 {/if}
-                <div class="w-full">
+                <div class="w-full min-w-0 break-words">
                   <div class="font-bold">{row.label}</div>
                   <div
-                    class="text-[var(--wpl-global-color-1)] font-bold wrap-anywhere"
+                    class="text-[var(--wpl-global-color-1)] font-bold text-ellipsis"
                   >
                     {@html row.value}
                   </div>
@@ -544,7 +544,7 @@
     <section class="wysiwyg-content" aria-labelledby="about-company">
       <h2 id="about-company" class="text-2xl flex items-center gap-2 mb-4">
         <MapPinSolid
-          class="text-[var(--wpl-global-color-1)] inline-block"
+          class="text-[var(--wpl-global-color-1)] inline-block w-5 h-5 md:w-7 md:h-7 shrink-0"
           aria-hidden="true"
         />
         <span class="font-semibold text-[var(--wpl-global-color-1)]"
@@ -562,7 +562,7 @@
     <section class="wysiwyg-content" aria-labelledby="job-description">
       <h2 id="job-description" class="text-xl flex items-center gap-2 mb-4">
         <CircleInfoSolid
-          class="text-[var(--wpl-global-color-1)] inline-block"
+          class="text-[var(--wpl-global-color-1)] inline-block w-5 h-5 md:w-6 md:h-6 shrink-0"
           aria-hidden="true"
         />
         <span class="font-semibold text-[var(--wpl-global-color-1)]"
@@ -580,7 +580,7 @@
     <section class="wysiwyg-content" aria-labelledby="requirements">
       <h2 id="requirements" class="text-2xl flex items-center gap-2">
         <CircleCheckSolid
-          class="text-[var(--wpl-global-color-1)] inline-block"
+          class="text-[var(--wpl-global-color-1)] inline-block w-5 h-5 md:w-7 md:h-7 shrink-0"
           aria-hidden="true"
         />
         <span class="font-semibold text-[var(--wpl-global-color-1)]"
@@ -598,7 +598,7 @@
     <section class="wysiwyg-content" aria-labelledby="how-to-apply">
       <h2 id="how-to-apply" class="text-2xl flex items-center gap-2">
         <FileSignatureSolid
-          class="text-[var(--wpl-global-color-1)] inline-block"
+          class="text-[var(--wpl-global-color-1)] inline-block w-5 h-5 md:w-7 md:h-7 shrink-0"
           aria-hidden="true"
         />
         <span class="font-semibold text-[var(--wpl-global-color-1)]"
@@ -616,7 +616,7 @@
     <section class="wysiwyg-content" aria-labelledby="benefits">
       <h2 id="benefits" class="text-2xl flex items-center gap-2 mb-4">
         <HandHoldingHeartSolid
-          class="text-[var(--wpl-global-color-1)] inline-block"
+          class="text-[var(--wpl-global-color-1)] inline-block w-5 h-5 md:w-7 md:h-7 shrink-0"
           aria-hidden="true"
         />
         <span class="font-semibold text-[var(--wpl-global-color-1)]"
@@ -638,7 +638,7 @@
       >
         <span class="flex items-center gap-2">
           <AddressCardSolid
-            class="text-[var(--wpl-global-color-1)]"
+            class="text-[var(--wpl-global-color-1)] w-5 h-5 md:w-7 md:h-7 shrink-0"
             aria-hidden="true"
           />
           <span class="font-semibold text-[var(--wpl-global-color-1)]"
@@ -657,7 +657,7 @@
                 <li class="flex items-center">
                   {#if Icon}
                     <Icon
-                      class="text-[var(--wpl-global-color-1)] w-6 text-center text-xl inline-block"
+                      class="text-[var(--wpl-global-color-1)] w-5 h-5 md:w-6 md:h-6 text-center inline-block shrink-0"
                       aria-hidden="true"
                     />
                   {/if}
@@ -688,7 +688,7 @@
         class="text-2xl flex items-center gap-2 mb-4"
       >
         <AddressBookSolid
-          class="text-[var(--wpl-global-color-1)]"
+          class="text-[var(--wpl-global-color-1)] w-5 h-5 md:w-7 md:h-7 shrink-0"
           aria-hidden="true"
         />
         <span class="font-semibold text-[var(--wpl-global-color-1)]"
@@ -704,7 +704,7 @@
             <li class="flex items-center">
               {#if Icon}
                 <Icon
-                  class="text-[var(--wpl-global-color-1)] w-6 text-center text-xl inline-block"
+                  class="text-[var(--wpl-global-color-1)] w-5 h-5 md:w-6 md:h-6 text-center inline-block shrink-0"
                   aria-hidden="true"
                 />
               {/if}

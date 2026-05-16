@@ -31,12 +31,4 @@
       <JobDetail {job} />
     </main>
   {/if}
-{:else}
-  <!-- minimal not-found fallback -->
-  <main class="container mx-auto max-w-[90vw] lg:max-w-[60vw] space-y-8 mt-12">
-    <h1 class="text-xl font-semibold">Lowongan tidak ditemukan</h1>
-    <p class="text-gray-600">
-      Maaf, lowongan yang Anda cari tidak tersedia atau telah dihapus.
-    </p>
-  </main>
 {/if}

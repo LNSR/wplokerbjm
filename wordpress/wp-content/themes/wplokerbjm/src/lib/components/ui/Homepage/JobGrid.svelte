@@ -5,6 +5,7 @@
     LoadMoreResponse,
     SearchResponse,
     SearchState,
+    StatusPekerjaanNumber, StatusPekerjaanString
   } from "@/types";
   import { goto } from "$app/navigation";
   import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
@@ -19,7 +20,18 @@
   import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
 
   const isMobile = $derived(deviceDetector.isPlatformMobile);
-  const displayJobs = $derived(jobListingStore.jobs);
+  const displayJobs = $derived.by(() => {
+    if (jobListingStore.context === "search") return jobListingStore.jobs;
+
+    /**
+     * only "Normal" one @see StatusPekerjaanString from WP backend
+     */
+    const status: StatusPekerjaanNumber = 0; // Normal
+
+    return jobListingStore.jobs.filter(
+      (job) => job.status_pekerjaan === status,
+    );
+  });
   const loading = $derived(jobListingStore.loading);
   const hasMore = $derived(jobListingStore.hasMore);
   const displayTotalJobs = $derived(jobListingStore.totalJobs);
@@ -63,7 +75,7 @@
         ); // save state with the target path so it can be restored in sidepanel context
 
         useSidePanel.openSidePanel(job.slug ?? "", job, "featured", () => {
-          useSidePanel.scrollToJobGridCard(job.slug ?? "", true, "featured");
+          useSidePanel.scrollToJobGridCard(job.slug ?? "", "featured");
         });
       } else {
         this.MobileJobClick(job);
@@ -312,7 +324,7 @@
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { onMount, tick } from "svelte";
-  import { useRIC } from "@/lib/utils/window.svelte";
+  import { useRIC } from "@/utils/window";
 
   const props: JobGridProps = $props();
 
@@ -462,7 +474,7 @@
                     jobdata={job}
                     variant="featured"
                     permalink={job.permalink ?? ""}
-                    onClick={() => {
+                    onclick={() => {
                       void NavigationController.handleJobClick(job);
                     }}
                   />
@@ -486,7 +498,7 @@
                   jobdata={job}
                   variant="featured"
                   permalink={job.permalink ?? ""}
-                  onClick={() => {
+                  onclick={() => {
                     void NavigationController.handleJobClick(job);
                   }}
                 />

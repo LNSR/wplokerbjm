@@ -19,7 +19,6 @@ export enum SocialMediaPlatform {
 }
 
 export type StatusPekerjaanString = 'Normal' | 'Urgent' | 'Pinned';
-
 export type StatusPekerjaanNumber = 0 | 1 | 2 | 3;
 
 export interface Taxonomies {
@@ -51,4 +50,4 @@ export interface CustomFields {
   status_pekerjaan: StatusPekerjaanNumber | (null | undefined);
 }
 
-export interface MetaBox extends Taxonomies, CustomFields { }
+export type MetaBox = Taxonomies & CustomFields;

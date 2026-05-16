@@ -26,7 +26,7 @@
     static handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === "Enter" || event.key === " ") {
         event.preventDefault();
-        dropdownHandler.openDropdown();
+        dropdownHandler.toggleDropdown();
       }
 
       if (event.key === "Escape") dropdownHandler.closeDropdown();
@@ -45,15 +45,15 @@
     };
     static handleMouseDown = (event: MouseEvent) => {
       event.preventDefault();
-      dropdownHandler.openDropdown();
+      dropdownHandler.toggleDropdown();
     };
   }
 
   class DropdownHandler {
     public dropdownOpen = $state(false);
     public dropdownRef = $state<HTMLElement | null>(null);
-    public openDropdown() {
-      this.dropdownOpen = true;
+    public toggleDropdown() {
+      this.dropdownOpen = !this.dropdownOpen;
     }
 
     public closeDropdown() {

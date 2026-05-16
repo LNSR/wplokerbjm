@@ -18,9 +18,9 @@ class WPGraphQL
     #[Action('graphql_init')]
     public static function injectJwtFromCookie(): void
     {
-        if (!SharedUtils::isPluginActive('wpgraphql')) {
+        if (!SharedUtils::isPluginActive('wpgraphql'))
             return;
-        }
+
 
         if (empty($_SERVER['HTTP_AUTHORIZATION']) && !empty($_COOKIE['jwt-token'])) {
             $bearer = 'Bearer ' . $_COOKIE['jwt-token'];
@@ -36,9 +36,8 @@ class WPGraphQL
     #[Action('init_graphql_request')]
     public static function authenticateViaCookie(): void
     {
-        if (!SharedUtils::isPluginActive('wpgraphql')) {
+        if (!SharedUtils::isPluginActive('wpgraphql'))
             return;
-        }
         $cookieValue = '';
         $cookieName = '';
 
@@ -144,7 +143,7 @@ class WPGraphQL
         int $http_status_code,
         mixed $graphql_response,
     ): int {
-        
+
         if ($graphql_response instanceof \GraphQL\Executor\ExecutionResult) {
             $data = $graphql_response->data ?? null;
             if (is_array($data) && array_key_exists('jwt', $data) && $data['jwt'] === null) {
@@ -153,5 +152,20 @@ class WPGraphQL
         }
 
         return $http_status_code;
+    }
+    
+    /**
+     * @see get_graphql_setting
+     * @see ../../../../../plugins/wp-graphql/src/Admin/Settings/Settings.php
+     */
+    #[Filter('graphql_get_setting_section_field_value', 10, 3)]
+    public static function setPublicIntrospection($value, $default_value, $option_name)
+    {
+        if ($option_name === 'public_introspection_enabled') {
+            if (defined('WP_ENV') && WP_ENV !== 'production')
+                return 'on';
+            return 'off';
+        }
+        return $value;
     }
 }

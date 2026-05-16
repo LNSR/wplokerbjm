@@ -4,7 +4,11 @@
 @custom-variant dark (&:where([data-theme=dark], [data-theme=dark] *));
 
 body {
-  background-color: color-mix(in srgb, var(--wpl-global-color-4) 75%, var(--wpl-global-color-5) 25%);
+  background-color: color-mix(
+    in srgb,
+    var(--wpl-global-color-4) 75%,
+    var(--wpl-global-color-5) 25%
+  );
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
@@ -92,4 +96,8 @@ footer {
   outline-offset: 2px;
   box-shadow: 0 0 0 4px
     color-mix(in oklab, var(--wpl-global-color-0) 15%, #0000);
+}
+
+.sectionClass {
+  @apply rounded-xl border-2 border-[var(--wpl-global-color-1)] shadow-md p-4 sm:p-6 md:p-8 mb-12 bg-[var(--wpl-global-color-5)];
 }

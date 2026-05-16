@@ -1,19 +1,23 @@
 <script module lang="ts">
   import { onMount, tick } from "svelte";
-  import { type ThemeName, type WPLokerBJMThemedData } from "@/types";
+  import { type ThemeScriptData, type WPLokerBJMThemedData } from "@/types";
+  import {
+    applyThemeAttribute,
+    applyThemeViewTransition,
+    localStorageThemeActions,
+  } from "@/utils/theme";
   import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { themePropsStore } from "$lib/stores/Theme.svelte";
   import { APIServiceBrowser } from "@/services/graphql/APIService";
-  import { useRIC } from "$lib/utils/window.svelte";
+  import { useRIC } from "@/utils/window";
   import { MediaQuery } from "svelte/reactivity";
 
   let showThemeModal = $state(false);
   let showLoginModal = $state(false);
 
   class ThemeColorManager {
-    readonly #key = "wplokerbjm-theme";
-    public currentTheme = $state<ThemeName>("light");
+    public currentTheme = $state.raw<ThemeScriptData["themeList"]>("light");
     public metaColor = $derived.by(() => {
       switch (this.currentTheme) {
         case "light":
@@ -22,8 +26,6 @@
           return "#212a37";
         case "lavender":
           return "#f6f5ff";
-        default:
-          return undefined;
       }
     });
     #mediaQuery: MediaQuery = new MediaQuery("(prefers-color-scheme: dark)");
@@ -33,96 +35,47 @@
      * Initializes the theme based on saved preference or system setting. This should be called once on onMount.
      */
     public init(): void {
-      let savedTheme: ThemeName;
-      try {
-        savedTheme = localStorage.getItem(this.#key) as ThemeName;
-      } catch {
-        console.warn("Failed to read theme preference from localStorage");
-        return;
+      const attributeName: ThemeScriptData["elements"]["attribute"] =
+        "data-theme";
+
+      if (document.documentElement.hasAttribute(attributeName)) {
+        const currentAttr =
+          document.documentElement.getAttribute(attributeName);
+        this.currentTheme = currentAttr as ThemeScriptData["themeList"];
+        return; // Inline script already set the theme
       }
 
-      const theme =
-        savedTheme === "light" ||
-        savedTheme === "dark" ||
-        savedTheme === "lavender"
-          ? savedTheme
-          : this.systemPrefersDark
-            ? "dark"
-            : "light";
+      const savedTheme = localStorageThemeActions({ get: true });
+      const theme = this.systemPrefersDark ? "dark" : (savedTheme ?? "light");
 
       this.setTheme(theme);
     }
 
-    public setTheme(theme: ThemeName): void {
+    public setTheme(theme: ThemeScriptData["themeList"]): void {
       try {
-        this.setThemeHelper(theme, { useViewTransition: true });
+        this.setThemeWithViewTransition(theme, { useViewTransition: true });
       } catch {
         console.error(
           "Failed to set theme with view transition, falling back to normal theme change",
         );
-        this.setThemeHelper(theme);
+        this.setThemeWithViewTransition(theme);
       }
     }
 
-    private persistTheme(theme: ThemeName): void {
-      useRIC(
-        () => {
-          try {
-            localStorage.setItem(this.#key, theme);
-          } catch (e) {
-            console.warn("Failed to write theme preference to localStorage", e);
-          }
-        },
-        { fallbackDelay: 500 },
-      );
-    }
-
-    private applyThemeAttribute(theme: ThemeName, dark: boolean): void {
-      document.documentElement.setAttribute("data-theme", theme);
-      if (dark) {
-        document.documentElement.classList.add("wplokerbjm-dark-mode-enable");
-      } else {
-        document.documentElement.classList.remove(
-          "wplokerbjm-dark-mode-enable",
-        );
-      }
-    }
-
-    private setThemeHelper(
-      theme: ThemeName,
+    private setThemeWithViewTransition(
+      theme: ThemeScriptData["themeList"],
       options: { useViewTransition?: boolean } = {},
     ): void {
-      const isDark = theme === "dark";
       if (this.currentTheme === theme) return;
-
       this.currentTheme = theme;
-      window.requestAnimationFrame(() => {
-        const runThemeUpdate = () => {
-          this.applyThemeAttribute(theme, isDark);
-        };
 
-        if (
-          options.useViewTransition &&
-          window.matchMedia("(prefers-reduced-motion: no-preference)").matches
-        ) {
-          const transition = document.startViewTransition?.(() => {
-            runThemeUpdate();
-          });
+      if (options.useViewTransition)
+        return applyThemeViewTransition(theme, () =>
+          applyThemeAttribute(theme),
+        );
 
-          if (transition) {
-            void transition.finished
-              ?.catch(() => {
-                console.error("Theme view transition failed");
-              })
-              .finally(() => {
-                this.persistTheme(theme);
-              });
-            return;
-          }
-        }
-
-        runThemeUpdate();
-        this.persistTheme(theme);
+      return void window.requestAnimationFrame(() => {
+        applyThemeAttribute(theme);
       });
     }
   }
@@ -223,49 +176,58 @@
     KeySolid,
   } from "svelte-awesome-icons";
   import { componentRegistry } from "@/lib/stores/ComponentRegistry.svelte";
-  import type { Attachment } from "svelte/attachments";
 
   let { themeData }: { themeData: WPLokerBJMThemedData } = $props();
 
   let showBookmarkModal = $state(false);
-  let showloginAdminModal = $state(false);
+  let showLoginAdminModal = $state(false);
 
   const isMobile = $derived(deviceDetector.isPlatformMobile);
   const bookmarkJobCount = $derived(bookmarkStore.jobs.length);
 
-  export const ButtonUIHandler: Attachment<Window> = (() => {
-    const handler: ProxyHandler<any> = {
-      set(target: any, prop: string, value: any) {
-        if (prop === "loginAdmin") {
-          showloginAdminModal = !!value;
-        }
-        return Reflect.set(target, prop, value);
-      },
-      get(target: any, prop: string) {
-        if (prop === "loginAdmin") return showloginAdminModal;
-        return Reflect.get(target, prop);
-      },
-    };
-
-    return (w: Window) => {
-      w = window;
-      (w as any).showUI = new Proxy(
-        { loginAdmin: showloginAdminModal },
-        handler,
-      );
-      return () => {
-        delete (w as any).showUI;
+  /**
+   * Sets up a global handler on the window object to control the visibility of the login admin modal.
+   */
+  function loginAdminModalHandler() {
+    interface ShowUI extends Window {
+      __wplokerbjm?: {
+        showUI: {
+          loginAdmin: boolean;
+        };
       };
+    }
+    if (typeof window === "undefined") return;
+    const w = window as ShowUI;
+    Object.defineProperty(w, "__wplokerbjm" as keyof ShowUI, {
+      value: {
+        showUI: {
+          get loginAdmin() {
+            return showLoginAdminModal;
+          },
+          set loginAdmin(value: boolean) {
+            showLoginAdminModal = value;
+          },
+        },
+      },
+      writable: true,
+      configurable: true,
+    });
+
+    return () => {
+      if (typeof window === "undefined") return;
+      delete (w as any).__wplokerbjm.showUI.loginAdmin;
     };
-  })();
+  }
 
   themePropsStore.setThemeData = (() => themeData)();
   onMount(() => {
     themeColorManager.init();
+    const cleanupLoginAdminModalHandler = loginAdminModalHandler();
+    return () => {
+      cleanupLoginAdminModalHandler?.();
+    };
   });
 </script>
-
-<svelte:window {@attach ButtonUIHandler} />
 
 <svelte:head>
   <meta
@@ -345,7 +307,9 @@
                   Pilih tema yang ingin Anda gunakan.
                 </p>
                 <div class="flex gap-3 mt-3">
-                  {#snippet themeButton(choosenTheme: ThemeName)}
+                  {#snippet themeButton(
+                    choosenTheme: ThemeScriptData["themeList"],
+                  )}
                     <button
                       class="btn flex-1 capitalize"
                       aria-label={`Set theme to ${choosenTheme}`}
@@ -361,7 +325,9 @@
                   {/snippet}
 
                   {#each ["light", "dark", "lavender"] as choosenTheme (choosenTheme)}
-                    {@render themeButton(choosenTheme as ThemeName)}
+                    {@render themeButton(
+                      choosenTheme as ThemeScriptData["themeList"],
+                    )}
                   {/each}
                 </div>
                 <div class="modal-action">
@@ -397,7 +363,7 @@
           </button>
 
           <!-- Login button (desktop) -->
-          {#if showloginAdminModal}
+          {#if showLoginAdminModal}
             <button
               class="btn rounded-full font-semibold bg-[var(--wpl-global-color-5)] text-[var(--wpl-global-color-1)] relative border-1 border-[var(--wpl-global-color-1)] hover:border-2 ml-2 hidden md:flex"
               onclick={() => {
@@ -446,7 +412,7 @@
         <ul
           class="menu bg-base-200 text-base-content min-h-full w-auto max-w-[90vw] p-4 px-2 gap-4"
         >
-          {#if showloginAdminModal}
+          {#if showLoginAdminModal}
             <li>
               <button
                 class="btn font-semibold border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-4)] text-[var(--wpl-global-color-1)] justify-center"
