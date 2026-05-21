@@ -1,11 +1,11 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { SvelteSet, SvelteMap } from "svelte/reactivity";
+  import { SvelteSet } from "svelte/reactivity";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { useVirtualization } from "$lib/features/Virtualization.svelte";
   import type { ListVirtualizationState } from "@/lib/features/Virtualization.svelte";
-  import type { CardJob, DeadlineStatus } from "@/types";
+  import type { CardJob } from "@/types";
   import { isJobGridEl } from "$lib/utils/elements.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
   import { goto } from "$app/navigation";
@@ -83,7 +83,6 @@
   class BookmarkUIHandler {
     public showDeleteConfirm = $state(false);
     public removingIds = new SvelteSet<number>(); // track ids of jobs being removed to apply exit animation
-    public getRefreshTime = $derived(bookmarkStore.lastSyncTime.getTime());
     public error = $state("");
 
     public refreshBookmark(): void {
@@ -141,41 +140,44 @@
       bookmarkStore.clearAllExpiredJobs();
     }
 
-    #displayedSavedJobs = $derived(
-      bookmarkStore.jobs.map((job) => ({
-        ...job,
-        timeAgo: showTimeAgo(job.post_time!),
+    public filteredDisplayedJobs = $derived.by(() => {
+      const jobs: CardJob[] = bookmarkStore.jobs.map((job) => ({
+        timeAgo: showTimeAgo(job.post_time ?? ""),
         deadlineInfo: job.ringkasanPekerjaan?.deadline
           ? showDeadline(job.ringkasanPekerjaan.deadline)
-          : { text: "", status: "unknown" as DeadlineStatus },
+          : ({ text: "", status: "unknown" } as ReturnType<
+              typeof showDeadline
+            >),
         // statusInfo is a single status string now (previously an object with identical label/status)
         statusInfo: job.status_pekerjaan
           ? showStatusJob(job.status_pekerjaan)
           : "none",
-      })),
-    );
-    public filteredDisplayedJobs = $derived.by(() => {
+        ...job,
+      }));
+
       const q = String(useSearchQuery.searchQuery || "")
         .trim()
         .toLowerCase();
-      if (!q) return this.#displayedSavedJobs;
-      return this.#displayedSavedJobs.filter((job) => {
+
+      if (!q) return jobs;
+      return jobs.filter((job) => {
         const title = String(job.title || "").toLowerCase();
         const company = String(job.nama_perusahaan || "").toLowerCase();
         return title.includes(q) || company.includes(q);
       });
     });
 
-    public formattedLastSync = $derived(
-      bookmarkStore.lastSyncTime.toLocaleString("en-GB", {
+    public get formattedLastSync() {
+      return bookmarkStore.lastSyncTime.toLocaleString("en-GB", {
         year: "numeric",
         month: "numeric",
         day: "numeric",
         hour: "numeric",
         minute: "numeric",
         hour12: true,
-      }),
-    );
+      });
+    }
+
     public observeOpenCloseDialog(): Attachment<HTMLDialogElement> {
       return (dialog: HTMLDialogElement) => {
         if (
@@ -201,8 +203,8 @@
     public cardHeights = routeStateStore.getCardHeights("bookmarkModal");
     #polling: ReturnType<typeof $effect.root> | null = null;
 
-    public virtualizedJobs: ListVirtualizationState<CardJob> = $derived(
-      useVirtualization.computeList({
+    public get virtualizedJobs(): ListVirtualizationState<CardJob> {
+      return useVirtualization.computeList({
         displayJobs: bookmarkHandlerUI.filteredDisplayedJobs,
         scrollY: this.containerScrollY,
         containerHeight: contentRect?.height || 0,
@@ -210,8 +212,8 @@
         fallbackHeight: 200,
         gap: 24,
         buffer: 2,
-      }),
-    );
+      });
+    }
 
     public measureHeight(jobId: number): Attachment<HTMLElement> {
       return useVirtualization.createMeasureHeight(this.cardHeights, jobId);
@@ -219,12 +221,12 @@
 
     // Clear card heights that are no longer displayed
     public clearCardHeights() {
-      const currentJobIds = new SvelteSet(
+      const currentJobIds = new Set<number>(
         bookmarkHandlerUI.filteredDisplayedJobs.map(
           (job: CardJob) => job.id || 0,
         ),
       );
-      const heightsToKeep = new SvelteMap<number, number>();
+      const heightsToKeep = new Map<number, number>();
       for (const [jobId, height] of this.cardHeights) {
         if (currentJobIds.has(jobId)) {
           heightsToKeep.set(jobId, height);
@@ -257,16 +259,15 @@
       }
       this.#polling ??= $effect.root(() => {
         $effect.pre(() => {
-          // use closure to prevent stale values of virtualizedJobs and cardHeights in this polling effect
-          const visibleJobs = () => this.virtualizedJobs.visibleJobs;
-          const measured = () => this.cardHeights.size;
+          const visibleJobs = this.virtualizedJobs.visibleJobs;
+          const measured = this.cardHeights.size;
 
-          if (visibleJobs().length === 0) {
+          if (visibleJobs.length === 0) {
             stopTimeout();
             this.measuring = false;
             return;
           }
-          if (this.measuring && measured() >= visibleJobs().length) {
+          if (this.measuring && measured >= visibleJobs.length) {
             this.stopBackgroundMeasure();
           }
         });
@@ -399,10 +400,11 @@
   const modalStyle = $derived(
     `transform: translate(${modalHandler.drag.translate.x}px, ${modalHandler.drag.translate.y}px); touch-action: ${isMobile ? "none" : "auto"};`,
   );
-  const loadingUI = $derived(
-    bookmarkStore.isSyncingStatus || virtualizationManager.measuring,
+  const isBusy = $derived(
+    bookmarkStore.isSyncingStatus ||
+      bookmarkStore.isSyncingStatus ||
+      virtualizationManager.measuring,
   );
-  const isBusy = $derived(bookmarkStore.isSyncingStatus || loadingUI);
 
   // Only collapse action buttons on small (mobile) layouts when search is active
   const shouldCollapseActions = $derived(
@@ -621,7 +623,7 @@
               <h4 class="font-semibold text-md">
                 Tersedia ({bookmarkStore.jobs.length})
               </h4>
-              {#if bookmarkHandlerUI.getRefreshTime > 0 && !isBusy}
+              {#if bookmarkStore.lastSyncTime.getTime() > 0 && !isBusy}
                 <div class="text-xs font-semibold flex flex-col">
                   <span class="mb-1 flex items-center gap-1"
                     >Terakhir sync:</span

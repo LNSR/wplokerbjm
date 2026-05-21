@@ -10,9 +10,18 @@
     ThumbTackSolid,
     UserTieSolid,
   } from "svelte-awesome-icons";
-  import type { DeadlineStatus, JobCardProps, StatusPekerjaanString } from "@/types";
+  import type {
+    DeadlineStatus,
+    JobCardProps,
+    StatusPekerjaanString,
+  } from "@/types";
   import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
-  import { showDeadline, showStatusJob, showSummaryJob, showTimeAgo } from "@/lib/composables/JobUI.svelte";
+  import {
+    showDeadline,
+    showStatusJob,
+    showSummaryJob,
+    showTimeAgo,
+  } from "@/lib/composables/JobUI.svelte";
   interface Props {
     jobdata: JobCardProps["jobdata"];
     variant: JobCardProps["variant"];
@@ -37,18 +46,19 @@
   const selected = $derived.by(() => {
     const slugMatch = routeStateStore.lastVisitedJob.slug === jobdata?.slug;
     const expectedSource = variant;
-    const sourceMatch = routeStateStore.lastVisitedJob.source === expectedSource;
+    const sourceMatch =
+      routeStateStore.lastVisitedJob.source === expectedSource;
     return slugMatch && sourceMatch;
   });
 
   // show spinner overlay when mobile navigating for the card currently selected by slug
-  const spinnerVisible = $derived(
-    isMobile && routeStore.isLoading && selected,
-  );
+  const spinnerVisible = $derived(isMobile && routeStore.isLoading && selected);
 
   // Derived UI helpers (keeps UI reactive to prop changes)
   const summaryRows = $derived(
-    showSummaryJob(jobdata?.ringkasanPekerjaan),
+    showSummaryJob(jobdata?.ringkasanPekerjaan).filter(
+      (row) => row.label !== "Deadline",
+    ),
   );
   // showStatusJob now returns a single status string
   const statusInfo: StatusPekerjaanString | "" = $derived(
@@ -57,9 +67,7 @@
   const deadlineInfo: { text: string; status: DeadlineStatus } = $derived(
     showDeadline(jobdata?.ringkasanPekerjaan?.deadline ?? ""),
   );
-  const timeAgo = $derived(
-    showTimeAgo(jobdata?.post_time ?? ""),
-  );
+  const timeAgo = $derived(showTimeAgo(jobdata?.post_time ?? ""));
 
   const statusClass = $derived.by(() => {
     switch (statusInfo) {
@@ -153,7 +161,7 @@
         {:else}
           <h4 class="font-bold text-lg flex items-center gap-2 mb-6">
             <UserTieSolid
-              class="h-6 w-6 text-[var(--wpl-global-color-1)] inline-block"
+              class="h-5 w-5 md:h-6 md:w-6 text-[var(--wpl-global-color-1)] inline-block shrink-0"
               aria-hidden="true"
             />
             {jobdata?.nama_perusahaan}
@@ -165,20 +173,18 @@
           class="flex flex-wrap gap-x-4 gap-y-1 mb-2 text-[var(--wpl-global-color-1)]"
         >
           {#each summaryRows as row (row.label)}
-            {#if row.label !== "Deadline"}
-              {@const Icon = row.icon}
-              <span
-                class="flex items-center text-base md:text-base font-semibold gap-2 py-1"
-              >
-                {#if Icon}
-                  <Icon
-                    class="text-[var(--wpl-global-color-1)] w-5 h-5 shrink-0"
-                    aria-hidden="true"
-                  />
-                {/if}
-                <span>{row.value ?? ""}</span>
-              </span>
-            {/if}
+            {@const Icon = row.icon}
+            <span
+              class="flex items-center text-base md:text-base font-semibold gap-2 py-1"
+            >
+              {#if Icon}
+                <Icon
+                  class="text-[var(--wpl-global-color-1)] w-4 h-4 sm:w-5 sm:h-5 shrink-0"
+                  aria-hidden="true"
+                />
+              {/if}
+              <span>{row.value ?? ""}</span>
+            </span>
           {/each}
         </div>
       </div>
@@ -191,9 +197,15 @@
             class={`flex items-center badge gap-1 px-3 py-1 font-semibold rounded ${statusClass}`}
           >
             {#if statusInfo === "Urgent"}
-              <ExclamationTriangleSolid class="h-4 w-4" aria-hidden="true" />
+              <ExclamationTriangleSolid
+                class="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0"
+                aria-hidden="true"
+              />
             {:else if statusInfo === "Pinned"}
-              <ThumbTackSolid class="h-4 w-4" aria-hidden="true" />
+              <ThumbTackSolid
+                class="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0"
+                aria-hidden="true"
+              />
             {/if}
             <span>{statusInfo}</span>
           </span>
@@ -203,7 +215,10 @@
           <span
             class={`flex badge gap-1 px-3 py-1 font-semibold rounded ${deadlineClass}`}
           >
-            <CalendarSolid class="h-4 w-4" aria-hidden="true" />
+            <CalendarSolid
+              class="h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0"
+              aria-hidden="true"
+            />
             <span>{deadlineInfo.text}</span>
           </span>
         {/if}
@@ -251,7 +266,7 @@
   }
 
   .card-body-carousel {
-    @apply card-body relative p-3 gap-0 flex flex-col min-h-[300px] h-full;
+    @apply card-body relative p-3 gap-0 flex flex-col min-w-[300px] min-h-[300px] h-full;
   }
 
   .card-body-featured,

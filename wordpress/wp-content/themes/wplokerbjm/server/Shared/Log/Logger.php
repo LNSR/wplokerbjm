@@ -29,6 +29,10 @@ class Logger
             return WP_ENVIRONMENT_TYPE;
         }
 
+        if (SharedUtils::isDevelopment()) {
+            return 'development';
+        }
+
         // Fallback detection for edge cases
         if (SharedUtils::isLocalhost()) {
             return 'local';

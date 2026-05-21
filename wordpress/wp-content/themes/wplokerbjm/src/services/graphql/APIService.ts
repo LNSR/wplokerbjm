@@ -279,7 +279,7 @@ export class APIServiceServer
       variables.ids = idsOrSlug;
     }
 
-    if (type) variables.type = typia.assertEquals<typeof type>(type);
+    if (type) variables.type = typia.assertEquals<JobSchemaResponse[ "type" ]>(type);
 
     const data = await URQLClientManager.runQuery(
       GET_JOB_SCHEMA,
@@ -291,7 +291,7 @@ export class APIServiceServer
 
     const schemas = data.jobSchema?.schemas;
 
-    return schemas?.filter((s): s is string => s !== null).map((s) => JSON.parse(s));
+    return typia.assertEquals<JobSchemaResponse[ "schemas" ]>(schemas ?? []);
   }
 
   //* Theme data related

@@ -51,4 +51,4 @@ export interface CustomFields {
   status_pekerjaan: StatusPekerjaanNumber | (null | undefined);
 }
 
-export interface MetaBox extends Taxonomies, CustomFields { }
+export type MetaBox = Taxonomies & CustomFields;

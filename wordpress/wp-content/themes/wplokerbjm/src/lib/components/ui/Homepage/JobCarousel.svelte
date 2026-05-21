@@ -1,16 +1,38 @@
+<script module lang="ts">
+  import type { CardJob, JobCardProps } from "@/types";
+  import type { SwiperOptions, VirtualData } from "swiper/types";
+  function sortJobsByDeadline(jobs: CardJob[] | null): CardJob[] {
+    if (!jobs) return [];
+    const items = [...jobs];
+    const sorted = items.sort((a, b) => {
+      const deadlineA = Date.parse(
+        a?.ringkasanPekerjaan?.deadline ?? "9999-12-31",
+      );
+      const deadlineB = Date.parse(
+        b?.ringkasanPekerjaan?.deadline ?? "9999-12-31",
+      );
+
+      if (deadlineA === deadlineB) {
+        return (Number(a?.id) ?? 0) - (Number(b?.id) ?? 0);
+      }
+
+      return deadlineA - deadlineB;
+    });
+    return sorted;
+  }
+</script>
+
 <script lang="ts">
   import JobCard from "@components/ui/Shared/JobCard.svelte";
   import { routeStateStore } from "$lib/stores/Route.svelte";
   import { goto } from "$app/navigation";
-  import type { CardJob, JobCardProps } from "@/types";
   import { APIServiceShared } from "@/services/graphql/APIService";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import { onMount, tick } from "svelte";
+  import { flushSync, onMount } from "svelte";
   import { useRIC } from "$lib/utils/window.svelte";
   import { innerWidth } from "svelte/reactivity/window";
   import SwiperCore, { type Swiper } from "swiper";
-  import type { SwiperOptions, VirtualData } from "swiper/types";
   import { Navigation, Pagination, Autoplay, Virtual } from "swiper/modules";
   import {
     ChevronCircleLeftSolid,
@@ -23,29 +45,6 @@
   import { useSidePanel } from "$lib/composables/SidePanel.svelte";
   import type { Attachment } from "svelte/attachments";
 
-  /*
-    JobCarousel uses Swiper's Virtual module (renderExternal) to efficiently
-    render very large lists (100+ items). Implementation notes and reasoning:
-
-    - Swiper Virtual is configured with an index array (0..n-1) and calls
-      `renderExternal` with { from, to, offset } when it needs DOM updates.
-      We store that in `virtualData` and render only `jobs[from..to]`.
-
-    - We apply `style="transform: translate3d(${virtualData.offset}px, 0, 0)"` on each rendered
-      `.swiper-slide` so Swiper's expected positioning matches Svelte's DOM.
-      This avoids the common "blank slides" issue where Swiper expects slides
-      at certain positions but the framework hasn't applied offsets yet.
-
-    - After Svelte paints (tick), we call a few Swiper update helpers to let
-      Swiper recompute sizes/classes. Keep these minimal to avoid thrashing.
-
-    TODOs for future maintainers:
-    - If you change how Swiper Virtual is configured (breakpoints / slidesPerView),
-      ensure `addSlidesBefore`/`addSlidesAfter` are sufficient to prevent
-      visible white-space during fast swipes.
-    - If switching to a different virtual strategy, preserve `data-swiper-slide-index`
-      so Swiper internals map indexes correctly.
-  */
   let {
     jobs,
     title = "Lowongan Darurat",
@@ -53,6 +52,9 @@
     jobs?: CardJob[];
     title?: string;
   } = $props();
+
+  const sortedJobs = $derived(sortJobsByDeadline(jobs ?? null));
+
   class SwiperManager {
     public virtualData = $state<Omit<VirtualData<any>, "slides">>({
       from: 0,
@@ -127,7 +129,7 @@
 
           addSlidesBefore: 2,
           addSlidesAfter: 2,
-          renderExternalUpdate: true,
+          renderExternalUpdate: false,
           renderExternal: (data: VirtualData<any>) => {
             const next = {
               from: Number(data?.from ?? 0),
@@ -143,11 +145,11 @@
             ) {
               return;
             }
-            queueMicrotask(async () => {
-              this.virtualData = next;
-              await tick();
-              this.swiperInstance?.updateSlides();
-            });
+
+            this.virtualData = next;
+            flushSync();
+            this.swiperInstance?.virtual?.update(true);
+            this.swiperInstance?.updateSlides();
           },
         },
         breakpoints: {
@@ -201,13 +203,15 @@
 
         requestAnimationFrame(() => {
           if (this.swiperInstance?.virtual)
-            this.swiperInstance.virtual.update(false);
+            this.swiperInstance.virtual.update(true);
           this.swiperInstance?.update();
           if (savedState && typeof savedState.slideIndex === "number")
             this.swiperInstance?.slideTo(clampedIndex, 0);
-          useRIC(() => routeStateStore.clearCarouselState(), {
-            fallbackDelay: 0,
-          });
+        });
+        useRIC(() => routeStateStore.clearCarouselState(), {
+          fallbackDelay: 0,
+          fallback: "timeout",
+          timeout: 1300,
         });
       } catch {
         throw new Error("Failed to initialize Swiper");
@@ -263,8 +267,8 @@
         jobs = data?.jobs ?? null;
         this.error = null;
         // Obligatory RAF
-        requestAnimationFrame(async () => {
-          await tick();
+        requestAnimationFrame(() => {
+          flushSync();
           this.swiperInstance?.virtual?.update(true);
           this.swiperInstance?.enable();
         });
@@ -348,10 +352,9 @@
 
     function handleIntersection(entries: IntersectionObserverEntry[]) {
       entries.forEach((entry) => {
-        if (entry.isIntersecting) swiperManager.swiperInstance?.enable();
-
-        if (!entry.isIntersecting && swiperManager.swiperInstance)
-          swiperManager.swiperInstance.disable();
+        if (!swiperManager.swiperInstance) return;
+        if (entry.isIntersecting) swiperManager.swiperInstance.enable();
+        if (!entry.isIntersecting) swiperManager.swiperInstance.disable();
       });
     }
 
@@ -382,7 +385,7 @@
   });
 </script>
 
-<section class="min-h-[450px] md:min-h-[400px] lg:min-h-[500px] mt-12">
+<section class="min-h-[400px] md:min-h-[500px] lg:min-h-[600px] mt-12">
   <div class="flex items-center justify-between mb-6">
     <h2 class="text-lg md:text-2xl font-semibold mt-4">{title}</h2>
     <div class="flex items-center gap-1">
@@ -462,7 +465,7 @@
     >
       <div class="swiper-wrapper">
         {#each swiperManager.virtualIndexes as idx}
-          {@const job: JobCardProps['jobdata'] = jobs[idx]}
+          {@const job: JobCardProps['jobdata'] = sortedJobs[idx]}
           <div
             class="swiper-slide"
             data-swiper-slide-index={idx}
@@ -493,7 +496,7 @@
         <div
           class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4"
         >
-          {#each jobs as job, idx (Number(job.id) ?? job.permalink ?? idx)}
+          {#each sortedJobs as job, idx (Number(job.id) ?? job.permalink ?? idx)}
             <div class="fallback-item">
               <JobCard
                 jobdata={job}

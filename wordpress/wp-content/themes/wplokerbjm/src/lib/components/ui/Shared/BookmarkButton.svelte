@@ -2,15 +2,17 @@
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import type { JobCardProps, WPBasePost } from "@/types";
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
-  import { componentRegistry } from "@/lib/stores/ComponentRegistry.svelte";
+  import { componentRegistry } from "$lib/stores/ComponentRegistry.svelte";
   import { useRIC } from "$lib/utils/window.svelte";
   import { onDestroy } from "svelte";
-  import { deviceDetector } from "@/lib/features/DeviceDetector.svelte";
-
+  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
   interface Props {
     jobId: WPBasePost["id"];
     variant: JobCardProps["variant"];
   }
+
+  type ConfirmationState = "saved" | "removed" | null;
+
   const { jobId, variant = undefined }: Props = $props();
 
   const isJobSaved = $derived(
@@ -20,33 +22,27 @@
 
   let isLoading = $state(false);
   let isHovered = $state(false);
-  let confirmationState: "saved" | "removed" | null = $state(null);
-  let errorState: "save" | "remove" | null = $state(null);
+  let confirmationState: ConfirmationState = $state(null);
+  let errorState: ConfirmationState = $state(null);
   let isPending = $state(false);
 
   let preToggleSaved = $state(false);
-  let bookmarkModalLoaded = false;
   let clicklock = false;
 
   /**
    * Toggle saved state for a job id. If saved, remove it; otherwise add it.
    */
-  function toggleSave(id: number): void {
-    if (bookmarkStore.jobs.some((job) => job.id === id)) {
-      return void bookmarkStore.removeJob(id);
-    }
+  function toggleSave(): void {
+    if (isJobSaved) return void bookmarkStore.removeJob(jobId);
 
-    return void bookmarkStore.addJob(id);
+    return void bookmarkStore.addJob(jobId);
   }
 
   function preloadBookmarkModal() {
-    if (bookmarkModalLoaded) return;
     useRIC(
       async () => {
-        if (!componentRegistry.getComponentByName("BookmarkModal")) {
-          await componentRegistry.loadComponentByName("BookmarkModal");
-          bookmarkModalLoaded = true;
-        }
+        if (componentRegistry.getComponentByName("BookmarkModal")) return;
+        await componentRegistry.loadComponentByName("BookmarkModal")
       },
       { fallbackDelay: 200, fallback: "timeout", timeout: 2000 },
     );
@@ -63,10 +59,7 @@
     e.stopPropagation();
     if (isNaN(jobId) || jobId < 1) return;
 
-    // If this tab is outdated (a newer build is open elsewhere), do a cache-reload fetch then force navigation.
-    if (typeof window !== "undefined" && bookmarkStore.outdatedStatus) {
-      return;
-    }
+    if (bookmarkStore.outdatedStatus) return;
 
     const startingOperation = () => {
       clicklock = true;
@@ -76,19 +69,15 @@
     };
 
     const saveOperation = () => {
-      toggleSave(jobId);
+      toggleSave();
       isPending = false;
-      if (!isJobSaved) {
-        confirmationState = "saved";
-      } else {
-        confirmationState = "removed";
-      }
+      confirmationState = isJobSaved ? "removed" : "saved";
     };
 
     const saveFailed = (err: unknown) => {
       isPending = false;
       const wasSaved = preToggleSaved;
-      errorState = wasSaved ? "remove" : "save";
+      errorState = wasSaved ? "removed" : "saved";
       console.error(
         `Failed to ${wasSaved ? "remove bookmark for" : "save bookmark for"} job ${jobId}:`,
         err,
@@ -250,7 +239,7 @@
       <div
         class="bg-red-600 text-white text-xs font-semibold px-2 py-1 rounded shadow-sm"
       >
-        {errorState === "save" ? "Gagal menyimpan" : "Gagal menghapus"}
+        {errorState === "saved" ? "Gagal menyimpan" : "Gagal menghapus"}
       </div>
     </div>
   {/if}

@@ -1,5 +1,5 @@
 import { APIServiceBrowser } from '@/services/graphql/APIService'
-import type { TaxonomyTerm, TaxonomyTermsResponse, TaxonomyType, TaxonomyGroup } from '@/types'
+import type { TaxonomyTerm, TaxonomyTermsResponse, TaxonomyType, TaxonomyGroup, WPBasePost } from '@/types'
 import { SvelteMap } from 'svelte/reactivity'
 import typia from 'typia'
 
@@ -12,22 +12,22 @@ class TaxonomyManager
 		pendidikan: [],
 	})
 
-	private loaded = $state({
+	private loaded = $state<Record<TaxonomyGroup, boolean>>({
 		lokasi: false,
 		gender: false,
 		pendidikan: false,
 	})
 
-	public loading = $state({
+	public loading = $state<Record<TaxonomyGroup, boolean>>({
 		lokasi: false,
 		gender: false,
 		pendidikan: false,
 	})
 
-	public error = $state({
-		lokasi: null as string | null,
-		gender: null as string | null,
-		pendidikan: null as string | null,
+	public error = $state<Record<TaxonomyGroup, string | null>>({
+		lokasi: null,
+		gender: null,
+		pendidikan: null,
 	})
 
 	public get anyError(): string | null
@@ -82,21 +82,14 @@ class TaxonomyManager
 		if (!typia.is<TaxonomyType>(type)) return;
 		this.loading[ this.getGroupFromType(type) ] = true
 		this.error[ this.getGroupFromType(type) ] = null
-		let keyAPI: keyof TaxonomyTermsResponse
-		switch (type)
-		{
-			case 'lokasi_pekerjaan':
-				keyAPI = 'lokasiTerms'
-				break
-			case 'gender':
-				keyAPI = 'genderTerms'
-				break
-			case 'pendidikan':
-				keyAPI = 'pendidikanTerms'
-				break
-			default:
-				throw new Error(`Unsupported taxonomy type: ${type}`)
+
+		const TAXONOMY_KEY_MAP: Record<TaxonomyType, keyof TaxonomyTermsResponse> = {
+			lokasi_pekerjaan: 'lokasiTerms',
+			gender: 'genderTerms',
+			pendidikan: 'pendidikanTerms',
 		}
+
+		const keyAPI: keyof TaxonomyTermsResponse = TAXONOMY_KEY_MAP[ type ]
 
 		try
 		{
@@ -114,7 +107,7 @@ class TaxonomyManager
 		}
 	}
 
-	public getTermNameBySlug(type: TaxonomyType, slug: string): string
+	public getTermNameBySlug(type: TaxonomyType, slug: NonNullable<WPBasePost['slug']>): string
 	{
 		const map = this.slugMaps[ this.getGroupFromType(type) ]
 		return map.get(slug) ?? slug

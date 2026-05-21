@@ -85,7 +85,11 @@ declare global
       themeData: WPLokerBJMThemedData | null
     }
 
-    interface PageData { deviceType: DevicePayload }
+    interface PageData
+    {
+      deviceType: DevicePayload,
+      jobSchemaScript?: string // This is a string containing a <script type="application/ld+json"> 
+    }
 
     interface Platform
     {

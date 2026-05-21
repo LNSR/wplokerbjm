@@ -1,11 +1,12 @@
 import { debounce } from "es-toolkit";
-import { SvelteDate, SvelteMap, SvelteSet } from "svelte/reactivity";
+import { SvelteMap, SvelteSet } from "svelte/reactivity";
 import { BookmarkIDB } from "@/services/IndexedDB";
 import { APIServiceBrowser } from "@/services/graphql/APIService";
 import type { CardJob } from "@/types";
 import { BaseBroadcastChannel } from "@/services/BroadcastChannel";
 import typia from "typia";
 import { TaskController } from "@/utils/mutex";
+import { useRIC } from "$lib/utils/window.svelte";
 
 interface BookmarkBroadcastMessage
 {
@@ -16,61 +17,56 @@ interface BookmarkBroadcastMessage
   broadcasterIdentifierId: string;
 }
 
+interface SyncResult { success: boolean; type: "partial" | "full" };
+
 
 class BookmarkManager
 {
 
-  //* === Instance fields ===
+  //* === Private instance fields ===
   #bookmarkTaskController: TaskController;
   #bookmarkRepository: BookmarkRepository;
   #bookmarkBroadcastChannel: BookmarkBroadcastChannel;
   #bookmarkSyncEngine: SyncOperation;
 
-  //* === Public derived state ===
-  public jobs;
-  public outdatedStatus;
-  public expiredJobIds;
-  public globalWarning;
-  public isSyncingStatus;
-  public lastSyncTime;
+  //* === Public getter state ===
+  public get jobs()
+  {
+    return Array.from(this.#bookmarkRepository.cacheJobs.values()).toSorted((a, b) => Number(b.id) - Number(a.id));
+  }
+  public get outdatedStatus() { return this.#bookmarkBroadcastChannel.isOutdated; }
+  public get globalWarning() { return (this.#bookmarkSyncEngine.warningFromSync || this.#storeWarning || this.#bookmarkBroadcastChannel.broadcastWarning) || undefined; }
+  public get isSyncingStatus() { return this.#bookmarkSyncEngine.isSyncing; }
+
+  //* === Public instance fields ===
+  public get expiredJobIds() { return this.#bookmarkRepository.expiredJobs; }
+  public get lastSyncTime() { return this.#bookmarkSyncEngine.lastSyncTime; }
 
   //* === Bookmark store fields ===
   #storeWarning = $state<string>("");
 
 
   constructor(
-    bookmarkRepository: BookmarkRepository = new BookmarkRepository(),
+    bookmarkRepository: BookmarkRepository,
     bookmarkTaskController: TaskController,
-    bookmarkBroadcastChannel: BookmarkBroadcastChannel = new BookmarkBroadcastChannel(
-      this.#loadFromStorageIDB.bind(this),
-      bookmarkRepository
-    ),
-    bookmarkSyncEngine: SyncOperation = new SyncOperation(
-      bookmarkRepository,
-      bookmarkTaskController,
-      bookmarkBroadcastChannel,
-    )
+    bookmarkBroadcastChannel?: BookmarkBroadcastChannel,
+    bookmarkSyncEngine?: SyncOperation,
   )
   {
     //* === Initialize dependencies ===
     this.#bookmarkTaskController = bookmarkTaskController;
     this.#bookmarkRepository = bookmarkRepository;
-    this.#bookmarkBroadcastChannel = bookmarkBroadcastChannel;
-    this.#bookmarkSyncEngine = bookmarkSyncEngine;
-    //* === Derived state for UI components ===
-    this.isSyncingStatus = $derived(bookmarkSyncEngine.isSyncing);
-    this.lastSyncTime = $derived(bookmarkSyncEngine.lastSyncTime);
-    this.jobs = $derived(
-      // Sort by ID descending to show newest bookmarks first, convert to array for easier mapping in UI
-      Array.from(bookmarkRepository.cacheJobs.values()).toSorted((a, b) => Number(b.id) - Number(a.id)),
+    this.#bookmarkBroadcastChannel = bookmarkBroadcastChannel ?? new BookmarkBroadcastChannel(
+      this.#loadFromStorageIDB.bind(this),
+      bookmarkRepository,
     );
-    this.globalWarning = $derived(
-      (bookmarkSyncEngine.warningFromSync || this.#storeWarning || bookmarkBroadcastChannel.broadcastWarning) || undefined,
+    this.#bookmarkSyncEngine = bookmarkSyncEngine ?? new SyncOperation(
+      bookmarkRepository,
+      bookmarkTaskController,
+      bookmarkBroadcastChannel ?? this.#bookmarkBroadcastChannel,
     );
-    this.outdatedStatus = $derived(bookmarkBroadcastChannel.isOutdated);
-    this.expiredJobIds = $derived(bookmarkRepository.expiredJobs);
 
-    //* Initialize the bookmark manager by loading data from IndexedDB and setting up necessary listeners and states
+    //* === Actions ===
     this.#init();
   }
 
@@ -83,9 +79,9 @@ class BookmarkManager
     {
       try
       {
-        const job = { id, title: "" } as CardJob; // skeleton job with minimal data to show loading state
+        const job: Pick<CardJob, "id" | "title"> = { id, title: "" }; // skeleton job with minimal data to show loading state
         this.#bookmarkSyncEngine.queueIdsForSync([ id ]); // queue for sync to get real data and update cache/IndexedDB
-        await this.#bookmarkRepository.addBookmark(job);
+        await this.#bookmarkRepository.addBookmark(job as CardJob);
       } catch (error)
       {
         console.error("Failed to add job:", error);
@@ -137,6 +133,7 @@ class BookmarkManager
   {
     const result = await this.#bookmarkSyncEngine.syncToServer();
     if (result?.success && result.type === "full") this.#bookmarkBroadcastChannel.postMessage("sync", true);
+    return result;
   }
 
   public clearAllExpiredJobs(): void
@@ -206,7 +203,7 @@ class BookmarkBroadcastChannel extends BaseBroadcastChannel
     this.#reloadStorageIDB = reloadStorageIDB;
     this.#expiredJobs = bookmarkRepository.expiredJobs;
 
-    // Initialize cross-tab communication and event listeners
+    //* === Actions ===
     this.#init();
 
   }
@@ -399,27 +396,27 @@ class SyncOperation
 
   public isSyncing = $state(false);
   public warningFromSync = $state<string>(""); // Specific warning for API issues
-  public lastSyncTime = new SvelteDate();
+  public lastSyncTime = new Date();
   #pendingSyncIds = new Set<number>(); // unique IDs pending sync
   #debouncedSync = debounce(() => this.#syncPending(), 2200);
   #localStorageKey = "bookmarkLastSync";
   //* === Injected dependencies ===
   #bookmarkRepository: Pick<BookmarkRepository, "cacheJobs" | "expiredJobs" | "bookmarkIDB">;
   #bookmarkTaskController: TaskController;
-  #isOutdated: BookmarkBroadcastChannel[ 'isOutdated' ];
-  get #getLatestJobIds(): CardJob[ 'id' ][] { return [...this.#bookmarkRepository.cacheJobs.keys()]; }
+  #bookmarkBroadcastChannel: Pick<BookmarkBroadcastChannel, "isOutdated">;
+  get #getLatestJobIds(): CardJob[ 'id' ][] { return [ ...this.#bookmarkRepository.cacheJobs.keys() ]; }
 
   constructor(
     bookmarkRepository: BookmarkRepository,
     bookmarkTaskController: TaskController,
-    bookmarkBroadcastChannel: Pick<BookmarkBroadcastChannel, "isOutdated">,
+    bookmarkBroadcastChannel: BookmarkBroadcastChannel,
   )
   {
     this.#bookmarkRepository = bookmarkRepository;
     this.#bookmarkTaskController = bookmarkTaskController;
+    this.#bookmarkBroadcastChannel = bookmarkBroadcastChannel;
 
-    //* === Computed state from dependencies ===
-    this.#isOutdated = $derived(bookmarkBroadcastChannel.isOutdated);
+    //* === Actions ===
     this.#init();
   }
 
@@ -429,9 +426,9 @@ class SyncOperation
    * * if idsToSync not provided, global full sync will be performed by taking snapshot of current job IDs in cache
    * ! Every sync will trigger version check, so if tab is outdated it will stop syncing and show warning instead of doing unnecessary API calls
    */
-  public async syncToServer(idsToSync?: CardJob[ 'id' ][]): Promise<void | { success: boolean; type: "partial" | "full" }>
+  public async syncToServer(idsToSync?: CardJob[ 'id' ][]): Promise<void | SyncResult>
   {
-    if (this.#isOutdated || document.visibilityState !== "visible") return;
+    if (this.#bookmarkBroadcastChannel.isOutdated || document.visibilityState !== "visible") return;
 
     const syncError = (error: unknown, idsToSync?: CardJob[ 'id' ][]): void =>
     {
@@ -443,42 +440,33 @@ class SyncOperation
 
     return this.#bookmarkTaskController.runQueued(async () =>
     {
-      interface SyncResult { success: boolean; type: "partial" | "full" };
-
-      if (this.isSyncing)
-      {
-        await this.#scheduleSyncRetry(idsToSync);
-        return; // yield to retry task without proceeding to performSync
-      };
+      if (this.isSyncing) return await this.#scheduleSyncRetry(idsToSync);
 
       // clear any pending retry as we're starting a real sync now
       this.#bookmarkTaskController.cancelRetry();
 
       if (!idsToSync) this.isSyncing = true;
 
-      return await this.#executeSync(idsToSync).then(() =>
+      return await this.#executeSync(idsToSync).then((): SyncResult =>
       {
 
         return {
           success: true,
           type: idsToSync ? "partial" : "full",
-        } satisfies SyncResult;
+        };
 
-      }).catch((error: unknown) =>
+      }).catch((error: unknown): SyncResult =>
       {
 
         syncError(error, idsToSync);
         return {
           success: false,
           type: idsToSync ? "partial" : "full",
-        } satisfies SyncResult;
+        };
 
       }).finally(() =>
       {
-        if (!idsToSync)
-        {
-          this.isSyncing = false;
-        }
+        if (!idsToSync) this.isSyncing = false;
       });
     }, 60000);
   }
@@ -500,18 +488,16 @@ class SyncOperation
   #syncPending(): void
   {
     const ids = [ ...this.#pendingSyncIds ];
-    if (ids.length > 0)
+    if (ids.length === 0) return;
+    this.syncToServer(ids).then(() =>
     {
-      this.syncToServer(ids).then(() =>
-      {
-        this.#saveLastSyncTimeToLocalStorage();
-      }).catch((error) =>
-        console.error("Failed to sync pending bookmarks:", error)
-      ).finally(() =>
-      {
-        this.#pendingSyncIds.clear();
-      });
-    }
+      this.#saveLastSyncTimeToLocalStorage();
+    }).catch((error) =>
+      console.error("Failed to sync pending bookmarks:", error)
+    ).finally(() =>
+    {
+      this.#pendingSyncIds.clear();
+    });
   }
 
   /**
@@ -575,32 +561,31 @@ class SyncOperation
    */
   #scheduleSyncRetry(idsToSync: Parameters<typeof this.syncToServer>[ 0 ]): void
   {
+    if (this.#bookmarkTaskController.isRetryScheduled) return;
     this.warningFromSync = "Sedang mencoba menyinkronkan ulang.";
-    if (!this.#bookmarkTaskController.isRetryScheduled)
+    this.#bookmarkTaskController.scheduleRetryTask(3000, async () =>
     {
-      this.#bookmarkTaskController.scheduleRetryTask(3000, async () =>
-      {
-        await this.syncToServer(idsToSync);
-      });
-    }
+      await this.syncToServer(idsToSync);
+    });
   }
 
   #saveLastSyncTimeToLocalStorage(): void
   {
     this.lastSyncTime.setTime(Date.now());
-    localStorage.setItem(this.#localStorageKey, this.lastSyncTime.getTime().toString());
+    useRIC(() => localStorage.setItem(this.#localStorageKey, this.lastSyncTime.getTime().toString()), { timeout: 2000, fallbackDelay: 2000, fallback: "timeout" });
+
   }
 
   #init(): void
   {
     if (typeof window === "undefined") return;
-    const localStorageSyncTime = localStorage.getItem(this.#localStorageKey);
-    if (localStorageSyncTime) this.lastSyncTime.setTime(Number(localStorageSyncTime));
+    const localStorageSyncTime = Number(localStorage.getItem(this.#localStorageKey));
+    localStorageSyncTime && this.lastSyncTime.setTime(localStorageSyncTime);
   }
 
 };
 
 export const bookmarkStore = new BookmarkManager(
-  new BookmarkRepository(),
+  new BookmarkRepository(new BookmarkIDB('JobBookmarks', 1, 'bookmarks')),
   new TaskController(),
 );

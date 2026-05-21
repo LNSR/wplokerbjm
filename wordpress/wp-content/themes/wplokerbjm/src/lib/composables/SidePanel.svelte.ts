@@ -10,8 +10,7 @@ import { goto } from "$app/navigation";
  */
 class SidePanelManager
 {
-  public selectedSlug = $derived(routeStateStore.lastVisitedJob.slug);
-  #isDesktop = $derived(deviceDetector.isPlatformDesktop);
+  public get selectedSlug() { return routeStateStore.lastVisitedJob.slug; }
   public isScrolling: boolean = false;
 
   /**
@@ -50,7 +49,7 @@ class SidePanelManager
     {
       // Handle page push and SEO for desktop
 
-      if (job && job.permalink && this.#isDesktop)
+      if (job && job.permalink && deviceDetector.isPlatformDesktop)
       {
         const url = new URL(job.permalink, window.location.origin);
         const path = url.pathname + url.search + url.hash;
@@ -87,61 +86,67 @@ class SidePanelManager
     // Skip if user is still scrolling and skipIfScrolling is true
     if (skipIfScrolling && this.isScrolling) return;
 
-    const performScroll = () =>
+    requestAnimationFrame(() =>
     {
       try
       {
-        const safeSlug = String(targetSlug);
-        const selector = `div[data-job-slug="${safeSlug}"]`;
-        const candidates = Array.from(
-          document.querySelectorAll(selector),
-        ) as HTMLElement[];
-        let cardElement: HTMLElement | null = null;
-
-        const isElementVisible = (el: HTMLElement) =>
-        {
-          const rect = el.getBoundingClientRect();
-          const style = window.getComputedStyle(el);
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            style.display !== "none" &&
-            el.offsetParent !== null
-          );
-        }
-
-        const visibleCandidates = candidates.filter(isElementVisible);
-        const sourceVisible = visibleCandidates
-          .filter((el) => el.dataset.jobSource === selectedSourceType)
-          .sort(
-            (a, b) =>
-              Math.abs(a.getBoundingClientRect().top) -
-              Math.abs(b.getBoundingClientRect().top),
-          );
-
-        const fallbackVisible = visibleCandidates.sort(
-          (a, b) =>
-            Math.abs(a.getBoundingClientRect().top) -
-            Math.abs(b.getBoundingClientRect().top),
-        );
-
-        cardElement = sourceVisible[ 0 ] || fallbackVisible[ 0 ] || null;
-
-        cardElement?.scrollIntoView({
-          behavior: "smooth",
-          block: "start",
-          inline: "nearest",
-        });
-      } catch (err)
+        useRIC(() => this.#performScroll(targetSlug, selectedSourceType), { timeout: 300, fallbackDelay: 300, fallback: "timeout" });
+      } catch (error)
       {
-        console.error("scrollToCard error:", err);
+        console.error("Error during scroll:", error);
       }
-    };
+    });
+  }
 
-    requestAnimationFrame(() =>
+  /**
+   * 
+   * @param targetSlug 
+   * @param selectedSourceType 
+   */
+  #performScroll(targetSlug: string, selectedSourceType: JobCardProps[ "variant" ]): void
+  {
+    const safeSlug = String(targetSlug);
+    const selector = `div[data-job-slug="${safeSlug}"]`;
+    const candidates = Array.from(
+      document.querySelectorAll(selector),
+    ) as HTMLElement[];
+    let cardElement: HTMLElement | null = null;
+
+    const isElementVisible = (el: HTMLElement) =>
     {
-      useRIC(performScroll, { timeout: 300, fallbackDelay: 300, fallback: "timeout" });
+      const rect = el.getBoundingClientRect();
+      const style = window.getComputedStyle(el);
+      return (
+        rect.width > 0 &&
+        rect.height > 0 &&
+        style.display !== "none" &&
+        el.offsetParent !== null
+      );
+    }
+
+    const visibleCandidates = candidates.filter(isElementVisible);
+    const sourceVisible = visibleCandidates
+      .filter((el) => el.dataset.jobSource === selectedSourceType)
+      .sort(
+        (a, b) =>
+          Math.abs(a.getBoundingClientRect().top) -
+          Math.abs(b.getBoundingClientRect().top),
+      );
+
+    const fallbackVisible = visibleCandidates.sort(
+      (a, b) =>
+        Math.abs(a.getBoundingClientRect().top) -
+        Math.abs(b.getBoundingClientRect().top),
+    );
+
+    cardElement = sourceVisible[ 0 ] || fallbackVisible[ 0 ] || null;
+
+    cardElement?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+      inline: "nearest",
     });
   }
 }
+
 export const useSidePanel = new SidePanelManager();

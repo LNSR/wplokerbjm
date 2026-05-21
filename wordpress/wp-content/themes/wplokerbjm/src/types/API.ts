@@ -16,8 +16,8 @@ export interface JobDetailResponse extends JobDetailPostMetaData, Pick<MetaBox, 
 
 export interface JobSchemaResponse
 {
-  schemas?: string | string[] | null
-  type: "ItemList" | "JobPosting"
+  schemas: (string | null)[];
+  type: "ItemList" | "JobPosting";
 }
 
 // Extended response for initial search operations

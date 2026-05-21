@@ -46,6 +46,7 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig =>
       dest: resolve(__dirname, "public", "~partytown"),
     }),
     analyzer({
+      enabled: false,
       fileName: "stats",
       openAnalyzer: false,
       analyzerMode: "static",
@@ -72,6 +73,7 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig =>
       polyfill: false,
     },
     target: "esnext",
+    sourcemap: false,
   };
 
   return {

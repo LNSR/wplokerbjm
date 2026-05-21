@@ -20,7 +20,7 @@ export const load: LayoutServerLoad = async ({ locals, url, fetch }) => {
         try {
           const hostOnly = origin.replace(/^https?:\/\//, "").replace(/\/$/, "");
           const originRegex = new RegExp(`https?:\\/\\/${hostOnly}`, "g");
-          rankMathHead = JSON.parse(JSON.stringify(rankMathHead).replace(originRegex, url.origin));
+          rankMathHead = rankMathHead.replace(originRegex, url.origin);
         } catch (e) {
           console.warn("layout load: failed to replace RankMath head URLs, using original", e);
         }

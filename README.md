@@ -44,8 +44,7 @@ wplokerbjm/
 ├── docker.conf.d # Additional Docker configuration snippets during docker build step
 │   ├── dev
 │   └── prod
-├── Dockerfile.development # Dockerfile for development environment
-├── Dockerfile.production # Dockerfile for production environment
+├── Dockerfile # Unified WordPress image with development and production targets
 ├── .env
 ├── .env.example
 ├── .github # GitHub Actions workflows

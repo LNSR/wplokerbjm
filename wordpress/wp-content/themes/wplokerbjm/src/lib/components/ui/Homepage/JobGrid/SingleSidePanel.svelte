@@ -10,18 +10,15 @@
   import JobDetail from "@components/ui/Shared/JobDetail.svelte";
   import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
   import { getCmsOrigin } from "@/utils/environment";
-  import { useRIC } from "@/lib/utils/window.svelte";
 
   const data = $derived((page.data?.job as JobDetailResponse | null) ?? null);
   const editPostId = $derived((data?.id as JobDetailResponse["id"]) ?? null);
 
-  let drawerElement: Element | undefined = undefined;
-
-  const isSidePanelVisible = $derived.by(() =>
+  const isSidePanelVisible = $derived(
     Boolean(data?.id || useSidePanel.selectedSlug),
   );
 
-  const isLoggedIn = $derived(themePropsStore.getNonce ? true : false);
+  const isLoggedIn = $derived<boolean>(!!themePropsStore.getNonce);
 
   function getCloneHref(postId?: number | null): string {
     if (!postId) return "#";
@@ -38,30 +35,34 @@
     return base;
   }
 
-  function handleWindowScroll(): void {
-    if (!useSidePanel.isScrolling) useSidePanel.setScrollState = true;
-
-    queueMicrotask(() => {
-      useRIC(() => {
-        useSidePanel.setScrollState = false;
-      });
-    });
-  }
-
-  function drawerElementAttachment(): Attachment {
+  const drawerElementAttachment: Attachment = (() => {
+    let drawerElement: Element | null = null;
     return (node: Element) => {
       data?.id; // re-run when job changes to reset scroll
       drawerElement = node;
 
       drawerElement.scrollTop = 0;
       return () => {
-        drawerElement = undefined;
+        drawerElement = null;
       };
     };
-  }
+  })();
+
+  const scrollHandler = {
+    handleScroll: (): void => {
+      useSidePanel.isScrolling || (useSidePanel.setScrollState = true);
+    },
+    handleScrollEnd: (): void => {
+      useSidePanel.isScrolling && (useSidePanel.setScrollState = false);
+    },
+  };
 </script>
 
-<svelte:window on:scroll|passive={handleWindowScroll} />
+<svelte:window
+  onscroll={scrollHandler.handleScroll}
+  onscrollend={scrollHandler.handleScrollEnd}
+/>
+
 <div
   data-last-error=""
   aria-hidden={!isSidePanelVisible}
@@ -69,7 +70,7 @@
 >
   <!-- Drawer -->
   <aside
-    {@attach drawerElementAttachment()}
+    {@attach drawerElementAttachment}
     class="relative shadow-xl rounded-xl border-2 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)] w-full max-h-[calc(100vh-var(--site-scroll-padding-top)-var(--site-header-height))] overflow-y-auto flex flex-col z-50"
   >
     <div

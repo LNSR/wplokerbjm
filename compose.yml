@@ -2,7 +2,8 @@ services:
   wordpress:
     build:
       context: .
-      dockerfile: Dockerfile.${WP_ENV}
+      dockerfile: Dockerfile
+      target: ${WP_ENV}
     container_name: wordpress-${WP_ENV}
     env_file:
       - ./.env

@@ -33,3 +33,9 @@ localhost.crt
 worker-configuration.d.ts
 **/*.d.ts
 **/*.graphql
+**/*.tsbuildinfo
+
+# Scraping related
+scrapper/**/downloads
+scrapper/.venv
+scrapper/__pycache__

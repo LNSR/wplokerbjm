@@ -5,13 +5,16 @@
   import JobGrid from "@components/ui/Homepage/JobGrid.svelte";
   import { page } from "$app/state";
   import type { CarouselProps, JobGridProps } from "@/types";
-  const props: {
+
+  interface Props {
     data: {
       carousel: CarouselProps;
       jobGrid: JobGridProps;
       itemListSchemaScript?: string;
     };
-  } = $props();
+  }
+
+  const props: Props = $props();
 </script>
 
 <svelte:head>

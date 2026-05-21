@@ -1,17 +1,19 @@
 <script lang="ts">
   import "@css/app.css";
+  import {
+    deviceDetector,
+    type DeviceDetectorInternal,
+  } from "$lib/features/DeviceDetector.svelte";
   import { GoogleServices } from "@/services/Google";
-  import Header from "$lib/components/layouts/Header.svelte";
+  import { routeStore } from "$lib/stores/Route.svelte";
+  import Header, { headerManager } from "$lib/components/layouts/Header.svelte";
   import Footer from "$lib/components/layouts/Footer.svelte";
   import FloatingActionButton from "$lib/components/ui/Shared/FloatingActionButton.svelte";
   import { type Snippet } from "svelte";
   import { afterNavigate, onNavigate, beforeNavigate } from "$app/navigation";
-  import { routeStore } from "$lib/stores/Route.svelte";
   import { updated } from "$app/state";
   import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
   import type { OnNavigate } from "@sveltejs/kit";
-  import { headerManager } from "$lib/components/layouts/Header.svelte";
-  import { deviceDetector, type DeviceDetectorInternal } from "$lib/features/DeviceDetector.svelte";
 
   let initialPageviewSent = false;
 
@@ -40,9 +42,9 @@
       if (updated.current && !willUnload && to?.url)
         location.href = to.url.href;
 
-      routeStore.setIsInitialLoad(false);
-      routeStore.setIsLoading(true);
-      routeStore.setIsTransitioningRoute(true);
+      routeStore.setIsInitialLoad = false;
+      routeStore.setIsLoading = true;
+      routeStore.setIsTransitioningRoute = true;
     } catch (error) {
       console.error("Error during beforeNavigate:", error);
     }
@@ -77,8 +79,8 @@
   });
 
   afterNavigate(() => {
-    routeStore.setIsLoading(false);
-    routeStore.setIsTransitioningRoute(false);
+    routeStore.setIsLoading = false;
+    routeStore.setIsTransitioningRoute = false;
     if (
       !routeStore.isInitialLoad &&
       initialPageviewSent &&
@@ -101,9 +103,8 @@
   // IIFE to avoid closure Svelte warning; set initialDeviceSSR for DeviceDetector during SSR
   (() => {
     if (deviceType)
-      ((deviceDetector as DeviceDetectorInternal).initialDeviceSSR = deviceType.isMobile
-        ? "mobile"
-        : "desktop");
+      (deviceDetector as DeviceDetectorInternal).initialDeviceSSR =
+        deviceType.isMobile ? "mobile" : "desktop";
   })();
 </script>
 

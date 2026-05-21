@@ -8,16 +8,7 @@ import { dev } from "$app/environment";
  * WordPress may live on a different domain than the frontend bundle, and the
  * head data endpoint requires the CMS host so it can produce valid canonicals.
  */
-export function getCmsOrigin (): string
+export function getCmsOrigin(): string
 {
-  let origin = dev ? PUBLIC_CMS_ORIGIN_DEV : PUBLIC_CMS_ORIGIN;
-
-  if ( !origin && typeof process !== "undefined" )
-  {
-    origin = dev
-      ? process.env.PUBLIC_CMS_ORIGIN_DEV || ""
-      : process.env.PUBLIC_CMS_ORIGIN || "";
-  }
-
-  return origin || "";
+  return dev ? PUBLIC_CMS_ORIGIN_DEV : PUBLIC_CMS_ORIGIN;
 }

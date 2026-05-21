@@ -27,22 +27,6 @@ class JobCarousel
         $result = $this->jobRepository->queryJob($args);
         $jobs = $result['jobs'] ?? [];
 
-        $sort = function ($a, $b) {
-            $statusA = (int) ($a['status_pekerjaan'] ?? 0);
-            $statusB = (int) ($b['status_pekerjaan'] ?? 0);
-            // Prioritize: Pinned (3) > Urgent (2) > Normal (0)
-            if ($statusA !== $statusB) {
-                return $statusB <=> $statusA; // DESC
-            }
-            // Within same status, sort by deadline ASC
-            $deadlineA = strtotime($a['deadline'] ?? '9999-12-31');
-            $deadlineB = strtotime($b['deadline'] ?? '9999-12-31');
-            return $deadlineA <=> $deadlineB; // ASC
-        };
-
-        // Sort jobs: status DESC (3 first), then deadline ASC
-        usort($jobs, $sort);
-
         $props = [
             'jobs' => $jobs,
             'totalJobs' => $query->found_posts,
