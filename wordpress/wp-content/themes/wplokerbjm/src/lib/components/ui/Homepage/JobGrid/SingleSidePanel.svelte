@@ -47,20 +47,11 @@
       };
     };
   })();
-
-  const scrollHandler = {
-    handleScroll: (): void => {
-      useSidePanel.isScrolling || (useSidePanel.setScrollState = true);
-    },
-    handleScrollEnd: (): void => {
-      useSidePanel.isScrolling && (useSidePanel.setScrollState = false);
-    },
-  };
 </script>
 
 <svelte:window
-  onscroll={scrollHandler.handleScroll}
-  onscrollend={scrollHandler.handleScrollEnd}
+  onscroll={() => (useSidePanel.isScrolling ||= true)}
+  onscrollend={() => (useSidePanel.isScrolling &&= false)}
 />
 
 <div

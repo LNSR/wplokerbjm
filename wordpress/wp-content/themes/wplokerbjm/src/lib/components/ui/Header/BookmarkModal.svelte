@@ -29,7 +29,11 @@
   } from "$lib/composables/JobUI.svelte";
   import { useSidePanel } from "$lib/composables/SidePanel.svelte";
 
-  let { open = $bindable() }: { open: boolean } = $props();
+  interface Props {
+    open: boolean;
+  }
+
+  let { open = $bindable() }: Props = $props();
 
   // This component scope state properties
   let modalEl: HTMLDialogElement;
@@ -198,13 +202,17 @@
   }
 
   class VirtualizationManager {
-    public measuring: boolean = $state(true); // show spinner until we measure heights of visible items to prevent INP
+    public measuring: boolean = $state.raw(false); // show spinner until we measure heights of visible items to prevent INP
     public containerScrollY = $state(0);
     public cardHeights = routeStateStore.getCardHeights("bookmarkModal");
-    #polling: ReturnType<typeof $effect.root> | null = null;
+    public backgroundMeasurement: DisposableStack | null = null;
 
-    public get virtualizedJobs(): ListVirtualizationState<CardJob> {
-      return useVirtualization.computeList({
+    constructor() {
+      this.#initBackgroundMeasurement();
+    }
+
+    public virtualizedJobs = $derived<ListVirtualizationState<CardJob>>(
+      useVirtualization.computeList({
         displayJobs: bookmarkHandlerUI.filteredDisplayedJobs,
         scrollY: this.containerScrollY,
         containerHeight: contentRect?.height || 0,
@@ -212,76 +220,80 @@
         fallbackHeight: 200,
         gap: 24,
         buffer: 2,
-      });
-    }
+      }),
+    );
 
     public measureHeight(jobId: number): Attachment<HTMLElement> {
       return useVirtualization.createMeasureHeight(this.cardHeights, jobId);
     }
 
-    // Clear card heights that are no longer displayed
-    public clearCardHeights() {
-      const currentJobIds = new Set<number>(
-        bookmarkHandlerUI.filteredDisplayedJobs.map(
-          (job: CardJob) => job.id || 0,
-        ),
-      );
-      const heightsToKeep = new Map<number, number>();
-      for (const [jobId, height] of this.cardHeights) {
-        if (currentJobIds.has(jobId)) {
-          heightsToKeep.set(jobId, height);
-        }
-      }
-      if (heightsToKeep.size !== this.cardHeights.size) {
-        this.cardHeights.clear();
-        for (const [k, v] of heightsToKeep) {
-          this.cardHeights.set(k, v);
-        }
-      }
-      return this.cardHeights;
-    }
+    // // Clear card heights that are no longer displayed
+    // public clearCardHeights() {
+    //   const currentJobIds = new Set<number>(
+    //     bookmarkHandlerUI.filteredDisplayedJobs.map(
+    //       (job: CardJob) => job.id || 0,
+    //     ),
+    //   );
+    //   const heightsToKeep = new Map<number, number>();
+    //   for (const [jobId, height] of this.cardHeights) {
+    //     if (currentJobIds.has(jobId)) {
+    //       heightsToKeep.set(jobId, height);
+    //     }
+    //   }
+    //   if (heightsToKeep.size !== this.cardHeights.size) {
+    //     this.cardHeights.clear();
+    //     for (const [k, v] of heightsToKeep) {
+    //       this.cardHeights.set(k, v);
+    //     }
+    //   }
+    //   return this.cardHeights;
+    // }
 
     /**
      * Start background measurement: poll cardHeights until visible items measured
-     * * Prevent INP by deferring measurement by showing loading state until heights are measured
+     * * Prevent INP spike on open by showing spinner first
      * !One time measurement
      * */
-    public startBackgroundMeasure() {
-      let timeout: ReturnType<typeof setTimeout> | null = setTimeout(() => {
-        this.stopBackgroundMeasure();
-      }, 1300);
+    #initBackgroundMeasurement() {
+      this.backgroundMeasurement ??= new DisposableStack();
+      if (this.backgroundMeasurement.disposed) return;
 
-      function stopTimeout() {
-        if (timeout) {
-          clearTimeout(timeout);
-          timeout = null;
-        }
-      }
-      this.#polling ??= $effect.root(() => {
-        $effect.pre(() => {
-          const visibleJobs = this.virtualizedJobs.visibleJobs;
-          const measured = this.cardHeights.size;
-
-          if (visibleJobs.length === 0) {
-            stopTimeout();
-            this.measuring = false;
-            return;
-          }
-          if (this.measuring && measured >= visibleJobs.length) {
-            this.stopBackgroundMeasure();
-          }
-        });
-
-        return () => {
-          stopTimeout();
-        };
+      this.backgroundMeasurement.defer(() => {
+        stopBackgroundMeasure();
       });
-    }
 
-    public stopBackgroundMeasure() {
-      if (this.#polling) this.#polling();
-      this.#polling &&= null;
-      this.measuring &&= false;
+      const stopBackgroundMeasure = () => {
+        polling?.();
+        polling = undefined;
+        this.measuring = false;
+        this.backgroundMeasurement = null;
+      };
+
+      let polling: ReturnType<typeof $effect.root> | undefined = $effect.root(
+        () => {
+          let timeout: ReturnType<typeof setTimeout> | undefined = setTimeout(
+            () => {
+              this.backgroundMeasurement?.dispose();
+            },
+            1300,
+          );
+
+          $effect.pre(() => {
+            const visibleJobs = this.virtualizedJobs.visibleJobs.length;
+            const measured = this.cardHeights.size;
+            this.measuring = true;
+
+            if (visibleJobs === 0 || measured >= visibleJobs) {
+              this.backgroundMeasurement?.dispose();
+            }
+          });
+
+          return () => {
+            timeout && clearTimeout(timeout);
+            timeout = undefined;
+          };
+        },
+      );
     }
   }
 
@@ -401,27 +413,23 @@
     `transform: translate(${modalHandler.drag.translate.x}px, ${modalHandler.drag.translate.y}px); touch-action: ${isMobile ? "none" : "auto"};`,
   );
   const isBusy = $derived(
-    bookmarkStore.isSyncingStatus ||
-      bookmarkStore.isSyncingStatus ||
-      virtualizationManager.measuring,
+    bookmarkStore.isSyncingStatus || virtualizationManager.measuring,
   );
 
   // Only collapse action buttons on small (mobile) layouts when search is active
   const shouldCollapseActions = $derived(
-    useSearchQuery.searchQuery && isMobile,
+    (useSearchQuery.isSearchOpen || (useSearchQuery.searchQuery && isMobile)) &&
+      !isBusy,
   );
-  onMount(() => {
-    virtualizationManager.startBackgroundMeasure();
-    if (open) modalEl.showModal();
 
-    // Focus search input when opening modal on desktop if not already open
-    useSearchQuery.initializeOpenOnDesktop();
-    // Start measuring container + card heights in background to avoid blocking interaction
+  onMount(() => {
+    if (open) modalEl.showModal();
+    useSearchQuery.initializeOpenOnDesktop(); // focus search input on desktop
     return () => {
       if (open) modalEl.close();
       modalHandler.resetPosition();
-      virtualizationManager.clearCardHeights();
-      virtualizationManager.stopBackgroundMeasure();
+      // virtualizationManager.clearCardHeights();
+      virtualizationManager.backgroundMeasurement?.dispose();
     };
   });
 </script>
@@ -537,28 +545,26 @@
             {/if}
 
             {#if !shouldCollapseActions}
-              {#if !isBusy && bookmarkStore.jobs.length > 0}
-                <button
-                  onclick={() => bookmarkHandlerUI.showDeleteAllConfirmation()}
-                  disabled={isBusy || bookmarkStore.outdatedStatus}
-                  class="btn btn-ghost btn-sm md:btn-md text-error w-auto whitespace-nowrap"
-                  aria-label="hapus semua"
-                  title="hapus semua"
-                >
-                  <TrashAltSolid class="h-4 w-4 mr-2" aria-hidden="true" />
-                  Hapus Semua
-                </button>
-                <button
-                  onclick={() => bookmarkHandlerUI.refreshBookmark()}
-                  disabled={isBusy || bookmarkStore.outdatedStatus}
-                  class="btn btn-ghost btn-sm md:btn-md w-auto whitespace-nowrap"
-                  aria-label="sync ke server"
-                  title="sync ke server"
-                >
-                  <RefreshSpinner size="h-4 w-4 mr-2" spin={isBusy} />
-                  Sync/Refresh
-                </button>
-              {/if}
+              <button
+                onclick={() => bookmarkHandlerUI.showDeleteAllConfirmation()}
+                disabled={isBusy || bookmarkStore.outdatedStatus}
+                class="btn btn-ghost btn-sm md:btn-md text-error w-auto whitespace-nowrap"
+                aria-label="hapus semua"
+                title="hapus semua"
+              >
+                <TrashAltSolid class="h-4 w-4 mr-2" aria-hidden="true" />
+                Hapus Semua
+              </button>
+              <button
+                onclick={() => bookmarkHandlerUI.refreshBookmark()}
+                disabled={isBusy || bookmarkStore.outdatedStatus}
+                class="btn btn-ghost btn-sm md:btn-md w-auto whitespace-nowrap"
+                aria-label="sync ke server"
+                title="sync ke server"
+              >
+                <RefreshSpinner size="h-4 w-4 mr-2" spin={isBusy} />
+                Sync/Refresh
+              </button>
             {/if}
           </div>
         </div>
@@ -621,7 +627,7 @@
               class="flex flex-row items-center justify-between break-words whitespace-normal mb-2"
             >
               <h4 class="font-semibold text-md">
-                Tersedia ({bookmarkStore.jobs.length})
+                Tersedia ({bookmarkHandlerUI.filteredDisplayedJobs.length})
               </h4>
               {#if bookmarkStore.lastSyncTime.getTime() > 0 && !isBusy}
                 <div class="text-xs font-semibold flex flex-col">
@@ -694,7 +700,7 @@
                           jobdata={job}
                           variant="bookmark"
                           permalink={job.permalink as string}
-                          onClick={() => modalHandler.handleJobClick(job)}
+                          onclick={() => modalHandler.handleJobClick(job)}
                         />
                       </div>
 
@@ -809,7 +815,7 @@
           class="btn btn-error"
           disabled={isBusy}
         >
-          {#if bookmarkStore.isSyncingStatus}
+          {#if isBusy}
             <LoadingSpinner size="sm" srLabel="Menghapus semua..." />
           {/if}
           Hapus Semua

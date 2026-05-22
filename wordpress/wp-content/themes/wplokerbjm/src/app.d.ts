@@ -7,6 +7,7 @@ import type {
   IncomingRequestCfProperties,
   KVNamespace,
 } from "@cloudflare/workers-types";
+import type { WPLokerBJMThemedData } from "@/types";
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces
@@ -80,9 +81,9 @@ declare global
     {
       deviceType: DevicePayload;
       jwtToken: string | null;
-
+      earlyHintsLink: string | null;
       /** Theme data fetched from the CMS and stored on locals for downstream usage. */
-      themeData: WPLokerBJMThemedData | null
+      themeData: WPLokerBJMThemedData
     }
 
     interface PageData
@@ -125,6 +126,12 @@ declare global
     // main thread (e.g., 'dataLayer.push').
     partytown?: PartytownConfig
   }
+  
+  declare module '*?inline-script' {
+    const src: string
+    export default src
+  }
 }
+
 
 export { };

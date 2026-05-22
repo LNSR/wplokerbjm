@@ -3,6 +3,8 @@ import { error } from '@sveltejs/kit';
 import { APIServiceServer, APIServiceShared } from "@/services/graphql/APIService";
 import { getCmsOrigin } from "@/utils/environment";
 import { schemaScriptAttach, schemaScriptParser } from "$lib/server/utils/scripts.server";
+import { collectPreloadLinksForJob } from "$lib/server/utils/http.server";
+import type { JobDetailResponse } from "../../../types/API";
 export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
 {
   const slug = String(params.slug ?? "");
@@ -12,7 +14,7 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
 
   try
   {
-    const jobPromise = APIServiceServer.fetchJobDetailGraphQL(slug, undefined, fetch);
+    const jobPromise: Promise<JobDetailResponse> = APIServiceServer.fetchJobDetailGraphQL(slug, undefined, fetch);
     const schemaPromise = APIServiceServer.fetchJobSchemasGraphQL(slug, undefined, "JobPosting", fetch).catch(
       (e) =>
       {
@@ -56,6 +58,8 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
     }
 
     if (!job) throw error(410, "Lowongan tidak ditemukan");
+    const linkHeader = collectPreloadLinksForJob(job);
+    linkHeader && (locals.earlyHintsLink = linkHeader);
     if (!isMobile)
     {
 
@@ -64,7 +68,7 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
         jobGrid: jobGrid ?? { jobs: [], maxNumPages: 1, totalJobs: 0 },
         job,
         jobSchemaScript: jobSchema
-          ? schemaScriptAttach(jobSchema, "JobPosting", job.id)
+          ? await schemaScriptAttach(jobSchema, "JobPosting", job.id)
           : "",
       };
 
@@ -74,7 +78,7 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
       return {
         job,
         jobSchemaScript: jobSchema
-          ? schemaScriptAttach(jobSchema, "JobPosting", job.id)
+          ? await schemaScriptAttach(jobSchema, "JobPosting", job.id)
           : "",
       };
 

@@ -1,7 +1,7 @@
 import type { CardJob, JobCardProps } from "@/types";
 import { routeStateStore } from "$lib/stores/Route.svelte";
 import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
-import { useRIC } from "$lib/utils/window.svelte";
+import { useRIC } from "@/utils/window";
 import { goto } from "$app/navigation";
 /**
  * SidePanelManager
@@ -12,17 +12,6 @@ class SidePanelManager
 {
   public get selectedSlug() { return routeStateStore.lastVisitedJob.slug; }
   public isScrolling: boolean = false;
-
-  /**
-   * Update scroll state used by `scrollToCard` to avoid interrupting
-   * user-initiated manual scrolling.
-   * 
-   * @note rely on this instead mutating `isScrolling` directly for better predictability
-   */
-  public set setScrollState(value: boolean)
-  {
-    this.isScrolling = value;
-  }
 
   /**
    * Open the side panel for a job.
@@ -70,21 +59,17 @@ class SidePanelManager
    * Smoothly scroll to the job card for the given slug.
    *
    * @param slug - The job slug to scroll to; defaults to `this.selectedSlug`
-   * @param skipIfScrolling - If true, skip scrolling if user is actively scrolling (default: true)
    * @param selectedSourceType - Choose source card to jump
    *
    */
   public scrollToJobGridCard(
     slug: string,
-    skipIfScrolling: boolean = true,
     selectedSourceType: JobCardProps[ "variant" ] = "featured", // default to "featured"
   ): void
   {
     const targetSlug = slug ?? this.selectedSlug;
     if (!targetSlug) return;
-
-    // Skip if user is still scrolling and skipIfScrolling is true
-    if (skipIfScrolling && this.isScrolling) return;
+    if (this.isScrolling) return;
 
     requestAnimationFrame(() =>
     {
@@ -99,9 +84,10 @@ class SidePanelManager
   }
 
   /**
-   * 
-   * @param targetSlug 
-   * @param selectedSourceType 
+   * Perform the actual scrolling to the job card element.
+   *
+   * @param targetSlug - The slug of the job to scroll to
+   * @param selectedSourceType - The source type of the job card
    */
   #performScroll(targetSlug: string, selectedSourceType: JobCardProps[ "variant" ]): void
   {

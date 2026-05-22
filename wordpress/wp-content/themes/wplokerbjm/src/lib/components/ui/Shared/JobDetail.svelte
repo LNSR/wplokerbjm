@@ -512,21 +512,21 @@
 
         {#if ringkasanPekerjaan && ringkasanPekerjaan.length}
           <div
-            class="mt-2 grid grid-cols-2 md:grid-cols-3 gap-4 text-sm md:text-base"
+            class="mt-2 min-w-0 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 text-sm md:text-base"
           >
             {#each ringkasanPekerjaan as row (row.label)}
               {@const Icon = row.icon}
-              <div class="flex items-start gap-2">
+              <div class="max-w-full flex items-start gap-2">
                 {#if Icon}
                   <Icon
                     class="text-[var(--wpl-global-color-1)] inline-block w-5 h-5 md:w-6 md:h-6 shrink-0"
                     aria-hidden="true"
                   />
                 {/if}
-                <div class="w-full min-w-0">
+                <div class="w-full min-w-0 break-words">
                   <div class="font-bold">{row.label}</div>
                   <div
-                    class="text-[var(--wpl-global-color-1)] font-bold wrap-anywhere"
+                    class="text-[var(--wpl-global-color-1)] font-bold text-ellipsis"
                   >
                     {@html row.value}
                   </div>

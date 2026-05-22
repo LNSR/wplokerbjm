@@ -6,7 +6,7 @@ import type { CardJob } from "@/types";
 import { BaseBroadcastChannel } from "@/services/BroadcastChannel";
 import typia from "typia";
 import { TaskController } from "@/utils/mutex";
-import { useRIC } from "$lib/utils/window.svelte";
+import { useRIC } from "@/utils/window";
 
 interface BookmarkBroadcastMessage
 {

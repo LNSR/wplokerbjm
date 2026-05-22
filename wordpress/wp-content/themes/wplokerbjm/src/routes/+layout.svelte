@@ -9,31 +9,19 @@
   import Header, { headerManager } from "$lib/components/layouts/Header.svelte";
   import Footer from "$lib/components/layouts/Footer.svelte";
   import FloatingActionButton from "$lib/components/ui/Shared/FloatingActionButton.svelte";
-  import { type Snippet } from "svelte";
   import { afterNavigate, onNavigate, beforeNavigate } from "$app/navigation";
   import { updated } from "$app/state";
-  import type { RankMathHeadData, WPLokerBJMThemedData } from "@/types";
   import type { OnNavigate } from "@sveltejs/kit";
+  import type { LayoutProps } from "./$types";
+  import inlinedScript from "@/utils/inlineScript?inline-script";
 
   let initialPageviewSent = false;
 
-  const {
-    children,
-    data,
-  }: {
-    children: Snippet;
-    data: {
-      themeData: WPLokerBJMThemedData;
-      rankMathHead?: Partial<RankMathHeadData> | string;
-      inlineScript?: string;
-      deviceType: DevicePayload;
-    };
-  } = $props();
+  const { children, data }: LayoutProps = $props();
 
-  const { themeData, rankMathHead, inlineScript, deviceType } = $derived({
-    themeData: data?.themeData,
+  const { themeData, rankMathHead, deviceType } = $derived({
+    themeData: data?.themeData!,
     rankMathHead: data?.rankMathHead,
-    inlineScript: data?.inlineScript,
     deviceType: data?.deviceType,
   });
 
@@ -52,8 +40,9 @@
 
   onNavigate((navigation: OnNavigate) => {
     if (
-      !document.startViewTransition ||
-      typeof document.startViewTransition !== "function"
+      typeof document.startViewTransition !== "function" ||
+      document.activeViewTransition ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
     )
       return;
 
@@ -65,15 +54,13 @@
         });
       } catch (error) {
         console.error("Error during onNavigate:", error);
-        reject(error);
-        return;
+        return reject(error);
       } finally {
         if (transition) {
           transition.finished.then(() => {
-            navigation.complete;
+            return navigation.complete;
           });
         }
-        return;
       }
     });
   });
@@ -109,8 +96,8 @@
 </script>
 
 <svelte:head>
-  {#if routeStore.isInitialLoad && inlineScript}
-    {@html inlineScript}
+  {#if routeStore.isInitialLoad}
+    {@html `<script id="wplokerbjm-theme-inline-script">${inlinedScript}</script>`}
   {/if}
   {#if themeData?.siteIconTags}
     {@html themeData.siteIconTags}

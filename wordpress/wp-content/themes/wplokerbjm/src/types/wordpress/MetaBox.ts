@@ -19,7 +19,6 @@ export enum SocialMediaPlatform {
 }
 
 export type StatusPekerjaanString = 'Normal' | 'Urgent' | 'Pinned';
-
 export type StatusPekerjaanNumber = 0 | 1 | 2 | 3;
 
 export interface Taxonomies {

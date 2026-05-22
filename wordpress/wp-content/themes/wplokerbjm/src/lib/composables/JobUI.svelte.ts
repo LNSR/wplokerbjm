@@ -1,3 +1,4 @@
+//TODO: Migrate to Temporal from Old Date API
 import { type DeadlineStatus, type JobSummary, type StatusPekerjaanNumber, type StatusPekerjaanString } from "@/types";
 import { createSubscriber } from "svelte/reactivity";
 import type { Component } from 'svelte';
@@ -24,45 +25,63 @@ interface SummaryRow
 /**
  * A self-correcting time interval that updates a date object every minute, aligned to the minute boundary
  */
-const timeInterval = (() =>
+const timeInterval = function()
 {
     const date = new Date();
     let timeoutId: ReturnType<typeof setTimeout> | null = null;
+    let stack: DisposableStack | null = new DisposableStack();
 
     const subscribeToTime = createSubscriber((update) =>
     {
         if (typeof window === 'undefined') return;
 
-        function syncMinuteTick() 
+        function clearedTimeout()
         {
+            timeoutId && clearTimeout(timeoutId);
+            timeoutId = null;
+        }
+
+        function syncMinuteTick()
+        {
+            function scheduleLoop()
+            {
+                clearedTimeout();
+                syncMinuteTick();
+                update();
+            }
+
             const msUntilNextMinute = 60000 - (Date.now() % 60000);
-            if (timeoutId) clearTimeout(timeoutId);
-            timeoutId = setTimeout(syncMinuteTick, msUntilNextMinute);
+            timeoutId ??= setTimeout(scheduleLoop, msUntilNextMinute);
             date.setTime(Date.now());
-            update();
+
+            return {
+                [ Symbol.dispose ]()
+                {
+                    clearedTimeout();
+                    date.setTime(Date.now());
+                }
+            }
         };
 
         // self correct according to the next minute boundary to avoid drift
-        syncMinuteTick();
+        stack?.use(syncMinuteTick());
 
         return () =>
         {
-            if (timeoutId)
-            {
-                clearTimeout(timeoutId);
-                timeoutId = null;
-            }
-        };
+            stack?.dispose();
+            stack = null;
+        }
     });
 
     return {
-        get reactiveNow(): number
+        get reactiveDate(): Date
         {
+            stack ??= new DisposableStack();
             subscribeToTime();
-            return date.getTime();
+            return date;
         }
     };
-})();
+}();
 
 export function showSummaryJob(jobdata?: JobSummary | null): SummaryRow[]
 {
@@ -98,7 +117,7 @@ export function showSummaryJob(jobdata?: JobSummary | null): SummaryRow[]
         { key: 'gaji', label: 'Gaji', icon: MoneyBillWaveSolid, value: gaji_display ?? '' },
         { key: 'umur', label: 'Usia', icon: CakeCandlesSolid, value: umur_display ?? '' },
         { key: 'lokasi_pekerjaan', label: 'Lokasi', icon: MapMarkerAltSolid, value: arrayOrString(data[ 'lokasi_pekerjaan' ]) },
-        { key: 'deadline', label: 'Deadline', icon: CalendarSolid, value: data[ 'deadline' ] ? FormatHelper.deadlineFormat(data[ 'deadline' ], timeInterval.reactiveNow) : '' },
+        { key: 'deadline', label: 'Deadline', icon: CalendarSolid, value: data[ 'deadline' ] ? FormatHelper.deadlineFormat(data[ 'deadline' ], timeInterval.reactiveDate.getTime()) : '' },
     ]
 
     dataSummaryFields.forEach(field =>
@@ -136,7 +155,7 @@ export function showDeadline(deadline: string): { text: string; status: Deadline
     const deadlineDateRaw = Date.parse(deadline);
     // compute Y/M/D in target time zone then compare UTC midnights to get whole-day difference
     const deadlineYMD = FormatHelper.getYMDInTimeZone(deadlineDateRaw);
-    const nowYMD = FormatHelper.getYMDInTimeZone(timeInterval.reactiveNow);
+    const nowYMD = FormatHelper.getYMDInTimeZone(timeInterval.reactiveDate.getTime());
     const msPerDay = 1000 * 60 * 60 * 24;
     const deadlineMidUTC = Date.UTC(deadlineYMD.year, deadlineYMD.month - 1, deadlineYMD.day);
     const nowMidUTC = Date.UTC(nowYMD.year, nowYMD.month - 1, nowYMD.day);
@@ -178,7 +197,7 @@ export function showTimeAgo(postTime: string): string
 {
     const postDate = Date.parse(postTime);
     if (isNaN(postDate)) return '';
-    const seconds = Math.floor((timeInterval.reactiveNow - postDate) / 1000);
+    const seconds = Math.floor((timeInterval.reactiveDate.getTime() - postDate) / 1000);
     return FormatHelper.formatTimeAgo(seconds);
 }
 
@@ -208,7 +227,7 @@ class FormatHelper
     /**
      * 
      * @param dateStr Date come from API
-     * @param nowDate from @see timeInterval.reactiveNow to make it reactive to time changes
+     * @param nowDate from @see timeInterval.reactiveDate to make it reactive to time changes
      * @returns 
      */
     public static deadlineFormat(dateStr: string | null, nowDate: number): string
@@ -236,10 +255,9 @@ class FormatHelper
             return this.#localTimeFormatter.format(date)
         } catch (e)
         {
-            const newDateObj = new Date(dateStr);
-            const day = newDateObj.getDate()
-            const month = newDateObj.getMonth()
-            const year = newDateObj.getFullYear()
+            const day = timeInterval.reactiveDate.getDate()
+            const month = timeInterval.reactiveDate.getMonth()
+            const year = timeInterval.reactiveDate.getFullYear()
             console.warn('Failed to format deadline date, falling back to manual formatting. Error:', e)
             return `${day} ${indonesianMonths[ month ]} ${year}`
         }

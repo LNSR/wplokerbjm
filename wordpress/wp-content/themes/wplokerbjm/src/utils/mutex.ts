@@ -6,42 +6,33 @@ export class TaskController
 {
     #retryTimer: AbortController | null = null;
     #operationMutex = new Mutex();
-    public get isRetryScheduled(): boolean
-    {
-        return this.#retryTimer !== null;
-    }
+    public get isRetryScheduled(): boolean { return this.#retryTimer !== null; }
 
     public scheduleRetryTask = (delayMs: number, task: () => Promise<void>): void =>
     {
         if (this.#retryTimer) return;
 
-        const controller = new AbortController();
+        let controller: AbortController | null = new AbortController();
         this.#retryTimer = controller;
+        const options: Parameters<typeof retry>[ 1 ] = {
+            delay: 0,
+            retries: 2,
+            signal: controller.signal,
+        };
 
-        retry(
-            async () =>
-            {
-                await delay(delayMs);
-                if (controller.signal.aborted)
-                {
-                    throw new Error("retry cancelled");
-                }
-                await task();
-            },
-            {
-                delay: 0,
-                retries: 2,
-                signal: controller.signal,
-            },
-        ).catch((e: unknown) =>
+        const executeTask = async (): Promise<void> =>
         {
-            console.error("Scheduled retry task failed:", e);
+            await delay(delayMs);
+            if (controller?.signal.aborted) throw new Error("retry cancelled");
+            await task();
+        };
+
+        retry(async () => await executeTask(), options).catch((e: unknown) =>
+        {
+            if (!controller?.signal.aborted) console.error("Scheduled retry task failed:", e);
         }).finally(() =>
         {
-            if (this.#retryTimer === controller)
-            {
-                this.#retryTimer = null;
-            }
+            if (this.#retryTimer === controller) this.#retryTimer = null;
         });
     }
 

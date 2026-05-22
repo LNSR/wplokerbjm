@@ -1,9 +1,10 @@
-export interface WPLokerBJMThemedData {
+export interface WPLokerBJMThemedData
+{
   logo: {
     logoUrl: string;
     logoSrcset?: string;
     logoSizes: string;
-    logoDecoding?: HTMLImageElement["decoding"];
+    logoDecoding?: HTMLImageElement[ "decoding" ];
     logoWidth?: number;
     logoHeight?: number;
   };
@@ -11,4 +12,12 @@ export interface WPLokerBJMThemedData {
   siteIconTags?: string;
 }
 
-export type ThemeName = 'light' | 'dark' | 'lavender';
+export interface ThemeScriptData
+{
+  localStorageKey: "wplokerbjm-theme";
+  elements: {
+    attribute: "data-theme";
+    class: "wplokerbjm-dark-mode-enable";
+  }
+  themeList: "light" | "dark" | "lavender";
+}

@@ -1,74 +1,75 @@
+import { sequence } from "@sveltejs/kit/hooks";
 import type { Handle } from "@sveltejs/kit";
 import type { WPLokerBJMThemedData } from "@/types";
 import { cookieJwtName } from "$lib/server/constants/constants";
 import { handleDeviceDetector } from "sveltekit-device-detector";
 import { APIServiceServer } from "@/services/graphql/APIService";
 import { dev } from "$app/environment";
+import { buildPreloadLink, isAuthenticated } from "$lib/server/utils/http.server";
 
-const deviceHandler: Handle = handleDeviceDetector({});
 
-class hooksHelper
+interface HttpUtils
 {
-  static isAuthenticated(cookies: string | null): boolean
-  {
-    if (!cookies) return false;
-
-    const wpAuthCookiePattern = /wordpress_logged_in|wordpress_sec|wordpress_\w+_?\d+/i;
-
-    if (new RegExp(`${cookieJwtName}=([^;]+)`).test(cookies)) return true;
-    if (wpAuthCookiePattern.test(cookies)) return true;
-
-    return false;
-  }
-
-  static prependHeader(headers: Headers, name: string, value: string): void
-  {
-    const existing = headers.get(name);
-    if (existing)
-    {
-      headers.set(name, `${value}, ${existing}`);
-    } else
-    {
-      headers.set(name, value);
-    }
-  }
-
-  static filterCookieString(raw: string): string
-  {
-    const parts = raw.split(";").map(p => p.trim());
-    const allowed = parts.filter(cook =>
-    {
-      // name before first =
-      const name = cook.split("=")[ 0 ] || "";
-      return (
-        name.toLowerCase().startsWith("wordpress") ||
-        name.toLowerCase().startsWith("wp") ||
-        name.toLowerCase().startsWith(cookieJwtName)
-      );
-    });
-    // you could add more device-specific logic here if needed
-    return allowed.join("; ");
-  }
+  prependHeader(headers: Headers, name: string, value: string[]): void;
+  filterCookieString(raw: string): string;
 }
 
-export const handle: Handle = async ({ event, resolve }) =>
+const HttpUtils: HttpUtils = {
+
+  prependHeader(headers: Headers, name: string, value: string[]): void
+  {
+    value.forEach(v =>
+    {
+      const existing = headers.get(name);
+      headers.set(name, existing ? `${v}, ${existing}` : v);
+    });
+  },
+
+  filterCookieString(raw: string): string
+  {
+    return raw
+      .split(";")
+      .map(p => p.trim())
+      .filter(cook =>
+      {
+        const name = cook.split("=")[ 0 ] || "";
+        const lowerName = name.toLowerCase();
+        return lowerName.startsWith("wordpress") || lowerName.startsWith("wp") || lowerName.startsWith(cookieJwtName);
+      })
+      .join("; ");
+  }
+};
+
+// --- Middleware Split ---
+
+/**
+ * 1. Fast-Path Bypass Middleware
+ */
+const handleBypass: Handle = async ({ event, resolve }) =>
 {
   if (event.url.pathname.startsWith("/.well-known/acme-challenge/"))
   {
-    return resolve(event); // bypass all custom logic for ACME challenge requests to allow Let's Encrypt to verify domain ownership
+    return resolve(event);
   }
+  return resolve(event);
+};
 
+/**
+ * 2. Auth Context & Fetch Wrapper Middleware
+ */
+const handleSecurityContext: Handle = async ({ event, resolve }) =>
+{
   const originalFetch = event.fetch;
-  let response: Response;
 
-  const wrappedFetch = ((info: RequestInfo | URL, init: RequestInit = {}) =>
+  event.fetch = ((...args: Parameters<typeof originalFetch>) =>
   {
+    const [ input, init = {} ] = args;
     init.headers = new Headers(init.headers);
-
     const cookie = event.request.headers.get("Cookie");
+
     if (cookie)
     {
-      const filtered = hooksHelper.filterCookieString(cookie);
+      const filtered = HttpUtils.filterCookieString(cookie);
       if (filtered)
       {
         init.headers.set("Cookie", filtered);
@@ -79,125 +80,132 @@ export const handle: Handle = async ({ event, resolve }) =>
         const m = filtered.match(new RegExp(`(?:^|;\\s*)${cookieJwtName}=([^;]+)`));
         if (m && m[ 1 ])
         {
-          const token = decodeURIComponent(m[ 1 ]);
-          init.headers.set("Authorization", `Bearer ${token}`);
+          init.headers.set("Authorization", `Bearer ${decodeURIComponent(m[ 1 ])}`);
         }
       }
     }
+    return originalFetch(input, init);
+  });
 
-    return originalFetch(info, init);
-  }) as unknown as typeof event.fetch;
+  return resolve(event);
+};
 
-  Object.assign(wrappedFetch, originalFetch);
-  event.fetch = wrappedFetch;
-
-  // fetch theme data as early as possible so load functions can see it
+/**
+ * 3. Layout Discovery Middleware
+ */
+const handleThemeContext: Handle = async ({ event, resolve }) =>
+{
   try
   {
-    const themeData: WPLokerBJMThemedData | null = await APIServiceServer.getThemeDataGraphQL(undefined, event.fetch);
-    event.locals.themeData = themeData;
+    const result: WPLokerBJMThemedData = await APIServiceServer.getThemeDataGraphQL(undefined, event.fetch);
+    event.locals.themeData = result;
   } catch (e)
   {
-    console.warn("hooks.handle: failed to fetch theme data", e);
-    event.locals.themeData = null;
+    console.warn("hooks.handleThemeContext: failed to fetch theme data", e);
   }
+  return resolve(event);
+};
 
-  const path = event.url.pathname;
-  const cookie = event.request.headers.get("Cookie");
-  const authenticated = hooksHelper.isAuthenticated(cookie);
+/**
+ * 4. Device Identification Middleware
+ */
+const handleDevice: Handle = async ({ event, resolve }) =>
+{
+  const deviceHandler = handleDeviceDetector({});
+  let response: Response;
 
   try
   {
     response = await deviceHandler({ event, resolve });
   } catch (err)
   {
-    console.error("hooks.handle: error in device handler", err);
+    console.error("hooks.handleDevice: error in device handler", err);
     response = await deviceHandler({ event, resolve });
   }
 
-  // vary responses based on device type so caches key separately
   if (event.locals.deviceType)
   {
     const existing = response.headers.get("Vary");
-    const varyValue = existing ? `${existing}, Device-Type` : "Device-Type";
-    const varyValueWithCookie = `${varyValue}, Cookie, Content-Encoding`; // also vary by cookie since auth status can affect content and we filter cookies in the fetch wrapper
-    response.headers.set("Vary", varyValueWithCookie);
+    const baseVary = existing ? `${existing}, Device-Type` : "Device-Type";
+    response.headers.set("Vary", `${baseVary}, Cookie, Content-Encoding`);
+
     try
     {
       const dt = event.locals.deviceType.isMobile ? "mobile" : "desktop";
       response.headers.set("Device-Type", dt);
     } catch (e)
     {
-      console.warn("hooks.handle: failed to set Device-Type header", e);
+      console.warn("hooks.handleDevice: failed to set Device-Type header", e);
     }
   }
+
+  return response;
+};
+
+/**
+ * 5. Caching & Transformation (Edge Optimization) Middleware
+ */
+const handleCacheAndTransform: Handle = async ({ event, resolve }) =>
+{
+  let response = await resolve(event);
+
+  const path = event.url.pathname;
   const contentType = response.headers.get("content-type") || "";
+  const cookie = event.request.headers.get("Cookie");
+  const authenticated = isAuthenticated(cookie);
+
   const publicCache = "public, max-age=60, stale-while-revalidate=3600, s-maxage=5184000, stale-if-error=86400";
   const privateCache = "private, max-age=20, must-revalidate";
-  const DevModeCache = "no-cache, must-revalidate";
-  // Set cache control headers
-  if (contentType.startsWith("text/html"))
-  {
-    if (authenticated)
-    {
-      // Don't cache authenticated requests
-      response.headers.set(
-        "Cache-Control",
-        dev ? DevModeCache : privateCache
-      );
-    } else
-    {
-      response.headers.set(
-        "Cache-Control",
-        dev ? DevModeCache : publicCache
-      );
-    }
+  const devModeCache = "no-cache, must-revalidate";
+  const cachePolicy = dev ? devModeCache : (authenticated ? privateCache : publicCache);
 
-    // Prepend preload Link header for the site logo without overwriting existing Link entries
+  const isHtml = contentType.startsWith("text/html");
+  const isJsonOrXml = contentType.includes("application/json") || contentType.includes("application/xml");
+
+  if (isHtml || isJsonOrXml) response.headers.set("Cache-Control", cachePolicy);
+
+  if (isHtml)
+  {
+    // Inject links for early hints
     try
     {
-      const themeData = event.locals.themeData;
-      const logoUrl = themeData?.logo?.logoUrl;
+      const links = new Set<string>();
+      const logoUrl = event.locals.themeData.logo.logoUrl;
       if (logoUrl)
       {
-
-        let link = `<${logoUrl}>; rel=preload; as=image`;
-        link += `; nopush`;
-
-        hooksHelper.prependHeader(response.headers, "Link", link);
+        const link = buildPreloadLink(logoUrl, "image", { nopush: true });
+        links.add(link);
       }
+      if (event.locals.earlyHintsLink) links.add(event.locals.earlyHintsLink);
+      const validLinks = Array.from(links).filter((l): l is string => Boolean(l));
+      if (validLinks.length > 0) HttpUtils.prependHeader(response.headers, "Link", validLinks);
     } catch (e)
     {
-      console.warn("hooks.handle: failed to append Link header", e);
+      console.warn("hooks.handleCacheAndTransform: preload parsing failed", e);
     }
 
     response.headers.set("Service-Worker-Allowed", "/");
     response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
     response.headers.set("Cross-Origin-Embedder-Policy", "credentialless");
-  } else if (contentType.includes("application/json") || contentType.includes("application/xml"))
-  {
-    if (authenticated)
-    {
-      response.headers.set("Cache-Control", dev ? DevModeCache : privateCache);
-    } else
-    {
-      response.headers.set(
-        "Cache-Control",
-        dev ? DevModeCache : publicCache
-      );
-    }
+
   }
 
-  // some Partytown assets are served with text/javascript and don't hit the
-  // html branch, so ensure the service worker header is always added when
-  // any path contains the special prefix.
   if (path.startsWith("/~partytown") || path.includes("/~partytown"))
   {
     response.headers.set("Service-Worker-Allowed", "/");
   }
 
-  // always expose and allow common headers for CORS responses
-  response.headers.set("Access-Control-Expose-Headers", 'ETag, CF-Ray, Last-Modified');
+  response.headers.set("Access-Control-Expose-Headers", "ETag, CF-Ray, Last-Modified");
   response.headers.set("Access-Control-Allow-Headers", "Authorization, Content-Type, If-None-Match, If-Match, If-Modified-Since, If-Unmodified-Since");
+
   return response;
 };
+
+// --- Execution Pipeline ---
+export const handle = sequence(
+  handleBypass,
+  handleSecurityContext,
+  handleThemeContext,
+  handleDevice,
+  handleCacheAndTransform
+);

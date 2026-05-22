@@ -22,7 +22,7 @@
     "strict": true,
     "disableSizeLimit": true,
     "moduleResolution": "bundler",
-    "types": ["node", "bun", "@cloudflare/workers-types", "es-toolkit"],
+    "types": ["node", "@cloudflare/workers-types", "es-toolkit"],
     "plugins": [
       {
         "transform": "typia/lib/transform"

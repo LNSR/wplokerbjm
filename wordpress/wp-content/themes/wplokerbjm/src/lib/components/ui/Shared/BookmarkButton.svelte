@@ -3,7 +3,7 @@
   import type { JobCardProps, WPBasePost } from "@/types";
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
   import { componentRegistry } from "$lib/stores/ComponentRegistry.svelte";
-  import { useRIC } from "$lib/utils/window.svelte";
+  import { useRIC } from "@/utils/window";
   import { onDestroy } from "svelte";
   import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
   interface Props {

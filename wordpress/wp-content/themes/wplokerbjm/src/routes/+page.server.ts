@@ -54,7 +54,7 @@ export const load: PageServerLoad = async ({ url, fetch }) =>
       carousel: carousel ?? { jobs: [], totalJobs: 0 },
       jobGrid: jobGrid ?? { jobs: [], maxNumPages: 1, totalJobs: 0 },
       itemListSchemaScript: itemListSchema
-        ? schemaScriptAttach(itemListSchema, "ItemList")
+        ? await schemaScriptAttach(itemListSchema, "ItemList")
         : "",
     };
   } catch (err)
