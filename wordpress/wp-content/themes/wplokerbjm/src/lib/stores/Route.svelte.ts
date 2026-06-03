@@ -36,11 +36,11 @@ class RouteManager
 class RouteStateManager
 {
   #deviceDetector = deviceDetector as DeviceDetectorInternal; // Access to internal methods
-  #scrollPositionsMap = new SvelteMap<string, number>();
-  #searchMap = new SvelteMap<string, SearchState | undefined>();
-  #visitedJobsMap = new SvelteMap<string, LastVisitedJobState>();
-  #carouselMap = new SvelteMap<string, CarouselState>();
-  #cardHeightsMap = new SvelteMap<string, SvelteMap<number, number>>();
+  #scrollPositionsMap = $state.raw(new SvelteMap<string, number>());
+  #searchMap = $state.raw(new SvelteMap<string, SearchState | undefined>());
+  #visitedJobsMap = $state.raw(new SvelteMap<string, LastVisitedJobState>());
+  #carouselMap = $state.raw(new SvelteMap<string, CarouselState>());
+  #cardHeightsMap = new Map<string, SvelteMap<number, number>>();
   public get lastVisitedJob() { return this.#visitedJobsMap.get(`${this.#deviceDetector.currentDevice}`) ?? { slug: undefined, source: undefined }; }
   get #carouselState() { return this.#carouselMap.get(`${this.#deviceDetector.currentDevice}`); }
 
@@ -250,10 +250,12 @@ class RouteStateManager
   {
     if (!this.#deviceDetector) return new SvelteMap<number, number>();
     const key = `${this.#deviceDetector.currentDevice}-${keyname}`;
-    let cardHeights = this.#cardHeightsMap.get(key);
-    if (cardHeights && cardHeights.size > 0) return cardHeights;
+    const existingCardHeights = this.#cardHeightsMap.get(key);
+    if (existingCardHeights) return existingCardHeights;
 
-    cardHeights = new SvelteMap<number, number>();
+    const cardHeights = new SvelteMap<number, number>();
+
+    this.#cardHeightsMap.set(key, cardHeights);
 
     if (typeof sessionStorage === "undefined") return cardHeights;
 
@@ -262,7 +264,7 @@ class RouteStateManager
       const stored = sessionStorage.getItem(`cardHeights-${key}`);
       if (!stored) return cardHeights;
 
-      const record = typia.json.assertParse<Record<number, number> | undefined>(stored);
+      const record = typia.json.assertParse<Record<string, number> | undefined>(stored);
       if (!record) return cardHeights;
 
       for (const [ recordKey, height ] of Object.entries(record))
@@ -274,8 +276,7 @@ class RouteStateManager
       console.warn("Failed to load cardHeights from sessionStorage", e);
     }
 
-    this.#cardHeightsMap.set(key, cardHeights);
-    return this.#cardHeightsMap.get(key) ?? cardHeights;
+    return cardHeights;
   }
 
   /**

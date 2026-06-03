@@ -40,7 +40,7 @@
   // virtualization parameters
   const FALLBACK_ITEM_HEIGHT = 420;
   const fallbackGap = 24;
-  const buffer = 3;
+  const buffer = 6;
   const currentHeightY = $derived(scrollY.current);
   const innerHeightValue = $derived(innerHeight.current);
   const cardHeightsJobCard = routeStateStore.getCardHeights("jobGrid");

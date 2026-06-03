@@ -44,8 +44,8 @@
   const isMobile = $derived(deviceDetector.isPlatformMobile);
 
   class SearchQueryController {
-    searchQuery = $state("");
-    isSearchOpen = $state(false);
+    public searchQuery = $state("");
+    public isSearchOpen = $state(false);
     #searchInputEl: HTMLInputElement | null = null;
 
     public toggleInputSearch = (): void => {
@@ -204,7 +204,7 @@
   class VirtualizationManager {
     public measuring: boolean = $state.raw(false); // show spinner until we measure heights of visible items to prevent INP
     public containerScrollY = $state(0);
-    public cardHeights = routeStateStore.getCardHeights("bookmarkModal");
+    public cardHeights = $state.raw(routeStateStore.getCardHeights("bookmarkModal"));
     public backgroundMeasurement: DisposableStack | null = null;
 
     constructor() {
@@ -219,7 +219,7 @@
         cardHeights: this.cardHeights,
         fallbackHeight: 200,
         gap: 24,
-        buffer: 2,
+        buffer: 6,
       }),
     );
 

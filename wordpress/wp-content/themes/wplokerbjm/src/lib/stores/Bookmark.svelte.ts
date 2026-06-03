@@ -1,12 +1,14 @@
-import { debounce } from "es-toolkit";
+import { throttle, type ThrottledFunction } from "es-toolkit";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import { BookmarkIDB } from "@/services/IndexedDB";
 import { APIServiceBrowser } from "@/services/graphql/APIService";
-import type { CardJob } from "@/types";
+import type { CardJob, SyncToServer, SyncResult } from "@/types";
 import { BaseBroadcastChannel } from "@/services/BroadcastChannel";
 import typia from "typia";
-import { TaskController } from "@/utils/mutex";
+import { on } from "svelte/events";
 import { useRIC } from "@/utils/window";
+import BookmarkWorker from "@/workers/bookmark/bookmark.worker.ts?sharedworker";
+import type { BookmarkWorkerInstance } from "@/workers/bookmark/bookmark.worker";
+import { proxy, wrap, type Remote } from "comlink";
 
 interface BookmarkBroadcastMessage
 {
@@ -17,15 +19,20 @@ interface BookmarkBroadcastMessage
   broadcasterIdentifierId: string;
 }
 
-interface SyncResult { success: boolean; type: "partial" | "full" };
+interface BookmarkCommandFailure
+{
+  logMessage: string;
+  warning: string;
+}
 
 
 class BookmarkManager
 {
 
   //* === Private instance fields ===
-  #bookmarkTaskController: TaskController;
+  #bookmarkTaskController: Remote<BookmarkWorkerInstance[ "bookmarkTaskController" ]>;
   #bookmarkRepository: BookmarkRepository;
+  #bookmarkSyncQueueTask: Remote<BookmarkWorkerInstance[ "bookmarkSyncQueueTask" ]>;
   #bookmarkBroadcastChannel: BookmarkBroadcastChannel;
   #bookmarkSyncEngine: SyncOperation;
 
@@ -48,7 +55,8 @@ class BookmarkManager
 
   constructor(
     bookmarkRepository: BookmarkRepository,
-    bookmarkTaskController: TaskController,
+    bookmarkTaskController: Remote<BookmarkWorkerInstance[ "bookmarkTaskController" ]>,
+    bookmarkSyncQueueTask: Remote<BookmarkWorkerInstance[ "bookmarkSyncQueueTask" ]>,
     bookmarkBroadcastChannel?: BookmarkBroadcastChannel,
     bookmarkSyncEngine?: SyncOperation,
   )
@@ -56,6 +64,8 @@ class BookmarkManager
     //* === Initialize dependencies ===
     this.#bookmarkTaskController = bookmarkTaskController;
     this.#bookmarkRepository = bookmarkRepository;
+    this.#bookmarkSyncQueueTask = bookmarkSyncQueueTask;
+
     this.#bookmarkBroadcastChannel = bookmarkBroadcastChannel ?? new BookmarkBroadcastChannel(
       this.#loadFromStorageIDB.bind(this),
       bookmarkRepository,
@@ -64,6 +74,7 @@ class BookmarkManager
       bookmarkRepository,
       bookmarkTaskController,
       bookmarkBroadcastChannel ?? this.#bookmarkBroadcastChannel,
+      bookmarkSyncQueueTask,
     );
 
     //* === Actions ===
@@ -73,56 +84,44 @@ class BookmarkManager
   //* === Public methods for UI components to interact with bookmark data ===
   public async addJob(id: CardJob[ 'id' ]): Promise<void>
   {
-    if (this.#bookmarkBroadcastChannel.isOutdated) return;
-
-    return this.#bookmarkTaskController.runQueued(async () =>
-    {
-      try
+    return this.#runBookmarkCommand(
+      () => this.#upsertBookmark(id),
       {
-        const job: Pick<CardJob, "id" | "title"> = { id, title: "" }; // skeleton job with minimal data to show loading state
-        this.#bookmarkSyncEngine.queueIdsForSync([ id ]); // queue for sync to get real data and update cache/IndexedDB
-        await this.#bookmarkRepository.addBookmark(job as CardJob);
-      } catch (error)
-      {
-        console.error("Failed to add job:", error);
-        this.#storeWarning = "Gagal menambahkan bookmark. Silakan coba lagi.";
-      }
-    });
+        logMessage: "Failed to add job:",
+        warning: "Gagal menambahkan bookmark. Silakan coba lagi.",
+      },
+    );
   }
 
 
   public async clearAll(): Promise<void>
   {
-    if (this.#bookmarkBroadcastChannel.isOutdated) return;
-    return this.#bookmarkTaskController.runQueued(async () =>
-    {
-      try
+    return this.#runBookmarkCommand(
+      async () =>
       {
         await this.#bookmarkRepository.clearAll();
-      } catch (error)
+        this.#bookmarkBroadcastChannel.postMessage("sync", true);
+      },
       {
-        console.error("Failed to clear all bookmarks:", error);
-        this.#storeWarning = "Gagal menghapus semua bookmark. Silakan coba lagi.";
-      }
-    });
+        logMessage: "Failed to clear all bookmarks:",
+        warning: "Gagal menghapus semua bookmark. Silakan coba lagi.",
+      },
+    );
   }
 
   public async removeJob(id: CardJob[ 'id' ]): Promise<void>
   {
-    if (this.#bookmarkBroadcastChannel.isOutdated) return;
-
-    return this.#bookmarkTaskController.runQueued(async () =>
-    {
-      try
+    return this.#runBookmarkCommand(
+      async () =>
       {
         await this.#bookmarkRepository.removeBookmark(id);
-        this.#bookmarkBroadcastChannel.postMessage("sync", true); // notify other tabs to sync and update their cache with the new job
-      } catch (error)
+        this.#bookmarkBroadcastChannel.postMessage("sync", true);
+      },
       {
-        console.error("Failed to remove job:", error);
-        this.#storeWarning = "Gagal menghapus bookmark. Silakan coba lagi.";
-      }
-    });
+        logMessage: "Failed to remove job:",
+        warning: "Gagal menghapus bookmark. Silakan coba lagi.",
+      },
+    );
   }
 
   /*
@@ -148,6 +147,35 @@ class BookmarkManager
 
   //* === Internal helper methods across bookmark management and shared workers ===
 
+  async #upsertBookmark(id: CardJob[ 'id' ]): Promise<void>
+  {
+    const pendingBookmark: Pick<CardJob, "id" | "title"> = { id, title: "" };
+    void Promise.race([
+      this.#bookmarkSyncQueueTask.queueIdsForSync([ id ]),
+      this.#bookmarkRepository.upsertBookmark(pendingBookmark as CardJob),
+    ]).catch((error) => console.error("Failed to upsert bookmark:", error));
+  }
+
+  async #runBookmarkCommand(command: () => Promise<void>, failure: BookmarkCommandFailure): Promise<void>
+  {
+    if (this.#bookmarkBroadcastChannel.isOutdated) return;
+
+    const task = proxy(async () =>
+    {
+      try
+      {
+        this.#storeWarning = "";
+        await command();
+      } catch (error)
+      {
+        console.error(failure.logMessage, error);
+        this.#storeWarning = failure.warning;
+      }
+    });
+
+    return void this.#bookmarkTaskController.runQueued(task);
+  }
+
   /**
    * Emergency method to reset warnings from sync and broadcast channel
    */
@@ -160,12 +188,20 @@ class BookmarkManager
   /**
    * Load bookmarks from IndexedDB into the cache, used for initial load and after receiving sync messages from other tabs. This method is queued to prevent multiple simultaneous loads and ensure data consistency. If loading fails, it will clear the cache to prevent showing stale data and log the error for debugging.
    */
-  #loadFromStorageIDB(): ReturnType<BookmarkRepository[ "loadFromStorageIDB" ]>
+  async #loadFromStorageIDB(): ReturnType<BookmarkRepository[ "loadFromStorageIDB" ]>
   {
-    return this.#bookmarkTaskController.runQueued(async () =>
+    const task = proxy(async () =>
     {
-      await this.#bookmarkRepository.loadFromStorageIDB();
+      try
+      {
+        await this.#bookmarkRepository.loadFromStorageIDB();
+      } catch (error)
+      {
+        console.error("Failed to load bookmarks from IndexedDB:", error);
+        this.#bookmarkRepository.cacheJobs.clear(); // clear cache to prevent showing stale data if loading fails
+      }
     });
+    return void this.#bookmarkTaskController.runQueued(task);
   }
 
   /**
@@ -191,7 +227,7 @@ class BookmarkBroadcastChannel extends BaseBroadcastChannel
   #tabInstanceID = `${this.currentVersion}-${this.#tabStartedAt}`;
   #warningOutdated = "Versi lama terdeteksi. Tutup tab lain dan muat ulang untuk melanjutkan.";
   // * === Injected dependencies ===
-  #reloadStorageIDB: BookmarkRepository[ "loadFromStorageIDB" ];
+  #reloadStorageIDB: ThrottledFunction<BookmarkRepository[ "loadFromStorageIDB" ]>;
   #expiredJobs: BookmarkRepository[ 'expiredJobs' ];
   constructor(
     reloadStorageIDB: BookmarkRepository[ "loadFromStorageIDB" ],
@@ -200,7 +236,7 @@ class BookmarkBroadcastChannel extends BaseBroadcastChannel
   {
     super("bookmark-sync"); // channel name
     //* === Injected dependencies ===
-    this.#reloadStorageIDB = reloadStorageIDB;
+    this.#reloadStorageIDB = throttle(reloadStorageIDB, 2000);
     this.#expiredJobs = bookmarkRepository.expiredJobs;
 
     //* === Actions ===
@@ -233,7 +269,7 @@ class BookmarkBroadcastChannel extends BaseBroadcastChannel
     {
       data.deleted && data.deleted.forEach((id) => this.#expiredJobs.add(id)); // update expired jobs with deleted IDs from other tab
       await this.#reloadStorageIDB();
-    }
+    };
 
     switch (data.type)
     {
@@ -242,7 +278,7 @@ class BookmarkBroadcastChannel extends BaseBroadcastChannel
         this.#reloadPage();
         break;
       case "sync":
-        refreshStoreOnMessage();
+        void refreshStoreOnMessage();
         break;
     }
   }
@@ -291,12 +327,18 @@ class BookmarkBroadcastChannel extends BaseBroadcastChannel
 
   #initEventListener(): void
   {
-    const handler = () =>
+    const visibilityHandler = () =>
     {
       if (document.visibilityState === "visible" && !this.isOutdated) void this.#reloadStorageIDB();
     };
 
-    document.addEventListener("visibilitychange", handler);
+    const focusHandler = () =>
+    {
+      if (!this.isOutdated) void this.#reloadStorageIDB();
+    };
+
+    on(document, "visibilitychange", visibilityHandler, { passive: true });
+    on(window, "focus", focusHandler, { passive: true });
   }
 
   #init(): void
@@ -320,11 +362,11 @@ class BookmarkBroadcastChannel extends BaseBroadcastChannel
 
 class BookmarkRepository
 {
-  // fow now direct access on module scope
-  public bookmarkIDB: BookmarkIDB;
-  public cacheJobs = new SvelteMap<number, CardJob>();
-  public expiredJobs = new SvelteSet<CardJob[ 'id' ]>();
-  constructor(bookmarkIDB: BookmarkIDB = new BookmarkIDB('JobBookmarks', 1, 'bookmarks'))
+  // For now, sync operations need direct repository access inside this module.
+  public bookmarkIDB: Remote<BookmarkWorkerInstance[ 'bookmarkIDB' ]>;
+  public cacheJobs = $state.raw(new SvelteMap<number, CardJob>());
+  public expiredJobs = $state.raw(new SvelteSet<CardJob[ 'id' ]>());
+  constructor(bookmarkIDB: Remote<BookmarkWorkerInstance[ 'bookmarkIDB' ]>)
   {
     this.bookmarkIDB = bookmarkIDB;
   }
@@ -338,6 +380,7 @@ class BookmarkRepository
     }).catch((error) =>
     {
       console.error("Failed to clear bookmarks from IndexedDB:", error);
+      throw error;
     });
   }
 
@@ -347,26 +390,33 @@ class BookmarkRepository
     if (id) this.expiredJobs.delete(id);
   }
 
-  /**
-   */
-  public async addBookmark(job: CardJob): Promise<void>
+  public async upsertBookmark(job: CardJob): Promise<void>
   {
-    this.cacheJobs.set(Number(job.id), job);
+    const cacheKey = Number(job.id);
+    const previousJob = this.cacheJobs.get(cacheKey);
+
+    this.cacheJobs.set(cacheKey, job);
     await this.bookmarkIDB.addBookmark(job).catch((error) =>
     {
       console.error("Failed to add bookmark to IndexedDB:", error);
-      this.cacheJobs.delete(Number(job.id)); // rollback cache if IDB operation fails to prevent stale data
+      previousJob ? this.cacheJobs.set(cacheKey, previousJob) : this.cacheJobs.delete(cacheKey);
+      throw error;
     });
   }
 
   public async removeBookmark(id: CardJob[ 'id' ]): Promise<void>
   {
-    this.cacheJobs.delete(Number(id));
+    const cacheKey = Number(id);
+    const previousJob = this.cacheJobs.get(cacheKey);
+
+    this.cacheJobs.delete(cacheKey);
     this.expiredJobs.add(id); // temporarly mark as expired so other tabs can know it's deleted
-    await this.bookmarkIDB.removeBookmark(Number(id)).catch((error) =>
+    await this.bookmarkIDB.removeBookmark(cacheKey).catch((error) =>
     {
       console.error("Failed to remove bookmark from IndexedDB:", error);
+      if (previousJob) this.cacheJobs.set(cacheKey, previousJob);
       this.expiredJobs.delete(id);
+      throw error;
     }).finally(() =>
     {
       this.expiredJobs.delete(id);
@@ -381,7 +431,13 @@ class BookmarkRepository
     if (typeof window === "undefined") return;
     await this.bookmarkIDB.loadBookmarks().then((jobs) =>
     {
-      if (this.cacheJobs.size) this.cacheJobs.clear();
+      const cacheJobs = new Set(this.cacheJobs.values().map((job) => Number(job.id)));
+      const incomingJobs = new Set(jobs.map((job) => Number(job.id)));
+      const symmetricDifference = cacheJobs.symmetricDifference(incomingJobs);
+
+      if (symmetricDifference.size === 0) return;
+
+      this.cacheJobs.clear();
       jobs.forEach((job) => this.cacheJobs.set(Number(job.id), job));
     }).catch((error) =>
     {
@@ -391,30 +447,32 @@ class BookmarkRepository
   }
 }
 
-class SyncOperation
+class SyncOperation implements SyncToServer
 {
 
   public isSyncing = $state(false);
   public warningFromSync = $state<string>(""); // Specific warning for API issues
   public lastSyncTime = new Date();
-  #pendingSyncIds = new Set<number>(); // unique IDs pending sync
-  #debouncedSync = debounce(() => this.#syncPending(), 2200);
   #localStorageKey = "bookmarkLastSync";
   //* === Injected dependencies ===
   #bookmarkRepository: Pick<BookmarkRepository, "cacheJobs" | "expiredJobs" | "bookmarkIDB">;
-  #bookmarkTaskController: TaskController;
+  #bookmarkTaskController: Remote<BookmarkWorkerInstance[ "bookmarkTaskController" ]>;
+  #bookmarkSyncQueueTask: Remote<BookmarkWorkerInstance[ "bookmarkSyncQueueTask" ]>;
   #bookmarkBroadcastChannel: Pick<BookmarkBroadcastChannel, "isOutdated">;
   get #getLatestJobIds(): CardJob[ 'id' ][] { return [ ...this.#bookmarkRepository.cacheJobs.keys() ]; }
 
   constructor(
     bookmarkRepository: BookmarkRepository,
-    bookmarkTaskController: TaskController,
+    bookmarkTaskController: Remote<BookmarkWorkerInstance[ "bookmarkTaskController" ]>,
     bookmarkBroadcastChannel: BookmarkBroadcastChannel,
+    bookmarkSyncQueueTask: Remote<BookmarkWorkerInstance[ "bookmarkSyncQueueTask" ]>,
   )
   {
     this.#bookmarkRepository = bookmarkRepository;
     this.#bookmarkTaskController = bookmarkTaskController;
     this.#bookmarkBroadcastChannel = bookmarkBroadcastChannel;
+
+    this.#bookmarkSyncQueueTask = bookmarkSyncQueueTask;
 
     //* === Actions ===
     this.#init();
@@ -438,12 +496,12 @@ class SyncOperation
       if (idsToSync) idsToSync.forEach((id) => this.#bookmarkRepository.cacheJobs.delete(id));
     };
 
-    return this.#bookmarkTaskController.runQueued(async () =>
+    const result = proxy(async () =>
     {
       if (this.isSyncing) return await this.#scheduleSyncRetry(idsToSync);
 
       // clear any pending retry as we're starting a real sync now
-      this.#bookmarkTaskController.cancelRetry();
+      await this.#bookmarkTaskController.cancelRetry();
 
       if (!idsToSync) this.isSyncing = true;
 
@@ -468,37 +526,11 @@ class SyncOperation
       {
         if (!idsToSync) this.isSyncing = false;
       });
-    }, 60000);
+    })
+
+    return await this.#bookmarkTaskController.runQueued(result, 60000) as Promise<void | SyncResult>;
   }
 
-  /**
-  * 
-  * @param ids IDs to be queued for syncing, will be debounced to batch multiple rapid calls into one sync operation
-  */
-  public queueIdsForSync(ids: Parameters<typeof this.syncToServer>[ 0 ]): void
-  {
-    if (!ids || ids.length === 0) return;
-    ids.forEach((id) => this.#pendingSyncIds.add(id));
-    this.#debouncedSync?.();
-  }
-
-  /**
-   * Perform the actual sync operation for pending IDs, @see SyncOperation.queueIdsForSync
-   */
-  #syncPending(): void
-  {
-    const ids = [ ...this.#pendingSyncIds ];
-    if (ids.length === 0) return;
-    this.syncToServer(ids).then(() =>
-    {
-      this.#saveLastSyncTimeToLocalStorage();
-    }).catch((error) =>
-      console.error("Failed to sync pending bookmarks:", error)
-    ).finally(() =>
-    {
-      this.#pendingSyncIds.clear();
-    });
-  }
 
   /**
    * Helper of @see syncToServer to perform the actual sync logic
@@ -508,7 +540,7 @@ class SyncOperation
     const snapshotBeforeSync = new Set(idsToSync ?? this.#getLatestJobIds); // requestedIds to server or snapshot if full sync
     if (snapshotBeforeSync.size === 0) return; // no jobs to sync, skip API call
 
-    const fetchedJobs = await APIServiceBrowser.syncBookmarkGraphQL([ ...snapshotBeforeSync ]);
+    const fetchedJobs = await APIServiceBrowser!.syncBookmarkGraphQL([ ...snapshotBeforeSync ]);
     if (fetchedJobs.length === 0) return;
 
     this.#reconcileCacheWithServer(snapshotBeforeSync, fetchedJobs);
@@ -527,7 +559,7 @@ class SyncOperation
    */
   #prepareGlobalSync(snapshotBeforeSync: Set<CardJob[ 'id' ]>): void
   {
-    this.#pendingSyncIds.clear();
+    void this.#bookmarkSyncQueueTask.clearPendingSyncIds();
     //* get latest snapshot from reactive source after reconciliation
     const snapshotAfterSync = new Set(this.#getLatestJobIds);
     const diff = snapshotBeforeSync.difference(snapshotAfterSync);
@@ -559,9 +591,9 @@ class SyncOperation
   /**
    * @param idsToSync IDs that failed to sync, will be retried after a delay with debouncing to prevent multiple rapid retries
    */
-  #scheduleSyncRetry(idsToSync: Parameters<typeof this.syncToServer>[ 0 ]): void
+  async #scheduleSyncRetry(idsToSync: Parameters<typeof this.syncToServer>[ 0 ]): Promise<void>
   {
-    if (this.#bookmarkTaskController.isRetryScheduled) return;
+    if (await this.#bookmarkTaskController.isRetryScheduled) return;
     this.warningFromSync = "Sedang mencoba menyinkronkan ulang.";
     this.#bookmarkTaskController.scheduleRetryTask(3000, async () =>
     {
@@ -579,13 +611,25 @@ class SyncOperation
   #init(): void
   {
     if (typeof window === "undefined") return;
+ 
+    void this.#bookmarkSyncQueueTask.syncCommand(proxy(this.syncToServer.bind(this)));
     const localStorageSyncTime = Number(localStorage.getItem(this.#localStorageKey));
     localStorageSyncTime && this.lastSyncTime.setTime(localStorageSyncTime);
   }
 
 };
 
+const bookmarkWorkerInstance = function()
+{
+  if (typeof window === "undefined") return;
+  const workerInstance = new BookmarkWorker();
+  return wrap<BookmarkWorkerInstance>(workerInstance.port);
+}()
+
+
+
 export const bookmarkStore = new BookmarkManager(
-  new BookmarkRepository(new BookmarkIDB('JobBookmarks', 1, 'bookmarks')),
-  new TaskController(),
+  new BookmarkRepository(bookmarkWorkerInstance?.bookmarkIDB as unknown as Remote<BookmarkWorkerInstance[ 'bookmarkIDB' ]>),
+  bookmarkWorkerInstance?.bookmarkTaskController as unknown as Remote<BookmarkWorkerInstance[ 'bookmarkTaskController' ]>,
+  bookmarkWorkerInstance?.bookmarkSyncQueueTask as unknown as Remote<BookmarkWorkerInstance[ 'bookmarkSyncQueueTask' ]>,
 );

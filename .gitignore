@@ -35,6 +35,11 @@ worker-configuration.d.ts
 **/*.graphql
 **/*.tsbuildinfo
 
+
+# agents
+.agents
+skills
+
 # Scraping related
 scrapper/**/downloads
 scrapper/.venv

@@ -70,10 +70,15 @@ class GraphQLData
             ? CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . $post_id . '_user_' . (int) get_current_user_id()
             : CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . $post_id . '_public';
 
+
+        $noncePlugin = fn($action, $postId) => match ($action) {
+            'duplicatePost' => wp_create_nonce('duplicate_post_' . $postId),
+        };
+
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             if (is_user_logged_in()) {
-                $cached['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
+                $cached['duplicateNonce'] = $noncePlugin('duplicatePost', $post_id);
                 return $cached;
             } else {
                 // safety remove in case cached from logged-in
@@ -110,9 +115,9 @@ class GraphQLData
                 'post_time' => get_post_time('c', false, $post_id),
             ];
 
-            if (is_user_logged_in()) {
-                $data['duplicateNonce'] = self::pluginSpecificNonce('duplicatePost', $post_id);
-            }
+
+            if (is_user_logged_in())
+                $data['duplicateNonce'] = $noncePlugin('duplicatePost', $post_id);
 
             $data = SharedUtils::filterEmptyValues($data);
 
@@ -138,21 +143,6 @@ class GraphQLData
             CustomFields::UMUR_MAX => $jobdata[CustomFields::UMUR_MAX] ?? null,
             CustomFields::DEADLINE => $jobdata[CustomFields::DEADLINE] ?? null,
         ];
-    }
-
-
-    /**
-     * Provides plugin-specific nonce for actions
-     * @param string $action
-     * @param int $post_id
-     * @return string
-     */
-    private static function pluginSpecificNonce(string $action, int $post_id): string
-    {
-        return match ($action) {
-            'duplicatePost' => wp_create_nonce('dt-duplicate-page-' . $post_id),
-            default => '',
-        };
     }
 
     /**

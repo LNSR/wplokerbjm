@@ -51,9 +51,7 @@ class Init
     public function initialize(): void
     {
         // Prevent multiple initializations
-        if ($this->initialized) {
-            return;
-        }
+        if ($this->initialized) return;
 
         // Create a map of services by class name for quick lookup
         $serviceMap = [];

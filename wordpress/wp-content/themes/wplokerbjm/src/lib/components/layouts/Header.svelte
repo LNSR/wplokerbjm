@@ -2,14 +2,16 @@
   import { onMount, tick } from "svelte";
   import { type ThemeScriptData, type WPLokerBJMThemedData } from "@/types";
   import {
-    applyThemeAttribute,
     applyThemeViewTransition,
     localStorageThemeActions,
   } from "@/utils/theme";
   import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { themePropsStore } from "$lib/stores/Theme.svelte";
-  import { APIServiceBrowser } from "@/services/graphql/APIService";
+  import {
+    APIServiceBrowser,
+    APIServiceShared,
+  } from "@/services/graphql/APIService";
   import { useRIC } from "@/utils/window";
   import { MediaQuery } from "svelte/reactivity";
 
@@ -48,35 +50,11 @@
       const savedTheme = localStorageThemeActions({ get: true });
       const theme = this.systemPrefersDark ? "dark" : (savedTheme ?? "light");
 
-      this.setTheme(theme);
+      void this.setTheme(theme);
     }
 
     public setTheme(theme: ThemeScriptData["themeList"]): void {
-      try {
-        this.setThemeWithViewTransition(theme, { useViewTransition: true });
-      } catch {
-        console.error(
-          "Failed to set theme with view transition, falling back to normal theme change",
-        );
-        this.setThemeWithViewTransition(theme);
-      }
-    }
-
-    private setThemeWithViewTransition(
-      theme: ThemeScriptData["themeList"],
-      options: { useViewTransition?: boolean } = {},
-    ): void {
-      if (this.currentTheme === theme) return;
-      this.currentTheme = theme;
-
-      if (options.useViewTransition)
-        return applyThemeViewTransition(theme, () =>
-          applyThemeAttribute(theme),
-        );
-
-      return void window.requestAnimationFrame(() => {
-        applyThemeAttribute(theme);
-      });
+      void applyThemeViewTransition(theme);
     }
   }
 
@@ -137,6 +115,7 @@
               const nonce = await APIServiceBrowser.getThemeNonceGraphQL();
               if (nonce && nonce.length > 0) {
                 themePropsStore.setNonce = nonce;
+                APIServiceShared.setNonce(nonce);
               }
             } catch (error) {
               console.error("Error fetching theme nonce:", error);
@@ -219,7 +198,11 @@
     };
   }
 
-  themePropsStore.setThemeData = (() => themeData)();
+  (() => {
+    themePropsStore.setThemeData = themeData;
+    APIServiceShared.setNonce(themeData.wpRestNonce);
+  })();
+
   onMount(() => {
     themeColorManager.init();
     const cleanupLoginAdminModalHandler = loginAdminModalHandler();

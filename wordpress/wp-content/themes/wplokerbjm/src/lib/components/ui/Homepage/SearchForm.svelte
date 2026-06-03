@@ -203,12 +203,11 @@
      * @returns The display label
      */
     public taxonomyLabel(key: TaxonomyType, emptyLabel: string): string {
-      return SearchUtils.getTaxonomyLabel(
-        key,
-        jobListingStore.filters[key],
-        taxonomyStore,
-        emptyLabel,
-      );
+      const values = jobListingStore.filters[key];
+      const arr = SearchUtils.sanitizeTaxonomyValue(values);
+      if (arr.length === 0) return emptyLabel;
+      if (arr.length === 1) return taxonomyStore.getTermNameBySlug(key, arr[0]);
+      return `${arr.length} filter dipilih`;
     }
 
     /**
@@ -570,8 +569,7 @@
       aria-controls={aria.controls}
       onclick={() => dropdownHandler.toggleDropdown(groupKey, storeKey)}
     >
-      <span
-        class="block min-w-0 break-words pl-8 leading-tight"
+      <span class="block min-w-0 break-words pl-8 leading-tight"
         >{dropdownHandler.taxonomyLabel(storeKey, emptyLabel)}</span
       >
     </button>
@@ -606,7 +604,9 @@
       <input type="hidden" name="post_type" value={WPPostType.Lowongan} />
 
       <!-- Search Input -->
-      <div class="relative grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2">
+      <div
+        class="relative grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-start gap-2"
+      >
         <input
           type="text"
           placeholder="Masukkan Pekerjaan atau Perusahaan"
@@ -719,8 +719,7 @@
             aria-expanded={dropdownHandler.isSortOpen}
             aria-controls="sort-listbox"
             onclick={() => dropdownHandler.toggleDropdown("sort")}
-            ><span
-              class="block min-w-0 break-words pl-8 leading-tight"
+            ><span class="block min-w-0 break-words pl-8 leading-tight"
               >{jobListingStore.filters.sort?.label ?? "Urutkan"}</span
             ></button
           >
@@ -743,7 +742,9 @@
       </div>
 
       {#if dropdownHandler.selectedFiltersWithNames && dropdownHandler.selectedFiltersWithNames.length}
-        <div class="mb-4 flex min-w-0 flex-wrap items-start gap-2 animate-fade-in">
+        <div
+          class="mb-4 flex min-w-0 flex-wrap items-start gap-2 animate-fade-in"
+        >
           <span
             class="font-semibold text-[var(--wpl-global-color-1)] flex items-center justify-center w-full mr-2"
             ><FilterSolid class="mr-1 inline-block" aria-hidden="true" />Filter
@@ -770,8 +771,7 @@
                     aria-hidden="true"
                   />
                 {/if}
-                <span
-                  class="min-w-0 break-words leading-tight"
+                <span class="min-w-0 break-words leading-tight"
                   >{filter.names[idx]}</span
                 >
                 <button

@@ -1,5 +1,4 @@
 import type { ThemeScriptData } from "@/types";
-import { useRIC } from "@/utils/window";
 
 export function isTheme(value: string | null | undefined): value is ThemeScriptData[ "themeList" ]
 {
@@ -21,7 +20,7 @@ export function localStorageThemeActions(action: { save?: ThemeScriptData[ "them
         },
     }
 
-    if (save) return void useRIC(() => actions.save(save)); // writeback technique to avoid briefly blocking the main thread
+    if (save) return void window.scheduler.postTask(() => actions.save(save), { priority: "background" });
     if (get) return actions.get();
 }
 

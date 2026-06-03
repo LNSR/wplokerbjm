@@ -9,6 +9,31 @@ import { resolve } from "path";
 import { analyzer } from "vite-bundle-analyzer";
 import { partytownVite, copyLibFiles } from "@qwik.dev/partytown/utils";
 
+const cloudflareSecurityHeaders = /*txt*/`
+# === START CUSTOM SECURITY HEADERS ===
+
+/~partytown/*
+  Service-Worker-Allowed: /
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
+
+/_app/immutable/workers/*
+  Service-Worker-Allowed: /
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
+# === END CUSTOM SECURITY HEADERS ===
+`;
+
+function writeCloudflareSecurityHeaders(): void
+{
+  const headersFile = resolve(__dirname, ".svelte-kit", "cloudflare", "_headers");
+  const existing = fs.existsSync(headersFile) ? fs.readFileSync(headersFile, "utf8") : "";
+
+  if (existing.includes("START CUSTOM SECURITY HEADERS")) return;
+
+  fs.writeFileSync(headersFile, `${existing.trimEnd()}\n${cloudflareSecurityHeaders}`);
+}
+
 function transformInlinedScript(format: LibraryFormats = "iife"): Plugin
 {
   let root: ResolvedConfig[ 'root' ] = process.cwd();
@@ -42,6 +67,7 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin
         configFile: false,
         publicDir: false,
         logLevel: "warn", // Toned down to avoid flooding the console on every edit
+        envPrefix: [ "VITE_", "PUBLIC_" ],
 
         resolve: {
           alias: resolveConfig?.alias,
@@ -119,7 +145,11 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig =>
       hmr: {
         port: 50001,
         clientPort: 50001,
-      }
+      },
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+      },
     }
     : undefined;
 
@@ -149,13 +179,21 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig =>
       name: "copy-partytown-assets",
       async closeBundle()
       {
+        const dest = resolve(__dirname, ".svelte-kit", "cloudflare", "~partytown");
         try
         {
-          const dest = resolve(__dirname, ".svelte-kit", "cloudflare", "~partytown");
           await copyLibFiles(dest);
         } catch (error)
         {
           console.warn("failed to copy Partytown assets to cloudflare dir", error);
+        }
+
+        try
+        {
+          writeCloudflareSecurityHeaders();
+        } catch (error)
+        {
+          console.warn("failed to write Cloudflare security headers", error);
         }
       },
     },
@@ -168,11 +206,35 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig =>
     },
     target: "esnext",
     sourcemap: false,
+    rolldownOptions: {
+      output: {
+        codeSplitting: true,
+      },
+    },
+  };
+
+  const worker: UserConfig[ 'worker' ] = {
+    format: "es",
+    plugins: () => [
+      transformInlinedScript(),
+      sveltekit(),
+      UnpluginTypia({
+        cache: true,
+        log: true,
+      }),
+    ],
+    rolldownOptions: {
+      output: {
+        codeSplitting: true,
+      },
+    },
   };
 
   return {
     plugins,
     server: devServer,
     build,
+    worker,
+    envPrefix: [ "VITE_", "PUBLIC_" ],
   };
 });

@@ -1,5 +1,5 @@
 import type { Attachment } from "svelte/attachments";
-import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import { SvelteMap } from "svelte/reactivity";
 import { LRUCache } from "lru-cache";
 
 /**
@@ -214,7 +214,7 @@ class Virtualization
         {
             observer: ResizeObserver;
             elementToJobId: WeakMap<Element, number>;
-            observedElements: SvelteSet<Element>;
+            observedElements: Set<Element>;
         }
     >();
 
@@ -227,7 +227,7 @@ class Virtualization
         if (!registry)
         {
             const elementToJobId = new WeakMap<Element, number>();
-            const observedElements = new SvelteSet<Element>();
+            const observedElements = new Set<Element>();
 
             const observer = new ResizeObserver((entries: ResizeObserverEntry[]) =>
             {
