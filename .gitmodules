@@ -1,0 +1,3 @@
+[submodule "wplokerbjm-post-automation"]
+	path = wplokerbjm-post-automation
+	url = git@github.com:LNSR/wplokerbjm-post-automation.git

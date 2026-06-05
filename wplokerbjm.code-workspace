@@ -9,8 +9,8 @@
       "path": "wordpress/wp-content/themes/wplokerbjm",
     },
     {
-      "name": "wplokerbjm-scrapper",
-      "path": "scrapper",
+      "name": "wplokerbjm-post-automation",
+      "path": "wplokerbjm-post-automation",
     },
   ],
   "settings": {

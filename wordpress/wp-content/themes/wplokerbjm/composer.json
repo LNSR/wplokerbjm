@@ -3,12 +3,13 @@
     "php-di/php-di": "*"
   },
   "require-dev": {
+    "brain/monkey": "*",
     "php-parallel-lint/php-console-highlighter": "*",
     "php-parallel-lint/php-parallel-lint": "*",
     "php-stubs/wordpress-stubs": "*",
+    "phpstan/phpstan": "^2.2",
     "phpunit/phpunit": "*",
-    "vlucas/phpdotenv": "*",
-    "brain/monkey": "*"
+    "vlucas/phpdotenv": "*"
   },
   "autoload": {
     "classmap": ["server"]

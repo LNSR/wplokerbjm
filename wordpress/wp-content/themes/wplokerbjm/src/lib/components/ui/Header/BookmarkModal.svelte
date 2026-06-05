@@ -28,6 +28,7 @@
     showTimeAgo,
   } from "$lib/composables/JobUI.svelte";
   import { useSidePanel } from "$lib/composables/SidePanel.svelte";
+  import { useRIC } from "@/utils/window";
 
   interface Props {
     open: boolean;
@@ -202,13 +203,13 @@
   }
 
   class VirtualizationManager {
-    public measuring: boolean = $state.raw(false); // show spinner until we measure heights of visible items to prevent INP
+    public measuring: boolean = $state.raw(true); // show spinner until we measure heights of visible items to prevent INP
     public containerScrollY = $state(0);
-    public cardHeights = $state.raw(routeStateStore.getCardHeights("bookmarkModal"));
-    public backgroundMeasurement: DisposableStack | null = null;
 
     constructor() {
-      this.#initBackgroundMeasurement();
+      useRIC(() => {
+        this.measuring = false;
+      }, { fallback: "timeout", timeout: 1000 });
     }
 
     public virtualizedJobs = $derived<ListVirtualizationState<CardJob>>(
@@ -216,7 +217,7 @@
         displayJobs: bookmarkHandlerUI.filteredDisplayedJobs,
         scrollY: this.containerScrollY,
         containerHeight: contentRect?.height || 0,
-        cardHeights: this.cardHeights,
+        cardHeights: routeStateStore.getCardHeights("bookmarkModal"),
         fallbackHeight: 200,
         gap: 24,
         buffer: 6,
@@ -224,7 +225,7 @@
     );
 
     public measureHeight(jobId: number): Attachment<HTMLElement> {
-      return useVirtualization.createMeasureHeight(this.cardHeights, jobId);
+      return useVirtualization.createMeasureHeight(routeStateStore.getCardHeights("bookmarkModal"), jobId);
     }
 
     // // Clear card heights that are no longer displayed
@@ -248,53 +249,6 @@
     //   }
     //   return this.cardHeights;
     // }
-
-    /**
-     * Start background measurement: poll cardHeights until visible items measured
-     * * Prevent INP spike on open by showing spinner first
-     * !One time measurement
-     * */
-    #initBackgroundMeasurement() {
-      this.backgroundMeasurement ??= new DisposableStack();
-      if (this.backgroundMeasurement.disposed) return;
-
-      this.backgroundMeasurement.defer(() => {
-        stopBackgroundMeasure();
-      });
-
-      const stopBackgroundMeasure = () => {
-        polling?.();
-        polling = undefined;
-        this.measuring = false;
-        this.backgroundMeasurement = null;
-      };
-
-      let polling: ReturnType<typeof $effect.root> | undefined = $effect.root(
-        () => {
-          let timeout: ReturnType<typeof setTimeout> | undefined = setTimeout(
-            () => {
-              this.backgroundMeasurement?.dispose();
-            },
-            1300,
-          );
-
-          $effect.pre(() => {
-            const visibleJobs = this.virtualizedJobs.visibleJobs.length;
-            const measured = this.cardHeights.size;
-            this.measuring = true;
-
-            if (visibleJobs === 0 || measured >= visibleJobs) {
-              this.backgroundMeasurement?.dispose();
-            }
-          });
-
-          return () => {
-            timeout && clearTimeout(timeout);
-            timeout = undefined;
-          };
-        },
-      );
-    }
   }
 
   /**
@@ -379,7 +333,7 @@
       if (!isMobile && el) {
         // Desktop: open overlay
         routeStateStore.saveCardHeights(
-          virtualizationManager.cardHeights,
+          routeStateStore.getCardHeights("bookmarkModal"),
           "bookmarkModal",
         );
         // mark as "bookmark" for desktop
@@ -389,7 +343,7 @@
       } else if (job.permalink) {
         // Mobile: navigate
         routeStateStore.saveCardHeights(
-          virtualizationManager.cardHeights,
+          routeStateStore.getCardHeights("bookmarkModal"),
           "bookmarkModal",
         );
         const url = new URL(job.permalink, window.location.origin);
@@ -429,7 +383,6 @@
       if (open) modalEl.close();
       modalHandler.resetPosition();
       // virtualizationManager.clearCardHeights();
-      virtualizationManager.backgroundMeasurement?.dispose();
     };
   });
 </script>

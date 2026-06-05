@@ -1,5 +1,6 @@
 <?php
 namespace WPLokerBJM\Controllers\Utilities;
+use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
 class ControllerUtils
@@ -74,5 +75,153 @@ class ControllerUtils
         return array_filter(array_map('intval', $ids), function ($id) {
             return $id > 0;
         });
+    }
+
+    public static function hasBearerAuthorization($request): bool
+    {
+        $authorization = '';
+
+        if (is_object($request) && method_exists($request, 'get_header')) {
+            $authorization = (string) $request->get_header('authorization');
+        }
+
+        if ($authorization === '') {
+            $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+        }
+
+        return preg_match('/^Bearer\s+\S+$/i', trim((string) $authorization)) === 1;
+    }
+
+    public static function getPermissionErrorStatus($request = null): ?int
+    {
+        if (!self::hasBearerAuthorization($request)) {
+            return 401;
+        }
+
+        if (!is_user_logged_in()) {
+            return 401;
+        }
+
+        if (!current_user_can('edit_posts')) {
+            return 403;
+        }
+
+        return null;
+    }
+
+    public static function hasNonEmptyValue($value): bool
+    {
+        if (is_array($value)) {
+            foreach ($value as $item) {
+                if (self::hasNonEmptyValue($item)) {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        return trim((string) $value) !== '';
+    }
+
+    public static function sanitizeContactList(string $field, $value): array
+    {
+        $rawParts = is_array($value) ? $value : explode(',', (string) $value);
+        $parts = array_values(array_filter(array_map(
+            fn($part): string => trim((string) $part),
+            $rawParts
+        ), fn($part) => $part !== ''));
+
+        return array_values(array_filter(array_map(function ($part) use ($field): ?string {
+            return match ($field) {
+                CustomFields::EMAIL_KONTAK => sanitize_email($part),
+                CustomFields::SITUS_KONTAK => esc_url_raw($part),
+                default => sanitize_text_field($part),
+            };
+        }, $parts), fn($part) => $part !== null && $part !== ''));
+    }
+
+    public static function sanitizeSocialMediaFieldset($value): array
+    {
+        
+        $allowedIndex = CustomFields::SOCIAL_MEDIA_PLATFORMS;
+
+        if (is_string($value)) {
+            $value = self::parseSocialMediaString($value);
+        }
+
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $sets = self::isAssoc($value) ? [$value] : $value;
+        $sanitizedSets = [];
+
+        foreach ($sets as $set) {
+            if (!is_array($set)) {
+                continue;
+            }
+
+            $sanitizedSet = [];
+            foreach ($set as $platform => $username) {
+                $platform = sanitize_text_field((string) $platform);
+                if (!isset($allowedIndex[$platform])) {
+                    continue;
+                }
+
+                $username = sanitize_text_field((string) $username);
+                if ($username === '') {
+                    continue;
+                }
+
+                $sanitizedSet[$platform] = $username;
+            }
+
+            if ($sanitizedSet !== []) {
+                $sanitizedSets[] = $sanitizedSet;
+            }
+        }
+
+        return $sanitizedSets;
+    }
+
+    private static function parseSocialMediaString(string $value): array
+    {
+        $set = [];
+
+        foreach (array_filter(array_map('trim', explode(';', $value))) as $item) {
+            $parts = explode(':', $item, 2);
+            if (count($parts) !== 2) {
+                continue;
+            }
+
+            $platform = trim($parts[0]);
+            $username = trim($parts[1]);
+            if ($platform !== '' && $username !== '') {
+                $set[$platform] = $username;
+            }
+        }
+
+        return $set === [] ? [] : [$set];
+    }
+
+    private static function isAssoc(array $value): bool
+    {
+        return array_keys($value) !== range(0, count($value) - 1);
+    }
+
+    /**
+     * @return array{status: int, data: array{code: string, message: string, warnings: array}}
+     */
+    public static function errorResult(int $status, string $code, string $message, array $warnings): array
+    {
+        return [
+            'status' => $status,
+            'data' => [
+                'code' => $code,
+                'message' => $message,
+                'warnings' => $warnings,
+            ],
+        ];
     }
 }

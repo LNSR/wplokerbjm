@@ -25,6 +25,9 @@ if (!defined('WP_ENV')) {
 define('JWT_AUTH_SECRET_KEY', getenv('JWT_AUTH_SECRET_KEY'));
 define('JWT_AUTH_CORS_ENABLE', true);
 
+define('WPLBJM_API_BASE_URL_DEV', getenv('WPLBJM_API_BASE_URL_DEV'));
+define('WPLBJM_JWT_DEV', getenv('WPLBJM_JWT_DEV'));
+
 // Auto-discover protocol and hostname from forwarded headers (for all proxies)
 $hostname = 'localhost'; // default fallback
 $protocol = 'http://'; // default fallback

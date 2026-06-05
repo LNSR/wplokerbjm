@@ -36,7 +36,7 @@
       "type": "http",
       "url": "https://mcp.context7.com/mcp",
       "headers": {
-        "CONTEXT7_API_KEY": "${env:CONTEXT7_API_KEY}"
+        "CONTEXT7_API_KEY": "${input:CONTEXT7_API_KEY}"
       }
     },
     "memory": {
@@ -71,6 +71,25 @@
         "docker.io/acuvity/mcp-server-benborla-mysql:latest"
       ],
       "type": "stdio"
+    },
+    "wplokerbjm-royalmcp-production": {
+      "type": "http",
+      "url": "https://wp.lokerbanjarmasin.my.id/wp-json/royal-mcp/v1/mcp",
+      "headers": {
+        "X-Royal-MCP-API-Key": "${input:X_ROYAL_MCP_API_KEY}"
+      },
+    },
+  },
+  "inputs": [
+    {
+      "id": "X_ROYAL_MCP_API_KEY",
+      "type": "promptString",
+      "description": "API key for Royal MCP"
+    },
+    {
+      "id": "CONTEXT7_API_KEY",
+      "type": "promptString",
+      "description": "API key for Context7"
     }
-  }
+  ]
 }

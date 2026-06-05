@@ -9,6 +9,8 @@ wordpress/wp-content/themes/*
 !wordpress/wp-content/themes/wplokerbjm
 **/.svelte-kit
 **/.wrangler
+**/.tmp
+**/.opencode
 **/build
 **/dist
 **/deploy-manual.sh
@@ -35,12 +37,6 @@ worker-configuration.d.ts
 **/*.graphql
 **/*.tsbuildinfo
 
-
-# agents
-.agents
-skills
-
-# Scraping related
-scrapper/**/downloads
-scrapper/.venv
-scrapper/__pycache__
+wplokerbjm-post-automation
+**/wplokerbjm/.agents
+**/.omo

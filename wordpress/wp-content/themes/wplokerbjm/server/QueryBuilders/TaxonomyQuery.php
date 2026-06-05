@@ -144,4 +144,35 @@ class TaxonomyQuery
         Cache::set($cache_key, $final_result, 86400); // Cache for 1 day
         return $final_result;
     }
+
+    public static function getTaxonomyOptions(array $taxonomies): array
+    {
+        $options = [];
+
+        foreach ($taxonomies as $taxonomy) {
+            $terms = get_terms([
+                'taxonomy' => $taxonomy,
+                'hide_empty' => false,
+                'orderby' => 'name',
+                'order' => 'ASC',
+            ]);
+
+            if (is_wp_error($terms) || !is_array($terms)) {
+                $options[$taxonomy] = [];
+                continue;
+            }
+
+            $options[$taxonomy] = array_values(array_map(
+                fn($term): array => [
+                    'id' => (int) $term->term_id,
+                    'name' => html_entity_decode((string) $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                    'slug' => (string) $term->slug,
+                    'parent' => isset($term->parent) ? (int) $term->parent : 0,
+                ],
+                $terms
+            ));
+        }
+
+        return $options;
+    }
 }

@@ -125,7 +125,6 @@
   @reference "@css/app.css";
   .page-transition {
     transition: opacity 0.1s ease-in-out;
-    content-visibility: auto;
     contain-intrinsic-size: auto
       calc(
         100vh -

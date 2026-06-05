@@ -131,7 +131,7 @@ class Virtualization
             scrollY,
             containerHeight,
             cardHeights,
-            fallbackHeight = 200,
+            fallbackHeight = 250,
             gap = 12,
             buffer = 12,
         } = opts;
@@ -182,7 +182,7 @@ class Virtualization
         const { itemPositions, totalHeight } = layout;
 
         // Find visible items based on scroll position using binary search for performance
-        const bufferHeight = 200; // Approximate height for buffer calculations
+        const bufferHeight = 250; // Approximate height for buffer calculations
         const startPos = Math.max(0, scrollY - buffer * bufferHeight);
         const startCandidate = this.#binarySearch(itemPositions, startPos);
         const startIndex = Math.max(0, startCandidate - buffer);

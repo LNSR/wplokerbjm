@@ -364,8 +364,11 @@ class BookmarkRepository
 {
   // For now, sync operations need direct repository access inside this module.
   public bookmarkIDB: Remote<BookmarkWorkerInstance[ 'bookmarkIDB' ]>;
+  /**
+   * using $state.raw since we swap instance on @see loadFromStorageIDB
+   */
   public cacheJobs = $state.raw(new SvelteMap<number, CardJob>());
-  public expiredJobs = $state.raw(new SvelteSet<CardJob[ 'id' ]>());
+  public expiredJobs = new SvelteSet<CardJob[ 'id' ]>();
   constructor(bookmarkIDB: Remote<BookmarkWorkerInstance[ 'bookmarkIDB' ]>)
   {
     this.bookmarkIDB = bookmarkIDB;
@@ -437,8 +440,7 @@ class BookmarkRepository
 
       if (symmetricDifference.size === 0) return;
 
-      this.cacheJobs.clear();
-      jobs.forEach((job) => this.cacheJobs.set(Number(job.id), job));
+      this.cacheJobs = new SvelteMap(jobs.map((job) => [ Number(job.id), job ]));
     }).catch((error) =>
     {
       console.error("Failed to load bookmarks from IndexedDB:", error);
@@ -611,7 +613,7 @@ class SyncOperation implements SyncToServer
   #init(): void
   {
     if (typeof window === "undefined") return;
- 
+
     void this.#bookmarkSyncQueueTask.syncCommand(proxy(this.syncToServer.bind(this)));
     const localStorageSyncTime = Number(localStorage.getItem(this.#localStorageKey));
     localStorageSyncTime && this.lastSyncTime.setTime(localStorageSyncTime);

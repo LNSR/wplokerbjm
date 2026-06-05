@@ -15,6 +15,8 @@
 3. 🖼️ **`src/`** - Directory containing SvelteKit code.
 4. 📦 **`/.svelte-kit`** - Directory for SvelteKit build artifacts.
 5. 🛠️ **`tools/`** - Directory for development and build tools.
+6. 🚀 **`wrangler.jsonc`** - Configuration file for Cloudflare Workers deployment.
+7. 📁 **`public/`** - Directory for static assets and public files.
 
 ## 🔌 Must-Use Plugin (MU Plugin)
 
@@ -132,7 +134,49 @@ class MyClassName
 
 This approach keeps hook registration declarative and centralized.
 
-## �📝 Development Notes
+## 🧪 Testing (PHPUnit)
+
+The theme includes a PHPUnit test suite for backend PHP services, container definitions, GraphQL behavior, caching, and REST ingest flows. Tests are designed to run without loading a full WordPress installation by mocking WordPress functions where needed.
+
+### How Tests Work
+
+- **PHPUnit** runs the test suite defined in `phpunit.xml`.
+- **`tests/bootstrap.php`** loads shared test support before PHPUnit executes tests.
+- **Brain Monkey** mocks WordPress functions such as `register_rest_route`, `wp_cache_get`, and remote response helpers.
+- **Patchwork** is loaded for function patching support used by Brain Monkey.
+- **`tests/Support/WplokerbjmTestCase.php`** is the base test case. It boots the proxy container, resets per-test state, initializes Brain Monkey in `setUp()`, and tears mocks down after each test.
+- **`tests/Support/ProxyContainer.php`** provides the test container layer used by tests that need PHP-DI services.
+
+### Running Tests
+
+From the theme directory, run:
+
+```bash
+composer test
+```
+
+The Composer script loads the root `.env`, then executes PHPUnit inside the WordPress Docker container:
+
+```bash
+docker exec wordpress-${WP_ENV:-production} sh -c "cd /var/www/html/wp-content/themes/wplokerbjm \
+&& ./vendor/bin/phpunit --colors=always --fail-on-skipped --testdox"
+```
+
+If you are already inside the container, run PHPUnit directly:
+
+```bash
+./vendor/bin/phpunit --colors=always --fail-on-skipped --testdox
+```
+
+### Test Files
+
+- `tests/CacheTest.php` — cache behavior and WordPress cache mocks.
+- `tests/ContainerDefinitionsTest.php` — PHP-DI container definition coverage.
+- `tests/GraphQLTest.php` — GraphQL query and response behavior.
+- `tests/LowonganIngestOptionsRestTest.php` — ingest options REST endpoint behavior.
+- `tests/LowonganIngestRestTest.php` — lowongan ingest REST endpoint behavior.
+
+## 📝 Development Notes
 
 > 💡 **Architecture Tips**
 >

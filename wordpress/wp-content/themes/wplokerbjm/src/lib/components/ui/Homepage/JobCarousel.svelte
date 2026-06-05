@@ -397,7 +397,10 @@
 <section
   class="mt-12 min-w-0 overflow-hidden md:min-h-[500px] lg:min-h-[600px]"
 >
-  <div class="mb-6 flex min-w-0 flex-wrap items-center justify-between gap-3">
+  <div
+    class="mb-6 flex min-w-0 flex-wrap items-center justify-between gap-3"
+    style="content-visibility: auto;"
+  >
     <h2
       class="mt-4 min-w-0 break-words text-lg font-semibold leading-tight md:text-2xl"
     >
