@@ -7,24 +7,34 @@
     "php-parallel-lint/php-console-highlighter": "*",
     "php-parallel-lint/php-parallel-lint": "*",
     "php-stubs/wordpress-stubs": "*",
-    "phpstan/phpstan": "^2.2",
+    "phpstan/phpstan": "*",
     "phpunit/phpunit": "*",
     "vlucas/phpdotenv": "*"
   },
   "autoload": {
-    "classmap": ["server"]
+    "classmap": [
+      "server"
+    ]
   },
   "autoload-dev": {
-    "classmap": ["tests"]
+    "classmap": [
+      "tests"
+    ]
   },
   "config": {
     "sort-packages": true,
     "process-timeout": 0
   },
   "scripts": {
-    "watch:autoload": ["./tools/Composer/Scripts/autoloadwatcher.sh"],
-    "post-update-cmd": ["composer dump-autoload --apcu -a -o"],
-    "post-install-cmd": ["composer dump-autoload --apcu -a -o"],
+    "watch:autoload": [
+      "./tools/Composer/Scripts/autoloadwatcher.sh"
+    ],
+    "post-update-cmd": [
+      "composer dump-autoload --apcu -a -o"
+    ],
+    "post-install-cmd": [
+      "composer dump-autoload --apcu -a -o"
+    ],
     "lint:php": "./tools/Composer/Scripts/lint.sh",
     "test": "./tools/Composer/Scripts/test.sh"
   }

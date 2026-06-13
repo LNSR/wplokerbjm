@@ -724,8 +724,8 @@
             ></button
           >
           {#if dropdownHandler.isSortOpen}
-            {@const CustomDropdown =
-              componentRegistry.getComponentByName("CustomDropdown")}
+            {const CustomDropdown = $derived(
+              componentRegistry.getComponentByName("CustomDropdown"))}
             <CustomDropdown
               id="sort"
               value={jobListingStore.filters.sort}

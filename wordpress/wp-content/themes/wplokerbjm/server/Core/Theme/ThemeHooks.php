@@ -171,43 +171,6 @@ class ThemeInject
     }
 
     /**
-     * Output preload <link> for the logo image.
-     *
-     * If a custom logo is set, this outputs a <link rel="preload" as="image"> tag
-     * with appropriate srcset and sizes attributes for responsive loading.
-     * This helps prioritize logo loading for better performance and user experience.
-     *
-     * Side effects:
-     * - Echoes HTML directly to the output buffer.
-     *
-     * @return void
-     */
-    #[Action('wp_head')]
-    public static function preloadLogo(): void
-    {
-        $logoData = self::getLogoData();
-        if (empty($logoData['url'])) {
-            return;
-        }
-
-        $Attrs = [
-            'rel' => 'preload',
-            'as' => 'image',
-            'href' => esc_url($logoData['url']),
-            'imagesrcset' => esc_attr($logoData['srcset'] ?: ''),
-            'imagesizes' => esc_attr($logoData['sizes'] ?: ''),
-            'fetchpriority' => 'high',
-        ];
-
-        $preloadAttrs = array_filter($Attrs, fn($value) => !empty($value));
-        echo '<link ' . implode(' ', array_map(
-            fn($key, $value) => $key . '="' . $value . '"',
-            array_keys($preloadAttrs),
-            $preloadAttrs
-        )) . ' />' . "\n";
-    }
-
-    /**
      * Provide theme runtime data for client-side hydration as an associative array.
      *
      * The array contains:

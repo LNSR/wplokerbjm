@@ -83,7 +83,7 @@ wplokerbjm/
 
 **`wplokerbjm-post-automation`** lives as a git submodule and deploys independently as a Render Web Service:
 
-- Reads flyer images via AI (Gemini / OpenCode)
+- Reads flyer images via agent vision capable (Gemini / OpenCode)
 - Decodes QR codes for extraction context
 - Optionally enriches data via Exa web search
 - Normalizes fields to the WordPress ingest schema
@@ -98,14 +98,14 @@ wplokerbjm/
 └── .github/workflows/               CI pipeline
 ```
 
-👉 **Full documentation**: [`wplokerbjm-post-automation/README.md`](wplokerbjm-post-automation/README.md)
+👉 **Full detail**: [`wplokerbjm-post-automation`](https://github.com/LNSR/wplokerbjm-post-automation)
 
 > 💡 **Note**: This microservice is independently deployed on Render. See its README for environment setup, Telegram configuration, and WordPress contract details.
-> 💡 **Note**: See `server/Models/Schema` for MetaBox implementation details
 
 ### 🏗️ Backend Structure
 
-The backend code is organized as follows:
+> 💡 **Note**: See `server/Models/Schema` for MetaBox implementation details.
+> The backend code is organized as follows:
 
 ```sh
 wordpress/wp-content/themes/wplokerbjm/server/

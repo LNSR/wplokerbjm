@@ -63,8 +63,15 @@ class JobDataFactory
     /**
      * Process custom fields data.
      *
-     * @param array $customFields Raw custom fields data.
-     * @return array Processed custom fields data.
+     * Applies sanitization and formatting to various field types:
+     * - WYSIWYG fields: wpautop, wp_kses_post, do_shortcode
+     * - Number fields: cast to int
+     * - Contact fields: sanitize_email, esc_url, sanitize_text_field
+     * - Date fields: format to Y-m-d
+     * - Social media: flatten and sanitize nested arrays
+     *
+     * @param array<string, mixed> $customFields Raw custom fields data from Meta Box
+     * @return array<string, mixed> Processed custom fields data with null for invalid values
      */
     public function processCustomFields(array $customFields): array
     {
@@ -175,10 +182,12 @@ class JobDataFactory
         }
     }
     /**
-     * Process taxonomy terms.
+     * Process taxonomy terms into sanitized name strings.
      *
-     * @param array $terms Raw taxonomy terms (array of term objects/arrays/strings).
-     * @return array Processed taxonomy term names.
+     * Handles WP_Term objects, associative arrays, and plain strings.
+     *
+     * @param array<int, \WP_Term|array{name: string}|string> $terms Raw taxonomy terms
+     * @return array<int, string> Sanitized term names
      */
     public function processTaxonomyTerms(array $terms): array
     {

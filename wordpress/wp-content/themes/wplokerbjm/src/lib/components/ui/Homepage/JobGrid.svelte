@@ -448,10 +448,10 @@
               style="height: {virtualization.totalHeight}px; position: relative;"
             >
               {#each virtualization.visibleJobs as job, index}
-                {@const absoluteTop =
+                {const absoluteTop = $derived(
                   virtualization.itemPositions[
                     virtualization.startIndex + index
-                  ]}
+                  ])}
                 <div
                   style="position: absolute; transform: translate3d(0, {absoluteTop}px, 0); width: 100%; contain: layout;"
                   {@attach useVirtualization.createMeasureHeight(

@@ -39,14 +39,14 @@
   // This component scope state properties
   let modalEl: HTMLDialogElement;
   let modalBox: HTMLElement;
-  let contentRect = $state<DOMRectReadOnly | null>(null);
+  let contentRect = $state.raw<DOMRectReadOnly | null>(null);
 
   // Search state for filtering saved jobs (title and company)
   const isMobile = $derived(deviceDetector.isPlatformMobile);
 
   class SearchQueryController {
-    public searchQuery = $state("");
-    public isSearchOpen = $state(false);
+    public searchQuery = $state.raw("");
+    public isSearchOpen = $state.raw(false);
     #searchInputEl: HTMLInputElement | null = null;
 
     public toggleInputSearch = (): void => {
@@ -86,9 +86,9 @@
   }
 
   class BookmarkUIHandler {
-    public showDeleteConfirm = $state(false);
+    public showDeleteConfirm = $state.raw(false);
     public removingIds = new SvelteSet<number>(); // track ids of jobs being removed to apply exit animation
-    public error = $state("");
+    public error = $state.raw("");
 
     public refreshBookmark(): void {
       if (bookmarkStore.isSyncingStatus) return;
@@ -598,20 +598,20 @@
                 .totalHeight}px;"
             >
               {#each virtualizationManager.virtualizedJobs.visibleJobs as job, idx (job.id)}
-                {@const absoluteIndex =
-                  virtualizationManager.virtualizedJobs.startIndex + idx}
-                {@const topPosition =
+                {const absoluteIndex = $derived(
+                  virtualizationManager.virtualizedJobs.startIndex + idx)}
+                {const topPosition = $derived(
                   virtualizationManager.virtualizedJobs.itemPositions[
                     absoluteIndex
-                  ] || 0}
+                  ] || 0)}
                 <div
                   class="card bg-[var(--wpl-global-color-5)] border-2 border-[var(--wpl-global-color-1)] shadow-sm hover:shadow-md absolute left-0 right-0"
                   class:scale-0={bookmarkHandlerUI.removingIds.has(job.id || 0)}
                   style="transform: translate3d(0, {topPosition}px, 0);"
                   {@attach virtualizationManager.measureHeight(job.id || 0)}
                 >
-                  {#if job.title === ""}
-                    <!-- Skeleton -->
+
+                {#snippet CardSkeleton()}
                     <div class="card-body animate-pulse">
                       <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 min-w-1">
@@ -646,6 +646,10 @@
                         </div>
                       </div>
                     </div>
+                {/snippet}
+
+                  {#if job.title === ""}
+                    {@render CardSkeleton()}
                   {:else}
                     <div class="flex w-full">
                       <div class="flex-1">

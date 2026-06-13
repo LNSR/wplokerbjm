@@ -44,7 +44,7 @@ class GlobalHooks
      * ! Notify search engines with 410 Gone for removed job posts.
      */
     #[Action('template_redirect', 1)]
-    public function oldPost410Redirect(): void
+    public static function oldPost410Redirect(): void
     {
         if (
             self::shouldBypassAutoSsl() ||
@@ -191,7 +191,7 @@ class GlobalHooks
      * This enables more comprehensive search results for the job platform, allowing users
      * to find jobs by company name or category even if those terms aren't in the title.
      *
-     * Used by: SearchForm, DynamicSearch REST endpoint, and any WP_Query with 's' parameter
+     * Used by: DynamicSearch Graphql endpoint, and any WP_Query with 's' parameter
      * on 'lowongan' post type.
      *
      * @param string $search The current search SQL fragment (may be empty).
@@ -199,7 +199,7 @@ class GlobalHooks
      * @return string Modified search SQL fragment.
      */
     #[Filter('posts_search', 10, 2)]
-    public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
+    public static function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
 
@@ -222,7 +222,7 @@ class GlobalHooks
      * Temporarily disable specific plugins if in development environment.
      */
     #[Filter('option_active_plugins', 4)]
-    public function disablePluginsForDevImpl(array $plugins): array
+    public static function disablePluginsForDevImpl(array $plugins): array
     {
         $isDev = SharedUtils::isDevelopment();
         if (!$isDev) {
@@ -231,28 +231,28 @@ class GlobalHooks
         $extra = [
         ];
 
-        $pluginsToDisable = $this->listPluginsToDisable($extra);
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
+        $pluginsToDisable = self::listPluginsToDisable($extra);
+        return self::filteredPlugins($plugins, $pluginsToDisable);
     }
 
     /**
      * Temporarily disable specific plugins if simulating production environment on local machine.
      */
     #[Filter('option_active_plugins', 4)]
-    public function disablePluginsforSimulatedProdImpl(array $plugins): array
+    public static function disablePluginsforSimulatedProdImpl(array $plugins): array
     {
         $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
 
-        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
+        $pluginsToDisable = $isDev ? self::listPluginsToDisable() : [];
 
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
+        return self::filteredPlugins($plugins, $pluginsToDisable);
     }
 
     /**
      * Force locale to Indonesian on the frontend for consistent user experience, while keeping admin in English.
      */
     #[Filter('locale')]
-    public function frontendLocal($locale)
+    public static function frontendLocal($locale)
     {
         if (!is_admin()) { // Only affects the public site, keeps your dashboard English
             return 'id_ID';
@@ -267,7 +267,7 @@ class GlobalHooks
      * @param array $pluginsToDisable Array of plugin prefixes to disable.
      * @return array Filtered array of active plugins.
      */
-    private function filteredPlugins(array $plugins, array $pluginsToDisable): array
+    private static function filteredPlugins(array $plugins, array $pluginsToDisable): array
     {
         $filtered = array_filter($plugins, function (string $plugin) use ($pluginsToDisable): bool {
             foreach ($pluginsToDisable as $disable) {
@@ -287,7 +287,7 @@ class GlobalHooks
      * @param array|null $extra Optional array of additional plugin prefixes to disable.
      * @return array Array of plugin prefixes to disable.
      */
-    private function listPluginsToDisable(?array $extra = []): array
+    private static function listPluginsToDisable(?array $extra = []): array
     {
         return array_merge([
             // 'google-site-kit/',
@@ -326,7 +326,7 @@ class GlobalHooks
     #[Action('updated_post_meta', 10, 4)]
     #[Action('set_object_terms', 10, 6)]
     #[Action('transition_post_status', 10, 3)]
-    public function purgeCacheOnChange(...$args): void
+    public static function purgeCacheOnChange(...$args): void
     {
         // Normalize incoming hook args: find first numeric-like value as post_id and any \WP_Post instance as post
         $post_id = null;
@@ -403,7 +403,7 @@ class GlobalHooks
 
             // If we detected a post id, also invalidate the per-job caches
             if ($post_id !== null) {
-                $this->invalidateJobDataCache((int) $post_id);
+                self::invalidateJobDataCache((int) $post_id);
             }
         } catch (\Exception $e) {
             Logger::error('Hooks', 'Hooks::purgeCacheOnChange error: ' . $e->getMessage());
@@ -416,7 +416,7 @@ class GlobalHooks
      * @param int $post_id The post ID.
      * @return bool True if cache was invalidated, false otherwise.
      */
-    private function invalidateJobDataCache(int $post_id): bool
+    private static function invalidateJobDataCache(int $post_id): bool
     {
         $post_type = get_post_type($post_id);
         if ($post_type !== 'lowongan') {

@@ -197,7 +197,7 @@ class JobQuery
         try {
             // Safely escape the search term for LIKE queries
             $q_esc = esc_sql($wpdb->esc_like($q));
-            $q_html = esc_sql($wpdb->esc_like(htmlentities($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+            $q_html = esc_sql($wpdb->esc_like(htmlspecialchars($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
 
             $posts = $wpdb->posts;
             $postmeta = $wpdb->postmeta;

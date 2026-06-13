@@ -62,6 +62,7 @@ export default defineConfig(
 		},
 		rules: {
 			"@typescript-eslint/no-explicit-any": 'off', // allow any when necessary, but prefer explicit types
+			"@typescript-eslint/no-unsafe-function-type": 'off',
 			"@typescript-eslint/no-floating-promises": "off",
 			"@typescript-eslint/require-await": "warn",
 

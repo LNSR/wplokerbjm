@@ -484,7 +484,7 @@
       >
         <div class="swiper-wrapper">
           {#each swiperManager.virtualIndexes as idx}
-            {@const job: JobCardProps['jobdata'] = sortedJobs[idx]}
+            {const job: JobCardProps['jobdata'] = sortedJobs[idx]}
             <div
               class="swiper-slide min-w-0"
               data-swiper-slide-index={idx}
@@ -543,7 +543,7 @@
     {/if}
     {#if swiperManager.swiperFailed}
       <div class="min-w-0 overflow-hidden">
-        <!-- Please match according Swiper breakpoints -->
+        <!-- !Please match according Swiper breakpoints -->
         <div class="flex w-full gap-3 min-[480px]:gap-4 sm:gap-5 lg:gap-8">
           {#each sortedJobs as job, idx (Number(job.id) ?? job.permalink ?? idx)}
             <div

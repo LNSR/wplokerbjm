@@ -18,8 +18,8 @@ class GraphQLData
     /**
      * Get card data for a Homepage Jobcard listing
      * used for JobGrid and JobCarousel props
-     * @param int $post_id
-     * @return array
+     * @param int $post_id Post ID to fetch card data for
+     * @return array{id: int, slug: string, title: string, nama_perusahaan: string, ringkasanPekerjaan: array, status_pekerjaan: int|null, permalink: string, post_time: string} Processed card data
      */
     public function getCardData(int $post_id): array
     {
@@ -59,8 +59,8 @@ class GraphQLData
     /**
      * Get detailed data for a single job overlay
      * Also used for SingleView props
-     * @param int $post_id
-     * @return array
+     * @param int $post_id Post ID to fetch detailed data for
+     * @return array{id: int, slug: string, permalink: string, title: string, nama_perusahaan: string|null, tentang_perusahaan: string|null, ringkasanPekerjaan: array, deskripsi_pekerjaan: string|null, persyaratan: string|null, cara_melamar: string|null, benefit: string|null, contacts: array{email_kontak: string|null, nomor_kontak: string|null, situs_kontak: string|null}, social_media: string|null, duplicateNonce?: string, post_time: string} Processed job detail data
      */
     public function getJobDetailData(int $post_id): array
     {
@@ -129,6 +129,12 @@ class GraphQLData
         }
     }
 
+    /**
+     * Extract job summary fields from full job data array.
+     *
+     * @param array $jobdata Full job data from JobDataFactory::createJobData
+     * @return array{jenis_pekerjaan: string|null, pendidikan: string|null, gender: string|null, lokasi_pekerjaan: string|null, pengalaman: int|null, gaji_minimal: int|null, gaji_maksimal: int|null, umur_min: int|null, umur_max: int|null, deadline: string|null}
+     */
     private static function getRingkasanPekerjaan(array $jobdata): array
     {
         return [
@@ -146,19 +152,20 @@ class GraphQLData
     }
 
     /**
-     * Get theme data for REST responses
-     * !Useful in future for headless setups
-     * @return array
+     * Get theme data for REST/GraphQL responses
+     * Useful in future for headless setups
+     * @return array{logo: array{logoUrl: string, logoSrcset: string, logoSizes: string, logoDecoding: string, logoWidth: int, logoHeight: int}, wpRestNonce: string, siteIconTags: string}
      */
-    public function getThemeData()
+    public function getThemeData(): array
     {
         return \WPLokerBJM\Core\Theme\ThemeInject::themeData();
     }
 
     /**
-     * Get JobSchema data for REST responses
-     * !Useful in future for headless setups
-     * @return array
+     * Get Schema.org JobPosting JSON-LD data for a single job.
+     * Useful in future for headless setups
+     * @param int $post_id Post ID
+     * @return array{@context: string, @type: string, title: string, ...} Schema.org JobPosting structured data
      */
     public function JobSchema(int $post_id): array
     {

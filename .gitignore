@@ -37,6 +37,5 @@ worker-configuration.d.ts
 **/*.graphql
 **/*.tsbuildinfo
 
-wplokerbjm-post-automation
 **/wplokerbjm/.agents
 **/.omo

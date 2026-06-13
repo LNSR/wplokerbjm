@@ -2,7 +2,6 @@
 
 namespace WPLokerBJM\Tests;
 
-use WPLokerBJM\Tests\Support\ProxyContainer;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Shared\Cache\Cache;
 use WPLokerBJM\Shared\Cache\CacheKey;
@@ -10,7 +9,7 @@ use WPLokerBJM\Configs\CredentialConfig;
 
 class CacheTest extends WplokerbjmTestCase
 {
-    
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -20,7 +19,7 @@ class CacheTest extends WplokerbjmTestCase
             define('LSOC_PREFIX', 'cf8e0');
         }
     }
-    
+
     public function testGetRedisConnectionWithEnvironmentConfig()
     {
         if (!extension_loaded('redis')) {

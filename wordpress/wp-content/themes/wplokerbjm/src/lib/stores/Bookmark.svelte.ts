@@ -190,18 +190,10 @@ class BookmarkManager
    */
   async #loadFromStorageIDB(): ReturnType<BookmarkRepository[ "loadFromStorageIDB" ]>
   {
-    const task = proxy(async () =>
-    {
-      try
-      {
-        await this.#bookmarkRepository.loadFromStorageIDB();
-      } catch (error)
-      {
-        console.error("Failed to load bookmarks from IndexedDB:", error);
-        this.#bookmarkRepository.cacheJobs.clear(); // clear cache to prevent showing stale data if loading fails
-      }
-    });
-    return void this.#bookmarkTaskController.runQueued(task);
+    this.#runBookmarkCommand(async () => await this.#bookmarkRepository.loadFromStorageIDB(), {
+      logMessage: "Gagal reload Storage IDB",
+      warning: ""
+    })
   }
 
   /**

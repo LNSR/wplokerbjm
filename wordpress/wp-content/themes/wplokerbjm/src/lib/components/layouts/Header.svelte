@@ -15,8 +15,8 @@
   import { useRIC } from "@/utils/window";
   import { MediaQuery } from "svelte/reactivity";
 
-  let showThemeModal = $state(false);
-  let showLoginModal = $state(false);
+  let showThemeModal = $state.raw(false);
+  let showLoginModal = $state.raw(false);
 
   class ThemeColorManager {
     public currentTheme = $state.raw<ThemeScriptData["themeList"]>("light");
@@ -54,12 +54,13 @@
     }
 
     public setTheme(theme: ThemeScriptData["themeList"]): void {
+      this.currentTheme = theme
       void applyThemeViewTransition(theme);
     }
   }
 
   class HeaderManager {
-    headerHeight = $state<number | undefined>(undefined);
+    headerHeight = $state.raw<number | undefined>(undefined);
     currentHeight = $derived(this.headerHeight);
   }
 
@@ -158,8 +159,8 @@
 
   let { themeData }: { themeData: WPLokerBJMThemedData } = $props();
 
-  let showBookmarkModal = $state(false);
-  let showLoginAdminModal = $state(false);
+  let showBookmarkModal = $state.raw(false);
+  let showLoginAdminModal = $state.raw(false);
 
   const isMobile = $derived(deviceDetector.isPlatformMobile);
   const bookmarkJobCount = $derived(bookmarkStore.jobs.length);
@@ -435,13 +436,14 @@
     {/if}
   </div>
   {#if showBookmarkModal}
-    {@const BookmarkModal =
-      componentRegistry.getComponentByName("BookmarkModal")}
+    {const BookmarkModal = $derived(
+      componentRegistry.getComponentByName("BookmarkModal"))}
     <BookmarkModal bind:open={showBookmarkModal} />
   {/if}
 
   {#if showLoginModal}
-    {@const LoginModal = componentRegistry.getComponentByName("LoginModal")}
+    {const LoginModal = $derived(
+      componentRegistry.getComponentByName("LoginModal"))}
     <LoginModal
       bind:open={showLoginModal}
       bind:username={loginManager.loginStates.username}

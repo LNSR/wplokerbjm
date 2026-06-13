@@ -17,6 +17,11 @@ class TaxonomyResolver
     const GENDER_TERMS = 'genderTerms';
     const PENDIDIKAN_TERMS = 'pendidikanTerms';
 
+    /**
+     * Resolve all taxonomy terms grouped by type.
+     *
+     * @return array{lokasiTerms: array, genderTerms: array, pendidikanTerms: array}
+     */
     public function resolveAllTerms(): array
     {
         try {
@@ -51,6 +56,11 @@ class TaxonomyResolver
         }
     }
 
+    /**
+     * Resolve location taxonomy terms with hierarchy.
+     *
+     * @return array<int, array{slug: string, name: string, parent: int, children: array}> Tree structure of location terms
+     */
     public function resolveLokasiTerms(): array
     {
         try {
@@ -71,6 +81,11 @@ class TaxonomyResolver
         }
     }
 
+    /**
+     * Resolve gender taxonomy terms (flat list).
+     *
+     * @return array<int, array{slug: string, name: string, parent: int, children: array}>
+     */
     public function resolveGenderTerms(): array
     {
         try {
@@ -96,6 +111,11 @@ class TaxonomyResolver
         }
     }
 
+    /**
+     * Resolve education level taxonomy terms with hierarchy.
+     *
+     * @return array<int, array{slug: string, name: string, parent: int, children: array}> Tree structure of pendidikan terms
+     */
     public function resolvePendidikanTerms(): array
     {
         try {

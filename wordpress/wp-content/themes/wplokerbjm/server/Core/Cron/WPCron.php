@@ -22,7 +22,7 @@ class WPCron
     public static function registerCronWP(): void
     {
 
-        $scheduleEvent = function (string $hook, string $recurrence): void {
+        $scheduleEvent = static function (string $hook, string $recurrence): void {
             if (!wp_next_scheduled($hook)) {
                 wp_schedule_event(time(), $recurrence, $hook);
             }

@@ -17,6 +17,9 @@ class JobsDataResolver
     ) {
     }
 
+    /**
+     * @return array{jobs: array, totalJobs: int}
+     */
     public function resolveCarousel(): array
     {
         try {
@@ -36,6 +39,13 @@ class JobsDataResolver
         }
     }
 
+    /**
+     * Resolve load-more paginated jobs for GraphQL.
+     *
+     * @param mixed $root The root Query object (unused)
+     * @param array{paged?: int, context?: string, filters?: array<string, mixed>} $args Query arguments
+     * @return array{jobs: array<int, array>, context: string, filters: array, total: int, maxNumPages: int}
+     */
     public function resolveLoadMore($root, $args): array
     {
         try {
@@ -100,6 +110,13 @@ class JobsDataResolver
         }
     }
 
+    /**
+     * Resolve job grid data for GraphQL.
+     *
+     * @param mixed $root The root Query object (unused)
+     * @param array{filters?: array, paged?: int, context?: string, title?: string, total_jobs?: int} $args Query arguments
+     * @return array{filters: array, jobs: array<int, array>, maxNumPages: int, total: int}
+     */
     public function resolveJobGrid($root, $args): array
     {
         try {
@@ -142,6 +159,13 @@ class JobsDataResolver
         }
     }
 
+    /**
+     * Resolve single job detail for GraphQL.
+     *
+     * @param mixed $root The root Query object (unused)
+     * @param array{slug: string} $args Query arguments with job slug
+     * @return array{id: int, slug: string, permalink: string, title: string, ...}|array{job: null}
+     */
     public function resolveJobDetail($root, $args): array
     {
         try {
@@ -166,6 +190,16 @@ class JobsDataResolver
         }
     }
 
+    /**
+     * Resolve Schema.org JSON-LD data for jobs.
+     *
+     * Supports per-id JobPosting schemas or combined ItemList. Can also resolve
+     * by slug to avoid an extra post ID lookup.
+     *
+     * @param mixed $root The root Query object (unused)
+     * @param array{ids?: array<int>, slug?: string, type?: string} $args Schema query arguments
+     * @return array{schemas: array<int, string>} Array of JSON-encoded schema strings
+     */
     public function resolveSchema($root, $args): array
     {
         try {
@@ -267,6 +301,13 @@ class JobsDataResolver
 
 
 
+    /**
+     * Resolve search jobs for GraphQL.
+     *
+     * @param mixed $root The root Query object (unused)
+     * @param array{filters?: array{cari?: string, lokasi_pekerjaan?: array, gender?: array, pendidikan?: array, sort?: array{value?: string}}} $args Search filters
+     * @return array{jobs: array<int, array>, context: string, filters: array, title: string, total: int, maxNumPages: int}
+     */
     public function resolveSearchJobs($root, $args): array
     {
         try {
@@ -318,6 +359,13 @@ class JobsDataResolver
         }
     }
 
+    /**
+     * Resolve bookmarked jobs by their IDs.
+     *
+     * @param mixed $root The root Query object (unused)
+     * @param array{ids?: array<int>} $args Arguments containing job IDs
+     * @return array<int, array> Array of job card data for existing posts
+     */
     public function resolveSyncBookmark($root, $args): array
     {
         try {
@@ -366,6 +414,15 @@ class JobsDataResolver
         }
     }
 
+    /**
+     * Resolve RankMath head HTML for a given URL.
+     *
+     * Validates that the URL is internal to this site before fetching.
+     *
+     * @param mixed $root The root Query object (unused)
+     * @param array{url: string} $args Arguments containing the URL
+     * @return string HTML head tags from RankMath
+     */
     public function resolveRankMathHead($root, $args): string
     {
         try {
@@ -417,6 +474,13 @@ class JobsDataResolver
         }
     }
 
+    /**
+     * Resolve autocomplete suggestions for job search.
+     *
+     * @param mixed $root The root Query object (unused)
+     * @param array{query: string} $args Arguments containing the search query
+     * @return array<int, string> Array of unique job title suggestions
+     */
     public function resolveAutoSuggestions($root, $args): array
     {
         try {

@@ -4,10 +4,8 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Tests;
 
-use WPLokerBJM\Tests\Support\ProxyContainer;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
-use WPLokerBJM\Models\Schema\Taxonomies;
 
 /**
  * Test suite for GraphQL API endpoints
@@ -22,6 +20,7 @@ class GraphQLTest extends WplokerbjmTestCase
     private $taxonomyResolverMock;
     private $jobsDataResolverMock;
     private $themeDataResolverMock;
+    private $jwtDataResolverMock;
 
     private string $baseUrl;
 
@@ -42,7 +41,7 @@ class GraphQLTest extends WplokerbjmTestCase
         $this->taxonomyResolverMock = $this->createMock(\WPLokerBJM\Controllers\GraphQL\Resolvers\TaxonomyResolver::class);
         $this->jobsDataResolverMock = $this->createMock(\WPLokerBJM\Controllers\GraphQL\Resolvers\JobsDataResolver::class);
         $this->themeDataResolverMock = $this->createMock(\WPLokerBJM\Controllers\GraphQL\Resolvers\ThemeDataResolver::class);
-
+        $this->jwtDataResolverMock = $this->createMock(\WPLokerBJM\Controllers\GraphQL\Resolvers\Auth\JWTDataResolver::class);
         // Override the default register_graphql_field mock to track registrations
         \Brain\Monkey\Functions\when('register_graphql_field')->alias(function ($type, $field, $config) {
             $GLOBALS['__wplokerbjm_registered_fields'][] = [
@@ -85,6 +84,7 @@ class GraphQLTest extends WplokerbjmTestCase
             $this->taxonomyResolverMock,
             $this->jobsDataResolverMock,
             $this->themeDataResolverMock,
+            $this->jwtDataResolverMock,
         );
     }
 
@@ -411,11 +411,11 @@ class GraphQLTest extends WplokerbjmTestCase
                             $this->assertArrayHasKey('searchJobs', $data['data'], "Query '{$name}' should contain 'searchJobs' in data");
                             break;
                         case 'syncBookmark':
+                            $this->assertArrayHasKey('syncBookmark', $data['data'], "Query '{$name}' should contain 'syncBookmark' in data");
+                            break;
                         case 'jwt':
                             $this->assertArrayHasKey('jwt', $data['data'], "Query '{$name}' should contain 'jwt' in data");
                             // token may be null if invalid
-                            break;
-                            $this->assertArrayHasKey('syncBookmark', $data['data'], "Query '{$name}' should contain 'syncBookmark' in data");
                             break;
                     }
 

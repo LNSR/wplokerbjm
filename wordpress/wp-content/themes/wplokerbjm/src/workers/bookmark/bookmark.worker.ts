@@ -6,8 +6,6 @@ import { BookmarkSyncQueueTask } from "./taskController";
 
 const sharedworker = self as unknown as SharedWorkerGlobalScope;
 
-
-
 export interface BookmarkWorkerInstance
 {
     bookmarkIDB: BookmarkIDB;

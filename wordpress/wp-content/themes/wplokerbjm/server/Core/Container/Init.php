@@ -34,10 +34,9 @@ class Init
      */
     public function __construct(private readonly array $services = [], private readonly array $hookRegistrations = [], private readonly ?ContainerInterface $container = null)
     {
-        $this->initialized = false;
     }
 
-    private bool $initialized;
+    private bool $initialized = false;
 
     /**
      * Initialize all services by registering WordPress hooks from attributes.
@@ -51,7 +50,8 @@ class Init
     public function initialize(): void
     {
         // Prevent multiple initializations
-        if ($this->initialized) return;
+        if ($this->initialized)
+            return;
 
         // Create a map of services by class name for quick lookup
         $serviceMap = [];

@@ -198,7 +198,7 @@
   </button>
 
   {#if isDesktop && isHovered && !isLoading}
-    {@const hapus = isJobSaved}
+    {const hapus = $derived(isJobSaved)}
     <div class="absolute -top-8 right-0 flex items-center pointer-events-none">
       <div
         class={`${hapus ? "bg-red-400 " : "bg-[var(--wpl-global-color-1)] "} text-white text-xs font-semibold px-2 py-1 rounded shadow-sm`}

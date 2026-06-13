@@ -40,7 +40,7 @@ jobs:
         env:
           PUBLIC_CMS_ORIGIN: "https://wp.lokerbanjarmasin.my.id"
           PUBLIC_CMS_ORIGIN_DEV: "https://localhost"
-        run: bun -b run build
+        run: bun -b run ci:deploy
 
       # sanity check - ensure the adapter produced a worker and assets
       - name: List build output

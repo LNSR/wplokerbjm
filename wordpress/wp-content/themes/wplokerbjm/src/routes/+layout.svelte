@@ -14,8 +14,6 @@
   import type { OnNavigate } from "@sveltejs/kit";
   import type { LayoutProps } from "./$types";
   import inlinedScript from "@/utils/inlineScript?inline-script";
-  import { themePropsStore } from "@/lib/stores/Theme.svelte";
-  import { untrack } from "svelte";
 
   let initialPageviewSent = false;
 

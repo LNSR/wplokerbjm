@@ -276,6 +276,7 @@ class JobSchemaHelper
         }
 
         $mapped = array_unique(array_filter($mapped));
+
         if (empty($mapped)) {
             $employmentType = 'FULL_TIME';
         } elseif (count($mapped) === 1) {
