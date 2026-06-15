@@ -175,7 +175,7 @@
           class="mb-2 flex min-w-0 flex-wrap gap-x-4 gap-y-1 text-[var(--wpl-global-color-1)]"
         >
           {#each summaryRows as row (row.label)}
-            {@const Icon = row.icon}
+            {const Icon = row.icon}
             <span
               class="flex min-w-0 items-start gap-2 py-1 text-base font-semibold md:text-base"
             >

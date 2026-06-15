@@ -60,35 +60,6 @@ class TaxonomyQuery
             ];
         }
 
-        // perusahaan handled specially when 'cari' (search) is provided - partial match
-        if (!empty($params['cari'])) {
-            $search_term = sanitize_text_field($params['cari']);
-            $cache_key = CacheKey::COMPANY_SEARCH_PREFIX . md5($search_term);
-            $company_terms = Cache::get($cache_key);
-            if ($company_terms === false) {
-                $company_terms = get_terms([
-                    'taxonomy' => Taxonomies::PERUSAHAAN,
-                    'name__like' => $search_term,
-                    'fields' => 'ids',
-                    'hide_empty' => false,
-                ]);
-                if (!is_wp_error($company_terms)) {
-                    Cache::set($cache_key, $company_terms, 86400); // Cache for 1 day
-                } else {
-                    $company_terms = [];
-                }
-            }
-            if (!empty($company_terms)) {
-                $tax_query[] = [
-                    'taxonomy' => Taxonomies::PERUSAHAAN,
-                    'field' => 'term_id',
-                    'terms' => $company_terms,
-                    'operator' => 'IN',
-                    'include_children' => is_taxonomy_hierarchical(Taxonomies::PERUSAHAAN),
-                ];
-            }
-        }
-
         return $tax_query;
     }
 
@@ -143,5 +114,36 @@ class TaxonomyQuery
 
         Cache::set($cache_key, $final_result, 86400); // Cache for 1 day
         return $final_result;
+    }
+
+    public static function getTaxonomyOptions(array $taxonomies): array
+    {
+        $options = [];
+
+        foreach ($taxonomies as $taxonomy) {
+            $terms = get_terms([
+                'taxonomy' => $taxonomy,
+                'hide_empty' => false,
+                'orderby' => 'name',
+                'order' => 'ASC',
+            ]);
+
+            if (is_wp_error($terms) || !is_array($terms)) {
+                $options[$taxonomy] = [];
+                continue;
+            }
+
+            $options[$taxonomy] = array_values(array_map(
+                fn($term): array => [
+                    'id' => (int) $term->term_id,
+                    'name' => html_entity_decode((string) $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                    'slug' => (string) $term->slug,
+                    'parent' => isset($term->parent) ? (int) $term->parent : 0,
+                ],
+                $terms
+            ));
+        }
+
+        return $options;
     }
 }

@@ -191,7 +191,7 @@ class GlobalHooks
      * This enables more comprehensive search results for the job platform, allowing users
      * to find jobs by company name or category even if those terms aren't in the title.
      *
-     * Used by: SearchForm, DynamicSearch REST endpoint, and any WP_Query with 's' parameter
+     * Used by: DynamicSearch Graphql endpoint, and any WP_Query with 's' parameter
      * on 'lowongan' post type.
      *
      * @param string $search The current search SQL fragment (may be empty).

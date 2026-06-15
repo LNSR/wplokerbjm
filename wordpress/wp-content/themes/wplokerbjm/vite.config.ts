@@ -9,27 +9,39 @@ import { resolve } from "path";
 import { analyzer } from "vite-bundle-analyzer";
 import { partytownVite, copyLibFiles } from "@qwik.dev/partytown/utils";
 
-function transformInlinedScript(format: LibraryFormats = "iife"): Plugin
-{
-  let root: ResolvedConfig[ 'root' ] = process.cwd();
-  let mode: ResolvedConfig[ 'mode' ] = "production";
-  let command: ResolvedConfig[ 'command' ] = "build";
-  let resolveConfig: UserConfig[ "resolve" ];
+const cloudflareSecurityHeaders = /*txt*/`
+# === START CUSTOM SECURITY HEADERS ===
+
+/~partytown/*
+  Service-Worker-Allowed: /
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
+
+/_app/immutable/workers/*
+  Service-Worker-Allowed: /
+  Cross-Origin-Opener-Policy: same-origin
+  Cross-Origin-Embedder-Policy: credentialless
+# === END CUSTOM SECURITY HEADERS ===
+`;
+
+function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
+  let root: ResolvedConfig['root'] = process.cwd();
+  let mode: ResolvedConfig['mode'] = "production";
+  let command: ResolvedConfig['command'] = "build";
+  let resolveConfig: UserConfig["resolve"];
 
   return {
     name: "transform-inlined-script",
     enforce: "pre",
 
-    configResolved(config)
-    {
+    configResolved(config) {
       root = config.root;
       mode = config.mode;
       command = config.command;
       resolveConfig = config.resolve;
     },
 
-    async load(id)
-    {
+    async load(id) {
       if (!id.endsWith("?inline-script")) return null;
 
       const entry = id.slice(0, -"?inline-script".length);
@@ -42,6 +54,7 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin
         configFile: false,
         publicDir: false,
         logLevel: "warn", // Toned down to avoid flooding the console on every edit
+        envPrefix: ["VITE_", "PUBLIC_"],
 
         resolve: {
           alias: resolveConfig?.alias,
@@ -59,7 +72,7 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin
 
           lib: {
             entry,
-            formats: [ format ],
+            formats: [format],
             name: "__inline_script__",
             fileName: "inline-script",
           },
@@ -73,7 +86,7 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin
       });
 
       // Vite's build returns an array or a single output object depending on configuration
-      const buildOutput = Array.isArray(result) ? result[ 0 ] : result;
+      const buildOutput = Array.isArray(result) ? result[0] : result;
       const output = buildOutput && 'output' in buildOutput ? buildOutput.output : null;
 
       if (!output) return null;
@@ -84,12 +97,9 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin
       );
 
       // Extract dependencies found during the sub-build and register them to the main watcher
-      if (chunk && chunk.modules)
-      {
-        Object.keys(chunk.modules).forEach((modulePath) =>
-        {
-          if (!modulePath.includes('\0') && fs.existsSync(modulePath))
-          {
+      if (chunk && chunk.modules) {
+        Object.keys(chunk.modules).forEach((modulePath) => {
+          if (!modulePath.includes('\0') && fs.existsSync(modulePath)) {
             this.addWatchFile(resolve(modulePath));
           }
         });
@@ -102,11 +112,52 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin
     },
   };
 }
-export default defineConfig((configEnv: ConfigEnv): UserConfig =>
-{
+
+
+function copyPartytownAssets(dest: string): Plugin {
+  return {
+    name: "copy-partytown-assets",
+    async closeBundle() {
+      try {
+        await copyLibFiles(dest);
+      } catch (error) {
+        console.warn("failed to copy Partytown assets to cloudflare dir", error);
+      }
+    }
+  }
+}
+
+function appendCloudflareHeaders(): Plugin {
+  return {
+    name: "append-cloudflare-headers",
+    async closeBundle() {
+      const headersFile = resolve(__dirname, ".svelte-kit", "cloudflare", "_headers");
+      const targetDir = resolve(__dirname, ".svelte-kit", "cloudflare");
+      let existingHeaders = "";
+
+      if (!fs.existsSync(targetDir)) {
+        fs.mkdirSync(targetDir, { recursive: true });
+      }
+
+      if (fs.existsSync(headersFile)) {
+        existingHeaders = fs.readFileSync(headersFile, "utf8");
+      }
+
+      if (existingHeaders.includes("START CUSTOM SECURITY HEADERS")) return;
+
+      const updatedHeaders = existingHeaders
+        ? `${existingHeaders.trimEnd()}\n${cloudflareSecurityHeaders}`
+        : cloudflareSecurityHeaders;
+
+      fs.writeFileSync(headersFile, updatedHeaders, "utf8");
+    }
+  }
+}
+
+export default defineConfig((configEnv: ConfigEnv): UserConfig => {
   const isDev = configEnv.mode === "development" || configEnv.mode === "preview";
 
-  const devServer: UserConfig[ "server" ] = isDev
+  const devServer: UserConfig["server"] = isDev
     ? {
       host: true,
       https:
@@ -119,60 +170,75 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig =>
       hmr: {
         port: 50001,
         clientPort: 50001,
-      }
+      },
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+      },
     }
     : undefined;
 
-  const plugins: UserConfig[ "plugins" ] = [
+  const sharedPlugins: UserConfig["plugins"] = [
+    sveltekit(),
+    UnpluginTypia({
+      cache: true,
+      log: true,
+    }),
+  ]
+
+  const plugins: UserConfig["plugins"] = [
     tailwindcss({
       optimize: {
         minify: true,
       },
     }),
     transformInlinedScript(),
-    sveltekit(),
-    UnpluginTypia({
-      cache: true,
-      log: true,
-    }),
+    ...sharedPlugins,
     devtoolsJson(),
     partytownVite({
       dest: resolve(__dirname, "public", "~partytown"),
     }),
+    appendCloudflareHeaders(),
     analyzer({
       enabled: false,
       fileName: "stats",
       openAnalyzer: false,
       analyzerMode: "static",
     }),
-    {
-      name: "copy-partytown-assets",
-      async closeBundle()
-      {
-        try
-        {
-          const dest = resolve(__dirname, ".svelte-kit", "cloudflare", "~partytown");
-          await copyLibFiles(dest);
-        } catch (error)
-        {
-          console.warn("failed to copy Partytown assets to cloudflare dir", error);
-        }
-      },
-    },
+    copyPartytownAssets(resolve(__dirname, ".svelte-kit", "cloudflare", "~partytown")),
   ];
 
-  const build: UserConfig[ "build" ] = {
+  const build: UserConfig["build"] = {
     minify: "oxc",
     modulePreload: {
       polyfill: false,
     },
     target: "esnext",
     sourcemap: false,
+    rolldownOptions: {
+      output: {
+        codeSplitting: true,
+      },
+    },
+  };
+
+  const worker: UserConfig['worker'] = {
+    format: "es",
+    plugins: () => [
+      ...sharedPlugins,
+    ],
+    rolldownOptions: {
+      output: {
+        codeSplitting: true,
+      },
+    },
   };
 
   return {
     plugins,
     server: devServer,
     build,
+    worker,
+    envPrefix: ["VITE_", "PUBLIC_"],
   };
 });

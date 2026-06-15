@@ -1,6 +1,7 @@
 //TODO: Migrate to Temporal from Old Date API
 import { type DeadlineStatus, type JobSummary, type StatusPekerjaanNumber, type StatusPekerjaanString } from "@/types";
 import { createSubscriber } from "svelte/reactivity";
+import timeWorker from '@/workers/clock/time.worker?worker';
 import type { Component } from 'svelte';
 import
 {
@@ -22,61 +23,44 @@ interface SummaryRow
     value: string
 }
 
+
 /**
  * A self-correcting time interval that updates a date object every minute, aligned to the minute boundary
  */
 const timeInterval = function()
 {
-    const date = new Date();
-    let timeoutId: ReturnType<typeof setTimeout> | null = null;
-    let stack: DisposableStack | null = new DisposableStack();
-
+    let date = new Date();
+    let worker: Worker | null = null;
     const subscribeToTime = createSubscriber((update) =>
     {
         if (typeof window === 'undefined') return;
+        worker ??= new timeWorker();
 
-        function clearedTimeout()
+        const updateTime = () =>
         {
-            timeoutId && clearTimeout(timeoutId);
-            timeoutId = null;
+            date.setTime(Date.now());
+            update();
         }
 
-        function syncMinuteTick()
+        worker.onmessage = (e: MessageEvent<string>) =>
         {
-            function scheduleLoop()
+            if (e.data === 'tick')
             {
-                clearedTimeout();
-                syncMinuteTick();
-                update();
+                updateTime();
             }
-
-            const msUntilNextMinute = 60000 - (Date.now() % 60000);
-            timeoutId ??= setTimeout(scheduleLoop, msUntilNextMinute);
-            date.setTime(Date.now());
-
-            return {
-                [ Symbol.dispose ]()
-                {
-                    clearedTimeout();
-                    date.setTime(Date.now());
-                }
-            }
-        };
-
-        // self correct according to the next minute boundary to avoid drift
-        stack?.use(syncMinuteTick());
+        }
 
         return () =>
         {
-            stack?.dispose();
-            stack = null;
+            worker?.postMessage('stop');
+            worker?.terminate();
+            worker = null;
         }
     });
 
     return {
         get reactiveDate(): Date
         {
-            stack ??= new DisposableStack();
             subscribeToTime();
             return date;
         }

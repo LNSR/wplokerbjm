@@ -4,25 +4,30 @@
 ![Svelte](https://img.shields.io/badge/Svelte-4A4A55?style=flat-square&logo=svelte&logoColor=FF3E00)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat-square&logo=php&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
 ![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white)
+![Docker](https://img.shields.io/badge/Docker-2496ED?style=flat-square&logo=docker&logoColor=white)
+![Render](https://img.shields.io/badge/Render-FF3E00?style=flat-square&logo=render&logoColor=white)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=github-actions&logoColor=white)
+![Cloudflare](https://img.shields.io/badge/Cloudflare-F38020?style=flat-square&logo=cloudflare&logoColor=white)
+![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=flat-square&logo=telegram&logoColor=white)
 
-> 🚀 A simple WordPress job board built with Svelte frontend and WordPress backend.
+> 🚀 WordPress job board built with SvelteKit frontend and WordPress backend with additional automation microservice.
 
 This repository contains the source code and configuration for **WPLokerBJM**.
 
 ## 📁 Project Structure
 
 - 🎨 **`wordpress/wp-content/themes/wplokerbjm`**  
-  The main directory for theme customizations.
-
+  The main directory for SvelteKit and Wordpress theme layer as backend.
 - 🔌 **`wordpress/wp-content/mu-plugins/wplokerbjm-bootstrap.php`**  
   Must-use plugin that loads the Composer autoloader and initializes the PHP-DI container early in the WordPress lifecycle, ensuring hooks and services are registered before regular plugins and themes.
-
 - ⚙️ **`wordpress/wp-content/themes/wplokerbjm/server`**  
   Contains backend PHP code, including custom functions, REST/GraphQL API, hooks, and filters. This may include custom post types, meta fields, and integration logic.
-
 - 🖼️ **`wordpress/wp-content/themes/wplokerbjm/src`**  
   Contains SvelteKit server and client code.
+- 🤖 **`wplokerbjm-post-automation`**  
+  A standalone microservice for converting job vacancy flyers into structured WordPress `lowongan` drafts via Telegram. This lives as a git submodule and deploys independently as a Render Web Service.
 
 ---
 
@@ -52,8 +57,9 @@ wplokerbjm/
 ├── README.md # You reading it!
 ├── scripts # docker entrypoint and other scripts
 │   └── entrypoint.sh # Wordpress modified entrypoint
+├── wplokerbjm-post-automation # Microservice submodule - flyer-to-WordPress bot
 ├── .vscode
-│   └── mcp.json 
+│   └── mcp.json
 ├── wordpress # WordPress core files and directories
 │   └── wp-content # WordPress content directory
 ├── wpcli.sh # Helper script for WP-CLI commands
@@ -71,14 +77,38 @@ wplokerbjm/
 | 💾 **UpdraftPlus**     | Backup and restore functionality         | 🔧 Optional |
 | ⚡ **LiteSpeed Cache** | High-performance caching solution        | 🔧 Optional |
 
-> 💡 **Note**: See `server/Models/Schema` for MetaBox implementation details
+## 🤖 Post Automation Microservice
+
+> 🐍 A standalone microservice for converting job vacancy flyers into structured WordPress `lowongan` drafts via Telegram bot.
+
+**`wplokerbjm-post-automation`** lives as a git submodule and deploys independently as a Render Web Service:
+
+- Reads flyer images via agent vision capable (Gemini / OpenCode)
+- Decodes QR codes for extraction context
+- Optionally enriches data via Exa web search
+- Normalizes fields to the WordPress ingest schema
+- Uploads original flyer as featured image via WP REST API
+- Exposes a Telegram bot and a health-check endpoint
+
+```text
+📦 wplokerbjm-post-automation/   →   Git submodule / Render microservice
+├── automation/                      Python package (AI, WordPress, Telegram)
+├── scripts/                         Deployment and sync utilities
+├── tests/                           pytest suite
+└── .github/workflows/               CI pipeline
+```
+
+👉 **Full detail**: [`wplokerbjm-post-automation`](https://github.com/LNSR/wplokerbjm-post-automation)
+
+> 💡 **Note**: This microservice is independently deployed on Render. See its README for environment setup, Telegram configuration, and WordPress contract details.
 
 ### 🏗️ Backend Structure
 
-The backend code is organized as follows:
+> 💡 **Note**: See `server/Models/Schema` for MetaBox implementation details.
+> The backend code is organized as follows:
 
 ```sh
-server/
+wordpress/wp-content/themes/wplokerbjm/server/
 ├── Configs/                   # Configuration files
 │   └── CredentialConfig.php
 ├── Controllers/               # Controllers
@@ -167,7 +197,7 @@ server/
 ## 🎨 Frontend Structure
 
 ```sh
-src                         # SvelteKit frontend entrypoint and app shell
+wordpress/wp-content/themes/wplokerbjm/src # SvelteKit frontend
 ├── app.html                 # SvelteKit HTML template
 ├── hooks.server.ts          # Server hook entrypoint for SvelteKit
 ├── lib                     # App libraries, shared components, stores, and helpers
@@ -350,6 +380,7 @@ Your development environment should now be running at `https://localhost`
 
 ## 📚 Additional Resources
 
-- 📋 [**Project Notes & Architecture**](wordpress/wp-content/themes/wplokerbjm/README.md)
+- 📋 [**Project Notes & Architecture**](wordpress/wp-content/themes/wplokerbjm/README.md) — Theme setup, dependency injection, hooks
+- 🤖 [**Post Automation Microservice**](wplokerbjm-post-automation/README.md) — Flyer-to-WordPress Telegram bot automation
 
 ---

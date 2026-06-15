@@ -1,5 +1,5 @@
 import type { Attachment } from "svelte/attachments";
-import { SvelteMap, SvelteSet } from "svelte/reactivity";
+import { SvelteMap } from "svelte/reactivity";
 import { LRUCache } from "lru-cache";
 
 /**
@@ -131,7 +131,7 @@ class Virtualization
             scrollY,
             containerHeight,
             cardHeights,
-            fallbackHeight = 200,
+            fallbackHeight = 250,
             gap = 12,
             buffer = 12,
         } = opts;
@@ -182,7 +182,7 @@ class Virtualization
         const { itemPositions, totalHeight } = layout;
 
         // Find visible items based on scroll position using binary search for performance
-        const bufferHeight = 200; // Approximate height for buffer calculations
+        const bufferHeight = 250; // Approximate height for buffer calculations
         const startPos = Math.max(0, scrollY - buffer * bufferHeight);
         const startCandidate = this.#binarySearch(itemPositions, startPos);
         const startIndex = Math.max(0, startCandidate - buffer);
@@ -214,7 +214,7 @@ class Virtualization
         {
             observer: ResizeObserver;
             elementToJobId: WeakMap<Element, number>;
-            observedElements: SvelteSet<Element>;
+            observedElements: Set<Element>;
         }
     >();
 
@@ -227,7 +227,7 @@ class Virtualization
         if (!registry)
         {
             const elementToJobId = new WeakMap<Element, number>();
-            const observedElements = new SvelteSet<Element>();
+            const observedElements = new Set<Element>();
 
             const observer = new ResizeObserver((entries: ResizeObserverEntry[]) =>
             {

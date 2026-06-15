@@ -40,10 +40,9 @@
   // virtualization parameters
   const FALLBACK_ITEM_HEIGHT = 420;
   const fallbackGap = 24;
-  const buffer = 3;
+  const buffer = 6;
   const currentHeightY = $derived(scrollY.current);
   const innerHeightValue = $derived(innerHeight.current);
-  const cardHeightsJobCard = routeStateStore.getCardHeights("jobGrid");
   /**
    * Decide navigation behavior when a job card is clicked, either opening the overlay (desktop) or navigating to the job detail page (mobile). Also handles saving the current grid state before navigation to allow for proper restoration when coming back. The separation of mobile and desktop logic ensures an optimized experience for each device type while maintaining state consistency across navigations.
    */
@@ -67,7 +66,7 @@
       // Mobile navigation goes to SingleLowongan.svelte route
 
       // Save card heights before navigating/opening overlay
-      routeStateStore.saveCardHeights(cardHeightsJobCard, "jobGrid");
+      routeStateStore.saveCardHeights(routeStateStore.getCardHeights("jobGrid"), "jobGrid");
 
       if (!isMobile) {
         jobGridManager.saveGridStates(
@@ -342,7 +341,7 @@
       displayJobs,
       scrollY: currentHeightY ?? 0,
       containerHeight: innerHeightValue ?? 800,
-      cardHeights: cardHeightsJobCard,
+      cardHeights: routeStateStore.getCardHeights("jobGrid"),
       fallbackHeight: FALLBACK_ITEM_HEIGHT,
       gap: fallbackGap,
       buffer,
@@ -405,7 +404,7 @@
   id="job-grid"
   style={!isMobile ? "view-transition-name: none;" : ""}
 >
-  <div class="flex items-center justify-between mb-6">
+  <div class="flex items-center justify-between mb-6" style="content-visibility: auto;">
     {#if displayJobs.length}
       <h2 class="text-xl md:text-2xl font-semibold">{displayTitle}</h2>
     {:else}
@@ -449,14 +448,14 @@
               style="height: {virtualization.totalHeight}px; position: relative;"
             >
               {#each virtualization.visibleJobs as job, index}
-                {@const absoluteTop =
+                {const absoluteTop = $derived(
                   virtualization.itemPositions[
                     virtualization.startIndex + index
-                  ]}
+                  ])}
                 <div
                   style="position: absolute; transform: translate3d(0, {absoluteTop}px, 0); width: 100%; contain: layout;"
                   {@attach useVirtualization.createMeasureHeight(
-                    cardHeightsJobCard,
+                    routeStateStore.getCardHeights("jobGrid"),
                     job.id,
                   )}
                   class="transition-opacity duration-600 ease-in-out"

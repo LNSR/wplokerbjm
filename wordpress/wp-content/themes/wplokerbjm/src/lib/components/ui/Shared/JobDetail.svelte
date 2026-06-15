@@ -515,7 +515,7 @@
             class="mt-2 min-w-0 grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-4 text-sm md:text-base"
           >
             {#each ringkasanPekerjaan as row (row.label)}
-              {@const Icon = row.icon}
+              {const Icon = row.icon}
               <div class="max-w-full flex items-start gap-2">
                 {#if Icon}
                   <Icon
@@ -653,7 +653,7 @@
           >
             <ul class="space-y-3">
               {#each contacts as contact (contact.label + contact.value)}
-                {@const Icon = contact.icon}
+                {const Icon = contact.icon}
                 <li class="flex items-center">
                   {#if Icon}
                     <Icon
@@ -700,7 +700,7 @@
           class="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
         >
           {#each socialMediaItems as item (item.platform + item.username)}
-            {@const Icon = item.icon}
+            {const Icon = item.icon}
             <li class="flex items-center">
               {#if Icon}
                 <Icon

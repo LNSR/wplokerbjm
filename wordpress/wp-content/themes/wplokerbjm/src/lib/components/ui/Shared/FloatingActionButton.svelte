@@ -191,7 +191,7 @@
         >
           <div class="grid grid-cols-2 gap-2" role="menu">
             {#each socialLinks as link}
-              {@const Icon = link.icon}
+              {const Icon = link.icon}
               <a
                 href={link.url}
                 target="_blank"

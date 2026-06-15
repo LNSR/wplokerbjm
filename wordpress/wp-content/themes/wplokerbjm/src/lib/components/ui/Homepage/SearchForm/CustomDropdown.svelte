@@ -11,6 +11,7 @@
     TrashAltSolid,
   } from "svelte-awesome-icons";
   import type { Attachment } from "svelte/attachments";
+  import { SearchUtils } from "@/utils/search";
   import type { DropdownOption, KeyboardKeysEvent } from "@/types";
 
   type DropdownSelectionValue = string | DropdownOption;
@@ -54,7 +55,7 @@
       this.resolveSelectedItems(value, options ?? []),
     );
     public searchQuery = $state("");
-    public normalizedSearchQuery = $derived(String(this.searchQuery).trim());
+    public normalizedSearchQuery = $derived(SearchUtils.sanitizeString(this.searchQuery));
 
     /**
      * Computes the list of options to display based on the current search query.

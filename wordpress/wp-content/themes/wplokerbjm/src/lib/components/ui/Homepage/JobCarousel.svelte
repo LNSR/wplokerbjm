@@ -397,7 +397,10 @@
 <section
   class="mt-12 min-w-0 overflow-hidden md:min-h-[500px] lg:min-h-[600px]"
 >
-  <div class="mb-6 flex min-w-0 flex-wrap items-center justify-between gap-3">
+  <div
+    class="mb-6 flex min-w-0 flex-wrap items-center justify-between gap-3"
+    style="content-visibility: auto;"
+  >
     <h2
       class="mt-4 min-w-0 break-words text-lg font-semibold leading-tight md:text-2xl"
     >
@@ -481,7 +484,7 @@
       >
         <div class="swiper-wrapper">
           {#each swiperManager.virtualIndexes as idx}
-            {@const job: JobCardProps['jobdata'] = sortedJobs[idx]}
+            {const job: JobCardProps['jobdata'] = sortedJobs[idx]}
             <div
               class="swiper-slide min-w-0"
               data-swiper-slide-index={idx}
@@ -540,7 +543,7 @@
     {/if}
     {#if swiperManager.swiperFailed}
       <div class="min-w-0 overflow-hidden">
-        <!-- Please match according Swiper breakpoints -->
+        <!-- !Please match according Swiper breakpoints -->
         <div class="flex w-full gap-3 min-[480px]:gap-4 sm:gap-5 lg:gap-8">
           {#each sortedJobs as job, idx (Number(job.id) ?? job.permalink ?? idx)}
             <div

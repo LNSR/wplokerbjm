@@ -2,7 +2,6 @@ import type {
     SearchFilters,
     TaxonomyTerm,
     DropdownOption,
-    TaxonomyType
 } from '@/types'
 /**
  * Utility class for search-related functions, such as sanitizing filters and mapping taxonomy terms to dropdown options.
@@ -85,17 +84,5 @@ export class SearchUtils {
     static sanitizeTaxonomyValue(value: unknown): string[] {
         const arr = SearchUtils.normalizeStringOrArray(value as string | string[] | null)
         return arr.filter((v) => v !== '')
-    }
-
-    static getTaxonomyLabel(
-        key: TaxonomyType,
-        values: unknown,
-        taxonomyStore: {getTermNameBySlug: (key: TaxonomyType, slug: string) => string},
-        emptyLabel: string,
-    ): string {
-        const arr = SearchUtils.sanitizeTaxonomyValue(values)
-        if (arr.length === 0) return emptyLabel
-        if (arr.length === 1) return taxonomyStore.getTermNameBySlug(key, arr[0])
-        return `${arr.length} filter dipilih`
     }
 }

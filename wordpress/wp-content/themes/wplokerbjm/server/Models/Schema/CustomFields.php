@@ -38,6 +38,17 @@ class CustomFields
     public const STATUS_PEKERJAAN_NORMAL = 0;
     public const STATUS_PEKERJAAN_URGENT = 2;
     public const STATUS_PEKERJAAN_PINNED = 3;
+    public const SOCIAL_MEDIA_PLATFORMS = [
+        'WhatsApp' => 'WhatsApp',
+        'Instagram' => 'Instagram',
+        'Facebook' => 'Facebook',
+        'X / Twitter' => 'X / Twitter',
+        'Threads' => 'Threads',
+        'TikTok' => 'TikTok',
+        'LinkedIn' => 'LinkedIn',
+        'Youtube' => 'Youtube',
+        'Telegram' => 'Telegram',
+    ];
 
     #[Filter('rwmb_meta_boxes')]
     public function lowongan_meta_boxes($meta_boxes)
@@ -255,17 +266,7 @@ class CustomFields
                     'type' => 'fieldset_text',
                     'label_description' => __('Masukkan username atau link sosial media perusahaan untuk masing-masing platform.', 'wplokerbjm'),
                     'desc' => __('Isi hanya username (tanpa @) atau link lengkap(contoh: loker_banjarmasin; WhatsApp perlu dimulai dengan +62 (contoh:+6283862447271).', 'wplokerbjm'),
-                    'options' => [
-                        'WhatsApp' => 'WhatsApp',
-                        'Instagram' => 'Instagram',
-                        'Facebook' => 'Facebook',
-                        'X / Twitter' => 'X / Twitter',
-                        'Threads' => 'Threads',
-                        'TikTok' => 'TikTok',
-                        'LinkedIn' => 'LinkedIn',
-                        'Youtube' => 'Youtube',
-                        'Telegram' => 'Telegram',
-                    ],
+                    'options' => self::SOCIAL_MEDIA_PLATFORMS,
                     'required' => false,
                     'clone' => true,
                     'min_clone' => 0,

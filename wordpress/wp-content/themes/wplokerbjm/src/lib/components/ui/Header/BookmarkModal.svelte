@@ -28,6 +28,7 @@
     showTimeAgo,
   } from "$lib/composables/JobUI.svelte";
   import { useSidePanel } from "$lib/composables/SidePanel.svelte";
+  import { useRIC } from "@/utils/window";
 
   interface Props {
     open: boolean;
@@ -38,14 +39,14 @@
   // This component scope state properties
   let modalEl: HTMLDialogElement;
   let modalBox: HTMLElement;
-  let contentRect = $state<DOMRectReadOnly | null>(null);
+  let contentRect = $state.raw<DOMRectReadOnly | null>(null);
 
   // Search state for filtering saved jobs (title and company)
   const isMobile = $derived(deviceDetector.isPlatformMobile);
 
   class SearchQueryController {
-    searchQuery = $state("");
-    isSearchOpen = $state(false);
+    public searchQuery = $state.raw("");
+    public isSearchOpen = $state.raw(false);
     #searchInputEl: HTMLInputElement | null = null;
 
     public toggleInputSearch = (): void => {
@@ -85,9 +86,9 @@
   }
 
   class BookmarkUIHandler {
-    public showDeleteConfirm = $state(false);
+    public showDeleteConfirm = $state.raw(false);
     public removingIds = new SvelteSet<number>(); // track ids of jobs being removed to apply exit animation
-    public error = $state("");
+    public error = $state.raw("");
 
     public refreshBookmark(): void {
       if (bookmarkStore.isSyncingStatus) return;
@@ -202,13 +203,13 @@
   }
 
   class VirtualizationManager {
-    public measuring: boolean = $state.raw(false); // show spinner until we measure heights of visible items to prevent INP
+    public measuring: boolean = $state.raw(true); // show spinner until we measure heights of visible items to prevent INP
     public containerScrollY = $state(0);
-    public cardHeights = routeStateStore.getCardHeights("bookmarkModal");
-    public backgroundMeasurement: DisposableStack | null = null;
 
     constructor() {
-      this.#initBackgroundMeasurement();
+      useRIC(() => {
+        this.measuring = false;
+      }, { fallback: "timeout", timeout: 1000 });
     }
 
     public virtualizedJobs = $derived<ListVirtualizationState<CardJob>>(
@@ -216,15 +217,15 @@
         displayJobs: bookmarkHandlerUI.filteredDisplayedJobs,
         scrollY: this.containerScrollY,
         containerHeight: contentRect?.height || 0,
-        cardHeights: this.cardHeights,
+        cardHeights: routeStateStore.getCardHeights("bookmarkModal"),
         fallbackHeight: 200,
         gap: 24,
-        buffer: 2,
+        buffer: 6,
       }),
     );
 
     public measureHeight(jobId: number): Attachment<HTMLElement> {
-      return useVirtualization.createMeasureHeight(this.cardHeights, jobId);
+      return useVirtualization.createMeasureHeight(routeStateStore.getCardHeights("bookmarkModal"), jobId);
     }
 
     // // Clear card heights that are no longer displayed
@@ -248,53 +249,6 @@
     //   }
     //   return this.cardHeights;
     // }
-
-    /**
-     * Start background measurement: poll cardHeights until visible items measured
-     * * Prevent INP spike on open by showing spinner first
-     * !One time measurement
-     * */
-    #initBackgroundMeasurement() {
-      this.backgroundMeasurement ??= new DisposableStack();
-      if (this.backgroundMeasurement.disposed) return;
-
-      this.backgroundMeasurement.defer(() => {
-        stopBackgroundMeasure();
-      });
-
-      const stopBackgroundMeasure = () => {
-        polling?.();
-        polling = undefined;
-        this.measuring = false;
-        this.backgroundMeasurement = null;
-      };
-
-      let polling: ReturnType<typeof $effect.root> | undefined = $effect.root(
-        () => {
-          let timeout: ReturnType<typeof setTimeout> | undefined = setTimeout(
-            () => {
-              this.backgroundMeasurement?.dispose();
-            },
-            1300,
-          );
-
-          $effect.pre(() => {
-            const visibleJobs = this.virtualizedJobs.visibleJobs.length;
-            const measured = this.cardHeights.size;
-            this.measuring = true;
-
-            if (visibleJobs === 0 || measured >= visibleJobs) {
-              this.backgroundMeasurement?.dispose();
-            }
-          });
-
-          return () => {
-            timeout && clearTimeout(timeout);
-            timeout = undefined;
-          };
-        },
-      );
-    }
   }
 
   /**
@@ -379,7 +333,7 @@
       if (!isMobile && el) {
         // Desktop: open overlay
         routeStateStore.saveCardHeights(
-          virtualizationManager.cardHeights,
+          routeStateStore.getCardHeights("bookmarkModal"),
           "bookmarkModal",
         );
         // mark as "bookmark" for desktop
@@ -389,7 +343,7 @@
       } else if (job.permalink) {
         // Mobile: navigate
         routeStateStore.saveCardHeights(
-          virtualizationManager.cardHeights,
+          routeStateStore.getCardHeights("bookmarkModal"),
           "bookmarkModal",
         );
         const url = new URL(job.permalink, window.location.origin);
@@ -429,7 +383,6 @@
       if (open) modalEl.close();
       modalHandler.resetPosition();
       // virtualizationManager.clearCardHeights();
-      virtualizationManager.backgroundMeasurement?.dispose();
     };
   });
 </script>
@@ -645,20 +598,20 @@
                 .totalHeight}px;"
             >
               {#each virtualizationManager.virtualizedJobs.visibleJobs as job, idx (job.id)}
-                {@const absoluteIndex =
-                  virtualizationManager.virtualizedJobs.startIndex + idx}
-                {@const topPosition =
+                {const absoluteIndex = $derived(
+                  virtualizationManager.virtualizedJobs.startIndex + idx)}
+                {const topPosition = $derived(
                   virtualizationManager.virtualizedJobs.itemPositions[
                     absoluteIndex
-                  ] || 0}
+                  ] || 0)}
                 <div
                   class="card bg-[var(--wpl-global-color-5)] border-2 border-[var(--wpl-global-color-1)] shadow-sm hover:shadow-md absolute left-0 right-0"
                   class:scale-0={bookmarkHandlerUI.removingIds.has(job.id || 0)}
                   style="transform: translate3d(0, {topPosition}px, 0);"
                   {@attach virtualizationManager.measureHeight(job.id || 0)}
                 >
-                  {#if job.title === ""}
-                    <!-- Skeleton -->
+
+                {#snippet CardSkeleton()}
                     <div class="card-body animate-pulse">
                       <div class="flex items-start justify-between gap-3">
                         <div class="flex-1 min-w-1">
@@ -693,6 +646,10 @@
                         </div>
                       </div>
                     </div>
+                {/snippet}
+
+                  {#if job.title === ""}
+                    {@render CardSkeleton()}
                   {:else}
                     <div class="flex w-full">
                       <div class="flex-1">

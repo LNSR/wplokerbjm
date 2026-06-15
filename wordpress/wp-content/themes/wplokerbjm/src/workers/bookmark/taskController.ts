@@ -1,8 +1,9 @@
-import { retry, delay, withTimeout, Mutex } from "es-toolkit";
+import { retry, delay, withTimeout, Mutex, debounce } from "es-toolkit";
+import type { CardJob, SyncToServer } from "@/types";
 /**
 * Task controller to manage sequential execution of operations and retries with timeout handling.
 */
-export class TaskController
+export class BookmarkTaskController
 {
     #retryTimer: AbortController | null = null;
     #operationMutex = new Mutex();
@@ -54,23 +55,53 @@ export class TaskController
         timeoutMs: number = 10000,
     ): Promise<T> =>
     {
-        const acquireLock = async () =>
-        {
-            await this.#operationMutex.acquire();
-            return {
-                [ Symbol.dispose ]: () =>
-                {
-                    this.#operationMutex.isLocked && this.#operationMutex.release();
-                },
-            };
-        }
-
-        using _lock = await acquireLock();
-
+        await this.#operationMutex.acquire();
         return await withTimeout(operation, timeoutMs).catch((e: unknown) =>
         {
             console.warn("Operation failed or timed out:", e);
             throw e;
+        }).finally(() =>
+        {
+            if (this.#operationMutex.isLocked) this.#operationMutex.release();
         });
+    }
+}
+
+export class BookmarkSyncQueueTask
+{
+    #pendingSyncIds = new Set<CardJob[ 'id' ]>(); // unique IDs pending sync
+    #debouncedSync = debounce(async () => await this.syncPending(), 2500);
+    #syncCommand?: SyncToServer[ 'syncToServer' ];
+    public async syncPending(): Promise<void>
+    {
+        const ids = [ ...this.#pendingSyncIds ];
+        if (ids.length === 0) return;
+        await this.#syncCommand?.(ids).catch((error) =>
+            console.error("Failed to sync pending bookmarks:", error)
+        ).finally(() =>
+        {
+            this.clearPendingSyncIds();
+        });
+    }
+
+    public syncCommand(command: SyncToServer[ 'syncToServer' ])
+    {
+        this.#syncCommand = command;
+    }
+
+    /**
+    * 
+    * @param ids IDs to be queued for syncing, will be debounced to batch multiple rapid calls into one sync operation
+    */
+    public queueIdsForSync(ids: Parameters<SyncToServer[ 'syncToServer' ]>[ 0 ]): void
+    {
+        if (!ids || ids.length === 0) return;
+        ids.forEach((id) => this.#pendingSyncIds.add(id));
+        this.#debouncedSync?.();
+    }
+
+    public clearPendingSyncIds(): void
+    {
+        this.#pendingSyncIds.clear();
     }
 }

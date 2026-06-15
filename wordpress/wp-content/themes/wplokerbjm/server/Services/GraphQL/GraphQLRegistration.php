@@ -15,6 +15,31 @@ class GraphQLRegistration
     ) {
     }
 
+    private const TYPE_ROOT_QUERY = 'RootQuery';
+    private const TYPE_ROOT_MUTATION = 'RootMutation';
+
+    private const TYPE_JSON = 'JSON';
+    private const TYPE_STRING = 'String';
+    private const TYPE_INT = 'Int';
+    private const TYPE_BOOLEAN = 'Boolean';
+
+    private const TYPE_SORT_OPTION = 'SortOption';
+    private const TYPE_SORT_OPTION_INPUT = 'SortOptionInput';
+    private const TYPE_TAXONOMY_TERMS_RESPONSE = 'TaxonomyTermsResponse';
+    private const TYPE_JOB = 'Job';
+    private const TYPE_JOB_SUMMARY = 'JobSummary';
+    private const TYPE_JOB_CONTACTS = 'JobContacts';
+    private const TYPE_CAROUSEL_RESPONSE = 'CarouselResponse';
+    private const TYPE_LOAD_MORE_RESPONSE = 'LoadMoreResponse';
+    private const TYPE_JOB_FILTERS = 'JobFilters';
+    private const TYPE_JOB_FILTERS_INPUT = 'JobFiltersInput';
+    private const TYPE_JOB_GRID_RESPONSE = 'JobGridResponse';
+    private const TYPE_JOB_SCHEMA_RESPONSE = 'JobSchemaResponse';
+    private const TYPE_LOGO = 'Logo';
+    private const TYPE_THEME_DATA = 'ThemeData';
+    private const TYPE_SEARCH_JOBS_RESPONSE = 'SearchJobsResponse';
+    private const TYPE_BOOKMARK_RESPONSE = 'BookmarkResponse';
+
     #[Action('graphql_register_types', 0)]
     public function registerTypes(): void
     {
@@ -28,15 +53,15 @@ class GraphQLRegistration
         return [
             'description' => $description,
             'fields' => [
-                'value' => ['type' => 'String'],
-                'label' => ['type' => 'String'],
+                'value' => ['type' => self::TYPE_STRING],
+                'label' => ['type' => self::TYPE_STRING],
             ],
         ];
     }
 
     private function registerScalars(): void
     {
-        register_graphql_scalar('JSON', [
+        register_graphql_scalar(self::TYPE_JSON, [
             'description' => 'Arbitrary JSON data',
             'serialize' => function ($value) {
                 return is_string($value) ? $value : json_encode($value);
@@ -57,172 +82,172 @@ class GraphQLRegistration
     {
 
         register_graphql_object_type(
-            'SortOption',
+            self::TYPE_SORT_OPTION,
             $this->sharedSortFields('Sort option object')
         );
 
         // TaxonomyTermsResponse for grouped terms
-        register_graphql_object_type('TaxonomyTermsResponse', [
+        register_graphql_object_type(self::TYPE_TAXONOMY_TERMS_RESPONSE, [
             'description' => 'Response containing taxonomy terms',
             'fields' => [
-                TaxonomyResolver::LOKASI_TERMS => ['type' => 'JSON'],
-                TaxonomyResolver::GENDER_TERMS => ['type' => 'JSON'],
-                TaxonomyResolver::PENDIDIKAN_TERMS => ['type' => 'JSON'],
+                TaxonomyResolver::LOKASI_TERMS => ['type' => self::TYPE_JSON],
+                TaxonomyResolver::GENDER_TERMS => ['type' => self::TYPE_JSON],
+                TaxonomyResolver::PENDIDIKAN_TERMS => ['type' => self::TYPE_JSON],
             ],
         ]);
 
         // Job related types
-        register_graphql_object_type('Job', [
+        register_graphql_object_type(self::TYPE_JOB, [
             'description' => 'A job post',
             'fields' => [
-                'id' => ['type' => 'Int'],
-                'title' => ['type' => 'String'],
-                'slug' => ['type' => 'String'],
-                CustomFields::NAMA_PERUSAHAAN => ['type' => 'String'],
-                CustomFields::TENTANG_PERUSAHAAN => ['type' => 'String'],
-                'ringkasanPekerjaan' => ['type' => 'JobSummary'],
-                CustomFields::DESKRIPSI_PEKERJAAN => ['type' => 'String'],
-                CustomFields::PERSYARATAN => ['type' => 'String'],
-                CustomFields::CARA_MELAMAR => ['type' => 'String'],
-                CustomFields::BENEFIT => ['type' => 'String'],
-                'contacts' => ['type' => 'JobContacts'],
-                CustomFields::SOCIAL_MEDIA => ['type' => 'String'],
-                CustomFields::STATUS_PEKERJAAN => ['type' => 'Int'],
-                'permalink' => ['type' => 'String'],
-                'post_time' => ['type' => 'String'],
-                'duplicateNonce' => ['type' => 'String'],
+                'id' => ['type' => self::TYPE_INT],
+                'title' => ['type' => self::TYPE_STRING],
+                'slug' => ['type' => self::TYPE_STRING],
+                CustomFields::NAMA_PERUSAHAAN => ['type' => self::TYPE_STRING],
+                CustomFields::TENTANG_PERUSAHAAN => ['type' => self::TYPE_STRING],
+                'ringkasanPekerjaan' => ['type' => self::TYPE_JOB_SUMMARY],
+                CustomFields::DESKRIPSI_PEKERJAAN => ['type' => self::TYPE_STRING],
+                CustomFields::PERSYARATAN => ['type' => self::TYPE_STRING],
+                CustomFields::CARA_MELAMAR => ['type' => self::TYPE_STRING],
+                CustomFields::BENEFIT => ['type' => self::TYPE_STRING],
+                'contacts' => ['type' => self::TYPE_JOB_CONTACTS],
+                CustomFields::SOCIAL_MEDIA => ['type' => self::TYPE_STRING],
+                CustomFields::STATUS_PEKERJAAN => ['type' => self::TYPE_INT],
+                'permalink' => ['type' => self::TYPE_STRING],
+                'post_time' => ['type' => self::TYPE_STRING],
+                'duplicateNonce' => ['type' => self::TYPE_STRING],
             ],
         ]);
 
-        register_graphql_object_type('JobSummary', [
+        register_graphql_object_type(self::TYPE_JOB_SUMMARY, [
             'description' => 'Job summary information',
             'fields' => [
-                Taxonomies::JENIS_PEKERJAAN => ['type' => 'String'],
-                Taxonomies::PENDIDIKAN => ['type' => 'String'],
-                Taxonomies::GENDER => ['type' => 'String'],
-                Taxonomies::LOKASI_PEKERJAAN => ['type' => 'String'],
-                CustomFields::PENGALAMAN => ['type' => 'Int'],
-                CustomFields::GAJI_MINIMAL => ['type' => 'Int'],
-                CustomFields::GAJI_MAKSIMAL => ['type' => 'Int'],
-                CustomFields::UMUR_MIN => ['type' => 'Int'],
-                CustomFields::UMUR_MAX => ['type' => 'Int'],
-                CustomFields::DEADLINE => ['type' => 'String'],
+                Taxonomies::JENIS_PEKERJAAN => ['type' => self::TYPE_STRING],
+                Taxonomies::PENDIDIKAN => ['type' => self::TYPE_STRING],
+                Taxonomies::GENDER => ['type' => self::TYPE_STRING],
+                Taxonomies::LOKASI_PEKERJAAN => ['type' => self::TYPE_STRING],
+                CustomFields::PENGALAMAN => ['type' => self::TYPE_INT],
+                CustomFields::GAJI_MINIMAL => ['type' => self::TYPE_INT],
+                CustomFields::GAJI_MAKSIMAL => ['type' => self::TYPE_INT],
+                CustomFields::UMUR_MIN => ['type' => self::TYPE_INT],
+                CustomFields::UMUR_MAX => ['type' => self::TYPE_INT],
+                CustomFields::DEADLINE => ['type' => self::TYPE_STRING],
             ],
         ]);
 
-        register_graphql_object_type('JobContacts', [
+        register_graphql_object_type(self::TYPE_JOB_CONTACTS, [
             'description' => 'Job contact information',
             'fields' => [
-                CustomFields::EMAIL_KONTAK => ['type' => 'String'],
-                CustomFields::NOMOR_KONTAK => ['type' => 'String'],
-                CustomFields::SITUS_KONTAK => ['type' => 'String'],
+                CustomFields::EMAIL_KONTAK => ['type' => self::TYPE_STRING],
+                CustomFields::NOMOR_KONTAK => ['type' => self::TYPE_STRING],
+                CustomFields::SITUS_KONTAK => ['type' => self::TYPE_STRING],
             ],
         ]);
 
-        register_graphql_object_type('CarouselResponse', [
+        register_graphql_object_type(self::TYPE_CAROUSEL_RESPONSE, [
             'description' => 'Carousel jobs response',
             'fields' => [
-                'jobs' => ['type' => ['list_of' => 'Job']],
-                'totalJobs' => ['type' => 'Int'],
+                'jobs' => ['type' => ['list_of' => self::TYPE_JOB]],
+                'totalJobs' => ['type' => self::TYPE_INT],
             ],
         ]);
 
-        register_graphql_object_type('LoadMoreResponse', [
+        register_graphql_object_type(self::TYPE_LOAD_MORE_RESPONSE, [
             'description' => 'Load more jobs response',
             'fields' => [
-                'jobs' => ['type' => ['list_of' => 'Job']],
-                'context' => ['type' => 'String'],
-                'filters' => ['type' => 'JobFilters'],
-                'total' => ['type' => 'Int'],
-                'maxNumPages' => ['type' => 'Int'],
+                'jobs' => ['type' => ['list_of' => self::TYPE_JOB]],
+                'context' => ['type' => self::TYPE_STRING],
+                'filters' => ['type' => self::TYPE_JOB_FILTERS],
+                'total' => ['type' => self::TYPE_INT],
+                'maxNumPages' => ['type' => self::TYPE_INT],
             ],
         ]);
 
-        register_graphql_object_type('JobFilters', [
+        register_graphql_object_type(self::TYPE_JOB_FILTERS, [
             'description' => 'Job filters',
             'fields' => [
-                'cari' => ['type' => 'String'],
-                Taxonomies::LOKASI_PEKERJAAN => ['type' => ['list_of' => 'String']],
-                Taxonomies::GENDER => ['type' => ['list_of' => 'String']],
-                Taxonomies::PENDIDIKAN => ['type' => ['list_of' => 'String']],
-                'sort' => ['type' => 'SortOption'],
-                'context' => ['type' => 'String'],
+                'cari' => ['type' => self::TYPE_STRING],
+                Taxonomies::LOKASI_PEKERJAAN => ['type' => ['list_of' => self::TYPE_STRING]],
+                Taxonomies::GENDER => ['type' => ['list_of' => self::TYPE_STRING]],
+                Taxonomies::PENDIDIKAN => ['type' => ['list_of' => self::TYPE_STRING]],
+                'sort' => ['type' => self::TYPE_SORT_OPTION],
+                'context' => ['type' => self::TYPE_STRING],
             ],
         ]);
 
-        register_graphql_object_type('JobGridResponse', [
+        register_graphql_object_type(self::TYPE_JOB_GRID_RESPONSE, [
             'description' => 'Job grid response',
             'fields' => [
-                'jobs' => ['type' => ['list_of' => 'Job']],
-                'total' => ['type' => 'Int'],
-                'maxNumPages' => ['type' => 'Int'],
-                'filters' => ['type' => 'JobFilters'],
+                'jobs' => ['type' => ['list_of' => self::TYPE_JOB]],
+                'total' => ['type' => self::TYPE_INT],
+                'maxNumPages' => ['type' => self::TYPE_INT],
+                'filters' => ['type' => self::TYPE_JOB_FILTERS],
             ],
         ]);
 
-        register_graphql_object_type('JobSchemaResponse', [
+        register_graphql_object_type(self::TYPE_JOB_SCHEMA_RESPONSE, [
             'description' => 'Job schema response',
             'fields' => [
-                'schemas' => ['type' => ['list_of' => 'String']],
+                'schemas' => ['type' => ['list_of' => self::TYPE_STRING]],
             ],
         ]);
 
 
-        register_graphql_object_type('Logo', [
+        register_graphql_object_type(self::TYPE_LOGO, [
             'description' => 'Logo image data',
             'fields' => [
-                'logoUrl' => ['type' => 'String'],
-                'logoSrcset' => ['type' => 'String'],
-                'logoSizes' => ['type' => 'String'],
-                'logoDecoding' => ['type' => 'String'],
-                'logoWidth' => ['type' => 'Int'],
-                'logoHeight' => ['type' => 'Int'],
+                'logoUrl' => ['type' => self::TYPE_STRING],
+                'logoSrcset' => ['type' => self::TYPE_STRING],
+                'logoSizes' => ['type' => self::TYPE_STRING],
+                'logoDecoding' => ['type' => self::TYPE_STRING],
+                'logoWidth' => ['type' => self::TYPE_INT],
+                'logoHeight' => ['type' => self::TYPE_INT],
             ],
         ]);
 
-        register_graphql_object_type('ThemeData', [
+        register_graphql_object_type(self::TYPE_THEME_DATA, [
             'description' => 'Theme data object',
             'fields' => [
-                'logo' => ['type' => 'Logo'],
-                'wpRestNonce' => ['type' => 'String'],
-                'siteIconTags' => ['type' => 'String'],
+                'logo' => ['type' => self::TYPE_LOGO],
+                'wpRestNonce' => ['type' => self::TYPE_STRING],
+                'siteIconTags' => ['type' => self::TYPE_STRING],
             ],
         ]);
 
-        register_graphql_object_type('SearchJobsResponse', [
+        register_graphql_object_type(self::TYPE_SEARCH_JOBS_RESPONSE, [
             'description' => 'Search jobs response',
             'fields' => [
-                'jobs' => ['type' => ['list_of' => 'Job']],
-                'context' => ['type' => 'String'],
-                'filters' => ['type' => 'JobFilters'],
-                'title' => ['type' => 'String'],
-                'total' => ['type' => 'Int'],
-                'maxNumPages' => ['type' => 'Int'],
+                'jobs' => ['type' => ['list_of' => self::TYPE_JOB]],
+                'context' => ['type' => self::TYPE_STRING],
+                'filters' => ['type' => self::TYPE_JOB_FILTERS],
+                'title' => ['type' => self::TYPE_STRING],
+                'total' => ['type' => self::TYPE_INT],
+                'maxNumPages' => ['type' => self::TYPE_INT],
             ],
         ]);
 
-        register_graphql_object_type('BookmarkResponse', [
+        register_graphql_object_type(self::TYPE_BOOKMARK_RESPONSE, [
             'description' => 'Bookmark sync response',
             'fields' => [
-                'success' => ['type' => 'Boolean'],
-                'message' => ['type' => 'String'],
+                'success' => ['type' => self::TYPE_BOOLEAN],
+                'message' => ['type' => self::TYPE_STRING],
             ],
         ]);
     }
 
     private function registerInputTypes(): void
     {
-        register_graphql_input_type('SortOptionInput', $this->sharedSortFields('Input for sort option'));
+        register_graphql_input_type(self::TYPE_SORT_OPTION_INPUT, $this->sharedSortFields('Input for sort option'));
 
-        register_graphql_input_type('JobFiltersInput', [
+        register_graphql_input_type(self::TYPE_JOB_FILTERS_INPUT, [
             'description' => 'Input for job filters',
             'fields' => [
-                'cari' => ['type' => 'String'],
-                Taxonomies::LOKASI_PEKERJAAN => ['type' => ['list_of' => 'String']],
-                Taxonomies::GENDER => ['type' => ['list_of' => 'String']],
-                Taxonomies::PENDIDIKAN => ['type' => ['list_of' => 'String']],
-                'sort' => ['type' => 'SortOptionInput'],
-                'context' => ['type' => 'String'],
+                'cari' => ['type' => self::TYPE_STRING],
+                Taxonomies::LOKASI_PEKERJAAN => ['type' => ['list_of' => self::TYPE_STRING]],
+                Taxonomies::GENDER => ['type' => ['list_of' => self::TYPE_STRING]],
+                Taxonomies::PENDIDIKAN => ['type' => ['list_of' => self::TYPE_STRING]],
+                'sort' => ['type' => self::TYPE_SORT_OPTION_INPUT],
+                'context' => ['type' => self::TYPE_STRING],
             ],
         ]);
     }
@@ -230,36 +255,36 @@ class GraphQLRegistration
     private function registerFields(): void
     {
         // Root queries for taxonomy endpoints
-        register_graphql_field('RootQuery', 'taxonomyTerms', [
-            'type' => 'TaxonomyTermsResponse',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'taxonomyTerms', [
+            'type' => self::TYPE_TAXONOMY_TERMS_RESPONSE,
             'description' => 'Get all taxonomy terms grouped by type',
             'resolve' => fn() => $this->taxonomyResolver->resolveAllTerms(),
         ]);
 
-        register_graphql_field('RootQuery', 'lokasiTerms', [
-            'type' => 'JSON',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'lokasiTerms', [
+            'type' => self::TYPE_JSON,
             'description' => 'Get location taxonomy terms',
             'resolve' => fn() => $this->taxonomyResolver->resolveLokasiTerms(),
         ]);
 
-        register_graphql_field('RootQuery', 'genderTerms', [
-            'type' => 'JSON',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'genderTerms', [
+            'type' => self::TYPE_JSON,
             'description' => 'Get gender taxonomy terms',
             'resolve' => fn() => $this->taxonomyResolver->resolveGenderTerms(),
         ]);
 
-        register_graphql_field('RootQuery', 'pendidikanTerms', [
-            'type' => 'JSON',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'pendidikanTerms', [
+            'type' => self::TYPE_JSON,
             'description' => 'Get education taxonomy terms',
             'resolve' => fn() => $this->taxonomyResolver->resolvePendidikanTerms(),
         ]);
 
-        register_graphql_field('RootQuery', 'autoSuggestions', [
-            'type' => ['list_of' => 'String'],
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'autoSuggestions', [
+            'type' => ['list_of' => self::TYPE_STRING],
             'description' => 'Get auto suggestions for job search',
             'args' => [
                 'query' => [
-                    'type' => 'String',
+                    'type' => self::TYPE_STRING,
                     'description' => 'The search query',
                 ],
             ],
@@ -267,134 +292,134 @@ class GraphQLRegistration
         ]);
 
         // Jobs data queries
-        register_graphql_field('RootQuery', 'carousel', [
-            'type' => 'CarouselResponse',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'carousel', [
+            'type' => self::TYPE_CAROUSEL_RESPONSE,
             'description' => 'Get carousel jobs data',
             'resolve' => fn() => $this->jobsDataResolver->resolveCarousel(),
         ]);
 
-        register_graphql_field('RootQuery', 'loadMore', [
-            'type' => 'LoadMoreResponse',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'loadMore', [
+            'type' => self::TYPE_LOAD_MORE_RESPONSE,
             'description' => 'Get load more jobs data',
             'args' => [
                 'paged' => [
-                    'type' => 'Int',
+                    'type' => self::TYPE_INT,
                     'description' => 'Page number',
                     'defaultValue' => 1,
                 ],
                 'context' => [
-                    'type' => 'String',
+                    'type' => self::TYPE_STRING,
                     'description' => 'Context for loading',
                     'defaultValue' => 'latest',
                 ],
                 'filters' => [
-                    'type' => 'JobFiltersInput',
+                    'type' => self::TYPE_JOB_FILTERS_INPUT,
                     'description' => 'Job filters',
                 ],
             ],
             'resolve' => fn(...$args) => $this->jobsDataResolver->resolveLoadMore(...$args),
         ]);
 
-        register_graphql_field('RootQuery', 'jobGrid', [
-            'type' => 'JobGridResponse',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'jobGrid', [
+            'type' => self::TYPE_JOB_GRID_RESPONSE,
             'description' => 'Get job grid data',
             'args' => [
                 'paged' => [
-                    'type' => 'Int',
+                    'type' => self::TYPE_INT,
                     'description' => 'Page number',
                     'defaultValue' => 1,
                 ],
                 'context' => [
-                    'type' => 'String',
+                    'type' => self::TYPE_STRING,
                     'description' => 'Context',
                     'defaultValue' => 'latest',
                 ],
                 'title' => [
-                    'type' => 'String',
+                    'type' => self::TYPE_STRING,
                     'description' => 'Title',
                     'defaultValue' => '',
                 ],
                 'total_jobs' => [
-                    'type' => 'Int',
+                    'type' => self::TYPE_INT,
                     'description' => 'Total jobs',
                     'defaultValue' => 0,
                 ],
                 'filters' => [
-                    'type' => 'JobFiltersInput',
+                    'type' => self::TYPE_JOB_FILTERS_INPUT,
                     'description' => 'Job filters',
                 ],
             ],
             'resolve' => fn(...$args) => $this->jobsDataResolver->resolveJobGrid(...$args),
         ]);
 
-        register_graphql_field('RootQuery', 'jobDetail', [
-            'type' => 'Job',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'jobDetail', [
+            'type' => self::TYPE_JOB,
             'description' => 'Get job detail',
             'args' => [
                 'slug' => [
-                    'type' => 'String',
+                    'type' => self::TYPE_STRING,
                     'description' => 'Job slug',
                 ],
             ],
             'resolve' => fn(...$args) => $this->jobsDataResolver->resolveJobDetail(...$args),
         ]);
 
-        register_graphql_field('RootQuery', 'jobSchema', [
-            'type' => 'JobSchemaResponse',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'jobSchema', [
+            'type' => self::TYPE_JOB_SCHEMA_RESPONSE,
             'description' => 'Get job schema. Returns per-id JobPosting schemas by default (even for multiple IDs). Set `type` to "ItemList" to explicitly request an ItemList, or "JobPosting" to request per-id JobPosting schemas. You can also request schema by `slug` to avoid an extra lookup for the post ID.',
             'args' => [
                 'ids' => [
-                    'type' => ['list_of' => 'Int'],
+                    'type' => ['list_of' => self::TYPE_INT],
                     'description' => 'Job IDs to retrieve. By default the resolver returns per-id JobPosting schemas; set `type` to "ItemList" to request a combined ItemList for these IDs.',
                 ],
                 'slug' => [
-                    'type' => 'String',
+                    'type' => self::TYPE_STRING,
                     'description' => 'Optional job slug. When provided, schema is generated for the job matching this slug.',
                 ],
                 'type' => [
-                    'type' => 'String',
+                    'type' => self::TYPE_STRING,
                     'description' => 'Optional schema type. Allowed values: "ItemList" (returns a single ItemList) or "JobPosting" (returns per-id JobPosting schemas). Defaults to per-id JobPosting behavior when omitted.',
                 ],
             ],
             'resolve' => fn(...$args) => $this->jobsDataResolver->resolveSchema(...$args),
         ]);
 
-        register_graphql_field('RootQuery', 'themeData', [
-            'type' => 'ThemeData',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'themeData', [
+            'type' => self::TYPE_THEME_DATA,
             'description' => 'Get theme data',
             'resolve' => fn() => $this->themeDataResolver->resolveThemeData(),
         ]);
 
-        register_graphql_field('RootQuery', 'searchJobs', [
-            'type' => 'SearchJobsResponse',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'searchJobs', [
+            'type' => self::TYPE_SEARCH_JOBS_RESPONSE,
             'description' => 'Search jobs',
             'args' => [
                 'filters' => [
-                    'type' => 'JobFiltersInput',
+                    'type' => self::TYPE_JOB_FILTERS_INPUT,
                     'description' => 'Job filters',
                 ],
             ],
             'resolve' => fn(...$args) => $this->jobsDataResolver->resolveSearchJobs(...$args),
         ]);
 
-        register_graphql_field('RootQuery', 'rankMathHead', [
-            'type' => 'String',
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'rankMathHead', [
+            'type' => self::TYPE_STRING,
             'description' => 'Get RankMath head data',
             'args' => [
                 'url' => [
-                    'type' => 'String',
+                    'type' => self::TYPE_STRING,
                     'description' => 'URL for RankMath',
                 ],
             ],
             'resolve' => fn(...$args) => $this->jobsDataResolver->resolveRankMathHead(...$args),
         ]);
 
-        register_graphql_field('RootQuery', 'syncBookmark', [
-            'type' => ['list_of' => 'Job'],
+        register_graphql_field(self::TYPE_ROOT_QUERY, 'syncBookmark', [
+            'type' => ['list_of' => self::TYPE_JOB],
             'description' => 'Get bookmarked jobs by IDs',
             'args' => [
                 'ids' => [
-                    'type' => ['list_of' => 'Int'],
+                    'type' => ['list_of' => self::TYPE_INT],
                     'description' => 'Job IDs to retrieve',
                 ],
             ],
@@ -402,13 +427,13 @@ class GraphQLRegistration
         ]);
 
         // JWT mutation is registered separately because of the POST requirement
-        register_graphql_field('RootMutation', 'jwt', [
-            'type' => 'String',
+        register_graphql_field(self::TYPE_ROOT_MUTATION, 'jwt', [
+            'type' => self::TYPE_STRING,
             'description' => 'Request or validate JWT token (provide username/password or existing token)',
             'args' => [
-                'username' => ['type' => 'String'],
-                'password' => ['type' => 'String'],
-                'token' => ['type' => 'String'],
+                'username' => ['type' => self::TYPE_STRING],
+                'password' => ['type' => self::TYPE_STRING],
+                'token' => ['type' => self::TYPE_STRING],
             ],
             'resolve' => fn(...$args) => $this->themeDataResolver->resolveJWTorValidate(...$args),
         ]);

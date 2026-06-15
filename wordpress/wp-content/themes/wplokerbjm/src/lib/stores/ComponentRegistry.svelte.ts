@@ -1,59 +1,53 @@
 import { isNil } from "es-toolkit";
 import { type Component, type ComponentProps } from "svelte";
+import { SvelteMap } from "svelte/reactivity";
 import type BookmarkModal from "@components/ui/Header/BookmarkModal.svelte";
 import type CustomDropdown from "@components/ui/Homepage/SearchForm/CustomDropdown.svelte";
 import type LoginModal from "@components/ui/Header/LoginModal.svelte";
 
-interface ComponentRegistryMap {
+interface ComponentRegistryMap
+{
   BookmarkModal?: Component<ComponentProps<typeof BookmarkModal>>;
   CustomDropdown?: Component<ComponentProps<typeof CustomDropdown>>;
   LoginModal?: Component<ComponentProps<typeof LoginModal>>;
 }
+
 class ComponentRegistry
 {
-
-  #components = $state<ComponentRegistryMap>({
-    BookmarkModal: undefined,
-    CustomDropdown: undefined,
-    LoginModal: undefined
-  });
-  #componentLoading: boolean = false;
+  #components = new SvelteMap<keyof ComponentRegistryMap, ComponentRegistryMap[ keyof ComponentRegistryMap ]>();
+  #componentLoading = false;
+  #registry: Record<keyof ComponentRegistryMap, () => Promise<{ default: any }>> = {
+    BookmarkModal: () => import("@components/ui/Header/BookmarkModal.svelte"),
+    CustomDropdown: () => import("@components/ui/Homepage/SearchForm/CustomDropdown.svelte"),
+    LoginModal: () => import("@components/ui/Header/LoginModal.svelte"),
+  };
 
   /**
    * Load a component by its name.
-   * @param name Component name
-   * @returns Promise resolving to the component instance, or the instance itself if already loaded
    */
-  public loadComponentByName(name: keyof ComponentRegistryMap): Promise<ComponentRegistryMap[ typeof name ]> | ComponentRegistryMap[ typeof name ]
+  public loadComponentByName<Key extends keyof ComponentRegistryMap>(
+    name: Key
+  ): Promise<ComponentRegistryMap[ Key ]> | ComponentRegistryMap[ Key ]
   {
-    if (!isNil(this.#components[ name ])) return this.#components[ name ];
+    const cached = this.getComponentByName(name);
+    if (!isNil(cached)) return cached;
 
-    type RegistryType = Record<keyof ComponentRegistryMap, () => Promise<{ default: ComponentRegistryMap[ keyof ComponentRegistryMap ] }>>;
-
-    const registry: RegistryType = {
-      BookmarkModal: () => import("@components/ui/Header/BookmarkModal.svelte"),
-      CustomDropdown: () => import("@components/ui/Homepage/SearchForm/CustomDropdown.svelte"),
-      LoginModal: () => import("@components/ui/Header/LoginModal.svelte"),
-    }
-
-    const importer = registry[ name ];
+    const importer = this.#registry[ name ];
     return this.#loadComponent(name, importer);
   }
 
   /**
    * Getter for a component by its name.
-   * @param name Component name
-   * @returns Component instance or undefined if not loaded
    */
-  public getComponentByName<Key extends keyof ComponentRegistryMap>(name: Key): ComponentRegistryMap[ Key ]
+  public getComponentByName<Key extends keyof ComponentRegistryMap>(
+    name: Key
+  ): ComponentRegistryMap[ Key ]
   {
-    return this.#components[ name ];
+    return this.#components.get(name) as ComponentRegistryMap[ Key ];
   }
 
   /**
    * Load a component by its name using the provided importer function.
-   * @param propName Component name
-   * @param importer Function that imports the component
    */
   async #loadComponent<Key extends keyof ComponentRegistryMap>(
     propName: Key,
@@ -64,7 +58,8 @@ class ComponentRegistry
     {
       this.#componentLoading = true;
       const comp = (await importer()).default;
-      this.#components[ propName ] = comp;
+
+      this.#components.set(propName, comp);
       return comp;
     } catch (error)
     {

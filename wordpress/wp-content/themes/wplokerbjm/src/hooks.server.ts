@@ -40,6 +40,12 @@ const HttpUtils: HttpUtils = {
   }
 };
 
+function setCrossOriginIsolationHeaders(headers: Headers): void
+{
+  headers.set("Cross-Origin-Opener-Policy", "same-origin");
+  headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+}
+
 // --- Middleware Split ---
 
 /**
@@ -150,6 +156,7 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) =>
   let response = await resolve(event);
 
   const path = event.url.pathname;
+  const search = event.url.search;
   const contentType = response.headers.get("content-type") || "";
   const cookie = event.request.headers.get("Cookie");
   const authenticated = isAuthenticated(cookie);
@@ -185,14 +192,20 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) =>
     }
 
     response.headers.set("Service-Worker-Allowed", "/");
-    response.headers.set("Cross-Origin-Opener-Policy", "same-origin");
-    response.headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+    setCrossOriginIsolationHeaders(response.headers);
 
   }
 
   if (path.startsWith("/~partytown") || path.includes("/~partytown"))
   {
     response.headers.set("Service-Worker-Allowed", "/");
+    setCrossOriginIsolationHeaders(response.headers);
+  }
+
+  if (path.includes(".worker") || search.includes("worker_file"))
+  {
+    response.headers.set("Service-Worker-Allowed", "/");
+    setCrossOriginIsolationHeaders(response.headers);
   }
 
   response.headers.set("Access-Control-Expose-Headers", "ETag, CF-Ray, Last-Modified");

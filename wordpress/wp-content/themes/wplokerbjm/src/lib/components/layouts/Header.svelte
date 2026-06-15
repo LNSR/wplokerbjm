@@ -2,19 +2,21 @@
   import { onMount, tick } from "svelte";
   import { type ThemeScriptData, type WPLokerBJMThemedData } from "@/types";
   import {
-    applyThemeAttribute,
     applyThemeViewTransition,
     localStorageThemeActions,
   } from "@/utils/theme";
   import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
   import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
   import { themePropsStore } from "$lib/stores/Theme.svelte";
-  import { APIServiceBrowser } from "@/services/graphql/APIService";
+  import {
+    APIServiceBrowser,
+    APIServiceShared,
+  } from "@/services/graphql/APIService";
   import { useRIC } from "@/utils/window";
   import { MediaQuery } from "svelte/reactivity";
 
-  let showThemeModal = $state(false);
-  let showLoginModal = $state(false);
+  let showThemeModal = $state.raw(false);
+  let showLoginModal = $state.raw(false);
 
   class ThemeColorManager {
     public currentTheme = $state.raw<ThemeScriptData["themeList"]>("light");
@@ -48,40 +50,16 @@
       const savedTheme = localStorageThemeActions({ get: true });
       const theme = this.systemPrefersDark ? "dark" : (savedTheme ?? "light");
 
-      this.setTheme(theme);
+      void this.setTheme(theme);
     }
 
     public setTheme(theme: ThemeScriptData["themeList"]): void {
-      try {
-        this.setThemeWithViewTransition(theme, { useViewTransition: true });
-      } catch {
-        console.error(
-          "Failed to set theme with view transition, falling back to normal theme change",
-        );
-        this.setThemeWithViewTransition(theme);
-      }
-    }
-
-    private setThemeWithViewTransition(
-      theme: ThemeScriptData["themeList"],
-      options: { useViewTransition?: boolean } = {},
-    ): void {
-      if (this.currentTheme === theme) return;
-      this.currentTheme = theme;
-
-      if (options.useViewTransition)
-        return applyThemeViewTransition(theme, () =>
-          applyThemeAttribute(theme),
-        );
-
-      return void window.requestAnimationFrame(() => {
-        applyThemeAttribute(theme);
-      });
+      void applyThemeViewTransition(theme);
     }
   }
 
   class HeaderManager {
-    headerHeight = $state<number | undefined>(undefined);
+    headerHeight = $state.raw<number | undefined>(undefined);
     currentHeight = $derived(this.headerHeight);
   }
 
@@ -137,6 +115,7 @@
               const nonce = await APIServiceBrowser.getThemeNonceGraphQL();
               if (nonce && nonce.length > 0) {
                 themePropsStore.setNonce = nonce;
+                APIServiceShared.setNonce(nonce);
               }
             } catch (error) {
               console.error("Error fetching theme nonce:", error);
@@ -179,8 +158,8 @@
 
   let { themeData }: { themeData: WPLokerBJMThemedData } = $props();
 
-  let showBookmarkModal = $state(false);
-  let showLoginAdminModal = $state(false);
+  let showBookmarkModal = $state.raw(false);
+  let showLoginAdminModal = $state.raw(false);
 
   const isMobile = $derived(deviceDetector.isPlatformMobile);
   const bookmarkJobCount = $derived(bookmarkStore.jobs.length);
@@ -219,7 +198,11 @@
     };
   }
 
-  themePropsStore.setThemeData = (() => themeData)();
+  (() => {
+    themePropsStore.setThemeData = themeData;
+    APIServiceShared.setNonce(themeData.wpRestNonce);
+  })();
+
   onMount(() => {
     themeColorManager.init();
     const cleanupLoginAdminModalHandler = loginAdminModalHandler();
@@ -452,13 +435,14 @@
     {/if}
   </div>
   {#if showBookmarkModal}
-    {@const BookmarkModal =
-      componentRegistry.getComponentByName("BookmarkModal")}
+    {const BookmarkModal = $derived(
+      componentRegistry.getComponentByName("BookmarkModal"))}
     <BookmarkModal bind:open={showBookmarkModal} />
   {/if}
 
   {#if showLoginModal}
-    {@const LoginModal = componentRegistry.getComponentByName("LoginModal")}
+    {const LoginModal = $derived(
+      componentRegistry.getComponentByName("LoginModal"))}
     <LoginModal
       bind:open={showLoginModal}
       bind:username={loginManager.loginStates.username}

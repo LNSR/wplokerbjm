@@ -34,6 +34,18 @@ abstract class WplokerbjmTestCase extends TestCase
         });
         // Note: wp_remote_get and wp_remote_post are mocked per-test as needed to avoid conflicts
         \Brain\Monkey\Functions\when('register_rest_route')->justReturn(true);
+        \Brain\Monkey\Functions\when('sanitize_text_field')->alias(function ($value) {
+            return trim(strip_tags((string) $value));
+        });
+        \Brain\Monkey\Functions\when('wp_kses_post')->alias(function ($value) {
+            return (string) $value;
+        });
+        \Brain\Monkey\Functions\when('sanitize_email')->alias(function ($value) {
+            return filter_var((string) $value, FILTER_SANITIZE_EMAIL);
+        });
+        \Brain\Monkey\Functions\when('esc_url_raw')->alias(function ($value) {
+            return trim((string) $value);
+        });
         \Brain\Monkey\Functions\when('wp_cache_get')->alias(function ($key, $group) {
             return self::$mockCache[$key] ?? false;
         });

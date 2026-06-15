@@ -149,6 +149,14 @@ final class ProxyContainer
             define('WP_ENVIRONMENT_TYPE', (WP_ENV === 'development') ? 'development' : 'production');
         }
 
+        // lowongan ingest
+        if (!defined('WPLBJM_API_BASE_URL_DEV')) {
+            define('WPLBJM_API_BASE_URL_DEV', getenv('WPLBJM_API_BASE_URL_DEV') ?: 'https://localhost');
+        }
+        if (!defined('WPLBJM_JWT_DEV')) {
+            define('WPLBJM_JWT_DEV', getenv('WPLBJM_JWT_DEV') ?: null);
+        }
+
         // Redis constants like WordPress does
         if (!defined('WP_REDIS_SOCK')) {
             define('WP_REDIS_SOCK', getenv('REDIS_SOCK') ?: null);
