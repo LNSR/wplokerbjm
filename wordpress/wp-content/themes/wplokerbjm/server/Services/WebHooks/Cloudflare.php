@@ -30,7 +30,7 @@ class Cloudflare
     #[Action('added_post_meta', 10, 4)]
     #[Action('updated_post_meta', 10, 4)]
     #[Action('deleted_post_meta', 10, 4)]
-    public static function purgeCache(...$args): bool
+    public function purgeCache(...$args): bool
     {
         if (SharedUtils::isDevelopment()) {
             Logger::info('WebHook', 'Skipping Cloudflare purge in development environment.');

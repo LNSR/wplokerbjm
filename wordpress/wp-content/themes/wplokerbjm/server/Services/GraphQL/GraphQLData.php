@@ -11,7 +11,8 @@ class GraphQLData
 {
     public function __construct(
         private \WPLokerBJM\Factories\JobDataFactory $jobDataFactory,
-        private \WPLokerBJM\Services\Schema\JobSchemaOrg $jobSchema
+        private \WPLokerBJM\Services\Schema\JobSchemaOrg $jobSchema,
+        private \WPLokerBJM\Core\Theme\ThemeInject $themeInject
     ) {
     }
 
@@ -71,7 +72,7 @@ class GraphQLData
             : CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . $post_id . '_public';
 
 
-        $noncePlugin = fn($action, $postId) => match ($action) {
+        $noncePlugin = static fn($action, &$postId) => match ($action) {
             'duplicatePost' => wp_create_nonce('duplicate_post_' . $postId),
         };
 
@@ -158,7 +159,7 @@ class GraphQLData
      */
     public function getThemeData(): array
     {
-        return \WPLokerBJM\Core\Theme\ThemeInject::themeData();
+        return $this->themeInject->themeData();
     }
 
     /**

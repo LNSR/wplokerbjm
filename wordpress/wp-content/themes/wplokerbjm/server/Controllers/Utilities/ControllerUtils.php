@@ -76,7 +76,7 @@ class ControllerUtils
             |> (static fn($arr) => array_filter($arr, static fn($id) => $id > 0));
     }
 
-    public static function hasBearerAuthorization($request): bool
+    public static function hasBearerAuthorization(\WP_REST_Request $request): bool
     {
         $authorization = '';
 

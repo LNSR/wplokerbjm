@@ -220,7 +220,7 @@
         cardHeights: routeStateStore.getCardHeights("bookmarkModal"),
         fallbackHeight: 200,
         gap: 24,
-        buffer: 6,
+        buffer: 4,
       }),
     );
 
@@ -291,17 +291,19 @@
       )
         return;
       if (!modalBox) return;
-      if (isMobile) {
-        const dy = e.clientY - this.drag.startClient.y;
-        const newH = this.drag.startHeight - dy;
-        this.drag.translate.x = 0;
-        this.drag.translate.y = 0;
-        this.drag.modalHeight = `${newH}px`;
-        return;
-      } else {
+      // Desktop
+      if (!isMobile) {
         this.drag.translate.x = e.clientX - this.drag.startClient.x;
         this.drag.translate.y = e.clientY - this.drag.startClient.y;
+        return;
       }
+
+      // Mobile
+      const dy = e.clientY - this.drag.startClient.y;
+      const newH = this.drag.startHeight - dy;
+      this.drag.translate.x = 0;
+      this.drag.translate.y = 0;
+      this.drag.modalHeight = `${newH}px`;
     };
 
     public onPointerUp = (e: PointerEvent): void => {

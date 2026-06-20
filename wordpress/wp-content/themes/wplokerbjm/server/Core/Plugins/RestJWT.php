@@ -11,7 +11,7 @@ use WPLokerBJM\Core\Container\Attributes\Filter;
 class JWTHooks
 {
     #[Filter("jwt_auth_expire")]
-    public static function setTokenDuration(): int
+    public function setTokenDuration(): int
     {
         $duration = 60 * 60 * 24 * 7; // 7 days
         return time() + $duration;

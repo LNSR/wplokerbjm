@@ -1,30 +1,26 @@
 import { persistedExchange } from "@urql/exchange-persisted";
-import { createClient, fetchExchange } from "urql";
-import type { AnyVariables, Client, ClientOptions, DocumentInput } from "urql";
+import { createClient, fetchExchange } from "@urql/core";
+import type { AnyVariables, Client, ClientOptions, DocumentInput } from "@urql/core";
 import typia from "typia";
 import { getCmsOrigin } from "@/utils/environment";
 import type { WPLokerBJMThemedData } from "@/types";
 
-abstract class URQLBaseManager
-{
+abstract class URQLBaseManager {
     private readonly clients = new Map<string, Client>();
 
-    protected nonce: WPLokerBJMThemedData[ "wpRestNonce" ];
+    protected nonce: WPLokerBJMThemedData["wpRestNonce"];
 
-    public setNonce(nonce: WPLokerBJMThemedData[ "wpRestNonce" ]): void
-    {
+    public setNonce(nonce: WPLokerBJMThemedData["wpRestNonce"]): void {
         this.nonce = nonce;
     }
 
     protected preferHTTPMethod(
-        httpMethod?: ClientOptions[ "preferGetMethod" ],
-    ): ClientOptions[ "preferGetMethod" ]
-    {
-        return typia.assertEquals<ClientOptions[ "preferGetMethod" ]>(httpMethod ?? "within-url-limit");
+        httpMethod?: ClientOptions["preferGetMethod"],
+    ): ClientOptions["preferGetMethod"] {
+        return typia.assertEquals<ClientOptions["preferGetMethod"]>(httpMethod ?? "within-url-limit");
     }
 
-    protected getBaseFetchOptions(): RequestInit
-    {
+    protected getBaseFetchOptions(): RequestInit {
         return {
             credentials: "include",
             mode: "cors",
@@ -39,31 +35,26 @@ abstract class URQLBaseManager
     protected abstract shouldCacheClient(): boolean;
 
     protected getClientCacheKey(
-        preferHTTPMethodOption?: ClientOptions[ "preferGetMethod" ],
-    ): string
-    {
+        preferHTTPMethodOption?: ClientOptions["preferGetMethod"],
+    ): string {
         return String(preferHTTPMethodOption ?? "default");
     }
 
-    protected getFetchOptions(): RequestInit
-    {
+    protected getFetchOptions(): RequestInit {
         return this.getBaseFetchOptions();
     }
 
     protected getClient(
-        preferHTTPMethodOption?: ClientOptions[ "preferGetMethod" ],
+        preferHTTPMethodOption?: ClientOptions["preferGetMethod"],
         fetchFn?: typeof fetch,
-    ): Client
-    {
+    ): Client {
         const baseOptions = this.getClientOptions(preferHTTPMethodOption);
 
-        if (fetchFn)
-        {
+        if (fetchFn) {
             return createClient({ ...baseOptions, fetch: fetchFn });
         }
 
-        if (!this.shouldCacheClient())
-        {
+        if (!this.shouldCacheClient()) {
             return createClient({ ...baseOptions });
         }
 
@@ -77,9 +68,8 @@ abstract class URQLBaseManager
     }
 
     protected getClientOptions(
-        preferHTTPMethodOption?: ClientOptions[ "preferGetMethod" ],
-    ): ClientOptions
-    {
+        preferHTTPMethodOption?: ClientOptions["preferGetMethod"],
+    ): ClientOptions {
         const preferGetMethod = this.preferHTTPMethod(preferHTTPMethodOption);
 
         return {
@@ -98,8 +88,7 @@ abstract class URQLBaseManager
         };
     }
 
-    protected headersToObject(headers?: HeadersInit): Record<string, string>
-    {
+    protected headersToObject(headers?: HeadersInit): Record<string, string> {
         if (!headers) return {};
         return Object.fromEntries(new Headers(headers).entries());
     }
@@ -108,10 +97,9 @@ abstract class URQLBaseManager
         query: DocumentInput<T, V>,
         variables: V,
         context?: any,
-        httpMethodPref?: ClientOptions[ "preferGetMethod" ],
+        httpMethodPref?: ClientOptions["preferGetMethod"],
         fetchFn?: typeof fetch,
-    ): Promise<T>
-    {
+    ): Promise<T> {
         const graphqlClient = this.getClient(httpMethodPref, fetchFn);
         const result = await graphqlClient
             .query<T, V>(query, variables, context)
@@ -126,8 +114,7 @@ abstract class URQLBaseManager
         variables: V,
         context?: any,
         fetchFn?: typeof fetch,
-    ): Promise<T>
-    {
+    ): Promise<T> {
         const graphqlClient = this.getClient(undefined, fetchFn);
         const result = await graphqlClient
             .mutation<T, V>(mutation, variables, context)
@@ -137,16 +124,13 @@ abstract class URQLBaseManager
         return result.data as T;
     }
 
-    public mergedFetchOptionsContext(signal?: AbortSignal):
-        {
-            fetchOptions: (
-                clientFetchOptions?: RequestInit | (() => RequestInit) | undefined,
-            ) => RequestInit;
-        }
-    {
+    public mergedFetchOptionsContext(signal?: AbortSignal): {
+        fetchOptions: (
+            clientFetchOptions?: RequestInit | (() => RequestInit) | undefined,
+        ) => RequestInit;
+    } {
         return {
-            fetchOptions: (clientFetchOptions?: RequestInit | (() => RequestInit)) =>
-            {
+            fetchOptions: (clientFetchOptions?: RequestInit | (() => RequestInit)) => {
                 const defaultOptions = this.getFetchOptions();
                 const resolvedClientOptions =
                     typeof clientFetchOptions === "function"
@@ -171,11 +155,9 @@ abstract class URQLBaseManager
     }
 }
 
-export class URQLServerManager extends URQLBaseManager
-{
+export class URQLServerManager extends URQLBaseManager {
 
-    protected override getClientOptions(preferHTTPMethodOption?: ClientOptions[ "preferGetMethod" ]): ClientOptions
-    {
+    protected override getClientOptions(preferHTTPMethodOption?: ClientOptions["preferGetMethod"]): ClientOptions {
         const baseOptions = super.getClientOptions(preferHTTPMethodOption);
         return {
             ...baseOptions,
@@ -185,17 +167,14 @@ export class URQLServerManager extends URQLBaseManager
         };
     }
 
-    protected shouldCacheClient(): boolean
-    {
+    protected shouldCacheClient(): boolean {
         return false;
     }
 }
 
-export class URQLBrowserManager extends URQLBaseManager
-{
+export class URQLBrowserManager extends URQLBaseManager {
 
-    protected shouldCacheClient(): boolean
-    {
+    protected shouldCacheClient(): boolean {
         return true;
     }
 }

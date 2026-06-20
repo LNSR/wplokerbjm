@@ -54,7 +54,6 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
         configFile: false,
         publicDir: false,
         logLevel: "warn", // Toned down to avoid flooding the console on every edit
-        envPrefix: ["VITE_", "PUBLIC_"],
 
         resolve: {
           alias: resolveConfig?.alias,
@@ -157,6 +156,17 @@ function appendCloudflareHeaders(): Plugin {
 export default defineConfig((configEnv: ConfigEnv): UserConfig => {
   const isDev = configEnv.mode === "development" || configEnv.mode === "preview";
 
+  const optimizeDeps: UserConfig["optimizeDeps"] = {
+    include: [
+      "comlink",
+      "idb",
+      "lru-cache",
+      "swiper",
+      "viewerjs",
+      "es-toolkit",
+    ],
+  };
+
   const devServer: UserConfig["server"] = isDev
     ? {
       host: true,
@@ -236,9 +246,9 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
 
   return {
     plugins,
+    optimizeDeps,
     server: devServer,
     build,
     worker,
-    envPrefix: ["VITE_", "PUBLIC_"],
   };
 });

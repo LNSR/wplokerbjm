@@ -647,35 +647,29 @@
         </span>
       </h2>
       <address class="not-italic">
-        <div class="grid grid-cols-1 gap-4 mt-4">
-          <div
-            class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
-          >
-            <ul class="space-y-3">
-              {#each contacts as contact (contact.label + contact.value)}
-                {const Icon = contact.icon}
-                <li class="flex items-center">
-                  {#if Icon}
-                    <Icon
-                      class="text-[var(--wpl-global-color-1)] w-5 h-5 md:w-6 md:h-6 text-center inline-block shrink-0"
-                      aria-hidden="true"
-                    />
-                  {/if}
-                  <div class="ml-2 font-semibold text-md">
-                    <span class="block font-semibold">{contact.label}:</span>
-                    <a
-                      href={contact.href}
-                      target="_blank"
-                      rel="noopener noreferrer nofollow"
-                      class="block font-semibold wrap-anywhere max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
-                      >{contact.value}</a
-                    >
-                  </div>
-                </li>
-              {/each}
-            </ul>
-          </div>
-        </div>
+        <ul class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-x-6 gap-y-3 mt-4">
+          {#each contacts as contact (contact.label + contact.value)}
+            {const Icon = contact.icon}
+            <li class="flex items-center">
+              {#if Icon}
+                <Icon
+                  class="text-[var(--wpl-global-color-1)] w-5 h-5 md:w-6 md:h-6 text-center inline-block shrink-0"
+                  aria-hidden="true"
+                />
+              {/if}
+              <div class="ml-2 font-semibold text-md">
+                <span class="block font-semibold">{contact.label}:</span>
+                <a
+                  href={contact.href}
+                  target="_blank"
+                  rel="noopener noreferrer nofollow"
+                  class="block font-semibold wrap-anywhere max-w-full whitespace-normal text-[var(--wpl-global-color-1)] hover:underline"
+                  >{contact.value}</a
+                >
+              </div>
+            </li>
+          {/each}
+        </ul>
       </address>
     </section>
   {/if}
@@ -697,7 +691,7 @@
       </h2>
       <nav aria-label="Sosial media links">
         <ul
-          class="grid grid-cols-1 gap-4 mt-4 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-4"
+          class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-x-6 gap-y-4 mt-4"
         >
           {#each socialMediaItems as item (item.platform + item.username)}
             {const Icon = item.icon}

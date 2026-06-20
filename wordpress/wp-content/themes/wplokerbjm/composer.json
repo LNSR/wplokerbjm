@@ -6,8 +6,6 @@
     "brain/monkey": "*",
     "php-parallel-lint/php-console-highlighter": "*",
     "php-parallel-lint/php-parallel-lint": "*",
-    "php-stubs/wordpress-stubs": "*",
-    "phpstan/phpstan": "*",
     "phpunit/phpunit": "*",
     "vlucas/phpdotenv": "*"
   },

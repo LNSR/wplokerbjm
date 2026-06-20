@@ -16,7 +16,7 @@ class WPGraphQL
      * authentication plugin can authenticate the request transparently.
      */
     #[Action('graphql_init')]
-    public static function injectJwtFromCookie(): void
+    public function injectJwtFromCookie(): void
     {
         if (!SharedUtils::isPluginActive('wpgraphql'))
             return;
@@ -34,7 +34,7 @@ class WPGraphQL
      * * Must be logged in Wordpress to have the cookies, but this allows GraphQL requests to be authenticated for decoupled frontend.
      */
     #[Action('init_graphql_request')]
-    public static function authenticateViaCookie(): void
+    public function authenticateViaCookie(): void
     {
         if (!SharedUtils::isPluginActive('wpgraphql'))
             return;
@@ -85,7 +85,7 @@ class WPGraphQL
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
     #[Filter('graphql_response_headers_to_send', 11)]
-    public static function ModifyHeaderGraphQL(array $headers): array
+    public function ModifyHeaderGraphQL(array $headers): array
     {
         if (!SharedUtils::isPluginActive('wpgraphql')) {
             return $headers;
@@ -118,7 +118,7 @@ class WPGraphQL
             unset($headers['Access-Control-Max-Age']);
             $headers['Access-Control-Max-Age'] = '86400';
         }
-        $cacheControl = function ($extra) use (&$headers) {
+        $cacheControl = static function ($extra) use (&$headers) {
             if (isset($headers['Cache-Control'])) {
                 unset($headers['Cache-Control']);
             }
@@ -139,7 +139,7 @@ class WPGraphQL
      * @see \WPGraphQL\Router::prepare_headers;
      */
     #[Filter('graphql_response_status_code', 9, 2)]
-    public static function setGraphQLResponseStatusCode(
+    public function setGraphQLResponseStatusCode(
         int $http_status_code,
         mixed $graphql_response,
     ): int {
@@ -153,13 +153,13 @@ class WPGraphQL
 
         return $http_status_code;
     }
-    
+
     /**
      * @see get_graphql_setting
      * @see ../../../../../plugins/wp-graphql/src/Admin/Settings/Settings.php
      */
     #[Filter('graphql_get_setting_section_field_value', 10, 3)]
-    public static function setPublicIntrospection($value, $default_value, $option_name)
+    public function setPublicIntrospection($value, $default_value, $option_name)
     {
         if ($option_name === 'public_introspection_enabled') {
             if (defined('WP_ENV') && WP_ENV !== 'production')

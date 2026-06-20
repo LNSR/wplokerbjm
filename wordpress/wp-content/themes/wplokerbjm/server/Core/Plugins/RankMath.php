@@ -12,18 +12,18 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  */
 class Rankmath
 {
-	private static ?bool $isActiveCache = null;
-	private static ?array $sitemapUrlsCache = null;
+	private ?bool $isActiveCache = null;
+	private ?array $sitemapUrlsCache = null;
 
 	/**
 	 * Check if Rank Math plugin is active (with caching)
 	 */
-	public static function isActive(): bool
+	public function isActive(): bool
 	{
-		if (self::$isActiveCache === null) {
-			self::$isActiveCache = SharedUtils::isPluginActive('rankmath');
+		if ($this->isActiveCache === null) {
+			$this->isActiveCache = SharedUtils::isPluginActive('rankmath');
 		}
-		return self::$isActiveCache;
+		return $this->isActiveCache;
 	}
 
 	/**
@@ -34,9 +34,9 @@ class Rankmath
 	 * @return mixed Modified input with correct og:image:type
 	 */
 	#[Filter('rank_math/opengraph/facebook/image_array')]
-	public static function FixImageTypeOG($input)
+	public function FixImageTypeOG($input)
 	{
-		if (!self::isActive()) {
+		if (!$this->isActive()) {
 			return $input;
 		}
 
@@ -67,9 +67,9 @@ class Rankmath
 	 * @return string Rewritten URL using headless domain.
 	 */
 	#[Filter('rank_math/indexing_api/publish_url')]
-	public static function RewritePublishUrl($url, $post = null, $provider = '')
+	public function RewritePublishUrl($url, $post = null, $provider = '')
 	{
-		if (!self::isActive() || empty($url)) {
+		if (!$this->isActive() || empty($url)) {
 			return $url;
 		}
 		$headless = SharedUtils::headlessDomainRedirect();
@@ -92,9 +92,9 @@ class Rankmath
 	 * @return string Rewritten URL using headless domain.
 	 */
 	#[Filter('rank_math/indexing_api/delete_url')]
-	public static function RewriteDeleteUrl($url, $post = null)
+	public function RewriteDeleteUrl($url, $post = null)
 	{
-		if (!self::isActive() || empty($url)) {
+		if (!$this->isActive() || empty($url)) {
 			return $url;
 		}
 		$headless = SharedUtils::headlessDomainRedirect();
@@ -113,9 +113,9 @@ class Rankmath
 	 * @return void
 	 */
 	#[Filter('seo_analysis/after_set_url')]
-	public static function rewriteSeoAnalyzerInstanceUrl($analyzer): void
+	public function rewriteSeoAnalyzerInstanceUrl($analyzer): void
 	{
-		if (!self::isActive()) {
+		if (!$this->isActive()) {
 			return;
 		}
 

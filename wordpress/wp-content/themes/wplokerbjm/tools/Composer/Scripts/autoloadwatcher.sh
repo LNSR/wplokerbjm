@@ -28,10 +28,13 @@ inotifywait -m -r -e modify,create,delete --format '%w%f' "${watch_paths[@]}" \
       fi
       # Run composer in background after a short delay (debounce)
       (
-        sleep 1
-        echo "[$(date +'%H:%M:%S')] running composer dump-autoload..."
-        docker compose restart wordpress redis
-        composer dump-autoload --apcu -a -o
+      sleep 2
+      echo "[$(date +'%H:%M:%S')] Running composer dump-autoload..." &
+      composer dump-autoload --apcu -a -o &
+      echo "[$(date +'%H:%M:%S')] Resetting Redis..." &
+      docker exec -i wordpress_redis redis-cli --user default -a "redis_secure_password" --no-auth-warning FLUSHALL &
+      echo "[$(date +'%H:%M:%S')] Resetting OPcache..." &
+      docker exec -i wordpress-${WP_ENV} bash -c "php -r \"opcache_reset();\""
       ) &
       pending_pid=$!
     fi

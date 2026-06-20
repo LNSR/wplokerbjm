@@ -15,28 +15,24 @@ class LowonganIngestRoute
     public const ROUTE_OPTIONS = self::ROUTE . '/options';
 
     public function __construct(
-        private LowonganIngestController $controller,
-        private LowonganIngestOptionsController $optionsController
+        private readonly LowonganIngestController $controller,
+        private readonly LowonganIngestOptionsController $optionsController
     ) {
     }
 
     #[Action('rest_api_init', acceptedArgs: 0)]
     public function registerRoutes(): void
     {
-        register_rest_route(self::NAMESPACE , self::ROUTE, [
-            'methods' => 'POST',
-            'callback' => [$this->controller, 'ingest'],
-            'permission_callback' => [$this->controller, 'permissionsCheck'],
-        ]);
-    }
 
-    #[Action('rest_api_init', acceptedArgs: 0)]
-    public function registerOptionsRoute(): void
-    {
         register_rest_route(self::NAMESPACE , self::ROUTE_OPTIONS, [
             'methods' => 'GET',
-            'callback' => [$this->optionsController, 'options'],
-            'permission_callback' => [$this->optionsController, 'permissionsCheck'],
+            'callback' => fn() => $this->optionsController->options(),
+            'permission_callback' => fn($request) => $this->optionsController->permissionsCheck($request),
+        ]);
+        register_rest_route(self::NAMESPACE , self::ROUTE, [
+            'methods' => 'POST',
+            'callback' => fn($request) => $this->controller->ingest($request),
+            'permission_callback' => fn($request) => $this->controller->permissionsCheck($request),
         ]);
     }
 }

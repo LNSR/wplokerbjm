@@ -437,10 +437,12 @@ class AutowireScanner
     }
 
     /**
-     * Get hook registrations from attributes on methods of HooksInterface implementers.
+     * Get hook registrations from attributes on methods of autowirable classes.
      *
-     * Scans classes for methods with #[Action] or #[Filter] attributes,
-     * and returns an array of hook registration data.
+     * Scans public, non-static methods for #[Action] or #[Filter] attributes
+     * and returns an array of hook registration data. Static methods are
+     * intentionally skipped — hooks are resolved through the DI container
+     * and therefore must be instance methods.
      *
      * @return array Array of hook data: ['class' => FQCN, 'method' => methodName, 'type' => 'action'|'filter', 'hook' => hookName, 'priority' => int, 'accepted_args' => int]
      */
@@ -486,6 +488,10 @@ class AutowireScanner
     /**
      * Perform the actual hook registration scanning logic.
      *
+     * Only public, **non-static** methods are considered: hooks are resolved
+     * through the DI container so the owning service must be instantiable.
+     * Static hook methods are intentionally ignored.
+     *
      * @return array Array of hook registration data
      */
     private function performHookRegistrationScan(): array
@@ -501,12 +507,16 @@ class AutowireScanner
                     try {
                         $reflection = new ReflectionClass($className);
                         foreach ($reflection->getMethods(\ReflectionMethod::IS_PUBLIC) as $method) {
+                            // Skip static methods — hooks must be instance methods
+                            // because the container resolves the owning service lazily.
+                            if ($method->isStatic()) {
+                                continue;
+                            }
                             foreach ($method->getAttributes(\WPLokerBJM\Core\Container\Attributes\Action::class) as $attribute) {
                                 $action = $attribute->newInstance();
                                 $registrations[] = [
                                     'class' => $className,
                                     'method' => $method->getName(),
-                                    'is_static' => $method->isStatic(),
                                     'type' => 'action',
                                     'hook' => $action->hook,
                                     'priority' => $action->priority,
@@ -518,7 +528,6 @@ class AutowireScanner
                                 $registrations[] = [
                                     'class' => $className,
                                     'method' => $method->getName(),
-                                    'is_static' => $method->isStatic(),
                                     'type' => 'filter',
                                     'hook' => $filter->hook,
                                     'priority' => $filter->priority,

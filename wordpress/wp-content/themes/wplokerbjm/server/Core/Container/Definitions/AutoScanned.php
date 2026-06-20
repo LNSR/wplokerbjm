@@ -14,7 +14,7 @@ use WPLokerBJM\Core\Container\Support\AutowireScanner;
  * Note: This only adds definitions for classes that don't already have manual
  * definitions in other definition files.
  */
-class AutoScanned
+class AutoScanned implements DefinitionProviderInterface
 {
     public static function getDefinitions(): array
     {
@@ -33,9 +33,8 @@ class AutoScanned
             if (basename($file) === 'AutoScanned.php') {
                 continue;
             }
-            // Get class name from file
             $className = __NAMESPACE__ . '\\' . basename($file, '.php');
-            if (class_exists($className) && method_exists($className, 'getDefinitions')) {
+            if (class_exists($className) && is_subclass_of($className, DefinitionProviderInterface::class)) {
                 $defs = $className::getDefinitions();
                 if (is_array($defs)) {
                     $existingDefinitions = array_merge($existingDefinitions, $defs);

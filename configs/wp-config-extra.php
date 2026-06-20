@@ -160,7 +160,7 @@ switch (WP_ENV) {
     define('DISABLE_WP_CRON', true);
 
     // Asset concatenation/compression
-    define('CONCATENATE_SCRIPTS', true); // Combine JS files
+    define('CONCATENATE_SCRIPTS', false); // Combine JS files
     define('COMPRESS_SCRIPTS', true); // Compress JS
     define('COMPRESS_CSS', true); // Compress CSS
 

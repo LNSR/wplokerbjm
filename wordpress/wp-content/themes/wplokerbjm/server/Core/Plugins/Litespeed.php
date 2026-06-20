@@ -17,7 +17,7 @@ class Litespeed
      * @return void
      */
     #[Action('litespeed_purged_all')]
-    public static function clearObjectCache(): void
+    public function clearObjectCache(): void
     {
         if (!SharedUtils::isPluginActive('litespeed')) {
             return;
@@ -57,7 +57,7 @@ class LiteSpeedFilters
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
     #[Filter('litespeed_is_mobile', 0)]
-    public static function customMobileDetect()
+    public function customMobileDetect()
     {
         return wp_is_mobile();
     }
@@ -73,7 +73,7 @@ class LiteSpeedGraphQL
      * Set GraphQL Queries returned via HTTP GET requests to be cacheable
      */
     #[Action('graphql_process_http_request_response', 2)]
-    public static function setCacheable(): void
+    public function setCacheable(): void
     {
         if (!SharedUtils::isPluginActive('litespeed')) {
             return;
@@ -93,7 +93,7 @@ class LiteSpeedGraphQL
      * Add LiteSpeed tags, unset the x-graphql-keys
      */
     #[Filter('graphql_response_headers_to_send', 11)]
-    public static function tagResponses(array $headers = []): array
+    public function tagResponses(array $headers = []): array
     {
         if (!SharedUtils::isPluginActive('litespeed')) {
             return $headers;
@@ -121,7 +121,7 @@ class LiteSpeedGraphQL
      * Call litespeed_purge when graphql_purge is called
      */
     #[Action('graphql_purge')]
-    public static function purgeCache($keys): void
+    public function purgeCache($keys): void
     {
         if (!SharedUtils::isPluginActive('litespeed')) {
             return;

@@ -23,7 +23,7 @@ class GlobalHooks
     /**
      * Skip redirect logic for ACME challenge requests and AutoSSL probe user agents.
      */
-    private static function shouldBypassAutoSsl(): bool
+    private function shouldBypassAutoSsl(): bool
     {
         $requestUri = $_SERVER['REQUEST_URI'] ?? '';
         if ($requestUri !== '' && str_starts_with($requestUri, '/.well-known/acme-challenge/')) {
@@ -44,10 +44,10 @@ class GlobalHooks
      * ! Notify search engines with 410 Gone for removed job posts.
      */
     #[Action('template_redirect', 1)]
-    public static function oldPost410Redirect(): void
+    public function oldPost410Redirect(): void
     {
         if (
-            self::shouldBypassAutoSsl() ||
+            $this->shouldBypassAutoSsl() ||
             !is_404() ||
             is_preview() ||
             is_admin() ||
@@ -58,7 +58,7 @@ class GlobalHooks
             return;
         }
 
-        $handleRemovedJob = function () {
+        $handleRemovedJob = static function () {
             if (is_404()) {
                 status_header(410);
                 wp_die('This job posting has been expired or removed.', 'Gone', ['response' => 410]);
@@ -81,11 +81,11 @@ class GlobalHooks
      * Redirect to home if accessing the lowongan post type archive.
      */
     #[Action('template_redirect', 4)]
-    public static function redirectToHome(): void
+    public function redirectToHome(): void
     {
         // Avoid redirecting during admin, AJAX, REST API, cron, or preview requests
         if (
-            self::shouldBypassAutoSsl() ||
+            $this->shouldBypassAutoSsl() ||
             (defined('REST_REQUEST') && REST_REQUEST) ||
             wp_doing_ajax() ||
             wp_doing_cron() ||
@@ -107,11 +107,11 @@ class GlobalHooks
      * public requests to the Svelte frontend (dev vs prod).
      */
     #[Action('template_redirect', 2)]
-    public static function headlessFrontendAdminSideRedirect(): void
+    public function headlessFrontendAdminSideRedirect(): void
     {
         // Avoid redirecting during admin, AJAX, REST API, cron, preview, or CLI requests
         if (
-            self::shouldBypassAutoSsl() ||
+            $this->shouldBypassAutoSsl() ||
             is_admin() ||
             (defined('REST_REQUEST') && REST_REQUEST) ||
             (defined('DOING_AJAX') && DOING_AJAX) ||
@@ -155,7 +155,7 @@ class GlobalHooks
      * - Noindex,nofollow for staging/dev subdomains.
      */
     #[Filter('wp_robots')]
-    public static function robotsMetaImpl(array $robots): array
+    public function robotsMetaImpl(array $robots): array
     {
         if (is_post_type_archive('lowongan')) {
             $robots['noindex'] = true;
@@ -199,7 +199,7 @@ class GlobalHooks
      * @return string Modified search SQL fragment.
      */
     #[Filter('posts_search', 10, 2)]
-    public static function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
+    public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
 
@@ -222,7 +222,7 @@ class GlobalHooks
      * Temporarily disable specific plugins if in development environment.
      */
     #[Filter('option_active_plugins', 4)]
-    public static function disablePluginsForDevImpl(array $plugins): array
+    public function disablePluginsForDevImpl(array $plugins): array
     {
         $isDev = SharedUtils::isDevelopment();
         if (!$isDev) {
@@ -231,28 +231,28 @@ class GlobalHooks
         $extra = [
         ];
 
-        $pluginsToDisable = self::listPluginsToDisable($extra);
-        return self::filteredPlugins($plugins, $pluginsToDisable);
+        $pluginsToDisable = $this->listPluginsToDisable($extra);
+        return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
 
     /**
      * Temporarily disable specific plugins if simulating production environment on local machine.
      */
     #[Filter('option_active_plugins', 4)]
-    public static function disablePluginsforSimulatedProdImpl(array $plugins): array
+    public function disablePluginsforSimulatedProdImpl(array $plugins): array
     {
         $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
 
-        $pluginsToDisable = $isDev ? self::listPluginsToDisable() : [];
+        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
 
-        return self::filteredPlugins($plugins, $pluginsToDisable);
+        return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
 
     /**
      * Force locale to Indonesian on the frontend for consistent user experience, while keeping admin in English.
      */
     #[Filter('locale')]
-    public static function frontendLocal($locale)
+    public function frontendLocal($locale)
     {
         if (!is_admin()) { // Only affects the public site, keeps your dashboard English
             return 'id_ID';
@@ -267,7 +267,7 @@ class GlobalHooks
      * @param array $pluginsToDisable Array of plugin prefixes to disable.
      * @return array Filtered array of active plugins.
      */
-    private static function filteredPlugins(array $plugins, array $pluginsToDisable): array
+    private function filteredPlugins(array $plugins, array $pluginsToDisable): array
     {
         $filtered = array_filter($plugins, function (string $plugin) use ($pluginsToDisable): bool {
             foreach ($pluginsToDisable as $disable) {
@@ -287,7 +287,7 @@ class GlobalHooks
      * @param array|null $extra Optional array of additional plugin prefixes to disable.
      * @return array Array of plugin prefixes to disable.
      */
-    private static function listPluginsToDisable(?array $extra = []): array
+    private function listPluginsToDisable(?array $extra = []): array
     {
         return array_merge([
             // 'google-site-kit/',
@@ -326,7 +326,7 @@ class GlobalHooks
     #[Action('updated_post_meta', 10, 4)]
     #[Action('set_object_terms', 10, 6)]
     #[Action('transition_post_status', 10, 3)]
-    public static function purgeCacheOnChange(...$args): void
+    public function purgeCacheOnChange(...$args): void
     {
         // Normalize incoming hook args: find first numeric-like value as post_id and any \WP_Post instance as post
         $post_id = null;
@@ -403,7 +403,7 @@ class GlobalHooks
 
             // If we detected a post id, also invalidate the per-job caches
             if ($post_id !== null) {
-                self::invalidateJobDataCache((int) $post_id);
+                $this->invalidateJobDataCache((int) $post_id);
             }
         } catch (\Exception $e) {
             Logger::error('Hooks', 'Hooks::purgeCacheOnChange error: ' . $e->getMessage());
@@ -416,7 +416,7 @@ class GlobalHooks
      * @param int $post_id The post ID.
      * @return bool True if cache was invalidated, false otherwise.
      */
-    private static function invalidateJobDataCache(int $post_id): bool
+    private function invalidateJobDataCache(int $post_id): bool
     {
         $post_type = get_post_type($post_id);
         if ($post_type !== 'lowongan') {
@@ -440,5 +440,70 @@ class GlobalHooks
 
         // Return true if any cache entry was deleted
         return !empty(array_filter($deleteResults));
+    }
+
+    /*======================================================================
+     | PLUGIN BUG FIXES
+     ======================================================================*/
+
+    /**
+     * Fix blank WYSIWYG/TinyMCE editor on fresh post-editor load edit by viewing WYSIWYG/TinyMCE editor html code first
+     */
+    #[Filter('wp_default_editor', 8)]
+    public function switch_tinymce_default_view(): string
+    {
+        return 'html';
+    }
+
+    #[Action('admin_footer')]
+    public function switch_tinymce_editor_view_to_visual(): void
+    {
+        $screen = get_current_screen();
+        if (!$screen || $screen->base !== 'post')
+            return;
+        ?>
+        <script type="module" id="tinyMCE-fix">
+            let attempts = 0;
+            const maxAttempts = 10;
+
+            const forceVisualTabClick = () => {
+                // Find the literal "Visual" tab buttons belonging to the editors
+                const visualButtons = document.querySelectorAll('.wp-editor-tabs .switch-tmce');
+
+                if (visualButtons.length === 0) {
+                    return retry();
+                }
+
+                visualButtons.forEach(button => {
+                    const wrapper = button.closest('.wp-editor-wrap');
+                    const editorId = wrapper?.querySelector('.wp-editor-area')?.id;
+
+                    // Skip the main core content editor, only target custom fields
+                    if (editorId && editorId !== 'content') {
+                        if (wrapper.classList.contains('html-active')) {
+                            const clickEvent = new MouseEvent('click', {
+                                view: window,
+                                bubbles: true,
+                                cancelable: true
+                            });
+                            button.dispatchEvent(clickEvent);
+                        }
+                    }
+                });
+            };
+
+            const retry = () => {
+                if (attempts < maxAttempts) {
+                    attempts++;
+                    window.scheduler.postTask(() => forceVisualTabClick(), {
+                        priority: 'user-visible',
+                        delay: 200
+                    });
+                }
+            };
+
+            retry();
+        </script>
+        <?php
     }
 }

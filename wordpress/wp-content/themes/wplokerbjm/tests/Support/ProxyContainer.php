@@ -46,6 +46,9 @@ final class ProxyContainer
     {
         // Reset in-memory object cache
         $GLOBALS['__wplokerbjm_wp_object_cache'] = [];
+
+        // Reset tracked WordPress hook registrations
+        $GLOBALS['__wplokerbjm_registered_hooks'] = [];
     }
 
     public static function container(): ContainerInterface

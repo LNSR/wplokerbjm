@@ -74,7 +74,7 @@ class SharedUtils
             return false;
         }
 
-        $checkPlugins = function() {
+        $checkPlugins = static function () {
             $plugins = get_option('active_plugins');
             return is_array($plugins) ? $plugins : null;
         };
@@ -93,16 +93,10 @@ class SharedUtils
      *! make arrays returned values more compact by removing empty entries 
      *
      * @param array $dataArray The input array to filter.
-     * @param bool|null $disable Optional flag to disable filtering in development environment.
      * @return array The filtered array with empty values removed.
      */
-    public static function filterEmptyValues(array $dataArray, ?bool $disable = false): array
+    public static function filterEmptyValues(array $dataArray): array
     {
-        // In development environment, return data as is for easier debugging
-        if (self::isDevelopment() && $disable) {
-            return $dataArray;
-        }
-
         $filtered = [];
         foreach ($dataArray as $key => $value) {
             if (is_array($value)) {
@@ -115,27 +109,5 @@ class SharedUtils
             }
         }
         return $filtered;
-    }
-
-    /**
-     * Parse deadline string to timestamp, trying multiple common formats
-     * @param string $deadline
-     * @return int|false
-     */
-    public static function parseDeadlineTimestamp(string $deadline): int|false
-    {
-        // Common date formats to try
-        $formats = ['Y-m-d', 'd/m/Y', 'm/d/Y', 'd-m-Y', 'm-d-Y'];
-
-        foreach ($formats as $format) {
-            $dt = \DateTime::createFromFormat($format, $deadline);
-            if ($dt !== false) {
-                return $dt->getTimestamp() + 86399; // Add 23:59:59 to the day
-            }
-        }
-
-        // Fallback to strtotime
-        $ts = strtotime($deadline . ' 23:59:59');
-        return $ts !== false ? $ts : false;
     }
 }

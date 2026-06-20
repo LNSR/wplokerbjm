@@ -68,6 +68,97 @@ abstract class WplokerbjmTestCase extends TestCase
             }
             return $responses;
         });
+
+        $this->setupWordPressHookMocks();
+    }
+
+    /**
+     * Mock WordPress hook registration and dispatch functions.
+     *
+     * Maintains a global registry of `add_action` / `add_filter` calls so tests
+     * can assert which hooks were registered and with what callables.
+     * `do_action` and `apply_filters` actually invoke the registered callables
+     * (limited by their `accepted_args`) so the lazy resolution path can be
+     * exercised end-to-end.
+     *
+     * @return void
+     */
+    protected function setupWordPressHookMocks(): void
+    {
+        $GLOBALS['__wplokerbjm_registered_hooks'] = [];
+
+        \Brain\Monkey\Functions\when('add_action')->alias(function ($hook, $callable, $priority = 10, $accepted_args = 1) {
+            $GLOBALS['__wplokerbjm_registered_hooks'][] = [
+                'type' => 'action',
+                'hook' => $hook,
+                'callable' => $callable,
+                'priority' => $priority,
+                'accepted_args' => $accepted_args,
+            ];
+            return true;
+        });
+
+        \Brain\Monkey\Functions\when('add_filter')->alias(function ($hook, $callable, $priority = 10, $accepted_args = 1) {
+            $GLOBALS['__wplokerbjm_registered_hooks'][] = [
+                'type' => 'filter',
+                'hook' => $hook,
+                'callable' => $callable,
+                'priority' => $priority,
+                'accepted_args' => $accepted_args,
+            ];
+            return true;
+        });
+
+        \Brain\Monkey\Functions\when('do_action')->alias(function ($hook, ...$args) {
+            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $reg) {
+                if ($reg['type'] !== 'action' || $reg['hook'] !== $hook) {
+                    continue;
+                }
+                $callable = $reg['callable'];
+                $limited = array_slice($args, 0, (int) $reg['accepted_args']);
+                $callable(...$limited);
+            }
+        });
+
+        \Brain\Monkey\Functions\when('apply_filters')->alias(function ($hook, $value, ...$args) {
+            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $reg) {
+                if ($reg['type'] !== 'filter' || $reg['hook'] !== $hook) {
+                    continue;
+                }
+                $callable = $reg['callable'];
+                $limited = array_slice([$value, ...$args], 0, (int) $reg['accepted_args']);
+                $value = $callable(...$limited);
+            }
+            return $value;
+        });
+    }
+
+    /**
+     * Return the list of hooks registered via `add_action` / `add_filter`
+     * during the current test.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    protected function registeredHooks(): array
+    {
+        return $GLOBALS['__wplokerbjm_registered_hooks'] ?? [];
+    }
+
+    /**
+     * Find the first registered hook matching the given type and name.
+     *
+     * @param string $type 'action' or 'filter'
+     * @param string $hook Hook name
+     * @return array<string,mixed>|null
+     */
+    protected function findRegisteredHook(string $type, string $hook): ?array
+    {
+        foreach ($this->registeredHooks() as $reg) {
+            if ($reg['type'] === $type && $reg['hook'] === $hook) {
+                return $reg;
+            }
+        }
+        return null;
     }
 
     protected function tearDown(): void

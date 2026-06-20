@@ -1,6 +1,6 @@
 <script module lang="ts">
   import type { CardJob, CarouselProps, JobCardProps } from "@/types";
-  import type { SwiperOptions, VirtualData } from "swiper/types";
+  import type { SwiperModule, SwiperOptions, VirtualData } from "swiper/types";
   function sortJobsByDeadline(jobs: CardJob[] | null): CardJob[] {
     if (!jobs) return [];
     const items = [...jobs];
@@ -47,24 +47,20 @@
   import { browser } from "$app/environment";
 
   let { jobs }: CarouselProps = $props();
-  const title = "Lowongan Darurat";
+  const title = $state.raw("Lowongan Darurat");
   const sortedJobs = $derived(sortJobsByDeadline(jobs ?? null));
 
+  /**
+   * @see {@link https://swiperjs.com/swiper-api}
+   * Using Swiper Core for better TS DX, Swiper Element currently does not provide inbuilt svelte/elements for attributes
+   * ? Migrate to Swiper Element when it has better TS element attributes support
+   */
   class SwiperManager {
-    public virtualData = $state<Omit<VirtualData<any>, "slides">>({
+    public virtualData = $state<Omit<VirtualData<CardJob>, "slides">>({
       from: 0,
       to: -1,
       offset: 0,
     });
-    public swiperFailed = $state(false);
-    public error = $state<string | null>(null);
-    public isRefreshing = $state(false);
-    public jobCount = $derived(jobs?.length ?? 0);
-    public swiperInstance: Swiper | null = null;
-    public swiperContainerEl = $state<HTMLElement | null>(null);
-    public paginationEl = $state<HTMLElement | null>(null);
-    public nextButtonEl = $state<HTMLElement | null>(null);
-    public prevButtonEl = $state<HTMLElement | null>(null);
     public virtualIndexes = $derived.by(() => {
       const total = this.jobCount;
       if (total <= 0) return [] as number[];
@@ -80,11 +76,20 @@
       for (let i = from; i <= to; i += 1) idxs.push(i);
       return idxs;
     });
+    public swiperFailed = $state(false);
+    public error = $state<string | null>(null);
+    public isRefreshing = $state(false);
+    public jobCount = $derived(jobs?.length ?? 0);
     #initialSlide = $state(0);
     #slides = $derived(
       Array.from({ length: this.jobCount }, (_, index) => index),
     );
     #isInitializing = $state(false);
+    public swiperInstance: Swiper | null = null;
+    public swiperContainerEl = $state<HTMLElement | null>(null);
+    public paginationEl = $state<HTMLDivElement | null>(null);
+    public nextButtonEl = $state<HTMLButtonElement | null>(null);
+    public prevButtonEl = $state<HTMLButtonElement | null>(null);
 
     private createSwiperConfig(
       paginationEl: HTMLElement | null,
@@ -92,9 +97,10 @@
       prevEl: HTMLElement | null,
     ): SwiperOptions {
       return {
+        modules: [Navigation, Pagination, Autoplay, Virtual] satisfies SwiperModule[],
         loop: false,
         rewind: false,
-        slidesPerView: 1,
+        slidesPerView: 1.15,
         centeredSlides: false,
         spaceBetween: 12,
         autoplay: {
@@ -126,11 +132,11 @@
           addSlidesBefore: 2,
           addSlidesAfter: 2,
           renderExternalUpdate: false,
-          renderExternal: (data: VirtualData<any>) => {
+          renderExternal: (data: VirtualData<CardJob>) => {
             const next = {
-              from: Number(data?.from ?? 0),
-              to: Number(data?.to ?? -1),
-              offset: Number(data?.offset ?? 0),
+              from: Number(data.from),
+              to: Number(data.to),
+              offset: Number(data.offset),
             };
 
             // Avoid excessive state writes during Swiper's internal loops.
@@ -142,15 +148,17 @@
               return;
             }
 
-            this.virtualData = next;
-            flushSync();
-            this.swiperInstance?.virtual?.update(true);
-            this.swiperInstance?.updateSlides();
+            requestAnimationFrame(() => {
+              this.virtualData = next;
+              flushSync();
+              this.swiperInstance?.virtual?.update(true);
+              this.swiperInstance?.updateSlides();
+            });
           },
         },
         breakpoints: {
           480: {
-            slidesPerView: 1.15,
+            slidesPerView: 1.2,
             spaceBetween: 16,
           },
           640: {
@@ -180,10 +188,6 @@
       prevEl: HTMLElement | null,
     ): void {
       try {
-        if (SwiperCore && (SwiperCore as typeof SwiperCore).use) {
-          SwiperCore.use([Navigation, Pagination, Autoplay, Virtual]);
-        }
-
         const savedState = routeStateStore.getCarouselState();
         const targetSlideIndex = savedState?.slideIndex;
         const clampedIndex =
@@ -194,12 +198,8 @@
         this.#initialSlide = clampedIndex;
 
         const cfg = this.createSwiperConfig(paginationEl, nextEl, prevEl);
-        const finalCfg = {
-          ...(cfg || {}),
-          modules: [Navigation, Pagination, Autoplay, Virtual],
-        };
 
-        this.swiperInstance = new SwiperCore(el, finalCfg);
+        this.swiperInstance = new SwiperCore(el, cfg);
 
         requestAnimationFrame(() => {
           if (this.swiperInstance?.virtual)
@@ -236,15 +236,15 @@
       this.swiperFailed = false;
 
       const paginationEl =
-        (document.querySelector(".swiper-pagination") as HTMLElement | null) ??
+        (document.querySelector(".swiper-pagination") as HTMLDivElement | null) ??
         this.paginationEl;
 
       const nextEl =
-        (document.querySelector(".job-carousel-next") as HTMLElement | null) ??
+        (document.querySelector(".job-carousel-next") as HTMLButtonElement | null) ??
         this.nextButtonEl;
 
       const prevEl =
-        (document.querySelector(".job-carousel-prev") as HTMLElement | null) ??
+        (document.querySelector(".job-carousel-prev") as HTMLButtonElement | null) ??
         this.prevButtonEl;
 
       try {
@@ -483,8 +483,8 @@
         aria-live="polite"
       >
         <div class="swiper-wrapper">
-          {#each swiperManager.virtualIndexes as idx}
-            {const job: JobCardProps['jobdata'] = sortedJobs[idx]}
+          {#each swiperManager.virtualIndexes as idx (idx)}
+            {const job: JobCardProps['jobdata'] = $derived(sortedJobs[idx])}
             <div
               class="swiper-slide min-w-0"
               data-swiper-slide-index={idx}

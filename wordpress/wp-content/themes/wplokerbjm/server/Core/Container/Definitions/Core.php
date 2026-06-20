@@ -24,7 +24,7 @@ namespace WPLokerBJM\Core\Container\Definitions;
  * @see \WPLokerBJM\Core\Container\Attributes\Action
  * @see \WPLokerBJM\Core\Container\Attributes\Filter
  */
-class Core
+class Core implements DefinitionProviderInterface
 {
     public static function getDefinitions(): array
     {
@@ -40,8 +40,10 @@ class Core
                 // Step 2: Get hook registrations from attributes.
                 $hookRegistrations = $scanner->getHookRegistrations();
 
-                // Init will register hooks from attributes automatically, resolving services from container as needed.
-                return new \WPLokerBJM\Core\Container\Init([], $hookRegistrations, $c);
+                // Init will register hooks from attributes automatically.
+                // Instance-method hooks are wrapped in lazy closures that defer
+                // container resolution to the moment the hook actually fires.
+                return new \WPLokerBJM\Core\Container\Init($hookRegistrations, $c);
             },
         ];
     }

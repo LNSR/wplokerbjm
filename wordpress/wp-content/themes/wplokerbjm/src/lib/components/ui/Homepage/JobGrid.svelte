@@ -40,7 +40,7 @@
   // virtualization parameters
   const FALLBACK_ITEM_HEIGHT = 420;
   const fallbackGap = 24;
-  const buffer = 6;
+  const buffer = 4;
   const currentHeightY = $derived(scrollY.current);
   const innerHeightValue = $derived(innerHeight.current);
   /**
@@ -404,7 +404,7 @@
   id="job-grid"
   style={!isMobile ? "view-transition-name: none;" : ""}
 >
-  <div class="flex items-center justify-between mb-6" style="content-visibility: auto;">
+  <div class="flex items-center justify-between mb-6">
     {#if displayJobs.length}
       <h2 class="text-xl md:text-2xl font-semibold">{displayTitle}</h2>
     {:else}
@@ -447,7 +447,7 @@
             <div
               style="height: {virtualization.totalHeight}px; position: relative;"
             >
-              {#each virtualization.visibleJobs as job, index}
+              {#each virtualization.visibleJobs as job, index (job.id)}
                 {const absoluteTop = $derived(
                   virtualization.itemPositions[
                     virtualization.startIndex + index
@@ -491,7 +491,7 @@
             </div>
           {:else}
             <!-- SSR rendering -->
-            {#each displayJobs as job}
+            {#each displayJobs as job (job.id)}
               <div class="relative w-full pt-4">
                 <JobCard
                   jobdata={job}

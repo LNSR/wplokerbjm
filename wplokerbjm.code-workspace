@@ -69,6 +69,15 @@
     "python.analysis.typeEvaluation.strictDictionaryInference": true,
     "python.analysis.typeEvaluation.strictListInference": true,
     "python.analysis.typeEvaluation.strictSetInference": true,
+    "intelephense.codeLens.overrides.enable": true,
+    "intelephense.codeLens.implementations.enable": true,
+    "intelephense.codeLens.parent.enable": true,
+    "intelephense.codeLens.references.enable": true,
+    "intelephense.codeLens.usages.enable": true,
+    "intelephense.compatibility.preferPsalmPhpstanPrefixedAnnotations": true,
+    "intelephense.completion.fullyQualifyGlobalConstantsAndFunctions": true,
+    "intelephense.completion.maxItems": 1000,
+    "intelephense.diagnostics.strictTypes": true,
   },
   "extensions": {
     "recommendations": [
