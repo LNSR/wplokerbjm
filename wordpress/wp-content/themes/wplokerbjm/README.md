@@ -1,22 +1,17 @@
-# 🎨 WPLokerBJM Theme
+# 🎨 WPLokerBJM ~~Theme~~ Server
 
-> 🚀 Modern WordPress job board theme built with SvelteKit, TypeScript, and PHP-DI
+> 🚀 Backend PHP for Modern WordPress job board theme built with SvelteKit, TypeScript, and PHP-DI
 
 ![WordPress](https://img.shields.io/badge/WordPress-21759B?style=flat-square&logo=wordpress&logoColor=white)
-![Svelte](https://img.shields.io/badge/Svelte-4A4A55?style=flat-square&logo=svelte&logoColor=FF3E00)
-![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat-square&logo=php&logoColor=white)
-![Vite](https://img.shields.io/badge/Vite-646CFF?style=flat-square&logo=vite&logoColor=white)
+![Composer](https://img.shields.io/badge/Composer-2B2737?style=flat-square&logo=composer&logoColor=white)
+![PHPUnit](https://img.shields.io/badge/PHPUnit-777BB4?style=flat-square&logo=phpunit&logoColor=white)
 
 ## 📁 Important Theme Files & Folders
 
 1. 🎨 **`style.css`** - Boilerplate WordPress stylesheet for the theme. Contains theme metadata and custom styles, not literally used, we redirect_template to SvelteKit domain.
 2. ⚙️ **`server/`** - Directory containing backend PHP code, including custom functions, GraphQL APIs, hooks, and filters.
-3. 🖼️ **`src/`** - Directory containing SvelteKit code.
-4. 📦 **`/.svelte-kit`** - Directory for SvelteKit build artifacts.
-5. 🛠️ **`tools/`** - Directory for development and build tools.
-6. 🚀 **`wrangler.jsonc`** - Configuration file for Cloudflare Workers deployment.
-7. 📁 **`public/`** - Directory for static assets and public files.
+3. 🛠️ **`tools/`** - Directory for development and build tools.
 
 ## 🔌 Must-Use Plugin (MU Plugin)
 
@@ -25,11 +20,11 @@
 - ⚡ **Benefits**: Ensures hooks, services, and dependencies are registered before regular plugins and themes load, preventing conflicts and ensuring early execution.
 - 🚀 **Deployment**: Automatically deployed via GitHub Actions CI/CD pipeline to the remote server.
 
-This MU plugin is crucial for the theme's architecture, as it bootstraps the dependency injection system and custom hooks that power the job board functionality.
+This MU plugin is crucial for the ~~theme's~~ **server's** architecture, as it bootstraps the dependency injection system and custom hooks that power the job board functionality.
 
 ## 🔗 Dependency Injection System
 
-This theme uses PHP-DI for dependency injection with automatic class discovery and registration.
+This ~~theme~~ **server** uses PHP-DI for dependency injection with automatic class discovery and registration.
 
 ### How It Works
 

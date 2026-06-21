@@ -29,12 +29,23 @@ inotifywait -m -r -e modify,create,delete --format '%w%f' "${watch_paths[@]}" \
       # Run composer in background after a short delay (debounce)
       (
       sleep 2
-      echo "[$(date +'%H:%M:%S')] Running composer dump-autoload..." &
-      composer dump-autoload --apcu -a -o &
-      echo "[$(date +'%H:%M:%S')] Resetting Redis..." &
-      docker exec -i wordpress_redis redis-cli --user default -a "redis_secure_password" --no-auth-warning FLUSHALL &
-      echo "[$(date +'%H:%M:%S')] Resetting OPcache..." &
-      docker exec -i wordpress-${WP_ENV} bash -c "php -r \"opcache_reset();\""
+      echo "[$(date +'%H:%M:%S')] 📦 Dumping Composer Classmap..."
+      composer dump-autoload --apcu -a -o > /dev/null 2>&1
+
+      echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local HMR Chain..."
+      CONTAINER_OUTPUT=$(docker exec -i wordpress-${WP_ENV} php -r "
+        require_once '/var/www/html/wp-load.php';
+        if (class_exists('LiteSpeed\Purge')) {
+            \LiteSpeed\Purge::purge_all();
+            echo 'Success';
+        }
+      " 2>&1)
+
+      if [ "$CONTAINER_OUTPUT" = "Success" ]; then
+        echo "[$(date +'%H:%M:%S')] ✅ HMR Sync Completed successfully."
+      else
+        echo "[$(date +'%H:%M:%S')] ❌ HMR Sync Failed: $CONTAINER_OUTPUT"
+      fi
       ) &
       pending_pid=$!
     fi

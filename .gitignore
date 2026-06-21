@@ -1,7 +1,4 @@
-# Ignore the contents of wordpress, but allow Git to scan the folder itself
 wordpress/*
-
-# Re-include the specific paths with trailing slashes so Git can crawl down them
 !wordpress/wp-content/
 wordpress/wp-content/*
 
@@ -12,6 +9,7 @@ wordpress/wp-content/mu-plugins/*
 !wordpress/wp-content/themes/
 wordpress/wp-content/themes/*
 !wordpress/wp-content/themes/wplokerbjm/
+
 **/.svelte-kit
 **/.wrangler
 **/.tmp
@@ -42,4 +40,4 @@ worker-configuration.d.ts
 **/*.graphql
 **/*.tsbuildinfo
 
-**/wplokerbjm/.agents
+**/.agents

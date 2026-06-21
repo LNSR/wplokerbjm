@@ -80,8 +80,8 @@ class Init
                 Logger::error(
                     'Init',
                     'Error registering hook ' . $reg['hook']
-                        . ' for ' . $reg['class'] . '::' . $reg['method']
-                        . ': ' . $e->getMessage()
+                    . ' for ' . $reg['class'] . '::' . $reg['method']
+                    . ': ' . $e->getMessage()
                 );
             }
         }
@@ -97,9 +97,9 @@ class Init
      * and emit a warning.
      *
      * @param array<string,mixed> $reg
-     * @return \Closure|null
+     * @return callable|null
      */
-    private function buildCallable(array $reg): ?\Closure
+    private function buildCallable(array $reg): callable|null
     {
         if (!$this->container || !$this->container->has($reg['class'])) {
             Logger::warning(
@@ -113,8 +113,6 @@ class Init
         $method = $reg['method'];
         $container = $this->container;
 
-        return static function (...$args) use ($class, $method, $container) {
-            return $container->get($class)->{$method}(...$args);
-        };
+        return static fn(...$args) => $container->get($class)->{$method}(...$args);
     }
 }

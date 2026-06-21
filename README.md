@@ -1,7 +1,7 @@
 # 💼 WPLokerBJM Source Code & Configuration
 
 ![WordPress](https://img.shields.io/badge/WordPress-21759B?style=flat-square&logo=wordpress&logoColor=white)
-![Svelte](https://img.shields.io/badge/Svelte-4A4A55?style=flat-square&logo=svelte&logoColor=FF3E00)
+![SvelteKit](https://img.shields.io/badge/SvelteKit-4A4A55?style=flat-square&logo=svelte&logoColor=FF3E00)
 ![TypeScript](https://img.shields.io/badge/TypeScript-007ACC?style=flat-square&logo=typescript&logoColor=white)
 ![PHP](https://img.shields.io/badge/PHP-777BB4?style=flat-square&logo=php&logoColor=white)
 ![Python](https://img.shields.io/badge/Python-3776AB?style=flat-square&logo=python&logoColor=white)
@@ -18,14 +18,14 @@ This repository contains the source code and configuration for **WPLokerBJM**.
 
 ## 📁 Project Structure
 
+- 🎨 **`sveltekit/`**  
+  SvelteKit frontend application — Svelte 5 runes, TypeScript, Tailwind CSS 4, DaisyUI 5, GraphQL via urql.
 - 🎨 **`wordpress/wp-content/themes/wplokerbjm`**  
-  The main directory for SvelteKit and Wordpress theme layer as backend.
+  The main directory for WordPress theme layer as backend.
 - 🔌 **`wordpress/wp-content/mu-plugins/wplokerbjm-bootstrap.php`**  
   Must-use plugin that loads the Composer autoloader and initializes the PHP-DI container early in the WordPress lifecycle, ensuring hooks and services are registered before regular plugins and themes.
 - ⚙️ **`wordpress/wp-content/themes/wplokerbjm/server`**  
   Contains backend PHP code, including custom functions, REST/GraphQL API, hooks, and filters. This may include custom post types, meta fields, and integration logic.
-- 🖼️ **`wordpress/wp-content/themes/wplokerbjm/src`**  
-  Contains SvelteKit server and client code.
 - 🤖 **`wplokerbjm-post-automation`**  
   A standalone microservice for converting job vacancy flyers into structured WordPress `lowongan` drafts via Telegram. This lives as a git submodule and deploys independently as a Render Web Service.
 
@@ -57,6 +57,7 @@ wplokerbjm/
 ├── README.md # You reading it!
 ├── scripts # docker entrypoint and other scripts
 │   └── entrypoint.sh # Wordpress modified entrypoint
+├── sveltekit # SvelteKit frontend (Svelte 5, TypeScript, Tailwind CSS 4, GraphQL)
 ├── wplokerbjm-post-automation # Microservice submodule - flyer-to-WordPress bot
 ├── .vscode
 │   └── mcp.json
@@ -70,12 +71,12 @@ wplokerbjm/
 
 | Plugin                 | Description                              | Status      |
 | ---------------------- | ---------------------------------------- | ----------- |
+| ⚡ **LiteSpeed Cache** | High-performance caching solution        | ✅ Required |
 | 🧩 **MetaBox**         | Dynamic data framework for custom fields | ✅ Required |
 | 🔗 **WPGraphQL**       | GraphQL API with smart caching for WP    | ✅ Required |
 | 🖥️ **Query Monitor**   | Debugging and performance monitoring     | 🔧 Optional |
 | 🔍 **Rank Math SEO**   | Custom Job Posting schema integration    | 🔧 Optional |
 | 💾 **UpdraftPlus**     | Backup and restore functionality         | 🔧 Optional |
-| ⚡ **LiteSpeed Cache** | High-performance caching solution        | 🔧 Optional |
 
 ## 🤖 Post Automation Microservice
 
@@ -194,10 +195,10 @@ wordpress/wp-content/themes/wplokerbjm/server/
 
 ---
 
-## 🎨 Frontend Structure
+## 🎨 Frontend Structure (sveltekit/)
 
 ```sh
-wordpress/wp-content/themes/wplokerbjm/src # SvelteKit frontend
+sveltekit/src # SvelteKit frontend
 ├── app.html                 # SvelteKit HTML template
 ├── hooks.server.ts          # Server hook entrypoint for SvelteKit
 ├── lib                     # App libraries, shared components, stores, and helpers
@@ -364,12 +365,10 @@ mkcert localhost 127.0.0.1 ::1  # Use your own IP or domain if needed
 
 #### 5. ⚡ **Start development server**
 
-```bash
-# Option 1: Direct command
-bun run dev
+The SvelteKit frontend lives in `sveltekit/`. Start the dev server from there:
 
-# Option 2: VSCode Task
-# VSCode → Terminal → Run Task → dev
+```bash
+cd sveltekit && bun run dev
 ```
 
 ### 🎉 You're all set
@@ -380,7 +379,8 @@ Your development environment should now be running at `https://localhost`
 
 ## 📚 Additional Resources
 
-- 📋 [**Project Notes & Architecture**](wordpress/wp-content/themes/wplokerbjm/README.md) — Theme setup, dependency injection, hooks
+- 📋 [**SvelteKit Frontend Context**](sveltekit/.opencode/context/project-intelligence/technical-domain.md) — Frontend architecture, patterns, and conventions
+- 📋 [**WordPress Backend Context**](wordpress/wp-content/themes/wplokerbjm/.opencode/context/project-intelligence/technical-domain.md) — Theme setup, dependency injection, hooks
 - 🤖 [**Post Automation Microservice**](wplokerbjm-post-automation/README.md) — Flyer-to-WordPress Telegram bot automation
 
 ---

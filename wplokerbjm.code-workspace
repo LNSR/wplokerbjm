@@ -5,7 +5,11 @@
       "path": ".",
     },
     {
-      "name": "wplokerbjm-wp-theme",
+      "name": "wplokerbjm-frontend",
+      "path": "sveltekit",
+    },
+    {
+      "name": "wplokerbjm-backend",
       "path": "wordpress/wp-content/themes/wplokerbjm",
     },
     {
@@ -43,7 +47,7 @@
     "eslint.options": {
       "overrideConfigFile": "eslint.config.ts",
     },
-    "eslint.workingDirectories": ["${workspaceFolder:wplokerbjm-wp-theme}"],
+    "eslint.workingDirectories": ["${workspaceFolder:wplokerbjm-frontend}"],
     "php.stubs": ["all"],
     "[php]": {
       "editor.defaultFormatter": "DEVSENSE.phptools-vscode",
@@ -53,9 +57,10 @@
     "debug.console.fontSize": 12,
     "scm.inputFontSize": 12,
     "terminal.integrated.fontSize": 13,
-    "js/ts.tsdk.path": "wplokerbjm-wp-theme/node_modules/typescript/lib",
+    "js/ts.tsdk.path": "wplokerbjm-frontend/node_modules/typescript/lib",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
     "js/ts.experimental.useTsgo": true,
-    "graphql-config.load.rootDir": "wordpress/wp-content/themes/wplokerbjm",
+    "graphql-config.load.rootDir": "sveltekit",
     "js/ts.implicitProjectConfig.target": "ESNext",
     "js/ts.tsserver.node.path": "/usr/bin/node",
     "js/ts.tsserver.maxMemory": 16392,
@@ -78,6 +83,7 @@
     "intelephense.completion.fullyQualifyGlobalConstantsAndFunctions": true,
     "intelephense.completion.maxItems": 1000,
     "intelephense.diagnostics.strictTypes": true,
+    "typescript.tsdk": "wplokerbjm-frontend/node_modules/typescript/lib",
   },
   "extensions": {
     "recommendations": [
@@ -121,7 +127,7 @@
         "command": "composer run lint:php",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-backend}",
         },
         "problemMatcher": [],
       },
@@ -131,7 +137,7 @@
         "command": "composer run watch:autoload",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-backend}",
         },
         "problemMatcher": [],
       },
@@ -141,7 +147,7 @@
         "command": "composer run test",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-backend}",
         },
         "problemMatcher": [],
       },
@@ -151,7 +157,7 @@
         "command": "bun run dev",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-frontend}",
         },
         "problemMatcher": [],
       },
@@ -161,7 +167,7 @@
         "command": "bun run build",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-frontend}",
         },
         "problemMatcher": [],
       },
@@ -171,7 +177,7 @@
         "command": "bun run preview",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-frontend}",
         },
         "problemMatcher": [],
       },
@@ -181,7 +187,7 @@
         "command": "bun run prepare",
         "group": "build",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-frontend}",
         },
         "problemMatcher": [],
       },
@@ -191,7 +197,7 @@
         "command": "bun run check",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-frontend}",
         },
         "problemMatcher": [],
       },
@@ -201,7 +207,7 @@
         "command": "bun run check:watch",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-frontend}",
         },
         "problemMatcher": [],
       },
@@ -211,7 +217,7 @@
         "command": "bun run lint",
         "group": "test",
         "options": {
-          "cwd": "${workspaceFolder:wplokerbjm-wp-theme}",
+          "cwd": "${workspaceFolder:wplokerbjm-frontend}",
         },
         "problemMatcher": [],
       },

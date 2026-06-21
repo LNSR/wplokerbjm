@@ -184,9 +184,7 @@ class JobsDataResolver
             return $job;
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'JobsDataResolver::resolveJobDetail error: ' . $e->getMessage());
-            return [
-                'job' => null,
-            ];
+            return [];
         }
     }
 

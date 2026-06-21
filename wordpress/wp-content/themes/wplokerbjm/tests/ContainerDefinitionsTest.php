@@ -5,7 +5,7 @@ namespace WPLokerBJM\Tests;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\AutoScanned;
 use WPLokerBJM\Core\Container\Definitions\Core;
-use WPLokerBJM\Core\Container\Support\AutowireScanner;
+use WPLokerBJM\Core\Container\Support\{AutowireScanner, WPhooksScanner};
 
 class ContainerDefinitionsTest extends WplokerbjmTestCase
 {
@@ -65,7 +65,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     public function testHookAttributesFound()
     {
         // Create scanner like Core.php does
-        $scanner = new AutowireScanner(
+        $scanner = new WPhooksScanner(
             get_stylesheet_directory() . '/server',
             'WPLokerBJM'
         );

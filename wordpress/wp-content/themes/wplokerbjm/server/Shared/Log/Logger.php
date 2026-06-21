@@ -8,12 +8,11 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  * Generic Logger for application events
  *
  * Provides structured logging with environment context and different log levels.
+ * @phpstan-type LogLevel 'DEBUG'|'INFO'|'WARNING'|'ERROR'
  */
 class Logger
 {
-    /**
-     * Log levels
-     */
+
     public const LEVEL_DEBUG = 'DEBUG';
     public const LEVEL_INFO = 'INFO';
     public const LEVEL_WARNING = 'WARNING';
@@ -21,6 +20,7 @@ class Logger
 
     /**
      * Get the current environment based on WordPress configuration
+     * @return 'development'|'local'|'production'
      */
     private static function getEnvironment(): string
     {
@@ -44,7 +44,7 @@ class Logger
     /**
      * Log a message with context
      *
-     * @param string $level Log level (DEBUG, INFO, WARNING, ERROR)
+     * @phpstan-param LogLevel $level
      * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
      * @param string $message Log message
      * @param array $context Additional context data
@@ -69,6 +69,10 @@ class Logger
 
     /**
      * Log debug message
+     *
+     * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
+     * @param string $message Log message
+     * @param array $context Additional context data
      */
     public static function debug(string $category, string $message, array $context = []): void
     {
@@ -77,6 +81,10 @@ class Logger
 
     /**
      * Log info message
+     *
+     * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
+     * @param string $message Log message
+     * @param array $context Additional context data
      */
     public static function info(string $category, string $message, array $context = []): void
     {
@@ -85,6 +93,10 @@ class Logger
 
     /**
      * Log warning message
+     *
+     * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
+     * @param string $message Log message
+     * @param array $context Additional context data
      */
     public static function warning(string $category, string $message, array $context = []): void
     {
@@ -93,6 +105,10 @@ class Logger
 
     /**
      * Log error message
+     *
+     * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
+     * @param string $message Log message
+     * @param array $context Additional context data
      */
     public static function error(string $category, string $message, array $context = []): void
     {
@@ -101,6 +117,9 @@ class Logger
 
     /**
      * Get ANSI color code for log level
+     *
+     * @phpstan-param LogLevel $level
+     * @return string ANSI color code for log level
      */
     private static function getLevelColor(string $level): string
     {
@@ -115,6 +134,9 @@ class Logger
 
     /**
      * Get emoji for log level
+     *
+     * @phpstan-param LogLevel $level
+     * @return string Emoji for log level
      */
     private static function getLevelEmoji(string $level): string
     {

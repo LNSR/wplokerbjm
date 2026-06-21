@@ -30,7 +30,9 @@
       },
       {
         "name": "gql.tada/ts-plugin",
-        "schema": "./schema.graphql",
+        "schema": {
+          "url": "https://localhost/graphql"
+        },
         "tadaOutputLocation": "./src/graphql-env.d.ts",
         "tadaTurboLocation": "./src/graphql-env-cache.d.ts",
         "shouldCheckForColocatedFragments": false,

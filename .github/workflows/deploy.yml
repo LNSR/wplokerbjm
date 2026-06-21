@@ -12,6 +12,7 @@ on:
 
 env:
   THEME_DIR: wordpress/wp-content/themes/wplokerbjm
+  SVELTEKIT_DIR: sveltekit
 jobs:
   build-and-deploy:
     name: Build and deploy
@@ -32,11 +33,10 @@ jobs:
       - name: Setup dependencies
         uses: ./.github/actions/setup-dependencies
         with:
-          theme-dir: ${{ env.THEME_DIR }}
-          install-jq: false
+          sveltekit-dir: ${{ env.SVELTEKIT_DIR }}
 
-      - name: Build (theme)
-        working-directory: ${{ env.THEME_DIR }}
+      - name: Build (frontend)
+        working-directory: ${{ env.SVELTEKIT_DIR }}
         env:
           PUBLIC_CMS_ORIGIN: "https://wp.lokerbanjarmasin.my.id"
           PUBLIC_CMS_ORIGIN_DEV: "https://localhost"
@@ -44,7 +44,7 @@ jobs:
 
       # sanity check - ensure the adapter produced a worker and assets
       - name: List build output
-        working-directory: ${{ env.THEME_DIR }}
+        working-directory: ${{ env.SVELTEKIT_DIR }}
         run: |
           echo "Contents of .svelte-kit/cloudflare:";
           ls -al .svelte-kit/cloudflare || true
@@ -84,7 +84,7 @@ jobs:
           bash "$GITHUB_WORKSPACE/.github/scripts/deploy/rclone-sync.sh" &
           RCLONE_PID=$!
 
-          bun wrangler deploy --env ${{ env.WRANGLER_ENV }} &
+          bun --cwd "$GITHUB_WORKSPACE/${{ env.SVELTEKIT_DIR }}" wrangler deploy --env ${{ env.WRANGLER_ENV }} &
           WRANGLER_PID=$!
 
           wait $RCLONE_PID

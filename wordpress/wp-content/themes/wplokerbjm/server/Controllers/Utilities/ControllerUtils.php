@@ -6,7 +6,7 @@ use WPLokerBJM\Shared\Log\Logger;
 
 class ControllerUtils
 {
-    public static function parseJobFilters(\WP_REST_Request $request): array
+    public static function parseJobFilters($request): array
     {
         $parseMulti = static function ($param) {
             if (is_array($param))
@@ -29,7 +29,7 @@ class ControllerUtils
         ];
     }
 
-    public static function failedResponse(string $message, int $code = 400): \WP_REST_Response
+    public static function failedResponse($message, $code = 400)
     {
         return new \WP_REST_Response([
             'success' => false,
@@ -76,7 +76,7 @@ class ControllerUtils
             |> (static fn($arr) => array_filter($arr, static fn($id) => $id > 0));
     }
 
-    public static function hasBearerAuthorization(\WP_REST_Request $request): bool
+    public static function hasBearerAuthorization($request): bool
     {
         $authorization = '';
 

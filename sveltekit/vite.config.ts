@@ -9,6 +9,106 @@ import { resolve } from "path";
 import { analyzer } from "vite-bundle-analyzer";
 import { partytownVite, copyLibFiles } from "@qwik.dev/partytown/utils";
 
+export default defineConfig((configEnv: ConfigEnv): UserConfig => {
+  const isDev = configEnv.mode === "development" || configEnv.mode === "preview";
+
+  const optimizeDeps: UserConfig["optimizeDeps"] = {
+    include: [
+      "comlink",
+      "idb",
+      "lru-cache",
+      "swiper",
+      "viewerjs",
+      "es-toolkit",
+    ],
+  };
+
+  const devServer: UserConfig["server"] = isDev
+    ? {
+      host: true,
+      https:
+        fs.existsSync("../certs/localhost.key") && fs.existsSync("../certs/localhost.crt")
+          ? {
+            key: fs.readFileSync("../certs/localhost.key"),
+            cert: fs.readFileSync("../certs/localhost.crt"),
+          }
+          : undefined,
+      hmr: {
+        port: 50001,
+        clientPort: 50001,
+      },
+      headers: {
+        'Cross-Origin-Opener-Policy': 'same-origin',
+        'Cross-Origin-Embedder-Policy': 'credentialless',
+      },
+    }
+    : undefined;
+
+  const sharedPlugins: UserConfig["plugins"] = [
+    sveltekit(),
+    UnpluginTypia({
+      cache: true,
+      log: true,
+    }),
+  ]
+
+  const plugins: UserConfig["plugins"] = [
+    tailwindcss({
+      optimize: {
+        minify: true,
+      },
+    }),
+    transformInlinedScript(),
+    ...sharedPlugins,
+    devtoolsJson(),
+    partytownVite({
+      dest: resolve(__dirname, "public", "~partytown"),
+    }),
+    appendCloudflareHeaders(),
+    analyzer({
+      enabled: false,
+      fileName: "stats",
+      openAnalyzer: false,
+      analyzerMode: "static",
+    }),
+    copyPartytownAssets(resolve(__dirname, ".svelte-kit", "cloudflare", "~partytown")),
+  ];
+
+  const build: UserConfig["build"] = {
+    minify: "oxc",
+    modulePreload: {
+      polyfill: false,
+    },
+    target: "esnext",
+    sourcemap: false,
+    rolldownOptions: {
+      output: {
+        codeSplitting: true,
+      },
+    },
+  };
+
+  const worker: UserConfig['worker'] = {
+    format: "es",
+    plugins: () => [
+      ...sharedPlugins,
+    ],
+    rolldownOptions: {
+      output: {
+        codeSplitting: true,
+      },
+    },
+  };
+
+  return {
+    plugins,
+    optimizeDeps,
+    server: devServer,
+    build,
+    worker,
+  };
+});
+
 const cloudflareSecurityHeaders = /*txt*/`
 # === START CUSTOM SECURITY HEADERS ===
 
@@ -152,103 +252,3 @@ function appendCloudflareHeaders(): Plugin {
     }
   }
 }
-
-export default defineConfig((configEnv: ConfigEnv): UserConfig => {
-  const isDev = configEnv.mode === "development" || configEnv.mode === "preview";
-
-  const optimizeDeps: UserConfig["optimizeDeps"] = {
-    include: [
-      "comlink",
-      "idb",
-      "lru-cache",
-      "swiper",
-      "viewerjs",
-      "es-toolkit",
-    ],
-  };
-
-  const devServer: UserConfig["server"] = isDev
-    ? {
-      host: true,
-      https:
-        fs.existsSync("../../../../certs/localhost.key") && fs.existsSync("../../../../certs/localhost.crt")
-          ? {
-            key: fs.readFileSync("../../../../certs/localhost.key"),
-            cert: fs.readFileSync("../../../../certs/localhost.crt"),
-          }
-          : undefined,
-      hmr: {
-        port: 50001,
-        clientPort: 50001,
-      },
-      headers: {
-        'Cross-Origin-Opener-Policy': 'same-origin',
-        'Cross-Origin-Embedder-Policy': 'credentialless',
-      },
-    }
-    : undefined;
-
-  const sharedPlugins: UserConfig["plugins"] = [
-    sveltekit(),
-    UnpluginTypia({
-      cache: true,
-      log: true,
-    }),
-  ]
-
-  const plugins: UserConfig["plugins"] = [
-    tailwindcss({
-      optimize: {
-        minify: true,
-      },
-    }),
-    transformInlinedScript(),
-    ...sharedPlugins,
-    devtoolsJson(),
-    partytownVite({
-      dest: resolve(__dirname, "public", "~partytown"),
-    }),
-    appendCloudflareHeaders(),
-    analyzer({
-      enabled: false,
-      fileName: "stats",
-      openAnalyzer: false,
-      analyzerMode: "static",
-    }),
-    copyPartytownAssets(resolve(__dirname, ".svelte-kit", "cloudflare", "~partytown")),
-  ];
-
-  const build: UserConfig["build"] = {
-    minify: "oxc",
-    modulePreload: {
-      polyfill: false,
-    },
-    target: "esnext",
-    sourcemap: false,
-    rolldownOptions: {
-      output: {
-        codeSplitting: true,
-      },
-    },
-  };
-
-  const worker: UserConfig['worker'] = {
-    format: "es",
-    plugins: () => [
-      ...sharedPlugins,
-    ],
-    rolldownOptions: {
-      output: {
-        codeSplitting: true,
-      },
-    },
-  };
-
-  return {
-    plugins,
-    optimizeDeps,
-    server: devServer,
-    build,
-    worker,
-  };
-});

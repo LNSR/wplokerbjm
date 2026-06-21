@@ -2,18 +2,10 @@ name: "Setup Dependencies"
 description: "Setup common dependencies with caching for Node.js modules and Playwright browsers"
 
 inputs:
-  theme-dir:
-    description: "Path to the theme directory"
+  sveltekit-dir:
+    description: "Path to the sveltekit directory"
     required: false
-    default: "wordpress/wp-content/themes/wplokerbjm"
-  install-jq:
-    description: "Whether to install jq"
-    required: false
-    default: "false"
-  install-brotli:
-    description: "Whether to install brotli for compression"
-    required: false
-    default: "true"
+    default: "$GITHUB_WORKSPACE/sveltekit"
   enable-apt-cache:
     description: "Enable APT caching behavior in this action"
     required: false
@@ -74,7 +66,7 @@ runs:
       uses: actions/cache@v4
       id: bun-cache
       with:
-        path: ${{ inputs.theme-dir }}/node_modules
+        path: ${{ inputs.sveltekit-dir }}/node_modules
         key: ${{ runner.os }}-bun-v2-${{ hashFiles('**/bun.lock', '**/package.json') }}
         restore-keys: |
           ${{ runner.os }}-bun-v2-
@@ -90,7 +82,7 @@ runs:
       shell: bash
 
     - name: Install dependencies (theme)
-      working-directory: ${{ inputs.theme-dir }}
+      working-directory: ${{ inputs.sveltekit-dir }}
       run: |
         # ensure bun is available
         echo "Bun: $(bun --version || echo 'bun not found')"

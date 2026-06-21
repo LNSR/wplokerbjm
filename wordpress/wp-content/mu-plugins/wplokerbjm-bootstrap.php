@@ -22,7 +22,7 @@ require_once get_stylesheet_directory() . '/vendor/autoload.php';
 try {
     // Initialize the DI container
     $wplokerbjm_container = \WPLokerBJM\Core\Container\Container::getContainer();
-    
+
     // Bootstrap the theme hooks via auto-discovered services
     $wplokerbjm_init = $wplokerbjm_container->get(\WPLokerBJM\Core\Container\Init::class);
     $wplokerbjm_init->initialize();

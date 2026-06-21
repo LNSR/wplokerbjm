@@ -8,17 +8,17 @@
   "packageManager": "bun",
   "scripts": {
     "bun:config": "bun --use-system-ca --env-file=.env",
-    "dev": "bun run bun:config --bun vite dev --host > vite.dev.log 2>&1",
-    "build": "bun run bun:config --bun vite build > vite.build.log 2>&1",
+    "dev": "bun run bun:config --bun vite dev --host > log/vite.dev.log 2>&1",
+    "build": "bun run bun:config --bun vite build > log/vite.build.log 2>&1",
     "ci:deploy": "bun run bun:config --bun vite build",
-    "preview": "bun run bun:config wrangler dev > vite.preview.log 2>&1",
+    "preview": "bun run bun:config wrangler dev > log/vite.preview.log 2>&1",
     "prepare": "bun run bun:config --parallel \"ts-patch install\" \"svelte-kit sync || echo ''\"",
     "check": "bun run bun:config --bun --parallel \"svelte-check-rs --tsconfig ./tsconfig.json\" \"tsgo\"",
     "check:watch": "bun run bun:config --parallel \"svelte-check-rs --tsconfig ./tsconfig.json --watch\"",
-    "generate-types": "bun run bun:config --parallel \"wrangler types\" \"gql-tada generate-output --output './src/graphql-env.d.ts'\" \"gql-tada generate-schema 'https://localhost/graphql' --output './schema.graphql'\" \"gql-tada generate turbo\""
+    "generate-types": "bun run bun:config --parallel \"wrangler types\" \"gql-tada generate-output --output './src/graphql-env.d.ts'\" \"gql-tada generate turbo\""
   },
   "graphql": {
-    "schema": "./schema.graphql",
+    "schema": "https://localhost/graphql",
     "documents": "**/*.{graphql,ts,svelte}"
   },
   "dependencies": {
@@ -43,7 +43,7 @@
     "@typia/unplugin": "^12.1.1",
     "@urql/exchange-persisted": "^5.0.1",
     "daisyui": "^5.5.23",
-    "es-toolkit": "^1.47.1",
+    "es-toolkit": "^1.48.1",
     "eslint": "^10.5.0",
     "eslint-plugin-svelte": "^3.19.0",
     "globals": "^17.6.0",
