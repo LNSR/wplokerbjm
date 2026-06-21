@@ -15,16 +15,15 @@ services:
       WORDPRESS_DEBUG: true
       WP_ENV: ${WP_ENV}
       WP_REPAIR: "false"
-      FORCE_SSL_ADMIN: "true"
       WP_HOME: ${WORDPRESS_WP_HOME}
       WP_SITEURL: ${WORDPRESS_WP_SITEURL}
       WORDPRESS_CONFIG_EXTRA: |
         include('/var/www/html/wp-config-extra.php');
     volumes:
-      - wordpress:/var/www/html
-      - ./wordpress/wp-content:/var/www/html/wp-content
+      - ./wordpress:/var/www/html
       - ./configs/wp-config-extra.php:/var/www/html/wp-config-extra.php:ro
       - ./certs/localhost.crt:/var/www/certs/localhost.crt:ro
+      - ${HOME}/.local/share/mkcert/rootCA.pem:/var/www/certs/rootCA.pem:ro
       - sock:/var/run/sock
     depends_on:
       - db
@@ -35,6 +34,7 @@ services:
       retries: 3
     extra_hosts:
       - "host.docker.internal:host-gateway"
+      - "lowker.site:host-gateway"
 
   caddy:
     build:
@@ -51,8 +51,7 @@ services:
       - "443:443/udp"
       - "80:80"
     volumes:
-      - wordpress:/var/www/html:ro
-      - ./wordpress/wp-content:/var/www/html/wp-content:ro
+      - ./wordpress:/var/www/html:ro
       - ./Caddyfile:/etc/caddy/Caddyfile:ro
       - ./configs/caddy-early-hints.conf:/etc/caddy/caddy-early-hints.conf:ro
       - ./certs/localhost.crt:/var/www/certs/localhost.crt:ro
@@ -135,6 +134,5 @@ services:
   #     - caddy
 
 volumes:
-  wordpress:
   db:
   sock:

@@ -80,14 +80,10 @@ class LowonganIngestController
         return new \WP_Error($code, $message, ['status' => $status]);
     }
 
-    public function ingest($request)
+    public function ingest(\WP_REST_Request $request)
     {
-        $payloadJson = is_object($request) && method_exists($request, 'get_param')
-            ? $request->get_param('payload')
-            : null;
-        $files = is_object($request) && method_exists($request, 'get_file_params')
-            ? $request->get_file_params()
-            : [];
+        $payloadJson = $request->get_param('payload');
+        $files = $request->get_file_params();
 
         $payload = json_decode((string) $payloadJson, true);
         if (!is_array($payload)) {

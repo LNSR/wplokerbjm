@@ -1,7 +1,18 @@
 <?php
 namespace WPLokerBJM\Shared\Utilities;
+enum PluginList: string
+{
+    case LiteSpeed = 'litespeed-cache/litespeed-cache.php';
+    case Wordfence = 'wordfence/wordfence.php';
+    case WpGraphql = 'wp-graphql/wp-graphql.php';
+    case RankMath = 'seo-by-rank-math/rank-math.php';
+    case QueryMonitor = 'query-monitor/query-monitor.php';
+    case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
+}
+
 class SharedUtils
 {
+
     public static function isLocalhost(): bool
     {
         $remoteAddr = $_SERVER['REMOTE_ADDR'] ?? '';
@@ -55,36 +66,18 @@ class SharedUtils
 
     /**
      * Check if a plugin is active by inspecting the 'active_plugins' option in wp_options.
-     * @param string $pluginKey one of: 'litespeed','wpgraphql','rankmath'
+     * @param PluginList $pluginKey The plugin enum case to check.
      * @return bool
      */
-    public static function isPluginActive(string $pluginKey): bool
+    public static function isPluginActive(PluginList $pluginKey): bool
     {
-        // Map pluginKey to plugin file slug
-        $pluginMap = [
-            'litespeed' => 'litespeed-cache/litespeed-cache.php',
-            'litespeed-cache' => 'litespeed-cache/litespeed-cache.php',
-            'wpgraphql' => 'wp-graphql/wp-graphql.php',
-            'wp-graphql' => 'wp-graphql/wp-graphql.php',
-            'rankmath' => 'seo-by-rank-math/rank-math.php',
-            'rank-math' => 'seo-by-rank-math/rank-math.php',
-        ];
-        $pluginFile = $pluginMap[strtolower($pluginKey)] ?? null;
-        if (!$pluginFile) {
-            return false;
-        }
+        $pluginFile = $pluginKey->value;
 
-        $checkPlugins = function() {
-            $plugins = get_option('active_plugins');
-            return is_array($plugins) ? $plugins : null;
-        };
-
-
-        // Query the database for active_plugins
-        $activePlugins = $checkPlugins();
+        $activePlugins = get_option('active_plugins');
         if (!is_array($activePlugins)) {
             return false;
         }
+
         return in_array($pluginFile, $activePlugins, true);
     }
 
@@ -93,16 +86,10 @@ class SharedUtils
      *! make arrays returned values more compact by removing empty entries 
      *
      * @param array $dataArray The input array to filter.
-     * @param bool|null $disable Optional flag to disable filtering in development environment.
      * @return array The filtered array with empty values removed.
      */
-    public static function filterEmptyValues(array $dataArray, ?bool $disable = false): array
+    public static function filterEmptyValues(array $dataArray): array
     {
-        // In development environment, return data as is for easier debugging
-        if (self::isDevelopment() && $disable) {
-            return $dataArray;
-        }
-
         $filtered = [];
         foreach ($dataArray as $key => $value) {
             if (is_array($value)) {
@@ -115,27 +102,5 @@ class SharedUtils
             }
         }
         return $filtered;
-    }
-
-    /**
-     * Parse deadline string to timestamp, trying multiple common formats
-     * @param string $deadline
-     * @return int|false
-     */
-    public static function parseDeadlineTimestamp(string $deadline): int|false
-    {
-        // Common date formats to try
-        $formats = ['Y-m-d', 'd/m/Y', 'm/d/Y', 'd-m-Y', 'm-d-Y'];
-
-        foreach ($formats as $format) {
-            $dt = \DateTime::createFromFormat($format, $deadline);
-            if ($dt !== false) {
-                return $dt->getTimestamp() + 86399; // Add 23:59:59 to the day
-            }
-        }
-
-        // Fallback to strtotime
-        $ts = strtotime($deadline . ' 23:59:59');
-        return $ts !== false ? $ts : false;
     }
 }

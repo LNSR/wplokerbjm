@@ -108,8 +108,8 @@ mkdir -p /var/run/sock
 chmod 755 /var/run/sock
 
 # Add custom CA certificate for local development
-if [ -f /var/www/certs/localhost.crt ]; then
-    cp /var/www/certs/localhost.crt /usr/local/share/ca-certificates/
+if [ -f /var/www/certs/rootCA.pem ]; then
+    cp /var/www/certs/rootCA.pem /usr/local/share/ca-certificates/mkcert-root.crt
     update-ca-certificates
 fi
 

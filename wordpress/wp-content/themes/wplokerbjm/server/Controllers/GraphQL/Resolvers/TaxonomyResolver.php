@@ -17,6 +17,11 @@ class TaxonomyResolver
     const GENDER_TERMS = 'genderTerms';
     const PENDIDIKAN_TERMS = 'pendidikanTerms';
 
+    /**
+     * Resolve all taxonomy terms grouped by type.
+     *
+     * @return array{lokasiTerms: array, genderTerms: array, pendidikanTerms: array}
+     */
     public function resolveAllTerms(): array
     {
         try {
@@ -29,12 +34,7 @@ class TaxonomyResolver
 
             $response = [
                 self::LOKASI_TERMS => ControllerUtils::buildTermsTree($terms[Taxonomies::LOKASI_PEKERJAAN]),
-                self::GENDER_TERMS => array_values(array_map(fn($term) => [
-                    'slug' => $term->slug,
-                    'name' => $term->name,
-                    'parent' => $term->parent,
-                    'children' => [],
-                ], $terms[Taxonomies::GENDER])),
+                self::GENDER_TERMS => ControllerUtils::buildTermsTree($terms[Taxonomies::GENDER]),
                 self::PENDIDIKAN_TERMS => ControllerUtils::buildTermsTree($terms[Taxonomies::PENDIDIKAN]),
             ];
 
@@ -51,6 +51,11 @@ class TaxonomyResolver
         }
     }
 
+    /**
+     * Resolve location taxonomy terms with hierarchy.
+     *
+     * @return array<int, array{slug: string, name: string, parent: int, children: array}> Tree structure of location terms
+     */
     public function resolveLokasiTerms(): array
     {
         try {
@@ -71,6 +76,11 @@ class TaxonomyResolver
         }
     }
 
+    /**
+     * Resolve gender taxonomy terms (flat list).
+     *
+     * @return array<int, array{slug: string, name: string, parent: int, children: array}>
+     */
     public function resolveGenderTerms(): array
     {
         try {
@@ -80,12 +90,7 @@ class TaxonomyResolver
             }
 
             $terms = $this->repository->getTaxonomyTerms();
-            $response = array_values(array_map(fn($term) => [
-                'slug' => $term->slug,
-                'name' => $term->name,
-                'parent' => $term->parent,
-                'children' => [],
-            ], $terms[Taxonomies::GENDER]));
+            $response = ControllerUtils::buildTermsTree($terms[Taxonomies::GENDER]);
 
             Cache::set(CacheKey::TAXONOMY_DEPTH_GENDER, $response);
 
@@ -96,6 +101,11 @@ class TaxonomyResolver
         }
     }
 
+    /**
+     * Resolve education level taxonomy terms with hierarchy.
+     *
+     * @return array<int, array{slug: string, name: string, parent: int, children: array}> Tree structure of pendidikan terms
+     */
     public function resolvePendidikanTerms(): array
     {
         try {

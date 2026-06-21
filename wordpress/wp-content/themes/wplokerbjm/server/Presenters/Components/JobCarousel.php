@@ -5,7 +5,6 @@ namespace WPLokerBJM\Presenters\Components;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Models\Schema\CustomFields;
 class JobCarousel
 {
     public function __construct(
@@ -13,6 +12,14 @@ class JobCarousel
     ) {
     }
 
+    /**
+     * Get carousel jobs data with caching.
+     *
+     * Fetches carousel job listings using WP_Query args from JobQuery::getCarouselArgs
+     * and formats them through JobRepository::queryJob.
+     *
+     * @return array{jobs: array<int, array>, totalJobs: int} Formatted carousel jobs data
+     */
     public function getProps(): array
     {
         $cacheKey = CacheKey::CAROUSEL_JOBS;

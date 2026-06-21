@@ -2,15 +2,15 @@
 
 namespace WPLokerBJM\Tests;
 
-use WPLokerBJM\Tests\Support\ProxyContainer;
+use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
-use WPLokerBJM\Shared\Cache\Cache;
 use WPLokerBJM\Shared\Cache\CacheKey;
 use WPLokerBJM\Configs\CredentialConfig;
 
 class CacheTest extends WplokerbjmTestCase
 {
-    
+    private RedisAdapter $adapter;
+
     protected function setUp(): void
     {
         parent::setUp();
@@ -19,9 +19,13 @@ class CacheTest extends WplokerbjmTestCase
         if (!defined('LSOC_PREFIX')) {
             define('LSOC_PREFIX', 'cf8e0');
         }
+
+        // Create an instance of RedisAdapter for testing
+        $credentials = CredentialConfig::RedisCredential();
+        $this->adapter = new RedisAdapter($credentials);
     }
-    
-    public function testGetRedisConnectionWithEnvironmentConfig()
+
+    public function testGetConnection()
     {
         if (!extension_loaded('redis')) {
             $this->fail('Redis extension is not loaded. Install with: pecl install redis && echo "extension=redis.so" >> php.ini');
@@ -39,7 +43,7 @@ class CacheTest extends WplokerbjmTestCase
         echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . ($credentials['password'] ? "\033[0;32m" . '{REDACTED}' . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
         echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . ($credentials['database'] !== null ? "\033[0;32m" . $credentials['database'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
 
-        $redis = Cache::getRedisConnection();
+        $redis = $this->adapter->getConnection();
 
         if ($redis === false) {
             echo "\033[0;31m❌ Redis connection failed\033[0m\n";
@@ -164,7 +168,7 @@ class CacheTest extends WplokerbjmTestCase
 
     public function testDeletePattern()
     {
-        // Test pattern-based deletion using Cache::deletePattern
+        // Test pattern-based deletion using Redis::deletePattern
         if (!extension_loaded('redis')) {
             $this->fail('Redis extension is not loaded. Install with: pecl install redis && echo "extension=redis.so" >> php.ini');
         }
@@ -172,7 +176,7 @@ class CacheTest extends WplokerbjmTestCase
         echo "\n\033[1;35m🔴 Cache Delete Pattern Test\033[0m\n";
 
         // Get Redis connection
-        $redis = Cache::getRedisConnection();
+        $redis = $this->adapter->getConnection();
         if ($redis === false) {
             echo "\033[0;31m❌ Redis connection failed\033[0m\n";
             $this->fail('Redis connection failed - cannot test deletePattern');
@@ -210,7 +214,7 @@ class CacheTest extends WplokerbjmTestCase
 
         // Call deletePattern
         $patternToDelete = 'phpunit_test_pattern_' . time() . '_*';
-        $deletedCount = Cache::deletePattern([$patternToDelete]);
+        $deletedCount = $this->adapter->deletePattern([$patternToDelete]);
 
         echo "\n\033[0;36mDelete Pattern Result:\033[0m\n";
         echo "  \033[0;33m•\033[0m Deleted count: \033[0;32m{$deletedCount}\033[0m\n";

@@ -4,6 +4,7 @@ namespace WPLokerBJM\Core\Container\Attributes;
 
 use Attribute;
 
+
 /**
  * Attribute for WordPress actions.
  * Annotate a method to register it as an action hook.
@@ -11,11 +12,17 @@ use Attribute;
 #[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
 class Action
 {
+    /**
+     * @param string $hook
+     * @param int $priority
+     * @param int $acceptedArgs
+     */
     public function __construct(
         public string $hook,
         public int $priority = 10,
         public int $acceptedArgs = 1
-    ) {}
+    ) {
+    }
 }
 
 /**
@@ -25,9 +32,15 @@ class Action
 #[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
 class Filter
 {
+    /**
+     * @param string $hook
+     * @param int $priority
+     * @param int $acceptedArgs
+     */
     public function __construct(
         public string $hook,
         public int $priority = 10,
         public int $acceptedArgs = 1
-    ) {}
+    ) {
+    }
 }

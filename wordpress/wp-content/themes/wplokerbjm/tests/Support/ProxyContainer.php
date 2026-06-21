@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\Support;
 
 use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use Dotenv\Dotenv;
 
 /**
@@ -46,6 +47,9 @@ final class ProxyContainer
     {
         // Reset in-memory object cache
         $GLOBALS['__wplokerbjm_wp_object_cache'] = [];
+
+        // Reset tracked WordPress hook registrations
+        $GLOBALS['__wplokerbjm_registered_hooks'] = [];
     }
 
     public static function container(): ContainerInterface
@@ -57,7 +61,7 @@ final class ProxyContainer
         // Ensure runtime is booted before container initialization.
         self::boot();
 
-        self::$container = \WPLokerBJM\Core\Container\Container::getContainer();
+        self::$container = WPLokerBJMContainer::getContainer();
         return self::$container;
     }
 

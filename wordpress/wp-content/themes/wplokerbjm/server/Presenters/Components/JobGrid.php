@@ -12,6 +12,18 @@ class JobGrid
     ) {
     }
 
+    /**
+     * Get job grid data with caching.
+     *
+     * Fetches paginated job listings using the provided WP_Query args and formats
+     * them for grid display. Supports search and latest contexts with filtering.
+     *
+     * @param array<string, mixed> $query_args WP_Query arguments for fetching jobs
+     * @param string $title Section title (auto-generated from context if empty)
+     * @param string $context Display context: 'latest'|'search'
+     * @param int $total_jobs Total jobs count override (0 = auto-detect from query)
+     * @return array{context: string, filters: array{cari: string, gender: string, lokasi: string, pendidikan: string, sort: string}, jobs: array<int, array>, maxNumPages: int, title: string, totalJobs: int}
+     */
     public function getProps(array $query_args, string $title, string $context = 'latest', int $total_jobs = 0): array
     {
         $cacheKey = CacheKey::JOB_GRID_PREFIX . md5(serialize($query_args));

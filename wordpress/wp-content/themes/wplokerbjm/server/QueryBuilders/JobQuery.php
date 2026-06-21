@@ -175,7 +175,7 @@ class JobQuery
 	/**
 	 * Build a SQL fragment for the `posts_search` filter used for job post searches.
 	 *
-	 * This returns an escaped SQL string (starting with a leading " AND (...)")
+	 * This returns a properly escaped SQL string using $wpdb->prepare
 	 * suitable for appending to the `$search` value in the `posts_search` filter.
 	 *
 	 * @param \wpdb $wpdb
@@ -184,90 +184,100 @@ class JobQuery
 	 */
 	public static function buildPostsSearchSql(\wpdb $wpdb, string $q): string
 	{
-        if ($q === '') {
-            return '';
-        }
+		if ($q === '') {
+			return '';
+		}
 
-        $cache_key = CacheKey::SEARCH_SQL_PREFIX . md5($q);
-        $cached = Cache::get($cache_key);
-        if ($cached !== false) {
-            return $cached;
-        }
+		$cache_key = CacheKey::SEARCH_SQL_PREFIX . md5($q);
+		$cached = Cache::get($cache_key);
+		if ($cached !== false) {
+			return $cached;
+		}
 
-        try {
-            // Safely escape the search term for LIKE queries
-            $q_esc = esc_sql($wpdb->esc_like($q));
-            $q_html = esc_sql($wpdb->esc_like(htmlspecialchars($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')));
+		try {
+			$posts = $wpdb->posts;
+			$postmeta = $wpdb->postmeta;
+			$terms = $wpdb->terms;
+			$term_taxonomy = $wpdb->term_taxonomy;
+			$term_relationships = $wpdb->term_relationships;
 
-            $posts = $wpdb->posts;
-            $postmeta = $wpdb->postmeta;
-            $terms = $wpdb->terms;
-            $term_taxonomy = $wpdb->term_taxonomy;
-            $term_relationships = $wpdb->term_relationships;
+			$like_q = '%' . $wpdb->esc_like($q) . '%';
+			$like_q_html = '%' . $wpdb->esc_like(htmlspecialchars($q, ENT_QUOTES | ENT_HTML5, 'UTF-8')) . '%';
 
-            $sql = " AND (";
-            $sql .= "{$posts}.post_title LIKE '%{$q_esc}%' OR ";
-            $sql .= "{$posts}.post_title LIKE '%{$q_html}%' OR ";
-            $sql .= "{$posts}.ID IN (
-                SELECT post_id FROM {$postmeta}
-                WHERE meta_key = '" . CustomFields::NAMA_PERUSAHAAN . "' AND (meta_value LIKE '%{$q_esc}%' OR meta_value LIKE '%{$q_html}%')
-            ) OR ";
-            $sql .= "{$posts}.ID IN (
-                SELECT object_id FROM {$term_relationships}
-                INNER JOIN {$term_taxonomy} ON {$term_taxonomy}.term_taxonomy_id = {$term_relationships}.term_taxonomy_id
-                INNER JOIN {$terms} ON {$terms}.term_id = {$term_taxonomy}.term_id
-                WHERE {$term_taxonomy}.taxonomy = '" . Taxonomies::PERUSAHAAN . "'
-                AND {$terms}.name LIKE '%{$q_esc}%'
+			$query_template = " AND (
+                {$posts}.post_title LIKE %s OR 
+                {$posts}.post_title LIKE %s OR 
+                {$posts}.ID IN (
+                    SELECT post_id FROM {$postmeta}
+                    WHERE meta_key = %s AND (meta_value LIKE %s OR meta_value LIKE %s)
+                ) OR 
+                {$posts}.ID IN (
+                    SELECT object_id FROM {$term_relationships}
+                    INNER JOIN {$term_taxonomy} ON {$term_taxonomy}.term_taxonomy_id = {$term_relationships}.term_taxonomy_id
+                    INNER JOIN {$terms} ON {$terms}.term_id = {$term_taxonomy}.term_id
+                    WHERE {$term_taxonomy}.taxonomy = %s
+                    AND {$terms}.name LIKE %s
+                )
             )";
-            $sql .= ")";
 
-            Cache::set($cache_key, $sql, 86400); // Cache for 1 day
-            return $sql;
-        } catch (\Exception $e) {
-            Logger::error('Query', 'JobQuery::buildPostsSearchSql error: ' . $e->getMessage());
-            return '';
-        }
-    }
+			$sql = $wpdb->prepare(
+				$query_template,
+				$like_q,
+				$like_q_html,
+				CustomFields::NAMA_PERUSAHAAN,
+				$like_q,
+				$like_q_html,
+				Taxonomies::PERUSAHAAN,
+				$like_q
+			);
 
-    /**
-     * Get the last modified date of the latest lowongan post.
-     *
-     * This method tracks the most recent modification timestamp for the 'lowongan' post type,
-     * which can be used to determine if new job postings have been added or updated since
-     * the page was loaded. Useful for implementing refresh logic or cache invalidation
-     * based on content changes.
-     *
-     * @return string The GMT modified date of the latest lowongan post, or current GMT time if none exist.
-     */
-    public static function getLastModifiedDate(): string
-    {
-        $cache_key = CacheKey::JOB_LAST_MODIFIED;
-        $cached = Cache::get($cache_key);
-        if ($cached !== false) {
-            return $cached;
-        }
+			Cache::set($cache_key, $sql, 86400); // Cache for 1 day
+			return $sql;
+		} catch (\Exception $e) {
+			Logger::error('Query', 'JobQuery::buildPostsSearchSql error: ' . $e->getMessage());
+			return '';
+		}
+	}
 
-        $latest = get_posts([
-            'post_type' => PostTypes::POST_TYPE_LOWONGAN,
-            'numberposts' => 1,
-            'orderby' => 'modified',
-            'order' => 'DESC',
-        ]);
+	/**
+	 * Get the last modified date of the latest lowongan post.
+	 *
+	 * This method tracks the most recent modification timestamp for the 'lowongan' post type,
+	 * which can be used to determine if new job postings have been added or updated since
+	 * the page was loaded. Useful for implementing refresh logic or cache invalidation
+	 * based on content changes.
+	 *
+	 * @return string The GMT modified date of the latest lowongan post, or current GMT time if none exist.
+	 */
+	public static function getLastModifiedDate(): string
+	{
+		$cache_key = CacheKey::JOB_LAST_MODIFIED;
+		$cached = Cache::get($cache_key);
+		if ($cached !== false) {
+			return $cached;
+		}
 
-        if (!empty($latest)) {
-            $post = $latest[0];
-            if (is_object($post) && property_exists($post, 'post_modified_gmt')) {
-                $result = $post->post_modified_gmt;
-            } else {
-                $result = gmdate('c');
-            }
-        } else {
-            $result = gmdate('c');
-        }
+		$latest = get_posts([
+			'post_type' => PostTypes::POST_TYPE_LOWONGAN,
+			'numberposts' => 1,
+			'orderby' => 'modified',
+			'order' => 'DESC',
+		]);
 
-        Cache::set($cache_key, $result, 86400); // Cache for 1 day
-        return $result;
-    }
+		if (!empty($latest)) {
+			$post = $latest[0];
+			if (is_object($post) && property_exists($post, 'post_modified_gmt')) {
+				$result = $post->post_modified_gmt;
+			} else {
+				$result = gmdate('c');
+			}
+		} else {
+			$result = gmdate('c');
+		}
+
+		Cache::set($cache_key, $result, 86400); // Cache for 1 day
+		return $result;
+	}
 
 	/**
 	 * Return args suitable for `get_posts()` to fetch attachment IDs for a parent post.

@@ -1,17 +1,20 @@
 <?php
 namespace WPLokerBJM\Services\GraphQL;
 
+use DI\Attribute\Injectable;
 use WPLokerBJM\Controllers\GraphQL\Resolvers\{TaxonomyResolver, JobsDataResolver, ThemeDataResolver};
+use WPLokerBJM\Controllers\GraphQL\Resolvers\Auth\JWTDataResolver;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Core\Container\Attributes\Action;
-
-class GraphQLRegistration
+#[Injectable(lazy: true)]
+final class GraphQLRegistration
 {
     public function __construct(
         private readonly TaxonomyResolver $taxonomyResolver,
         private readonly JobsDataResolver $jobsDataResolver,
         private readonly ThemeDataResolver $themeDataResolver,
+        private readonly JWTDataResolver $jwtDataResolver
     ) {
     }
 
@@ -40,6 +43,12 @@ class GraphQLRegistration
     private const TYPE_SEARCH_JOBS_RESPONSE = 'SearchJobsResponse';
     private const TYPE_BOOKMARK_RESPONSE = 'BookmarkResponse';
 
+    /**
+     * Register all GraphQL types, fields, and mutations.
+     *
+     * Hooked to the 'graphql_register_types' action. Orchestrates the registration
+     * of custom scalars, object types, input types, and root query/mutation fields.
+     */
     #[Action('graphql_register_types', 0)]
     public function registerTypes(): void
     {
@@ -48,6 +57,13 @@ class GraphQLRegistration
         $this->registerInputTypes();
         $this->registerFields();
     }
+
+    /**
+     * Get shared field configuration for sort option types.
+     *
+     * @param string $description Description for the sort option type
+     * @return array{description: string, fields: array{value: array{type: string}, label: array{type: string}}}
+     */
     private function sharedSortFields($description)
     {
         return [
@@ -59,17 +75,20 @@ class GraphQLRegistration
         ];
     }
 
+    /**
+     * Register custom GraphQL scalar types (e.g., JSON).
+     */
     private function registerScalars(): void
     {
         register_graphql_scalar(self::TYPE_JSON, [
             'description' => 'Arbitrary JSON data',
-            'serialize' => function ($value) {
+            'serialize' => static function ($value) {
                 return is_string($value) ? $value : json_encode($value);
             },
-            'parseValue' => function ($value) {
+            'parseValue' => static function ($value) {
                 return is_string($value) ? json_decode($value, true) : $value;
             },
-            'parseLiteral' => function ($ast) {
+            'parseLiteral' => static function ($ast) {
                 if ($ast instanceof \GraphQL\Language\AST\StringValueNode) {
                     return json_decode($ast->value, true);
                 }
@@ -78,6 +97,9 @@ class GraphQLRegistration
         ]);
     }
 
+    /**
+     * Register all GraphQL object types (SortOption, Job, CarouselResponse, etc.).
+     */
     private function registerObjectTypes(): void
     {
 
@@ -115,7 +137,7 @@ class GraphQLRegistration
                 CustomFields::STATUS_PEKERJAAN => ['type' => self::TYPE_INT],
                 'permalink' => ['type' => self::TYPE_STRING],
                 'post_time' => ['type' => self::TYPE_STRING],
-                'duplicateNonce' => ['type' => self::TYPE_STRING],
+                'dpNonce' => ['type' => self::TYPE_STRING],
             ],
         ]);
 
@@ -235,6 +257,9 @@ class GraphQLRegistration
         ]);
     }
 
+    /**
+     * Register GraphQL input types (SortOptionInput, JobFiltersInput).
+     */
     private function registerInputTypes(): void
     {
         register_graphql_input_type(self::TYPE_SORT_OPTION_INPUT, $this->sharedSortFields('Input for sort option'));
@@ -252,6 +277,9 @@ class GraphQLRegistration
         ]);
     }
 
+    /**
+     * Register root query and mutation fields with their resolvers.
+     */
     private function registerFields(): void
     {
         // Root queries for taxonomy endpoints
@@ -426,7 +454,6 @@ class GraphQLRegistration
             'resolve' => fn(...$args) => $this->jobsDataResolver->resolveSyncBookmark(...$args),
         ]);
 
-        // JWT mutation is registered separately because of the POST requirement
         register_graphql_field(self::TYPE_ROOT_MUTATION, 'jwt', [
             'type' => self::TYPE_STRING,
             'description' => 'Request or validate JWT token (provide username/password or existing token)',
@@ -435,7 +462,7 @@ class GraphQLRegistration
                 'password' => ['type' => self::TYPE_STRING],
                 'token' => ['type' => self::TYPE_STRING],
             ],
-            'resolve' => fn(...$args) => $this->themeDataResolver->resolveJWTorValidate(...$args),
+            'resolve' => fn(...$args) => $this->jwtDataResolver->resolveJWTorValidate(...$args),
         ]);
     }
 }

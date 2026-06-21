@@ -15,6 +15,27 @@ class JobDataFactory
     ) {
     }
 
+    private const WYSIWYG_FIELDS = [
+        CustomFields::TENTANG_PERUSAHAAN,
+        CustomFields::DESKRIPSI_PEKERJAAN,
+        CustomFields::PERSYARATAN,
+        CustomFields::CARA_MELAMAR,
+        CustomFields::BENEFIT,
+    ];
+    private const NUMBER_FIELDS = [
+        CustomFields::UMUR_MIN,
+        CustomFields::UMUR_MAX,
+        CustomFields::PENGALAMAN,
+        CustomFields::GAJI_MINIMAL,
+        CustomFields::GAJI_MAKSIMAL,
+        CustomFields::STATUS_PEKERJAAN,
+    ];
+    private const CONTACT_FIELDS = [
+        CustomFields::EMAIL_KONTAK,
+        CustomFields::SITUS_KONTAK,
+        CustomFields::NOMOR_KONTAK,
+    ];
+
     /**
      * Process and combine custom fields and taxonomy data for a job listing.
      *
@@ -63,14 +84,21 @@ class JobDataFactory
     /**
      * Process custom fields data.
      *
-     * @param array $customFields Raw custom fields data.
-     * @return array Processed custom fields data.
+     * Applies sanitization and formatting to various field types:
+     * - WYSIWYG fields: wpautop, wp_kses_post, do_shortcode
+     * - Number fields: cast to int
+     * - Contact fields: sanitize_email, esc_url, sanitize_text_field
+     * - Date fields: format to Y-m-d
+     * - Social media: flatten and sanitize nested arrays
+     *
+     * @param array<string, mixed> $customFields Raw custom fields data from Meta Box
+     * @return array<string, mixed> Processed custom fields data with null for invalid values
      */
-    public function processCustomFields(array $customFields): array
+    private function processCustomFields(array $customFields): array
     {
         try {
             // Process WYSIWYG fields
-            $wysiwyg_fields = [CustomFields::TENTANG_PERUSAHAAN, CustomFields::DESKRIPSI_PEKERJAAN, CustomFields::PERSYARATAN, CustomFields::CARA_MELAMAR, CustomFields::BENEFIT];
+            $wysiwyg_fields = self::WYSIWYG_FIELDS;
             foreach ($wysiwyg_fields as $field) {
                 if (isset($customFields[$field])) {
                     // Accept strings only; other types are ignored
@@ -83,7 +111,7 @@ class JobDataFactory
             }
 
             // Process number fields
-            $number_fields = [CustomFields::UMUR_MIN, CustomFields::UMUR_MAX, CustomFields::PENGALAMAN, CustomFields::GAJI_MINIMAL, CustomFields::GAJI_MAKSIMAL, CustomFields::STATUS_PEKERJAAN];
+            $number_fields = self::NUMBER_FIELDS;
             foreach ($number_fields as $field) {
                 if (isset($customFields[$field])) {
                     if (is_numeric($customFields[$field])) {
@@ -96,17 +124,19 @@ class JobDataFactory
             }
 
             $sanitize_contact_fields = [
-                CustomFields::EMAIL_KONTAK => fn($v) => is_string($v) ? (sanitize_email($v) ?: null) : null,
-                CustomFields::SITUS_KONTAK => fn($v) => is_string($v) ? (esc_url($v) ?: null) : null,
-                CustomFields::NOMOR_KONTAK => fn($v) => is_string($v) ? (sanitize_text_field($v) ?: null) : null,
+                self::CONTACT_FIELDS[0] => static fn($v) => is_string($v) ? (sanitize_email($v) ?: null) : null,
+                self::CONTACT_FIELDS[1] => static fn($v) => is_string($v) ? (esc_url($v) ?: null) : null,
+                self::CONTACT_FIELDS[2] => static fn($v) => is_string($v) ? (sanitize_text_field($v) ?: null) : null,
             ];
 
             // Process email, URL, and text fields (handle arrays for cloned fields)
-            foreach ([CustomFields::EMAIL_KONTAK, CustomFields::SITUS_KONTAK, CustomFields::NOMOR_KONTAK] as $field) {
+            foreach (self::CONTACT_FIELDS as $field) {
                 if (isset($customFields[$field])) {
                     $sanitize_callback = $sanitize_contact_fields[$field];
                     if (is_array($customFields[$field])) {
-                        $customFields[$field] = implode(', ', array_filter(array_map($sanitize_callback, $customFields[$field])));
+                        $customFields[$field] = array_map($sanitize_callback, $customFields[$field])
+                            |> array_filter(...)
+                            |> (static fn($arr) => implode(', ', $arr));
                     } else {
                         $customFields[$field] = $sanitize_callback($customFields[$field]);
                     }
@@ -162,11 +192,13 @@ class JobDataFactory
                     }
                 }
 
-                $customFields[CustomFields::SOCIAL_MEDIA] = implode('; ', array_map(
-                    fn($platform, $usernames) => $platform . ': ' . implode(', ', $usernames),
+                // pipe operator version
+                $customFields[CustomFields::SOCIAL_MEDIA] = array_map(
+                    static fn($platform, $usernames) => $platform . ': ' . implode(', ', $usernames),
                     array_keys($processedSocialMedia),
                     $processedSocialMedia
-                ));
+                )
+                    |> (static fn($v) => implode('; ', $v));
             }
         } catch (\Exception $e) {
             Logger::error('Factory', 'CustomFieldsService::processCustomFields error: ' . $e->getMessage());
@@ -175,12 +207,14 @@ class JobDataFactory
         }
     }
     /**
-     * Process taxonomy terms.
+     * Process taxonomy terms into sanitized name strings.
      *
-     * @param array $terms Raw taxonomy terms (array of term objects/arrays/strings).
-     * @return array Processed taxonomy term names.
+     * Handles WP_Term objects, associative arrays, and plain strings.
+     *
+     * @param array<int, \WP_Term|array{name: string}|string> $terms Raw taxonomy terms
+     * @return array<int, string> Sanitized term names
      */
-    public function processTaxonomyTerms(array $terms): array
+    private function processTaxonomyTerms(array $terms): array
     {
         if (empty($terms)) {
             return [];

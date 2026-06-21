@@ -8,23 +8,33 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  * Generic Logger for application events
  *
  * Provides structured logging with environment context and different log levels.
+ * Log entries are buffered in-memory and flushed on WordPress shutdown via
+ * LoggerFlushHooks (see GlobalHooks.php). If the batch write fails, each
+ * entry is written individually as a graceful fallback.
+ *
+ * @phpstan-type LogLevel 'DEBUG'|'INFO'|'WARNING'|'ERROR'
+ * @phpstan-type LogEntry array{timestamp: string, environment: string, level: string, category: string, message: string, context: array}
  */
 class Logger
 {
-    /**
-     * Log levels
-     */
+
     public const LEVEL_DEBUG = 'DEBUG';
     public const LEVEL_INFO = 'INFO';
     public const LEVEL_WARNING = 'WARNING';
     public const LEVEL_ERROR = 'ERROR';
 
+    /** @var array<int, LogEntry> In-memory buffer of pending log entries */
+    private static array $buffer = [];
+
+    /** Guard flag to prevent re-entry during flush() */
+    private static bool $flushing = false;
+
     /**
      * Get the current environment based on WordPress configuration
+     * @return 'development'|'local'|'production'
      */
     private static function getEnvironment(): string
     {
-        // Use WP_ENVIRONMENT_TYPE if already set by wp-config-extra.php
         if (defined('WP_ENVIRONMENT_TYPE')) {
             return WP_ENVIRONMENT_TYPE;
         }
@@ -34,9 +44,9 @@ class Logger
         }
 
         // Fallback detection for edge cases
-        if (SharedUtils::isLocalhost()) {
-            return 'local';
-        }
+        // if (SharedUtils::isLocalhost()) {
+        //     return 'local';
+        // }
 
         return 'production'; // Default fallback
     }
@@ -44,31 +54,71 @@ class Logger
     /**
      * Log a message with context
      *
-     * @param string $level Log level (DEBUG, INFO, WARNING, ERROR)
+     * Buffers the entry in-memory instead of writing immediately.
+     * The buffer is flushed on WordPress shutdown via a dedicated
+     * shutdown handler with a graceful fallback on failure.
+     *
+     * @phpstan-param LogLevel $level
      * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
      * @param string $message Log message
      * @param array $context Additional context data
      */
-    public static function log(string $level, string $category, string $message, array $context = []): void
+    private static function log(string $level, string $category, string $message, array $context = []): void
     {
-        $environment = self::getEnvironment();
-        $timestamp = date('Y-m-d H:i:s');
+        self::$buffer[] = [
+            'timestamp' => date('Y-m-d H:i:s'),
+            'environment' => self::getEnvironment(),
+            'level' => $level,
+            'category' => $category,
+            'message' => $message,
+            'context' => $context,
+        ];
+    }
 
-        // Add color coding based on log level
-        $colorCode = self::getLevelColor($level);
-        $levelEmoji = self::getLevelEmoji($level);
+    /**
+     * Flush all buffered log entries to error_log.
+     *
+     * Attempts a single batch write; if it fails, falls back to writing
+     * each entry individually. The buffer is cleared regardless of outcome.
+     * Safe against re-entry (nested calls during flush are no-ops).
+     * @see \WPLokerBJM\Core\LoggerHooks::flushBuffer() use this to setup logger
+     * ! Strictly used only during Wordpress shutdown hook
+     */
+    public static function flush(): void
+    {
+        if (self::$flushing) {
+            return;
+        }
+        self::$flushing = true;
 
-        $logMessage = "\033{$colorCode}[{$timestamp}] [{$environment}] [{$levelEmoji} {$level}] [{$category}]\033[0m: {$message}";
+        $entries = self::$buffer;
+        self::$buffer = [];
 
-        if (!empty($context)) {
-            $logMessage .= " - " . json_encode($context);
+        if ($entries === []) {
+            self::$flushing = false;
+            return;
         }
 
-        error_log($logMessage);
+        // Format all entries
+        $formatted = array_map([self::class, 'formatEntry'], $entries);
+        $batch = implode("\n", $formatted);
+
+        // Try batch write; fall back to individual writes on failure
+        if (error_log($batch) === false) {
+            foreach ($formatted as $entry) {
+                error_log($entry);
+            }
+        }
+
+        self::$flushing = false;
     }
 
     /**
      * Log debug message
+     *
+     * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
+     * @param string $message Log message
+     * @param array $context Additional context data
      */
     public static function debug(string $category, string $message, array $context = []): void
     {
@@ -77,6 +127,10 @@ class Logger
 
     /**
      * Log info message
+     *
+     * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
+     * @param string $message Log message
+     * @param array $context Additional context data
      */
     public static function info(string $category, string $message, array $context = []): void
     {
@@ -85,6 +139,10 @@ class Logger
 
     /**
      * Log warning message
+     *
+     * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
+     * @param string $message Log message
+     * @param array $context Additional context data
      */
     public static function warning(string $category, string $message, array $context = []): void
     {
@@ -93,6 +151,10 @@ class Logger
 
     /**
      * Log error message
+     *
+     * @param string $category Log category (e.g., 'Cache', 'API', 'Core')
+     * @param string $message Log message
+     * @param array $context Additional context data
      */
     public static function error(string $category, string $message, array $context = []): void
     {
@@ -100,7 +162,30 @@ class Logger
     }
 
     /**
+     * Format a single log entry into its string representation.
+     *
+     * @phpstan-param LogEntry $entry
+     * @return string Formatted log line with ANSI colour codes and emoji
+     */
+    private static function formatEntry(array $entry): string
+    {
+        $colorCode = self::getLevelColor($entry['level']);
+        $levelEmoji = self::getLevelEmoji($entry['level']);
+
+        $message = "\033{$colorCode}[{$entry['timestamp']}] [{$entry['environment']}] [{$levelEmoji} {$entry['level']}] [{$entry['category']}]\033[0m: {$entry['message']}";
+
+        if ($entry['context'] !== []) {
+            $message .= ' - ' . json_encode($entry['context']);
+        }
+
+        return $message;
+    }
+
+    /**
      * Get ANSI color code for log level
+     *
+     * @phpstan-param LogLevel $level
+     * @return string ANSI color code for log level
      */
     private static function getLevelColor(string $level): string
     {
@@ -115,6 +200,9 @@ class Logger
 
     /**
      * Get emoji for log level
+     *
+     * @phpstan-param LogLevel $level
+     * @return string Emoji for log level
      */
     private static function getLevelEmoji(string $level): string
     {

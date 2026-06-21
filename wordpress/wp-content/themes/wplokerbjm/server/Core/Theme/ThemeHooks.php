@@ -1,9 +1,9 @@
 <?php
 namespace WPLokerBJM\Core\Theme;
-use WPLokerBJM\Shared\Utilities\SharedUtils;
+use DI\Attribute\Injectable;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\GlobalHooks;
+#[Injectable(lazy: true)]
 class ThemeInject
 {
 
@@ -24,7 +24,7 @@ class ThemeInject
      * @return void
      */
     #[Action('after_setup_theme')]
-    public static function addThemeSupport(): void
+    public function addThemeSupport(): void
     {
 
         add_theme_support('title-tag');         // Add title tag support for dynamic titles
@@ -70,7 +70,7 @@ class ThemeInject
      *     @type int    height  Intrinsic pixel height (fallbacks applied)
      * }
      */
-    public static function getLogoData(): array
+    public function getLogoData(): array
     {
         $custom_logo_id = get_theme_mod('custom_logo');
         if (!$custom_logo_id) {
@@ -116,7 +116,7 @@ class ThemeInject
      * Adds additional site icon meta tags for custom sizes.
      */
     #[Filter('site_icon_meta_tags')]
-    public static function addSiteIconMetaTags(array $meta_tags): array
+    public function addSiteIconMetaTags(array $meta_tags): array
     {
 
         $additional_sizes = [48, 96, 144, 256, 384, 512];
@@ -136,7 +136,7 @@ class ThemeInject
             $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($original_url));
         }
 
-        $addTypeAttribute = function (&$meta_tags, $type) {
+        $addTypeAttribute = static function (&$meta_tags, $type) {
             foreach ($meta_tags as &$tag) {
                 // For link tags (icon and apple-touch-icon)
                 if (preg_match('/<link (?:rel="icon"|rel="apple-touch-icon")[^>]*href="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
@@ -165,46 +165,9 @@ class ThemeInject
      * @return int[] Array of additional icon sizes in pixels.
      */
     #[Filter('site_icon_image_sizes')]
-    public static function siteIconImageSizes(): array
+    public function siteIconImageSizes(): array
     {
         return [32, 48, 96, 144, 192, 256, 384, 512];
-    }
-
-    /**
-     * Output preload <link> for the logo image.
-     *
-     * If a custom logo is set, this outputs a <link rel="preload" as="image"> tag
-     * with appropriate srcset and sizes attributes for responsive loading.
-     * This helps prioritize logo loading for better performance and user experience.
-     *
-     * Side effects:
-     * - Echoes HTML directly to the output buffer.
-     *
-     * @return void
-     */
-    #[Action('wp_head')]
-    public static function preloadLogo(): void
-    {
-        $logoData = self::getLogoData();
-        if (empty($logoData['url'])) {
-            return;
-        }
-
-        $Attrs = [
-            'rel' => 'preload',
-            'as' => 'image',
-            'href' => esc_url($logoData['url']),
-            'imagesrcset' => esc_attr($logoData['srcset'] ?: ''),
-            'imagesizes' => esc_attr($logoData['sizes'] ?: ''),
-            'fetchpriority' => 'high',
-        ];
-
-        $preloadAttrs = array_filter($Attrs, fn($value) => !empty($value));
-        echo '<link ' . implode(' ', array_map(
-            fn($key, $value) => $key . '="' . $value . '"',
-            array_keys($preloadAttrs),
-            $preloadAttrs
-        )) . ' />' . "\n";
     }
 
     /**
@@ -217,8 +180,9 @@ class ThemeInject
      * - siteIconTags (string): newline‑separated <link> tags generated via the
      *   `site_icon_meta_tags` filter. Useful for rendering favicon markup in
      *   head elements when hydrating client code.
+     * @return array{logo: array{logoUrl: string, logoSrcset: string, logoSizes: string, logoDecoding: string, logoWidth: int, logoHeight: int}, siteIconTags: string, wpRestNonce?: string}
      */
-    public static function themeData(): array
+    public function themeData(): array
     {
         $loggedIn = is_user_logged_in();
         // For logged-in users store per-user caches to avoid leaking any per-user secrets (nonces)
@@ -239,7 +203,7 @@ class ThemeInject
         }
 
 
-        $logoData = ThemeInject::getLogoData();
+        $logoData = $this->getLogoData();
         if (empty($logoData['sizes'])) {
             $logoData['sizes'] = '(max-width: 640px) 48px, (max-width: 1024px) 64px, 128px';
         }

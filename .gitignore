@@ -1,19 +1,21 @@
 wordpress/*
-!wordpress/wp-content
+!wordpress/wp-content/
 wordpress/wp-content/*
+
 !wordpress/wp-content/mu-plugins/
 wordpress/wp-content/mu-plugins/*
 !wordpress/wp-content/mu-plugins/wplokerbjm-bootstrap.php
-!wordpress/wp-content/themes
+
+!wordpress/wp-content/themes/
 wordpress/wp-content/themes/*
-!wordpress/wp-content/themes/wplokerbjm
+!wordpress/wp-content/themes/wplokerbjm/
+
 **/.svelte-kit
 **/.wrangler
 **/.tmp
 **/.opencode
 **/build
 **/dist
-**/deploy-manual.sh
 **/.playwright-mcp
 **/mcp
 **/vendor
@@ -37,5 +39,4 @@ worker-configuration.d.ts
 **/*.graphql
 **/*.tsbuildinfo
 
-**/wplokerbjm/.agents
-**/.omo
+**/.agents

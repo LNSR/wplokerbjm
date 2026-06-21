@@ -3,16 +3,19 @@ namespace WPLokerBJM\Controllers\Utilities;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
+
 class ControllerUtils
 {
-
-    public static function parseJobFilters(\WP_REST_Request $request): array
+    public static function parseJobFilters($request): array
     {
-        $parseMulti = function ($param) {
+        $parseMulti = static function ($param) {
             if (is_array($param))
                 return $param;
-            if (is_string($param) && strpos($param, ',') !== false) {
-                return array_filter(array_map('trim', explode(',', $param)));
+            if (is_string($param) && str_contains($param, ',')) { // Optimized from strpos
+                return $param
+                    |> (static fn($str) => explode(',', $str))
+                    |> (static fn($arr) => array_map('trim', $arr))
+                    |> array_filter(...);
             }
             return $param ? [$param] : [];
         };
@@ -26,7 +29,7 @@ class ControllerUtils
         ];
     }
 
-    public static function failedResponse(string $message, int $code = 400): \WP_REST_Response
+    public static function failedResponse($message, $code = 400)
     {
         return new \WP_REST_Response([
             'success' => false,
@@ -37,9 +40,8 @@ class ControllerUtils
     public static function buildTermsTree(array $terms, $taxonomy = ''): array
     {
         try {
-
             $terms_by_id = [];
-            foreach ($terms as $term) {
+            foreach ($terms as &$term) {
                 $terms_by_id[$term->term_id] = [
                     'slug' => $term->slug,
                     'name' => $term->name,
@@ -66,15 +68,12 @@ class ControllerUtils
 
     /**
      * Validate and filter an array of IDs
-     *
-     * @param array $ids Array of IDs to validate
-     * @return array Filtered array of valid positive integer IDs
      */
     public static function validateIds(array $ids): array
     {
-        return array_filter(array_map('intval', $ids), function ($id) {
-            return $id > 0;
-        });
+        return $ids
+            |> (static fn($arr) => array_map('intval', $arr))
+            |> (static fn($arr) => array_filter($arr, static fn($id) => $id > 0));
     }
 
     public static function hasBearerAuthorization($request): bool
@@ -89,7 +88,9 @@ class ControllerUtils
             $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
         }
 
-        return preg_match('/^Bearer\s+\S+$/i', trim((string) $authorization)) === 1;
+        return $authorization
+            |> (static fn($auth) => trim((string) $auth))
+            |> (static fn($auth) => preg_match('/^Bearer\s+\S+$/i', $auth) === 1);
     }
 
     public static function getPermissionErrorStatus($request = null): ?int
@@ -117,7 +118,6 @@ class ControllerUtils
                     return true;
                 }
             }
-
             return false;
         }
 
@@ -127,23 +127,24 @@ class ControllerUtils
     public static function sanitizeContactList(string $field, $value): array
     {
         $rawParts = is_array($value) ? $value : explode(',', (string) $value);
-        $parts = array_values(array_filter(array_map(
-            fn($part): string => trim((string) $part),
-            $rawParts
-        ), fn($part) => $part !== ''));
 
-        return array_values(array_filter(array_map(function ($part) use ($field): ?string {
-            return match ($field) {
+        $parts = $rawParts
+            |> (static fn($arr) => array_map(static fn($part) => trim((string) $part), $arr))
+            |> (static fn($arr) => array_filter($arr, static fn($part) => $part !== ''))
+            |> array_values(...);
+
+        return $parts
+            |> (static fn($arr) => array_map(static fn($part) => match ($field) {
                 CustomFields::EMAIL_KONTAK => sanitize_email($part),
                 CustomFields::SITUS_KONTAK => esc_url_raw($part),
                 default => sanitize_text_field($part),
-            };
-        }, $parts), fn($part) => $part !== null && $part !== ''));
+            }, $arr))
+            |> (static fn($arr) => array_filter($arr, static fn($part) => $part !== null && $part !== ''))
+            |> array_values(...);
     }
 
     public static function sanitizeSocialMediaFieldset($value): array
     {
-        
         $allowedIndex = CustomFields::SOCIAL_MEDIA_PLATFORMS;
 
         if (is_string($value)) {
@@ -189,7 +190,12 @@ class ControllerUtils
     {
         $set = [];
 
-        foreach (array_filter(array_map('trim', explode(';', $value))) as $item) {
+        $items = $value
+            |> (static fn($str) => explode(';', $str))
+            |> (static fn($arr) => array_map('trim', $arr))
+            |> array_filter(...);
+
+        foreach ($items as $item) {
             $parts = explode(':', $item, 2);
             if (count($parts) !== 2) {
                 continue;
