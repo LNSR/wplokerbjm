@@ -132,7 +132,7 @@
           addSlidesBefore: 2,
           addSlidesAfter: 2,
           renderExternalUpdate: false,
-          renderExternal: (data: VirtualData<CardJob>) => {
+          renderExternal: <T>(data: VirtualData<T>): void => {
             const next = {
               from: Number(data.from),
               to: Number(data.to),
@@ -344,13 +344,11 @@
    */
   class CarouselNavigationHandler {
     public static handleClickNavigateToJob(
-      slug: string,
-      permalink: CardJob["permalink"],
       job: CardJob,
       clickedSlideIndex?: number,
     ): void {
       this.carouselSaveCurrentSlideState(clickedSlideIndex);
-      this.handlePlatformSpecificNavigation(slug, permalink, job);
+      this.handlePlatformSpecificNavigation(job);
     }
     private static carouselSaveCurrentSlideState(
       clickedSlideIndex?: number,
@@ -366,10 +364,10 @@
     }
 
     private static handlePlatformSpecificNavigation(
-      slug: string,
-      permalink: CardJob["permalink"],
       job: CardJob,
     ): void {
+      const { slug, permalink } = job;
+      if (!slug || !permalink) return;
       if (innerWidth.current! >= 768) {
         // Desktop: open overlay
         useSidePanel.openSidePanel(slug, job, "carousel", () => {
@@ -484,7 +482,7 @@
       >
         <div class="swiper-wrapper">
           {#each swiperManager.virtualIndexes as idx (idx)}
-            {const job: JobCardProps['jobdata'] = $derived(sortedJobs[idx])}
+            {const job: JobCardProps['jobdata'] = sortedJobs[idx]}
             <div
               class="swiper-slide min-w-0"
               data-swiper-slide-index={idx}
@@ -497,8 +495,6 @@
                 onclick={() => {
                   if (!job) return;
                   CarouselNavigationHandler.handleClickNavigateToJob(
-                    job.slug ?? "",
-                    job.permalink ?? "",
                     job,
                     idx,
                   );
@@ -529,8 +525,6 @@
                 variant="carousel"
                 onclick={() => {
                   CarouselNavigationHandler.handleClickNavigateToJob(
-                    job.slug ?? "",
-                    job.permalink ?? "",
                     job,
                     idx,
                   );

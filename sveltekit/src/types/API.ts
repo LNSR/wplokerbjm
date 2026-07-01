@@ -8,7 +8,7 @@ import type { SearchTitle } from './Search';
 type JobDetailPostMetaData = Omit<WPBasePost, keyof Pick<WPBasePost, 'permalink' | 'post_type'>>;
 export interface JobDetailResponse extends JobDetailPostMetaData, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'>
 {
-  duplicateNonce?: string | null; // Nonce for plugin 'Duplicate post as draft'
+  dpNonce?: string | null; // Nonce for plugin 'Yoast Duplicate Post'
   ringkasanPekerjaan?: JobSummary;
   contacts?: JobContactRow;
   post_time: string;

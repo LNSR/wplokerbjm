@@ -1,4 +1,7 @@
-#!/usr/bin/env sh
+#!/usr/bin/env zsh
+: ${REDIS_PWD:? "Redis Password env missing"} 
+: ${WP_ENV:? "WP_ENV env missing"}
+
 watch_paths=(server composer.json composer.lock)
 
 if ! command -v inotifywait >/dev/null 2>&1; then
@@ -28,24 +31,15 @@ inotifywait -m -r -e modify,create,delete --format '%w%f' "${watch_paths[@]}" \
       fi
       # Run composer in background after a short delay (debounce)
       (
-      sleep 2
-      echo "[$(date +'%H:%M:%S')] 📦 Dumping Composer Classmap..."
-      composer dump-autoload --apcu -a -o > /dev/null 2>&1
-
+      sleep 1
+  
       echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local HMR Chain..."
-      CONTAINER_OUTPUT=$(docker exec -i wordpress-${WP_ENV} php -r "
-        require_once '/var/www/html/wp-load.php';
-        if (class_exists('LiteSpeed\Purge')) {
-            \LiteSpeed\Purge::purge_all();
-            echo 'Success';
-        }
-      " 2>&1)
+      docker exec -i wordpress-${WP_ENV} pkill -USR2 php-fpm &
+      docker exec -i wordpress_redis redis-cli -a ${REDIS_PWD} FLUSHALL
+      # docker exec -i wordpress-${WP_ENV} gosu wordpress wp --path=/var/www/html --url=https://lowker.site litespeed-purge all
 
-      if [ "$CONTAINER_OUTPUT" = "Success" ]; then
-        echo "[$(date +'%H:%M:%S')] ✅ HMR Sync Completed successfully."
-      else
-        echo "[$(date +'%H:%M:%S')] ❌ HMR Sync Failed: $CONTAINER_OUTPUT"
-      fi
+      echo "[$(date +'%H:%M:%S')] 📦 Dumping Composer Classmap..."
+      composer dump-autoload --apcu -a -o > /dev/null
       ) &
       pending_pid=$!
     fi

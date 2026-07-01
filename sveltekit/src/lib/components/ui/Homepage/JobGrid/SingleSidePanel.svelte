@@ -19,15 +19,16 @@
   );
 
   const isLoggedIn = $derived<boolean>(!!themePropsStore.getNonce);
+  const action = "duplicate_post_new_draft";
 
   function getCloneHref(postId?: number | null): string {
-    if (!postId) return "#";
-    const base = `${getCmsOrigin()}/wp-admin/admin.php?action=dt_dpp_post_as_draft&post=${postId}`;
+    if (!postId || !data?.dpNonce) return "#";
+    const base = `${getCmsOrigin()}/wp-admin/admin.php?action=${action}&post=${postId}`;
 
     try {
-      const dup = data?.duplicateNonce;
-      if (typeof dup === "string" && dup.length > 0)
-        return `${base}&nonce=${encodeURIComponent(dup)}`;
+      const nonce = data?.dpNonce;
+      if (typeof nonce === "string" && nonce.length > 0)
+        return `${base}&_wpnonce=${encodeURIComponent(nonce)}`;
     } catch (e) {
       console.error("Error constructing clone URL with nonce:", e);
     }

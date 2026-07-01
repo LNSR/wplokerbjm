@@ -24,7 +24,6 @@ class Logger
      */
     private static function getEnvironment(): string
     {
-        // Use WP_ENVIRONMENT_TYPE if already set by wp-config-extra.php
         if (defined('WP_ENVIRONMENT_TYPE')) {
             return WP_ENVIRONMENT_TYPE;
         }

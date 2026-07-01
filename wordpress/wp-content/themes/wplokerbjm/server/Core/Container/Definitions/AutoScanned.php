@@ -16,11 +16,11 @@ use WPLokerBJM\Core\Container\Support\AutowireScanner;
  */
 class AutoScanned implements DefinitionProviderInterface
 {
+
     public static function getDefinitions(): array
     {
-        // Create scanner instance directly (not from container)
         $scanner = new AutowireScanner(
-            get_stylesheet_directory() . '/server', // Points to the server/ directory
+            get_stylesheet_directory() . '/server',
             'WPLokerBJM'
         );
 
@@ -49,7 +49,6 @@ class AutoScanned implements DefinitionProviderInterface
                 $filteredDefinitions[$className] = $definition;
             }
         }
-
         return $filteredDefinitions;
     }
 }

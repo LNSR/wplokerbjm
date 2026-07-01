@@ -84,6 +84,7 @@
     "intelephense.completion.maxItems": 1000,
     "intelephense.diagnostics.strictTypes": true,
     "typescript.tsdk": "wplokerbjm-frontend/node_modules/typescript/lib",
+    "editor.formatOnSave": false,
   },
   "extensions": {
     "recommendations": [

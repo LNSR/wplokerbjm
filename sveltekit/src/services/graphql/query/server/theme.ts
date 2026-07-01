@@ -16,11 +16,3 @@ export const GET_THEME_DATA = graphql(`
     }
   }
 `);
-
-export const GET_THEME_NONCE = graphql(`
-  query GetThemeNonce {
-    themeData {
-      wpRestNonce
-    }
-  }
-`);

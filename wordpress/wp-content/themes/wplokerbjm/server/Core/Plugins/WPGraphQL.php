@@ -4,13 +4,18 @@ namespace WPLokerBJM\Core\Plugins;
 
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 
 /**
  * WPGraphQL-related hooks extracted from GlobalHooks.
  */
 class WPGraphQL
 {
+
+    public static function isActive(): bool {
+        return SharedUtils::isPluginActive(PluginList::WpGraphql);
+    }
+    
     /**
      * Inject the JWT from the HttpOnly cookie as a Bearer token so the JWT
      * authentication plugin can authenticate the request transparently.
@@ -18,10 +23,6 @@ class WPGraphQL
     #[Action('graphql_init')]
     public function injectJwtFromCookie(): void
     {
-        if (!SharedUtils::isPluginActive('wpgraphql'))
-            return;
-
-
         if (empty($_SERVER['HTTP_AUTHORIZATION']) && !empty($_COOKIE['jwt-token'])) {
             $bearer = 'Bearer ' . $_COOKIE['jwt-token'];
             $_SERVER['HTTP_AUTHORIZATION'] = $bearer;
@@ -36,8 +37,6 @@ class WPGraphQL
     #[Action('init_graphql_request')]
     public function authenticateViaCookie(): void
     {
-        if (!SharedUtils::isPluginActive('wpgraphql'))
-            return;
         $cookieValue = '';
         $cookieName = '';
 
@@ -87,7 +86,7 @@ class WPGraphQL
     #[Filter('graphql_response_headers_to_send', 11)]
     public function ModifyHeaderGraphQL(array $headers): array
     {
-        if (!SharedUtils::isPluginActive('wpgraphql')) {
+        if (!self::isActive()) {
             return $headers;
         }
 

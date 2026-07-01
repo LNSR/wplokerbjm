@@ -2,24 +2,27 @@
 
 namespace WPLokerBJM\Core;
 
+use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+/*======================================================================
+ | Collection of Global Hooks Classes
+ ======================================================================*/
+
+/*======================================================================
+ | REDIRECTS
+ ======================================================================*/
 
 /**
- * Global hooks registration for actions and filters.
- * Registers WordPress actions and filters to modify theme behavior.
- * * Might dump some temporary hooks here before promoting to dedicated classes/layer.
+ * Handles all template_redirect hooks: SSL bypass, 410 Gone, archive → home,
+ * and headless SvelteKit frontend routing.
  */
-class GlobalHooks
+class RedirectHooks
 {
-    /*======================================================================
-     | REDIRECTS
-     ======================================================================*/
-
     /**
      * Skip redirect logic for ACME challenge requests and AutoSSL probe user agents.
      */
@@ -39,66 +42,53 @@ class GlobalHooks
     }
 
     /**
+     * Common early-return guard for all template_redirect hooks.
+     *
+     * Consolidates checks that apply universally: SSL bypass probes,
+     * backend-only contexts (REST, AJAX, CLI, cron, preview), and
+     * special query-parameter bypass flags.
+     */
+    private function shouldSkipRedirect(): bool
+    {
+        if ($this->shouldBypassAutoSsl()) {
+            return true;
+        }
+
+        if (
+            (defined('REST_REQUEST') && REST_REQUEST) ||
+            (defined('DOING_AJAX') && DOING_AJAX) ||
+            (defined('WP_CLI') && WP_CLI) ||
+            wp_doing_cron() ||
+            is_preview() ||
+            isset($_GET['_wfsf']) // WordFence query
+        ) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
      * Return 410 Gone for old job posts that have been trashed due to age.
      * * For deleted job posts (404 on single lowongan), return 410 Gone.
      * ! Notify search engines with 410 Gone for removed job posts.
      */
-    #[Action('template_redirect', 1)]
+    #[Action('template_redirect', 2)]
     public function oldPost410Redirect(): void
     {
-        if (
-            $this->shouldBypassAutoSsl() ||
-            !is_404() ||
-            is_preview() ||
-            is_admin() ||
-            (defined('REST_REQUEST') && REST_REQUEST) ||
-            wp_doing_ajax() ||
-            wp_doing_cron()
-        ) {
+        if ($this->shouldSkipRedirect() || !is_404() || is_admin()) {
             return;
         }
-
-        $handleRemovedJob = static function () {
-            if (is_404()) {
-                status_header(410);
-                wp_die('This job posting has been expired or removed.', 'Gone', ['response' => 410]);
-            } else {
-                wp_safe_redirect(home_url('/'), 302);
-                exit;
-            }
-        };
 
         if (is_singular('lowongan') || strpos($_SERVER['REQUEST_URI'] ?? '', '/lowongan/') !== false) {
-            $handleRemovedJob();
-        } else {
-            // Other 404s redirect to home
-            wp_safe_redirect(home_url('/'), 302);
-            exit;
-        }
-    }
-
-    /**
-     * Redirect to home if accessing the lowongan post type archive.
-     */
-    #[Action('template_redirect', 4)]
-    public function redirectToHome(): void
-    {
-        // Avoid redirecting during admin, AJAX, REST API, cron, or preview requests
-        if (
-            $this->shouldBypassAutoSsl() ||
-            (defined('REST_REQUEST') && REST_REQUEST) ||
-            wp_doing_ajax() ||
-            wp_doing_cron() ||
-            is_preview()
-        ) {
-            return;
+            status_header(410);
+            wp_die('This job posting has been expired or removed.', 'Gone', ['response' => 410]);
         }
 
-        if (is_post_type_archive('lowongan')) {
-            // Use wp_safe_redirect to ensure the redirect target is allowed
-            wp_safe_redirect(home_url('/'), 302);
-            exit;
-        }
+        // Other 404s: redirect to the headless Svelte frontend
+        $baseUrl = SharedUtils::headlessDomainRedirect();
+        wp_redirect(rtrim($baseUrl, '/') . '/', 302);
+        exit;
     }
 
     /**
@@ -106,19 +96,10 @@ class GlobalHooks
      * Runs early during `template_redirect` so the theme always forwards
      * public requests to the Svelte frontend (dev vs prod).
      */
-    #[Action('template_redirect', 2)]
+    #[Action('template_redirect', 3)]
     public function headlessFrontendAdminSideRedirect(): void
     {
-        // Avoid redirecting during admin, AJAX, REST API, cron, preview, or CLI requests
-        if (
-            $this->shouldBypassAutoSsl() ||
-            is_admin() ||
-            (defined('REST_REQUEST') && REST_REQUEST) ||
-            (defined('DOING_AJAX') && DOING_AJAX) ||
-            (function_exists('wp_doing_cron') && wp_doing_cron()) ||
-            (defined('WP_CLI') && WP_CLI) ||
-            is_preview()
-        ) {
+        if ($this->shouldSkipRedirect() || is_admin()) {
             return;
         }
 
@@ -134,7 +115,10 @@ class GlobalHooks
             if ($post && !empty($post->post_name)) {
                 $path = '/lowongan/' . $post->post_name;
             }
-        } elseif (function_exists('is_front_page') && (is_front_page() || is_page(146))) {
+        } elseif (
+            function_exists('is_post_type_archive') && is_post_type_archive('lowongan') ||
+            function_exists('is_front_page') && (is_front_page() || is_page(146))
+        ) {
             $path = '/';
         }
 
@@ -144,16 +128,20 @@ class GlobalHooks
         wp_redirect($location, 302);
         exit;
     }
+}
 
-    /*======================================================================
-     | META TAGS
-     ======================================================================*/
 
-    /**
-     * Adds noindex and nofollow directives to robots meta tag.
-     * - Noindex for lowongan post type archive page.
-     * - Noindex,nofollow for staging/dev subdomains.
-     */
+/*======================================================================
+ | META TAGS / SEO
+ ======================================================================*/
+
+/**
+ * Adds noindex and nofollow directives to robots meta tag.
+ * - Noindex for lowongan post type archive page.
+ * - Noindex,nofollow for staging/dev subdomains.
+ */
+class RobotsHooks
+{
     #[Filter('wp_robots')]
     public function robotsMetaImpl(array $robots): array
     {
@@ -168,34 +156,33 @@ class GlobalHooks
 
         return $robots;
     }
-
-    /*======================================================================
-     | HEADERS
-     ======================================================================*/
+}
 
 
+/*======================================================================
+ | SEARCH
+ ======================================================================*/
 
-    /*======================================================================
-     | FILTERS
-     ======================================================================*/
-
+/**
+ * Customizes the SQL WHERE clause for WordPress search queries on job posts.
+ *
+ * This filter intercepts the default WordPress search behavior and replaces it with
+ * custom SQL that searches across multiple fields relevant to job listings:
+ * - Post titles
+ * - Company names (stored in post meta)
+ * - Taxonomy terms (e.g., job categories, locations)
+ *
+ * This enables more comprehensive search results for the job platform, allowing users
+ * to find jobs by company name or category even if those terms aren't in the title.
+ *
+ * Used by: DynamicSearch Graphql endpoint, and any WP_Query with 's' parameter
+ * on 'lowongan' post type.
+ */
+class SearchHooks
+{
     /**
-     * Customizes the SQL WHERE clause for WordPress search queries on job posts.
-     *
-     * This filter intercepts the default WordPress search behavior and replaces it with
-     * custom SQL that searches across multiple fields relevant to job listings:
-     * - Post titles
-     * - Company names (stored in post meta)
-     * - Taxonomy terms (e.g., job categories, locations)
-     *
-     * This enables more comprehensive search results for the job platform, allowing users
-     * to find jobs by company name or category even if those terms aren't in the title.
-     *
-     * Used by: DynamicSearch Graphql endpoint, and any WP_Query with 's' parameter
-     * on 'lowongan' post type.
-     *
-     * @param string $search The current search SQL fragment (may be empty).
-     * @param \WP_Query $wp_query The WP_Query object being executed.
+     * @param string        $search   The current search SQL fragment (may be empty).
+     * @param \WP_Query     $wp_query The WP_Query object being executed.
      * @return string Modified search SQL fragment.
      */
     #[Filter('posts_search', 10, 2)]
@@ -213,11 +200,18 @@ class GlobalHooks
 
         return $search;
     }
+}
 
-    /*======================================================================
-     | ENVIRONMENT FILTERS
-     ======================================================================*/
 
+/*======================================================================
+ | ENVIRONMENT
+ ======================================================================*/
+
+/**
+ * Environment-specific behaviour: disable plugins in dev, force locale.
+ */
+class EnvironmentHooks
+{
     /**
      * Temporarily disable specific plugins if in development environment.
      */
@@ -249,7 +243,8 @@ class GlobalHooks
     }
 
     /**
-     * Force locale to Indonesian on the frontend for consistent user experience, while keeping admin in English.
+     * Force locale to Indonesian on the frontend for consistent user experience,
+     * while keeping admin in English.
      */
     #[Filter('locale')]
     public function frontendLocal($locale)
@@ -263,7 +258,7 @@ class GlobalHooks
     /**
      * Filters the list of active plugins by removing specified plugins.
      *
-     * @param array $plugins Array of active plugin file paths.
+     * @param array $plugins          Array of active plugin file paths.
      * @param array $pluginsToDisable Array of plugin prefixes to disable.
      * @return array Filtered array of active plugins.
      */
@@ -290,30 +285,31 @@ class GlobalHooks
     private function listPluginsToDisable(?array $extra = []): array
     {
         return array_merge([
-            // 'google-site-kit/',
+            'wordfence/',
             'tinywp-mobile-detect/',
             'fast-indexing-api/',
-            // 'wps-hide-login/',
         ], $extra);
     }
-
-    /*======================================================================
-     | CACHE
-     ======================================================================*/
+}
 
 
+/*======================================================================
+ | CACHE INVALIDATION
+ ======================================================================*/
+
+/**
+ * Centralized cache purge when posts, meta, terms, or status change.
+ *
+ * Calling conventions:
+ * - For post hooks (e.g., `save_post`, `delete_post`) we pass `($post_id, $post)` so
+ *   the method can perform both global purges and per-job invalidation when applicable.
+ * - For term hooks (`created_term`, `edited_term`, `delete_term`) we call this method
+ *   without arguments (no post context) and it will only purge global caches.
+ * - For meta/taxonomy hooks we pass the `object_id` (post id) when available.
+ */
+class CacheInvalidationHooks
+{
     /**
-     * Centralized cache purge when posts, meta, terms, or status change.
-     *
-     * Prefer explicit parameters to make intent and types clear when hooked from WP.
-     *
-     * Calling conventions:
-     * - For post hooks (e.g., `save_post`, `delete_post`) we pass `($post_id, $post)` so
-     *   the method can perform both global purges and per-job invalidation when applicable.
-     * - For term hooks (`created_term`, `edited_term`, `delete_term`) we call this method
-     *   without arguments (no post context) and it will only purge global caches.
-     * - For meta/taxonomy hooks we pass the `object_id` (post id) when available.
-     *
      * @return void
      */
     #[Action('save_post', 10, 2)]
@@ -377,6 +373,9 @@ class GlobalHooks
                 CacheKey::TAXONOMY_LAST_MODIFIED,
                 CacheKey::ALL_TAXONOMY_TERMS,
 
+                    // Purge Taxonomy
+                CacheKey::ALL_TAXONOMY_OPTIONS,
+
                     // Purge taxonomy depth REST caches
                 CacheKey::TAXONOMY_DEPTH_HANDLE,
                 CacheKey::TAXONOMY_DEPTH_LOKASI,
@@ -385,7 +384,7 @@ class GlobalHooks
                 CacheKey::HOMEPAGE_JOB_SCHEMAS,
             ]);
 
-            Cache::deletePattern([
+            RedisAdapter::deletePattern([
                 CacheKey::JOB_GRID_PREFIX . '*',
                 CacheKey::SEARCH_SQL_PREFIX . '*',
                 CacheKey::COMPANY_SEARCH_PREFIX . '*',
@@ -406,7 +405,7 @@ class GlobalHooks
                 $this->invalidateJobDataCache((int) $post_id);
             }
         } catch (\Exception $e) {
-            Logger::error('Hooks', 'Hooks::purgeCacheOnChange error: ' . $e->getMessage());
+            Logger::error('Hooks', 'CacheInvalidationHooks::purgeCacheOnChange error: ' . $e->getMessage());
         }
     }
 
@@ -440,70 +439,5 @@ class GlobalHooks
 
         // Return true if any cache entry was deleted
         return !empty(array_filter($deleteResults));
-    }
-
-    /*======================================================================
-     | PLUGIN BUG FIXES
-     ======================================================================*/
-
-    /**
-     * Fix blank WYSIWYG/TinyMCE editor on fresh post-editor load edit by viewing WYSIWYG/TinyMCE editor html code first
-     */
-    #[Filter('wp_default_editor', 8)]
-    public function switch_tinymce_default_view(): string
-    {
-        return 'html';
-    }
-
-    #[Action('admin_footer')]
-    public function switch_tinymce_editor_view_to_visual(): void
-    {
-        $screen = get_current_screen();
-        if (!$screen || $screen->base !== 'post')
-            return;
-        ?>
-        <script type="module" id="tinyMCE-fix">
-            let attempts = 0;
-            const maxAttempts = 10;
-
-            const forceVisualTabClick = () => {
-                // Find the literal "Visual" tab buttons belonging to the editors
-                const visualButtons = document.querySelectorAll('.wp-editor-tabs .switch-tmce');
-
-                if (visualButtons.length === 0) {
-                    return retry();
-                }
-
-                visualButtons.forEach(button => {
-                    const wrapper = button.closest('.wp-editor-wrap');
-                    const editorId = wrapper?.querySelector('.wp-editor-area')?.id;
-
-                    // Skip the main core content editor, only target custom fields
-                    if (editorId && editorId !== 'content') {
-                        if (wrapper.classList.contains('html-active')) {
-                            const clickEvent = new MouseEvent('click', {
-                                view: window,
-                                bubbles: true,
-                                cancelable: true
-                            });
-                            button.dispatchEvent(clickEvent);
-                        }
-                    }
-                });
-            };
-
-            const retry = () => {
-                if (attempts < maxAttempts) {
-                    attempts++;
-                    window.scheduler.postTask(() => forceVisualTabClick(), {
-                        priority: 'user-visible',
-                        delay: 200
-                    });
-                }
-            };
-
-            retry();
-        </script>
-        <?php
     }
 }

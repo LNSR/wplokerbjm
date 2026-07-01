@@ -72,19 +72,17 @@ class GraphQLData
             : CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . $post_id . '_public';
 
 
-        $noncePlugin = static fn($action, &$postId) => match ($action) {
-            'duplicatePost' => wp_create_nonce('duplicate_post_' . $postId),
-        };
+        $noncePlugin = static fn(string $action, int $postId): string => wp_create_nonce($action . '_' . $postId);
 
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             if (is_user_logged_in()) {
-                $cached['duplicateNonce'] = $noncePlugin('duplicatePost', $post_id);
+                $cached['dpNonce'] = $noncePlugin('duplicate_post_new_draft', $post_id);
                 return $cached;
             } else {
                 // safety remove in case cached from logged-in
-                if (isset($cached['duplicateNonce'])) {
-                    unset($cached['duplicateNonce']);
+                if (isset($cached['dpNonce'])) {
+                    unset($cached['dpNonce']);
                 }
                 return $cached;
             }
@@ -118,7 +116,7 @@ class GraphQLData
 
 
             if (is_user_logged_in())
-                $data['duplicateNonce'] = $noncePlugin('duplicatePost', $post_id);
+                $data['dpNonce'] = $noncePlugin('duplicate_post_new_draft', $post_id);
 
             $data = SharedUtils::filterEmptyValues($data);
 

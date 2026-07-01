@@ -57,6 +57,20 @@
         "GOOGLE_MAPS_RATE_LIMIT_WINDOW_MS": "120000",
         "GOOGLE_MAPS_RATE_LIMIT_MAX_REQUESTS": "200"
       }
+    },
+    "wplokerbjm-mcp-prod": {
+      "type": "remote",
+      "url": "{env:WP_MCP_WPLOKERBJM_PROD}",
+      "headers": {
+        "X-Royal-MCP-API-Key": "{env:X_ROYAL_MCP_API_KEY}"
+      }
+    },
+    "wplokerbjm-mcp-local": {
+      "type": "remote",
+      "url": "{env:WP_MCP_WPLOKERBJM_DEV}",
+      "headers": {
+        "X-Royal-MCP-API-Key": "{env:X_ROYAL_MCP_API_KEY}"
+      }
     }
   }
 }

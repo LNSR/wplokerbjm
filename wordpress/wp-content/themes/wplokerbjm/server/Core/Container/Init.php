@@ -36,6 +36,7 @@ class Init
 {
     /**
      * @var array<int,array<string,mixed>> $hookRegistrations
+     * @var ContainerInterface $container 
      * Array of hook registration data produced by the AutowireScanner.
      */
     public function __construct(
@@ -111,8 +112,7 @@ class Init
 
         $class = $reg['class'];
         $method = $reg['method'];
-        $container = $this->container;
 
-        return static fn(...$args) => $container->get($class)->{$method}(...$args);
+        return fn(...$args) => $this->container->get($class)->{$method}(...$args);
     }
 }

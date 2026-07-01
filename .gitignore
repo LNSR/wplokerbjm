@@ -16,7 +16,6 @@ wordpress/wp-content/themes/*
 **/.opencode
 **/build
 **/dist
-**/deploy-manual.sh
 **/.playwright-mcp
 **/mcp
 **/vendor

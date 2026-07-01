@@ -6,6 +6,7 @@ use WPLokerBJM\Controllers\GraphQL\Resolvers\Auth\JWTDataResolver;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 class GraphQLRegistration
 {
@@ -81,13 +82,13 @@ class GraphQLRegistration
     {
         register_graphql_scalar(self::TYPE_JSON, [
             'description' => 'Arbitrary JSON data',
-            'serialize' => function ($value) {
+            'serialize' => static function ($value) {
                 return is_string($value) ? $value : json_encode($value);
             },
-            'parseValue' => function ($value) {
+            'parseValue' => static function ($value) {
                 return is_string($value) ? json_decode($value, true) : $value;
             },
-            'parseLiteral' => function ($ast) {
+            'parseLiteral' => static function ($ast) {
                 if ($ast instanceof \GraphQL\Language\AST\StringValueNode) {
                     return json_decode($ast->value, true);
                 }
@@ -136,7 +137,7 @@ class GraphQLRegistration
                 CustomFields::STATUS_PEKERJAAN => ['type' => self::TYPE_INT],
                 'permalink' => ['type' => self::TYPE_STRING],
                 'post_time' => ['type' => self::TYPE_STRING],
-                'duplicateNonce' => ['type' => self::TYPE_STRING],
+                'dpNonce' => ['type' => self::TYPE_STRING],
             ],
         ]);
 
@@ -453,7 +454,6 @@ class GraphQLRegistration
             'resolve' => fn(...$args) => $this->jobsDataResolver->resolveSyncBookmark(...$args),
         ]);
 
-        // JWT mutation is registered separately because of the POST requirement
         register_graphql_field(self::TYPE_ROOT_MUTATION, 'jwt', [
             'type' => self::TYPE_STRING,
             'description' => 'Request or validate JWT token (provide username/password or existing token)',

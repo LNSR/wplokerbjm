@@ -61,7 +61,27 @@ const handleBypass: Handle = async ({ event, resolve }) =>
 };
 
 /**
- * 2. Auth Context & Fetch Wrapper Middleware
+ * 2. Real IP Resolution Middleware
+ *
+ * Uses SvelteKit's built-in getClientAddress() 
+ *
+ * NOTE: We only store in event.locals — we cannot .set() headers on the
+ * incoming Request (it's immutable in Cloudflare Workers). Downstream code
+ * should read from event.locals.clientIp instead.
+ */
+const handleClientIp: Handle = async ({ event, resolve }) =>
+{
+  event.locals.clientIp = event.getClientAddress();
+  return resolve(event);
+};
+
+/**
+ * 3. Auth Context & Fetch Wrapper Middleware
+ *
+ * Wraps event.fetch to:
+ * - Forward the real visitor IP (from handleClientIp) as X-Forwarded-For
+ * - Filter cookies to only pass WordPress/wp/JWT cookies upstream
+ * - Inject Authorization header from JWT cookie
  */
 const handleSecurityContext: Handle = async ({ event, resolve }) =>
 {
@@ -71,6 +91,10 @@ const handleSecurityContext: Handle = async ({ event, resolve }) =>
   {
     const [ input, init = {} ] = args;
     init.headers = new Headers(init.headers);
+
+    // Forward real visitor IP to upstream services
+    if (event.locals.clientIp) init.headers.set("X-Forwarded-For", event.locals.clientIp);
+
     const cookie = event.request.headers.get("Cookie");
 
     if (cookie)
@@ -97,7 +121,7 @@ const handleSecurityContext: Handle = async ({ event, resolve }) =>
 };
 
 /**
- * 3. Layout Discovery Middleware
+ * 4. Layout Discovery Middleware
  */
 const handleThemeContext: Handle = async ({ event, resolve }) =>
 {
@@ -113,7 +137,7 @@ const handleThemeContext: Handle = async ({ event, resolve }) =>
 };
 
 /**
- * 4. Device Identification Middleware
+ * 5. Device Identification Middleware
  */
 const handleDevice: Handle = async ({ event, resolve }) =>
 {
@@ -149,7 +173,7 @@ const handleDevice: Handle = async ({ event, resolve }) =>
 };
 
 /**
- * 5. Caching & Transformation (Edge Optimization) Middleware
+ * 6. Caching & Transformation (Edge Optimization) Middleware
  */
 const handleCacheAndTransform: Handle = async ({ event, resolve }) =>
 {
@@ -217,6 +241,7 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) =>
 // --- Execution Pipeline ---
 export const handle = sequence(
   handleBypass,
+  handleClientIp,
   handleSecurityContext,
   handleThemeContext,
   handleDevice,

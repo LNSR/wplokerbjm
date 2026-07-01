@@ -1,6 +1,10 @@
 <?php
 
 namespace WPLokerBJM\Core\Container\Definitions;
+use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPhooksScanner;
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Init;
 
 /**
  * Core container definitions for the wplokerbjm theme.
@@ -30,20 +34,11 @@ class Core implements DefinitionProviderInterface
     {
         return [
             // Define the Init service: It handles automatic hook registration for all services.
-            \WPLokerBJM\Core\Container\Init::class => function ($c) {
-                // Step 1: Create the scanner to find hook registrations from attributes.
-                $scanner = new \WPLokerBJM\Core\Container\Support\WPhooksScanner(
-                    get_stylesheet_directory() . '/server', // Path to the server/ directory containing services.
-                    'WPLokerBJM' // Base namespace for the theme.
-                );
-
-                // Step 2: Get hook registrations from attributes.
+            Init::class => static function (ContainerInterface $c) {
+                /** @var WPhooksScanner $scanner */
+                $scanner = $c->get(WPhooksScanner::class);
                 $hookRegistrations = $scanner->getHookRegistrations();
-
-                // Init will register hooks from attributes automatically.
-                // Instance-method hooks are wrapped in lazy closures that defer
-                // container resolution to the moment the hook actually fires.
-                return new \WPLokerBJM\Core\Container\Init($hookRegistrations, $c);
+                return new Init($hookRegistrations, $c);
             },
         ];
     }

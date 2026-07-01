@@ -116,8 +116,19 @@ class TaxonomyQuery
         return $final_result;
     }
 
+    /**
+     * Get all taxonomy options for the specified taxonomies.
+     * @param array $taxonomies
+     * @return array
+     */
     public static function getTaxonomyOptions(array $taxonomies): array
     {
+        $cache_key = CacheKey::ALL_TAXONOMY_OPTIONS;
+        $cached = Cache::get($cache_key);
+        if ($cached !== false) {
+            return $cached;
+        }
+        
         $options = [];
 
         foreach ($taxonomies as $taxonomy) {
@@ -143,7 +154,7 @@ class TaxonomyQuery
                 $terms
             ));
         }
-
+        Cache::set($cache_key, $options, 86400);
         return $options;
     }
 }

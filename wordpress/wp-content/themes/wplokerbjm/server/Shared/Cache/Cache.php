@@ -2,16 +2,19 @@
 namespace WPLokerBJM\Shared\Cache;
 
 use WPLokerBJM\Shared\Log\Logger;
-use WPLokerBJM\Configs\CredentialConfig;
 
 /**
  * Object Cache management
  *
- * This class provides direct access to WordPress object cache (e.g., Redis) for high-performance operations.
- * Supports both individual and bulk operations, conditional operations, and direct Redis access for advanced features.
+ * This class provides access to WordPress object cache for high-performance operations.
+ * Supports both individual and bulk operations, and conditional operations.
+ *
+ * Redis-specific advanced features (pattern deletion, direct connection) are
+ * handled by WPLokerBJM\Adapter\Redis.
  */
 class Cache
 {
+
     /**
      * Set a value in object cache.
      *
@@ -66,7 +69,6 @@ class Cache
             if (!function_exists('wp_cache_delete')) {
                 return false;
             }
-            Logger::info('Cache', "Deleting cache key: '{$key}' with group: '" . CacheKey::OBJECT_CACHE_PREFIX . "'");
             $result = wp_cache_delete($key, CacheKey::OBJECT_CACHE_PREFIX);
             Logger::info('Cache', "Cache delete result for key '{$key}': " . ($result ? 'success' : 'failure'));
             return $result;
@@ -327,7 +329,6 @@ class Cache
             if (!function_exists('wp_cache_flush')) {
                 return false;
             }
-            Logger::info('Cache', "Flushing all cache");
             $result = wp_cache_flush();
             Logger::info('Cache', "Cache flushAll result: " . ($result ? 'success' : 'failure'));
             return $result;
@@ -337,115 +338,7 @@ class Cache
         }
     }
 
-    /**
-     * Delete cache keys matching multiple patterns (Redis-specific).
-     * This method provides direct Redis access for pattern-based deletion.
-     * Only works when Redis is the cache backend.
-     *
-     * @param string[] $patterns Array of patterns to match (e.g., ['prefix1_*', 'prefix2_*']).
-     * @return int Number of keys deleted, or false on error.
-     */
-    public static function deletePattern(array $patterns): int|false
-    {
-        Logger::info('Cache', "Cache::deletePattern called with patterns: " . implode(', ', $patterns));
 
-        try {
-            // Get Redis connection
-            $redis = self::getRedisConnection();
-            if (!$redis) {
-                Logger::error('Cache', 'Cache::deletePattern: Redis connection failed');
-                return false;
-            }
-
-            // Build full pattern with LSC's prefix (use constant if available, else replicate)
-            $wp_content_dir = defined('WP_CONTENT_DIR') ? WP_CONTENT_DIR : dirname(get_stylesheet_directory()) . '/..';
-            $lscwp_dir = (defined('WP_PLUGIN_DIR') ? WP_PLUGIN_DIR : $wp_content_dir . '/plugins') . '/litespeed-cache/';
-            $cls_file = $lscwp_dir . 'src/object-cache-wp.cls.php';
-            if (defined('LSOC_PREFIX') && is_string(LSOC_PREFIX) && !empty(LSOC_PREFIX)) {
-                $salt = LSOC_PREFIX;
-                Logger::info('Cache', "Using LSOC_PREFIX constant: '{$salt}'");
-            } else {
-                $salt = substr(md5($cls_file), -5);
-                Logger::warning('Cache', "LSOC_PREFIX not defined or invalid, falling back to computed salt: '{$salt}'");
-            }
-
-            $allKeys = [];
-            foreach ($patterns as $pattern) {
-                $fullPattern = $salt . CacheKey::OBJECT_CACHE_PREFIX . '.' . $pattern;
-                $keys = $redis->keys($fullPattern);
-                $allKeys = array_merge($allKeys, $keys);
-            }
-
-            Logger::info('Cache', "Cache::deletePattern: Found " . count($allKeys) . " keys matching patterns: " . implode(', ', $patterns));
-
-            if (empty($allKeys)) {
-                return 0;
-            }
-
-            // Use unlink for asynchronous deletion (faster)
-            $deletedCount = $redis->unlink($allKeys);
-
-            Logger::info('Cache', "Cache::deletePattern: Unlinked {$deletedCount} keys matching patterns: " . implode(', ', $patterns));
-
-            return $deletedCount;
-
-        } catch (\Exception $e) {
-            Logger::error('Cache', 'Cache::deletePattern error: ' . $e->getMessage());
-            return false;
-        }
-    }
-
-    /**
-     * Get a connected Redis instance for direct Redis operations.
-     * ! Only use this for advanced operations not supported by WP object cache.
-     *
-     * @return \Redis|false Connected Redis instance or false on failure.
-     */
-    public static function getRedisConnection(): \Redis|false
-    {
-        try {
-            // Check if Redis extension is available
-            if (!extension_loaded('redis')) {
-                return false;
-            }
-
-            $credentials = CredentialConfig::RedisCredential();
-            $host = $credentials['host'];
-            $port = $credentials['port'];
-            $password = $credentials['password'];
-            $database = $credentials['database'];
-            $sock = $credentials['sock'];
-
-            $redis = new \Redis();
-
-            if ($sock && file_exists($sock)) {
-                $connected = $redis->connect($sock);
-            } else {
-                $connected = $redis->connect($host, $port);
-            }
-
-            if (!$connected) {
-                return false;
-            }
-
-            // Authenticate if password is set
-            if ($password) {
-                if (!$redis->auth($password)) {
-                    return false;
-                }
-            }
-
-            // Select database
-            if ($database !== null && !$redis->select($database)) {
-                return false;
-            }
-
-            return $redis;
-
-        } catch (\Exception $e) {
-            return false;
-        }
-    }
 }
 
 /**
@@ -458,7 +351,6 @@ class CacheKey
 {
     // General cache prefixes and keys
     const OBJECT_CACHE_PREFIX = 'wplokerbjm_obj_';
-    const COMPILED_CONTAINER_HASH = 'compiled_container_hash';
     const THEME_DATA = 'theme_data';
 
     // Job-related
@@ -483,6 +375,7 @@ class CacheKey
     const HOMEPAGE_DATA = 'homepage_data';
 
     // Taxonomy
+    const ALL_TAXONOMY_OPTIONS = 'all_taxonomy_options';
     const TAXONOMY_LAST_MODIFIED = 'taxonomy_last_modified';
     const COMPANY_SEARCH_PREFIX = 'company_search_';
     const ALL_TAXONOMY_TERMS = 'all_taxonomy_terms';

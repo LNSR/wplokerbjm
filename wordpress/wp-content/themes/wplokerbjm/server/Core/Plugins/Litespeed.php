@@ -3,10 +3,12 @@ namespace WPLokerBJM\Core\Plugins;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Container;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
+
 
 /**
- * LiteSpeed General Hooks
+ * LiteSpeed custom hooks extend
+ * @link https://docs.litespeedtech.com/lscache/lscwp/api/
  */
 class Litespeed
 {
@@ -19,7 +21,7 @@ class Litespeed
     #[Action('litespeed_purged_all')]
     public function clearObjectCache(): void
     {
-        if (!SharedUtils::isPluginActive('litespeed')) {
+        if (!SharedUtils::isPluginActive(PluginList::LiteSpeed)) {
             return;
         }
         // Clear APCu cache first
@@ -29,9 +31,7 @@ class Litespeed
 
         // Invalidate OPCache
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
-            $file = Container::$CACHE_FILE;
-            wp_opcache_invalidate($file, true);
-            wp_opcache_invalidate_directory(get_stylesheet_directory() . '/server');
+            wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
 
         Cache::flushGroup(CacheKey::OBJECT_CACHE_PREFIX);
@@ -41,19 +41,10 @@ class Litespeed
         if (is_dir($cacheDir)) {
             array_map('unlink', glob("$cacheDir/*"));
         }
-
+        Container::getContainer(true);
     }
 
-}
-
-/**
- * LiteSpeed Filters Focused Hooks
- * @link https://docs.litespeedtech.com/lscache/lscwp/api/
- */
-class LiteSpeedFilters
-{
-
-    /**
+        /**
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
     #[Filter('litespeed_is_mobile', 0)]
@@ -61,6 +52,7 @@ class LiteSpeedFilters
     {
         return wp_is_mobile();
     }
+
 }
 
 /**
@@ -69,15 +61,17 @@ class LiteSpeedFilters
 class LiteSpeedGraphQL
 {
 
+    public static function isActive(): bool
+    {
+        return SharedUtils::isPluginActive(PluginList::LiteSpeed);
+    }
+
     /**
      * Set GraphQL Queries returned via HTTP GET requests to be cacheable
      */
     #[Action('graphql_process_http_request_response', 2)]
     public function setCacheable(): void
     {
-        if (!SharedUtils::isPluginActive('litespeed')) {
-            return;
-        }
         if ('GET' !== $_SERVER['REQUEST_METHOD']) {
             return;
         }
@@ -95,9 +89,6 @@ class LiteSpeedGraphQL
     #[Filter('graphql_response_headers_to_send', 11)]
     public function tagResponses(array $headers = []): array
     {
-        if (!SharedUtils::isPluginActive('litespeed')) {
-            return $headers;
-        }
 
         if (isset($headers['X-GraphQL-Keys'])) {
             $keys = $headers['X-GraphQL-Keys'];
@@ -123,9 +114,6 @@ class LiteSpeedGraphQL
     #[Action('graphql_purge')]
     public function purgeCache($keys): void
     {
-        if (!SharedUtils::isPluginActive('litespeed')) {
-            return;
-        }
         do_action('litespeed_purge', $keys);
     }
 }

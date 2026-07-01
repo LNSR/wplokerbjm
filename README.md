@@ -135,7 +135,7 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   ├── Cron/                  # Cron job management
 │   │   └── WPCron.php
 │   ├── GlobalHooks.php        # Global WordPress hooks
-│   ├── Plugins/               # Plugin integrations
+│   ├── Plugins/               # Extend Plugins integrations
 │   │   ├── Litespeed.php
 │   │   └── Rankmath.php
 │   ├── Posts/                 # Post management

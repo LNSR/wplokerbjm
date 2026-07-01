@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Core\Plugins;
 
 use WPlokerBJM\Core\Container\Attributes\Filter;
-use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 
 /**
  * Rank Math Integration Service
@@ -21,7 +21,7 @@ class Rankmath
 	public function isActive(): bool
 	{
 		if ($this->isActiveCache === null) {
-			$this->isActiveCache = SharedUtils::isPluginActive('rankmath');
+			$this->isActiveCache = SharedUtils::isPluginActive(PluginList::RankMath);
 		}
 		return $this->isActiveCache;
 	}
