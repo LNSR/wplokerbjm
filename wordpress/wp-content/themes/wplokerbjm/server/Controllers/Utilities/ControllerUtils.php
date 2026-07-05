@@ -41,7 +41,7 @@ class ControllerUtils
     {
         try {
             $terms_by_id = [];
-            foreach ($terms as $term) {
+            foreach ($terms as &$term) {
                 $terms_by_id[$term->term_id] = [
                     'slug' => $term->slug,
                     'name' => $term->name,

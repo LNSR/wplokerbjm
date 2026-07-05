@@ -1,20 +1,18 @@
 import type { JobDetailResponse } from "@/types";
 import { cookieJwtName } from "$lib/server/constants/constants";
 
-type LinkAs = HTMLLinkElement[ 'as' ] & ("audio" | "document" | "embed" | "fetch" | "font" | "image" | "object" | "script" | "style" | "track" | "video" | "worker");
+type LinkAs = HTMLLinkElement['as'] & ("audio" | "document" | "embed" | "fetch" | "font" | "image" | "object" | "script" | "style" | "track" | "video" | "worker");
 
 /**
  * Extract image URLs from an HTML string using a simple regex fallback.
  */
-function extractImagesFromHtml(html: string | null | undefined): string[]
-{
+function extractImagesFromHtml(html: string | null | undefined): string[] {
     if (!html) return [];
     const srcs: string[] = [];
     const imgRe = /<img\s[^>]*?(?:src|data-src)=(\"|')(.*?)\1/gi;
     let match: RegExpExecArray | null;
-    while ((match = imgRe.exec(html)))
-    {
-        if (match[ 2 ]) srcs.push(match[ 2 ]);
+    while ((match = imgRe.exec(html))) {
+        if (match[2]) srcs.push(match[2]);
     }
     return srcs.filter(Boolean);
 }
@@ -22,9 +20,8 @@ function extractImagesFromHtml(html: string | null | undefined): string[]
 /**
  * Build a preload Link entry for early hints.
  */
-export function buildPreloadLink(url: HTMLLinkElement[ 'href' ], as: LinkAs = "image", opts?: { nopush?: boolean; crossorigin?: boolean; media?: string }): string
-{
-    const parts = [ `<${url}>`, `rel=preload`, `as=${as}` ];
+export function buildPreloadLink(url: HTMLLinkElement['href'], as: LinkAs = "image", opts?: { nopush?: boolean; crossorigin?: boolean; media?: string }): string {
+    const parts = [`<${url}>`, `rel=preload`, `as=${as}`];
     if (opts?.nopush) parts.push("nopush");
     if (opts?.crossorigin) parts.push("crossorigin");
     if (opts?.media) parts.push(`media=${opts.media}`);
@@ -35,8 +32,7 @@ export function buildPreloadLink(url: HTMLLinkElement[ 'href' ], as: LinkAs = "i
  * Collect image URLs from a JobDetailResponse and return a single Link header value
  * suitable for early hints (comma-separated preload entries).
  */
-export function collectPreloadLinksForJob(job: JobDetailResponse | null | undefined): string | null
-{
+export function collectPreloadLinksForJob(job: JobDetailResponse | null | undefined): string | null {
     if (!job) return null;
 
     const fields = [
@@ -59,10 +55,32 @@ export function collectPreloadLinksForJob(job: JobDetailResponse | null | undefi
     return entries.join(", ");
 }
 
-export function isAuthenticated(cookies: string | null): boolean
-{
+export function isAuthenticated(cookies: string | null): boolean {
     if (!cookies) return false;
     const wpAuthCookiePattern = /wordpress_logged_in|wordpress_sec|wordpress_\w+_?\d+/i;
     if (new RegExp(`${cookieJwtName}=([^;]+)`).test(cookies)) return true;
     return wpAuthCookiePattern.test(cookies);
+}
+
+export function prependHeader(headers: Headers, name: string, value: string[]): void {
+    value.forEach(v => {
+        const existing = headers.get(name);
+        headers.set(name, existing ? `${v}, ${existing}` : v);
+    });
+}
+export function filterCookieString(raw: string): string {
+    return raw
+        .split(";")
+        .map(p => p.trim())
+        .filter(cook => {
+            const name = cook.split("=")[0] || "";
+            const lowerName = name.toLowerCase();
+            return lowerName.startsWith("wordpress") || lowerName.startsWith("wp") || lowerName.startsWith(cookieJwtName);
+        })
+        .join("; ");
+}
+
+export function setCrossOriginIsolationHeaders(headers: Headers): void {
+    headers.set("Cross-Origin-Opener-Policy", "same-origin");
+    headers.set("Cross-Origin-Embedder-Policy", "credentialless");
 }

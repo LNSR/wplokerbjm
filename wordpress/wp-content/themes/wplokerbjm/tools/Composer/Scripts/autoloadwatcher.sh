@@ -1,8 +1,13 @@
 #!/usr/bin/env zsh
-: ${REDIS_PWD:? "Redis Password env missing"} 
+: ${REDIS_PWD:? "Redis Password env missing"}
 : ${WP_ENV:? "WP_ENV env missing"}
-
 watch_paths=(server composer.json composer.lock)
+# exit if pwd isnt wplokerbjm
+echo "Running in directory $(pwd)"
+if ! [[ $(pwd) == */wplokerbjm ]]; then
+  echo "Error: Autoloadwatcher is not running in the correct directory." >&2
+  exit 1
+fi
 
 if ! command -v inotifywait >/dev/null 2>&1; then
   echo "Error: inotifywait is not installed. Please install inotify-tools." >&2
@@ -31,13 +36,14 @@ inotifywait -m -r -e modify,create,delete --format '%w%f' "${watch_paths[@]}" \
       fi
       # Run composer in background after a short delay (debounce)
       (
-      sleep 1
-  
+      sleep 2
+
       echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local HMR Chain..."
       docker exec -i wordpress-${WP_ENV} pkill -USR2 php-fpm &
       docker exec -i wordpress_redis redis-cli -a ${REDIS_PWD} FLUSHALL
-      # docker exec -i wordpress-${WP_ENV} gosu wordpress wp --path=/var/www/html --url=https://lowker.site litespeed-purge all
-
+      echo "[$(date +'%H:%M:%S')] Purging LiteSpeed cache..."
+      docker exec -i wordpress-${WP_ENV} rm -rf /var/www/html/wp-content/themes/wplokerbjm/cache
+      docker exec -i wordpress-${WP_ENV} gosu wordpress wp --path=/var/www/html --url=https://lowker.site litespeed-purge all
       echo "[$(date +'%H:%M:%S')] 📦 Dumping Composer Classmap..."
       composer dump-autoload --apcu -a -o > /dev/null
       ) &

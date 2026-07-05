@@ -123,6 +123,16 @@
     },
     "tasks": [
       {
+        "label": "opencode",
+        "type": "shell",
+        "command": "opencode serve",
+        "group": "none",
+        "options": {
+          "cwd": "${workspaceFolder:wplokerbjm-root}",
+        },
+        "problemMatcher": [],
+      },
+      {
         "label": "php-lint",
         "type": "shell",
         "command": "composer run lint:php",

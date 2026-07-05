@@ -3,8 +3,8 @@
 namespace WPLokerBJM\Core\Container;
 
 use DI\ContainerBuilder;
-use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Definitions\{AutoScanned, Core, Factory};
+use DI\Container as ContainerInterface;
+use WPLokerBJM\Core\Container\Definitions\{Core, Factory};
 use WPLokerBJM\Shared\Log\Logger;
 
 class Container
@@ -64,10 +64,11 @@ class Container
 
             // Enable autowiring and attributes for automatic dependency injection
             $builder->useAutowiring(true);
-            $builder->useAttributes(false);
+            $builder->useAttributes(true);
 
             // Add all service definitions
             if (!file_exists(self::$CACHE_FILE)) {
+                Logger::info("Container", "Building container from scratch");
                 self::setupDefinitions($builder);
             }
 
@@ -84,16 +85,14 @@ class Container
 
     private static function setupDefinitions(ContainerBuilder $builder): void
     {
-        $builder->addDefinitions(array_merge(
-            // Auto-scanned definitions from the server/ directory
-            AutoScanned::getDefinitions(),
-
-            // Interface bindings and factory definitions
-            Factory::getDefinitions(),
-
-            // Manually defined dependencies for core services
-            Core::getDefinitions(),
-        ));
+        $builder->addDefinitions(
+            // Last position will overwrite previous definitions
+            array_merge(
+                Core::getDefinitions(),
+                // factory definitions
+                Factory::getDefinitions(),
+            )
+        );
     }
 
     private static function setupCache(ContainerBuilder $builder): void

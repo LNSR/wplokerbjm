@@ -1,6 +1,6 @@
 <?php
 
-namespace WPLokerBJM\Core\Posts;
+namespace WPLokerBJM\Core\Cron\Posts;
 
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
@@ -8,7 +8,7 @@ use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Cron\WPCron;
 
-/**s
+/**
  * Handles job-related operations, including deletion and status updates.
  */
 class PostsManagement
@@ -24,7 +24,7 @@ class PostsManagement
 
                 // Skip deletion if the job still has a deadline in the future (guard against accidental deletion)
                 try {
-                    $deadline = get_post_meta($post_id, CustomFields::DEADLINE);
+                    $deadline = get_post_meta($post_id, CustomFields::DEADLINE, true);
                     if (!empty($deadline)) {
                         $deadline_ts = strtotime($deadline . ' 23:59:59');
                         if ($deadline_ts !== false && $deadline_ts >= time()) {
@@ -134,6 +134,7 @@ class PostsJobStatus
             $now = time();
             if ($now > $deadline_ts && $current_status !== CustomFields::STATUS_PEKERJAAN_NORMAL) {
                 update_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, CustomFields::STATUS_PEKERJAAN_NORMAL);
+                Logger::info('Posts', 'PostsManagement::updateJobStatusIfExpired set status to normal for post ' . $post_id . ' with deadline ' . $deadline);
             }
         } catch (\Exception $e) {
             Logger::error('Posts', 'PostsManagement::updateJobStatusIfExpired error for post ' . $post_id . ': ' . $e->getMessage());
@@ -159,6 +160,7 @@ class PostsJobStatus
             $fourteen_days_ahead = strtotime('+14 days 23:59:59', strtotime('today', $now));
             if ($deadline_ts >= $now && $deadline_ts <= $fourteen_days_ahead && $current_status !== CustomFields::STATUS_PEKERJAAN_URGENT) {
                 update_post_meta($post_id, CustomFields::STATUS_PEKERJAAN, CustomFields::STATUS_PEKERJAAN_URGENT);
+                Logger::info('Posts', 'PostsManagement::setJobStatustoUrgent set status to urgent for post ' . $post_id . ' with deadline ' . $deadline);
             }
         } catch (\Exception $e) {
             Logger::error('Posts', 'PostsManagement::setJobStatustoUrgent error for post ' . $post_id . ': ' . $e->getMessage());

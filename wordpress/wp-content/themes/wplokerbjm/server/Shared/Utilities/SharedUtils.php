@@ -6,6 +6,7 @@ enum PluginList: string
     case Wordfence = 'wordfence/wordfence.php';
     case WpGraphql = 'wp-graphql/wp-graphql.php';
     case RankMath = 'seo-by-rank-math/rank-math.php';
+    case QueryMonitor = 'query-monitor/query-monitor.php';
     case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
 }
 

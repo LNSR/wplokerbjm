@@ -1,7 +1,9 @@
 <?php
 namespace WPLokerBJM\Core\Theme;
+use DI\Attribute\Injectable;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+#[Injectable(lazy: true)]
 class ThemeInject
 {
 
@@ -178,6 +180,7 @@ class ThemeInject
      * - siteIconTags (string): newline‑separated <link> tags generated via the
      *   `site_icon_meta_tags` filter. Useful for rendering favicon markup in
      *   head elements when hydrating client code.
+     * @return array{logo: array{logoUrl: string, logoSrcset: string, logoSizes: string, logoDecoding: string, logoWidth: int, logoHeight: int}, siteIconTags: string, wpRestNonce?: string}
      */
     public function themeData(): array
     {

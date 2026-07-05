@@ -7,6 +7,8 @@ namespace WPLokerBJM\Tests;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Init;
+use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\LazyHookHandler;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\FilterService;
 use WPLokerBJM\Tests\Support\Fixtures\LazyHookService;
@@ -46,19 +48,30 @@ class InitLazyHookTest extends WplokerbjmTestCase
         FilterService::reset();
     }
 
+    /**
+     * Create an Init instance wired to WPHooksRegistry for the given registrations.
+     *
+     * @param array<int,array<string,mixed>> $registrations
+     */
+    private function createInit(array $registrations): Init
+    {
+        $registry = new WPHooksRegistry($this->container, $registrations);
+        return new Init($registry);
+    }
+
     public function testInstanceHookIsNotResolvedAtRegistration(): void
     {
         $registrations = [
             $this->action(LazyHookService::class, 'onAction', 'lazy_action_hook'),
         ];
 
-        $init = new Init($registrations, $this->container);
+        $init = $this->createInit($registrations);
         $init->initialize();
 
         // The hook must be registered...
         $reg = $this->findRegisteredHook('action', 'lazy_action_hook');
         $this->assertNotNull($reg, 'Hook should be registered');
-        $this->assertIsCallable($reg['callable'], 'Hook callable should be a closure');
+        $this->assertInstanceOf(LazyHookHandler::class, $reg['callable'], 'Hook callable should be a LazyHookHandler');
 
         // ...but the service MUST NOT have been instantiated yet.
         $this->assertSame(
@@ -74,7 +87,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
             $this->action(LazyHookService::class, 'onAction', 'lazy_action_hook'),
         ];
 
-        $init = new Init($registrations, $this->container);
+        $init = $this->createInit($registrations);
         $init->initialize();
 
         $this->assertSame(0, LazyHookService::$instantiationCount, 'Not yet fired');
@@ -96,7 +109,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
             $this->action(LazyHookService::class, 'onAction', 'lazy_action_hook'),
         ];
 
-        $init = new Init($registrations, $this->container);
+        $init = $this->createInit($registrations);
         $init->initialize();
 
         do_action('lazy_action_hook', 'a');
@@ -123,7 +136,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
             $this->filter(FilterService::class, 'onFilter', 'lazy_filter_hook', acceptedArgs: 2),
         ];
 
-        $init = new Init($registrations, $this->container);
+        $init = $this->createInit($registrations);
         $init->initialize();
 
         $this->assertSame(0, FilterService::$instantiationCount, 'Not yet fired');
@@ -144,7 +157,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
             $this->action(LazyHookService::class, 'onAction', 'present_hook'),
         ];
 
-        $init = new Init($registrations, $this->container);
+        $init = $this->createInit($registrations);
         $init->initialize();
 
         $this->assertNull(
@@ -163,7 +176,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
             $this->action(LazyHookService::class, 'onAction', 'lazy_action_hook'),
         ];
 
-        $init = new Init($registrations, $this->container);
+        $init = $this->createInit($registrations);
         $init->initialize();
         $init->initialize();
         $init->initialize();
@@ -182,7 +195,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
             $this->filter(FilterService::class, 'onFilter', 'mixed_hook', acceptedArgs: 1),
         ];
 
-        $init = new Init($registrations, $this->container);
+        $init = $this->createInit($registrations);
         $init->initialize();
 
         $this->assertSame(0, LazyHookService::$instantiationCount, 'Lazy service should not be instantiated yet');

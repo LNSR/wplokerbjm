@@ -3,8 +3,10 @@
 namespace WPLokerBJM\Services\WebHooks;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Log\Logger;
+use DI\Attribute\Injectable;
 
 /**
  * Cloudflare webhook helpers.
@@ -15,15 +17,22 @@ use WPLokerBJM\Shared\Log\Logger;
  *    frontend and the SvelteKit mirror, plus the home page.
  *  - Full-zone purging (term/taxonomy hooks) — clears everything.
  *
- * Credentials are resolved via CredentialConfig::CloudflareCredential().
+  * Credentials are injected via the constructor using PHP-DI.
+ * @see \WPLokerBJM\Core\Container\Definitions\Factory
  */
+#[Injectable(lazy: true)]
 class Cloudflare
 {
     private const WP_DOMAIN = 'wp.lokerbanjarmasin.my.id';
     private const APP_DOMAIN = 'lokerbanjarmasin.my.id';
     private const DEVICE_TYPES = ['desktop', 'mobile', 'tablet'];
 
-    public function __construct(private array $credential) {
+    /**
+     * @param array $credential filled by PHP-DI
+     * @param WPHooksRegistry $wpHooksRegistry autowired by PHP-DI
+     */
+    public function __construct(private array $credential, private WPHooksRegistry $wpHooksRegistry)
+    {
 
     }
 
@@ -35,23 +44,16 @@ class Cloudflare
      * per CF-Device-Type value (desktop, mobile, tablet) — so every
      * variant is cleared.
      *
-     * Fires on post and meta hooks where a $post_id is available.
+     * Registered on post-lifecycle hooks.  NEVER self-unregisters — every
+     * post in a batch operation must have its CDN cache purged individually.
      *
      * @param mixed ...$args Hook arguments.
      * @return bool True on success, false on failure.
      */
     #[Action('save_post', 10, 2)]
     #[Action('deleted_post', 10, 1)]
-    #[Action('added_post_meta', 10, 4)]
-    #[Action('updated_post_meta', 10, 4)]
-    #[Action('deleted_post_meta', 10, 4)]
     public function purgeCache(...$args): bool
     {
-        if (SharedUtils::isDevelopment()) {
-            Logger::info('WebHook', 'Skipping Cloudflare purge in development environment.');
-            return false;
-        }
-
         $postId = $this->extractPostId(current_action(), $args);
         $files = $this->buildPurgeUrls($postId);
 
@@ -67,6 +69,31 @@ class Cloudflare
     }
 
     /**
+     * Purge triggered by meta changes — self-unregisters after first fire.
+     *
+     * Meta hooks (added_post_meta, updated_post_meta, deleted_post_meta)
+     * are redundant within a single post lifecycle: by the time these fire,
+     * `save_post` has already triggered a purge.  After the first meta hook
+     * fires, this handler removes itself for the rest of the request.
+     *
+     * In a batch operation this means post #1's meta change triggers a purge
+     * (and unregisters), while posts #2–50 rely on their `save_post` /
+     * `deleted_post` hooks (which remain registered on a different method).
+     *
+     * @param mixed ...$args Hook arguments.
+     * @return bool True on success, false on failure.
+     */
+    #[Action('added_post_meta', 10, 4)]
+    #[Action('updated_post_meta', 10, 4)]
+    #[Action('deleted_post_meta', 10, 4)]
+    public function purgeOnMetaChange(...$args): bool
+    {
+        $this->wpHooksRegistry->unregisterByMethod(self::class, 'purgeOnMetaChange');
+
+        return $this->purgeCache(...$args);
+    }
+
+    /**
      * Purge the entire zone cache.
      *
      * Fires on taxonomy / term hooks where no single post is relevant.
@@ -78,10 +105,7 @@ class Cloudflare
     #[Action('delete_term', 10, 0)]
     public function purgeCacheAll(): bool
     {
-        if (SharedUtils::isDevelopment()) {
-            Logger::info('WebHook', 'Skipping Cloudflare purge in development environment.');
-            return false;
-        }
+        $this->wpHooksRegistry->unregisterByMethod(self::class, 'purgeCacheAll');
 
         return $this->sendPurgeRequest(['purge_everything' => true]);
     }
@@ -154,6 +178,11 @@ class Cloudflare
      */
     private function sendPurgeRequest(array $payload, ?string $deviceType = null): bool
     {
+        if (SharedUtils::isDevelopment()) {
+            Logger::info('WebHook', 'Skipping Cloudflare purge in development environment.');
+            return false;
+        }
+
         $creds = $this->credential;
         $token = $creds['token'] ?? '';
         $zone = $creds['zone'] ?? '';

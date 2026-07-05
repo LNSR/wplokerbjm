@@ -1,6 +1,7 @@
 <?php
 
 namespace WPLokerBJM\Models\Schema;
+use DI\Attribute\Injectable;
 use WPLokerBJM\Core\Container\Attributes\Action;
 
 /**
@@ -16,6 +17,7 @@ use WPLokerBJM\Core\Container\Attributes\Action;
  *
  * @package WPLokerBJM\Models\Schema
  */
+#[Injectable(lazy: true)]
 class Taxonomies
 {
 

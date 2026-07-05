@@ -2,12 +2,14 @@
 
 namespace WPLokerBJM\Core;
 
+use DI\Attribute\Injectable;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 /*======================================================================
  | Collection of Global Hooks Classes
@@ -21,6 +23,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  * Handles all template_redirect hooks: SSL bypass, 410 Gone, archive → home,
  * and headless SvelteKit frontend routing.
  */
+#[Injectable(lazy: true)]
 class RedirectHooks
 {
     /**
@@ -178,6 +181,7 @@ class RobotsHooks
  * Used by: DynamicSearch Graphql endpoint, and any WP_Query with 's' parameter
  * on 'lowongan' post type.
  */
+#[Injectable(lazy: true)]
 class SearchHooks
 {
     /**
@@ -307,10 +311,52 @@ class EnvironmentHooks
  *   without arguments (no post context) and it will only purge global caches.
  * - For meta/taxonomy hooks we pass the `object_id` (post id) when available.
  */
+#[Injectable(lazy: true)]
 class CacheInvalidationHooks
 {
+
     /**
-     * @return void
+     * @param WPHooksRegistry $hooksRegistry Used for self-unregistration of the
+     *                                       global purge after first fire per request.
+     * @param RedisAdapter    $redisAdapter  Used for direct Redis pattern-based cache deletion.
+     */
+    public function __construct(
+        private WPHooksRegistry $hooksRegistry,
+        private RedisAdapter $redisAdapter,
+    ) {
+
+    }
+
+    /**
+     * Per-post cache invalidation — fires for EVERY lowongan post change.
+     *
+     * Never self-unregisters: in a batch of 50 trashed jobs, each one must
+     * invalidate its own individual cache entries. The global cache sweep
+     * is handled separately by {@see purgeGlobalCacheOnce()}.
+     *
+     * Registered only on hooks that carry post context.
+     */
+    #[Action('save_post', 10, 2)]
+    #[Action('delete_post', 10, 1)]
+    #[Action('trashed_post', 10, 1)]
+    #[Action('delete_attachment', 10, 1)]
+    #[Action('transition_post_status', 10, 3)]
+    public function invalidatePostCache(...$args): void
+    {
+        Logger::debug('Hook method', 'invalidatePostCache');
+        $post_id = $this->extractPostId($args);
+
+        if ($post_id !== null) {
+            $this->invalidateJobDataCache((int) $post_id);
+        }
+    }
+
+    /**
+     * Global cache purge — fires once per request, then self-unregisters.
+     *
+     * One comprehensive global sweep per request is sufficient. After the
+     * first fire, this handler removes itself from WordPress so that term/
+     * meta changes later in the same request don't trigger redundant purges.
      */
     #[Action('save_post', 10, 2)]
     #[Action('delete_post', 10, 1)]
@@ -322,17 +368,63 @@ class CacheInvalidationHooks
     #[Action('updated_post_meta', 10, 4)]
     #[Action('set_object_terms', 10, 6)]
     #[Action('transition_post_status', 10, 3)]
-    public function purgeCacheOnChange(...$args): void
+    public function purgeGlobalCacheOnce(...$args): void
     {
-        // Normalize incoming hook args: find first numeric-like value as post_id and any \WP_Post instance as post
+        $this->hooksRegistry->unregisterByMethod(self::class, 'purgeGlobalCacheOnce');
+
+        try {
+            Cache::deleteMultiple([
+                CacheKey::CAROUSEL_JOBS,
+                CacheKey::JOB_LAST_MODIFIED,
+                CacheKey::TAXONOMY_LAST_MODIFIED,
+                CacheKey::ALL_TAXONOMY_TERMS,
+                CacheKey::ALL_TAXONOMY_OPTIONS,
+                CacheKey::TAXONOMY_DEPTH_HANDLE,
+                CacheKey::TAXONOMY_DEPTH_LOKASI,
+                CacheKey::TAXONOMY_DEPTH_GENDER,
+                CacheKey::TAXONOMY_DEPTH_PENDIDIKAN,
+                CacheKey::HOMEPAGE_JOB_SCHEMAS,
+            ]);
+
+            $this->redisAdapter->deletePattern([
+                CacheKey::JOB_GRID_PREFIX . '*',
+                CacheKey::SEARCH_SQL_PREFIX . '*',
+                CacheKey::COMPANY_SEARCH_PREFIX . '*',
+                CacheKey::AUTO_SUGGESTION_PREFIX . '*',
+                CacheKey::POST_TAXONOMIES_PREFIX . '*',
+                CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . '*',
+                CacheKey::GRAPHQL_JOB_CARD_PREFIX . '*',
+                CacheKey::DYNAMIC_SEARCH_PREFIX . '*',
+                CacheKey::SYNC_BOOKMARK_PREFIX . '*',
+                CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . '*',
+                CacheKey::RANKMATH_HEAD_PREFIX . '*',
+                CacheKey::THEME_DATA . '*',
+            ]);
+        } catch (\Exception $e) {
+            Logger::error('Hooks', 'CacheInvalidationHooks::purgeGlobalCacheOnce error: ' . $e->getMessage());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    //  Helpers
+    // -----------------------------------------------------------------------
+
+    /**
+     * Extract a post ID from variadic hook arguments, validating post type.
+     *
+     * @param array $args Hook arguments
+     * @return int|null The resolved lowongan post ID, or null if not applicable
+     */
+    private function extractPostId(array $args): ?int
+    {
         $post_id = null;
-        $post = null;
 
         foreach ($args as $arg) {
             if ($arg instanceof \WP_Post) {
-                $post = $arg;
-                $post_id = $post->ID ?? $post_id;
-                // keep scanning in case a numeric ID also appears elsewhere
+                if ($arg->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
+                    return null;
+                }
+                $post_id = $arg->ID;
                 continue;
             }
 
@@ -346,98 +438,76 @@ class CacheInvalidationHooks
                 continue;
             }
         }
-        // If a post object is provided, ensure it's the 'lowongan' type; otherwise bail out.
-        if ($post instanceof \WP_Post) {
-            if ($post->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
-                return;
-            }
-            $post_id = $post->ID ?? $post_id;
-        }
 
-        // If only a post_id was provided, resolve it and apply same post type check.
-        if ($post_id !== null && !($post instanceof \WP_Post)) {
+        if ($post_id !== null) {
             $resolved = get_post($post_id);
-            if ($resolved !== null && $resolved->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
-                return; // don't purge when a non-lowongan post changed
-            }
-            if ($resolved !== null) {
-                $post = $resolved;
+            if ($resolved === null || $resolved->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
+                return null;
             }
         }
 
-        try {
-            // Purge general caches
-            Cache::deleteMultiple([
-                CacheKey::CAROUSEL_JOBS,
-                CacheKey::JOB_LAST_MODIFIED,
-                CacheKey::TAXONOMY_LAST_MODIFIED,
-                CacheKey::ALL_TAXONOMY_TERMS,
-
-                    // Purge Taxonomy
-                CacheKey::ALL_TAXONOMY_OPTIONS,
-
-                    // Purge taxonomy depth REST caches
-                CacheKey::TAXONOMY_DEPTH_HANDLE,
-                CacheKey::TAXONOMY_DEPTH_LOKASI,
-                CacheKey::TAXONOMY_DEPTH_GENDER,
-                CacheKey::TAXONOMY_DEPTH_PENDIDIKAN,
-                CacheKey::HOMEPAGE_JOB_SCHEMAS,
-            ]);
-
-            RedisAdapter::deletePattern([
-                CacheKey::JOB_GRID_PREFIX . '*',
-                CacheKey::SEARCH_SQL_PREFIX . '*',
-                CacheKey::COMPANY_SEARCH_PREFIX . '*',
-                CacheKey::AUTO_SUGGESTION_PREFIX . '*',
-                CacheKey::POST_TAXONOMIES_PREFIX . '*',
-                CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . '*',
-                CacheKey::GRAPHQL_JOB_CARD_PREFIX . '*',
-                CacheKey::DYNAMIC_SEARCH_PREFIX . '*',
-                CacheKey::SYNC_BOOKMARK_PREFIX . '*',
-                CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . '*',
-                CacheKey::RANKMATH_HEAD_PREFIX . '*',
-                CacheKey::THEME_DATA . '*',
-                CacheKey::HOMEPAGE_DATA . '*',
-            ]);
-
-            // If we detected a post id, also invalidate the per-job caches
-            if ($post_id !== null) {
-                $this->invalidateJobDataCache((int) $post_id);
-            }
-        } catch (\Exception $e) {
-            Logger::error('Hooks', 'CacheInvalidationHooks::purgeCacheOnChange error: ' . $e->getMessage());
-        }
+        return $post_id;
     }
 
     /**
-     * Invalidate job data cache for a specific post if it's a 'lowongan' post type.
+     * Invalidate job data caches for a specific lowongan post.
      *
      * @param int $post_id The post ID.
-     * @return bool True if cache was invalidated, false otherwise.
+     * @return bool True if any cache entry was deleted.
      */
     private function invalidateJobDataCache(int $post_id): bool
     {
-        $post_type = get_post_type($post_id);
-        if ($post_type !== 'lowongan') {
-            return false;
-        }
+        $deleteResults = Cache::deleteMultiple([
+            CacheKey::JOB_DATA_PREFIX . $post_id,
+            CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id,
+            CacheKey::JOB_SCHEMA_PREFIX . $post_id,
+        ]);
 
-        $jobDataCacheKey = CacheKey::JOB_DATA_PREFIX . $post_id;
-        $cardCacheKey = CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id;
-        // overlay caches may be per-user or public; we'll invalidate by pattern below
-        $schemaCacheKey = CacheKey::JOB_SCHEMA_PREFIX . $post_id;
-
-        // Use deleteMultiple for better performance - single network round trip
-        $cacheKeys = [
-            $jobDataCacheKey,
-            $cardCacheKey,
-            $schemaCacheKey,
-            $schemaCacheKey,
-        ];
-
-        $deleteResults = Cache::deleteMultiple($cacheKeys);
-
-        // Return true if any cache entry was deleted
         return !empty(array_filter($deleteResults));
+    }
+}
+
+/*======================================================================
+ | HTTP HOOKS
+ ======================================================================*/
+class HTTPHooks
+{
+    //** forwarded IP from the SvelteKit frontend
+    #[Action('muplugins_loaded', PHP_INT_MIN)]
+    public function setRemoteAddr(): void
+    {
+        if (SharedUtils::isDevelopment()) return; // @dev local mode, skip this
+        if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
+        }
+    }
+}
+
+/*======================================================================
+ | LOGGER FLUSH
+ ======================================================================*/
+
+/**
+ * Flushes the Logger's in-memory buffer on WordPress shutdown.
+ *
+ * All Logger::info/debug/warning/error calls during the request are
+ * buffered in memory. This handler writes them to error_log() in a
+ * single batch when the request completes, with a graceful fallback
+ * to individual writes on failure.
+ */
+class LoggerHooks
+{
+    #[Action('shutdown', PHP_INT_MAX)]
+    public function flushBuffer(): void
+    {
+        // ONLY detach the browser connection if we are running in an HTTP context (not WP-CLI)
+        if (defined('PHP_SAPI') && PHP_SAPI !== 'cli') {
+            if (function_exists('litespeed_finish_request')) {
+                litespeed_finish_request();
+            } elseif (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+        }
+        Logger::flush();
     }
 }

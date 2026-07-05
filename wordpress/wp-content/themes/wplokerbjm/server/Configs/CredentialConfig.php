@@ -8,16 +8,16 @@ class CredentialConfig
      * Return Redis connection credentials.
      *
      * @param array|null $params Optional overrides ('host', 'port', 'password', 'database', 'sock').
-     * @return array{host: ?string, port: ?int|string, password: ?string, database: ?int|string, sock: ?string}
+     * @return array{host: ?string, port: ?int, password: ?string, database: ?int, sock: ?string}
      */
     public static function RedisCredential(?array $params = null): array
     {
         return [
-            'host'     => $params['host'] ?? (defined('WP_REDIS_HOST') ? WP_REDIS_HOST : null),
-            'port'     => $params['port'] ?? (defined('WP_REDIS_PORT') ? WP_REDIS_PORT : null),
-            'password' => $params['password'] ?? (defined('WP_REDIS_PASSWORD') ? WP_REDIS_PASSWORD : null),
-            'database' => $params['database'] ?? (defined('WP_REDIS_DATABASE') ? WP_REDIS_DATABASE : null),
-            'sock'     => $params['sock'] ?? (defined('WP_REDIS_SOCK') ? WP_REDIS_SOCK : null),
+            'host'     => (string) ($params['host'] ?? (defined('WP_REDIS_HOST') ? (string) WP_REDIS_HOST : null)),
+            'port'     => (int) ($params['port'] ?? (defined('WP_REDIS_PORT') ? (int) WP_REDIS_PORT : null)),
+            'password' => (string) ($params['password'] ?? (defined('WP_REDIS_PASSWORD') ? (string) WP_REDIS_PASSWORD : null)),
+            'database' => (int) ($params['database'] ?? (defined('WP_REDIS_DATABASE') ? (int) WP_REDIS_DATABASE : null)),
+            'sock'     => (string) ($params['sock'] ?? (defined('WP_REDIS_SOCK') ? (string) WP_REDIS_SOCK : null)),
         ];
     }
 

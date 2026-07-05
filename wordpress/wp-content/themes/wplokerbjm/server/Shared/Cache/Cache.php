@@ -30,6 +30,7 @@ class Cache
                 return false;
             }
             $result = wp_cache_set($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            Logger::info('Cache', "Cache set result for key '{$key}': " . ($result ? 'success' : 'failure'));
             return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::set error: ' . $e->getMessage());
@@ -146,6 +147,7 @@ class Cache
                 return false;
             }
             $result = wp_cache_add($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            Logger::info('Cache', "Cache add result for key '{$key}': " . ($result ? 'success' : 'failure'));
             return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::add error: ' . $e->getMessage());
@@ -311,6 +313,7 @@ class Cache
                 return false;
             }
             $result = wp_cache_flush_group($group);
+            Logger::info('Cache', "Cache flushGroup result for group '{$group}': " . ($result ? 'success' : 'failure'));
             return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::flushGroup error: ' . $e->getMessage());
@@ -372,7 +375,6 @@ class CacheKey
     const CAROUSEL_JOBS = 'carousel_jobs';
     const JOB_GRID_PREFIX = 'job_grid_';
     const HOMEPAGE_JOB_SCHEMAS = 'homepage_job_schemas';
-    const HOMEPAGE_DATA = 'homepage_data';
 
     // Taxonomy
     const ALL_TAXONOMY_OPTIONS = 'all_taxonomy_options';
@@ -387,18 +389,4 @@ class CacheKey
 
     // Query Builders
     const SEARCH_SQL_PREFIX = 'search_sql_';
-
-    // Enqueue/Assets
-    const VITE_MANIFEST = 'vite_manifest';
-    const PRELOAD_URLS_PREFIX = 'preload_urls_';
-    const PRELOAD_LINK_HEADER_PREFIX = 'preload_link_header_';
-    const TRANSITIVE_ASSETS_PREFIX = 'transitive_assets_';
-
-    // Autowire Scanner
-    const AUTOWIRE_SCANNER_PREFIX = 'autowire_scanner_';
-
-    // RankMath
-    const RANKMATH_SITEMAP_DEBOUNCE_PREFIX = 'rankmath_sitemap_debounce_';
-    const RANKMATH_SITEMAP_DELETE_DEBOUNCE_PREFIX = 'rankmath_sitemap_delete_debounce_';
-    const RANKMATH_FULL_SITEMAP_DEBOUNCE = 'rankmath_full_sitemap_debounce';
 }

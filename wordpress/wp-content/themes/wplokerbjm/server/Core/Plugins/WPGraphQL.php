@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Core\Plugins;
 
+use DI\Attribute\Injectable;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
@@ -9,13 +10,15 @@ use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 /**
  * WPGraphQL-related hooks extracted from GlobalHooks.
  */
+#[Injectable(lazy: true)]
 class WPGraphQL
 {
 
-    public static function isActive(): bool {
+    public static function isActive(): bool
+    {
         return SharedUtils::isPluginActive(PluginList::WpGraphql);
     }
-    
+
     /**
      * Inject the JWT from the HttpOnly cookie as a Bearer token so the JWT
      * authentication plugin can authenticate the request transparently.
@@ -23,10 +26,14 @@ class WPGraphQL
     #[Action('graphql_init')]
     public function injectJwtFromCookie(): void
     {
-        if (empty($_SERVER['HTTP_AUTHORIZATION']) && !empty($_COOKIE['jwt-token'])) {
-            $bearer = 'Bearer ' . $_COOKIE['jwt-token'];
-            $_SERVER['HTTP_AUTHORIZATION'] = $bearer;
-            $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $bearer;
+        try {
+            if (empty($_SERVER['HTTP_AUTHORIZATION']) && !empty($_COOKIE['jwt-token'])) {
+                $bearer = 'Bearer ' . $_COOKIE['jwt-token'];
+                $_SERVER['HTTP_AUTHORIZATION'] = $bearer;
+                $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $bearer;
+            }
+        } catch (\Exception $e) {
+            Logger::error('AuthDebug', 'injectJwtFromCookie error: ' . $e->getMessage());
         }
     }
 

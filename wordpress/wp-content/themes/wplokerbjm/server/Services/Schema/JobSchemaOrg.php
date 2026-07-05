@@ -52,7 +52,7 @@ class JobSchemaOrg
 
         $pendidikan = $jobdata[Taxonomies::PENDIDIKAN] ?? '';
         if (is_array($pendidikan)) {
-            $pendidikan = array_filter(array_map('trim', $pendidikan), fn($v) => $v !== '');
+            $pendidikan = array_filter(array_map('trim', $pendidikan), static fn($v) => $v !== '');
             if (count($pendidikan) === 1) {
                 $pendidikan = reset($pendidikan);
             } elseif (count($pendidikan) > 1) {
@@ -153,7 +153,7 @@ class JobSchemaOrg
             $schema = array_merge($schema, $salaryData);
         }
 
-        $schema['hiringOrganization'] = array_filter($schema['hiringOrganization'], fn($v) => !is_null($v));
+        $schema['hiringOrganization'] = array_filter($schema['hiringOrganization'], static fn($v) => !is_null($v));
         $schema = SharedUtils::filterEmptyValues($schema);
 
         Cache::set($cacheKey, $schema, 86400);

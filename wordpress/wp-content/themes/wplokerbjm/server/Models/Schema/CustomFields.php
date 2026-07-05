@@ -1,6 +1,7 @@
 <?php
 
 namespace WPLokerBJM\Models\Schema;
+use DI\Attribute\Injectable;
 use WPLokerBJM\Core\Container\Attributes\Filter;
 
 /**
@@ -15,6 +16,7 @@ use WPLokerBJM\Core\Container\Attributes\Filter;
  *       primarily through the Meta Box admin interface.
  * @package WPLokerBJM\Models\Schema
  */
+#[Injectable(lazy: true)]
 class CustomFields
 {
 

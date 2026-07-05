@@ -9,6 +9,7 @@ use WPLokerBJM\Configs\CredentialConfig;
 
 class CacheTest extends WplokerbjmTestCase
 {
+    private RedisAdapter $adapter;
 
     protected function setUp(): void
     {
@@ -19,10 +20,9 @@ class CacheTest extends WplokerbjmTestCase
             define('LSOC_PREFIX', 'cf8e0');
         }
 
-        // Bootstrap the Redis adapter singleton so static methods work in tests
-        $credentials = static fn() => CredentialConfig::RedisCredential();
-        $adapter = new RedisAdapter($credentials());
-        RedisAdapter::setInstance($adapter);
+        // Create an instance of RedisAdapter for testing
+        $credentials = CredentialConfig::RedisCredential();
+        $this->adapter = new RedisAdapter($credentials);
     }
 
     public function testGetConnection()
@@ -43,7 +43,7 @@ class CacheTest extends WplokerbjmTestCase
         echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . ($credentials['password'] ? "\033[0;32m" . '{REDACTED}' . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
         echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . ($credentials['database'] !== null ? "\033[0;32m" . $credentials['database'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
 
-        $redis = RedisAdapter::getConnection();
+        $redis = $this->adapter->getConnection();
 
         if ($redis === false) {
             echo "\033[0;31m❌ Redis connection failed\033[0m\n";
@@ -176,7 +176,7 @@ class CacheTest extends WplokerbjmTestCase
         echo "\n\033[1;35m🔴 Cache Delete Pattern Test\033[0m\n";
 
         // Get Redis connection
-        $redis = RedisAdapter::getConnection();
+        $redis = $this->adapter->getConnection();
         if ($redis === false) {
             echo "\033[0;31m❌ Redis connection failed\033[0m\n";
             $this->fail('Redis connection failed - cannot test deletePattern');
@@ -214,7 +214,7 @@ class CacheTest extends WplokerbjmTestCase
 
         // Call deletePattern
         $patternToDelete = 'phpunit_test_pattern_' . time() . '_*';
-        $deletedCount = RedisAdapter::deletePattern([$patternToDelete]);
+        $deletedCount = $this->adapter->deletePattern([$patternToDelete]);
 
         echo "\n\033[0;36mDelete Pattern Result:\033[0m\n";
         echo "  \033[0;33m•\033[0m Deleted count: \033[0;32m{$deletedCount}\033[0m\n";

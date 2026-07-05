@@ -3,13 +3,15 @@ namespace WPLokerBJM\Core\Plugins;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Container;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
-
+use DI\Attribute\Injectable;
 
 /**
  * LiteSpeed custom hooks extend
  * @link https://docs.litespeedtech.com/lscache/lscwp/api/
  */
+#[Injectable(lazy: true)]
 class Litespeed
 {
     /**
@@ -44,7 +46,7 @@ class Litespeed
         Container::getContainer(true);
     }
 
-        /**
+    /**
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
     #[Filter('litespeed_is_mobile', 0)]
@@ -58,6 +60,7 @@ class Litespeed
 /**
  * LiteSpeed GraphQL Integration
  */
+#[Injectable(lazy: true)]
 class LiteSpeedGraphQL
 {
 
@@ -89,22 +92,19 @@ class LiteSpeedGraphQL
     #[Filter('graphql_response_headers_to_send', 11)]
     public function tagResponses(array $headers = []): array
     {
-
         if (isset($headers['X-GraphQL-Keys'])) {
-            $keys = $headers['X-GraphQL-Keys'];
-
-            do_action('litespeed_tag_add', explode(' ', $keys));
-
+            do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
             unset($headers['X-GraphQL-Keys']);
         }
+
         if (isset($headers['X-LiteSpeed-Cache-Control'])) {
-            unset($headers['X-LiteSpeed-Cache-Control']);
             if (is_user_logged_in()) {
-                header('X-LiteSpeed-Cache-Control: private, no-cache, must-revalidate');
+                $headers['X-LiteSpeed-Cache-Control'] = 'private, no-cache, must-revalidate';
             } else {
-                header('X-LiteSpeed-Cache-Control: public, must-revalidate, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400');
+                $headers['X-LiteSpeed-Cache-Control'] = 'public, must-revalidate, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400';
             }
         }
+
         return $headers;
     }
 

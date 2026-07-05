@@ -3,25 +3,17 @@
 namespace WPLokerBJM\Core\Container\Support;
 
 use ReflectionClass;
+use DI\Attribute\Injectable;
 use WPLokerBJM\Core\Container\Support\Utilities\FileScannerTrait;
-use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Core\Container\Container;
 
 /**
  * Scans directories for autowirable PHP classes.
  *
- * This scanner recursively searches a base directory for PHP files, extracts class names,
- * and determines which classes are suitable for dependency injection (autowiring). It excludes
- * interfaces, abstracts, static-only classes, and files in specified directories (e.g., vendor).
+ * Recursively searches a base directory for PHP files, extracts class names,
+ * and creates PHP-DI autowire definitions for suitable classes. Excludes
+ * interfaces, abstracts, static-only classes, and attribute classes.
  *
- * Key features:
- * - Caches results using APCu (primary) and Redis (fallback) for performance.
- * - Provides debug methods to inspect scan results and reasons for exclusions.
- * - Uses FileScannerTrait for shared file-scanning utilities.
- *
- * Used by the DI container to automatically register services without manual definitions.
- *
- * @see \WPLokerBJM\Core\Container\Definitions\AutoScanned
+ * @see \WPLokerBJM\Core\Container\Definitions\Core
  * @see Utilities\FileScannerTrait
  */
 class AutowireScanner
@@ -37,62 +29,21 @@ class AutowireScanner
     }
 
     /**
-     * Get the cache key for the scanner results.
-     * Includes the CompiledContainer mtime and directory hash to invalidate when container or files change.
-     */
-    private function getCacheKey(): string
-    {
-        $cachePath = Container::$CACHE_DIR;
-        $mtime = is_dir($cachePath) ? filemtime($cachePath) : 0;
-        return CacheKey::AUTOWIRE_SCANNER_PREFIX . md5($this->baseDirectory . $this->namespace . $this->getDirectoryHash() . $mtime);
-    }
-
-    /**
-     * Scan directories recursively and return DI definitions for autowirable classes.
+     * Scan directories and return DI definitions for autowirable classes.
      *
-     * Finds all PHP files in the base directory (excluding specified folders), extracts
-     * class names, and creates autowire definitions for suitable classes. Skips interfaces,
-     * abstracts, static-only classes, and those with non-public constructors.
+     * Scans all PHP files, extracts class names, creates autowire definitions
+     * for concrete, instantiable classes. Results are cached in-memory for
+     * subsequent calls within the same request.
      *
-     * Uses caching for performance in all environments. APCu is preferred over Redis for speed.
-     *
-     * @return array Associative array of class names to DI autowire definitions
+     * @return array<string, \DI\Definition\AutowireDefinition> Class → autowire definition
      */
     public function scanForAutowirableClasses(): array
     {
-        // Check in-memory cache first
         if ($this->cachedDefinitions !== null) {
             return $this->cachedDefinitions;
         }
 
-        $cacheKey = $this->getCacheKey();
-
-        // Check APCu first (fast in-memory cache)
-        if (function_exists('apcu_enabled') && apcu_enabled()) {
-            $cached = apcu_fetch($cacheKey);
-            if ($cached !== false) {
-                $this->cachedDefinitions = $cached;
-                return $cached;
-            }
-        }
-
-        // Fallback to Redis-based object cache
-        $cached = Cache::get($cacheKey);
-        if ($cached !== false) {
-            $this->cachedDefinitions = $cached;
-            return $cached;
-        }
-
-        // No cache hit: Perform the actual scan
         $definitions = $this->performAutowirableScan();
-
-        // Store result in cache (APCu primary, Redis fallback)
-        if (function_exists('apcu_enabled') && apcu_enabled()) {
-            apcu_store($cacheKey, $definitions, 86400); // Cache for 1 day
-        } else {
-            Cache::set($cacheKey, $definitions, 86400); // Cache for 1 day
-        }
-
         $this->cachedDefinitions = $definitions;
         return $definitions;
     }
@@ -111,8 +62,16 @@ class AutowireScanner
             $classNames = $this->getClassNamesFromFile($file);
 
             foreach ($classNames as $className) {
-                if ($this->isAutowirable($className)) {
+                $checkList = $this->isAutowirable($className);
+
+                if (!$checkList['autowirable']) {
+                    continue;
+                }
+
+                if ($checkList['lazy']) {
                     $definitions[$className] = \DI\autowire($className)->lazy();
+                } else {
+                    $definitions[$className] = \DI\autowire($className);
                 }
             }
         }
@@ -121,46 +80,48 @@ class AutowireScanner
     }
 
     /**
-     * Check if a class is suitable for autowiring.
+     * Check if a class is suitable for autowiring and determine if it should be lazy loaded.
      *
-     * Performs multiple validation checks to determine if a class can be autowired:
-     * - Class must exist
-     * - Must not be the scanner itself (circular dependency)
-     * - Must be a concrete class (not interface, abstract, trait, or final)
-     * - Must not be static-only
-     * - Must have a public constructor (or no constructor)
+     * Performs multiple validation checks to determine if a class can be autowired.
      *
-     * @param string $className The fully qualified class name
-     * @return bool True if the class is autowirable
+     * @param string $className name of class being inspected
+     * @return list{autowirable: bool, lazy: bool}
      */
-    private function isAutowirable(string $className): bool
+    private function isAutowirable(string $className): array
     {
+        $checkList = [
+            'autowirable' => false,
+            'lazy' => false,
+        ];
         try {
             if (!$this->passesBasicChecks($className)) {
-                return false;
+                return $checkList;
             }
 
             $reflection = new ReflectionClass($className);
 
             if ($this->isAttributeClass($reflection)) {
-                return false;
+                return $checkList;
             }
 
             if (!$this->isConcreteClass($reflection)) {
-                return false;
+                return $checkList;
             }
 
             if ($this->isStaticOnlyClass($reflection)) {
-                return false;
+                return $checkList;
             }
 
             if (!$this->hasAccessibleConstructor($reflection)) {
-                return false;
+                return $checkList;
             }
 
-            return true;
+            // Since it passed all concrete structural checks, inspect its lazy attribute status
+            $checkList['autowirable'] = true;
+            $checkList['lazy'] = $this->isAsLazyClass($reflection);
+            return $checkList;
         } catch (\Exception $e) {
-            return false;
+            return $checkList;
         }
     }
 
@@ -185,10 +146,11 @@ class AutowireScanner
     }
 
     /**
-     * Check if the reflection represents a concrete class.
+     * Check if the reflection represents a concrete, instantiable class.
      *
-     * A concrete class is one that can be instantiated and proxied.
-     * Excludes interfaces, abstract classes, traits, and final classes.
+     * Excludes interfaces, abstract classes, and traits.
+     * Final classes are included — PHP-DI's ProxyManager (v2.14+) handles
+     * them via UninitializedLazyLoadingValueHolder on PHP 8.5+.
      *
      * @param ReflectionClass $reflection The class reflection
      * @return bool True if it's a concrete class
@@ -197,8 +159,7 @@ class AutowireScanner
     {
         return !$reflection->isInterface()
             && !$reflection->isAbstract()
-            && !$reflection->isTrait()
-            && !$reflection->isFinal();
+            && !$reflection->isTrait();
     }
 
     /**
@@ -242,7 +203,7 @@ class AutowireScanner
 
         $methods = $reflection->getMethods();
         foreach ($methods as $method) {
-            if (strpos($method->getName(), '__') === 0) {
+            if (str_starts_with($method->getName(), '__')) {
                 continue;
             }
             if (!$method->isStatic()) {
@@ -264,5 +225,24 @@ class AutowireScanner
     private function isAttributeClass(ReflectionClass $reflection): bool
     {
         return !empty($reflection->getAttributes(\Attribute::class));
+    }
+
+    /**
+     * Check if a class has PHP-DI #[Injectable] attribute with lazy = true.
+     *
+     * @param ReflectionClass $reflection
+     * @return bool
+     */
+    private function isAsLazyClass(ReflectionClass $reflection): bool
+    {
+        /** @var \ReflectionAttribute[] $attributes */
+        $attributes = $reflection->getAttributes(Injectable::class);
+        if (empty($attributes)) {
+            return false;
+        }
+        
+        /** @var Injectable $attribute */
+        $attribute = $attributes[0]->newInstance();
+        return $attribute->isLazy();
     }
 }

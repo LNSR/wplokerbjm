@@ -1,9 +1,10 @@
 <?php
-namespace WPLokerBJM\Core\Taxonomy;
+namespace WPLokerBJM\Core\Cron\Taxonomy;
 
 use WPLokerBJM\QueryBuilders\TaxonomyQuery;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Cron\WPCron;
+use WPLokerBJM\Shared\Log\Logger;
 
 class TaxonomyManagement
 {
@@ -20,6 +21,8 @@ class TaxonomyManagement
             foreach ($terms as $term_id) {
                 $last_used = get_term_meta($term_id, 'last_used', true);
                 if ($last_used && $last_used < strtotime('-3 months')) {
+                    $term = get_term($term_id, $taxonomy);
+                    Logger::warning("TaxonomyManagement", "Deleting term: " . $term->name);
                     wp_delete_term($term_id, $taxonomy);
                 }
             }

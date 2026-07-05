@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Core\Plugins;
 
+use DI\Attribute\Injectable;
 use WPlokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 
@@ -10,6 +11,7 @@ use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
  * Extends RankMath plugin functionality
  * Handles Rank Math SEO plugin integrations including sitemap regeneration
  */
+#[Injectable(lazy: true)]
 class Rankmath
 {
 	private ?bool $isActiveCache = null;

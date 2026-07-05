@@ -34,12 +34,7 @@ class TaxonomyResolver
 
             $response = [
                 self::LOKASI_TERMS => ControllerUtils::buildTermsTree($terms[Taxonomies::LOKASI_PEKERJAAN]),
-                self::GENDER_TERMS => array_values(array_map(fn($term) => [
-                    'slug' => $term->slug,
-                    'name' => $term->name,
-                    'parent' => $term->parent,
-                    'children' => [],
-                ], $terms[Taxonomies::GENDER])),
+                self::GENDER_TERMS => ControllerUtils::buildTermsTree($terms[Taxonomies::GENDER]),
                 self::PENDIDIKAN_TERMS => ControllerUtils::buildTermsTree($terms[Taxonomies::PENDIDIKAN]),
             ];
 
@@ -95,12 +90,7 @@ class TaxonomyResolver
             }
 
             $terms = $this->repository->getTaxonomyTerms();
-            $response = array_values(array_map(fn($term) => [
-                'slug' => $term->slug,
-                'name' => $term->name,
-                'parent' => $term->parent,
-                'children' => [],
-            ], $terms[Taxonomies::GENDER]));
+            $response = ControllerUtils::buildTermsTree($terms[Taxonomies::GENDER]);
 
             Cache::set(CacheKey::TAXONOMY_DEPTH_GENDER, $response);
 

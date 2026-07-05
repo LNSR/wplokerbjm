@@ -1,14 +1,14 @@
 <?php
 namespace WPLokerBJM\Services\GraphQL;
 
+use DI\Attribute\Injectable;
 use WPLokerBJM\Controllers\GraphQL\Resolvers\{TaxonomyResolver, JobsDataResolver, ThemeDataResolver};
 use WPLokerBJM\Controllers\GraphQL\Resolvers\Auth\JWTDataResolver;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Shared\Utilities\SharedUtils;
-
-class GraphQLRegistration
+#[Injectable(lazy: true)]
+final class GraphQLRegistration
 {
     public function __construct(
         private readonly TaxonomyResolver $taxonomyResolver,

@@ -1,7 +1,7 @@
 {
   "require": {
     "php-di/php-di": "*",
-    "php-standard-library/php-standard-library": "^6.2"
+    "php-standard-library/php-standard-library": "*"
   },
   "require-dev": {
     "brain/monkey": "*",

@@ -14,7 +14,7 @@ use WPLokerBJM\Core\Container\Init;
     // Only run if the active theme is 'wplokerbjm'
     if (get_stylesheet() !== 'wplokerbjm') return;
 
-    require_once get_stylesheet_directory() . '/vendor/autoload.php';
+    require_once WP_CONTENT_DIR . '/themes/wplokerbjm/vendor/autoload.php';
 
     try {
         $container = \WPLokerBJM\Core\Container\Container::getContainer();
