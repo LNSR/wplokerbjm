@@ -38,7 +38,7 @@ class Init
     public function initialize(): void
     {
         if ($this->initialized) {
-            return;
+            return; // prevent double registration of hooks
         }
 
         $this->registry->initialize();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\Support;
 
 use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use Dotenv\Dotenv;
 
 /**
@@ -60,7 +61,7 @@ final class ProxyContainer
         // Ensure runtime is booted before container initialization.
         self::boot();
 
-        self::$container = \WPLokerBJM\Core\Container\Container::getContainer();
+        self::$container = WPLokerBJMContainer::getContainer();
         return self::$container;
     }
 

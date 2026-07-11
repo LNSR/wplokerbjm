@@ -88,8 +88,7 @@ class RedisAdapter
                 return false;
             }
 
-            $this->connection = $redis;
-            return $redis;
+            return $this->connection = $redis;
         } catch (\Exception $e) {
             Logger::error('Redis', 'Failed to connect to Redis: ' . $e->getMessage());
             return false;

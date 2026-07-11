@@ -13,17 +13,17 @@ use DI\Attribute\Injectable;
  *
  * Provides two purge strategies:
  *  - Targeted per-post purging (post/meta hooks) — uses get_permalink() to
- *    derive the canonical URL, then purges that path on both the WordPress
- *    frontend and the SvelteKit mirror, plus the home page.
+ *    derive the canonical URL, then purges that path as a URL prefix on the
+ *    SvelteKit frontend, plus the home page prefix.  Three requests are sent
+ *    (one per CF-Device-Type) because "Cache by device type" is enabled.
  *  - Full-zone purging (term/taxonomy hooks) — clears everything.
  *
-  * Credentials are injected via the constructor using PHP-DI.
+ * Credentials are injected via the constructor using PHP-DI.
  * @see \WPLokerBJM\Core\Container\Definitions\Factory
  */
 #[Injectable(lazy: true)]
 class Cloudflare
 {
-    private const WP_DOMAIN = 'wp.lokerbanjarmasin.my.id';
     private const APP_DOMAIN = 'lokerbanjarmasin.my.id';
     private const DEVICE_TYPES = ['desktop', 'mobile', 'tablet'];
 
@@ -37,12 +37,13 @@ class Cloudflare
     }
 
     /**
-     * Purge the home page and the affected post's permalink on both domains.
+     * Purge the home page and the affected post's permalink on the app domain.
      *
-     * Since "Cache by device type" is enabled, a single file-based purge
-     * only invalidates one device variant.  We send three requests — one
-     * per CF-Device-Type value (desktop, mobile, tablet) — so every
-     * variant is cleared.
+     * Every call targets a specific device type via CF-Device-Type so that
+     * all three Cloudflare device-partitioned cache buckets are cleared.
+     *
+     * Uses prefix-based purge so all URL variants (query params, subpaths)
+     * under each path are also invalidated.
      *
      * Registered on post-lifecycle hooks.  NEVER self-unregisters — every
      * post in a batch operation must have its CDN cache purged individually.
@@ -55,12 +56,12 @@ class Cloudflare
     public function purgeCache(...$args): bool
     {
         $postId = $this->extractPostId(current_action(), $args);
-        $files = $this->buildPurgeUrls($postId);
+        $prefixes = $this->buildPurgePrefixes($postId);
 
         $success = true;
 
         foreach (self::DEVICE_TYPES as $deviceType) {
-            if (!$this->sendPurgeRequest(['files' => $files], $deviceType)) {
+            if (!$this->sendPurgeRequest(['prefixes' => $prefixes], $deviceType)) {
                 $success = false;
             }
         }
@@ -129,50 +130,52 @@ class Cloudflare
     }
 
     /**
-     * Build the list of file URLs to purge.
+     * Build the list of URL prefixes to purge.
      *
      * Always includes the SvelteKit home page.  When $postId is provided,
-     * resolves the WordPress permalink and mirrors it on both domains,
+     * resolves the WordPress permalink and mirrors its path on the app domain.
+     *
+     * Using prefixes (rather than exact file URLs) ensures all device
+     * variants, query-parameter combinations, and subpaths are cleared.
      *
      * @param int|null $postId The post ID, or null for home-only.
-     * @return string[] List of absolute URLs.
+     * @return string[] List of absolute URL prefixes.
      */
-    private function buildPurgeUrls(?int $postId): array
+    private function buildPurgePrefixes(?int $postId): array
     {
-        $urls = [
+        $prefixes = [
             sprintf('https://%s/', self::APP_DOMAIN),
         ];
 
         if ($postId === null) {
-            return $urls;
+            return $prefixes;
         }
 
         $permalink = get_permalink($postId);
 
         if (!is_string($permalink) || $permalink === '') {
-            return $urls;
+            return $prefixes;
         }
 
         $path = (string) wp_parse_url($permalink, PHP_URL_PATH);
 
         if ($path === '' || $path === '/') {
-            return $urls;
+            return $prefixes;
         }
 
-        $urls[] = sprintf('https://%s%s', self::WP_DOMAIN, $path);
-        $urls[] = sprintf('https://%s%s', self::APP_DOMAIN, $path);
+        $prefixes[] = sprintf('https://%s%s', self::APP_DOMAIN, $path);
 
-        return $urls;
+        return $prefixes;
     }
 
     /**
      * Send a purge request to the Cloudflare API.
      *
-     * When $deviceType is set, the CF-Device-Type header is included so
-     * that the request targets a specific device variant of the cached
-     * resource (required when "Cache by device type" is enabled).
+     * When $deviceType is set, the CF-Device-Type header targets a
+     * specific device variant — required when "Cache by device type"
+     * is enabled in Cloudflare cache rules.
      *
-     * @param array      $payload    The request body payload.
+     * @param array       $payload    The request body payload.
      * @param string|null $deviceType One of 'desktop', 'mobile', 'tablet', or null.
      * @return bool True on success, false on failure.
      */

@@ -73,7 +73,7 @@ class Factory implements DefinitionProviderInterface
 {
     public static function getDefinitions(): array
     {
-        
+
         return [
             ...self::getInstanceWithCredentials(),
         ];
@@ -84,9 +84,7 @@ class Factory implements DefinitionProviderInterface
     {
         return [
             Cloudflare::class => \DI\autowire(Cloudflare::class)->constructor(static fn() => CredentialConfig::CloudflareCredential())->lazy(),
-            RedisAdapter::class => \DI\autowire(RedisAdapter::class)
-                ->constructor(static fn() => CredentialConfig::RedisCredential())
-                ->lazy(),
+            RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn() => CredentialConfig::RedisCredential())->lazy(),
         ];
     }
 }

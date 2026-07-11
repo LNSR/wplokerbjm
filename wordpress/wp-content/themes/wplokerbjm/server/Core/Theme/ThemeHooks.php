@@ -116,24 +116,14 @@ class ThemeInject
      * Adds additional site icon meta tags for custom sizes.
      */
     #[Filter('site_icon_meta_tags')]
-    public function addSiteIconMetaTags(array $meta_tags): array
+    public function addSiteIconMetaTags(array &$meta_tags): array
     {
 
         $additional_sizes = [48, 96, 144, 256, 384, 512];
 
         foreach ($additional_sizes as $size) {
             $url = get_site_icon_url($size);
-            if ($url) {
-                $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
-            }
-        }
-
-        // Add PNG fallback pointing directly to the original uploaded favicon
-        $original_url = wp_get_attachment_url(get_option('site_icon'));
-        if ($original_url) {
-            // Replace .avif extension with .png for PNG fallback
-            $original_url = str_replace('cropped-site-icon.avif', 'site-icon.png', $original_url);
-            $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($original_url));
+            $url && $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
         }
 
         $addTypeAttribute = static function (&$meta_tags, $type) {
@@ -153,7 +143,34 @@ class ThemeInject
             $addTypeAttribute($meta_tags, $type);
         }
 
+        $fallbackTag = $this->addFallbackSiteIconMetaTags();
+        $fallbackTag && $meta_tags[] = $fallbackTag;
+
         return $meta_tags;
+    }
+    /**
+     * Adds fallback site icon meta tags for custom sizes.
+     * WordPress may convert the original PNG to AVIF during upload(via Modern Image Formats plugin), so:
+     * 1. Walk post_parent to find the original upload attachment.
+     * 2. Use wp_get_original_image_url() to get the original PNG URL.
+     * @param array
+     * @return string
+     */
+    private function addFallbackSiteIconMetaTags(): ?string
+    {
+        $cropped_id = get_option('site_icon');
+        if (!$cropped_id)
+            return null;
+
+        $cropped_post = get_post($cropped_id);
+        $original_id = ($cropped_post && $cropped_post->post_parent) ? $cropped_post->post_parent : 0;
+        if (!$original_id)
+            return null;
+
+        $png_url = wp_get_original_image_url($original_id);
+        if (!$png_url)
+            return null;
+        return sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($png_url));
     }
 
     /**

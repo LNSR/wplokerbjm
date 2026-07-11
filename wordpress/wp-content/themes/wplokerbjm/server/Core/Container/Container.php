@@ -3,13 +3,13 @@
 namespace WPLokerBJM\Core\Container;
 
 use DI\ContainerBuilder;
-use DI\Container as ContainerInterface;
+use DI\Container;
 use WPLokerBJM\Core\Container\Definitions\{Core, Factory};
 use WPLokerBJM\Shared\Log\Logger;
 
-class Container
+class WPLokerBJMContainer
 {
-    private static ?ContainerInterface $container = null;
+    private static ?Container $container = null;
     public static ?string $CACHE_DIR = null;
     public static ?string $CACHE_FILE = null;
 
@@ -46,10 +46,10 @@ class Container
      * Uses singleton pattern to ensure only one container instance exists.
      * 
      * @param bool|null $rebuild Whether to rebuild the container (skip cache). Default false.
-     * @return ContainerInterface The configured DI container
+     * @return Container The configured DI container
      * @throws \Exception If container creation fails
      */
-    public static function getContainer(?bool $rebuild = null): ContainerInterface
+    public static function getContainer(?bool $rebuild = null): Container
     {
         if (self::$container !== null && !$rebuild)
             return self::$container;

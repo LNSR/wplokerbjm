@@ -374,12 +374,10 @@ class CacheKey
     // Presenters
     const CAROUSEL_JOBS = 'carousel_jobs';
     const JOB_GRID_PREFIX = 'job_grid_';
-    const HOMEPAGE_JOB_SCHEMAS = 'homepage_job_schemas';
 
     // Taxonomy
     const ALL_TAXONOMY_OPTIONS = 'all_taxonomy_options';
     const TAXONOMY_LAST_MODIFIED = 'taxonomy_last_modified';
-    const COMPANY_SEARCH_PREFIX = 'company_search_';
     const ALL_TAXONOMY_TERMS = 'all_taxonomy_terms';
     const POST_TAXONOMIES_PREFIX = 'post_taxonomies_';
     const TAXONOMY_DEPTH_HANDLE = 'taxonomy_depth_handle';

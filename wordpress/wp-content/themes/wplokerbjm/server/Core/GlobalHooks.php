@@ -383,13 +383,12 @@ class CacheInvalidationHooks
                 CacheKey::TAXONOMY_DEPTH_LOKASI,
                 CacheKey::TAXONOMY_DEPTH_GENDER,
                 CacheKey::TAXONOMY_DEPTH_PENDIDIKAN,
-                CacheKey::HOMEPAGE_JOB_SCHEMAS,
             ]);
 
             $this->redisAdapter->deletePattern([
                 CacheKey::JOB_GRID_PREFIX . '*',
                 CacheKey::SEARCH_SQL_PREFIX . '*',
-                CacheKey::COMPANY_SEARCH_PREFIX . '*',
+                CacheKey::LOAD_MORE_PREFIX . '*',
                 CacheKey::AUTO_SUGGESTION_PREFIX . '*',
                 CacheKey::POST_TAXONOMIES_PREFIX . '*',
                 CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . '*',

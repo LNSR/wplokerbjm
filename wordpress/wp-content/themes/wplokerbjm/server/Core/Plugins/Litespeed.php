@@ -1,9 +1,8 @@
 <?php
 namespace WPLokerBJM\Core\Plugins;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Core\Container\Container;
+use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 use DI\Attribute\Injectable;
 
@@ -39,11 +38,11 @@ class Litespeed
         Cache::flushGroup(CacheKey::OBJECT_CACHE_PREFIX);
 
         // Clear entire cache folder last
-        $cacheDir = Container::$CACHE_DIR;
+        $cacheDir = WPLokerBJMContainer::$CACHE_DIR;
         if (is_dir($cacheDir)) {
             array_map('unlink', glob("$cacheDir/*"));
         }
-        Container::getContainer(true);
+        WPLokerBJMContainer::getContainer(true);
     }
 
     /**
