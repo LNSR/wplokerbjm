@@ -98,9 +98,9 @@ class LiteSpeedGraphQL
 
         if (isset($headers['X-LiteSpeed-Cache-Control'])) {
             if (is_user_logged_in()) {
-                $headers['X-LiteSpeed-Cache-Control'] = 'private, no-cache, must-revalidate';
+                $headers['X-LiteSpeed-Cache-Control'] = 'private, no-cache';
             } else {
-                $headers['X-LiteSpeed-Cache-Control'] = 'public, must-revalidate, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400';
+                $headers['X-LiteSpeed-Cache-Control'] = 'public, max-age=60, s-maxage=86400';
             }
         }
 

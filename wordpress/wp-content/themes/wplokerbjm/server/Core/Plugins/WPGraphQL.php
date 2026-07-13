@@ -132,10 +132,10 @@ class WPGraphQL
         };
         $loggedIn = is_user_logged_in();
         if ($loggedIn) {
-            $cacheControl('private, max-age=10');
+            $cacheControl('private, no-cache');
             $headers['Logged-In'] = $loggedIn ? 'true' : 'false';
         } else {
-            $cacheControl('public, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400');
+            $cacheControl('public, max-age=60');
         }
 
         return $headers;

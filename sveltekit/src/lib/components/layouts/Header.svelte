@@ -50,12 +50,20 @@
       const savedTheme = localStorageThemeActions({ get: true });
       const theme = this.systemPrefersDark ? "dark" : (savedTheme ?? "light");
 
-      void this.setTheme(theme);
+      void this.setTheme(theme, false);
     }
 
-    public setTheme(theme: ThemeScriptData["themeList"]): void {
-      this.currentTheme = theme
-      void applyThemeViewTransition(theme);
+    /**
+     * Changes the current theme. Can opt-out from saving to localStorage by passing `save = false`.
+     * @param theme The theme to apply.
+     * @param save Whether to save the theme to localStorage.
+     */
+    public setTheme(theme: ThemeScriptData["themeList"], save = true): void {
+      this.currentTheme = theme;
+      const saveCommand = save
+        ? () => localStorageThemeActions({ save: theme })
+        : undefined;
+      void applyThemeViewTransition(theme, saveCommand);
     }
   }
 

@@ -379,7 +379,9 @@
   );
 
   onMount(() => {
-    if (open) modalEl.showModal();
+    if (!open) return;
+    modalEl.showModal();
+    bookmarkHandlerUI.refreshBookmark();
     useSearchQuery.initializeOpenOnDesktop(); // focus search input on desktop
     return () => {
       if (open) modalEl.close();

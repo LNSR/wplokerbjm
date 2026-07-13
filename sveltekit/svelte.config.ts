@@ -8,7 +8,7 @@ const config: Config = {
   preprocess: vitePreprocess( { script: true } ),
   kit: {
     version: {
-      name: Date.now().toString(),
+      name: "test2",
     },
     prerender: {
       origin: "https://lokerbanjarmasin.my.id",
