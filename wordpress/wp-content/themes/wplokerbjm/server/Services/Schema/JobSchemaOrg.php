@@ -6,6 +6,37 @@ use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
+/**
+ * @phpstan-type JobPostingSchema array{
+ *     @context: string,
+ *     @type: 'JobPosting',
+ *     title: string,
+ *     url: string|null,
+ *     @id: string|null,
+ *     mainEntityOfPage: array{@type: 'WebPage', @id: string}|null,
+ *     description: string|null,
+ *     howToApply: string|null,
+ *     datePosted: string|null,
+ *     hiringOrganization: array{@type: 'Organization', name: string, sameAs: string[]|null, description?: string},
+ *     jobLocation: array{@type: 'Place', address: array{@type: 'PostalAddress', addressLocality: string, addressCountry: string}},
+ *     jobLocationType: string|null,
+ *     employmentType: string|list<string>|null,
+ *     validThrough: string|null,
+ *     identifier: array{@type: 'PropertyValue', name: string, value: int},
+ *     educationRequirements: string|null,
+ *     experienceRequirements: string|null,
+ *     jobBenefits: string|null,
+ *     baseSalary?: array{@type: 'MonetaryAmount', currency: 'IDR', value: array{@type: 'QuantitativeValue', value?: int, minValue?: int, maxValue?: int, unitText: 'MONTH'}}
+ * }
+ * @phpstan-type ItemListSchema array{
+ *     @context: string,
+ *     @type: 'ItemList',
+ *     mainEntity: array{@type: 'ItemList'},
+ *     itemListElement: list<array{@type: 'ListItem', position: int, name: string, url: string|null}>,
+ *     itemListOrder: string,
+ *     numberOfItems: int
+ * }
+ */
 class JobSchemaOrg
 {
     public function __construct(
@@ -16,11 +47,12 @@ class JobSchemaOrg
     /**
      * Schema.org JobPosting JSON-LD generator
      * @param int $post_id
-     * @return array
+     * @return JobPostingSchema
      */
     public function getJobPostingSchema(int $post_id): array
     {
         $cacheKey = CacheKey::JOB_SCHEMA_PREFIX . $post_id;
+        /** @var JobPostingSchema|false $cached */
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -72,15 +104,13 @@ class JobSchemaOrg
         $sameAs = [];
 
         // Add company website(s)
-        if (!empty($jobdata[CustomFields::SITUS_KONTAK])) {
-            if (is_array($jobdata[CustomFields::SITUS_KONTAK])) {
-                foreach ($jobdata[CustomFields::SITUS_KONTAK] as $url) {
-                    if (filter_var($url, FILTER_VALIDATE_URL)) {
-                        $sameAs[] = $url;
-                    }
+        $situsKontak = $jobdata[CustomFields::SITUS_KONTAK] ?? null;
+        if (!empty($situsKontak)) {
+            $urls = is_array($situsKontak) ? $situsKontak : [$situsKontak];
+            foreach ($urls as $url) {
+                if (filter_var($url, FILTER_VALIDATE_URL)) {
+                    $sameAs[] = $url;
                 }
-            } elseif (filter_var($jobdata[CustomFields::SITUS_KONTAK], FILTER_VALIDATE_URL)) {
-                $sameAs[] = $jobdata[CustomFields::SITUS_KONTAK];
             }
         }
 
@@ -163,14 +193,15 @@ class JobSchemaOrg
 
     /**
      * Schema.org ItemList JSON-LD generator for multiple JobPostings
-     * @param array $post_ids
-     * @return array
+     * @param int[] $post_ids
+     * @return ItemListSchema
      */
     public function getItemListSchema(array $post_ids): array
     {
         // Use a cache key specific to this set of post IDs to avoid returning
         // the same ItemList for different ID sets.
         $cacheKey = CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . md5(implode(',', $post_ids));
+        /** @var ItemListSchema|false $cached */
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -207,12 +238,15 @@ class JobSchemaOrg
     }
 }
 
+/**
+ * @phpstan-import-type JobData from JobDataFactory
+ */
 class JobSchemaHelper
 {
     /**
      * Map taxonomy string to Google employmentType and detect remote jobLocationType
      * @param string|null $jenis
-     * @return array [employmentType, jobLocationType]
+     * @return array{0: string|list<string>|null, 1: string|null}
      */
     public static function mapEmploymentAndLocationType(?string $jenis): array
     {
@@ -290,10 +324,10 @@ class JobSchemaHelper
 
     /**
      * Map pengalaman (years or text) to experienceRequirements
-     * @param mixed $pengalaman
+     * @param int|string|null $pengalaman
      * @return string|null
      */
-    public static function mapExperienceRequirements($pengalaman): ?string
+    public static function mapExperienceRequirements(int|string|null $pengalaman): ?string
     {
         if ($pengalaman === null || $pengalaman === '') {
             return null;
@@ -316,7 +350,7 @@ class JobSchemaHelper
 
     /**
      * Build description using DESKRIPSI_PEKERJAAN and fallback/appended PERSYARATAN
-     * @param array $jobdata
+     * @param JobData $jobdata
      * @return string|null
      */
     public static function buildDescription(array $jobdata): ?string
@@ -339,8 +373,8 @@ class JobSchemaHelper
 
     /**
      * Format base salary block for schema and return additional keys
-     * @param array $jobdata
-     * @return array
+     * @param JobData $jobdata
+     * @return array{baseSalary: array{@type: 'MonetaryAmount', currency: 'IDR', value: array{@type: 'QuantitativeValue', value?: int, minValue?: int, maxValue?: int, unitText: 'MONTH'}}}|array{}
      */
     public static function formatBaseSalary(array $jobdata): array
     {

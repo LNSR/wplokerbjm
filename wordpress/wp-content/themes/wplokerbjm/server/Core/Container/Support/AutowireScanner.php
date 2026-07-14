@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core\Container\Support;
 use ReflectionClass;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Core\Container\Support\Utilities\FileScannerTrait;
+use DI\Definition\AutowireDefinition;
 
 /**
  * Scans directories for autowirable PHP classes.
@@ -20,6 +21,7 @@ class AutowireScanner
 {
     use FileScannerTrait;
 
+    /** @var array<class-string, AutowireDefinition>|null */
     private ?array $cachedDefinitions = null;
 
     public function __construct(private string $baseDirectory, private string $namespace = 'WPLokerBJM')
@@ -35,7 +37,7 @@ class AutowireScanner
      * for concrete, instantiable classes. Results are cached in-memory for
      * subsequent calls within the same request.
      *
-     * @return array<string, \DI\Definition\AutowireDefinition> Class → autowire definition
+     * @return array<class-string, AutowireDefinition> Class → autowire definition
      */
     public function scanForAutowirableClasses(): array
     {
@@ -51,7 +53,7 @@ class AutowireScanner
     /**
      * Perform the actual autowirable class scanning logic.
      *
-     * @return array Array of autowire definitions
+     * @return array<class-string, AutowireDefinition>
      */
     private function performAutowirableScan(): array
     {
@@ -84,7 +86,7 @@ class AutowireScanner
      *
      * Performs multiple validation checks to determine if a class can be autowired.
      *
-     * @param string $className name of class being inspected
+     * @param class-string $className name of class being inspected
      * @return list{autowirable: bool, lazy: bool}
      */
     private function isAutowirable(string $className): array
@@ -128,7 +130,7 @@ class AutowireScanner
     /**
      * Perform basic validation checks on the class.
      *
-     * @param string $className The class name to check
+     * @param class-string $className The class name to check
      * @return bool True if basic checks pass
      */
     private function passesBasicChecks(string $className): bool
@@ -240,7 +242,7 @@ class AutowireScanner
         if (empty($attributes)) {
             return false;
         }
-        
+
         /** @var Injectable $attribute */
         $attribute = $attributes[0]->newInstance();
         return $attribute->isLazy();

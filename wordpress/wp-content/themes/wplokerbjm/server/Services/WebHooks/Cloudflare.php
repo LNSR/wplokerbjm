@@ -19,6 +19,8 @@ use DI\Attribute\Injectable;
  *
  * Credentials are injected via the constructor using PHP-DI.
  * @see \WPLokerBJM\Core\Container\Definitions\Factory
+ * 
+ * @phpstan-import-type CloudflareCred from \WPLokerBJM\Configs\CredentialConfig
  */
 #[Injectable(lazy: true)]
 class Cloudflare
@@ -26,7 +28,7 @@ class Cloudflare
     private const APP_DOMAIN = 'lokerbanjarmasin.my.id';
 
     /**
-     * @param array $credential filled by PHP-DI
+     * @param CloudflareCred $credential filled by PHP-DI
      * @param WPHooksRegistry $wpHooksRegistry autowired by PHP-DI
      */
     public function __construct(private array $credential, private WPHooksRegistry $wpHooksRegistry)
@@ -76,7 +78,7 @@ class Cloudflare
     #[Action('deleted_post_meta', 10, 4)]
     public function purgeOnMetaChange(...$args): bool
     {
-        $this->wpHooksRegistry->unregisterByMethod(self::class, 'purgeOnMetaChange');
+        $this->wpHooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
         return $this->purgeCache(...$args);
     }
@@ -93,7 +95,7 @@ class Cloudflare
     #[Action('delete_term', 10, 0)]
     public function purgeCacheAll(): bool
     {
-        $this->wpHooksRegistry->unregisterByMethod(self::class, 'purgeCacheAll');
+        $this->wpHooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
         return $this->sendPurgeRequest(['purge_everything' => true]);
     }

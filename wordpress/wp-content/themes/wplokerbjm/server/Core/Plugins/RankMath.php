@@ -14,18 +14,18 @@ use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 #[Injectable(lazy: true)]
 class Rankmath
 {
-	private ?bool $isActiveCache = null;
-	private ?array $sitemapUrlsCache = null;
+	private static ?bool $isActiveCache = null;
+	private static ?array $sitemapUrlsCache = null;
 
 	/**
 	 * Check if Rank Math plugin is active (with caching)
 	 */
-	public function isActive(): bool
+	public static function isActive(): bool
 	{
-		if ($this->isActiveCache === null) {
-			$this->isActiveCache = SharedUtils::isPluginActive(PluginList::RankMath);
+		if (self::$isActiveCache === null) {
+			self::$isActiveCache = PluginList::RankMath->isActive();
 		}
-		return $this->isActiveCache;
+		return self::$isActiveCache;
 	}
 
 	/**
@@ -38,7 +38,7 @@ class Rankmath
 	#[Filter('rank_math/opengraph/facebook/image_array')]
 	public function FixImageTypeOG($input)
 	{
-		if (!$this->isActive()) {
+		if (!self::isActive()) {
 			return $input;
 		}
 
@@ -71,7 +71,7 @@ class Rankmath
 	#[Filter('rank_math/indexing_api/publish_url')]
 	public function RewritePublishUrl($url, $post = null, $provider = '')
 	{
-		if (!$this->isActive() || empty($url)) {
+		if (!self::isActive() || empty($url)) {
 			return $url;
 		}
 		$headless = SharedUtils::headlessDomainRedirect();
@@ -96,7 +96,7 @@ class Rankmath
 	#[Filter('rank_math/indexing_api/delete_url')]
 	public function RewriteDeleteUrl($url, $post = null)
 	{
-		if (!$this->isActive() || empty($url)) {
+		if (!self::isActive() || empty($url)) {
 			return $url;
 		}
 		$headless = SharedUtils::headlessDomainRedirect();
@@ -117,7 +117,7 @@ class Rankmath
 	#[Filter('seo_analysis/after_set_url')]
 	public function rewriteSeoAnalyzerInstanceUrl($analyzer): void
 	{
-		if (!$this->isActive()) {
+		if (!self::isActive()) {
 			return;
 		}
 

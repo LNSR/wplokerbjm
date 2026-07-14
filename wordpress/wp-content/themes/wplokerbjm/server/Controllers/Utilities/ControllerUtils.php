@@ -1,11 +1,20 @@
 <?php
 namespace WPLokerBJM\Controllers\Utilities;
+use SearchFilters;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\QueryBuilders\JobQuery;
 
+/**
+ * @phpstan-import-type SearchFilters from JobQuery
+ */
 class ControllerUtils
 {
+    /**
+     * @param \WP_REST_Request $request
+     * @return SearchFilters
+     */
     public static function parseJobFilters($request): array
     {
         $parseMulti = static function ($param) {
@@ -29,6 +38,11 @@ class ControllerUtils
         ];
     }
 
+    /**
+     * @param string $message Error message
+     * @param int $code HTTP status code (default 400)
+     * @return \WP_REST_Response
+     */
     public static function failedResponse($message, $code = 400)
     {
         return new \WP_REST_Response([
@@ -37,6 +51,13 @@ class ControllerUtils
         ], $code);
     }
 
+    /**
+     * Build a hierarchical tree from WP_Term objects.
+     *
+     * @template T of \WP_Term
+     * @param T[] $terms
+     * @return list<array{slug: string, name: string, parent: int, children: list<array{slug: string, name: string, parent: int, children: list<mixed>}>}>
+     */
     public static function buildTermsTree(array $terms, $taxonomy = ''): array
     {
         try {
@@ -67,7 +88,10 @@ class ControllerUtils
     }
 
     /**
-     * Validate and filter an array of IDs
+     * Validate and filter an array of IDs.
+     *
+     * @param array<int, mixed> $ids
+     * @return list<int> Positive integer IDs only
      */
     public static function validateIds(array $ids): array
     {
@@ -76,6 +100,10 @@ class ControllerUtils
             |> (static fn($arr) => array_filter($arr, static fn($id) => $id > 0));
     }
 
+    /**
+     * @param \WP_REST_Request|mixed $request
+     * @return bool
+     */
     public static function hasBearerAuthorization($request): bool
     {
         $authorization = '';
@@ -93,6 +121,10 @@ class ControllerUtils
             |> (static fn($auth) => preg_match('/^Bearer\s+\S+$/i', $auth) === 1);
     }
 
+    /**
+     * @param \WP_REST_Request|mixed $request
+     * @return int|null 401|403|null
+     */
     public static function getPermissionErrorStatus($request = null): ?int
     {
         if (!self::hasBearerAuthorization($request)) {
@@ -110,6 +142,10 @@ class ControllerUtils
         return null;
     }
 
+    /**
+     * @param mixed $value
+     * @return bool
+     */
     public static function hasNonEmptyValue($value): bool
     {
         if (is_array($value)) {
@@ -124,6 +160,13 @@ class ControllerUtils
         return trim((string) $value) !== '';
     }
 
+    /**
+     * Sanitize contact list values (email, URL, text).
+     *
+     * @param string $field The contact field key
+     * @param string|string[] $value Raw contact value(s)
+     * @return list<non-empty-string> Sanitized contact entries
+     */
     public static function sanitizeContactList(string $field, $value): array
     {
         $rawParts = is_array($value) ? $value : explode(',', (string) $value);
@@ -143,6 +186,12 @@ class ControllerUtils
             |> array_values(...);
     }
 
+    /**
+     * Sanitize social media fieldset data from Meta Box.
+     *
+     * @param string|array<int, array<string, string>>|array<string, string> $value Raw social media data
+     * @return list<array<string, non-empty-string>> Sanitized social media sets
+     */
     public static function sanitizeSocialMediaFieldset($value): array
     {
         $allowedIndex = CustomFields::SOCIAL_MEDIA_PLATFORMS;
@@ -186,6 +235,12 @@ class ControllerUtils
         return $sanitizedSets;
     }
 
+    /**
+     * Parse a social media string format "platform:username;platform:username" into an array set.
+     *
+     * @param string $value Semicolon-separated platform:username pairs
+     * @return list<array<string, string>> Single-element list containing the parsed set, or empty list
+     */
     private static function parseSocialMediaString(string $value): array
     {
         $set = [];
@@ -211,6 +266,10 @@ class ControllerUtils
         return $set === [] ? [] : [$set];
     }
 
+    /**
+     * @param array $value
+     * @return bool
+     */
     private static function isAssoc(array $value): bool
     {
         return array_keys($value) !== range(0, count($value) - 1);

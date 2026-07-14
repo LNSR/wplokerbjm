@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Shared\Utilities\PluginList;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
@@ -216,6 +217,11 @@ class SearchHooks
  */
 class EnvironmentHooks
 {
+    const MUST_HAVE_PLUGIN = [
+        PluginList::LiteSpeed->value,
+        PluginList::WpGraphql->value,
+        PluginList::RankMath->value,
+    ];
     /**
      * Temporarily disable specific plugins if in development environment.
      */
@@ -231,6 +237,37 @@ class EnvironmentHooks
 
         $pluginsToDisable = $this->listPluginsToDisable($extra);
         return $this->filteredPlugins($plugins, $pluginsToDisable);
+    }
+
+    /**
+     * Remove the "Deactivate" action link for required plugins.
+     */
+    #[Filter('plugin_action_links', 4, 2)]
+    public function lockPluginActionLinks(array $actions, string $pluginFile): array
+    {
+        if (in_array($pluginFile, self::MUST_HAVE_PLUGIN) && isset($actions['deactivate'])) {
+            unset($actions['deactivate']);
+
+            $actions['required'] = '<span style="color: red; font-weight: bold;">Must Have Dependency</span>';
+        }
+
+        return $actions;
+    }
+
+    /**
+     * Force active plugins
+     */
+    #[Filter('option_active_plugins', 4)]
+    public function forceActivePlugin(array $plugins): array
+    {
+        if (SharedUtils::isDevelopment())
+            return $plugins;
+        foreach (self::MUST_HAVE_PLUGIN as $plugin) {
+            if (!in_array($plugin, $plugins)) {
+                array_push($plugins, $plugin);
+            }
+        }
+        return $plugins;
     }
 
     /**
@@ -370,7 +407,7 @@ class CacheInvalidationHooks
     #[Action('transition_post_status', 10, 3)]
     public function purgeGlobalCacheOnce(...$args): void
     {
-        $this->hooksRegistry->unregisterByMethod(self::class, 'purgeGlobalCacheOnce');
+        $this->hooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
         try {
             Cache::deleteMultiple([
@@ -475,7 +512,8 @@ class HTTPHooks
     #[Action('muplugins_loaded', PHP_INT_MIN)]
     public function setRemoteAddr(): void
     {
-        if (SharedUtils::isDevelopment()) return; // @dev local mode, skip this
+        if (SharedUtils::isDevelopment())
+            return; // @dev local mode, skip this
         if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
             $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
         }

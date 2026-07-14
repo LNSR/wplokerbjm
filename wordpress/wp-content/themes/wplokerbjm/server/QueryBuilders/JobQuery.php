@@ -7,8 +7,38 @@ use WPLokerBJM\Models\Schema\{CustomFields, Taxonomies, PostTypes};
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Log\Logger;
 
+/**
+ * Query argument builder for the lowongan post type.
+ *
+ * @phpstan-type BaseQuery array{post_type: string, post_status: string}
+ * @phpstan-type SearchFilters array{
+ *   cari?: string,
+ *   sort?: string|array{value?: 'asc'|'desc'},
+ *   lokasi_pekerjaan?: string|list<string>,
+ *   gender?: string|list<string>,
+ *   pendidikan?: string|list<string>
+ * }
+ * @phpstan-type CarouselMetaQuery array{
+ *   relation: 'OR',
+ *   0: array{key: string, value: string, compare: '=', type: 'NUMERIC'},
+ *   1: array{
+ *     relation: 'AND',
+ *     0: array{key: string, value: string, compare: '=', type: 'NUMERIC'},
+ *     1: array{key: string, value: string[], compare: 'BETWEEN', type: 'DATE'}
+ *   }
+ * }
+ * @phpstan-type OldJobsMetaQuery array{
+ *   relation: 'OR',
+ *   0: array{key: string, compare: 'NOT EXISTS'},
+ *   1: array{key: string, value: string, compare: '<=', type: 'DATE'}
+ * }
+ */
 class JobQuery
 {
+	/**
+	 * 
+	 * @var BaseQuery
+	 */
 	const array getBaseArgs = [
 		'post_type' => PostTypes::POST_TYPE_LOWONGAN,
 		'post_status' => 'publish',
@@ -17,9 +47,9 @@ class JobQuery
 	/**
 	 * Get WP_Query args for latest jobs.
 	 *
-	 * @param int $paged
-	 * @param int $posts_per_page
-	 * @return array
+	 * @param positive-int $paged
+	 * @param positive-int $posts_per_page
+	 * @return BaseQuery & array{posts_per_page: positive-int, paged: positive-int, orderby: string, order: 'ASC'|'DESC'}
 	 */
 	public static function latestJobsArgs(int $paged = 1, $posts_per_page = 9): array
 	{
@@ -35,7 +65,7 @@ class JobQuery
 	 * Get WP_Query args for auto suggestion search.
 	 *
 	 * @param string $query
-	 * @return array
+	 * @return array{post_type: string, post_status: string, s: string, fields: 'ids', posts_per_page: int, no_found_rows: true}
 	 */
 	public static function autoSuggestionArgs(string $query): array
 	{
@@ -47,9 +77,13 @@ class JobQuery
 		]);
 	}
 
-	/*
+	/**
 	 * Get WP_Query args for job carousel.
 	 *
+	 * Builds args with meta_query for pinned (status 3) and urgent (status 2 with upcoming deadline) jobs.
+	 *
+	 * @param positive-int $per_page
+	 * @return BaseQuery & array{posts_per_page: positive-int, meta_query: CarouselMetaQuery}
 	 */
 	public static function getCarouselArgs(int $per_page): array
 	{
@@ -90,10 +124,10 @@ class JobQuery
 	/**
 	 * Get WP_Query args for searching jobs.
 	 *
-	 * @param array $params
-	 * @param int $paged
-	 * @param int $per_page
-	 * @return array
+	 * @param SearchFilters $params
+	 * @param positive-int $paged
+	 * @param positive-int $per_page
+	 * @return BaseQuery & array{posts_per_page: positive-int, paged: positive-int, orderby: string, order: 'ASC'|'DESC', s?: string, tax_query?: non-empty-array}
 	 */
 	public static function searchJobsArgs(array $params, int $paged, int $per_page): array
 	{
@@ -129,6 +163,8 @@ class JobQuery
 	 *
 	 * NOTE: This query excludes jobs that have a future 'deadline' meta value —
 	 * we want to avoid deleting job postings that are still active.
+	 *
+	 * @return BaseQuery & array{posts_per_page: int, date_query: array<int, array{column: string, before: string}>, meta_query: OldJobsMetaQuery, fields: 'ids'}
 	 */
 	public static function oldJobsArgs(): array
 	{
@@ -164,6 +200,11 @@ class JobQuery
 	}
 
 
+	/**
+	 * Get WP_Query args to fetch all job post IDs.
+	 *
+	 * @return BaseQuery & array{posts_per_page: int, fields: 'ids'}
+	 */
 	public static function allJobsIdsArgs(): array
 	{
 		return array_merge(self::getBaseArgs, [
@@ -189,6 +230,7 @@ class JobQuery
 		}
 
 		$cache_key = CacheKey::SEARCH_SQL_PREFIX . md5($q);
+		/** @var string|false $cached */
 		$cached = Cache::get($cache_key);
 		if ($cached !== false) {
 			return $cached;
@@ -252,6 +294,7 @@ class JobQuery
 	public static function getLastModifiedDate(): string
 	{
 		$cache_key = CacheKey::JOB_LAST_MODIFIED;
+		/** @var string|false $cached */
 		$cached = Cache::get($cache_key);
 		if ($cached !== false) {
 			return $cached;
@@ -282,9 +325,9 @@ class JobQuery
 	/**
 	 * Return args suitable for `get_posts()` to fetch attachment IDs for a parent post.
 	 *
-	 * @param int $parent_id
+	 * @param positive-int $parent_id
 	 * @param bool $only_ids If true, return only IDs (fields => 'ids').
-	 * @return array
+	 * @return array{post_parent: positive-int, post_type: 'attachment', numberposts: int, post_status: 'any', fields?: 'ids'}
 	 */
 	public static function byParentArgs(int $parent_id, bool $only_ids = true): array
 	{
@@ -306,7 +349,7 @@ class JobQuery
 	 * Get WP_Query args to check if a job post exists in trash by name.
 	 *
 	 * @param string $post_name
-	 * @return array
+	 * @return array{name: string, post_type: string, post_status: 'trash', numberposts: int, fields: 'ids'}
 	 */
 	public static function getTrashedJobByNameArgs(string $post_name): array
 	{

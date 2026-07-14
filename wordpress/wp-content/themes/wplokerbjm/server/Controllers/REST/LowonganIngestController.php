@@ -11,6 +11,12 @@ use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
 
+/**
+ * @phpstan-type IngestErrorResult array{status: 400|500, data: array{code: string, message: string, warnings: array}}
+ * @phpstan-type IngestDuplicateResult array{status: 409, data: array{code: string, message: string, existing_id: int, warnings: array}}
+ * @phpstan-type IngestSuccessResult array{status: 201, data: array{id: int, status: string, edit_url: string, permalink: string, warnings: array}}
+ * @phpstan-type IngestResult IngestErrorResult|IngestDuplicateResult|IngestSuccessResult
+ */
 class LowonganIngestController
 {
     private const LOG_CATEGORY = 'LowonganIngest';
@@ -80,6 +86,9 @@ class LowonganIngestController
         return new \WP_Error($code, $message, ['status' => $status]);
     }
 
+    /**
+     * @return \WP_REST_Response
+     */
     public function ingest(\WP_REST_Request $request)
     {
         $payloadJson = $request->get_param('payload');
@@ -104,6 +113,11 @@ class LowonganIngestController
         return new \WP_REST_Response($result['data'], $result['status']);
     }
 
+    /**
+     * @param array $payload
+     * @param array{tmp_name?: string, name?: string, type?: string, size?: int, error?: int}|null $featuredImage
+     * @return IngestResult
+     */
     public function createDraftFromPayload(array $payload, ?array $featuredImage): array
     {
         $warnings = [];
@@ -255,6 +269,10 @@ class LowonganIngestController
         return false;
     }
 
+    /**
+     * @param array{tmp_name?: string, name?: string, error?: int}|null $featuredImage
+     * @return array{code: string, message: string}|null
+     */
     private function validateFeaturedImage(?array $featuredImage): ?array
     {
         if ($featuredImage === null) {
@@ -307,6 +325,11 @@ class LowonganIngestController
         return (int) $posts[0];
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<int, string> &$warnings
+     * @return array<string, mixed>
+     */
     private function prepareMetaFields(array $payload, array &$warnings): array
     {
         $meta = [];
@@ -384,7 +407,7 @@ class LowonganIngestController
                 continue;
             }
 
-            $termIds = $this->resolveTermIds($taxonomy, (string) $payload[$taxonomy], $warnings);
+            $termIds = $this->resolveTermIds((string) $taxonomy, (string) $payload[$taxonomy], $warnings);
             if ($termIds === []) {
                 continue;
             }
@@ -403,6 +426,10 @@ class LowonganIngestController
         }
     }
 
+    /**
+     * @param array<int, string> &$warnings
+     * @return list<int>
+     */
     private function resolveTermIds(string $taxonomy, string $value, array &$warnings): array
     {
         $availableTerms = get_terms([
@@ -424,7 +451,7 @@ class LowonganIngestController
             $index[mb_strtolower((string) $term->slug)] = (int) $term->term_id;
         }
 
-        $parts = $this->splitTaxonomyValue($taxonomy, $value);
+        $parts = $this->splitTaxonomyValue((string) $taxonomy, $value);
         $termIds = [];
 
         foreach ($parts as $part) {
@@ -434,12 +461,15 @@ class LowonganIngestController
                 continue;
             }
 
-            $warnings[] = "Unknown {$taxonomy} term skipped: {$part}";
+            $warnings[] = "Unknown " . (string) $taxonomy . " term skipped: {$part}";
         }
 
         return array_values(array_unique($termIds));
     }
 
+    /**
+     * @return list<string>
+     */
     private function splitTaxonomyValue(string $taxonomy, string $value): array
     {
         $parts = array_map('trim', explode(',', $value));
@@ -459,6 +489,10 @@ class LowonganIngestController
         return array_values(array_filter($parts, fn($part) => $part !== ''));
     }
 
+    /**
+     * @param array{tmp_name?: string, name?: string, type?: string, size?: int, error?: int} $featuredImage
+     * @return int|\WP_Error
+     */
     private function uploadFeaturedImage(array $featuredImage, int $postId)
     {
         if (!function_exists('media_handle_upload') && defined('ABSPATH')) {
@@ -472,6 +506,11 @@ class LowonganIngestController
         return media_handle_upload('featured_image', $postId);
     }
 
+    /**
+     * @param array $payload
+     * @param array{name?: string, type?: string, size?: int, error?: int}|null $featuredImage
+     * @return array{title: string, source: string, payload_fields: list<string>, image_name: string, image_type: string, image_size: int|null, image_upload_error: int|null}
+     */
     private function buildLogContext(array $payload, ?array $featuredImage, string $title): array
     {
         return [
@@ -485,6 +524,10 @@ class LowonganIngestController
         ];
     }
 
+    /**
+     * @param mixed $value
+     * @return array{wp_error_code?: string, wp_error_message?: string}
+     */
     private function getWordPressErrorContext($value): array
     {
         if (!is_object($value)) {
@@ -552,11 +595,17 @@ class LowonganIngestOptionsController
         return new \WP_Error($code, $message, ['status' => $status]);
     }
 
+    /**
+     * @return \WP_REST_Response
+     */
     public function options()
     {
         return new \WP_REST_Response($this->getOptionsData(), 200);
     }
 
+    /**
+     * @return array{schema: string, taxonomies: array<string, list<array{id: int, name: string, slug: string, parent: int}>>, reserved_taxonomies: string[], status_pekerjaan: list<array{value: int, label: string}>}
+     */
     public function getOptionsData(): array
     {
         return [

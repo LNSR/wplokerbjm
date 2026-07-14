@@ -170,8 +170,8 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
   const cookie = event.request.headers.get("Cookie");
   const authenticated = isAuthenticated(cookie);
 
-  const publicCache = "public, max-age=60, s-maxage=2592000, stale-while-revalidate=86400";
-  const privateCache = "private, max-age=30, must-revalidate";
+  const publicCache = "public, max-age=180, s-maxage=2592000, stale-while-revalidate=86400";
+  const privateCache = "private, max-age=300, must-revalidate";
   const devModeCache = "no-cache, must-revalidate";
   const cachePolicy = dev
     ? devModeCache

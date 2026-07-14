@@ -16,7 +16,7 @@ class WPGraphQL
 
     public static function isActive(): bool
     {
-        return SharedUtils::isPluginActive(PluginList::WpGraphql);
+        return PluginList::WpGraphql->isActive();
     }
 
     /**
@@ -93,10 +93,6 @@ class WPGraphQL
     #[Filter('graphql_response_headers_to_send', 11)]
     public function ModifyHeaderGraphQL(array $headers): array
     {
-        if (!self::isActive()) {
-            return $headers;
-        }
-
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
         $allowList = [

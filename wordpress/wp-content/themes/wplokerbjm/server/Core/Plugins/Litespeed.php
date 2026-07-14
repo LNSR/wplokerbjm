@@ -4,7 +4,17 @@ use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
+use WPLokerBJM\Core\Plugins\WPGraphQL;
 use DI\Attribute\Injectable;
+
+
+trait LitespeedStatus
+{
+    public static function isActive(): bool
+    {
+        return PluginList::LiteSpeed->isActive();
+    }
+}
 
 /**
  * LiteSpeed custom hooks extend
@@ -13,6 +23,8 @@ use DI\Attribute\Injectable;
 #[Injectable(lazy: true)]
 class Litespeed
 {
+    use LitespeedStatus;
+
     /**
      * Deletes the compiled container cache file when LiteSpeed cache is purged.
      * Also clears APCu and OPCache caches.
@@ -22,7 +34,7 @@ class Litespeed
     #[Action('litespeed_purged_all')]
     public function clearObjectCache(): void
     {
-        if (!SharedUtils::isPluginActive(PluginList::LiteSpeed)) {
+        if (!self::isActive()) {
             return;
         }
         // Clear APCu cache first
@@ -48,9 +60,10 @@ class Litespeed
     /**
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
-    #[Filter('litespeed_is_mobile', 0)]
+    #[Filter('litespeed_is_mobile', 5)]
     public function customMobileDetect()
     {
+        if (!self::isActive()) return;
         return wp_is_mobile();
     }
 
@@ -62,10 +75,12 @@ class Litespeed
 #[Injectable(lazy: true)]
 class LiteSpeedGraphQL
 {
+    use LitespeedStatus {
+        isActive as isLitespeedActive;
+    }
 
-    public static function isActive(): bool
-    {
-        return SharedUtils::isPluginActive(PluginList::LiteSpeed);
+    public static function isActive(): bool {
+        return self::isLitespeedActive() && WPGraphQL::isActive();
     }
 
     /**
@@ -74,7 +89,7 @@ class LiteSpeedGraphQL
     #[Action('graphql_process_http_request_response', 2)]
     public function setCacheable(): void
     {
-        if ('GET' !== $_SERVER['REQUEST_METHOD']) {
+        if ('GET' !== $_SERVER['REQUEST_METHOD'] || !self::isActive()) {
             return;
         }
 
@@ -91,6 +106,9 @@ class LiteSpeedGraphQL
     #[Filter('graphql_response_headers_to_send', 11)]
     public function tagResponses(array $headers = []): array
     {
+        if (!self::isActive()) {
+            return $headers;
+        }
         if (isset($headers['X-GraphQL-Keys'])) {
             do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
             unset($headers['X-GraphQL-Keys']);
@@ -113,6 +131,7 @@ class LiteSpeedGraphQL
     #[Action('graphql_purge')]
     public function purgeCache($keys): void
     {
+        if (!self::isActive()) return;
         do_action('litespeed_purge', $keys);
     }
 }

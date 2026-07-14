@@ -8,6 +8,11 @@ enum PluginList: string
     case RankMath = 'seo-by-rank-math/rank-math.php';
     case QueryMonitor = 'query-monitor/query-monitor.php';
     case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
+    public function isActive(): bool {
+        static $activePlugins = null;
+        $activePlugins ??= get_option('active_plugins') ?: [];
+        return is_array($activePlugins) && in_array($this->value, $activePlugins, true);
+    }
 }
 
 class SharedUtils
@@ -65,28 +70,12 @@ class SharedUtils
     }
 
     /**
-     * Check if a plugin is active by inspecting the 'active_plugins' option in wp_options.
-     * @param PluginList $pluginKey The plugin enum case to check.
-     * @return bool
-     */
-    public static function isPluginActive(PluginList $pluginKey): bool
-    {
-        $pluginFile = $pluginKey->value;
-
-        $activePlugins = get_option('active_plugins');
-        if (!is_array($activePlugins)) {
-            return false;
-        }
-
-        return in_array($pluginFile, $activePlugins, true);
-    }
-
-    /**
      * Recursively filter out empty values from an array.
      *! make arrays returned values more compact by removing empty entries 
      *
-     * @param array $dataArray The input array to filter.
-     * @return array The filtered array with empty values removed.
+     * @template T of array
+     * @param T $dataArray The input array to filter.
+     * @return T The filtered array with empty values removed.
      */
     public static function filterEmptyValues(array $dataArray): array
     {

@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core\Container\Support;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
 use ReflectionMethod;
+use WPLokerBJM\Core\Container\Attributes\{Action,Filter};
 use WPLokerBJM\Core\Container\Support\Utilities\FileScannerTrait;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
@@ -18,14 +19,17 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  * register WordPress hooks via the DI container.
  *
  * @see \WPLokerBJM\Core\Container\Init
- * @see \WPLokerBJM\Core\Container\Attributes\Action
- * @see \WPLokerBJM\Core\Container\Attributes\Filter
+ * @see Action
+ * @see Filter
  * @see Utilities\FileScannerTrait
+ *
+ * @phpstan-type HookRegistration array{class: class-string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int}
  */
 class WPhooksScanner
 {
     use FileScannerTrait;
 
+    /** @var array<int, HookRegistration>|null */
     private ?array $cachedHookRegistrations = null;
 
     public function __construct(private string $baseDirectory, private string $namespace = 'WPLokerBJM')
@@ -40,7 +44,7 @@ class WPhooksScanner
      * Scans public, non-static methods for hook attributes across all PHP files
      * in the base directory. Results are cached in-memory for the request.
      *
-     * @return array<int, array{class: string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int}>
+     * @return HookRegistration[]
      */
     public function getHookRegistrations(): array
     {
@@ -60,7 +64,7 @@ class WPhooksScanner
      * through the DI container so the owning service must be instantiable.
      * Static hook methods are intentionally ignored.
      *
-     * @return array Array of hook registration data
+     * @return HookRegistration[]
      */
     private function performHookRegistrationScan(): array
     {
@@ -83,9 +87,9 @@ class WPhooksScanner
                                 continue;
                             }
                             /** @var ReflectionClass $attribute */
-                            foreach ($method->getAttributes(\WPLokerBJM\Core\Container\Attributes\Action::class) as $attribute) {
+                            foreach ($method->getAttributes(Action::class) as $attribute) {
                                 $action = $attribute->newInstance();
-                                /** @var \WPLokerBJM\Core\Container\Attributes\Action $action */
+                                /** @var Action $action */
                                 $registrations[] = [
                                     'class' => $className,
                                     'method' => $method->getName(),
@@ -96,9 +100,9 @@ class WPhooksScanner
                                 ];
                             }
                             /** @var ReflectionClass $attribute */
-                            foreach ($method->getAttributes(\WPLokerBJM\Core\Container\Attributes\Filter::class) as $attribute) {
+                            foreach ($method->getAttributes(Filter::class) as $attribute) {
                                 $filter = $attribute->newInstance();
-                                /** @var \WPLokerBJM\Core\Container\Attributes\Filter $filter */
+                                /** @var Filter $filter */
                                 $registrations[] = [
                                     'class' => $className,
                                     'method' => $method->getName(),
@@ -132,9 +136,8 @@ class LazyHookHandler
     public readonly string $label;
 
     /**
-     * Summary of __construct
      * @param ContainerInterface $container
-     * @param string $class
+     * @param class-string $class
      * @param string $method
      */
     public function __construct(
@@ -164,6 +167,8 @@ class LazyHookHandler
  * Stores all hook registrations as identifiable LazyHookHandler instances,
  * enabling unregistration by hook name, class, or specific class::method.
  * Service resolution is deferred to hook-fire time (lazy loading).
+ *
+ * @phpstan-import-type HookRegistration from \WPLokerBJM\Core\Container\Support\WPhooksScanner
  */
 class WPHooksRegistry
 {
@@ -174,6 +179,11 @@ class WPHooksRegistry
 
     private bool $initialized = false;
 
+    /**
+     * Summary of __construct
+     * @param ContainerInterface $container
+     * @param HookRegistration[] $hooksRegistration
+     */
     public function __construct(
         private readonly ContainerInterface $container,
         private array $hooksRegistration,
@@ -184,7 +194,7 @@ class WPHooksRegistry
      * Register hook registrations from the scanner.
      * Pre-builds LazyHookHandler instances and validates container existence.
      *
-     * @param array $registrations Array of reg data: ['class', 'method', 'type', 'hook', 'priority', 'accepted_args']
+     * @param HookRegistration[] $registrations
      */
     private function registerAll(array $registrations): void
     {
@@ -285,7 +295,7 @@ class WPHooksRegistry
      * All hooks from CacheInvalidationHooks are removed
      * ```
      *
-     * @param string $class Fully qualified class name (e.g. 'WPLokerBJM\Core\CacheInvalidationHooks').
+     * @param class-string $class Fully qualified class name (e.g. 'WPLokerBJM\Core\CacheInvalidationHooks').
      */
     public function unregisterByClass(string $class): void
     {
@@ -315,7 +325,7 @@ class WPHooksRegistry
      * Only purgeCacheOnChange hooks are removed; other methods on the same service stay active
      * ```
      *
-     * @param string $class  Fully qualified class name.
+     * @param class-string $class  Fully qualified class name.
      * @param string $method Method name to unregister.
      */
     public function unregisterByMethod(string $class, string $method): void

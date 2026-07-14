@@ -6,6 +6,19 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 #[Injectable(lazy: true)]
 /**
  * Leverage Wordpress theme feature for easier assets (logo,favicon,etc) management and integrate to frontend
+ * @phpstan-type LogoData array{
+ *  logoDecoding: string,
+ *  logoHeight: int,
+ *  logoSizes: string,
+ *  logoSrcset: string,
+ *  logoUrl: string, 
+ *  logoWidth: int
+ * }
+ * @phpstan-type ThemeData array{
+ *  logo: LogoData, 
+ *  siteIconTags: string,
+ *  wpRestNonce?: string
+ * }
  */
 class ThemeInject
 {
@@ -65,19 +78,13 @@ class ThemeInject
      *   to the theme support defaults, then to a safe 128x128 fallback so browsers can
      *   compute aspect ratio reliably.
      *
-     * @return array{url:string,srcset:string,sizes:string,width:int,height:int} {
-     *     @type string url     Absolute URL to the logo (empty string if none)
-     *     @type string srcset  Responsive srcset value produced by WP (may be empty)
-     *     @type string sizes   Sizes attribute suggestion for responsive images (may be empty)
-     *     @type int    width   Intrinsic pixel width (fallbacks applied)
-     *     @type int    height  Intrinsic pixel height (fallbacks applied)
-     * }
+     * @return array{url:string|false,srcset:string|false,sizes:string|false,width:int,height:int}
      */
     private function getLogoData(): array
     {
         $custom_logo_id = get_theme_mod('custom_logo');
         if (!$custom_logo_id) {
-            return ['url' => '', 'srcset' => '', 'sizes' => '', 'width' => 0, 'height' => 0];
+            return ['url' => false, 'srcset' => false, 'sizes' => false, 'width' => 0, 'height' => 0];
         }
 
         $url = wp_get_attachment_image_url($custom_logo_id, 'full') ?: '';
@@ -155,7 +162,7 @@ class ThemeInject
          * 2. Use wp_get_original_image_url() to get the original PNG URL.
          * @return string|null
          */
-        $addFallbackSiteIconMetaTags = static function(): string|null {
+        $addFallbackSiteIconMetaTags = static function (): string|null {
             $cropped_id = get_option('site_icon');
             if (!$cropped_id)
                 return null;
@@ -204,7 +211,7 @@ class ThemeInject
      * - siteIconTags (string): newline‑separated <link> tags generated via the
      *   `site_icon_meta_tags` filter. Useful for rendering favicon markup in
      *   head elements when hydrating client code.
-     * @return array{logo: array{logoDecoding: string, logoHeight: int, logoSizes: string, logoSrcset: string, logoUrl: string, logoWidth: int}, siteIconTags: string} $wpThemeData
+     * @return ThemeData
      */
     public function themeData(): array
     {

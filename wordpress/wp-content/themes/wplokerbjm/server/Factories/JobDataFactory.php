@@ -6,7 +6,33 @@ use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-
+/**
+ *  @phpstan-type JobData array{
+ *     nama_perusahaan?: string,
+ *     tentang_perusahaan?: string|null,
+ *     deskripsi_pekerjaan?: string|null,
+ *     persyaratan?: string|null,
+ *     cara_melamar?: string|null,
+ *     benefit?: string|null,
+ *     umur_min?: int,
+ *     umur_max?: int,
+ *     pengalaman?: int,
+ *     gaji_minimal?: int,
+ *     gaji_maksimal?: int,
+ *     deadline?: string,
+ *     email_kontak?: string,
+ *     nomor_kontak?: string,
+ *     situs_kontak?: string,
+ *     social_media?: string,
+ *     status_pekerjaan?: int,
+ *     perusahaan?: string,
+ *     kategori_lowongan?: string,
+ *     lokasi_pekerjaan?: string,
+ *     jenis_pekerjaan?: string,
+ *     gender?: string,
+ *     pendidikan?: string,
+ * }
+ */
 class JobDataFactory
 {
     public function __construct(
@@ -42,13 +68,13 @@ class JobDataFactory
      * This method retrieves custom fields and taxonomy data for the given post ID,
      * processes the data (e.g., sanitization, formatting), and combines it into
      * a single associative array for use in views or other parts of the application.
-     *
      * @param int $post_id Post ID
-     * @return array Combined and processed job data
+     * @return JobData Combined and processed job data
      */
     public function createJobData(int $post_id): array
     {
         $cacheKey = CacheKey::JOB_DATA_PREFIX . $post_id;
+        /** @var JobData|false $cachedData */
         $cachedData = Cache::get($cacheKey);
         if ($cachedData !== false) {
             return $cachedData;

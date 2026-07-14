@@ -1,7 +1,15 @@
 <?php
 namespace WPLokerBJM\Controllers\GraphQL\Resolvers;
+use ThemeData;
 use WPLokerBJM\Shared\Log\Logger;
-
+/**
+ * Resolver for theme data in GraphQL.
+ *
+ * Fetches theme-related data for GraphQL queries, including site title,
+ * description, and logo information. Caches results internally to optimize
+ * repeated requests.
+ * @phpstan-import-type ThemeData from \WPLokerBJM\Core\Theme\ThemeInject
+ */
 class ThemeDataResolver
 {
     public function __construct(
@@ -10,15 +18,12 @@ class ThemeDataResolver
     }
     /**
      * Resolve theme data for GraphQL endpoint.
-     *
-     * @return array{logo: array{logoUrl: string, logoSrcset: string, logoSizes: string, logoDecoding: string, logoWidth: int, logoHeight: int}, wpRestNonce: string, siteIconTags: string}|array{data: null}
+     * @return ThemeData
      */
     public function resolveThemeData(): array
     {
         try {
-            $themeData = $this->graphqlData->getThemeData(); // cached internally
-
-            return $themeData;
+            return $this->graphqlData->getThemeData(); // cached internally
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'ThemeDataResolver::resolveThemeData error: ' . $e->getMessage());
             return [

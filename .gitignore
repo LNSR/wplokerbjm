@@ -40,3 +40,4 @@ worker-configuration.d.ts
 **/*.tsbuildinfo
 
 **/.agents
+**/.claude
