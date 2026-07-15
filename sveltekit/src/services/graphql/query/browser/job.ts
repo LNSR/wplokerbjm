@@ -13,7 +13,6 @@ export const GET_LOAD_MORE = graphql(`
       jobs {
         ...JobCardFields
       }
-      context
       filters {
         ...JobFilterFields
       }
@@ -24,12 +23,11 @@ export const GET_LOAD_MORE = graphql(`
 `, [FRAGMENT_JOB_CARD_FIELDS, FRAGMENT_JOB_FILTER_FIELDS]);
 
 export const GET_SEARCH_JOBS = graphql(`
-  query GetSearchJobs($filters: JobFiltersInput!) {
-    searchJobs(filters: $filters) {
+  query GetSearchJobs($context: String, $filters: JobFiltersInput!) {
+    searchJobs(context: $context, filters: $filters) {
       jobs {
         ...JobCardFields
       }
-      context
       title
       filters {
         ...JobFilterFields

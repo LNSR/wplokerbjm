@@ -20,7 +20,7 @@ use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
  * @phpstan-import-type SearchFilters from JobQuery
  * 
  * @phpstan-type Context 'latest'|'search'
- * @phpstan-type Filters SearchFilters & array{context: Context}
+ * @phpstan-type Filters SearchFilters
  */
 class JobsDataResolver
 {
@@ -59,7 +59,7 @@ class JobsDataResolver
      *
      * @param mixed $root The root Query object (unused)
      * @param array{paged?: int, context?: Context, filters?: Filters} $args Query arguments
-     * @return array{jobs: CardData[], context: Context, filters: Filters, total: int, maxNumPages: int}
+     * @return array{jobs: CardData[], filters: Filters, total: int, maxNumPages: int}
      */
     public function resolveLoadMore($root, array $args): array
     {
@@ -73,7 +73,7 @@ class JobsDataResolver
             }
 
             $cacheKey = CacheKey::LOAD_MORE_PREFIX . md5(serialize([$paged, $context, $filters]));
-            /** @var array{data: array{jobs: CardData[], context: Context, filters: Filters, total: int, maxNumPages: int}, total: int, maxNumPages: int}|false $cached */
+            /** @var array{data: array{jobs: CardData[], filters: Filters, total: int, maxNumPages: int}, total: int, maxNumPages: int}|false $cached */
             $cached = Cache::get($cacheKey);
 
             if ($cached !== false) {
@@ -100,7 +100,6 @@ class JobsDataResolver
             $data = SharedUtils::filterEmptyValues([
                 'jobs' => $jobs,
                 'filters' => $filters,
-                'context' => $context,
                 'total' => $query->found_posts,
                 'maxNumPages' => $query->max_num_pages,
             ]);
@@ -118,7 +117,6 @@ class JobsDataResolver
             Logger::error('GraphQL', 'JobsDataResolver::resolveLoadMore error: ' . $e->getMessage());
             return [
                 'jobs' => [],
-                'context' => $args['context'] ?? 'latest',
                 'filters' => $args['filters'] ?? [],
                 'total' => 0,
                 'maxNumPages' => 0,
@@ -322,13 +320,14 @@ class JobsDataResolver
      * Resolve search jobs for GraphQL.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{filters?: Filters|array} $args Search filters
+     * @param array{context?: Context, filters?: Filters|array} $args Search filters
      * @template TResolveSearchJobs of array{jobs: CardData[], filters: Filters, title: string, total: int, maxNumPages: int}
      * @return TResolveSearchJobs
      */
     public function resolveSearchJobs($root, array $args): array
     {
         try {
+            $context = $args['context'] ?? 'search';
             $filters = $args['filters'] ?? [];
 
             $searchFilters = [
@@ -337,10 +336,9 @@ class JobsDataResolver
                 Taxonomies::GENDER => (array) $filters[Taxonomies::GENDER] ?? [],
                 Taxonomies::PENDIDIKAN => (array) $filters[Taxonomies::PENDIDIKAN] ?? [],
                 'sort' => (string) $filters['sort']['value'] ?? 'desc',
-                'context' => (string) $filters['context'] ?? 'search',
             ];
 
-            $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize($searchFilters));
+            $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize([$searchFilters, $context]));
             /** @var TResolveSearchJobs|false $cached */
             $cached = Cache::get($cacheKey);
             if ($cached !== false) {
@@ -356,7 +354,6 @@ class JobsDataResolver
 
             $data = SharedUtils::filterEmptyValues([
                 'jobs' => $jobs,
-                'context' => 'search',
                 'filters' => $filters,
                 'title' => 'Hasil Pencarian',
                 'total' => $query->found_posts,
@@ -370,7 +367,6 @@ class JobsDataResolver
             Logger::error('GraphQL', 'JobsDataResolver::resolveSearchJobs error: ' . $e->getMessage());
             return [
                 'jobs' => [],
-                'context' => 'search',
                 'filters' => $args['filters'] ?? [],
                 'title' => 'Hasil Pencarian',
                 'total' => 0,

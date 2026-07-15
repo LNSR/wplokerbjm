@@ -217,10 +217,12 @@ class SearchHooks
  */
 class EnvironmentHooks
 {
-    const MUST_HAVE_PLUGIN = [
+    private const MUST_HAVE_PLUGINS = [
         PluginList::LiteSpeed->value,
         PluginList::WpGraphql->value,
         PluginList::RankMath->value,
+        PluginList::MetaBoxLite->value,
+        PluginList::MetaBox->value,
     ];
     /**
      * Temporarily disable specific plugins if in development environment.
@@ -245,7 +247,7 @@ class EnvironmentHooks
     #[Filter('plugin_action_links', 4, 2)]
     public function lockPluginActionLinks(array $actions, string $pluginFile): array
     {
-        if (in_array($pluginFile, self::MUST_HAVE_PLUGIN) && isset($actions['deactivate'])) {
+        if (in_array($pluginFile, self::MUST_HAVE_PLUGINS) && isset($actions['deactivate'])) {
             unset($actions['deactivate']);
 
             $actions['required'] = '<span style="color: red; font-weight: bold;">Must Have Dependency</span>';
@@ -262,7 +264,7 @@ class EnvironmentHooks
     {
         if (SharedUtils::isDevelopment())
             return $plugins;
-        foreach (self::MUST_HAVE_PLUGIN as $plugin) {
+        foreach (self::MUST_HAVE_PLUGINS as $plugin) {
             if (!in_array($plugin, $plugins)) {
                 array_push($plugins, $plugin);
             }
@@ -305,7 +307,7 @@ class EnvironmentHooks
      */
     private function filteredPlugins(array $plugins, array $pluginsToDisable): array
     {
-        $filtered = array_filter($plugins, function (string $plugin) use ($pluginsToDisable): bool {
+        $filtered = array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
             foreach ($pluginsToDisable as $disable) {
                 if (str_starts_with($plugin, $disable)) {
                     return false;
@@ -512,10 +514,18 @@ class HTTPHooks
     #[Action('muplugins_loaded', PHP_INT_MIN)]
     public function setRemoteAddr(): void
     {
+        
         if (SharedUtils::isDevelopment())
             return; // @dev local mode, skip this
-        if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
+            
+        if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+            $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_CF_CONNECTING_IP'];
+            return;
+        }
+
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $_SERVER['REMOTE_ADDR'] = trim($ips[0]);
         }
     }
 }

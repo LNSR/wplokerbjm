@@ -110,7 +110,7 @@ class JobListingStore
             const cleaned = SearchUtils.sanitizeFilters({ ...this.filters })
             const response = await APIServiceBrowser.searchJobsGraphQL(cleaned)
             this.jobs = [ ...(response.jobs || []) ]
-            this.context = (response.context) || "search"
+            this.context = "search"
             this.title = response.title || "Hasil Pencarian"
             this.totalJobs = response.total || 0
             this.maxNumPages = response.maxNumPages || 1
@@ -152,7 +152,7 @@ class JobListingStore
 
             this.jobs = response.jobs || []
             this.maxNumPages = response.maxNumPages || 1
-            this.context = response.context || "latest"
+            this.context = "latest"
             this.title = response.title || "Lowongan Terbaru"
             this.totalJobs = response.total || 0
             if (response.filters)

@@ -104,6 +104,9 @@ class JWTDataResolver
             return null;
         }
         $code = method_exists($resp, 'get_status') ? $resp->get_status() : 0;
+        /**
+         * @var JWTDataShape $data
+         */
         $data = method_exists($resp, 'get_data') ? $resp->get_data() : null;
         if (defined('WP_DEBUG') && WP_DEBUG) {
             Logger::error('GraphQL', "JWT login response code={$code} data=" . print_r($data, true));

@@ -90,7 +90,7 @@ class WPGraphQL
     /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
-    #[Filter('graphql_response_headers_to_send', 11)]
+    #[Filter('graphql_response_headers_to_send', 10)]
     public function ModifyHeaderGraphQL(array $headers): array
     {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -124,14 +124,14 @@ class WPGraphQL
             if (isset($headers['Cache-Control'])) {
                 unset($headers['Cache-Control']);
             }
-            $headers['Cache-Control'] = $extra . ', must-revalidate';
+            $headers['Cache-Control'] = $extra;
         };
         $loggedIn = is_user_logged_in();
         if ($loggedIn) {
-            $cacheControl('private, no-cache');
+            $cacheControl('private, max-age=30, must-revalidate');
             $headers['Logged-In'] = $loggedIn ? 'true' : 'false';
         } else {
-            $cacheControl('public, max-age=60');
+            $cacheControl('public, max-age=90, stale-while-revalidate=300');
         }
 
         return $headers;
@@ -140,7 +140,7 @@ class WPGraphQL
     /**
      * @see \WPGraphQL\Router::prepare_headers;
      */
-    #[Filter('graphql_response_status_code', 9, 2)]
+    #[Filter('graphql_response_status_code', 10, 2)]
     public function setGraphQLResponseStatusCode(
         int $http_status_code,
         mixed $graphql_response,

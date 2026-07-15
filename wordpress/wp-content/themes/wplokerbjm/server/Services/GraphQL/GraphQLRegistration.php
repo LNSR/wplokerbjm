@@ -178,7 +178,6 @@ final class GraphQLRegistration
             'description' => 'Load more jobs response',
             'fields' => [
                 'jobs' => ['type' => ['list_of' => self::TYPE_JOB]],
-                'context' => ['type' => self::TYPE_STRING],
                 'filters' => ['type' => self::TYPE_JOB_FILTERS],
                 'total' => ['type' => self::TYPE_INT],
                 'maxNumPages' => ['type' => self::TYPE_INT],
@@ -193,7 +192,6 @@ final class GraphQLRegistration
                 Taxonomies::GENDER => ['type' => ['list_of' => self::TYPE_STRING]],
                 Taxonomies::PENDIDIKAN => ['type' => ['list_of' => self::TYPE_STRING]],
                 'sort' => ['type' => self::TYPE_SORT_OPTION],
-                'context' => ['type' => self::TYPE_STRING],
             ],
         ]);
 
@@ -240,7 +238,6 @@ final class GraphQLRegistration
             'description' => 'Search jobs response',
             'fields' => [
                 'jobs' => ['type' => ['list_of' => self::TYPE_JOB]],
-                'context' => ['type' => self::TYPE_STRING],
                 'filters' => ['type' => self::TYPE_JOB_FILTERS],
                 'title' => ['type' => self::TYPE_STRING],
                 'total' => ['type' => self::TYPE_INT],
@@ -272,7 +269,6 @@ final class GraphQLRegistration
                 Taxonomies::GENDER => ['type' => ['list_of' => self::TYPE_STRING]],
                 Taxonomies::PENDIDIKAN => ['type' => ['list_of' => self::TYPE_STRING]],
                 'sort' => ['type' => self::TYPE_SORT_OPTION_INPUT],
-                'context' => ['type' => self::TYPE_STRING],
             ],
         ]);
     }
@@ -422,6 +418,11 @@ final class GraphQLRegistration
             'type' => self::TYPE_SEARCH_JOBS_RESPONSE,
             'description' => 'Search jobs',
             'args' => [
+                'context' => [
+                    'type' => self::TYPE_STRING,
+                    'description' => 'Context',
+                    'defaultValue' => 'search',
+                ],
                 'filters' => [
                     'type' => self::TYPE_JOB_FILTERS_INPUT,
                     'description' => 'Job filters',

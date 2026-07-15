@@ -471,8 +471,6 @@
       const response = await jobListingStore.searchJobs();
       jobListingStore.title = "Lowongan Terbaru";
       jobListingStore.context = "latest";
-      response.title = "Lowongan Terbaru";
-      response.context = "latest";
       return response;
     }
 

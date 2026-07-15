@@ -34,9 +34,6 @@ class Litespeed
     #[Action('litespeed_purged_all')]
     public function clearObjectCache(): void
     {
-        if (!self::isActive()) {
-            return;
-        }
         // Clear APCu cache first
         if (function_exists('apcu_clear_cache')) {
             apcu_clear_cache();
@@ -63,7 +60,6 @@ class Litespeed
     #[Filter('litespeed_is_mobile', 5)]
     public function customMobileDetect()
     {
-        if (!self::isActive()) return;
         return wp_is_mobile();
     }
 
@@ -79,14 +75,15 @@ class LiteSpeedGraphQL
         isActive as isLitespeedActive;
     }
 
-    public static function isActive(): bool {
+    public static function isActive(): bool
+    {
         return self::isLitespeedActive() && WPGraphQL::isActive();
     }
 
     /**
      * Set GraphQL Queries returned via HTTP GET requests to be cacheable
      */
-    #[Action('graphql_process_http_request_response', 2)]
+    #[Action('graphql_process_http_request_response', 4)]
     public function setCacheable(): void
     {
         if ('GET' !== $_SERVER['REQUEST_METHOD'] || !self::isActive()) {
@@ -97,6 +94,7 @@ class LiteSpeedGraphQL
             do_action('litespeed_control_set_private');
         } else {
             do_action('litespeed_control_force_cacheable');
+            do_action('litespeed_control_set_ttl', 86400);
         }
     }
 
@@ -114,14 +112,6 @@ class LiteSpeedGraphQL
             unset($headers['X-GraphQL-Keys']);
         }
 
-        if (isset($headers['X-LiteSpeed-Cache-Control'])) {
-            if (is_user_logged_in()) {
-                $headers['X-LiteSpeed-Cache-Control'] = 'private, no-cache';
-            } else {
-                $headers['X-LiteSpeed-Cache-Control'] = 'public, max-age=60, s-maxage=86400';
-            }
-        }
-
         return $headers;
     }
 
@@ -131,7 +121,8 @@ class LiteSpeedGraphQL
     #[Action('graphql_purge')]
     public function purgeCache($keys): void
     {
-        if (!self::isActive()) return;
+        if (!self::isActive())
+            return;
         do_action('litespeed_purge', $keys);
     }
 }

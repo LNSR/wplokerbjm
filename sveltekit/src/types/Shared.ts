@@ -1,4 +1,4 @@
-import type { SearchContext, SearchFilters } from './Search';
+import type { SearchFilters } from './Search';
 import type { MetaBox } from './wordpress/MetaBox';
 import type { WPBasePost } from './wordpress/Wordpress';
 
@@ -19,7 +19,6 @@ export interface BaseJobSearch
 {
   jobs?: CardJob[] | null
   maxNumPages?: number | null
-  context?: SearchContext
   filters?: SearchFilters
   total?: number | null
 }

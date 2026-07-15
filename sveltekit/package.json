@@ -31,7 +31,7 @@
     "viewerjs": "^1.11.7"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260715.1",
+    "@cloudflare/workers-types": "^5.20260716.1",
     "@eslint/compat": "^2.1.0",
     "@gql.tada/svelte-support": "^1.0.3",
     "@sveltejs/adapter-cloudflare": "^7.2.9",
@@ -52,7 +52,7 @@
     "runed": "^0.37.1",
     "svelte": "^5.56.5",
     "svelte-awesome-icons": "^3.0.1",
-    "svelte-check": "^4.7.2",
+    "svelte-check": "^4.7.3",
     "svelte-check-rs": "^0.10.2",
     "sveltekit-device-detector": "^2.0.1",
     "tailwindcss": "4.3.2",
@@ -67,7 +67,7 @@
   },
   "overrides": {
     "ts-patch": "^4.0.1",
-    "typescript": "~6.0.2",
+    "typescript": "^6.0.3",
     "@typia/unplugin": "^12.1.1",
     "typia": "^12.1.1"
   }

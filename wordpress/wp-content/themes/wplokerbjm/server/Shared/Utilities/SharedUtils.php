@@ -4,6 +4,8 @@ enum PluginList: string
 {
     case LiteSpeed = 'litespeed-cache/litespeed-cache.php';
     case Wordfence = 'wordfence/wordfence.php';
+    case MetaBox = 'meta-box/meta-box.php';
+    case MetaBoxLite = 'meta-box-lite/meta-box-lite.php';
     case WpGraphql = 'wp-graphql/wp-graphql.php';
     case RankMath = 'seo-by-rank-math/rank-math.php';
     case QueryMonitor = 'query-monitor/query-monitor.php';

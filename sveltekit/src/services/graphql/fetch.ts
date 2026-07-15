@@ -149,9 +149,10 @@ export class BrowserFetch extends SharedFetch {
         filters: SearchFilters,
         fetchFn?: typeof fetch,
     ): Promise<SearchResponse> {
+        const { context, ...filterFields } = filters;
         const data = await this.URQLManager.runQuery(
             GET_SEARCH_JOBS,
-            { filters },
+            { context: context ?? 'search', filters: filterFields },
             undefined,
             undefined,
             fetchFn,

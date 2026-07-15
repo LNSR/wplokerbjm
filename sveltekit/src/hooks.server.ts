@@ -21,6 +21,19 @@ class HttpUtils {
       headers.set(name, existing ? `${v}, ${existing}` : v);
     });
   }
+
+  public static async calculateHash(response: Response): Promise<string> {
+    const clone = response.clone();
+    const body = await clone.text();
+    const hashBuffer = await crypto.subtle.digest(
+      "SHA-1",
+      new TextEncoder().encode(body),
+    );
+    return Array.from(new Uint8Array(hashBuffer))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  }
+
   public static filterCookieString(raw: string): string {
     return raw
       .split(";")
@@ -162,15 +175,13 @@ const handleDevice: Handle = async ({ event, resolve }) => {
  * 6. Caching & Transformation (Edge Optimization) Middleware
  */
 const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
-  let response = await resolve(event);
-
   const path = event.url.pathname;
   const search = event.url.search;
-  const contentType = response.headers.get("Content-Type") || "";
   const cookie = event.request.headers.get("Cookie");
   const authenticated = isAuthenticated(cookie);
 
-  const publicCache = "public, max-age=180, s-maxage=2592000, stale-while-revalidate=86400";
+  const publicCache =
+    "public, max-age=180, s-maxage=2592000, stale-while-revalidate=86400";
   const privateCache = "private, max-age=300, must-revalidate";
   const devModeCache = "no-cache, must-revalidate";
   const cachePolicy = dev
@@ -179,6 +190,8 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
       ? privateCache
       : publicCache;
 
+  let response = await resolve(event);
+  const contentType = response.headers.get("Content-Type") || "";
   const isHtml = contentType.startsWith("text/html");
   const isJsonOrXml =
     contentType.includes("application/json") ||
@@ -227,6 +240,25 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
     "Access-Control-Allow-Headers",
     "Authorization, Content-Type, If-None-Match, If-Match, If-Modified-Since, If-Unmodified-Since",
   );
+
+  if ((isHtml || isJsonOrXml) && response.ok && response.status < 300) {
+    try {
+      const etag = await HttpUtils.calculateHash(response);
+      const eTagValue = `W/"${etag}"`;
+      const ifNoneMatch = event.request.headers.get("If-None-Match");
+      if (ifNoneMatch === eTagValue) {
+        return new Response(null, {
+          status: 304,
+          headers: { ETag: eTagValue, "Cache-Control": cachePolicy },
+        });
+      }
+
+      response.headers.set("ETag", eTagValue);
+      response.headers.set("Last-Modified", new Date().toUTCString());
+    } catch (e) {
+      console.warn("ETag generation failed", e);
+    }
+  }
 
   return response;
 };

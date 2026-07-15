@@ -25,7 +25,6 @@ export const FRAGMENT_JOB_FILTER_FIELDS = graphql(`
       value
       label
     }
-    context
   }
 `);
 
