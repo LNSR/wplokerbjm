@@ -42,7 +42,7 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
 
     let jobSchema: string | null = null;
     schemas && (jobSchema = schemaScriptParser(schemas));
-
+    locals.postTime = job.post_time;
     if (jobSchema && url.origin)
     {
       const cmsOrigin: string = getCmsOrigin();

@@ -83,7 +83,7 @@ class LiteSpeedGraphQL
     /**
      * Set GraphQL Queries returned via HTTP GET requests to be cacheable
      */
-    #[Action('graphql_process_http_request_response', 4)]
+    #[Action('graphql_process_http_request_response', 6)]
     public function setCacheable(): void
     {
         if ('GET' !== $_SERVER['REQUEST_METHOD'] || !self::isActive()) {
@@ -101,7 +101,7 @@ class LiteSpeedGraphQL
     /**
      * Add LiteSpeed tags, unset the x-graphql-keys
      */
-    #[Filter('graphql_response_headers_to_send', 11)]
+    #[Filter('graphql_response_headers_to_send', 7)]
     public function tagResponses(array $headers = []): array
     {
         if (!self::isActive()) {

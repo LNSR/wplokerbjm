@@ -67,11 +67,6 @@ define('ADMIN_COOKIE_PATH', '/');
 define('COOKIEPATH', '/');
 define('SITECOOKIEPATH', '/');
 
-// If JWT issuer wasn't provided earlier, default it to the cookie domain.
-if (!defined('JWT_AUTH_ISS')) {
-  define('JWT_AUTH_ISS', $cookie_domain);
-}
-
 
 //! LiteSpeed Cache Configuration Flag
 // https://docs.litespeedtech.com/lscache/lscwp/constants/

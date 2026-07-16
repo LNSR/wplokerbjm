@@ -152,11 +152,11 @@ class LazyHookHandler
     {
         try {
             $execute = $this->container->get($this->class)->{$this->method}(...$args);
-            SharedUtils::isDevelopment() && Logger::debug("LazyHookHandler", "Hook invoke {$this->label}");
+            // SharedUtils::isDevelopment() && Logger::debug("LazyHookHandler", "Hook invoke {$this->label}");
             return $execute;
         } catch (\Throwable $e) {
             Logger::error('WPHooksRegistry', 'Error invoking hook for class ' . $this->class . ' and method ' . $this->method . ': ' . $e->getMessage());
-            return null;
+            return array_key_exists(0, $args) ? $args[0] : null;
         }
     }
 }

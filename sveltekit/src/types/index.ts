@@ -8,3 +8,4 @@ export * from './Shared'
 export * from './Search'
 export * from './KeyboardKeys'
 export * from './worker/bookmark/contract'
+export type DeviceType = "mobile" | "tablet" | "desktop"

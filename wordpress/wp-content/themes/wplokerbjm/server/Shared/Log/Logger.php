@@ -23,7 +23,7 @@ class Logger
     public const LEVEL_WARNING = 'WARNING';
     public const LEVEL_ERROR = 'ERROR';
 
-    /** @var array<int, LogEntry> In-memory buffer of pending log entries */
+    /** @var LogEntry[] In-memory buffer of pending log entries */
     private static array $buffer = [];
 
     /** Guard flag to prevent re-entry during flush() */

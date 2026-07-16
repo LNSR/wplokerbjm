@@ -1,6 +1,6 @@
 import { sequence } from "@sveltejs/kit/hooks";
-import type { Handle } from "@sveltejs/kit";
-import type { WPLokerBJMThemedData } from "@/types";
+import type { Handle, RequestEvent } from "@sveltejs/kit";
+import type { WPLokerBJMThemedData, DeviceType } from "@/types";
 import { cookieJwtName } from "$lib/server/constants/constants";
 import { handleDeviceDetector } from "sveltekit-device-detector";
 import { APIServiceServer } from "@/services/graphql/APIService";
@@ -11,6 +11,7 @@ import {
 } from "$lib/server/utils/http.server";
 
 class HttpUtils {
+  private static readonly encoder = new TextEncoder();
   public static prependHeader(
     headers: Headers,
     name: string,
@@ -22,12 +23,24 @@ class HttpUtils {
     });
   }
 
-  public static async calculateHash(response: Response): Promise<string> {
-    const clone = response.clone();
-    const body = await clone.text();
+  public static async calculateAuthETag(
+    event: RequestEvent,
+    response: Response,
+  ): Promise<string> {
+    const baseHash = event.locals.postTime?.trim() || response;
+    const authToken = event.locals.authToken || null;
+    const hash = await HttpUtils.calculateHash(`${baseHash}:${authToken}`);
+    return `W/"${hash}"`;
+  }
+
+  public static async calculateHash(
+    response: Response | string,
+    deviceType?: DeviceType,
+  ): Promise<string> {
+    const body = `${response}-${deviceType}`;
     const hashBuffer = await crypto.subtle.digest(
-      "SHA-1",
-      new TextEncoder().encode(body),
+      "SHA-256",
+      HttpUtils.encoder.encode(body),
     );
     return Array.from(new Uint8Array(hashBuffer))
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -105,6 +118,7 @@ const handleSecurityContext: Handle = async ({ event, resolve }) => {
       const filtered = HttpUtils.filterCookieString(cookie);
       if (filtered) {
         init.headers.set("Cookie", filtered);
+        event.locals.authToken = filtered;
       }
 
       if (!init.headers.has("Authorization")) {
@@ -161,7 +175,9 @@ const handleDevice: Handle = async ({ event, resolve }) => {
     response.headers.set("Vary", `${baseVary}, Cookie, Content-Encoding`);
 
     try {
-      const dt = event.locals.deviceType.isMobile ? "mobile" : "desktop";
+      const dt: DeviceType = event.locals.deviceType.isMobile
+        ? "mobile"
+        : "desktop";
       response.headers.set("CF-Device-Type", dt);
     } catch (e) {
       console.warn("hooks.handleDevice: failed to set Device-Type header", e);
@@ -177,12 +193,15 @@ const handleDevice: Handle = async ({ event, resolve }) => {
 const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
   const path = event.url.pathname;
   const search = event.url.search;
+  const dt: DeviceType = event.locals.deviceType?.isMobile
+    ? "mobile"
+    : "desktop";
   const cookie = event.request.headers.get("Cookie");
   const authenticated = isAuthenticated(cookie);
 
   const publicCache =
     "public, max-age=180, s-maxage=2592000, stale-while-revalidate=86400";
-  const privateCache = "private, max-age=300, must-revalidate";
+  const privateCache = "private, max-age=90, must-revalidate";
   const devModeCache = "no-cache, must-revalidate";
   const cachePolicy = dev
     ? devModeCache
@@ -243,18 +262,36 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
 
   if ((isHtml || isJsonOrXml) && response.ok && response.status < 300) {
     try {
-      const etag = await HttpUtils.calculateHash(response);
-      const eTagValue = `W/"${etag}"`;
+      const clonedResponse = response.clone();
       const ifNoneMatch = event.request.headers.get("If-None-Match");
+      if (!authenticated) {
+        // Public: CDN edge cache handles this via s-maxage. Just set ETag.
+        //! Make sure Wrangler.jsonc its cache config enabled!
+        const etag = await HttpUtils.calculateHash(clonedResponse, dt);
+        const eTagValue = `W/"${etag}"`;
+        if (ifNoneMatch === eTagValue) {
+          return new Response(null, {
+            status: 304,
+            headers: { ETag: eTagValue, "Cache-Control": cachePolicy },
+          });
+        }
+        response.headers.set("ETag", eTagValue);
+        return response;
+      }
+
+      const eTagValue = await HttpUtils.calculateAuthETag(
+        event,
+        clonedResponse,
+      );
       if (ifNoneMatch === eTagValue) {
         return new Response(null, {
           status: 304,
           headers: { ETag: eTagValue, "Cache-Control": cachePolicy },
         });
       }
-
       response.headers.set("ETag", eTagValue);
-      response.headers.set("Last-Modified", new Date().toUTCString());
+
+      return response;
     } catch (e) {
       console.warn("ETag generation failed", e);
     }

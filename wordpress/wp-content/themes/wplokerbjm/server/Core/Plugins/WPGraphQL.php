@@ -88,50 +88,48 @@ class WPGraphQL
     }
 
     /**
+     * Prevent WordPress Core from sending default 1984 nocache headers 
+     * on GraphQL responses so our custom Cache-Control takes effect.
+     */
+    #[Filter('graphql_send_nocache_headers', 100)]
+    public function disableWpDefaultNocache(): bool
+    {
+        return false;
+    }
+
+    /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
-    #[Filter('graphql_response_headers_to_send', 10)]
+    #[Filter('graphql_response_headers_to_send', 20)]
     public function ModifyHeaderGraphQL(array $headers): array
     {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-
-        $allowList = [
+        $allowedOrigins = [
             'https://dev.lokerbanjarmasin.my.id',
             'https://staging.lokerbanjarmasin.my.id',
             'https://lokerbanjarmasin.my.id',
             'https://wp.lokerbanjarmasin.my.id',
-            'https://localhost:3000',
-            'https://localhost:5173',
-            'https://localhost:8787',
-            'https://localhost:8173',
-            'https://localhost:4173',
         ];
+        $isAllowed = in_array($origin, $allowedOrigins, true);
+        if (!$isAllowed && $origin !== '') {
+            $parts = wp_parse_url($origin);
 
-        if (in_array($origin, $allowList, true)) {
+            $isAllowed =
+                ($parts['scheme'] ?? '') === 'https'
+                && ($parts['host'] ?? '') === 'localhost';
+        }
+
+        if ($isAllowed) {
             $headers['Access-Control-Allow-Origin'] = $origin;
         }
 
         $headers['Access-Control-Allow-Credentials'] = 'true';
-
-        $headers['Access-Control-Allow-Headers'] = $headers['Access-Control-Allow-Headers'] . ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
+        $headers['Access-Control-Allow-Headers'] = ($headers['Access-Control-Allow-Headers'] ?? '') . ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
         $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag';
+        $headers['Access-Control-Max-Age'] = '86400';
 
-        if (isset($headers['Access-Control-Max-Age'])) {
-            unset($headers['Access-Control-Max-Age']);
-            $headers['Access-Control-Max-Age'] = '86400';
-        }
-        $cacheControl = static function ($extra) use (&$headers) {
-            if (isset($headers['Cache-Control'])) {
-                unset($headers['Cache-Control']);
-            }
-            $headers['Cache-Control'] = $extra;
-        };
-        $loggedIn = is_user_logged_in();
-        if ($loggedIn) {
-            $cacheControl('private, max-age=30, must-revalidate');
-            $headers['Logged-In'] = $loggedIn ? 'true' : 'false';
-        } else {
-            $cacheControl('public, max-age=90, stale-while-revalidate=300');
+        if (isset($headers['Last-Modified']) && empty($headers['Last-Modified'])) {
+            unset($headers['Last-Modified']);
         }
 
         return $headers;

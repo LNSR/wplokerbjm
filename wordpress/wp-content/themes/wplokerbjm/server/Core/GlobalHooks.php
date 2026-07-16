@@ -514,10 +514,10 @@ class HTTPHooks
     #[Action('muplugins_loaded', PHP_INT_MIN)]
     public function setRemoteAddr(): void
     {
-        
+
         if (SharedUtils::isDevelopment())
             return; // @dev local mode, skip this
-            
+
         if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) {
             $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_CF_CONNECTING_IP'];
             return;
@@ -527,6 +527,32 @@ class HTTPHooks
             $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
             $_SERVER['REMOTE_ADDR'] = trim($ips[0]);
         }
+    }
+    
+    /**
+     * Set cache header for GraphQL response
+     */
+    #[Filter('nocache_headers', 11)]
+    public function setCacheHeaders(array $headers): array
+    {
+        // bail out if if not graphql_request
+        if (!function_exists('is_graphql_http_request') || !is_graphql_http_request()) {
+            return $headers;
+        }
+
+        $thunk = static function ($cacheValues) use (&$headers): void {
+            $headers['Cache-Control'] = $cacheValues;
+            unset($headers['Expires']);
+        };
+
+        $loggedIn = is_user_logged_in();
+        if ($loggedIn) {
+            $headers['Logged-In'] = 'true';
+            $thunk('private, max-age=60, must-revalidate');
+        } else {
+            $thunk('public, max-age=120, stale-while-revalidate=300');
+        }
+        return $headers;
     }
 }
 

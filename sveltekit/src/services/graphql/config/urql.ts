@@ -157,15 +157,15 @@ abstract class URQLBaseManager {
 
 export class URQLServerManager extends URQLBaseManager {
 
-    protected override getClientOptions(preferHTTPMethodOption?: ClientOptions["preferGetMethod"]): ClientOptions {
-        const baseOptions = super.getClientOptions(preferHTTPMethodOption);
-        return {
-            ...baseOptions,
-            exchanges: [
-                fetchExchange,
-            ],
-        };
-    }
+    // protected override getClientOptions(preferHTTPMethodOption?: ClientOptions["preferGetMethod"]): ClientOptions {
+    //     const baseOptions = super.getClientOptions(preferHTTPMethodOption);
+    //     return {
+    //         ...baseOptions,
+    //         exchanges: [
+    //             fetchExchange,
+    //         ],
+    //     };
+    // }
 
     protected shouldCacheClient(): boolean {
         return false;

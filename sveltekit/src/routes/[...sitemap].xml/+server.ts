@@ -27,7 +27,7 @@ export const GET: RequestHandler = async ({ url }) => {
   }
 
   let xml = await res.text();
-  const frontendOrigin = url.origin;
+  const frontendOrigin = url.origin.replaceAll("http://", "https://");
 
   xml = xml.replace(new RegExp(escapeRegExp(cmsBase), "g"), frontendOrigin);
   xml = xml.replace(

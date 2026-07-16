@@ -1,12 +1,12 @@
 import { createSubscriber } from "svelte/reactivity";
 import { on } from "svelte/events";
 import typia from "typia";
+import type { DeviceType } from "@/types";
 import { browser } from "$app/environment";
-type Device = "desktop" | "mobile";
 class DeviceDetector
 {
     #mediaQuery?: MediaQueryList;
-    #initialDeviceSSR? = $state.raw<Device | undefined>(undefined); // set by root layout during SSR.
+    #initialDeviceSSR? = $state.raw<DeviceType | undefined>(undefined); // set by root layout during SSR.
     #onDeviceChange?: () => void;
     #deviceSubscriber = createSubscriber((update) =>
     {
@@ -21,9 +21,9 @@ class DeviceDetector
         return () => off();
     });
 
-    public get currentDevice(): Device
+    public get currentDevice(): DeviceType
     {
-        if (!browser) return typia.assertEquals<Device>(this.#initialDeviceSSR === "mobile" ? "mobile" : "desktop");
+        if (!browser) return typia.assertEquals<DeviceType>(this.#initialDeviceSSR === "mobile" ? "mobile" : "desktop");
         this.#deviceSubscriber();
         return this.#mediaQuery?.matches ? "mobile" : "desktop";
     }
@@ -36,7 +36,7 @@ class DeviceDetector
      * set on +layout.svelte during SSR to ensure correct initial device type on first render and prevent hydration mismatch
      * @internal
      */
-    public set initialDeviceSSR(value: Device) { this.#initialDeviceSSR = value; }
+    public set initialDeviceSSR(value: DeviceType) { this.#initialDeviceSSR = value; }
 
     /**
      * callback passed when device type changes

@@ -9,91 +9,57 @@ use WPLokerBJM\Shared\Log\Logger;
 use DI\Attribute\Injectable;
 
 /**
- * Cloudflare webhook helpers.
+ * Cloudflare cache purging via the purge_everything API.
  *
- * Provides two purge strategies:
- *  - Prefix-based per-post purging (post/meta hooks) — uses get_permalink()
- *    to derive the canonical URL path, then purges that path plus the home
- *    page as Cloudflare URL prefixes.
- *  - Full-zone purging (term/taxonomy hooks) — clears everything.
+ * Any content change (post, meta, term) invalidates the entire zone.
+ * Since the app is served through QUIC.cloud, Cloudflare just refetches
+ * warm content on next request — full purges are cheap.
  *
- * Credentials are injected via the constructor using PHP-DI.
- * @see \WPLokerBJM\Core\Container\Definitions\Factory
+ * Meta and term hooks self-unregister after the first fire within a
+ * request to avoid duplicate zone-wide purges.
  * 
+ * We rely on QUIC Cloud cache to simplify things.  There is no need to
+ * purge individual URLs or paths — a full-zone purge is cheap and fast.
+ *
+ * @see \WPLokerBJM\Core\Container\Definitions\Factory
+ *
  * @phpstan-import-type CloudflareCred from \WPLokerBJM\Configs\CredentialConfig
  */
 #[Injectable(lazy: true)]
 class Cloudflare
 {
-    private const APP_DOMAIN = 'lokerbanjarmasin.my.id';
-
     /**
      * @param CloudflareCred $credential filled by PHP-DI
      * @param WPHooksRegistry $wpHooksRegistry autowired by PHP-DI
      */
-    public function __construct(private array $credential, private WPHooksRegistry $wpHooksRegistry)
-    {
-
-    }
+    public function __construct(
+        private array $credential,
+        private WPHooksRegistry $wpHooksRegistry,
+    ) {}
 
     /**
-     * Purge the home page and the affected post's permalink on the app domain.
-     *
-     * Uses Cloudflare's prefix-based cache purge so all URL variants
-     * (query parameters, subpaths) are invalidated in a single call.
+     * Purge the entire Cloudflare zone cache.
      *
      * Registered on post-lifecycle hooks.  NEVER self-unregisters — every
      * post in a batch operation must have its CDN cache purged individually.
-     *
-     * @param mixed ...$args Hook arguments.
-     * @return bool True on success, false on failure.
      */
     #[Action('save_post', 10, 2)]
     #[Action('deleted_post', 10, 1)]
-    public function purgeCache(...$args): bool
+    public function purgeCache(): bool
     {
-        $postId = $this->extractPostId(current_action(), $args);
-        $prefixes = $this->buildPurgePrefixes($postId);
-
-        return $this->sendPurgeRequest(['prefixes' => $prefixes]);
+        return $this->sendPurgeRequest(['purge_everything' => true]);
     }
 
     /**
-     * Purge triggered by meta changes — self-unregisters after first fire.
+     * Purge the entire zone on the first meta change of the request.
      *
-     * Meta hooks (added_post_meta, updated_post_meta, deleted_post_meta)
-     * are redundant within a single post lifecycle: by the time these fire,
-     * `save_post` has already triggered a purge.  After the first meta hook
-     * fires, this handler removes itself for the rest of the request.
-     *
-     * In a batch operation this means post #1's meta change triggers a purge
-     * (and unregisters), while posts #2–50 rely on their `save_post` /
-     * `deleted_post` hooks (which remain registered on a different method).
-     *
-     * @param mixed ...$args Hook arguments.
-     * @return bool True on success, false on failure.
+     * Self-unregisters after firing: subsequent meta hooks within the
+     * same request are redundant (the zone was already purged).
      */
     #[Action('added_post_meta', 10, 4)]
     #[Action('updated_post_meta', 10, 4)]
     #[Action('deleted_post_meta', 10, 4)]
-    public function purgeOnMetaChange(...$args): bool
-    {
-        $this->wpHooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
-
-        return $this->purgeCache(...$args);
-    }
-
-    /**
-     * Purge the entire zone cache.
-     *
-     * Fires on taxonomy / term hooks where no single post is relevant.
-     *
-     * @return bool True on success, false on failure.
-     */
-    #[Action('created_term', 10, 0)]
-    #[Action('edit_term', 10, 0)]
-    #[Action('delete_term', 10, 0)]
-    public function purgeCacheAll(): bool
+    public function purgeOnMetaChange(): bool
     {
         $this->wpHooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
@@ -101,64 +67,23 @@ class Cloudflare
     }
 
     /**
-     * Extract the post ID from the current action's variadic arguments.
+     * Purge the entire zone on the first term change of the request.
      *
-     * @param string $action The current hook name (from current_action()).
-     * @param array  $args   The variadic arguments passed to the handler.
-     * @return int|null The post ID, or null if it cannot be determined.
+     * Self-unregisters after firing: subsequent term hooks within the
+     * same request are redundant (the zone was already purged).
      */
-    private function extractPostId(string $action, array $args): ?int
+    #[Action('created_term', 10, 0)]
+    #[Action('edit_term', 10, 0)]
+    #[Action('delete_term', 10, 0)]
+    public function purgeOnTermChange(): bool
     {
-        return match ($action) {
-            'save_post', 'deleted_post' => isset($args[0]) ? (int) $args[0] : null,
-            'added_post_meta',
-            'updated_post_meta',
-            'deleted_post_meta' => isset($args[1]) ? (int) $args[1] : null,
-            default => null,
-        };
-    }
+        $this->wpHooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
-    /**
-     * Build the list of URL prefixes to purge.
-     *
-     * Always includes the SvelteKit home page.  When $postId is provided,
-     * resolves the WordPress permalink and mirrors its path on the app domain.
-     *
-     * @param int|null $postId The post ID, or null for home-only.
-     * @return string[] List of absolute URL prefixes.
-     */
-    private function buildPurgePrefixes(?int $postId): array
-    {
-        $prefixes = [
-            sprintf('https://%s/', self::APP_DOMAIN),
-        ];
-
-        if ($postId === null) {
-            return $prefixes;
-        }
-
-        $permalink = get_permalink($postId);
-
-        if (!is_string($permalink) || $permalink === '') {
-            return $prefixes;
-        }
-
-        $path = (string) wp_parse_url($permalink, PHP_URL_PATH);
-
-        if ($path === '' || $path === '/') {
-            return $prefixes;
-        }
-
-        $prefixes[] = sprintf('https://%s%s', self::APP_DOMAIN, $path);
-
-        return $prefixes;
+        return $this->sendPurgeRequest(['purge_everything' => true]);
     }
 
     /**
      * Send a purge request to the Cloudflare API.
-     *
-     * @param array $payload The request body payload.
-     * @return bool True on success, false on failure.
      */
     private function sendPurgeRequest(array $payload): bool
     {
@@ -167,9 +92,8 @@ class Cloudflare
             return false;
         }
 
-        $creds = $this->credential;
-        $token = $creds['token'] ?? '';
-        $zone = $creds['zone'] ?? '';
+        $token = $this->credential['token'] ?? '';
+        $zone  = $this->credential['zone'] ?? '';
 
         if (!$token || !$zone) {
             Logger::warning('WebHook', 'Cloudflare credentials are missing.');
@@ -177,17 +101,15 @@ class Cloudflare
         }
 
         $endpoint = sprintf('https://api.cloudflare.com/client/v4/zones/%s/purge_cache', $zone);
-        $body = wp_json_encode($payload);
-
-        $headers = [
-            'Authorization' => 'Bearer ' . $token,
-            'Content-Type' => 'application/json',
-        ];
+        $body     = wp_json_encode($payload);
 
         $response = wp_remote_request($endpoint, [
-            'method' => 'POST',
-            'headers' => $headers,
-            'body' => $body,
+            'method'  => 'POST',
+            'headers' => [
+                'Authorization' => 'Bearer ' . $token,
+                'Content-Type'  => 'application/json',
+            ],
+            'body'    => $body,
             'timeout' => 10,
         ]);
 
@@ -197,13 +119,12 @@ class Cloudflare
         }
 
         $code = wp_remote_retrieve_response_code($response);
-        $data = wp_remote_retrieve_body($response);
 
         if ($code === 200) {
             return true;
         }
 
-        Logger::error('WebHook', 'Cloudflare purge failed ' . $code . ' body: ' . $data);
+        Logger::error('WebHook', 'Cloudflare purge failed ' . $code . ' body: ' . wp_remote_retrieve_body($response));
         return false;
     }
 }
