@@ -29,7 +29,7 @@ class WPCron
      *
      * @return void
      */
-    #[Action(hook: 'init')]
+    #[Action('init')]
     public function registerCronWP(): void
     {
         $this->scheduleEvent(self::DELETE_OLD_JOBS, 'daily');

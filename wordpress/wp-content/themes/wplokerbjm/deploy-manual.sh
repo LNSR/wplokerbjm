@@ -84,7 +84,7 @@ echo "All rsync operations completed"
 # Brief pause before running remote commands to allow server to settle
 sleep 5
 
-REMOTE_EXEC="composer install --no-dev --prefer-dist --no-interaction --classmap-authoritative --apcu-autoloader --no-scripts && wp litespeed-purge all && composer dump-autoload --apcu -a -o"
+REMOTE_EXEC="composer update --no-dev --prefer-dist --no-interaction --classmap-authoritative --apcu-autoloader --no-scripts && wp litespeed-purge all && composer dump-autoload --apcu -a -o"
 
 echo "Purging LiteSpeed cache and running composer dump-autoload on remote server"
 if [[ -n "$DRY_RUN" ]]; then

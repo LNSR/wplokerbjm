@@ -4,6 +4,7 @@ use SearchFilters;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\Sanitizer;
 use WPLokerBJM\QueryBuilders\JobQuery;
 
 /**
@@ -18,15 +19,13 @@ class ControllerUtils
     public static function parseJobFilters($request): array
     {
         $parseMulti = static function ($param) {
-            if (is_array($param))
+            if (is_array($param)) {
                 return $param;
-            if (is_string($param) && str_contains($param, ',')) { // Optimized from strpos
-                return $param
-                    |> (static fn($str) => explode(',', $str))
-                    |> (static fn($arr) => array_map('trim', $arr))
-                    |> array_filter(...);
             }
-            return $param ? [$param] : [];
+            if (is_string($param) && $param !== '') {
+                return Sanitizer::splitAndClean(',', $param);
+            }
+            return [];
         };
 
         return [
@@ -91,7 +90,7 @@ class ControllerUtils
      * Validate and filter an array of IDs.
      *
      * @param array<int, mixed> $ids
-     * @return list<int> Positive integer IDs only
+     * @return list<positive-int> Positive integer IDs only
      */
     public static function validateIds(array $ids): array
     {
@@ -161,32 +160,6 @@ class ControllerUtils
     }
 
     /**
-     * Sanitize contact list values (email, URL, text).
-     *
-     * @param string $field The contact field key
-     * @param string|string[] $value Raw contact value(s)
-     * @return list<non-empty-string> Sanitized contact entries
-     */
-    public static function sanitizeContactList(string $field, $value): array
-    {
-        $rawParts = is_array($value) ? $value : explode(',', (string) $value);
-
-        $parts = $rawParts
-            |> (static fn($arr) => array_map(static fn($part) => trim((string) $part), $arr))
-            |> (static fn($arr) => array_filter($arr, static fn($part) => $part !== ''))
-            |> array_values(...);
-
-        return $parts
-            |> (static fn($arr) => array_map(static fn($part) => match ($field) {
-                CustomFields::EMAIL_KONTAK => sanitize_email($part),
-                CustomFields::SITUS_KONTAK => esc_url_raw($part),
-                default => sanitize_text_field($part),
-            }, $arr))
-            |> (static fn($arr) => array_filter($arr, static fn($part) => $part !== null && $part !== ''))
-            |> array_values(...);
-    }
-
-    /**
      * Sanitize social media fieldset data from Meta Box.
      *
      * @param string|array<int, array<string, string>>|array<string, string> $value Raw social media data
@@ -245,10 +218,7 @@ class ControllerUtils
     {
         $set = [];
 
-        $items = $value
-            |> (static fn($str) => explode(';', $str))
-            |> (static fn($arr) => array_map('trim', $arr))
-            |> array_filter(...);
+        $items = Sanitizer::splitAndClean(';', $value);
 
         foreach ($items as $item) {
             $parts = explode(':', $item, 2);

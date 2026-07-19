@@ -1,10 +1,10 @@
 <?php
 namespace WPLokerBJM\Core\Plugins;
+use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
-use WPLokerBJM\Core\Plugins\WPGraphQL;
 use DI\Attribute\Injectable;
 
 
@@ -51,13 +51,14 @@ class Litespeed
         if (is_dir($cacheDir)) {
             array_map('unlink', glob("$cacheDir/*"));
         }
+        do_action('wpgraphql_cache_purge_all');
         WPLokerBJMContainer::getContainer(true);
     }
 
     /**
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
-    #[Filter('litespeed_is_mobile', 5)]
+    #[Filter('litespeed_is_mobile')]
     public function customMobileDetect()
     {
         return wp_is_mobile();
@@ -69,44 +70,39 @@ class Litespeed
  * LiteSpeed GraphQL Integration
  */
 #[Injectable(lazy: true)]
-class LiteSpeedGraphQL
+class LiteSpeedGraphQLIntegration
 {
     use LitespeedStatus {
         isActive as isLitespeedActive;
     }
 
+    public function __construct(private WPHooksRegistry $hookRegistry)
+    {
+        if (self::isActive())
+            return;
+        $hookRegistry->unregisterByClass(self::class);
+    }
+
     public static function isActive(): bool
     {
-        return self::isLitespeedActive() && WPGraphQL::isActive();
+        return self::isLitespeedActive() && PluginList::WpGraphql->isActive();
     }
 
     /**
      * Set GraphQL Queries returned via HTTP GET requests to be cacheable
      */
-    #[Action('graphql_process_http_request_response', 6)]
+    #[Action('graphql_process_http_request_response')]
     public function setCacheable(): void
     {
-        if ('GET' !== $_SERVER['REQUEST_METHOD'] || !self::isActive()) {
+        if ('GET' !== $_SERVER['REQUEST_METHOD']) {
             return;
         }
-
-        if (is_user_logged_in()) {
-            do_action('litespeed_control_set_private');
-        } else {
-            do_action('litespeed_control_force_cacheable');
-            do_action('litespeed_control_set_ttl', 86400);
-        }
+        do_action('litespeed_control_force_cacheable');
+        do_action('litespeed_control_set_ttl', 86400);
     }
 
-    /**
-     * Add LiteSpeed tags, unset the x-graphql-keys
-     */
-    #[Filter('graphql_response_headers_to_send', 7)]
-    public function tagResponses(array $headers = []): array
+    public function addTagResponses(array $headers = []): array
     {
-        if (!self::isActive()) {
-            return $headers;
-        }
         if (isset($headers['X-GraphQL-Keys'])) {
             do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
             unset($headers['X-GraphQL-Keys']);
@@ -121,8 +117,6 @@ class LiteSpeedGraphQL
     #[Action('graphql_purge')]
     public function purgeCache($keys): void
     {
-        if (!self::isActive())
-            return;
         do_action('litespeed_purge', $keys);
     }
 }

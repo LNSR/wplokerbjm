@@ -71,6 +71,14 @@
     "python.analysis.typeEvaluation.strictSetInference": true,
     "typescript.tsdk": "wplokerbjm-frontend/node_modules/typescript/lib",
     "editor.formatOnSave": false,
+    "php.workspace.includePath": "wordpress/wp-content/themes/wplokerbjm",
+    "html.format.templating": true,
+    "php.suggest.basic": false,
+    "php.problems.scope": "opened",
+    "php.problems.exclude": {
+      "**/generate-meta-hooks/captures/": true,
+      "**/vendor/": true,
+    },
   },
   "extensions": {
     "recommendations": [

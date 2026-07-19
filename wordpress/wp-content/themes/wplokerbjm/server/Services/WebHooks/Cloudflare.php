@@ -35,7 +35,9 @@ class Cloudflare
     public function __construct(
         private array $credential,
         private WPHooksRegistry $wpHooksRegistry,
-    ) {}
+    ) {
+        empty(array_filter($credential)) && $wpHooksRegistry->unregisterByClass(self::class);
+    }
 
     /**
      * Purge the entire Cloudflare zone cache.

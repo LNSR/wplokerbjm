@@ -1,13 +1,14 @@
 <?php
 
 namespace WPLokerBJM\Presenters\Components;
+use JobGridData;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 
 /**
  * @phpstan-import-type CardData from \WPLokerBJM\Services\GraphQL\GraphQLData
  * 
- * @phpstan-type TProps array{
+ * @phpstan-type JobGridData array{
  *     jobs: list<CardData>,
  *     maxNumPages: int,
  *     context: 'latest'|'search',
@@ -32,9 +33,9 @@ class JobGrid
      *
      * @param array<string, mixed> $query_args WP_Query arguments for fetching jobs
      * @param string $title Section title (auto-generated from context if empty)
-     * @param 'latest'|'search' $context Display context
+     * @phpstan-param JobGridData['context'] $context Display context
      * @param int $total_jobs Total jobs count override (0 = auto-detect from query)
-     * @return TProps of array
+     * @return JobGridData
      */
     public function getProps(array $query_args, string $title, string $context = 'latest', int $total_jobs = 0): array
     {

@@ -110,19 +110,16 @@ class RedirectHooks
         $baseUrl = SharedUtils::headlessDomainRedirect();
 
         $path = '/';
-        if (function_exists('is_page') && (is_page('pasang-iklan-loker') || is_page(184))) {
+        if ((is_page('pasang-iklan-loker') || is_page(184))) {
             $path = '/pasang-iklan-loker';
-        } elseif (function_exists('is_page') && is_page('kebijakan-privasi')) {
+        } elseif (is_page('kebijakan-privasi')) {
             $path = '/kebijakan-privasi';
-        } elseif (function_exists('is_single') && is_single() && get_post_type() === 'lowongan') {
+        } elseif (is_single() && get_post_type() === 'lowongan') {
             $post = get_post();
             if ($post && !empty($post->post_name)) {
                 $path = '/lowongan/' . $post->post_name;
             }
-        } elseif (
-            function_exists('is_post_type_archive') && is_post_type_archive('lowongan') ||
-            function_exists('is_front_page') && (is_front_page() || is_page(146))
-        ) {
+        } elseif (is_post_type_archive('lowongan') || is_front_page() || is_page(146)) {
             $path = '/';
         }
 
@@ -224,21 +221,27 @@ class EnvironmentHooks
         PluginList::MetaBoxLite->value,
         PluginList::MetaBox->value,
     ];
-    /**
-     * Temporarily disable specific plugins if in development environment.
-     */
-    #[Filter('option_active_plugins', 4)]
-    public function disablePluginsForDevImpl(array $plugins): array
-    {
-        $isDev = SharedUtils::isDevelopment();
-        if (!$isDev) {
-            return $plugins;
-        }
-        $extra = [
-        ];
 
-        $pluginsToDisable = $this->listPluginsToDisable($extra);
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
+    #[Filter('option_active_plugins', 0)]
+    public function activePluginsCondition(array $plugins): array
+    {
+        $plugins = $this->disablePluginsForDevImpl($plugins);
+        $plugins = $this->disablePluginsforSimulatedProdImpl($plugins);
+        $plugins = $this->forceActivePlugin($plugins);
+        return $plugins;
+    }
+
+    /**
+     * Force locale to Indonesian on the frontend for consistent user experience,
+     * while keeping admin in English.
+     */
+    #[Filter('locale')]
+    public function frontendLocal($locale)
+    {
+        if (!is_admin()) { // Only affects the public site, keeps your dashboard English
+            return 'id_ID';
+        }
+        return $locale;
     }
 
     /**
@@ -257,10 +260,25 @@ class EnvironmentHooks
     }
 
     /**
+     * Temporarily disable specific plugins if in development environment.
+     */
+    private function disablePluginsForDevImpl(array $plugins): array
+    {
+        $isDev = SharedUtils::isDevelopment();
+        if (!$isDev) {
+            return $plugins;
+        }
+        $extra = [
+        ];
+
+        $pluginsToDisable = $this->listPluginsToDisable($extra);
+        return $this->filteredPlugins($plugins, $pluginsToDisable);
+    }
+
+    /**
      * Force active plugins
      */
-    #[Filter('option_active_plugins', 4)]
-    public function forceActivePlugin(array $plugins): array
+    private function forceActivePlugin(array $plugins): array
     {
         if (SharedUtils::isDevelopment())
             return $plugins;
@@ -275,27 +293,13 @@ class EnvironmentHooks
     /**
      * Temporarily disable specific plugins if simulating production environment on local machine.
      */
-    #[Filter('option_active_plugins', 4)]
-    public function disablePluginsforSimulatedProdImpl(array $plugins): array
+    private function disablePluginsforSimulatedProdImpl(array $plugins): array
     {
         $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
 
         $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
 
         return $this->filteredPlugins($plugins, $pluginsToDisable);
-    }
-
-    /**
-     * Force locale to Indonesian on the frontend for consistent user experience,
-     * while keeping admin in English.
-     */
-    #[Filter('locale')]
-    public function frontendLocal($locale)
-    {
-        if (!is_admin()) { // Only affects the public site, keeps your dashboard English
-            return 'id_ID';
-        }
-        return $locale;
     }
 
     /**
@@ -382,7 +386,6 @@ class CacheInvalidationHooks
     #[Action('transition_post_status', 10, 3)]
     public function invalidatePostCache(...$args): void
     {
-        Logger::debug('Hook method', 'invalidatePostCache');
         $post_id = $this->extractPostId($args);
 
         if ($post_id !== null) {
@@ -404,7 +407,7 @@ class CacheInvalidationHooks
     #[Action('created_term', 10, 0)]
     #[Action('edited_term', 10, 0)]
     #[Action('delete_term', 10, 0)]
-    #[Action('updated_post_meta', 10, 4)]
+    #[Action('updated_postmeta', 10, 4)]
     #[Action('set_object_terms', 10, 6)]
     #[Action('transition_post_status', 10, 3)]
     public function purgeGlobalCacheOnce(...$args): void
@@ -436,6 +439,7 @@ class CacheInvalidationHooks
                 CacheKey::SYNC_BOOKMARK_PREFIX . '*',
                 CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . '*',
                 CacheKey::RANKMATH_HEAD_PREFIX . '*',
+                CacheKey::GRAPHQL_ETAG_PREFIX . '*',
                 CacheKey::THEME_DATA . '*',
             ]);
         } catch (\Exception $e) {
@@ -527,32 +531,6 @@ class HTTPHooks
             $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
             $_SERVER['REMOTE_ADDR'] = trim($ips[0]);
         }
-    }
-    
-    /**
-     * Set cache header for GraphQL response
-     */
-    #[Filter('nocache_headers', 11)]
-    public function setCacheHeaders(array $headers): array
-    {
-        // bail out if if not graphql_request
-        if (!function_exists('is_graphql_http_request') || !is_graphql_http_request()) {
-            return $headers;
-        }
-
-        $thunk = static function ($cacheValues) use (&$headers): void {
-            $headers['Cache-Control'] = $cacheValues;
-            unset($headers['Expires']);
-        };
-
-        $loggedIn = is_user_logged_in();
-        if ($loggedIn) {
-            $headers['Logged-In'] = 'true';
-            $thunk('private, max-age=60, must-revalidate');
-        } else {
-            $thunk('public, max-age=120, stale-while-revalidate=300');
-        }
-        return $headers;
     }
 }
 

@@ -37,16 +37,18 @@
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     Referrer-Policy "strict-origin-when-cross-origin"
     X-Content-Type-Options "nosniff"
-    X-Frame-Options "SAMEORIGIN"
-    Permissions-Policy "microphone=(), camera=(), payment=()"
-    Cross-Origin-Embedder-Policy "credentialless"
-    Cross-Origin-Opener-Policy "same-origin"
     -X-Powered-By
   }
 
   header {
-    X-Not-Modified "true"
-    match status 304
+      Cross-Origin-Opener-Policy "same-origin"
+      X-Frame-Options "SAMEORIGIN"
+      Permissions-Policy "microphone=(), camera=(), payment=()"
+      Cross-Origin-Embedder-Policy "credentialless"
+
+      match {
+          header Content-Type *text/html*
+      }
   }
 
   # Static assets: long-term caching and immutable flag (fingerprinted assets) + caching for CDNs

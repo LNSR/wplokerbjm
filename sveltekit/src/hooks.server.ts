@@ -5,6 +5,7 @@ import { cookieJwtName } from "$lib/server/constants/constants";
 import { handleDeviceDetector } from "sveltekit-device-detector";
 import { APIServiceServer } from "@/services/graphql/APIService";
 import { dev } from "$app/environment";
+import { getEtag, setEtag } from "$lib/server/cache/eTagCache";
 import {
   buildPreloadLink,
   isAuthenticated,
@@ -33,14 +34,32 @@ class HttpUtils {
     return `W/"${hash}"`;
   }
 
+  public static handleETagResponse(
+    ifNoneMatch: string | null,
+    eTagValue: string,
+    cachePolicy: string,
+  ): Response | null {
+    if (ifNoneMatch === eTagValue) {
+      return new Response(null, {
+        status: 304,
+        headers: { ETag: eTagValue, "Cache-Control": cachePolicy },
+      });
+    }
+    return null;
+  }
+
   public static async calculateHash(
     response: Response | string,
     deviceType?: DeviceType,
   ): Promise<string> {
     const body = `${response}-${deviceType}`;
+    return HttpUtils.hashString(body);
+  }
+
+  public static async hashString(input: string): Promise<string> {
     const hashBuffer = await crypto.subtle.digest(
       "SHA-256",
-      HttpUtils.encoder.encode(body),
+      HttpUtils.encoder.encode(input),
     );
     return Array.from(new Uint8Array(hashBuffer))
       .map((b) => b.toString(16).padStart(2, "0"))
@@ -65,6 +84,8 @@ class HttpUtils {
   public static setCrossOriginIsolationHeaders(headers: Headers): void {
     headers.set("Cross-Origin-Opener-Policy", "same-origin");
     headers.set("Cross-Origin-Embedder-Policy", "credentialless");
+    headers.set("Cross-Origin-Resource-Policy", "same-site");
+    headers.set("Origin-Agent-Cluster", "?1");
   }
 }
 // --- Middleware Split ---
@@ -104,43 +125,118 @@ const handleClientIp: Handle = async ({ event, resolve }) => {
 const handleSecurityContext: Handle = async ({ event, resolve }) => {
   const originalFetch = event.fetch;
 
-  event.fetch = (...args: Parameters<typeof originalFetch>) => {
-    const [input, init = {}] = args;
-    init.headers = new Headers(init.headers);
+  event.fetch = async (input, init = {}) => {
+    const headers = new Headers(init.headers);
 
-    // Forward real visitor IP to upstream services
-    if (event.locals.clientIp)
-      init.headers.set("X-Forwarded-For", event.locals.clientIp);
+    if (event.locals.clientIp) {
+      headers.set("X-Forwarded-For", event.locals.clientIp);
+    }
 
-    const cookie = event.request.headers.get("Cookie");
+    const cookie = event.request.headers.get("cookie");
 
     if (cookie) {
       const filtered = HttpUtils.filterCookieString(cookie);
-      if (filtered) {
-        init.headers.set("Cookie", filtered);
-        event.locals.authToken = filtered;
-      }
 
-      if (!init.headers.has("Authorization")) {
-        const m = filtered.match(
-          new RegExp(`(?:^|;\\s*)${cookieJwtName}=([^;]+)`),
-        );
-        if (m && m[1]) {
-          init.headers.set(
-            "Authorization",
-            `Bearer ${decodeURIComponent(m[1])}`,
+      if (filtered) {
+        headers.set("Cookie", filtered);
+        event.locals.authToken = filtered;
+
+        if (!headers.has("Authorization")) {
+          const m = filtered.match(
+            new RegExp(`(?:^|;\\s*)${cookieJwtName}=([^;]+)`),
           );
+
+          if (m) {
+            headers.set("Authorization", `Bearer ${decodeURIComponent(m[1])}`);
+          }
         }
       }
     }
-    return originalFetch(input, init);
+
+    return originalFetch(input, {
+      ...init,
+      headers,
+    });
+  };
+
+  const response = await resolve(event);
+
+  if (event.locals.authToken) {
+    response.headers.append("Vary", "Cookie");
+    response.headers.append("Vary", "Authorization");
+  }
+
+  return response;
+};
+/**
+ * 4. GraphQL ETag Middleware
+ *
+ * Wraps event.fetch to add server-to-server ETag caching for /graphql calls.
+ * Runs after handleSecurityContext, so WordPress already has auth context
+ * and IP forwarding when we add If-None-Match.
+ */
+const handleGraphQLETag: Handle = async ({ event, resolve }) => {
+  const originalFetch = event.fetch;
+
+  event.fetch = (...args: Parameters<typeof originalFetch>) => {
+    const [input, init = {}] = args;
+    const url =
+      typeof input === "string"
+        ? input
+        : input instanceof URL
+          ? input.href
+          : input.url;
+
+    if (!url.includes("/graphql")) {
+      return originalFetch(input, init);
+    }
+
+    const rawBody = typeof init.body === "string" ? init.body : "";
+
+    return (async () => {
+      const hashKey = (await HttpUtils.hashString(rawBody || url)).slice(0, 32);
+
+      const cached = await getEtag(hashKey);
+      if (cached) {
+        const headers = new Headers(init.headers);
+        headers.set("If-None-Match", cached.etag);
+        init.headers = headers;
+      }
+
+      const response = await originalFetch(input, init);
+
+      if (cached && response.status === 304) {
+        return new Response(JSON.stringify(cached.data), {
+          status: 200,
+          headers: {
+            "Content-Type": "application/json",
+            ETag: cached.etag,
+            "X-ETag-Hit": "true",
+          },
+        });
+      }
+
+      if (response.ok && response.status !== 304) {
+        const wpEtag = response.headers.get("ETag");
+        response
+          .clone()
+          .json()
+          .then((data) => {
+            const etag = wpEtag ?? `W/"${hashKey}"`;
+            setEtag(hashKey, etag, data).catch(() => {});
+          })
+          .catch(() => {});
+      }
+
+      return response;
+    })();
   };
 
   return resolve(event);
 };
 
 /**
- * 4. Layout Discovery Middleware
+ * 5. Layout Discovery Middleware
  */
 const handleThemeContext: Handle = async ({ event, resolve }) => {
   try {
@@ -154,7 +250,7 @@ const handleThemeContext: Handle = async ({ event, resolve }) => {
 };
 
 /**
- * 5. Device Identification Middleware
+ * 6. Device Identification Middleware
  */
 const handleDevice: Handle = async ({ event, resolve }) => {
   const deviceHandler = handleDeviceDetector({});
@@ -172,7 +268,7 @@ const handleDevice: Handle = async ({ event, resolve }) => {
     const baseVary = existing
       ? `${existing}, CF-Device-Type`
       : "CF-Device-Type";
-    response.headers.set("Vary", `${baseVary}, Cookie, Content-Encoding`);
+    response.headers.set("Vary", `${baseVary}, Content-Encoding`);
 
     try {
       const dt: DeviceType = event.locals.deviceType.isMobile
@@ -188,7 +284,7 @@ const handleDevice: Handle = async ({ event, resolve }) => {
 };
 
 /**
- * 6. Caching & Transformation (Edge Optimization) Middleware
+ * 7. Caching & Transformation (Edge Optimization) Middleware
  */
 const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
   const path = event.url.pathname;
@@ -200,8 +296,8 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
   const authenticated = isAuthenticated(cookie);
 
   const publicCache =
-    "public, max-age=180, s-maxage=2592000, stale-while-revalidate=86400";
-  const privateCache = "private, max-age=90, must-revalidate";
+    "public, max-age=360, s-maxage=2592000, stale-while-revalidate=86400";
+  const privateCache = "private, max-age=60, must-revalidate";
   const devModeCache = "no-cache, must-revalidate";
   const cachePolicy = dev
     ? devModeCache
@@ -269,12 +365,12 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
         //! Make sure Wrangler.jsonc its cache config enabled!
         const etag = await HttpUtils.calculateHash(clonedResponse, dt);
         const eTagValue = `W/"${etag}"`;
-        if (ifNoneMatch === eTagValue) {
-          return new Response(null, {
-            status: 304,
-            headers: { ETag: eTagValue, "Cache-Control": cachePolicy },
-          });
-        }
+        const notModified = HttpUtils.handleETagResponse(
+          ifNoneMatch,
+          eTagValue,
+          cachePolicy,
+        );
+        if (notModified) return notModified;
         response.headers.set("ETag", eTagValue);
         return response;
       }
@@ -283,12 +379,12 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
         event,
         clonedResponse,
       );
-      if (ifNoneMatch === eTagValue) {
-        return new Response(null, {
-          status: 304,
-          headers: { ETag: eTagValue, "Cache-Control": cachePolicy },
-        });
-      }
+      const notModified = HttpUtils.handleETagResponse(
+        ifNoneMatch,
+        eTagValue,
+        cachePolicy,
+      );
+      if (notModified) return notModified;
       response.headers.set("ETag", eTagValue);
 
       return response;
@@ -305,6 +401,7 @@ export const handle = sequence(
   handleBypass,
   handleClientIp,
   handleSecurityContext,
+  handleGraphQLETag,
   handleThemeContext,
   handleDevice,
   handleCacheAndTransform,

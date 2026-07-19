@@ -21,7 +21,7 @@ wordpress/wp-content/themes/*
 **/vendor
 **/node_modules
 **/.env
-**/cache
+**/wplokerbjm/cache
 **/bun.lock
 **/package-lock.json
 **/composer.lock
@@ -41,3 +41,4 @@ worker-configuration.d.ts
 
 **/.agents
 **/.claude
+**/.phpstorm.meta.php

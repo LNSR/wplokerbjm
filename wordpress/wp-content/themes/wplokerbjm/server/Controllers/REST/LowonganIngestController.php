@@ -10,6 +10,7 @@ use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\Sanitizer;
 
 /**
  * @phpstan-type IngestErrorResult array{status: 400|500, data: array{code: string, message: string, warnings: array}}
@@ -342,13 +343,13 @@ class LowonganIngestController
 
         foreach (self::WYSIWYG_FIELDS as $field) {
             if (isset($payload[$field]) && ControllerUtils::hasNonEmptyValue($payload[$field])) {
-                $meta[$field] = wp_kses_post((string) $payload[$field]);
+                $meta[$field] = Sanitizer::wysiwyg((string) $payload[$field]);
             }
         }
 
         foreach (self::CONTACT_FIELDS as $field) {
             if (isset($payload[$field]) && ControllerUtils::hasNonEmptyValue($payload[$field])) {
-                $meta[$field] = ControllerUtils::sanitizeContactList($field, $payload[$field]);
+                $meta[$field] = Sanitizer::contactFieldList($field, $payload[$field]);
             }
         }
 
@@ -364,12 +365,12 @@ class LowonganIngestController
                 continue;
             }
 
-            if (!is_int($payload[$field]) && !(is_string($payload[$field]) && preg_match('/^-?\d+$/', $payload[$field]))) {
+            $value = Sanitizer::intOrNull($payload[$field]);
+            if ($value === null) {
                 $warnings[] = "Invalid integer field skipped: {$field}";
                 continue;
             }
 
-            $value = (int) $payload[$field];
             if (
                 $field === CustomFields::STATUS_PEKERJAAN && !in_array($value, [
                     CustomFields::STATUS_PEKERJAAN_NORMAL,
@@ -384,9 +385,9 @@ class LowonganIngestController
             $meta[$field] = $value;
         }
 
-        if (isset($payload[CustomFields::DEADLINE]) && trim((string) $payload[CustomFields::DEADLINE]) !== '') {
-            $deadline = trim((string) $payload[CustomFields::DEADLINE]);
-            if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $deadline) === 1) {
+        if (isset($payload[CustomFields::DEADLINE])) {
+            $deadline = Sanitizer::deadline((string) $payload[CustomFields::DEADLINE]);
+            if ($deadline !== null) {
                 $meta[CustomFields::DEADLINE] = $deadline;
             } else {
                 $warnings[] = 'Invalid deadline skipped.';
@@ -472,7 +473,7 @@ class LowonganIngestController
      */
     private function splitTaxonomyValue(string $taxonomy, string $value): array
     {
-        $parts = array_map('trim', explode(',', $value));
+        $parts = Sanitizer::splitAndClean(',', $value);
 
         if ($taxonomy === Taxonomies::GENDER) {
             $expanded = [];
@@ -486,7 +487,7 @@ class LowonganIngestController
             $parts = $expanded;
         }
 
-        return array_values(array_filter($parts, fn($part) => $part !== ''));
+        return array_values($parts);
     }
 
     /**
@@ -569,6 +570,8 @@ class LowonganIngestOptionsController
 
     /**
      * Return an HTTP status code for permission failures, or null when allowed.
+     * @param \WP_REST_Request|null $request
+     * @return int|null
      */
     public function getPermissionErrorStatus($request = null): ?int
     {
@@ -577,7 +580,7 @@ class LowonganIngestOptionsController
 
     /**
      * Permission callback for the REST route.
-     *
+     * @param \WP_REST_Request|null $request
      * @return true|\WP_Error
      */
     public function permissionsCheck($request = null)

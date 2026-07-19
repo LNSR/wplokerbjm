@@ -23,7 +23,12 @@
     "disableSizeLimit": true,
     "moduleResolution": "bundler",
     "ignoreDeprecations": "6.0",
-    "types": ["node", "./worker-configuration.d.ts", "es-toolkit"],
+    "types": [
+      "node",
+      "@cloudflare/workers-types",
+      "./worker-configuration.d.ts",
+      "es-toolkit"
+    ],
     "plugins": [
       {
         "transform": "typia/lib/transform"

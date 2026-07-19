@@ -12,15 +12,26 @@ use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
 
 /**
- * 
  * @phpstan-import-type CardData from GraphQLData
  * @phpstan-import-type JobDetailData from GraphQLData
  * @phpstan-import-type JobPostingSchema from JobSchemaOrg
  * @phpstan-import-type ItemListSchema from JobSchemaOrg
  * @phpstan-import-type SearchFilters from JobQuery
+ * @phpstan-import-type JobGridData from JobGrid
+ * @phpstan-import-type CarouselData from JobCarousel
+ * @phpstan-import-type AutoSuggestionsArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type LoadMoreArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type JobGridArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type JobDetailArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type JobSchemaArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type SearchJobsArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type RankMathHeadArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type SyncBookmarkArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
  * 
  * @phpstan-type Context 'latest'|'search'
  * @phpstan-type Filters SearchFilters
+ * @phpstan-type LoadMoreResponse array{jobs: CardData[], filters: Filters, total: int, maxNumPages: int}
+ * @phpstan-type SearchJobsResponse array{jobs: CardData[], filters: Filters, title: string, total: int, maxNumPages: int}
  */
 class JobsDataResolver
 {
@@ -33,7 +44,7 @@ class JobsDataResolver
     }
 
     /**
-     * @return array{jobs: CardData[], totalJobs: int}
+     * @return CarouselData
      */
     public function resolveCarousel(): array
     {
@@ -58,8 +69,8 @@ class JobsDataResolver
      * Resolve load-more paginated jobs for GraphQL.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{paged?: int, context?: Context, filters?: Filters} $args Query arguments
-     * @return array{jobs: CardData[], filters: Filters, total: int, maxNumPages: int}
+     * @param LoadMoreArgs $args Query arguments
+     * @return LoadMoreResponse
      */
     public function resolveLoadMore($root, array $args): array
     {
@@ -128,8 +139,8 @@ class JobsDataResolver
      * Resolve job grid data for GraphQL.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{filters?: Filters, paged?: int, context?: Context, title?: string, total_jobs?: int} $args Query arguments
-     * @return array{jobs: CardData[], total: int, maxNumPages: int, filters?: Filters}
+     * @param JobGridArgs $args Query arguments
+     * @return JobGridData
      */
     public function resolveJobGrid($root, array $args): array
     {
@@ -141,7 +152,7 @@ class JobsDataResolver
             $total_jobs = $args['total_jobs'] ?? 0;
 
             $cacheKey = CacheKey::JOB_GRID_PREFIX . md5(serialize([$filters, $paged, $context, $title, $total_jobs]));
-            /** @var array{jobs: CardData[], total: int, maxNumPages: int, filters: Filters}|false $cached */
+            /** @var JobGridData|false $cached */
             $cached = Cache::get($cacheKey);
             if ($cached !== false) {
                 return $cached;
@@ -178,7 +189,7 @@ class JobsDataResolver
      * Resolve single job detail for GraphQL.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{slug: string} $args Query arguments with job slug
+     * @param JobDetailArgs $args Query arguments with job slug
      * @return JobDetailData|array{}
      */
     public function resolveJobDetail($root, $args): array
@@ -210,7 +221,7 @@ class JobsDataResolver
      * by slug to avoid an extra post ID lookup.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{ids?: array<int>, slug?: string, type?: string} $args Schema query arguments
+     * @param JobSchemaArgs $args Schema query arguments
      * @return array{schemas: array<int, string>} Array of JSON-encoded schema strings
      */
     public function resolveSchema($root, $args): array
@@ -320,9 +331,8 @@ class JobsDataResolver
      * Resolve search jobs for GraphQL.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{context?: Context, filters?: Filters|array} $args Search filters
-     * @template TResolveSearchJobs of array{jobs: CardData[], filters: Filters, title: string, total: int, maxNumPages: int}
-     * @return TResolveSearchJobs
+     * @param SearchJobsArgs $args Search filters
+     * @return SearchJobsResponse
      */
     public function resolveSearchJobs($root, array $args): array
     {
@@ -339,7 +349,7 @@ class JobsDataResolver
             ];
 
             $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize([$searchFilters, $context]));
-            /** @var TResolveSearchJobs|false $cached */
+            /** @var SearchJobsResponse|false $cached */
             $cached = Cache::get($cacheKey);
             if ($cached !== false) {
                 return $cached;
@@ -379,7 +389,7 @@ class JobsDataResolver
      * Resolve bookmarked jobs by their IDs.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{ids?: array<int>} $args Arguments containing job IDs
+     * @param SyncBookmarkArgs $args Arguments containing job IDs
      * @return CardData[] Array of job card data for existing posts
      */
     public function resolveSyncBookmark($root, $args): array
@@ -437,7 +447,7 @@ class JobsDataResolver
      * Validates that the URL is internal to this site before fetching.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{url: string} $args Arguments containing the URL
+     * @param RankMathHeadArgs $args Arguments containing the URL
      * @return string HTML head tags from RankMath
      */
     public function resolveRankMathHead($root, $args): string
@@ -496,10 +506,10 @@ class JobsDataResolver
      * Resolve autocomplete suggestions for job search.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{query: string} $args Arguments containing the search query
+     * @param AutoSuggestionsArgs $args Query arguments
      * @return string[] Array of unique job title suggestions
      */
-    public function resolveAutoSuggestions($root, string $args): array
+    public function resolveAutoSuggestions($root, array $args): array
     {
         try {
             $query = sanitize_text_field($args['query']);

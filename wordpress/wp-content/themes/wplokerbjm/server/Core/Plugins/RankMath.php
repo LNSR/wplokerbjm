@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core\Plugins;
 use DI\Attribute\Injectable;
 use WPlokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
+use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
 
 /**
  * Rank Math Integration Service
@@ -16,6 +17,12 @@ class Rankmath
 {
 	private static ?bool $isActiveCache = null;
 	private static ?array $sitemapUrlsCache = null;
+
+	public function __construct(private WPHooksRegistry $hookRegistry)
+	{
+		if (self::isActive()) return;
+		$this->hookRegistry->unregisterByClass(self::class);
+	}
 
 	/**
 	 * Check if Rank Math plugin is active (with caching)

@@ -9,6 +9,7 @@ use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * @phpstan-type TaxonomyTerms array{slug: string, name: string, parent: int, children: array}
+ * @phpstan-type TaxonomyJobTerms array{lokasiTerms: TaxonomyTerms[], genderTerms: TaxonomyTerms[], pendidikanTerms: TaxonomyTerms[]}
  */
 class TaxonomyResolver
 {
@@ -24,7 +25,7 @@ class TaxonomyResolver
     /**
      * Resolve all taxonomy terms grouped by type.
      *
-     * @return array{lokasiTerms: TaxonomyTerms[], genderTerms: TaxonomyTerms[], pendidikanTerms: TaxonomyTerms[]}
+     * @return TaxonomyJobTerms
      */
     public function resolveAllTerms(): array
     {

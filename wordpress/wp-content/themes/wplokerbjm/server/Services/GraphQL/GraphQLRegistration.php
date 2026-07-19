@@ -4,10 +4,63 @@ namespace WPLokerBJM\Services\GraphQL;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Controllers\GraphQL\Resolvers\{TaxonomyResolver, JobsDataResolver, ThemeDataResolver};
 use WPLokerBJM\Controllers\GraphQL\Resolvers\Auth\JWTDataResolver;
+use WPLokerBJM\Core\Theme\ThemeInject;
+use WPLokerBJM\Services\GraphQL\GraphQLData;
+use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Core\Container\Attributes\Action;
 #[Injectable(lazy: true)]
+/**
+ * @phpstan-import-type ThemeData from ThemeInject
+ * @phpstan-import-type TaxonomyJobTerms from TaxonomyResolver
+ * @phpstan-import-type TaxonomyTerms from TaxonomyResolver
+ * @phpstan-import-type Filters from JobsDataResolver
+ * @phpstan-import-type LoadMoreResponse from JobsDataResolver
+ * @phpstan-import-type SearchJobsResponse from JobsDataResolver
+ * @phpstan-import-type JWTDataShape from JWTDataResolver
+ * @phpstan-import-type CarouselData from JobCarousel
+ * @phpstan-import-type JobGridData from JobGrid
+ * @phpstan-import-type CardData from GraphQLData
+ * @phpstan-import-type JobDetailData from GraphQLData
+ * @phpstan-type ArrayFilters array{cari?: string, lokasi_pekerjaan?: list<string>, gender?: list<string>, pendidikan?: list<string>, sort?: array{value?: string, label?: string}}
+ * @phpstan-type AutoSuggestionsArgs array{query?: string}
+ * @phpstan-type LoadMoreArgs array{paged?: int, context?: string, filters?: ArrayFilters}
+ * @phpstan-type JobGridArgs array{paged?: int, context?: string, title?: string, total_jobs?: int, filters?: ArrayFilters}
+ * @phpstan-type JobDetailArgs array{slug?: string}
+ * @phpstan-type JobSchemaArgs array{ids?: list<int>, slug?: string, type?: string}
+ * @phpstan-type SearchJobsArgs array{context?: string, filters?: ArrayFilters}
+ * @phpstan-type RankMathHeadArgs array{url?: string}
+ * @phpstan-type SyncBookmarkArgs array{ids?: list<int>}
+ * @phpstan-type GraphQLDataType array{
+ *     taxonomyTerms?: TaxonomyJobTerms,
+ *     lokasiTerms?: TaxonomyTerms[],
+ *     genderTerms?: TaxonomyTerms[],
+ *     pendidikanTerms?: TaxonomyTerms[],
+ *     autoSuggestions?: list<string>,
+ *     carousel?: CarouselData,
+ *     loadMore?: LoadMoreResponse,
+ *     jobGrid?: JobGridData,
+ *     jobDetail?: JobDetailData|array{},
+ *     jobSchema?: array{schemas: list<string>},
+ *     themeData?: ThemeData,
+ *     searchJobs?: SearchJobsResponse,
+ *     rankMathHead?: string,
+ *     syncBookmark?: CardData[],
+ *     jwt?: JWTDataShape,
+ * }
+ * @phpstan-type GraphQLArgumentType array{
+ *     autoSuggestions?: AutoSuggestionsArgs,
+ *     loadMore?: LoadMoreArgs,
+ *     jobGrid?: JobGridArgs,
+ *     jobDetail?: JobDetailArgs,
+ *     jobSchema?: JobSchemaArgs,
+ *     searchJobs?: SearchJobsArgs,
+ *     rankMathHead?: RankMathHeadArgs,
+ *     syncBookmark?: SyncBookmarkArgs,
+ *     jwt?: JWTDataShape,
+ * }
+ */
 final class GraphQLRegistration
 {
     public function __construct(

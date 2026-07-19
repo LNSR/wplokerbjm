@@ -161,7 +161,8 @@ class AutowireScanner
     {
         return !$reflection->isInterface()
             && !$reflection->isAbstract()
-            && !$reflection->isTrait();
+            && !$reflection->isTrait()
+            && !$reflection->isEnum();
     }
 
     /**

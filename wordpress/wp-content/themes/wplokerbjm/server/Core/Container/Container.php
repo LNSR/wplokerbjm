@@ -51,38 +51,34 @@ class WPLokerBJMContainer
      */
     public static function getContainer(?bool $rebuild = null): Container
     {
-        if (self::$container !== null && !$rebuild)
+        if (self::$container !== null && !$rebuild) {
             return self::$container;
+        }
 
         self::initializeCachePaths();
 
         try {
             $builder = new ContainerBuilder();
 
-            // Configure caching for performance
-            self::setupCache($builder);
-
-            // Enable autowiring and attributes for automatic dependency injection
             $builder->useAutowiring(true);
             $builder->useAttributes(true);
 
-            // Add all service definitions
-            if (!file_exists(self::$CACHE_FILE)) {
-                Logger::info("Container", "Building container from scratch");
-                self::setupDefinitions($builder);
-            }
+            self::setupCache($builder, (bool) $rebuild);
 
-            // Build the container
             self::$container = $builder->build();
         } catch (\Exception $e) {
             Logger::error('Container', 'Container::getContainer error: ' . $e->getMessage());
-            throw $e; // Re-throw as container is critical for application functionality
+            Logger::flush();
+            throw $e;
         }
-
         return self::$container;
     }
 
 
+    /**
+     * Setup definitions
+     * @param ContainerBuilder $builder
+     */
     private static function setupDefinitions(ContainerBuilder $builder): void
     {
         $builder->addDefinitions(
@@ -95,31 +91,40 @@ class WPLokerBJMContainer
         );
     }
 
-    private static function setupCache(ContainerBuilder $builder): void
+    /**
+     * Configures container compilation using strict guard clauses to minimize disk I/O.
+     * @param ContainerBuilder $builder
+     * @param bool $rebuild
+     */
+    private static function setupCache(ContainerBuilder $builder, bool $rebuild): void
     {
-        if (!is_dir(self::$CACHE_DIR) && !mkdir(self::$CACHE_DIR, 0755, true)) {
-            Logger::error('Container', "Failed to create cache directory: " . self::$CACHE_DIR);
+        $hasCache = file_exists(self::$CACHE_FILE);
+
+        if ($hasCache && !$rebuild) {
+            $builder->enableCompilation(self::$CACHE_DIR);
+            return;
         }
 
-        if (!self::$CACHE_DIR || !is_dir(self::$CACHE_DIR)) {
-            Logger::warning('Container', "Compilation directory not writable, skipping compilation: " . self::$CACHE_DIR);
+        if (!is_dir(self::$CACHE_DIR) && !mkdir(self::$CACHE_DIR, 0755, true)) {
+            Logger::error('Container', "Failed to create cache directory: " . self::$CACHE_DIR);
+            Logger::flush();
             return;
         }
 
         if (!is_writable(self::$CACHE_DIR)) {
             Logger::warning('Container', "Compilation directory not writable, skipping compilation: " . self::$CACHE_DIR);
-        } else {
-            try {
-                if (function_exists('apcu_enabled') && apcu_enabled()) {
-                    $builder->enableDefinitionCache('wplokerbjm_container_cache');
-                }
-                $builder->enableCompilation(self::$CACHE_DIR);
-                // Write proxies to disk for additional performance boost
-                $builder->writeProxiesToFile(true, self::$CACHE_DIR . '/');
-            } catch (\Throwable $e) {
-                // Log and continue without compilation to keep tests/CI stable
-                Logger::warning('Container', 'Failed to enable compilation: ' . $e->getMessage());
-            }
+            Logger::flush();
+            return;
+        }
+
+        try {
+            self::setupDefinitions($builder);
+
+            $builder->enableCompilation(self::$CACHE_DIR);
+            $builder->writeProxiesToFile(true, self::$CACHE_DIR . '/');
+        } catch (\Throwable $e) {
+            Logger::warning('Container', 'Failed to enable compilation: ' . $e->getMessage());
+            Logger::flush();
         }
     }
 }

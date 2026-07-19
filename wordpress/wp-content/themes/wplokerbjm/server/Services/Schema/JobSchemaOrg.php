@@ -4,6 +4,7 @@ namespace WPLokerBJM\Services\Schema;
 use WPLokerBJM\Factories\JobDataFactory;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
+use WPLokerBJM\Shared\Utilities\Sanitizer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
@@ -258,7 +259,7 @@ class JobSchemaHelper
             return ['FULL_TIME', null];
         }
 
-        $parts = array_filter(array_map('trim', explode(',', $jenis)));
+        $parts = Sanitizer::splitAndClean(',', $jenis);
         $mapped = [];
         foreach ($parts as $p) {
             $l = mb_strtolower($p);

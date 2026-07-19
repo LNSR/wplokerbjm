@@ -18,7 +18,6 @@ use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
  * ## Usage
  * Call `initialize()` to register all discovered hooks with WordPress.
  * ! initialized in MU_PLUGIN_DIR.'/wplokerbjm-bootstrap.php'
- * @see \WPLokerBJM\Core\Container\Support\WPHooksRegistry
  * @see \WPLokerBJM\Core\Container\Support\LazyHookHandler
  * @see \WPLokerBJM\Core\Container\Definitions\Core
  */

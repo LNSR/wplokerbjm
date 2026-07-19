@@ -5,6 +5,10 @@ namespace WPLokerBJM\Core\Container\Support\Utilities;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use RegexIterator;
+use PhpParser\Node;
+use PhpParser\NodeTraverser;
+use PhpParser\NodeVisitorAbstract;
+use PhpParser\ParserFactory;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -57,53 +61,63 @@ trait FileScannerTrait
     /**
      * Extract the fully qualified class names from a PHP file.
      *
-     * Reads the file content and uses token parsing to extract all namespaces
-     * and class names, combining them into fully qualified class names.
+     * Uses nikic/php-parser to build a proper AST and walk it for class-like
+     * declarations (classes, interfaces, traits, enums), combining them with
+     * the file's namespace declaration into fully qualified class names.
+     *
+     * Handles all PHP 8+ constructs correctly — enum, readonly class, anonymous
+     * classes (skipped), and multi-namespace files (each declaration is
+     * associated with its containing namespace).
      *
      * @param string $filePath The absolute path to the PHP file
      * @return string[] Array of fully qualified class names, or empty array if none found
      */
     private function getClassNamesFromFile(string $filePath): array
     {
-        $tokens = token_get_all(file_get_contents($filePath));
+        $code = file_get_contents($filePath);
 
-        if ($tokens === false) {
+        if ($code === false) {
             return [];
         }
 
-        $classes = [];
-        $currentNamespace = '';
-        $inNamespace = false;
-        $inClass = false;
+        try {
+            $parser = (new ParserFactory())->createForHostVersion();
+            $ast = $parser->parse($code);
 
-        foreach ($tokens as $token) {
-            if (is_array($token)) {
-                $tokenType = $token[0];
-                $tokenValue = $token[1];
-
-                if ($tokenType === T_NAMESPACE) {
-                    $inNamespace = true;
-                    $currentNamespace = '';
-                } elseif ($inNamespace && ($tokenType === T_NAME_QUALIFIED || $tokenType === T_STRING)) {
-                    $currentNamespace = $tokenValue;
-                    $inNamespace = false;
-                } elseif ($tokenType === T_CLASS) {
-                    $inClass = true;
-                } elseif ($inClass && $tokenType === T_STRING) {
-                    $className = $tokenValue;
-                    if (!empty($currentNamespace)) {
-                        $classes[] = $currentNamespace . '\\' . $className;
-                    } else {
-                        $classes[] = $className;
-                    }
-                    $inClass = false;
-                }
-            } elseif ($token === ';') {
-                $inNamespace = false;
+            if ($ast === null) {
+                return [];
             }
-        }
 
-        return $classes;
+            $classes = [];
+            $namespace = '';
+
+            $traverser = new NodeTraverser();
+            $traverser->addVisitor(new class($classes, $namespace) extends NodeVisitorAbstract {
+                public function __construct(
+                    private array &$classes,
+                    private string &$namespace,
+                ) {}
+
+                public function enterNode(Node $node): void
+                {
+                    if ($node instanceof Node\Stmt\Namespace_) {
+                        $this->namespace = $node->name?->toString() ?? '';
+                    }
+
+                    if ($node instanceof Node\Stmt\ClassLike && $node->name !== null) {
+                        $className = $node->name->toString();
+                        $this->classes[] = $this->namespace !== ''
+                            ? $this->namespace . '\\' . $className
+                            : $className;
+                    }
+                }
+            });
+
+            $traverser->traverse($ast);
+            return $classes;
+        } catch (\Throwable) {
+            return [];
+        }
     }
 
     /**
@@ -147,27 +161,5 @@ trait FileScannerTrait
             '.git',
             'node_modules',
         ];
-    }
-
-    /**
-     * Get a hash of the modification time of the base directory.
-     *
-     * Used for cache invalidation when files change.
-     *
-     * @return string MD5 hash of directory mtime, or empty string on failure
-     */
-    private function getDirectoryHash(): string
-    {
-        try {
-            $dirMtime = filemtime($this->baseDirectory);
-            if ($dirMtime === false) {
-                Logger::warning('FileScannerTrait', 'Failed to get directory mtime for ' . $this->baseDirectory);
-                return '';
-            }
-            return md5((string) $dirMtime);
-        } catch (\Exception $e) {
-            Logger::error('FileScannerTrait', 'getDirectoryHash error: ' . $e->getMessage());
-            return '';
-        }
     }
 }
