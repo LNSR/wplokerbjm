@@ -6,13 +6,61 @@ use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Factories\JobDataFactory;
+use WPLokerBJM\Core\Theme\ThemeInject;
+use WPLokerBJM\Services\Schema\JobSchemaOrg;
 
+/**
+ * @phpstan-type RingkasanPekerjaan array{
+ *     jenis_pekerjaan?: string|null,
+ *     pendidikan?: string|null,
+ *     gender?: string|null,
+ *     lokasi_pekerjaan?: string|null,
+ *     pengalaman?: int|null,
+ *     gaji_minimal?: int|null,
+ *     gaji_maksimal?: int|null,
+ *     umur_min?: int|null,
+ *     umur_max?: int|null,
+ *     deadline?: string|null,
+ * }
+ * @phpstan-type CardData array{
+ *     id: int,
+ *     slug: string,
+ *     title: string,
+ *     nama_perusahaan?: string,
+ *     ringkasanPekerjaan: RingkasanPekerjaan,
+ *     status_pekerjaan?: int,
+ *     permalink: string,
+ *     post_time?: string,
+ * }
+ * @phpstan-type JobDetailData array{
+ *     id: int,
+ *     slug: string,
+ *     permalink: string,
+ *     title: string,
+ *     nama_perusahaan?: string,
+ *     tentang_perusahaan?: string|null,
+ *     ringkasanPekerjaan: RingkasanPekerjaan,
+ *     deskripsi_pekerjaan?: string|null,
+ *     persyaratan?: string|null,
+ *     cara_melamar?: string|null,
+ *     benefit?: string|null,
+ *     contacts?: array{email_kontak?: string, nomor_kontak?: string, situs_kontak?: string},
+ *     social_media?: string|null,
+ *     dpNonce?: string,
+ *     post_time?: string,
+ * }
+ * @phpstan-import-type ThemeData from 
+ * @phpstan-import-type JobData from JobDataFactory
+ * @phpstan-import-type JobPostingSchema from JobSchemaOrg
+ * @phpstan-import-type ItemListSchema from JobSchemaOrg
+ */
 class GraphQLData
 {
     public function __construct(
-        private \WPLokerBJM\Factories\JobDataFactory $jobDataFactory,
-        private \WPLokerBJM\Services\Schema\JobSchemaOrg $jobSchema,
-        private \WPLokerBJM\Core\Theme\ThemeInject $themeInject
+        private JobDataFactory $jobDataFactory,
+        private JobSchemaOrg $jobSchema,
+        private ThemeInject $themeInject
     ) {
     }
 
@@ -20,12 +68,13 @@ class GraphQLData
      * Get card data for a Homepage Jobcard listing
      * used for JobGrid and JobCarousel props
      * @param int $post_id Post ID to fetch card data for
-     * @return array{id: int, slug: string, title: string, nama_perusahaan: string, ringkasanPekerjaan: array, status_pekerjaan: int|null, permalink: string, post_time: string} Processed card data
+     * @return CardData Processed card data
      */
     public function getCardData(int $post_id): array
     {
         $post_id = (int) $post_id; // Explicit coercion for type safety
         $cacheKey = CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id;
+        /** @var CardData|false $cached */
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -41,7 +90,7 @@ class GraphQLData
                 CustomFields::NAMA_PERUSAHAAN => !empty($jobdata[Taxonomies::PERUSAHAAN])
                     ? html_entity_decode($jobdata[Taxonomies::PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') // prioritize taxonomy perusahaan first
                     : (isset($jobdata[CustomFields::NAMA_PERUSAHAAN]) ? html_entity_decode($jobdata[CustomFields::NAMA_PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : ''),
-                'ringkasanPekerjaan' => self::getRingkasanPekerjaan($jobdata),
+                'ringkasanPekerjaan' => $this->getRingkasanPekerjaan($jobdata),
                 CustomFields::STATUS_PEKERJAAN => $jobdata[CustomFields::STATUS_PEKERJAAN] ?? null,
                 'permalink' => esc_url(get_permalink($post_id)),
                 'post_time' => get_post_time('c', false, $post_id),
@@ -61,7 +110,7 @@ class GraphQLData
      * Get detailed data for a single job overlay
      * Also used for SingleView props
      * @param int $post_id Post ID to fetch detailed data for
-     * @return array{id: int, slug: string, permalink: string, title: string, nama_perusahaan: string|null, tentang_perusahaan: string|null, ringkasanPekerjaan: array, deskripsi_pekerjaan: string|null, persyaratan: string|null, cara_melamar: string|null, benefit: string|null, contacts: array{email_kontak: string|null, nomor_kontak: string|null, situs_kontak: string|null}, social_media: string|null, duplicateNonce?: string, post_time: string} Processed job detail data
+     * @return JobDetailData Processed job detail data
      */
     public function getJobDetailData(int $post_id): array
     {
@@ -74,6 +123,7 @@ class GraphQLData
 
         $noncePlugin = static fn(string $action, int $postId): string => wp_create_nonce($action . '_' . $postId);
 
+        /** @var JobDetailData|false $cached */
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             if (is_user_logged_in()) {
@@ -100,7 +150,7 @@ class GraphQLData
                     ? html_entity_decode($jobdata[Taxonomies::PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') // prioritize taxonomy perusahaan first
                     : (isset($jobdata[CustomFields::NAMA_PERUSAHAAN]) ? html_entity_decode($jobdata[CustomFields::NAMA_PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null),
                 CustomFields::TENTANG_PERUSAHAAN => isset($jobdata[CustomFields::TENTANG_PERUSAHAAN]) ? html_entity_decode($jobdata[CustomFields::TENTANG_PERUSAHAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
-                'ringkasanPekerjaan' => self::getRingkasanPekerjaan($jobdata),
+                'ringkasanPekerjaan' => $this->getRingkasanPekerjaan($jobdata),
                 CustomFields::DESKRIPSI_PEKERJAAN => isset($jobdata[CustomFields::DESKRIPSI_PEKERJAAN]) ? html_entity_decode($jobdata[CustomFields::DESKRIPSI_PEKERJAAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
                 CustomFields::PERSYARATAN => isset($jobdata[CustomFields::PERSYARATAN]) ? html_entity_decode($jobdata[CustomFields::PERSYARATAN], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
                 CustomFields::CARA_MELAMAR => isset($jobdata[CustomFields::CARA_MELAMAR]) ? html_entity_decode($jobdata[CustomFields::CARA_MELAMAR], ENT_QUOTES | ENT_HTML5, 'UTF-8') : null,
@@ -131,10 +181,10 @@ class GraphQLData
     /**
      * Extract job summary fields from full job data array.
      *
-     * @param array $jobdata Full job data from JobDataFactory::createJobData
-     * @return array{jenis_pekerjaan: string|null, pendidikan: string|null, gender: string|null, lokasi_pekerjaan: string|null, pengalaman: int|null, gaji_minimal: int|null, gaji_maksimal: int|null, umur_min: int|null, umur_max: int|null, deadline: string|null}
+     * @param JobData $jobdata Full job data from JobDataFactory::createJobData
+     * @return RingkasanPekerjaan
      */
-    private static function getRingkasanPekerjaan(array $jobdata): array
+    private function getRingkasanPekerjaan(array $jobdata): array
     {
         return [
             Taxonomies::JENIS_PEKERJAAN => $jobdata[Taxonomies::JENIS_PEKERJAAN] ?? null,
@@ -153,7 +203,7 @@ class GraphQLData
     /**
      * Get theme data for REST/GraphQL responses
      * Useful in future for headless setups
-     * @return array{logo: array{logoUrl: string, logoSrcset: string, logoSizes: string, logoDecoding: string, logoWidth: int, logoHeight: int}, wpRestNonce: string, siteIconTags: string}
+     * @return ThemeData
      */
     public function getThemeData(): array
     {
@@ -164,7 +214,7 @@ class GraphQLData
      * Get Schema.org JobPosting JSON-LD data for a single job.
      * Useful in future for headless setups
      * @param int $post_id Post ID
-     * @return array{@context: string, @type: string, title: string, ...} Schema.org JobPosting structured data
+     * @return JobPostingSchema
      */
     public function JobSchema(int $post_id): array
     {
@@ -175,7 +225,7 @@ class GraphQLData
     /**
      * Return an ItemList schema id for post IDs
      * @param array<int> $post_ids
-     * @return array
+     * @return ItemListSchema
      */
     public function ItemListJobPostings(array $post_ids): array
     {

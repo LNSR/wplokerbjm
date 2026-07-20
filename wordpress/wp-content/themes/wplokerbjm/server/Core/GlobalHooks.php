@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Shared\Utilities\PluginList;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
@@ -109,19 +110,16 @@ class RedirectHooks
         $baseUrl = SharedUtils::headlessDomainRedirect();
 
         $path = '/';
-        if (function_exists('is_page') && (is_page('pasang-iklan-loker') || is_page(184))) {
+        if ((is_page('pasang-iklan-loker') || is_page(184))) {
             $path = '/pasang-iklan-loker';
-        } elseif (function_exists('is_page') && is_page('kebijakan-privasi')) {
+        } elseif (is_page('kebijakan-privasi')) {
             $path = '/kebijakan-privasi';
-        } elseif (function_exists('is_single') && is_single() && get_post_type() === 'lowongan') {
+        } elseif (is_single() && get_post_type() === 'lowongan') {
             $post = get_post();
             if ($post && !empty($post->post_name)) {
                 $path = '/lowongan/' . $post->post_name;
             }
-        } elseif (
-            function_exists('is_post_type_archive') && is_post_type_archive('lowongan') ||
-            function_exists('is_front_page') && (is_front_page() || is_page(146))
-        ) {
+        } elseif (is_post_type_archive('lowongan') || is_front_page() || is_page(146)) {
             $path = '/';
         }
 
@@ -216,34 +214,21 @@ class SearchHooks
  */
 class EnvironmentHooks
 {
-    /**
-     * Temporarily disable specific plugins if in development environment.
-     */
-    #[Filter('option_active_plugins', 4)]
-    public function disablePluginsForDevImpl(array $plugins): array
+    private const MUST_HAVE_PLUGINS = [
+        PluginList::LiteSpeed->value,
+        PluginList::WpGraphql->value,
+        PluginList::RankMath->value,
+        PluginList::MetaBoxLite->value,
+        PluginList::MetaBox->value,
+    ];
+
+    #[Filter('option_active_plugins', 0)]
+    public function activePluginsCondition(array $plugins): array
     {
-        $isDev = SharedUtils::isDevelopment();
-        if (!$isDev) {
-            return $plugins;
-        }
-        $extra = [
-        ];
-
-        $pluginsToDisable = $this->listPluginsToDisable($extra);
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
-    }
-
-    /**
-     * Temporarily disable specific plugins if simulating production environment on local machine.
-     */
-    #[Filter('option_active_plugins', 4)]
-    public function disablePluginsforSimulatedProdImpl(array $plugins): array
-    {
-        $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
-
-        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
-
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
+        $plugins = $this->disablePluginsForDevImpl($plugins);
+        $plugins = $this->disablePluginsforSimulatedProdImpl($plugins);
+        $plugins = $this->forceActivePlugin($plugins);
+        return $plugins;
     }
 
     /**
@@ -260,6 +245,64 @@ class EnvironmentHooks
     }
 
     /**
+     * Remove the "Deactivate" action link for required plugins.
+     */
+    #[Filter('plugin_action_links', 4, 2)]
+    public function lockPluginActionLinks(array $actions, string $pluginFile): array
+    {
+        if (in_array($pluginFile, self::MUST_HAVE_PLUGINS) && isset($actions['deactivate'])) {
+            unset($actions['deactivate']);
+
+            $actions['required'] = '<span style="color: red; font-weight: bold;">Must Have Dependency</span>';
+        }
+
+        return $actions;
+    }
+
+    /**
+     * Temporarily disable specific plugins if in development environment.
+     */
+    private function disablePluginsForDevImpl(array $plugins): array
+    {
+        $isDev = SharedUtils::isDevelopment();
+        if (!$isDev) {
+            return $plugins;
+        }
+        $extra = [
+        ];
+
+        $pluginsToDisable = $this->listPluginsToDisable($extra);
+        return $this->filteredPlugins($plugins, $pluginsToDisable);
+    }
+
+    /**
+     * Force active plugins
+     */
+    private function forceActivePlugin(array $plugins): array
+    {
+        if (SharedUtils::isDevelopment())
+            return $plugins;
+        foreach (self::MUST_HAVE_PLUGINS as $plugin) {
+            if (!in_array($plugin, $plugins)) {
+                array_push($plugins, $plugin);
+            }
+        }
+        return $plugins;
+    }
+
+    /**
+     * Temporarily disable specific plugins if simulating production environment on local machine.
+     */
+    private function disablePluginsforSimulatedProdImpl(array $plugins): array
+    {
+        $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
+
+        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
+
+        return $this->filteredPlugins($plugins, $pluginsToDisable);
+    }
+
+    /**
      * Filters the list of active plugins by removing specified plugins.
      *
      * @param array $plugins          Array of active plugin file paths.
@@ -268,7 +311,7 @@ class EnvironmentHooks
      */
     private function filteredPlugins(array $plugins, array $pluginsToDisable): array
     {
-        $filtered = array_filter($plugins, function (string $plugin) use ($pluginsToDisable): bool {
+        $filtered = array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
             foreach ($pluginsToDisable as $disable) {
                 if (str_starts_with($plugin, $disable)) {
                     return false;
@@ -343,7 +386,6 @@ class CacheInvalidationHooks
     #[Action('transition_post_status', 10, 3)]
     public function invalidatePostCache(...$args): void
     {
-        Logger::debug('Hook method', 'invalidatePostCache');
         $post_id = $this->extractPostId($args);
 
         if ($post_id !== null) {
@@ -365,12 +407,12 @@ class CacheInvalidationHooks
     #[Action('created_term', 10, 0)]
     #[Action('edited_term', 10, 0)]
     #[Action('delete_term', 10, 0)]
-    #[Action('updated_post_meta', 10, 4)]
+    #[Action('updated_postmeta', 10, 4)]
     #[Action('set_object_terms', 10, 6)]
     #[Action('transition_post_status', 10, 3)]
     public function purgeGlobalCacheOnce(...$args): void
     {
-        $this->hooksRegistry->unregisterByMethod(self::class, 'purgeGlobalCacheOnce');
+        $this->hooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
         try {
             Cache::deleteMultiple([
@@ -383,13 +425,12 @@ class CacheInvalidationHooks
                 CacheKey::TAXONOMY_DEPTH_LOKASI,
                 CacheKey::TAXONOMY_DEPTH_GENDER,
                 CacheKey::TAXONOMY_DEPTH_PENDIDIKAN,
-                CacheKey::HOMEPAGE_JOB_SCHEMAS,
             ]);
 
             $this->redisAdapter->deletePattern([
                 CacheKey::JOB_GRID_PREFIX . '*',
                 CacheKey::SEARCH_SQL_PREFIX . '*',
-                CacheKey::COMPANY_SEARCH_PREFIX . '*',
+                CacheKey::LOAD_MORE_PREFIX . '*',
                 CacheKey::AUTO_SUGGESTION_PREFIX . '*',
                 CacheKey::POST_TAXONOMIES_PREFIX . '*',
                 CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . '*',
@@ -476,9 +517,18 @@ class HTTPHooks
     #[Action('muplugins_loaded', PHP_INT_MIN)]
     public function setRemoteAddr(): void
     {
-        if (SharedUtils::isDevelopment()) return; // @dev local mode, skip this
-        if (isset($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
+
+        if (SharedUtils::isDevelopment())
+            return; // @dev local mode, skip this
+
+        if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+            $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_CF_CONNECTING_IP'];
+            return;
+        }
+
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $_SERVER['REMOTE_ADDR'] = trim($ips[0]);
         }
     }
 }

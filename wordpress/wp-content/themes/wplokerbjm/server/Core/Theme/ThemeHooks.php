@@ -4,6 +4,22 @@ use DI\Attribute\Injectable;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 #[Injectable(lazy: true)]
+/**
+ * Leverage Wordpress theme feature for easier assets (logo,favicon,etc) management and integrate to frontend
+ * @phpstan-type LogoData array{
+ *  logoDecoding: string,
+ *  logoHeight: int,
+ *  logoSizes: string,
+ *  logoSrcset: string,
+ *  logoUrl: string, 
+ *  logoWidth: int
+ * }
+ * @phpstan-type ThemeData array{
+ *  logo: LogoData, 
+ *  siteIconTags: string,
+ *  wpRestNonce?: string
+ * }
+ */
 class ThemeInject
 {
 
@@ -31,22 +47,22 @@ class ThemeInject
         add_theme_support('align-wide');        // Enable wide alignment for blocks
         add_theme_support('responsive-embeds'); // Responsive embeds
         // HTML5 markup for forms, galleries, captions, and scripts/styles
-        add_theme_support('html5', array(
+        add_theme_support('html5', [
             'gallery',
             'caption',
             'script',
-        ));
+        ]);
         add_theme_support('post-thumbnails');          // featured images
 
         // Register custom logo support with sensible defaults.
         // Admin can set the logo in Appearance -> Customize -> Site Identity.
-        add_theme_support('custom-logo', array(
+        add_theme_support('custom-logo', [
             'width' => 222,
             'height' => 64,
             'flex-height' => true,
             'flex-width' => true,
-            'header-text' => array('site-title', 'site-description'),
-        ));
+            'header-text' => ['site-title', 'site-description'],
+        ]);
     }
 
     /**
@@ -62,19 +78,13 @@ class ThemeInject
      *   to the theme support defaults, then to a safe 128x128 fallback so browsers can
      *   compute aspect ratio reliably.
      *
-     * @return array{url:string,srcset:string,sizes:string,width:int,height:int} {
-     *     @type string url     Absolute URL to the logo (empty string if none)
-     *     @type string srcset  Responsive srcset value produced by WP (may be empty)
-     *     @type string sizes   Sizes attribute suggestion for responsive images (may be empty)
-     *     @type int    width   Intrinsic pixel width (fallbacks applied)
-     *     @type int    height  Intrinsic pixel height (fallbacks applied)
-     * }
+     * @return array{url:string|false,srcset:string|false,sizes:string|false,width:int,height:int}
      */
-    public function getLogoData(): array
+    private function getLogoData(): array
     {
         $custom_logo_id = get_theme_mod('custom_logo');
         if (!$custom_logo_id) {
-            return ['url' => '', 'srcset' => '', 'sizes' => '', 'width' => 0, 'height' => 0];
+            return ['url' => false, 'srcset' => false, 'sizes' => false, 'width' => 0, 'height' => 0];
         }
 
         $url = wp_get_attachment_image_url($custom_logo_id, 'full') ?: '';
@@ -116,27 +126,23 @@ class ThemeInject
      * Adds additional site icon meta tags for custom sizes.
      */
     #[Filter('site_icon_meta_tags')]
-    public function addSiteIconMetaTags(array $meta_tags): array
+    public function addSiteIconMetaTags(array &$meta_tags): array
     {
 
         $additional_sizes = [48, 96, 144, 256, 384, 512];
 
         foreach ($additional_sizes as $size) {
             $url = get_site_icon_url($size);
-            if ($url) {
-                $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
-            }
+            $url && $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
         }
 
-        // Add PNG fallback pointing directly to the original uploaded favicon
-        $original_url = wp_get_attachment_url(get_option('site_icon'));
-        if ($original_url) {
-            // Replace .avif extension with .png for PNG fallback
-            $original_url = str_replace('cropped-site-icon.avif', 'site-icon.png', $original_url);
-            $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($original_url));
-        }
-
-        $addTypeAttribute = static function (&$meta_tags, $type) {
+        /**
+         * Add type attributes to meta tags
+         * @param array $meta_tags
+         * @param string $type
+         * @return void
+         */
+        $addTypeAttribute = static function (array &$meta_tags, string $type): void {
             foreach ($meta_tags as &$tag) {
                 // For link tags (icon and apple-touch-icon)
                 if (preg_match('/<link (?:rel="icon"|rel="apple-touch-icon")[^>]*href="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
@@ -149,9 +155,35 @@ class ThemeInject
             }
         };
 
+        /**
+         * Adds fallback site icon meta tags for custom sizes.
+         * WordPress may convert the original PNG to AVIF during upload(via Modern Image Formats plugin), so:
+         * 1. Walk post_parent to find the original upload attachment.
+         * 2. Use wp_get_original_image_url() to get the original PNG URL.
+         * @return string|null
+         */
+        $addFallbackSiteIconMetaTags = static function (): string|null {
+            $cropped_id = get_option('site_icon');
+            if (!$cropped_id)
+                return null;
+
+            $cropped_post = get_post($cropped_id);
+            $original_id = ($cropped_post && $cropped_post->post_parent) ? $cropped_post->post_parent : 0;
+            if (!$original_id)
+                return null;
+
+            $png_url = wp_get_original_image_url($original_id);
+            if (!$png_url)
+                return null;
+            return sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($png_url));
+        };
+
         foreach (['png', 'ico', 'svg', 'webp', 'avif'] as $type) {
             $addTypeAttribute($meta_tags, $type);
         }
+
+        $fallbackTag = $addFallbackSiteIconMetaTags();
+        $fallbackTag && $meta_tags[] = $fallbackTag;
 
         return $meta_tags;
     }
@@ -171,16 +203,15 @@ class ThemeInject
     }
 
     /**
-     * Provide theme runtime data for client-side hydration as an associative array.
+     * Provide theme runtime data for frontend side.
      *
      * The array contains:
      * - logo: nested logo metadata
-     * - disableTracking (bool)
      * - wpRestNonce (string, when logged in)
      * - siteIconTags (string): newline‑separated <link> tags generated via the
      *   `site_icon_meta_tags` filter. Useful for rendering favicon markup in
      *   head elements when hydrating client code.
-     * @return array{logo: array{logoUrl: string, logoSrcset: string, logoSizes: string, logoDecoding: string, logoWidth: int, logoHeight: int}, siteIconTags: string, wpRestNonce?: string}
+     * @return ThemeData
      */
     public function themeData(): array
     {

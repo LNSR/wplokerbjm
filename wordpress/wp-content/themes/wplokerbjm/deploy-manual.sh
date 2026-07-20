@@ -1,7 +1,13 @@
 #!/usr/bin/env zsh
+set -euo pipefail
+
+# Make sure pwd is 'wplokerbjm' theme root
+if [[ "$(basename "$PWD")" != "wplokerbjm" ]]; then
+  echo "Please run this script from the 'wplokerbjm' theme root directory"
+  exit 1
+fi
 set -a
 source deployment_local.env 2>/dev/null || true
-set -euo pipefail
 set +a
 
 # Parse --dry-run flag
@@ -33,13 +39,26 @@ START_TIME=$(date +%s)
 
 cd "$SRC_DIR"
 
-# echo "Running tests before deployment..."
-# if ! composer test; then
-# echo "❌ Tests failed, aborting deployment"
-# exit 1
-# fi
-# echo "✅ Tests passed, proceeding with deployment"
+# ==============================================================================
+# MU-PLUGINS DEPLOYMENT
+# ==============================================================================
+# Go back 2 directories from theme root to reach wp-content
+LOCAL_MU_PLUGINS_DIR="$(cd ../.. && pwd)/mu-plugins"
+REMOTE_MU_PLUGINS_DIR="$(dirname "$(dirname "$REMOTE_PATH")")/mu-plugins"
 
+if [ -d "$LOCAL_MU_PLUGINS_DIR" ]; then
+  echo "Syncing mu-plugins to $REMOTE_MU_PLUGINS_DIR"
+  # Using -lkK flags or trailing slashes appropriately to ensure the directory syncs correctly
+  rsync -avz $DRY_RUN --delete-after --bwlimit=500 "$LOCAL_MU_PLUGINS_DIR/" "$REMOTE_MU_PLUGINS_DIR/"
+  sleep 5
+else
+  echo "Skipping mu-plugins; local directory not found at $LOCAL_MU_PLUGINS_DIR"
+fi
+# ==============================================================================
+
+# ==============================================================================
+# Theme parts DEPLOYMENT
+# ==============================================================================
 SELECTED=(
 "cache"
 "server"
@@ -60,11 +79,12 @@ for p in "${SELECTED[@]}"; do
 done
 
 echo "All rsync operations completed"
+# ==============================================================================
 
 # Brief pause before running remote commands to allow server to settle
 sleep 5
 
-REMOTE_EXEC="composer install --no-dev --prefer-dist --no-interaction --classmap-authoritative --apcu-autoloader --no-scripts && wp litespeed-purge all && composer dump-autoload --apcu -a -o"
+REMOTE_EXEC="composer update --no-dev --prefer-dist --no-interaction --classmap-authoritative --apcu-autoloader --no-scripts && wp litespeed-purge all && composer dump-autoload --apcu -a -o"
 
 echo "Purging LiteSpeed cache and running composer dump-autoload on remote server"
 if [[ -n "$DRY_RUN" ]]; then

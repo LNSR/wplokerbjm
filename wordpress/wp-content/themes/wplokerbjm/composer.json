@@ -1,5 +1,6 @@
 {
   "require": {
+    "nikic/php-parser": "*",
     "php-di/php-di": "*",
     "php-standard-library/php-standard-library": "*"
   },
@@ -26,7 +27,7 @@
   },
   "scripts": {
     "watch:autoload": [
-      "./tools/Composer/Scripts/autoloadwatcher.sh"
+      "php ./tools/Composer/Scripts/generate-meta-hooks.php & ./tools/Composer/Scripts/autoloadwatcher.sh"
     ],
     "post-update-cmd": [
       "composer dump-autoload --apcu -a -o"
@@ -34,6 +35,7 @@
     "post-install-cmd": [
       "composer dump-autoload --apcu -a -o"
     ],
+    "generate-meta-hooks": "php ./tools/Composer/Scripts/generate-meta-hooks.php",
     "lint:php": "./tools/Composer/Scripts/lint.sh",
     "test": "./tools/Composer/Scripts/test.sh"
   }

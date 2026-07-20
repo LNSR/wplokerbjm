@@ -85,7 +85,7 @@
       </div>
 
       <div class="flex items-center gap-2">
-        {#if !routeStore.isLoading && data && isLoggedIn && editPostId}
+        {#if !routeStore.isLoading && data && data.dpNonce}
           <a
             href={getCloneHref(editPostId)}
             target="_blank"

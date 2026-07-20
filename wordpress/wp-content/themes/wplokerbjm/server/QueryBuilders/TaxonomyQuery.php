@@ -7,6 +7,8 @@ use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 
 /**
  * Encapsulates taxonomy-related query construction.
+ *
+ * @phpstan-import-type SearchFilters from \WPLokerBJM\QueryBuilders\JobQuery
  */
 class TaxonomyQuery
 {
@@ -14,8 +16,8 @@ class TaxonomyQuery
      * Build tax_query parts for job search based on incoming params.
      * Returns an array of tax_query fragments (not wrapped with relation).
      *
-     * @param array $params
-     * @return array
+     * @param SearchFilters $params
+     * @return list<array{taxonomy: string, field: 'slug', terms: list<string>, operator: 'IN', include_children: bool}>
      */
     public static function jobTaxQueryParts(array $params): array
     {
@@ -67,7 +69,7 @@ class TaxonomyQuery
      * Return args to fetch all terms (ids) for a taxonomy (used for cleanup or listing unused terms).
      *
      * @param string $taxonomy
-     * @return array
+     * @return list<int>
      */
     public static function allTaxonomiesTermsArgs(string $taxonomy): array
     {
@@ -91,6 +93,7 @@ class TaxonomyQuery
     public static function getLastModifiedDateForTaxonomies(): string
     {
         $cache_key = CacheKey::TAXONOMY_LAST_MODIFIED;
+        /** @var string|false $cached */
         $cached = Cache::get($cache_key);
         if ($cached !== false) {
             return $cached;
@@ -118,12 +121,14 @@ class TaxonomyQuery
 
     /**
      * Get all taxonomy options for the specified taxonomies.
-     * @param array $taxonomies
-     * @return array
+     *
+     * @param string[] $taxonomies
+     * @return array<string, list<array{id: int, name: string, slug: string, parent: int}>>
      */
     public static function getTaxonomyOptions(array $taxonomies): array
     {
         $cache_key = CacheKey::ALL_TAXONOMY_OPTIONS;
+        /** @var array<string, list<array{id: int, name: string, slug: string, parent: int}>>|false $cached */
         $cached = Cache::get($cache_key);
         if ($cached !== false) {
             return $cached;

@@ -18,12 +18,12 @@ class Cache
     /**
      * Set a value in object cache.
      *
-     * @param string $key The cache key.
+     * @param key-of<\WPLokerBJM\Shared\Cache\CacheKey::*> $key The cache key.
      * @param mixed $value The value to store.
      * @param int $expiration Time until expiration in seconds. Default 0 (no expiration).
      * @return bool True if the value was set, false otherwise.
      */
-    public static function set($key, $value, $expiration = 0): bool
+    public static function set(string $key, $value, $expiration = 0): bool
     {
         try {
             if (!function_exists('wp_cache_set')) {
@@ -41,10 +41,11 @@ class Cache
     /**
      * Get a value from object cache.
      *
-     * @param string $key The cache key.
-     * @return mixed The cached value or false if not found.
+     * @template T
+     * @param key-of<\WPLokerBJM\Shared\Cache\CacheKey::*> $key The cache key.
+     * @return T|false The cached value or false if not found.
      */
-    public static function get($key): mixed
+    public static function get(string $key): mixed
     {
         try {
             if (!function_exists('wp_cache_get')) {
@@ -61,10 +62,10 @@ class Cache
     /**
      * Delete a value from object cache.
      *
-     * @param string $key The cache key.
+     * @param key-of<\WPLokerBJM\Shared\Cache\CacheKey::*> $key The cache key.
      * @return bool True if the value was deleted, false otherwise.
      */
-    public static function delete($key): bool
+    public static function delete(string $key): bool
     {
         try {
             if (!function_exists('wp_cache_delete')) {
@@ -135,12 +136,12 @@ class Cache
     /**
      * Add a value to object cache only if the key doesn't already exist.
      *
-     * @param string $key The cache key.
+     * @param key-of<\WPLokerBJM\Shared\Cache\CacheKey::*> $key The cache key.
      * @param mixed $value The value to store.
      * @param int $expiration Time until expiration in seconds. Default 0 (no expiration).
      * @return bool True if the value was added, false if the key already exists or on failure.
      */
-    public static function add($key, $value, $expiration = 0): bool
+    public static function add(string $key, $value, int $expiration = 0): bool
     {
         try {
             if (!function_exists('wp_cache_add')) {
@@ -184,12 +185,12 @@ class Cache
     /**
      * Increment a cache value atomically.
      *
-     * @param string $key The cache key.
+     * @param key-of<\WPLokerBJM\Shared\Cache\CacheKey::*> $key The cache key.
      * @param int $value The value to increment by. Default 1.
      * @param int $expiration Time until expiration in seconds. Default 0 (no expiration).
      * @return int|false The new incremented value, or false if increment failed.
      */
-    public static function increment($key, $value = 1, $expiration = 0): int|false
+    public static function increment(string $key, int $value = 1, int $expiration = 0): int|false
     {
         try {
             if (!function_exists('wp_cache_incr')) {
@@ -219,11 +220,11 @@ class Cache
     /**
      * Decrement a cache value atomically.
      *
-     * @param string $key The cache key.
+     * @param key-of<\WPLokerBJM\Shared\Cache\CacheKey::*> $key The cache key.
      * @param int $value The value to decrement by. Default 1.
      * @return int|false The new decremented value, or false if decrement failed.
      */
-    public static function decrement($key, $value = 1): int|false
+    public static function decrement(string $key, int $value = 1): int|false
     {
         try {
             if (!function_exists('wp_cache_decr')) {
@@ -254,12 +255,12 @@ class Cache
     /**
      * Replace the contents of the cache with new data.
      *
-     * @param string $key The cache key.
+     * @param key-of<\WPLokerBJM\Shared\Cache\CacheKey::*> $key The cache key.
      * @param mixed $value The value to store.
      * @param int $expiration Time until expiration in seconds. Default 0 (no expiration).
      * @return bool True if the value was replaced, false if the key doesn't exist or on failure.
      */
-    public static function replace($key, $value, $expiration = 0): bool
+    public static function replace(string $key, $value, int $expiration = 0): bool
     {
         try {
             if (!function_exists('wp_cache_replace')) {
@@ -278,8 +279,9 @@ class Cache
     /**
      * Get multiple values from object cache.
      *
-     * @param string[] $keys Array of cache keys to retrieve.
-     * @return array Array of cache values, keyed by cache key.
+     * @template T
+     * @param key-of<\WPLokerBJM\Shared\Cache\CacheKey::*>[] $keys Array of cache keys to retrieve.
+     * @return array<string, T|false> Array of cache values, keyed by cache key.
      */
     public static function getMultiple(array $keys): array
     {
@@ -303,7 +305,7 @@ class Cache
     /**
      * Flush all cache entries for a specific group.
      *
-     * @param string $group The cache group to flush.
+     * @param \WPLokerBJM\Shared\Cache\CacheKey::OBJECT_CACHE_PREFIX $group The cache group to flush.
      * @return bool True if the group was flushed, false otherwise.
      */
     public static function flushGroup(string $group): bool
@@ -374,12 +376,10 @@ class CacheKey
     // Presenters
     const CAROUSEL_JOBS = 'carousel_jobs';
     const JOB_GRID_PREFIX = 'job_grid_';
-    const HOMEPAGE_JOB_SCHEMAS = 'homepage_job_schemas';
 
     // Taxonomy
     const ALL_TAXONOMY_OPTIONS = 'all_taxonomy_options';
     const TAXONOMY_LAST_MODIFIED = 'taxonomy_last_modified';
-    const COMPANY_SEARCH_PREFIX = 'company_search_';
     const ALL_TAXONOMY_TERMS = 'all_taxonomy_terms';
     const POST_TAXONOMIES_PREFIX = 'post_taxonomies_';
     const TAXONOMY_DEPTH_HANDLE = 'taxonomy_depth_handle';

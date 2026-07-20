@@ -5,8 +5,35 @@ namespace WPLokerBJM\Factories;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\Sanitizer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-
+/**
+ *  @phpstan-type JobData array{
+ *     nama_perusahaan?: string,
+ *     tentang_perusahaan?: string|null,
+ *     deskripsi_pekerjaan?: string|null,
+ *     persyaratan?: string|null,
+ *     cara_melamar?: string|null,
+ *     benefit?: string|null,
+ *     umur_min?: int,
+ *     umur_max?: int,
+ *     pengalaman?: int,
+ *     gaji_minimal?: int,
+ *     gaji_maksimal?: int,
+ *     deadline?: string,
+ *     email_kontak?: string,
+ *     nomor_kontak?: string,
+ *     situs_kontak?: string,
+ *     social_media?: string,
+ *     status_pekerjaan?: int,
+ *     perusahaan?: string,
+ *     kategori_lowongan?: string,
+ *     lokasi_pekerjaan?: string,
+ *     jenis_pekerjaan?: string,
+ *     gender?: string,
+ *     pendidikan?: string,
+ * }
+ */
 class JobDataFactory
 {
     public function __construct(
@@ -42,13 +69,13 @@ class JobDataFactory
      * This method retrieves custom fields and taxonomy data for the given post ID,
      * processes the data (e.g., sanitization, formatting), and combines it into
      * a single associative array for use in views or other parts of the application.
-     *
      * @param int $post_id Post ID
-     * @return array Combined and processed job data
+     * @return JobData Combined and processed job data
      */
     public function createJobData(int $post_id): array
     {
         $cacheKey = CacheKey::JOB_DATA_PREFIX . $post_id;
+        /** @var JobData|false $cachedData */
         $cachedData = Cache::get($cacheKey);
         if ($cachedData !== false) {
             return $cachedData;
@@ -98,28 +125,19 @@ class JobDataFactory
     {
         try {
             // Process WYSIWYG fields
-            $wysiwyg_fields = self::WYSIWYG_FIELDS;
-            foreach ($wysiwyg_fields as $field) {
+            foreach (self::WYSIWYG_FIELDS as $field) {
                 if (isset($customFields[$field])) {
                     // Accept strings only; other types are ignored
-                    if (is_string($customFields[$field])) {
-                        $customFields[$field] = do_shortcode(wpautop(wp_kses_post($customFields[$field])));
-                    } else {
-                        $customFields[$field] = null;
-                    }
+                    $customFields[$field] = is_string($customFields[$field])
+                        ? Sanitizer::wysiwygDisplay($customFields[$field])
+                        : null;
                 }
             }
 
             // Process number fields
-            $number_fields = self::NUMBER_FIELDS;
-            foreach ($number_fields as $field) {
+            foreach (self::NUMBER_FIELDS as $field) {
                 if (isset($customFields[$field])) {
-                    if (is_numeric($customFields[$field])) {
-                        // Cast numeric strings or numbers to int
-                        $customFields[$field] = (int) $customFields[$field];
-                    } else {
-                        $customFields[$field] = null;
-                    }
+                    $customFields[$field] = Sanitizer::intOrNull($customFields[$field]);
                 }
             }
 
@@ -145,11 +163,9 @@ class JobDataFactory
 
             // Process date fields
             if (isset($customFields[CustomFields::DEADLINE])) {
-                if (is_string($customFields[CustomFields::DEADLINE]) && strtotime($customFields[CustomFields::DEADLINE]) !== false) {
-                    $customFields[CustomFields::DEADLINE] = date('Y-m-d', strtotime($customFields[CustomFields::DEADLINE]));
-                } else {
-                    $customFields[CustomFields::DEADLINE] = null;
-                }
+                $customFields[CustomFields::DEADLINE] = Sanitizer::normalizeDate(
+                    is_string($customFields[CustomFields::DEADLINE]) ? $customFields[CustomFields::DEADLINE] : null
+                );
             }
 
             // Process fieldset fields (e.g., social media)
@@ -192,13 +208,11 @@ class JobDataFactory
                     }
                 }
 
-                // pipe operator version
-                $customFields[CustomFields::SOCIAL_MEDIA] = array_map(
+                $customFields[CustomFields::SOCIAL_MEDIA] = implode('; ', array_map(
                     static fn($platform, $usernames) => $platform . ': ' . implode(', ', $usernames),
                     array_keys($processedSocialMedia),
                     $processedSocialMedia
-                )
-                    |> (static fn($v) => implode('; ', $v));
+                ));
             }
         } catch (\Exception $e) {
             Logger::error('Factory', 'CustomFieldsService::processCustomFields error: ' . $e->getMessage());

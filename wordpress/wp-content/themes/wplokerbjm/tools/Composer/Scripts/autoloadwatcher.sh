@@ -27,7 +27,6 @@ done
 inotifywait -m -r -e modify,create,delete --format '%w%f' "${watch_paths[@]}" \
   --exclude '(^|/)(node_modules|dist|assets/dist|vendor|\.git|\..*swp$|~$)' | while read -r file; do
   if [[ -n "$file" ]]; then
-    # Only act on PHP and composer JSON changes to reduce churn
     if [[ "$file" =~ \.(php|json)$ ]]; then
       echo "[$(date +'%H:%M:%S')] Change detected in $file, scheduling autoload dump..."
       # Kill any previous pending composer run
@@ -37,15 +36,15 @@ inotifywait -m -r -e modify,create,delete --format '%w%f' "${watch_paths[@]}" \
       # Run composer in background after a short delay (debounce)
       (
       sleep 2
-
-      echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local HMR Chain..."
-      docker exec -i wordpress-${WP_ENV} pkill -USR2 php-fpm &
-      docker exec -i wordpress_redis redis-cli -a ${REDIS_PWD} FLUSHALL
-      echo "[$(date +'%H:%M:%S')] Purging LiteSpeed cache..."
-      docker exec -i wordpress-${WP_ENV} rm -rf /var/www/html/wp-content/themes/wplokerbjm/cache
-      docker exec -i wordpress-${WP_ENV} gosu wordpress wp --path=/var/www/html --url=https://lowker.site litespeed-purge all
-      echo "[$(date +'%H:%M:%S')] 📦 Dumping Composer Classmap..."
-      composer dump-autoload --apcu -a -o > /dev/null
+      echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local Hot Reload Chain..." &
+      docker restart wordpress-${WP_ENV} &
+      echo "[$(date +'%H:%M:%S')] Flushing Redis..." &
+      docker exec -i wordpress_redis redis-cli -a ${REDIS_PWD} FLUSHALL > /dev/null 2>&1 &
+      echo "[$(date +'%H:%M:%S')] Dumping Autoload..." &
+      composer dump-autoload --apcu -a -o > /dev/null &
+      if [[ -d cache ]]; then echo "[$(date +'%H:%M:%S')] Clearing cache directory." ; rm -rf cache/*; else echo "[$(date +'%H:%M:%S')] Cache directory not found." ;fi
+      echo "[$(date +'%H:%M:%S')] 🚀 WordPress Local Hot Reload Chain Completed." &
+      # docker exec -i wordpress-${WP_ENV} gosu wordpress wp --path=/var/www/html --url=https://lowker.site litespeed-purge all &
       ) &
       pending_pid=$!
     fi

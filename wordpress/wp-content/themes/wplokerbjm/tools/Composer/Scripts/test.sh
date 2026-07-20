@@ -1,5 +1,4 @@
 #!/usr/bin/env sh
-# Load .env without using shell `source` to avoid syntax errors from unescaped characters
 ENV_FILE="../../../../.env"
 if [ -f "$ENV_FILE" ]; then
 	while IFS= read -r line || [ -n "$line" ]; do

@@ -6,9 +6,11 @@ use DI\Attribute\Injectable;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
+use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
 
 /**
  * WPGraphQL-related hooks extracted from GlobalHooks.
+ * @phpstan-import-type GraphQLDataType from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
  */
 #[Injectable(lazy: true)]
 class WPGraphQL
@@ -16,7 +18,15 @@ class WPGraphQL
 
     public static function isActive(): bool
     {
-        return SharedUtils::isPluginActive(PluginList::WpGraphql);
+        return PluginList::WpGraphql->isActive();
+    }
+
+    public function __construct(private WPHooksRegistry $hookRegistry, private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration)
+    {
+        if (self::isActive())
+            return;
+        $hookRegistry->unregisterByClass(self::class);
+        $hookRegistry->unregisterDeferredByClass(self::class);
     }
 
     /**
@@ -35,6 +45,24 @@ class WPGraphQL
         } catch (\Exception $e) {
             Logger::error('AuthDebug', 'injectJwtFromCookie error: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Disable nonce check for our origins
+     * @param bool $requireNonce default true according
+     * @see \WPGraphQL\Router::validate_http_request_authentication
+     */
+    #[Filter('graphql_cookie_auth_require_nonce')]
+    public function disableRequireNonce(bool $requireNonce): bool
+    {
+        $origin = $_SERVER['HTTP_ORIGIN'];
+
+        if (empty($origin))
+            return $requireNonce;
+
+
+        $result = \in_array($origin, $this->allowedOrigins(), true);
+        return $result ? false : $requireNonce;
     }
 
     /**
@@ -88,69 +116,113 @@ class WPGraphQL
     }
 
     /**
-     * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
+     * @return array
      */
-    #[Filter('graphql_response_headers_to_send', 11)]
-    public function ModifyHeaderGraphQL(array $headers): array
+    private function allowedOrigins(): array
     {
-        if (!self::isActive()) {
-            return $headers;
-        }
-
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        $allowList = [
+        $officalOrigins = [
             'https://dev.lokerbanjarmasin.my.id',
             'https://staging.lokerbanjarmasin.my.id',
             'https://lokerbanjarmasin.my.id',
             'https://wp.lokerbanjarmasin.my.id',
-            'https://localhost:3000',
-            'https://localhost:5173',
-            'https://localhost:8787',
-            'https://localhost:8173',
-            'https://localhost:4173',
         ];
+        
+        $allowed = [];
+        if (!SharedUtils::isDevelopment())
+            return $officalOrigins;
 
-        if (in_array($origin, $allowList, true)) {
+        $parts = wp_parse_url($origin);
+        if (
+            ($parts['scheme'] ?? '') === 'https'
+            && ($parts['host'] ?? '') === 'localhost'
+        ) {
+            $allowed[] = $origin;
+        }
+        return array_merge($officalOrigins, $allowed);
+    }
+
+    /**
+     * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
+     */
+    #[Filter('graphql_response_headers_to_send', 12)]
+    public function ModifyHeaderGraphQL(array $headers): array
+    {
+        $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
+        $isAllowed = in_array($origin, $this->allowedOrigins(), true);
+
+        if ($isAllowed) {
             $headers['Access-Control-Allow-Origin'] = $origin;
         }
 
+        if (is_user_logged_in()) {
+            $headers['Logged-In'] = 'true';
+        }
+
+        $removeDuplicate = static function ($headerValue) {
+            return $headerValue
+                |> (static fn($v) => explode(',', $v))
+                |> (static fn($v) => array_map('trim', $v))
+                |> array_filter(...)
+                |> array_unique(...)
+                |> (static fn($v) => implode(', ', $v));
+        };
+
         $headers['Access-Control-Allow-Credentials'] = 'true';
 
-        $headers['Access-Control-Allow-Headers'] = $headers['Access-Control-Allow-Headers'] . ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
+        $headers['Access-Control-Allow-Headers'] = ($headers['Access-Control-Allow-Headers'] ?? '') . ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
+        $headers['Access-Control-Allow-Headers'] = $removeDuplicate($headers['Access-Control-Allow-Headers']);
+
         $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag';
+        $headers['Access-Control-Max-Age'] = '86400';
+        $headers['Vary'] = ($headers['Vary'] ?? '') . ', Origin, Authorization';
+        $headers['Vary'] = $removeDuplicate($headers['Vary']);
 
-        if (isset($headers['Access-Control-Max-Age'])) {
-            unset($headers['Access-Control-Max-Age']);
-            $headers['Access-Control-Max-Age'] = '86400';
+        $headers = $this->litespeedGraphQLIntegration->addTagResponses($headers);
+        unset($headers['Expires']);
+
+        if (isset($headers['Last-Modified']) && empty($headers['Last-Modified'])) {
+            unset($headers['Last-Modified']);
         }
-        $cacheControl = static function ($extra) use (&$headers) {
-            if (isset($headers['Cache-Control'])) {
-                unset($headers['Cache-Control']);
-            }
-            $headers['Cache-Control'] = $extra . ', must-revalidate';
-        };
+
+        if (!is_user_logged_in())
+            return $headers = $this->applyCachePolicy($headers);
+
+        /** 
+         * @see WPGraphQL::applyCachePolicy 
+         * 'graphql_send_nocache_headers' filter might be overridden by Litespeed hence we better target 'nocache_headers' instead
+         */
+        $this->hookRegistry->activateDeferredByMethod(self::class, 'applyCachePolicy');
+        return $headers;
+    }
+
+    /**
+     * Override default no-store header
+     */
+    #[Filter('nocache_headers', 12, defer: true)]
+    public function applyCachePolicy(array $headers): array
+    {
         $loggedIn = is_user_logged_in();
-        if ($loggedIn) {
-            $cacheControl('private, max-age=10');
-            $headers['Logged-In'] = $loggedIn ? 'true' : 'false';
-        } else {
-            $cacheControl('public, max-age=60, stale-while-revalidate=3600, s-maxage=604800, stale-if-error=86400');
-        }
+        $cacheValue = $loggedIn
+            ? 'private, max-age=360, must-revalidate'
+            : 'public, max-age=3600, stale-while-revalidate=86400';
 
+        $headers['Cache-Control'] = $cacheValue;
         return $headers;
     }
 
     /**
      * @see \WPGraphQL\Router::prepare_headers;
      */
-    #[Filter('graphql_response_status_code', 9, 2)]
+    #[Filter('graphql_response_status_code', 11, 2)]
     public function setGraphQLResponseStatusCode(
         int $http_status_code,
         mixed $graphql_response,
     ): int {
 
         if ($graphql_response instanceof \GraphQL\Executor\ExecutionResult) {
+            /** @var GraphQLDataType $data */
             $data = $graphql_response->data ?? null;
             if (is_array($data) && array_key_exists('jwt', $data) && $data['jwt'] === null) {
                 return 401;
@@ -162,9 +234,10 @@ class WPGraphQL
 
     /**
      * @see get_graphql_setting
-     * @see ../../../../../plugins/wp-graphql/src/Admin/Settings/Settings.php
+     * @see \WPGraphQL\Admin\Settings\Settings::register_settings() -> public_introspection_enabled
+     * @see \WPGraphQL\SmartCache\Admin\Settings::init()
      */
-    #[Filter('graphql_get_setting_section_field_value', 10, 3)]
+    #[Filter('graphql_get_setting_section_field_value', 11, 3)]
     public function setPublicIntrospection($value, $default_value, $option_name)
     {
         if ($option_name === 'public_introspection_enabled') {

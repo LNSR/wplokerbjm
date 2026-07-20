@@ -7,11 +7,16 @@ use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Log\Logger;
 
+/**
+ * @phpstan-type TaxonomyTerms array{slug: string, name: string, parent: int, children: array}
+ * @phpstan-type TaxonomyJobTerms array{lokasiTerms: TaxonomyTerms[], genderTerms: TaxonomyTerms[], pendidikanTerms: TaxonomyTerms[]}
+ */
 class TaxonomyResolver
 {
     public function __construct(
         private TaxonomyRepository $repository
-    ) {}
+    ) {
+    }
 
     const LOKASI_TERMS = 'lokasiTerms';
     const GENDER_TERMS = 'genderTerms';
@@ -20,7 +25,7 @@ class TaxonomyResolver
     /**
      * Resolve all taxonomy terms grouped by type.
      *
-     * @return array{lokasiTerms: array, genderTerms: array, pendidikanTerms: array}
+     * @return TaxonomyJobTerms
      */
     public function resolveAllTerms(): array
     {
@@ -54,7 +59,7 @@ class TaxonomyResolver
     /**
      * Resolve location taxonomy terms with hierarchy.
      *
-     * @return array<int, array{slug: string, name: string, parent: int, children: array}> Tree structure of location terms
+     * @return TaxonomyTerms[] Tree structure of location terms
      */
     public function resolveLokasiTerms(): array
     {
@@ -79,7 +84,7 @@ class TaxonomyResolver
     /**
      * Resolve gender taxonomy terms (flat list).
      *
-     * @return array<int, array{slug: string, name: string, parent: int, children: array}>
+     * @return TaxonomyTerms[]
      */
     public function resolveGenderTerms(): array
     {
@@ -104,7 +109,7 @@ class TaxonomyResolver
     /**
      * Resolve education level taxonomy terms with hierarchy.
      *
-     * @return array<int, array{slug: string, name: string, parent: int, children: array}> Tree structure of pendidikan terms
+     * @return TaxonomyTerms[] Tree structure of pendidikan terms
      */
     public function resolvePendidikanTerms(): array
     {

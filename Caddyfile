@@ -3,17 +3,6 @@
   @production expression {env.WP_ENV} == "production"
   @development expression {env.WP_ENV} == "development"
 
-  @partytown_dev path_regexp partytownDev ^/~partytown(/.*)?$
-  header @partytown_dev Service-Worker-Allowed "/"
-
-  @partytown_assets path_regexp partytownAssets ^/wp-content/themes/wplokerbjm/assets/dist/~partytown(/.*)?$
-  header @partytown_assets Service-Worker-Allowed "/"
-
-  @partytown_sw path_regexp partytownSW ^/wp-content/themes/wplokerbjm/assets/dist/~partytown/.*partytown-sw.*$
-  header @partytown_sw Cache-Control "no-cache, no-store, must-revalidate"
-  header @partytown_sw Pragma "no-cache"
-  header @partytown_sw Expires "0"
-
   root * /var/www/html
   # Pass request host/proto headers into PHP-FPM so PHP's $_SERVER sees
   # HTTP_X_FORWARDED_HOST and HTTP_X_FORWARDED_PROTO when using AUTO mode.
@@ -24,7 +13,6 @@
     env HTTP_X_FORWARDED_HOST {host}
     env HTTP_HOST {host}
     env HTTP_X_FORWARDED_FOR {remote}
-    env HTTP_X_REAL_IP {remote_host}
   }
 
   file_server {
@@ -46,21 +34,21 @@
 
   # Default security headers for all responses (keeps site secure while remaining permissive for WordPress plugins)
    header {
-    Content-Security-Policy "Upgrade-Insecure-Requests"
     Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
     Referrer-Policy "strict-origin-when-cross-origin"
     X-Content-Type-Options "nosniff"
-    X-Frame-Options "SAMEORIGIN"
-    Permissions-Policy "microphone=(), camera=(), payment=()"
-    Cross-Origin-Embedder-Policy "credentialless"
-    Cross-Origin-Opener-Policy "same-origin"
     -X-Powered-By
-    X-Real-IP {remote_host}
   }
 
   header {
-    X-Not-Modified "true"
-    match status 304
+      Cross-Origin-Opener-Policy "same-origin"
+      X-Frame-Options "SAMEORIGIN"
+      Permissions-Policy "microphone=(), camera=(), payment=()"
+      Cross-Origin-Embedder-Policy "credentialless"
+
+      match {
+          header Content-Type *text/html*
+      }
   }
 
   # Static assets: long-term caching and immutable flag (fingerprinted assets) + caching for CDNs

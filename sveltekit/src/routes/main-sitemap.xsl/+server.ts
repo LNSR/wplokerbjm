@@ -12,7 +12,7 @@ export const GET: RequestHandler = async () => {
     return new Response('CMS origin not configured', { status: 500 });
   }
 
-  const target = new URL('/main-sitemap.xsl', cmsBase).href;
+  const target = new URL('/main-sitemap.xsl', cmsBase).href.replaceAll("http://", "https://");
   const res = await fetch(target);
   if (!res.ok) {
     return new Response(res.statusText, { status: res.status });

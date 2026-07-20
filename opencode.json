@@ -62,6 +62,13 @@
       "headers": {
         "X-Royal-MCP-API-Key": "{env:X_ROYAL_MCP_API_KEY}"
       }
+    },
+    "cloudflare-api": {
+      "type": "remote",
+      "url": "https://mcp.cloudflare.com/mcp",
+      "headers": {
+        "Authorization": "Bearer {env:CLOUDFLARE_MCP_API_KEY}"
+      }
     }
   }
 }

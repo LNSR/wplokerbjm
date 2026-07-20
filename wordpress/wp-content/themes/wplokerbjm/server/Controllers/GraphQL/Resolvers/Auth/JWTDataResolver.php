@@ -4,6 +4,9 @@ namespace WPLokerBJM\Controllers\GraphQL\Resolvers\Auth;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
+/**
+ * @phpstan-type JWTDataShape array{token?: string, username?: string, password?: string}
+ */
 class JWTDataResolver
 {
 
@@ -17,10 +20,10 @@ class JWTDataResolver
      * On successful login, sets an HTTP-only SameSite=Lax cookie with the JWT.
      *
      * @param mixed $root The root Mutation object (unused)
-     * @param array{username?: string, password?: string, token?: string} $args Mutation inputs
+     * @param JWTDataShape $args Mutation inputs
      * @return string|null 'ok' on success, null on failure
      */
-    public function resolveJWTorValidate($root, $args): ?string
+    public function resolveJWTorValidate($root, array $args): ?string
     {
         // $args already contains our named inputs from the GraphQL field.
         $argArr = is_array($args) ? $args : [];
@@ -101,6 +104,9 @@ class JWTDataResolver
             return null;
         }
         $code = method_exists($resp, 'get_status') ? $resp->get_status() : 0;
+        /**
+         * @var JWTDataShape $data
+         */
         $data = method_exists($resp, 'get_data') ? $resp->get_data() : null;
         if (defined('WP_DEBUG') && WP_DEBUG) {
             Logger::error('GraphQL', "JWT login response code={$code} data=" . print_r($data, true));

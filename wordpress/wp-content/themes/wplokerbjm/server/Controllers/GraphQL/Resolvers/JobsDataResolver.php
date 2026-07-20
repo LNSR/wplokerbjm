@@ -6,19 +6,45 @@ use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Services\GraphQL\GraphQLData;
+use WPLokerBJM\Services\Schema\JobSchemaOrg;
+use WPLokerBJM\Repositories\JobRepository;
+use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
 
+/**
+ * @phpstan-import-type CardData from GraphQLData
+ * @phpstan-import-type JobDetailData from GraphQLData
+ * @phpstan-import-type JobPostingSchema from JobSchemaOrg
+ * @phpstan-import-type ItemListSchema from JobSchemaOrg
+ * @phpstan-import-type SearchFilters from JobQuery
+ * @phpstan-import-type JobGridData from JobGrid
+ * @phpstan-import-type CarouselData from JobCarousel
+ * @phpstan-import-type AutoSuggestionsArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type LoadMoreArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type JobGridArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type JobDetailArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type JobSchemaArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type SearchJobsArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type RankMathHeadArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type SyncBookmarkArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * 
+ * @phpstan-type Context 'latest'|'search'
+ * @phpstan-type Filters SearchFilters
+ * @phpstan-type LoadMoreResponse array{jobs: CardData[], filters: Filters, total: int, maxNumPages: int}
+ * @phpstan-type SearchJobsResponse array{jobs: CardData[], filters: Filters, title: string, total: int, maxNumPages: int}
+ */
 class JobsDataResolver
 {
     public function __construct(
-        private readonly \WPLokerBJM\Services\GraphQL\GraphQLData $graphqlData,
-        private readonly \WPLokerBJM\Presenters\Components\JobCarousel $jobCarouselPresenter,
-        private readonly \WPLokerBJM\Repositories\JobRepository $jobRepository,
-        private readonly \WPLokerBJM\Presenters\Components\JobGrid $jobGridPresenter,
+        private readonly GraphQLData $graphqlData,
+        private readonly JobCarousel $jobCarouselPresenter,
+        private readonly JobRepository $jobRepository,
+        private readonly JobGrid $jobGridPresenter,
     ) {
     }
 
     /**
-     * @return array{jobs: array, totalJobs: int}
+     * @return CarouselData
      */
     public function resolveCarousel(): array
     {
@@ -43,10 +69,10 @@ class JobsDataResolver
      * Resolve load-more paginated jobs for GraphQL.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{paged?: int, context?: string, filters?: array<string, mixed>} $args Query arguments
-     * @return array{jobs: array<int, array>, context: string, filters: array, total: int, maxNumPages: int}
+     * @param LoadMoreArgs $args Query arguments
+     * @return LoadMoreResponse
      */
-    public function resolveLoadMore($root, $args): array
+    public function resolveLoadMore($root, array $args): array
     {
         try {
             $paged = $args['paged'] ?? 1;
@@ -58,6 +84,7 @@ class JobsDataResolver
             }
 
             $cacheKey = CacheKey::LOAD_MORE_PREFIX . md5(serialize([$paged, $context, $filters]));
+            /** @var array{data: array{jobs: CardData[], filters: Filters, total: int, maxNumPages: int}, total: int, maxNumPages: int}|false $cached */
             $cached = Cache::get($cacheKey);
 
             if ($cached !== false) {
@@ -84,7 +111,6 @@ class JobsDataResolver
             $data = SharedUtils::filterEmptyValues([
                 'jobs' => $jobs,
                 'filters' => $filters,
-                'context' => $context,
                 'total' => $query->found_posts,
                 'maxNumPages' => $query->max_num_pages,
             ]);
@@ -102,7 +128,6 @@ class JobsDataResolver
             Logger::error('GraphQL', 'JobsDataResolver::resolveLoadMore error: ' . $e->getMessage());
             return [
                 'jobs' => [],
-                'context' => $args['context'] ?? 'latest',
                 'filters' => $args['filters'] ?? [],
                 'total' => 0,
                 'maxNumPages' => 0,
@@ -114,10 +139,10 @@ class JobsDataResolver
      * Resolve job grid data for GraphQL.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{filters?: array, paged?: int, context?: string, title?: string, total_jobs?: int} $args Query arguments
-     * @return array{filters: array, jobs: array<int, array>, maxNumPages: int, total: int}
+     * @param JobGridArgs $args Query arguments
+     * @return JobGridData
      */
-    public function resolveJobGrid($root, $args): array
+    public function resolveJobGrid($root, array $args): array
     {
         try {
             $filters = $args['filters'] ?? [];
@@ -127,6 +152,7 @@ class JobsDataResolver
             $total_jobs = $args['total_jobs'] ?? 0;
 
             $cacheKey = CacheKey::JOB_GRID_PREFIX . md5(serialize([$filters, $paged, $context, $title, $total_jobs]));
+            /** @var JobGridData|false $cached */
             $cached = Cache::get($cacheKey);
             if ($cached !== false) {
                 return $cached;
@@ -163,8 +189,8 @@ class JobsDataResolver
      * Resolve single job detail for GraphQL.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{slug: string} $args Query arguments with job slug
-     * @return array{id: int, slug: string, permalink: string, title: string, ...}|array{job: null}
+     * @param JobDetailArgs $args Query arguments with job slug
+     * @return JobDetailData|array{}
      */
     public function resolveJobDetail($root, $args): array
     {
@@ -195,7 +221,7 @@ class JobsDataResolver
      * by slug to avoid an extra post ID lookup.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{ids?: array<int>, slug?: string, type?: string} $args Schema query arguments
+     * @param JobSchemaArgs $args Schema query arguments
      * @return array{schemas: array<int, string>} Array of JSON-encoded schema strings
      */
     public function resolveSchema($root, $args): array
@@ -229,6 +255,7 @@ class JobsDataResolver
                 $schemas = [];
                 foreach ($ids as $id) {
                     $singleCacheKey = CacheKey::JOB_SCHEMA_PREFIX . $id;
+                    /** @var JobPostingSchema|false $singleCached */
                     $singleCached = Cache::get($singleCacheKey);
                     if ($singleCached !== false) {
                         $schemas[] = json_encode($singleCached);
@@ -245,6 +272,7 @@ class JobsDataResolver
 
             // Build ItemList for multiple IDs, or when forced via type='ItemList'
             $cacheKey = CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . md5(implode(',', $ids) . '|' . ($type ?? 'auto'));
+            /** @var ItemListSchema|false $cached */
             $cached = Cache::get($cacheKey);
             if ($cached !== false) {
                 return ['schemas' => [json_encode($cached)]];
@@ -303,23 +331,25 @@ class JobsDataResolver
      * Resolve search jobs for GraphQL.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{filters?: array{cari?: string, lokasi_pekerjaan?: array, gender?: array, pendidikan?: array, sort?: array{value?: string}}} $args Search filters
-     * @return array{jobs: array<int, array>, context: string, filters: array, title: string, total: int, maxNumPages: int}
+     * @param SearchJobsArgs $args Search filters
+     * @return SearchJobsResponse
      */
-    public function resolveSearchJobs($root, $args): array
+    public function resolveSearchJobs($root, array $args): array
     {
         try {
+            $context = $args['context'] ?? 'search';
             $filters = $args['filters'] ?? [];
 
             $searchFilters = [
-                'cari' => $filters['cari'] ?? '',
-                Taxonomies::LOKASI_PEKERJAAN => $filters[Taxonomies::LOKASI_PEKERJAAN] ?? [],
-                Taxonomies::GENDER => $filters[Taxonomies::GENDER] ?? [],
-                Taxonomies::PENDIDIKAN => $filters[Taxonomies::PENDIDIKAN] ?? [],
-                'sort' => $filters['sort']['value'] ?? 'desc',
+                'cari' => (string) $filters['cari'] ?? '',
+                Taxonomies::LOKASI_PEKERJAAN => (array) $filters[Taxonomies::LOKASI_PEKERJAAN] ?? [],
+                Taxonomies::GENDER => (array) $filters[Taxonomies::GENDER] ?? [],
+                Taxonomies::PENDIDIKAN => (array) $filters[Taxonomies::PENDIDIKAN] ?? [],
+                'sort' => (string) $filters['sort']['value'] ?? 'desc',
             ];
 
-            $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize($searchFilters));
+            $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize([$searchFilters, $context]));
+            /** @var SearchJobsResponse|false $cached */
             $cached = Cache::get($cacheKey);
             if ($cached !== false) {
                 return $cached;
@@ -334,7 +364,6 @@ class JobsDataResolver
 
             $data = SharedUtils::filterEmptyValues([
                 'jobs' => $jobs,
-                'context' => 'search',
                 'filters' => $filters,
                 'title' => 'Hasil Pencarian',
                 'total' => $query->found_posts,
@@ -348,7 +377,6 @@ class JobsDataResolver
             Logger::error('GraphQL', 'JobsDataResolver::resolveSearchJobs error: ' . $e->getMessage());
             return [
                 'jobs' => [],
-                'context' => 'search',
                 'filters' => $args['filters'] ?? [],
                 'title' => 'Hasil Pencarian',
                 'total' => 0,
@@ -361,8 +389,8 @@ class JobsDataResolver
      * Resolve bookmarked jobs by their IDs.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{ids?: array<int>} $args Arguments containing job IDs
-     * @return array<int, array> Array of job card data for existing posts
+     * @param SyncBookmarkArgs $args Arguments containing job IDs
+     * @return CardData[] Array of job card data for existing posts
      */
     public function resolveSyncBookmark($root, $args): array
     {
@@ -384,6 +412,7 @@ class JobsDataResolver
 
             sort($ids);
             $cacheKey = CacheKey::SYNC_BOOKMARK_PREFIX . md5(implode(',', $ids));
+            /** @var CardData[]|false $cached */
             $cached = Cache::get($cacheKey);
             if ($cached !== false) {
                 return $cached;
@@ -418,7 +447,7 @@ class JobsDataResolver
      * Validates that the URL is internal to this site before fetching.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{url: string} $args Arguments containing the URL
+     * @param RankMathHeadArgs $args Arguments containing the URL
      * @return string HTML head tags from RankMath
      */
     public function resolveRankMathHead($root, $args): string
@@ -439,6 +468,7 @@ class JobsDataResolver
             }
 
             $cacheKey = CacheKey::RANKMATH_HEAD_PREFIX . md5($url);
+            /** @var string|false $cached */
             $cached = Cache::get($cacheKey);
             if ($cached !== false) {
                 return $cached;
@@ -476,15 +506,16 @@ class JobsDataResolver
      * Resolve autocomplete suggestions for job search.
      *
      * @param mixed $root The root Query object (unused)
-     * @param array{query: string} $args Arguments containing the search query
-     * @return array<int, string> Array of unique job title suggestions
+     * @param AutoSuggestionsArgs $args Query arguments
+     * @return string[] Array of unique job title suggestions
      */
-    public function resolveAutoSuggestions($root, $args): array
+    public function resolveAutoSuggestions($root, string $args): array
     {
         try {
             $query = sanitize_text_field($args['query']);
 
             $cacheKey = CacheKey::AUTO_SUGGESTION_PREFIX . md5($query);
+            /** @var string[]|false $cached */
             $cached = Cache::get($cacheKey);
             if ($cached !== false) {
                 return $cached;

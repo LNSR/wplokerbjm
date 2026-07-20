@@ -1,18 +1,20 @@
 <?php
 
 namespace WPLokerBJM\Repositories;
-use WPLokerBJM\QueryBuilders\JobQuery;
-
+use WPLokerBJM\Services\GraphQL\GraphQLData;
+use WPLokerBJM\Services\Schema\JobSchemaOrg;
 /**
  * Job Repository
  * 
  * Provides methods to interact with job meta data using Meta Box functions
+ * @phpstan-import-type CardData from GraphQLData
+ * @phpstan-import-type JobPostingSchema from JobSchemaOrg
  */
 class JobRepository
 {
     public function __construct(
-        private \WPLokerBJM\Services\GraphQL\GraphQLData $restData,
-        private \WPLokerBJM\Services\Schema\JobSchemaOrg $jobSchema
+        private GraphQLData $restData,
+        private JobSchemaOrg $jobSchema
     ) {
     }
 
@@ -20,7 +22,7 @@ class JobRepository
      * Run a WP_Query and return normalized card data and schema.
      *
      * @param array $query_args WP_Query args
-     * @return array{jobs: array, schema_data: array, query: \WP_Query}
+     * @return array{jobs: CardData[], schema_data: JobPostingSchema[], query: \WP_Query}
      */
     public function queryJob(array $query_args): array
     {

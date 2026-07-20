@@ -217,7 +217,10 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $registry->initialize();
 
         $registered = $this->registeredHooks();
-        $this->assertCount(count($registrations), $registered, 'All registrations should produce a registered hook');
+        // Deferred hooks (defer: true) are not auto-registered by initialize(),
+        // so exclude them from the count assertion.
+        $nonDeferred = array_filter($registrations, fn(array $r) => empty($r['defer']));
+        $this->assertCount(count($nonDeferred), $registered, 'All non-deferred registrations should produce a registered hook');
         $this->assertGreaterThan(0, $registered);
 
         // Verify each registered hook has a matching registration and a LazyHookHandler callable.

@@ -11,6 +11,11 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 // Exit if accessed directly for security   
 !defined('ABSPATH') && exit;
 
+/**
+ * Some notes on the bootstrap process:
+ * - This MU-Plugin is reliant on some theme functionalities from WP hence it should be activated with theme enabled.
+ * @see WPLokerBJM\Core\Theme\ThemeInject
+ */
 (static function () {
     $theme = 'wplokerbjm';
     if (get_stylesheet() !== $theme)

@@ -1,9 +1,22 @@
 <?php
 
 namespace WPLokerBJM\Presenters\Components;
+use JobGridData;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 
+/**
+ * @phpstan-import-type CardData from \WPLokerBJM\Services\GraphQL\GraphQLData
+ * 
+ * @phpstan-type JobGridData array{
+ *     jobs: list<CardData>,
+ *     maxNumPages: int,
+ *     context: 'latest'|'search',
+ *     filters: array{cari: string, lokasi: string, gender: string, pendidikan: string, sort: string},
+ *     title: string,
+ *     totalJobs: int
+ * }
+ */
 class JobGrid
 {
 
@@ -20,9 +33,9 @@ class JobGrid
      *
      * @param array<string, mixed> $query_args WP_Query arguments for fetching jobs
      * @param string $title Section title (auto-generated from context if empty)
-     * @param string $context Display context: 'latest'|'search'
+     * @phpstan-param JobGridData['context'] $context Display context
      * @param int $total_jobs Total jobs count override (0 = auto-detect from query)
-     * @return array{context: string, filters: array{cari: string, gender: string, lokasi: string, pendidikan: string, sort: string}, jobs: array<int, array>, maxNumPages: int, title: string, totalJobs: int}
+     * @return JobGridData
      */
     public function getProps(array $query_args, string $title, string $context = 'latest', int $total_jobs = 0): array
     {
@@ -45,16 +58,17 @@ class JobGrid
             };
         }
 
+
         $props = [
             'jobs' => $jobs,
             'maxNumPages' => (int) $jobs_query->max_num_pages,
             'context' => $context,
             'filters' => [
-                'cari' => $_GET['cari'] ?? '',
-                'lokasi' => $_GET['lokasi'] ?? '',
-                'gender' => $_GET['gender'] ?? '',
-                'pendidikan' => $_GET['pendidikan'] ?? '',
-                'sort' => $_GET['sort'] ?? 'desc',
+                'cari' => (string) ($_GET['cari'] ?? ''),
+                'lokasi' => (string) ($_GET['lokasi'] ?? ''),
+                'gender' => (string) ($_GET['gender'] ?? ''),
+                'pendidikan' => (string) ($_GET['pendidikan'] ?? ''),
+                'sort' => (string) ($_GET['sort'] ?? 'desc'),
             ],
             'title' => $title,
             'totalJobs' => $jobs_query->found_posts,

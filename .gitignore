@@ -35,8 +35,10 @@ localhost-key.pem
 localhost.key
 localhost.crt
 worker-configuration.d.ts
-**/*.d.ts
 **/*.graphql
+**/graphql-env*
 **/*.tsbuildinfo
 
 **/.agents
+**/.claude
+**/.phpstorm.meta.php

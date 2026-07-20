@@ -2,13 +2,33 @@
 
 namespace WPLokerBJM\Configs;
 
+/**
+ * @phpstan-type RedisCred array{
+ *     host: ?string,
+ *     port: ?int,
+ *     password: ?string,
+ *     database: ?int,
+ *     sock: ?string
+ * }
+ * @phpstan-type R2CFCred array{
+ *     key: ?string,
+ *     secret: ?string,
+ *     bucket: ?string,
+ *     domain: ?string,
+ *     endpoint: ?string
+ * }
+ * @phpstan-type CloudflareCred array{
+ *     token: ?string,
+ *     zone: ?string
+ * }
+ */
 class CredentialConfig
 {
     /**
      * Return Redis connection credentials.
      *
      * @param array|null $params Optional overrides ('host', 'port', 'password', 'database', 'sock').
-     * @return array{host: ?string, port: ?int, password: ?string, database: ?int, sock: ?string}
+     * @return RedisCred
      */
     public static function RedisCredential(?array $params = null): array
     {
@@ -25,7 +45,7 @@ class CredentialConfig
      * Return Cloudflare R2 storage bucket credentials.
      *
      * @param array|null $params Optional overrides ('key', 'secret', 'bucket', 'domain', 'endpoint').
-     * @return array{key: ?string, secret: ?string, bucket: ?string, domain: ?string, endpoint: ?string}
+     * @return R2CFCred
      */
     public static function R2CFCredential(?array $params = null): array
     {
@@ -45,7 +65,7 @@ class CredentialConfig
      * centralizes lookup logic for any future rotation or override needs.
      *
      * @param array|null $params Optional overrides ('token' and/or 'zone').
-     * @return array{token: ?string, zone: ?string}
+     * @return CloudflareCred
      */
     public static function CloudflareCredential(?array $params = null): array
     {
