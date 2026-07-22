@@ -68,10 +68,9 @@ class WPLokerBJMContainer
             self::$container = $builder->build();
         } catch (\Exception $e) {
             Logger::error('Container', 'Container::getContainer error: ' . $e->getMessage());
+            Logger::flush();
             throw $e;
         }
-        Logger::info("DI-Container", 'Rebuilding Container');
-        Logger::flush();
         return self::$container;
     }
 

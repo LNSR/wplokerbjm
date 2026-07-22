@@ -509,7 +509,7 @@ class JobsDataResolver
      * @param AutoSuggestionsArgs $args Query arguments
      * @return string[] Array of unique job title suggestions
      */
-    public function resolveAutoSuggestions($root, string $args): array
+    public function resolveAutoSuggestions($root, array $args): array
     {
         try {
             $query = sanitize_text_field($args['query']);

@@ -439,6 +439,7 @@ class CacheInvalidationHooks
                 CacheKey::SYNC_BOOKMARK_PREFIX . '*',
                 CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . '*',
                 CacheKey::RANKMATH_HEAD_PREFIX . '*',
+                CacheKey::GRAPHQL_ETAG_PREFIX . '*',
                 CacheKey::THEME_DATA . '*',
             ]);
         } catch (\Exception $e) {

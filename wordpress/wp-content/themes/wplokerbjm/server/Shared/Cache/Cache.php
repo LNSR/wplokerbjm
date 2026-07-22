@@ -389,4 +389,7 @@ class CacheKey
 
     // Query Builders
     const SEARCH_SQL_PREFIX = 'search_sql_';
+
+    // ETag
+    const GRAPHQL_ETAG_PREFIX = 'graphql_etag_';
 }

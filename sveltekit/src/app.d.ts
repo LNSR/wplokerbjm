@@ -4,6 +4,7 @@ import type {
   Env,
   ExecutionContext,
   CacheStorage,
+  Cache,
   IncomingRequestCfProperties,
   KVNamespace,
 } from "@cloudflare/workers-types";
@@ -13,6 +14,10 @@ import type { WPLokerBJMThemedData } from "@/types";
 // for information about these interfaces
 declare global
 {
+  interface CacheStorage {
+    default: Cache;
+  }
+
   interface DeviceType
   {
     isMobile: boolean;
@@ -71,6 +76,7 @@ declare global
     os?: string;
     ua?: string;
   }
+
   namespace App
   {
     // interface Error {}
@@ -98,10 +104,7 @@ declare global
 
     interface Platform
     {
-      env?: {
-        wplokerbjm: KVNamespace;
-      };
-      env: Env;
+      env: Env; 
       ctx: ExecutionContext;
       caches: CacheStorage;
       cf?: IncomingRequestCfProperties;
@@ -136,6 +139,5 @@ declare global
     export default src
   }
 }
-
 
 export { };

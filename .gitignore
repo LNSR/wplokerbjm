@@ -21,7 +21,7 @@ wordpress/wp-content/themes/*
 **/vendor
 **/node_modules
 **/.env
-**/cache
+**/wplokerbjm/cache
 **/bun.lock
 **/package-lock.json
 **/composer.lock

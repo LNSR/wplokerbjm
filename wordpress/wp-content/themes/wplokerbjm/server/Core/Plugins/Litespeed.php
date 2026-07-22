@@ -97,13 +97,8 @@ class LiteSpeedGraphQLIntegration
         if ('GET' !== $_SERVER['REQUEST_METHOD']) {
             return;
         }
-
-        if (is_user_logged_in()) {
-            do_action('litespeed_control_set_private');
-        } else {
-            do_action('litespeed_control_force_cacheable');
-            do_action('litespeed_control_set_ttl', 86400);
-        }
+        do_action('litespeed_control_force_cacheable');
+        do_action('litespeed_control_set_ttl', 86400);
     }
 
     public function addTagResponses(array $headers = []): array
