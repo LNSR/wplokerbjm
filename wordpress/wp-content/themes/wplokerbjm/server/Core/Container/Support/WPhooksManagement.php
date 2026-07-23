@@ -226,7 +226,7 @@ class WPHooksRegistry
                 $reg['method'],
             );
 
-            $key = $reg['class'] . '::' . $reg['method'];
+            $key = $reg['class'] . '::' . $reg['method'] . '::' . $reg['priority'];
             $target = !empty($reg['defer'])
                 ? 'deferredHandlers'
                 : 'handlers';
@@ -352,24 +352,25 @@ class WPHooksRegistry
      */
     public function activateDeferredByMethod(string $class, string $method): void
     {
-        $key = $class . '::' . $method;
+        $prefix = $class . '::' . $method . '::';
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            if (!isset($hookHandlers[$key])) {
-                continue;
-            }
+            foreach ($hookHandlers as $key => $data) {
+                if (!str_starts_with($key, $prefix)) {
+                    continue;
+                }
 
-            // Guard: skip if already activated
-            if (isset($this->handlers[$hook][$key])) {
+                // Guard: skip if already activated
+                if (isset($this->handlers[$hook][$key])) {
+                    unset($hookHandlers[$key]);
+                    continue;
+                }
+
+                $this->handlers[$hook][$key] = $data;
+
+                $this->addSingleHook($hook, $data);
+
                 unset($hookHandlers[$key]);
-                continue;
             }
-
-            $data = $hookHandlers[$key];
-            $this->handlers[$hook][$key] = $data;
-
-            $this->addSingleHook($hook, $data);
-
-            unset($hookHandlers[$key]);
         }
         unset($hookHandlers);
     }
@@ -433,9 +434,13 @@ class WPHooksRegistry
      */
     public function unregisterDeferredByMethod(string $class, string $method): void
     {
-        $key = $class . '::' . $method;
+        $prefix = $class . '::' . $method . '::';
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            unset($hookHandlers[$key]);
+            foreach (array_keys($hookHandlers) as $key) {
+                if (str_starts_with($key, $prefix)) {
+                    unset($hookHandlers[$key]);
+                }
+            }
         }
     }
 
@@ -512,13 +517,15 @@ class WPHooksRegistry
      */
     public function unregisterByMethod(string $class, string $method): void
     {
-        $key = $class . '::' . $method;
+        $prefix = $class . '::' . $method . '::';
         foreach ($this->handlers as $hook => &$hookHandlers) {
-            if (!isset($hookHandlers[$key])) {
-                continue;
+            foreach ($hookHandlers as $key => $data) {
+                if (!str_starts_with($key, $prefix)) {
+                    continue;
+                }
+                $this->removeSingleHook($hook, $data);
+                unset($hookHandlers[$key]);
             }
-            $this->removeSingleHook($hook, $hookHandlers[$key]);
-            unset($hookHandlers[$key]);
         }
         unset($hookHandlers);
     }

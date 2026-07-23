@@ -89,14 +89,11 @@ class LiteSpeedGraphQLIntegration
     }
 
     /**
-     * Set GraphQL Queries returned via HTTP GET requests to be cacheable
+     * Set GraphQL Queries returned via HTTP GET|OPTIONS requests to be cacheable
      */
-    #[Action('graphql_process_http_request_response')]
     public function setCacheable(): void
     {
-        if ('GET' !== $_SERVER['REQUEST_METHOD']) {
-            return;
-        }
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'OPTIONS') return;
         do_action('litespeed_control_force_cacheable');
         do_action('litespeed_control_set_ttl', 86400);
     }

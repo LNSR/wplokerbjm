@@ -78,6 +78,7 @@ class WPGraphQL
     #[Action('init_graphql_request', 9)]
     public function handleInitRequest(): void
     {
+        $this->litespeedGraphQLIntegration->setCacheable();
         $this->eTag->checkEarly304();
         $this->authenticateViaCookie();
     }
@@ -158,11 +159,6 @@ class WPGraphQL
         }
         return array_merge($officalOrigins, $allowed);
     }
-    #[Filter('graphql_send_nocache_headers')]
-    public function overrideApplyCachePolicy(): bool
-    {
-        return false;
-    }
 
     /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
@@ -170,22 +166,26 @@ class WPGraphQL
     #[Filter('graphql_response_headers_to_send', 11)]
     public function ModifyHeaderGraphQL(array $headers): array
     {
-
-        $headers = $this->eTag->setHeader($headers);
-
+        /**
+         * @see WPGraphQL\SmartCache\Cache\Results::init
+         *  remove WPGraphQL author hooks
+         */
+        remove_all_filters('graphql_response_headers_to_send', PHP_INT_MAX);
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        $isAllowed = in_array($origin, $this->allowedOrigins(), true);
 
-        if ($isAllowed) {
+        if (in_array($origin, $this->allowedOrigins(), true)) {
             $headers['Access-Control-Allow-Origin'] = $origin;
         }
 
-        if (is_user_logged_in()) {
-            $headers['Logged-In'] = 'true';
-        }
+        // Headers relevant to both preflight and actual responses.
+        $headers['Access-Control-Allow-Credentials'] = 'true';
+        $headers['Access-Control-Allow-Headers'] =
+            ($headers['Access-Control-Allow-Headers'] ?? '') .
+            ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
+        $headers['Access-Control-Max-Age'] = '86400';
 
-        $removeDuplicate = static function ($headerValue) {
-            return $headerValue
+        $removeDuplicate = static function (string $value): string {
+            return $value
                 |> (static fn($v) => explode(',', $v))
                 |> (static fn($v) => array_map('trim', $v))
                 |> array_filter(...)
@@ -193,50 +193,51 @@ class WPGraphQL
                 |> (static fn($v) => implode(', ', $v));
         };
 
-        $headers['Access-Control-Allow-Credentials'] = 'true';
+        $headers['Access-Control-Allow-Headers'] =
+            $removeDuplicate($headers['Access-Control-Allow-Headers']);
 
-        $headers['Access-Control-Allow-Headers'] = ($headers['Access-Control-Allow-Headers'] ?? '') . ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
-        $headers['Access-Control-Allow-Headers'] = $removeDuplicate($headers['Access-Control-Allow-Headers']);
+        //! Preflight ends here.
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+            return $headers;
+        }
+
+        $headers = $this->eTag->setHeader($headers);
+
+        if (is_user_logged_in()) {
+            $headers['Logged-In'] = 'true';
+        }
 
         $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag';
-        $headers['Access-Control-Max-Age'] = '86400';
+
         $headers['Vary'] = ($headers['Vary'] ?? '') . ', Origin, Authorization';
         $headers['Vary'] = $removeDuplicate($headers['Vary']);
 
         $headers = $this->litespeedGraphQLIntegration->addTagResponses($headers);
+
         unset($headers['Expires']);
 
-        if (isset($headers['Last-Modified']) && empty($headers['Last-Modified'])) {
+        if (empty($headers['Last-Modified'])) {
             unset($headers['Last-Modified']);
         }
+        $headers = $this->applyCachePolicy($headers);
 
-        return $headers = $this->applyCachePolicy($headers);
-    }
-
-    private function applyCachePolicy(array $headers): array
-    {
-        $loggedIn = is_user_logged_in();
-        $cacheValue = $loggedIn
-            ? 'private, max-age=60, must-revalidate'
-            : 'public, max-age=360, stale-while-revalidate=86400';
-
-        $headers['Cache-Control'] = $cacheValue;
-        $this->removeGraphQLAuthorHooks();
+        /**  @see WPGraphQL::applyCachePolicy */
+        is_user_logged_in() && $this->hookRegistry->activateDeferredByMethod(self::class, 'applyCachePolicy');
         return $headers;
     }
 
-    /**
-     * Remove hardcoded author hooks
-     * * Some are being set as PHP_INT_MAX for crying out loud
-     */
-    private function removeGraphQLAuthorHooks()
+    #[Filter('nocache_headers', 11, defer: true)]
+    public function applyCachePolicy(array $headers): array
     {
-        global $wp_filter;
+        $loggedIn = is_user_logged_in();
+        $isDev = SharedUtils::isDevelopment();
+        $cacheValue = match (true) {
+            default => $loggedIn ? 'private, max-age=90, must-revalidate' : 'public, max-age=360, stale-while-revalidate=3600',
+            $isDev => $loggedIn ? 'private, no-cache, must-revalidate' : 'public, no-cache, must-revalidate',
+        };
 
-        // Direct removal from $wp_filter bypassing instance hash requirement
-        if (isset($wp_filter['graphql_response_headers_to_send']->callbacks[PHP_INT_MAX])) {
-            unset($wp_filter['graphql_response_headers_to_send']->callbacks[PHP_INT_MAX]);
-        }
+        $headers['Cache-Control'] = $cacheValue;
+        return $headers;
     }
 
     /**
@@ -327,7 +328,7 @@ class WPGraphQLETag
 
         $cachedValue = Cache::get(CacheKey::GRAPHQL_ETAG_PREFIX . $this->buildRequestHash());
 
-        // Redis somehow wraps values in ['data' => $value]
+        // Redis somehow wraps values in ['data' => $value] and php serializer cause extra characters
         $cachedEtag = match (true) {
             is_string($cachedValue) => trim($cachedValue),
             is_array($cachedValue) && isset($cachedValue['data']) => trim((string) $cachedValue['data']),
@@ -336,6 +337,7 @@ class WPGraphQLETag
 
         if ($cachedEtag !== '' && $cachedEtag === $ifNoneMatch) {
             status_header(304);
+            header('ETag: ' . $cachedEtag);
             exit;
         }
     }
