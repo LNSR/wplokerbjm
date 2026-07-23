@@ -10,7 +10,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
-use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 /*======================================================================
  | Collection of Global Hooks Classes
@@ -206,139 +206,49 @@ class SearchHooks
 
 
 /*======================================================================
- | ENVIRONMENT
+ | LANGUAGE HOOKS
  ======================================================================*/
 
 /**
- * Environment-specific behaviour: disable plugins in dev, force locale.
+ * Force locale to Indonesian on the frontend for consistent user experience,
+ * while keeping admin in English.
  */
-class EnvironmentHooks
+class LanguageHooks
 {
-    private const MUST_HAVE_PLUGINS = [
-        PluginList::LiteSpeed->value,
-        PluginList::WpGraphql->value,
-        PluginList::RankMath->value,
-        PluginList::MetaBoxLite->value,
-        PluginList::MetaBox->value,
-    ];
-
-    #[Filter('option_active_plugins', 0)]
-    public function activePluginsCondition(array $plugins): array
-    {
-        $plugins = $this->disablePluginsForDevImpl($plugins);
-        $plugins = $this->disablePluginsforSimulatedProdImpl($plugins);
-        $plugins = $this->forceActivePlugin($plugins);
-        return $plugins;
-    }
-
-    /**
-     * Force locale to Indonesian on the frontend for consistent user experience,
-     * while keeping admin in English.
-     */
     #[Filter('locale')]
-    public function frontendLocal($locale)
+    public function frontendLocalHTMLl10n($locale)
     {
-        if (!is_admin()) { // Only affects the public site, keeps your dashboard English
+        if (!is_admin()) { // Only affects the public site, keeps dashboard English
             return 'id_ID';
         }
         return $locale;
     }
-
-    /**
-     * Remove the "Deactivate" action link for required plugins.
-     */
-    #[Filter('plugin_action_links', 4, 2)]
-    public function lockPluginActionLinks(array $actions, string $pluginFile): array
-    {
-        if (in_array($pluginFile, self::MUST_HAVE_PLUGINS) && isset($actions['deactivate'])) {
-            unset($actions['deactivate']);
-
-            $actions['required'] = '<span style="color: red; font-weight: bold;">Must Have Dependency</span>';
-        }
-
-        return $actions;
-    }
-
-    /**
-     * Temporarily disable specific plugins if in development environment.
-     */
-    private function disablePluginsForDevImpl(array $plugins): array
-    {
-        $isDev = SharedUtils::isDevelopment();
-        if (!$isDev) {
-            return $plugins;
-        }
-        $extra = [
-        ];
-
-        $pluginsToDisable = $this->listPluginsToDisable($extra);
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
-    }
-
-    /**
-     * Force active plugins
-     */
-    private function forceActivePlugin(array $plugins): array
-    {
-        if (SharedUtils::isDevelopment())
-            return $plugins;
-        foreach (self::MUST_HAVE_PLUGINS as $plugin) {
-            if (!in_array($plugin, $plugins)) {
-                array_push($plugins, $plugin);
-            }
-        }
-        return $plugins;
-    }
-
-    /**
-     * Temporarily disable specific plugins if simulating production environment on local machine.
-     */
-    private function disablePluginsforSimulatedProdImpl(array $plugins): array
-    {
-        $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
-
-        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
-
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
-    }
-
-    /**
-     * Filters the list of active plugins by removing specified plugins.
-     *
-     * @param array $plugins          Array of active plugin file paths.
-     * @param array $pluginsToDisable Array of plugin prefixes to disable.
-     * @return array Filtered array of active plugins.
-     */
-    private function filteredPlugins(array $plugins, array $pluginsToDisable): array
-    {
-        $filtered = array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
-            foreach ($pluginsToDisable as $disable) {
-                if (str_starts_with($plugin, $disable)) {
-                    return false;
-                }
-            }
-            return true;
-        });
-
-        return array_values($filtered);
-    }
-
-    /**
-     * Returns the list of plugins to disable, optionally merged with extra plugins.
-     *
-     * @param array|null $extra Optional array of additional plugin prefixes to disable.
-     * @return array Array of plugin prefixes to disable.
-     */
-    private function listPluginsToDisable(?array $extra = []): array
-    {
-        return array_merge([
-            'wordfence/',
-            'tinywp-mobile-detect/',
-            'fast-indexing-api/',
-        ], $extra);
-    }
 }
 
+/*======================================================================
+ | HTTP HOOKS
+ ======================================================================*/
+class HTTPHooks
+{
+    //** forwarded IP from the SvelteKit frontend
+    #[Action('muplugins_loaded', PHP_INT_MIN)]
+    public function setRemoteAddr(): void
+    {
+
+        if (SharedUtils::isDevelopment())
+            return; // @dev local mode, skip this
+
+        if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) {
+            $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_CF_CONNECTING_IP'];
+            return;
+        }
+
+        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
+            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
+            $_SERVER['REMOTE_ADDR'] = trim($ips[0]);
+        }
+    }
+}
 
 /*======================================================================
  | CACHE INVALIDATION
@@ -412,6 +322,10 @@ class CacheInvalidationHooks
     #[Action('transition_post_status', 10, 3)]
     public function purgeGlobalCacheOnce(...$args): void
     {
+        static $alreadyRun = false;
+        if ($alreadyRun)
+            return;
+        $alreadyRun = true;
         $this->hooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
         try {
@@ -509,30 +423,6 @@ class CacheInvalidationHooks
     }
 }
 
-/*======================================================================
- | HTTP HOOKS
- ======================================================================*/
-class HTTPHooks
-{
-    //** forwarded IP from the SvelteKit frontend
-    #[Action('muplugins_loaded', PHP_INT_MIN)]
-    public function setRemoteAddr(): void
-    {
-
-        if (SharedUtils::isDevelopment())
-            return; // @dev local mode, skip this
-
-        if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) {
-            $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_CF_CONNECTING_IP'];
-            return;
-        }
-
-        if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-            $_SERVER['REMOTE_ADDR'] = trim($ips[0]);
-        }
-    }
-}
 
 /*======================================================================
  | LOGGER FLUSH

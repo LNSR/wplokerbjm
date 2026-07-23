@@ -1,11 +1,11 @@
 <?php
 
-namespace WPLokerBJM\Core\Plugins;
+namespace WPLokerBJM\Core\Plugins\ThirdParty;
 
 use DI\Attribute\Injectable;
+use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPlokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
-use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
 
 /**
  * Rank Math Integration Service
@@ -13,25 +13,17 @@ use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
  * Handles Rank Math SEO plugin integrations including sitemap regeneration
  */
 #[Injectable(lazy: true)]
-class Rankmath
+class Rankmath implements PluginConfigInterface
 {
 	private static ?bool $isActiveCache = null;
 	private static ?array $sitemapUrlsCache = null;
-
-	public function __construct(private WPHooksRegistry $hookRegistry)
-	{
-		if (self::isActive()) return;
-		$this->hookRegistry->unregisterByClass(self::class);
-	}
 
 	/**
 	 * Check if Rank Math plugin is active (with caching)
 	 */
 	public static function isActive(): bool
 	{
-		if (self::$isActiveCache === null) {
-			self::$isActiveCache = PluginList::RankMath->isActive();
-		}
+		self::$isActiveCache ??= PluginList::RankMath->isActive();
 		return self::$isActiveCache;
 	}
 
@@ -124,9 +116,6 @@ class Rankmath
 	#[Filter('seo_analysis/after_set_url')]
 	public function rewriteSeoAnalyzerInstanceUrl($analyzer): void
 	{
-		if (!self::isActive()) {
-			return;
-		}
 
 		if (empty($analyzer) || !property_exists($analyzer, 'analyse_url')) {
 			return;

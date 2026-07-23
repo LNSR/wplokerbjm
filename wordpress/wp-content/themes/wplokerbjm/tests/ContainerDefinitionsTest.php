@@ -6,12 +6,11 @@ namespace WPLokerBJM\Tests;
 
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Definitions\Factory;
-use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
-use WPLokerBJM\Core\Container\Support\LazyHookHandler;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\Core;
 use WPLokerBJM\Core\Container\Definitions\DefinitionProviderInterface;
-use WPLokerBJM\Core\Container\Support\{AutowireScanner, WPhooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\{LazyHookHandler, LazyPropertyHookHandler, WPHooksRegistry, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
@@ -227,11 +226,10 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         // Comparison is by hook name + type rather than index because WPHooksRegistry
         // groups handlers by hook name internally, which changes iteration order.
         foreach ($registered as $hookData) {
-            // Each callable must be a named LazyHookHandler, not an anonymous closure
-            $this->assertInstanceOf(
-                LazyHookHandler::class,
-                $hookData['callable'],
-                "Callable for {$hookData['hook']} should be LazyHookHandler (not anonymous closure)"
+            // Each callable must be a LazyHookHandler or LazyPropertyHookHandler, not an anonymous closure
+            $this->assertTrue(
+                $hookData['callable'] instanceof LazyHookHandler || $hookData['callable'] instanceof LazyPropertyHookHandler,
+                "Callable for {$hookData['hook']} should be LazyHookHandler or LazyPropertyHookHandler (not anonymous closure)"
             );
 
             // Verify type is valid
@@ -239,7 +237,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             $this->assertIsInt($hookData['priority']);
         }
 
-        echo "  \033[0;32m•\033[0m All " . count($registrations) . " hooks use named LazyHookHandler callables (ordered by hook name)\n";
+        echo "  \033[0;32m•\033[0m All " . count($registrations) . " hooks use named LazyHookHandler / LazyPropertyHookHandler callables (ordered by hook name)\n";
 
         // Verify initialize() is idempotent
         $countBefore = count($this->registeredHooks());

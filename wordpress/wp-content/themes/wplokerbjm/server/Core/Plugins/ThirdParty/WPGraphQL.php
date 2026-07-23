@@ -1,16 +1,16 @@
 <?php
 
-namespace WPLokerBJM\Core\Plugins;
+namespace WPLokerBJM\Core\Plugins\ThirdParty;
 
 use DI\Attribute\Injectable;
 use GraphQLDataType;
+use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
 use GraphQL\Executor\ExecutionResult;
-use WPGraphQL\Router;
 use WP_User;
 
 /**
@@ -18,7 +18,7 @@ use WP_User;
  * @phpstan-import-type GraphQLDataType from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
  */
 #[Injectable(lazy: true)]
-class WPGraphQL
+class WPGraphQL implements PluginConfigInterface
 {
 
     public static function isActive(): bool
@@ -31,10 +31,6 @@ class WPGraphQL
         private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration,
         private WPGraphQLETag $eTag
     ) {
-        if (self::isActive())
-            return;
-        $hookRegistry->unregisterByClass(self::class);
-        $hookRegistry->unregisterDeferredByClass(self::class);
     }
 
     /**
@@ -65,8 +61,9 @@ class WPGraphQL
     {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        if (empty($origin))
-            return $requireNonce;
+        if (empty($origin)) {
+            return false;
+        }
 
         $result = \in_array($origin, $this->allowedOrigins(), true);
         return $result ? false : $requireNonce;
@@ -78,8 +75,9 @@ class WPGraphQL
     #[Action('init_graphql_request', 9)]
     public function handleInitRequest(): void
     {
-        $this->eTag->checkEarly304();
+        $this->litespeedGraphQLIntegration->setCacheable();
         $this->authenticateViaCookie();
+        $this->eTag->checkEarly304();
     }
 
     /**
@@ -138,11 +136,11 @@ class WPGraphQL
     {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        $officalOrigins = [
-            'https://dev.lokerbanjarmasin.my.id',
-            'https://staging.lokerbanjarmasin.my.id',
-            'https://lokerbanjarmasin.my.id',
-            'https://wp.lokerbanjarmasin.my.id',
+        static $officalOrigins = [
+        'https://dev.lokerbanjarmasin.my.id',
+        'https://staging.lokerbanjarmasin.my.id',
+        'https://lokerbanjarmasin.my.id',
+        'https://wp.lokerbanjarmasin.my.id',
         ];
 
         if (!SharedUtils::isDevelopment())
@@ -158,11 +156,6 @@ class WPGraphQL
         }
         return array_merge($officalOrigins, $allowed);
     }
-    #[Filter('graphql_send_nocache_headers')]
-    public function overrideApplyCachePolicy(): bool
-    {
-        return false;
-    }
 
     /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
@@ -170,73 +163,79 @@ class WPGraphQL
     #[Filter('graphql_response_headers_to_send', 11)]
     public function ModifyHeaderGraphQL(array $headers): array
     {
-
-        $headers = $this->eTag->setHeader($headers);
-
+        /**
+         * @see WPGraphQL\SmartCache\Cache\Results::init
+         *  remove WPGraphQL author hooks
+         */
+        remove_all_filters('graphql_response_headers_to_send', PHP_INT_MAX);
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-        $isAllowed = in_array($origin, $this->allowedOrigins(), true);
 
-        if ($isAllowed) {
+        if (in_array($origin, $this->allowedOrigins(), true)) {
             $headers['Access-Control-Allow-Origin'] = $origin;
         }
 
-        if (is_user_logged_in()) {
-            $headers['Logged-In'] = 'true';
+        // Headers relevant to both preflight and actual responses.
+        $headers['Access-Control-Allow-Credentials'] = 'true';
+        $headers['Access-Control-Allow-Headers'] =
+            ($headers['Access-Control-Allow-Headers'] ?? '') .
+            ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
+        $headers['Access-Control-Max-Age'] = '86400';
+
+        static $removeDuplicate = static fn(string $value): string => $value
+        |> (static fn($v) => explode(',', $v))
+        |> (static fn($v) => array_map('trim', $v))
+        |> array_filter(...)
+        |> array_unique(...)
+        |> (static fn($v) => implode(', ', $v));
+
+        $headers['Access-Control-Allow-Headers'] =
+            $removeDuplicate($headers['Access-Control-Allow-Headers']);
+
+        //! Preflight ends here.
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
+            return $headers;
         }
 
-        $removeDuplicate = static function ($headerValue) {
-            return $headerValue
-                |> (static fn($v) => explode(',', $v))
-                |> (static fn($v) => array_map('trim', $v))
-                |> array_filter(...)
-                |> array_unique(...)
-                |> (static fn($v) => implode(', ', $v));
-        };
-
-        $headers['Access-Control-Allow-Credentials'] = 'true';
-
-        $headers['Access-Control-Allow-Headers'] = ($headers['Access-Control-Allow-Headers'] ?? '') . ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
-        $headers['Access-Control-Allow-Headers'] = $removeDuplicate($headers['Access-Control-Allow-Headers']);
+        $headers = $this->eTag->setHeader($headers);
 
         $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag';
-        $headers['Access-Control-Max-Age'] = '86400';
+
         $headers['Vary'] = ($headers['Vary'] ?? '') . ', Origin, Authorization';
         $headers['Vary'] = $removeDuplicate($headers['Vary']);
 
         $headers = $this->litespeedGraphQLIntegration->addTagResponses($headers);
+
         unset($headers['Expires']);
 
-        if (isset($headers['Last-Modified']) && empty($headers['Last-Modified'])) {
+        if (empty($headers['Last-Modified'])) {
             unset($headers['Last-Modified']);
         }
+        $headers = $this->applyCachePolicy($headers);
 
-        return $headers = $this->applyCachePolicy($headers);
-    }
-
-    private function applyCachePolicy(array $headers): array
-    {
-        $loggedIn = is_user_logged_in();
-        $cacheValue = $loggedIn
-            ? 'private, max-age=60, must-revalidate'
-            : 'public, max-age=360, stale-while-revalidate=86400';
-
-        $headers['Cache-Control'] = $cacheValue;
-        $this->removeGraphQLAuthorHooks();
+        if (is_user_logged_in()) {
+            $headers['Logged-In'] = 'true';
+            $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
+            /** @see WPGraphQL::disableGraphQLNoCacheHeaders */
+            $this->hookRegistry->activateDeferredByMethod(self::class, 'disableGraphQLNoCacheHeaders');
+        }
         return $headers;
     }
 
-    /**
-     * Remove hardcoded author hooks
-     * * Some are being set as PHP_INT_MAX for crying out loud
-     */
-    private function removeGraphQLAuthorHooks()
-    {
-        global $wp_filter;
+    #[Filter('graphql_send_nocache_headers', 10, defer: true)]
+    public function disableGraphQLNoCacheHeaders(): bool { return false; }
 
-        // Direct removal from $wp_filter bypassing instance hash requirement
-        if (isset($wp_filter['graphql_response_headers_to_send']->callbacks[PHP_INT_MAX])) {
-            unset($wp_filter['graphql_response_headers_to_send']->callbacks[PHP_INT_MAX]);
-        }
+    // #[Filter('nocache_headers', 11, defer: true)]
+    public function applyCachePolicy(array $headers): array
+    {
+        $loggedIn = is_user_logged_in();
+        $isDev = SharedUtils::isDevelopment();
+        $cacheValue = match (true) {
+            $isDev => $loggedIn ? 'private, no-cache, must-revalidate' : 'public, no-cache, must-revalidate',
+            default => $loggedIn ? 'private, max-age=60, must-revalidate' : 'public, max-age=360, stale-while-revalidate=3600',
+        };
+
+        $headers['Cache-Control'] = $cacheValue;
+        return $headers;
     }
 
     /**
@@ -327,7 +326,7 @@ class WPGraphQLETag
 
         $cachedValue = Cache::get(CacheKey::GRAPHQL_ETAG_PREFIX . $this->buildRequestHash());
 
-        // Redis somehow wraps values in ['data' => $value]
+        // Redis somehow wraps values in ['data' => $value] and php serializer cause extra characters
         $cachedEtag = match (true) {
             is_string($cachedValue) => trim($cachedValue),
             is_array($cachedValue) && isset($cachedValue['data']) => trim((string) $cachedValue['data']),
@@ -336,6 +335,7 @@ class WPGraphQLETag
 
         if ($cachedEtag !== '' && $cachedEtag === $ifNoneMatch) {
             status_header(304);
+            header('ETag: ' . $cachedEtag);
             exit;
         }
     }
@@ -390,22 +390,21 @@ class WPGraphQLETag
     private function buildRequestHash(): string
     {
         static $hash = null;
+        if ($hash !== null) return $hash; // memoize
 
-        if ($hash === null) {
-            $query = $_REQUEST['query'] ?? '';
-            $operationName = $_REQUEST['operationName'] ?? '';
-            $extensions = $_REQUEST['extensions'] ?? '';
+        $query = $_REQUEST['query'] ?? '';
+        $operationName = $_REQUEST['operationName'] ?? '';
+        $extensions = $_REQUEST['extensions'] ?? '';
 
-            $rawVars = $_REQUEST['variables'] ?? '';
-            if (is_string($rawVars) && $rawVars !== '') {
-                $variables = json_decode($rawVars, true) ?: [];
-            } else {
-                $variables = is_array($rawVars) ? $rawVars : [];
-            }
-
-            $authFingerprint = $this->buildAuthFingerprint();
-            $hash = hash('xxh128', serialize(compact('query', 'variables', 'operationName', 'extensions', 'authFingerprint')));
+        $rawVars = $_REQUEST['variables'] ?? '';
+        if (is_string($rawVars) && $rawVars !== '') {
+            $variables = json_decode($rawVars, true) ?: [];
+        } else {
+            $variables = is_array($rawVars) ? $rawVars : [];
         }
+
+        $authFingerprint = $this->buildAuthFingerprint();
+        $hash = hash('xxh128', serialize(compact('query', 'variables', 'operationName', 'extensions', 'authFingerprint')));
 
         return $hash;
     }

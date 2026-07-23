@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
-use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**

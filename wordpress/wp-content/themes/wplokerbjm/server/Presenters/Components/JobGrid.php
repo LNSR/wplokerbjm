@@ -1,7 +1,6 @@
 <?php
 
 namespace WPLokerBJM\Presenters\Components;
-use JobGridData;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 

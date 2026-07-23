@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Tests\Support;
 
-use Psr\Container\ContainerInterface;
+use \DI\Container;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use Dotenv\Dotenv;
 
@@ -21,7 +21,7 @@ use Dotenv\Dotenv;
 final class ProxyContainer
 {
     private static bool $booted = false;
-    private static ?ContainerInterface $container = null;
+    private static ?Container $container = null;
 
     /**
      * Boot test runtime once per PHPUnit process.
@@ -52,9 +52,9 @@ final class ProxyContainer
         $GLOBALS['__wplokerbjm_registered_hooks'] = [];
     }
 
-    public static function container(): ContainerInterface
+    public static function container(): Container
     {
-        if (self::$container instanceof ContainerInterface) {
+        if (self::$container instanceof Container) {
             return self::$container;
         }
 

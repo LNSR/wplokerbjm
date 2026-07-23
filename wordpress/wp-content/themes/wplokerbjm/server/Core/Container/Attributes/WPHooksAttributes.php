@@ -9,7 +9,7 @@ use Attribute;
  * Attribute for WordPress actions.
  * Annotate a method to register it as an action hook.
  */
-#[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
+#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::IS_REPEATABLE)]
 class Action
 {
     /**
@@ -32,7 +32,7 @@ class Action
  * Attribute for WordPress filters.
  * Annotate a method to register it as a filter hook.
  */
-#[Attribute(Attribute::TARGET_METHOD | Attribute::IS_REPEATABLE)]
+#[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::IS_REPEATABLE)]
 class Filter
 {
     /**

@@ -52,6 +52,34 @@ class CustomFields
         'Telegram' => 'Telegram',
     ];
 
+    public const CONTACT_FIELDS = [
+        self::EMAIL_KONTAK,
+        self::NOMOR_KONTAK,
+        self::SITUS_KONTAK,
+    ];
+
+    public const TEXT_FIELDS = [
+        self::NAMA_PERUSAHAAN,
+        self::NOMOR_KONTAK
+    ];
+
+    public const WYSIWYG_FIELDS = [
+        self::TENTANG_PERUSAHAAN,
+        self::DESKRIPSI_PEKERJAAN,
+        self::PERSYARATAN,
+        self::CARA_MELAMAR,
+        self::BENEFIT,
+    ];
+    
+    public const INT_FIELDS = [
+        self::UMUR_MIN,
+        self::UMUR_MAX,
+        self::PENGALAMAN,
+        self::GAJI_MINIMAL,
+        self::GAJI_MAKSIMAL,
+        self::STATUS_PEKERJAAN,
+    ];
+
     #[Filter('rwmb_meta_boxes')]
     public function lowongan_meta_boxes($meta_boxes)
     {

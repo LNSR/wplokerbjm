@@ -1,7 +1,6 @@
 <?php
 
-namespace WPLokerBJM\Core\Container\Support;
-
+namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery;
 use ReflectionClass;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Core\Container\Support\Utilities\FileScannerTrait;

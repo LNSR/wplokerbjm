@@ -8,8 +8,8 @@ export const load: PageServerLoad = async ({ url, fetch }) =>
   try
   {
     const [ carousel, jobGrid ] = await Promise.all([
-      APIServiceShared.fetchCarouselGraphQL(fetch),
-      APIServiceShared.fetchJobGridGraphQL({ paged: 1 }, fetch),
+      APIServiceShared.fetchCarouselGraphQL(),
+      APIServiceShared.fetchJobGridGraphQL({ paged: 1 }),
     ]);
 
     // compute initial ItemList schema for homepage using jobGrid IDs
@@ -24,9 +24,7 @@ export const load: PageServerLoad = async ({ url, fetch }) =>
       {
         const schemas: JobSchemaResponse[ 'schemas' ] = await APIServiceServer.fetchJobSchemasGraphQL(
           ids,
-          undefined,
           "ItemList",
-          fetch,
         );
         schemas && (itemListSchema = schemaScriptParser(schemas));
 

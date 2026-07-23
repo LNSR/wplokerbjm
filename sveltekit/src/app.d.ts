@@ -86,8 +86,8 @@ declare global
     interface Locals
     {
       deviceType: DevicePayload;
-      authToken: string | null;
-      earlyHintsLink: string | null;
+      authToken?: string;
+      earlyHintsLink?: string;
       /** Theme data fetched from the CMS and stored on locals for downstream usage. */
       themeData: WPLokerBJMThemedData;
       /** Real visitor IP address resolved from CF-Connecting-IP or X-Forwarded-For headers. */
