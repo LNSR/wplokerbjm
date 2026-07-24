@@ -17,7 +17,6 @@ use WPLokerBJM\Core\Container\Attributes\Action;
  *
  * @package WPLokerBJM\Models\Schema
  */
-#[Injectable(lazy: true)]
 class PostTypes {
     
     public const POST_TYPE_LOWONGAN = 'lowongan';

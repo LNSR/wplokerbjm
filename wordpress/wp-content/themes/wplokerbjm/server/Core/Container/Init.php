@@ -2,7 +2,7 @@
 
 namespace WPLokerBJM\Core\Container;
 
-use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
 
 /**
  * Initializes core services in the wplokerbjm theme by registering WordPress hooks.
@@ -18,7 +18,6 @@ use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
  * ## Usage
  * Call `initialize()` to register all discovered hooks with WordPress.
  * ! initialized in MU_PLUGIN_DIR.'/wplokerbjm-bootstrap.php'
- * @see \WPLokerBJM\Core\Container\Support\LazyHookHandler
  * @see \WPLokerBJM\Core\Container\Definitions\Core
  */
 class Init

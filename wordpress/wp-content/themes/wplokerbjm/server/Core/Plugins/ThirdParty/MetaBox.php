@@ -1,27 +1,19 @@
 <?php
-declare(strict_types=1);
-namespace WPLokerBJM\Core\Plugins;
+namespace WPLokerBJM\Core\Plugins\ThirdParty;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use DI\Attribute\Injectable;
-use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
+use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Utilities\PluginList;
 
 /**
  * MetaBox Plugin Hooks
  */
-#[Injectable(lazy: true)]
-class MetaBox
+final class MetaBox implements PluginConfigInterface
 {
 
-    public static function isActive()
+    public static function isActive(): bool
     {
         return PluginList::MetaBox->isActive();
-    }
-
-    public function __construct(private WPHooksRegistry $hookRegistry)
-    {
-        if (self::isActive()) return;
-        $hookRegistry->unregisterByClass(self::class);
     }
 
     /**

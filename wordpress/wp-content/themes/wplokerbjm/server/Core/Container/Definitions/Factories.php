@@ -1,7 +1,8 @@
 <?php
 namespace WPLokerBJM\Core\Container\Definitions;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\{WPhooksScanner, WPHooksRegistry, AutowireScanner};
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksRegistry, WPHooksScanner};
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Configs\CredentialConfig;
@@ -27,18 +28,11 @@ interface DefinitionProviderInterface
  *
  * How it works:
  * 1. WPhooksScanner scans the server/ directory for #[Action] and #[Filter] attributes.
- * 2. WPHooksRegistry receives the scanner results and pre-builds LazyHookHandler instances
+ * 2. WPHooksRegistry receives the scanner results and pre-builds LazyHookHandler and LazyPropertyHookHandler instances
  *    (named invocable objects that defer container resolution to hook-fire time).
  * 3. Init delegates to WPHooksRegistry::initialize() which registers hooks with WordPress
  *    via add_action/add_filter using the stored handler instances.
  *
- * The named LazyHookHandler objects enable hook unregistration by class/method key,
- * unlike anonymous closures which cannot be unregistered.
- *
- * @see \WPLokerBJM\Core\Container\Support\WPHooksRegistry
- * @see \WPLokerBJM\Core\Container\Support\LazyHookHandler
- * @see \WPLokerBJM\Core\Container\Init
- * @see \WPLokerBJM\Core\Container\Support\WPhooksScanner
  */
 class Core implements DefinitionProviderInterface
 {

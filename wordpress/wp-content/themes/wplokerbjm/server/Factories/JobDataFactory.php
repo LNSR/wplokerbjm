@@ -42,13 +42,6 @@ class JobDataFactory
     ) {
     }
 
-    private const WYSIWYG_FIELDS = [
-        CustomFields::TENTANG_PERUSAHAAN,
-        CustomFields::DESKRIPSI_PEKERJAAN,
-        CustomFields::PERSYARATAN,
-        CustomFields::CARA_MELAMAR,
-        CustomFields::BENEFIT,
-    ];
     private const NUMBER_FIELDS = [
         CustomFields::UMUR_MIN,
         CustomFields::UMUR_MAX,
@@ -125,7 +118,7 @@ class JobDataFactory
     {
         try {
             // Process WYSIWYG fields
-            foreach (self::WYSIWYG_FIELDS as $field) {
+            foreach (CustomFields::WYSIWYG_FIELDS as $field) {
                 if (isset($customFields[$field])) {
                     // Accept strings only; other types are ignored
                     $customFields[$field] = is_string($customFields[$field])

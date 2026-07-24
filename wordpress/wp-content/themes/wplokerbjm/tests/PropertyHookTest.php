@@ -1,0 +1,363 @@
+<?php
+
+declare(strict_types=1);
+
+namespace WPLokerBJM\Tests;
+
+use DI\ContainerBuilder;
+use DI\Container;
+use ReflectionClass;
+use WPLokerBJM\Core\Container\Support\WPHooks\LazyPropertyHookHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Tests\Support\Fixtures\PropertyActionService;
+use WPLokerBJM\Tests\Support\Fixtures\PropertyDeferredService;
+use WPLokerBJM\Tests\Support\Fixtures\PropertyFilterService;
+use WPLokerBJM\Tests\Support\Fixtures\PropertyMultiPriorityService;
+use WPLokerBJM\Tests\Support\Fixtures\PropertyNonClosureService;
+use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+
+
+/**
+ * Test suite for property-closure hooks via #[Action]/#[Filter] attributes.
+ *
+ * Verifies that:
+ *  - LazyPropertyHookHandler reads a public property and invokes the closure.
+ *  - Filter closures return values correctly (apply_filters).
+ *  - Action closures produce side effects (do_action).
+ *  - Multiple #[Filter] on the same property (IS_REPEATABLE) work.
+ *  - Deferred property hooks are activated on demand.
+ *  - Non-Closure properties are handled gracefully (error logged, fallback returned).
+ *  - Container missing the class is skipped without crash.
+ */
+class PropertyHookTest extends WplokerbjmTestCase
+{
+    private Container $container;
+    private WPHooksRegistry $registry;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $builder = new ContainerBuilder();
+        $builder->useAutowiring(true);
+        $builder->useAttributes(false);
+        $this->container = $builder->build();
+
+        $this->registry = new WPHooksRegistry($this->container, []);
+
+        // Reset fixture static state
+        PropertyFilterService::reset();
+        PropertyActionService::reset();
+        PropertyMultiPriorityService::reset();
+        PropertyDeferredService::reset();
+    }
+
+    /**
+     * Seed hook registrations into the registry via reflection.
+     *
+     * @param array<int, array> $registrations
+     */
+    private function seedRegistrations(array $registrations): void
+    {
+        $ref = new ReflectionClass($this->registry);
+        $method = $ref->getMethod('registerAll');
+        $method->invoke($this->registry, $registrations);
+    }
+
+    /**
+     * Read a private property from the registry.
+     */
+    private function getRegistryProperty(string $name): mixed
+    {
+        $ref = new ReflectionClass($this->registry);
+        $prop = $ref->getProperty($name);
+        return $prop->getValue($this->registry);
+    }
+
+    // ── Filter tests ─────────────────────────────────────────────────
+
+    public function testPropertyFilterInvokesClosure(): void
+    {
+        $service = new PropertyFilterService();
+        $this->container->set(PropertyFilterService::class, $service);
+
+        $this->seedRegistrations([
+            [
+                'class'         => PropertyFilterService::class,
+                'method'        => 'appendSuffix',
+                'type'          => 'filter',
+                'hook'          => 'property_filter',
+                'priority'      => 10,
+                'accepted_args' => 1,
+                'defer'         => false,
+                'target'        => 'property',
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        $this->assertNotNull(
+            $this->findRegisteredHook('filter', 'property_filter'),
+            'Property filter hook should be registered',
+        );
+
+        $result = apply_filters('property_filter', 'hello');
+
+        $this->assertSame('hello_suffixed', $result, 'Filter closure should modify the value');
+        $this->assertSame(['hello'], PropertyFilterService::$capturedValues, 'Closure should have been invoked');
+    }
+
+    public function testPropertyActionProducesSideEffect(): void
+    {
+        $service = new PropertyActionService();
+        $this->container->set(PropertyActionService::class, $service);
+
+        $this->seedRegistrations([
+            [
+                'class'         => PropertyActionService::class,
+                'method'        => 'logAction',
+                'type'          => 'action',
+                'hook'          => 'property_action',
+                'priority'      => 10,
+                'accepted_args' => 1,
+                'defer'         => false,
+                'target'        => 'property',
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        do_action('property_action', 'triggered');
+
+        $this->assertSame(['triggered'], PropertyActionService::$capturedValues, 'Action closure should have been triggered');
+    }
+
+    public function testPropertyFilterReturnsValueThroughApplyFilters(): void
+    {
+        $service = new PropertyFilterService();
+        $this->container->set(PropertyFilterService::class, $service);
+
+        $this->seedRegistrations([
+            [
+                'class'         => PropertyFilterService::class,
+                'method'        => 'appendSuffix',
+                'type'          => 'filter',
+                'hook'          => 'property_filter',
+                'priority'      => 10,
+                'accepted_args' => 1,
+                'defer'         => false,
+                'target'        => 'property',
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        $result = apply_filters('property_filter', 'input');
+        $this->assertSame('input_suffixed', $result);
+    }
+
+    // ── Multiple priorities on same property ─────────────────────────
+
+    public function testMultiplePrioritiesOnSameProperty(): void
+    {
+        $service = new PropertyMultiPriorityService();
+        $this->container->set(PropertyMultiPriorityService::class, $service);
+
+        $this->seedRegistrations([
+            [
+                'class'         => PropertyMultiPriorityService::class,
+                'method'        => 'multiFilter',
+                'type'          => 'filter',
+                'hook'          => 'multi_priority_filter',
+                'priority'      => 10,
+                'accepted_args' => 1,
+                'defer'         => false,
+                'target'        => 'property',
+            ],
+            [
+                'class'         => PropertyMultiPriorityService::class,
+                'method'        => 'multiFilter',
+                'type'          => 'filter',
+                'hook'          => 'multi_priority_filter',
+                'priority'      => 20,
+                'accepted_args' => 1,
+                'defer'         => false,
+                'target'        => 'property',
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        $hooks = $this->registeredHooks();
+        $matched = array_values(array_filter(
+            $hooks,
+            fn(array $h): bool => $h['hook'] === 'multi_priority_filter' && $h['type'] === 'filter',
+        ));
+
+        $this->assertCount(2, $matched, 'Both priority registrations should be active');
+        $this->assertSame(10, $matched[0]['priority']);
+        $this->assertSame(20, $matched[1]['priority']);
+
+        $result = apply_filters('multi_priority_filter', 'val');
+        $this->assertSame('val_processed_processed', $result, 'Both priority filters should apply, chaining the value');
+    }
+
+    // ── Deferred property hooks ──────────────────────────────────────
+
+    public function testDeferredPropertyHookNotRegisteredOnInitialize(): void
+    {
+        $service = new PropertyDeferredService();
+        $this->container->set(PropertyDeferredService::class, $service);
+
+        $this->seedRegistrations([
+            [
+                'class'         => PropertyDeferredService::class,
+                'method'        => 'deferredFilter',
+                'type'          => 'filter',
+                'hook'          => 'deferred_property_filter',
+                'priority'      => 10,
+                'accepted_args' => 1,
+                'defer'         => true,
+                'target'        => 'property',
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        $this->assertNull(
+            $this->findRegisteredHook('filter', 'deferred_property_filter'),
+            'Deferred property hook should NOT be registered after initialize()',
+        );
+
+        // Activate by method name (which also works for property names)
+        $this->registry->activateDeferredByMethod(PropertyDeferredService::class, 'deferredFilter');
+
+        $this->assertNotNull(
+            $this->findRegisteredHook('filter', 'deferred_property_filter'),
+            'Deferred property hook should be registered after activateDeferredByMethod',
+        );
+
+        $result = apply_filters('deferred_property_filter', 'later');
+        $this->assertSame('later_deferred', $result, 'Deferred property closure should execute and modify value');
+    }
+
+    public function testNonClosurePropertyLogsErrorAndReturnsFallback(): void
+    {
+        $service = new PropertyNonClosureService();
+        $this->container->set(PropertyNonClosureService::class, $service);
+
+        $this->seedRegistrations([
+            [
+                'class'         => PropertyNonClosureService::class,
+                'method'        => 'notAClosure',
+                'type'          => 'filter',
+                'hook'          => 'non_closure_filter',
+                'priority'      => 10,
+                'accepted_args' => 1,
+                'defer'         => false,
+                'target'        => 'property',
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        // Should not throw — LazyPropertyHookHandler catches the error
+        $result = apply_filters('non_closure_filter', 'fallback_test');
+
+        // Should return the first argument as fallback
+        $this->assertSame('fallback_test', $result, 'Non-closure property should return fallback first arg');
+    }
+
+    // ── Edge cases ───────────────────────────────────────────────────
+
+    public function testClassNotInContainerIsSkipped(): void
+    {
+        // Register a property hook for a class NOT in the container
+        $this->seedRegistrations([
+            [
+                'class'         => 'NonExistent\\Class',
+                'method'        => 'someProp',
+                'type'          => 'filter',
+                'hook'          => 'ghost_hook',
+                'priority'      => 10,
+                'accepted_args' => 1,
+                'defer'         => false,
+                'target'        => 'property',
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        $this->assertNull(
+            $this->findRegisteredHook('filter', 'ghost_hook'),
+            'Hook for class not in container should be skipped',
+        );
+    }
+
+    public function testPropertyHookUsesLazyPropertyHookHandlerInstance(): void
+    {
+        $service = new PropertyFilterService();
+        $this->container->set(PropertyFilterService::class, $service);
+
+        $this->seedRegistrations([
+            [
+                'class'         => PropertyFilterService::class,
+                'method'        => 'appendSuffix',
+                'type'          => 'filter',
+                'hook'          => 'handler_type_check',
+                'priority'      => 10,
+                'accepted_args' => 1,
+                'defer'         => false,
+                'target'        => 'property',
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        $hook = $this->findRegisteredHook('filter', 'handler_type_check');
+        $this->assertNotNull($hook, 'Handler should be registered');
+
+        $handler = $hook['callable'];
+        $this->assertInstanceOf(LazyPropertyHookHandler::class, $handler, 'Property hooks should use LazyPropertyHookHandler');
+        $this->assertStringContainsString(
+            'appendSuffix',
+            $handler->label,
+            'Label should contain the property name',
+        );
+    }
+
+    public function testStaticClosureDoesNotCaptureThis(): void
+    {
+        $service = new class {
+            public static array $captured = [];
+
+            #[Filter(hook: 'static_closure_filter', priority: 10, acceptedArgs: 1)]
+            public $staticClosure = static function (string $value): string {
+                self::$captured[] = $value;
+                return $value . '_static';
+            };
+        };
+
+        $className = get_class($service);
+        $this->container->set($className, $service);
+
+        $this->seedRegistrations([
+            [
+                'class'         => $className,
+                'method'        => 'staticClosure',
+                'type'          => 'filter',
+                'hook'          => 'static_closure_filter',
+                'priority'      => 10,
+                'accepted_args' => 1,
+                'defer'         => false,
+                'target'        => 'property',
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        $result = apply_filters('static_closure_filter', 'static_test');
+        $this->assertSame('static_test_static', $result, 'Static closure on property should work');
+    }
+}

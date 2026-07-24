@@ -1,29 +1,22 @@
 <?php
-namespace WPLokerBJM\Core\Plugins;
-use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
+namespace WPLokerBJM\Core\Plugins\ThirdParty;
+use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 use DI\Attribute\Injectable;
 
-
-trait LitespeedStatus
+/**
+ * LiteSpeed custom hooks extend
+ * @link https://docs.litespeedtech.com/lscache/lscwp/api/
+ */
+final class Litespeed implements PluginConfigInterface
 {
     public static function isActive(): bool
     {
         return PluginList::LiteSpeed->isActive();
     }
-}
-
-/**
- * LiteSpeed custom hooks extend
- * @link https://docs.litespeedtech.com/lscache/lscwp/api/
- */
-#[Injectable(lazy: true)]
-class Litespeed
-{
-    use LitespeedStatus;
 
     /**
      * Deletes the compiled container cache file when LiteSpeed cache is purged.
@@ -69,24 +62,20 @@ class Litespeed
 /**
  * LiteSpeed GraphQL Integration
  */
-#[Injectable(lazy: true)]
-class LiteSpeedGraphQLIntegration
+class LiteSpeedGraphQLIntegration implements PluginConfigInterface
 {
-    use LitespeedStatus {
-        isActive as isLitespeedActive;
-    }
-
-    public function __construct(private WPHooksRegistry $hookRegistry)
-    {
-        if (self::isActive())
-            return;
-        $hookRegistry->unregisterByClass(self::class);
-    }
 
     public static function isActive(): bool
     {
-        return self::isLitespeedActive() && PluginList::WpGraphql->isActive();
+        return PluginList::LiteSpeed->isActive() && PluginList::WpGraphql->isActive();
     }
+
+    /**
+     * Call litespeed_purge when graphql_purge is called
+     */
+    #[Action('graphql_purge')]
+    public $purgeCache = static function ($keys): void {
+            do_action('litespeed_purge', $keys); };
 
     /**
      * Set GraphQL Queries returned via HTTP GET|OPTIONS requests to be cacheable
@@ -112,14 +101,5 @@ class LiteSpeedGraphQLIntegration
         }
 
         return $headers;
-    }
-
-    /**
-     * Call litespeed_purge when graphql_purge is called
-     */
-    #[Action('graphql_purge')]
-    public function purgeCache($keys): void
-    {
-        do_action('litespeed_purge', $keys);
     }
 }

@@ -20,7 +20,6 @@
   "settings": {
     "php.version": "8.5",
     "php.format.rules.addCommaAfterLastArrayElement": true,
-    "caddyfile.executable": "${workspaceFolder:wplokerbjm-root}/Caddyfile",
     "editor.codeLens": true,
     "files.watcherExclude": {
       "**/dist": true,
@@ -73,8 +72,9 @@
     "editor.formatOnSave": false,
     "php.workspace.includePath": "wordpress/wp-content/themes/wplokerbjm",
     "html.format.templating": true,
-    "php.suggest.basic": false,
+    "php.suggest.basic": true,
     "php.problems.scope": "opened",
+    "php.codeActions.enabled": true,
     "php.problems.exclude": {
       "**/generate-meta-hooks/captures/": true,
       "**/vendor/": true,

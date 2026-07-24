@@ -1,24 +1,23 @@
 <?php
 
-namespace WPLokerBJM\Core\Plugins;
+namespace WPLokerBJM\Core\Plugins\ThirdParty;
 
 use DI\Attribute\Injectable;
 use GraphQLDataType;
+use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Core\Container\Support\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
 use GraphQL\Executor\ExecutionResult;
-use WPGraphQL\Router;
 use WP_User;
 
 /**
  * WPGraphQL-related hooks extracted from GlobalHooks.
  * @phpstan-import-type GraphQLDataType from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
  */
-#[Injectable(lazy: true)]
-class WPGraphQL
+final class WPGraphQL implements PluginConfigInterface
 {
 
     public static function isActive(): bool
@@ -31,10 +30,6 @@ class WPGraphQL
         private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration,
         private WPGraphQLETag $eTag
     ) {
-        if (self::isActive())
-            return;
-        $hookRegistry->unregisterByClass(self::class);
-        $hookRegistry->unregisterDeferredByClass(self::class);
     }
 
     /**
@@ -140,11 +135,11 @@ class WPGraphQL
     {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        $officalOrigins = [
-            'https://dev.lokerbanjarmasin.my.id',
-            'https://staging.lokerbanjarmasin.my.id',
-            'https://lokerbanjarmasin.my.id',
-            'https://wp.lokerbanjarmasin.my.id',
+        static $officalOrigins = [
+        'https://dev.lokerbanjarmasin.my.id',
+        'https://staging.lokerbanjarmasin.my.id',
+        'https://lokerbanjarmasin.my.id',
+        'https://wp.lokerbanjarmasin.my.id',
         ];
 
         if (!SharedUtils::isDevelopment())
@@ -161,6 +156,7 @@ class WPGraphQL
         return array_merge($officalOrigins, $allowed);
     }
 
+    #region Header stuff
     /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
@@ -185,14 +181,12 @@ class WPGraphQL
             ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
         $headers['Access-Control-Max-Age'] = '86400';
 
-        $removeDuplicate = static function (string $value): string {
-            return $value
-                |> (static fn($v) => explode(',', $v))
-                |> (static fn($v) => array_map('trim', $v))
-                |> array_filter(...)
-                |> array_unique(...)
-                |> (static fn($v) => implode(', ', $v));
-        };
+        static $removeDuplicate = static fn(string $value): string => $value
+        |> (static fn($v) => explode(',', $v))
+        |> (static fn($v) => array_map('trim', $v))
+        |> array_filter(...)
+        |> array_unique(...)
+        |> (static fn($v) => implode(', ', $v));
 
         $headers['Access-Control-Allow-Headers'] =
             $removeDuplicate($headers['Access-Control-Allow-Headers']);
@@ -218,22 +212,17 @@ class WPGraphQL
         }
         $headers = $this->applyCachePolicy($headers);
 
-        /**  @see WPGraphQL::applyCachePolicy */
         if (is_user_logged_in()) {
             $headers['Logged-In'] = 'true';
             $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
-            $this->disableGraphQLNoCacheHeaders();
-            // $this->hookRegistry->activateDeferredByMethod(self::class, 'applyCachePolicy');
+            /** @see WPGraphQL::disableGraphQLNoCacheHeaders */
+            $this->hookRegistry->activateDeferredByMethod(self::class, 'disableGraphQLNoCacheHeaders');
         }
         return $headers;
     }
 
-    #[Filter('graphql_send_nocache_headers', defer: true)]
-    public function disableGraphQLNoCacheHeaders(): bool
-    {
-        $this->hookRegistry->activateDeferredByMethod(self::class, __FUNCTION__);
-        return __return_false();
-    }
+    #[Filter('graphql_send_nocache_headers', 10, defer: true)]
+    public function disableGraphQLNoCacheHeaders(): bool { return false; }
 
     // #[Filter('nocache_headers', 11, defer: true)]
     public function applyCachePolicy(array $headers): array
@@ -248,6 +237,7 @@ class WPGraphQL
         $headers['Cache-Control'] = $cacheValue;
         return $headers;
     }
+    #endregion
 
     /**
      * @see \WPGraphQL\Router::prepare_headers;
@@ -401,22 +391,21 @@ class WPGraphQLETag
     private function buildRequestHash(): string
     {
         static $hash = null;
+        if ($hash !== null) return $hash; // memoize
 
-        if ($hash === null) {
-            $query = $_REQUEST['query'] ?? '';
-            $operationName = $_REQUEST['operationName'] ?? '';
-            $extensions = $_REQUEST['extensions'] ?? '';
+        $query = $_REQUEST['query'] ?? '';
+        $operationName = $_REQUEST['operationName'] ?? '';
+        $extensions = $_REQUEST['extensions'] ?? '';
 
-            $rawVars = $_REQUEST['variables'] ?? '';
-            if (is_string($rawVars) && $rawVars !== '') {
-                $variables = json_decode($rawVars, true) ?: [];
-            } else {
-                $variables = is_array($rawVars) ? $rawVars : [];
-            }
-
-            $authFingerprint = $this->buildAuthFingerprint();
-            $hash = hash('xxh128', serialize(compact('query', 'variables', 'operationName', 'extensions', 'authFingerprint')));
+        $rawVars = $_REQUEST['variables'] ?? '';
+        if (is_string($rawVars) && $rawVars !== '') {
+            $variables = json_decode($rawVars, true) ?: [];
+        } else {
+            $variables = is_array($rawVars) ? $rawVars : [];
         }
+
+        $authFingerprint = $this->buildAuthFingerprint();
+        $hash = hash('xxh128', serialize(compact('query', 'variables', 'operationName', 'extensions', 'authFingerprint')));
 
         return $hash;
     }

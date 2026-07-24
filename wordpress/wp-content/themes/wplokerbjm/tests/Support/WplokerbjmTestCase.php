@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\Support;
 
 use PHPUnit\Framework\TestCase;
-use Psr\Container\ContainerInterface;
+use \DI\Container;
 
 abstract class WplokerbjmTestCase extends TestCase
 {
@@ -56,17 +56,6 @@ abstract class WplokerbjmTestCase extends TestCase
         \Brain\Monkey\Functions\when('wp_cache_delete')->alias(function ($key, $group) {
             unset(self::$mockCache[$key]);
             return true;
-        });
-        \Brain\Monkey\Functions\when('__wplokerbjm_make_multi_http_requests')->alias(function ($requests) {
-            $responses = [];
-            foreach ($requests as $request) {
-                $responses[] = [
-                    'response' => ['code' => 200],
-                    'body' => '{"success": true}',
-                    'headers' => ['content-type' => 'application/json'],
-                ];
-            }
-            return $responses;
         });
 
         $this->setupWordPressHookMocks();
@@ -169,7 +158,7 @@ abstract class WplokerbjmTestCase extends TestCase
         parent::tearDown();
     }
 
-    protected function container(): ContainerInterface
+    protected function container(): Container
     {
         return ProxyContainer::container();
     }

@@ -1,6 +1,7 @@
 <?php
 namespace WPLokerBJM\Controllers\GraphQL\Resolvers\Auth;
 
+use JWTDataShape;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
@@ -52,7 +53,7 @@ class JWTDataResolver
      * Sends a POST request to the JWT validate endpoint with the token
      * as a Bearer Authorization header.
      *
-     * @param string $token JWT token string to validate
+     * @phpstan-param JWTDataShape['token'] $token JWT token string to validate
      * @return string|null 'ok' if valid, null on failure
      */
     private function validateOnlyToken(string $token): string|null
@@ -84,8 +85,8 @@ class JWTDataResolver
      * Sends a POST request to the JWT token endpoint with username/password.
      * On success, automatically sets an HTTP-only cookie with the token.
      *
-     * @param string $username WordPress username
-     * @param string $password WordPress password
+     * @phpstan-param JWTDataShape['username'] $username WordPress username
+     * @phpstan-param JWTDataShape['password'] $password WordPress password
      * @return string|null 'ok' on successful authentication, null on failure
      */
     private function validateCredentialWP(string $username, string $password): string|null
@@ -115,7 +116,7 @@ class JWTDataResolver
         if ($token === null) {
             return null;
         }
-        self::setJwtCookie($token);
+        $this->setJwtCookie($token);
         return 'ok';
     }
 
@@ -128,7 +129,7 @@ class JWTDataResolver
      *
      * @param string $token JWT token string to store in cookie
      */
-    private static function setJwtCookie(string $token): void
+    private function setJwtCookie(string $token): void
     {
         $domain = static function () {
             $url = SharedUtils::headlessDomainRedirect();

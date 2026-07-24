@@ -2,15 +2,14 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Services\REST;
+namespace WPLokerBJM\Services\REST\Route;
 
 use WPLokerBJM\Controllers\REST\LowonganIngestController;
 use WPLokerBJM\Controllers\REST\LowonganIngestOptionsController;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use DI\Attribute\Injectable;
 
-#[Injectable(lazy: true)]
-class LowonganIngestRoute
+final class LowonganIngestRoute
 {
     public const NAMESPACE = 'wplokerbjm/v1';
     public const ROUTE = '/lowongan/ingest';
@@ -27,7 +26,7 @@ class LowonganIngestRoute
     {
 
         register_rest_route(self::NAMESPACE , self::ROUTE_OPTIONS, [
-            'methods' => 'GET',
+        'methods' => 'GET',
             'callback' => fn() => $this->optionsController->options(),
             'permission_callback' => fn($request) => $this->optionsController->permissionsCheck($request),
         ]);

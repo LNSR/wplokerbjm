@@ -12,11 +12,14 @@ use PhpParser\Node\Scalar\String_;
 use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 
 /**
- * !Omitted, this might useful in future
  * Phase 4 — Scan theme PHP files for #[Action] / #[Filter] attributes using
  * php-parser (handles multiline attributes, nested parens, named arguments).
+ *
+ * Detects hook attributes on both methods and public property closures.
+ * Runs concurrently with Phases 1-3. Results merged as authoritative source.
  *
  * @return array{actions: list<string>, filters: list<string>}
  */
@@ -48,15 +51,18 @@ function themeAttributeScan(string $themeRoot): array
                 return;
             }
             foreach ($attr->args as $arg) {
-                if (
-                    $arg instanceof Node\Arg
-                    && $arg->name?->name === 'hook'
-                    && $arg->value instanceof String_
-                ) {
+                if (!$arg instanceof Node\Arg || !$arg->value instanceof String_) {
+                    continue;
+                }
+                if ($arg->name === null || $arg->name->name === 'hook') {
                     if ($baseName === 'Action') {
-                        $this->actions[] = $arg->value->value;
+                        /** @var String_ $val */
+                        $val = $arg->value;
+                        $this->actions[] = $val->value;
                     } else {
-                        $this->filters[] = $arg->value->value;
+                        /** @var String_ $val */
+                        $val = $arg->value;
+                        $this->filters[] = $val->value;
                     }
                     return;
                 }

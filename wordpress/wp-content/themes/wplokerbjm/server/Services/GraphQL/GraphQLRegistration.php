@@ -10,7 +10,6 @@ use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Core\Container\Attributes\Action;
-#[Injectable(lazy: true)]
 /**
  * @phpstan-import-type ThemeData from ThemeInject
  * @phpstan-import-type TaxonomyJobTerms from TaxonomyResolver

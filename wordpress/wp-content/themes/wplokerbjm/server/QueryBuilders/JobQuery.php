@@ -362,4 +362,20 @@ class JobQuery
 		];
 	}
 
+	public static function findPostIdForIngest(string $hashKey,string $hash): array
+	{
+		return get_posts([
+			'post_type' => PostTypes::POST_TYPE_LOWONGAN,
+			'post_status' => 'any',
+			'fields' => 'ids',
+			'posts_per_page' => 1,
+			'meta_query' => [
+				[	
+					'key' => $hashKey,
+					'value' => $hash,
+					'compare' => '=',
+				],
+			],
+		]);
+	}
 }
