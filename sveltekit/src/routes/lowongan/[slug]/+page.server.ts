@@ -14,8 +14,8 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
 
   try
   {
-    const jobPromise: Promise<JobDetailResponse> = APIServiceServer.fetchJobDetailGraphQL(slug, undefined, fetch);
-    const schemaPromise = APIServiceServer.fetchJobSchemasGraphQL(slug, undefined, "JobPosting", fetch).catch(
+    const jobPromise: Promise<JobDetailResponse> = APIServiceServer.fetchJobDetailGraphQL(slug);
+    const schemaPromise = APIServiceServer.fetchJobSchemasGraphQL(slug, "JobPosting").catch(
       (e) =>
       {
         console.warn("Failed to fetch job schema on server load:", e);
@@ -25,8 +25,8 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
 
     const desktopDataPromise = !isMobile
       ? Promise.all([
-        APIServiceShared.fetchCarouselGraphQL(fetch),
-        APIServiceShared.fetchJobGridGraphQL({ paged: 1 }, fetch),
+        APIServiceShared.fetchCarouselGraphQL(),
+        APIServiceShared.fetchJobGridGraphQL({ paged: 1 }),
       ]).catch((e) =>
       {
         console.warn("Failed to fetch carousel/jobGrid on server load:", e);

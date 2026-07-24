@@ -63,6 +63,9 @@ class Cloudflare
     #[Action('deleted_post_meta', 10, 4)]
     public function purgeOnMetaChange(): bool
     {
+        static $alreadyRun = false;
+        if ($alreadyRun) return true;
+        $alreadyRun = true;
         $this->wpHooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
         return $this->sendPurgeRequest(['purge_everything' => true]);
@@ -79,6 +82,9 @@ class Cloudflare
     #[Action('delete_term', 10, 0)]
     public function purgeOnTermChange(): bool
     {
+        static $alreadyRun = false;
+        if ($alreadyRun) return true;
+        $alreadyRun = true;
         $this->wpHooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
         return $this->sendPurgeRequest(['purge_everything' => true]);

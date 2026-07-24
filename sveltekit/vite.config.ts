@@ -64,7 +64,6 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
     partytownVite({
       dest: resolve(__dirname, "public", "~partytown"),
     }),
-    appendCloudflareHeaders(),
     analyzer({
       enabled: false,
       fileName: "stats",
@@ -108,21 +107,6 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
     worker,
   };
 });
-
-const cloudflareSecurityHeaders = /*txt*/`
-# === START CUSTOM SECURITY HEADERS ===
-
-/~partytown/*
-  Service-Worker-Allowed: /
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: credentialless
-
-/_app/immutable/workers/*
-  Service-Worker-Allowed: /
-  Cross-Origin-Opener-Policy: same-origin
-  Cross-Origin-Embedder-Policy: credentialless
-# === END CUSTOM SECURITY HEADERS ===
-`;
 
 function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
   let root: ResolvedConfig['root'] = process.cwd();
@@ -226,29 +210,3 @@ function copyPartytownAssets(dest: string): Plugin {
   }
 }
 
-function appendCloudflareHeaders(): Plugin {
-  return {
-    name: "append-cloudflare-headers",
-    async closeBundle() {
-      const headersFile = resolve(__dirname, ".svelte-kit", "cloudflare", "_headers");
-      const targetDir = resolve(__dirname, ".svelte-kit", "cloudflare");
-      let existingHeaders = "";
-
-      if (!fs.existsSync(targetDir)) {
-        fs.mkdirSync(targetDir, { recursive: true });
-      }
-
-      if (fs.existsSync(headersFile)) {
-        existingHeaders = fs.readFileSync(headersFile, "utf8");
-      }
-
-      if (existingHeaders.includes("START CUSTOM SECURITY HEADERS")) return;
-
-      const updatedHeaders = existingHeaders
-        ? `${existingHeaders.trimEnd()}\n${cloudflareSecurityHeaders}`
-        : cloudflareSecurityHeaders;
-
-      fs.writeFileSync(headersFile, updatedHeaders, "utf8");
-    }
-  }
-}

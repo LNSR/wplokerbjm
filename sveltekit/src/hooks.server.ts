@@ -6,6 +6,7 @@ import { handleDeviceDetector } from "sveltekit-device-detector";
 import { APIServiceServer } from "@/services/graphql/APIService";
 import { dev } from "$app/environment";
 import { getEtag, setEtag } from "$lib/server/cache/eTagCache";
+import { getThemeCache, setThemeCache } from "$lib/server/cache/themeCache";
 import {
   buildPreloadLink,
   isAuthenticated,
@@ -161,11 +162,8 @@ const handleSecurityContext: Handle = async ({ event, resolve }) => {
 
   const response = await resolve(event);
 
-  if (event.locals.authToken) {
-    response.headers.append("Vary", "Cookie");
-    response.headers.append("Vary", "Authorization");
-  }
-
+  response.headers.append("Vary", "Cookie");
+  response.headers.append("Vary", "Authorization");
   return response;
 };
 /**
@@ -197,12 +195,6 @@ const handleGraphQLETag: Handle = async ({ event, resolve }) => {
       const hashKey = (await HttpUtils.hashString(rawBody || url)).slice(0, 32);
 
       const cached = await getEtag(hashKey);
-      if (cached) {
-        const headers = new Headers(init.headers);
-        headers.set("If-None-Match", cached.etag);
-        init.headers = headers;
-      }
-
       const response = await originalFetch(input, init);
 
       if (cached && response.status === 304) {
@@ -239,10 +231,21 @@ const handleGraphQLETag: Handle = async ({ event, resolve }) => {
  * 5. Layout Discovery Middleware
  */
 const handleThemeContext: Handle = async ({ event, resolve }) => {
+  APIServiceServer.setFetchFn(event.fetch); //! set fetchFn function for server
+  let cache: WPLokerBJMThemedData | undefined = getThemeCache();
+  
+  if (cache) {
+    cache.wpRestNonce = APIServiceServer.getNonce;
+    event.locals.themeData = { ...cache };
+    return resolve(event);
+  }
+
   try {
     const result: WPLokerBJMThemedData =
-      await APIServiceServer.getThemeDataGraphQL(undefined, event.fetch);
-    event.locals.themeData = result;
+      await APIServiceServer.getThemeDataGraphQL();
+    cache = { ...result, wpRestNonce: undefined };
+    setThemeCache(cache);
+    event.locals.themeData = { ...cache, wpRestNonce: APIServiceServer.getNonce };
   } catch (e) {
     console.warn("hooks.handleThemeContext: failed to fetch theme data", e);
   }

@@ -14,8 +14,6 @@ export const load: LayoutServerLoad = async ({ locals, url, fetch }) =>
     {
       rankMathHead = await APIServiceServer.getRankMathHeadGraphQL(
         fullUrl,
-        undefined,
-        fetch,
       );
 
       if (rankMathHead && url.origin)

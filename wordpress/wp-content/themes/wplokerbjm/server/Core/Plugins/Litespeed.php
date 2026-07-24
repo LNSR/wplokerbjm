@@ -93,7 +93,13 @@ class LiteSpeedGraphQLIntegration
      */
     public function setCacheable(): void
     {
-        if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'OPTIONS') return;
+        if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'OPTIONS')
+            return;
+        if (is_user_logged_in()) {
+            do_action('litespeed_control_force_cacheable');
+            do_action('litespeed_control_set_ttl', 3600);
+            return;
+        }
         do_action('litespeed_control_force_cacheable');
         do_action('litespeed_control_set_ttl', 86400);
     }

@@ -65,8 +65,9 @@ class WPGraphQL
     {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        if (empty($origin))
-            return $requireNonce;
+        if (empty($origin)) {
+            return false;
+        }
 
         $result = \in_array($origin, $this->allowedOrigins(), true);
         return $result ? false : $requireNonce;
@@ -79,8 +80,8 @@ class WPGraphQL
     public function handleInitRequest(): void
     {
         $this->litespeedGraphQLIntegration->setCacheable();
-        $this->eTag->checkEarly304();
         $this->authenticateViaCookie();
+        $this->eTag->checkEarly304();
     }
 
     /**
@@ -203,10 +204,6 @@ class WPGraphQL
 
         $headers = $this->eTag->setHeader($headers);
 
-        if (is_user_logged_in()) {
-            $headers['Logged-In'] = 'true';
-        }
-
         $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag';
 
         $headers['Vary'] = ($headers['Vary'] ?? '') . ', Origin, Authorization';
@@ -222,18 +219,30 @@ class WPGraphQL
         $headers = $this->applyCachePolicy($headers);
 
         /**  @see WPGraphQL::applyCachePolicy */
-        is_user_logged_in() && $this->hookRegistry->activateDeferredByMethod(self::class, 'applyCachePolicy');
+        if (is_user_logged_in()) {
+            $headers['Logged-In'] = 'true';
+            $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
+            $this->disableGraphQLNoCacheHeaders();
+            // $this->hookRegistry->activateDeferredByMethod(self::class, 'applyCachePolicy');
+        }
         return $headers;
     }
 
-    #[Filter('nocache_headers', 11, defer: true)]
+    #[Filter('graphql_send_nocache_headers', defer: true)]
+    public function disableGraphQLNoCacheHeaders(): bool
+    {
+        $this->hookRegistry->activateDeferredByMethod(self::class, __FUNCTION__);
+        return __return_false();
+    }
+
+    // #[Filter('nocache_headers', 11, defer: true)]
     public function applyCachePolicy(array $headers): array
     {
         $loggedIn = is_user_logged_in();
         $isDev = SharedUtils::isDevelopment();
         $cacheValue = match (true) {
-            default => $loggedIn ? 'private, max-age=90, must-revalidate' : 'public, max-age=360, stale-while-revalidate=3600',
             $isDev => $loggedIn ? 'private, no-cache, must-revalidate' : 'public, no-cache, must-revalidate',
+            default => $loggedIn ? 'private, max-age=60, must-revalidate' : 'public, max-age=360, stale-while-revalidate=3600',
         };
 
         $headers['Cache-Control'] = $cacheValue;

@@ -1,56 +1,54 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "wplokerbjm-dev",
+  "name": "wplokerbjm",
   "account_id": "5996bc6e6329a2824240d44bc86bcc03",
   "compatibility_date": "2026-07-14",
   "compatibility_flags": [
     "nodejs_compat",
     "enable_nodejs_http_modules",
-    "enable_nodejs_http_server_modules",
+    "enable_nodejs_http_server_modules"
   ],
   "main": ".svelte-kit/cloudflare/_worker.js",
   "assets": {
     "binding": "ASSETS",
-    "directory": ".svelte-kit/cloudflare",
+    "directory": ".svelte-kit/cloudflare"
   },
-  "routes": [
-    {
-      "zone_name": "dev.lokerbanjarmasin.my.id",
-      "pattern": "dev.lokerbanjarmasin.my.id/*",
-    },
-  ],
   "minify": true,
-  "cache": { "enabled": true, "cross_version_cache": false },
-  "workers_dev": false,
-  "preview_urls": false,
+  "cache": { "enabled": false, "cross_version_cache": false },
   "observability": {
-    "enabled": true,
+    "enabled": true
   },
   "dev": {
     "local_protocol": "https",
-    "port": 8787,
+    "port": 8787
   },
+
   "env": {
+    "development": {
+      "name": "wplokerbjm-dev",
+      "workers_dev": false,
+      "routes": [
+        {
+          "zone_name": "dev.lokerbanjarmasin.my.id",
+          "pattern": "dev.lokerbanjarmasin.my.id/*"
+        }
+      ]
+    },
     "production": {
-      "cache": { "enabled": true, "cross_version_cache": false },
-      "minify": true,
+      "name": "wplokerbjm-prod",
+      "workers_dev": false,
+      "routes": [
+        {
+          "zone_name": "lokerbanjarmasin.my.id",
+          "pattern": "lokerbanjarmasin.my.id/*"
+        }
+      ],
       "kv_namespaces": [
         {
           "binding": "wplokerbjm",
-          "id": "75fc8b0cd2d74548b6c05321296d4d45",
-        },
-      ],
-      "assets": {
-        "binding": "ASSETS",
-        "directory": ".svelte-kit/cloudflare",
-      },
-      "name": "wplokerbjm-prod",
-      "routes": [
-        {
-          "pattern": "lokerbanjarmasin.my.id/*",
-          "zone_name": "lokerbanjarmasin.my.id",
-        },
-      ],
-    },
-  },
+          "id": "75fc8b0cd2d74548b6c05321296d4d45"
+        }
+      ]
+    }
+  }
 }

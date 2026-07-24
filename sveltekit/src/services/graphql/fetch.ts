@@ -25,7 +25,7 @@ import { GET_JOB_DETAIL, GET_JOB_SCHEMA, GET_RANK_MATH_HEAD } from "@/services/g
 import { GET_THEME_DATA } from "@/services/graphql/query/server/theme";
 import { URQLServerManager } from "@/services/graphql/config/urql";
 type BookmarkResponse = CardJob[];
-export class SharedFetch {
+class SharedFetch {
 
     protected URQLManager: URQLBrowserManager | URQLServerManager;
 
@@ -37,9 +37,20 @@ export class SharedFetch {
         this.URQLManager.setNonce(nonce);
     }
 
+    /**
+     * @param fetchFn SvelteKit its SSR fetch
+     */
+    public setFetchFn(fetchFn: typeof fetch): void {
+        this.URQLManager.setFetchFn(fetchFn);
+    }
+
+    public get getNonce(): WPLokerBJMThemedData["wpRestNonce"] {
+        return this.URQLManager.getNonce;
+    }
+
     //* Jobs related
-    public async fetchCarouselGraphQL(fetchFn?: typeof fetch): Promise<CarouselProps> {
-        const data = await this.URQLManager!.runQuery(GET_CAROUSEL, {}, undefined, undefined, fetchFn);
+    public async fetchCarouselGraphQL(): Promise<CarouselProps> {
+        const data = await this.URQLManager!.runQuery({ query: GET_CAROUSEL, variables: {} });
         const carousel = data.carousel;
         if (carousel?.jobs && Array.isArray(carousel.jobs)) {
             carousel.jobs = carousel.jobs.map((j) => APIServiceHelper.normalizeJob(j));
@@ -48,16 +59,12 @@ export class SharedFetch {
     }
     public async fetchJobGridGraphQL(
         filters: JobGridFilters,
-        fetchFn?: typeof fetch,
     ): Promise<JobGridProps> {
         const { sort, paged, context, title, total_jobs, ...filterFields } = filters;
-        const data = await this.URQLManager!.runQuery(
-            GET_JOB_GRID,
-            { sort, paged, context, title, total_jobs, filters: filterFields },
-            undefined,
-            undefined,
-            fetchFn,
-        );
+        const data = await this.URQLManager!.runQuery({
+            query: GET_JOB_GRID,
+            variables: { sort, paged, context, title, total_jobs, filters: filterFields },
+        });
         const grid = data.jobGrid;
         if (grid?.jobs && Array.isArray(grid.jobs)) {
             grid.jobs = grid.jobs.map((j) => APIServiceHelper.normalizeJob(j));
@@ -66,7 +73,7 @@ export class SharedFetch {
         return typia.assertEquals<JobGridProps>(grid);
     }
     //  async fetchAllTermsGraphQL(): Promise<TaxonomyTermsResponse> {
-    //   const data = await URQLClientManager.runQuery(GET_ALL_TERMS, {}, undefined, undefined);
+    //   const data = await URQLClientManager.runQuery({ query: GET_ALL_TERMS, variables: {} });
 
     //   const taxonomyTerms = data.taxonomyTerms as TaxonomyTermsResponse;
     //   const keys = ["lokasiTerms", "genderTerms", "pendidikanTerms"] as const;
@@ -94,40 +101,33 @@ export class BrowserFetch extends SharedFetch {
             password?: string;
             token?: string;
         },
-        fetchFn?: typeof fetch,
     ): Promise<string | null> {
         const assert = typia.createAssertEquals<typeof options>();
         const validated = assert(options);
-        const data = await this.URQLManager.runMutation(
-            GET_JWT,
-            {
+        const data = await this.URQLManager.runMutation({
+            mutation: GET_JWT,
+            variables: {
                 username: validated.username,
                 password: validated.password,
                 token: validated.token,
             },
-            await this.URQLManager.mergedFetchOptionsContext(),
-            fetchFn,
-        );
+            context: await this.URQLManager.mergedFetchOptionsContext(),
+        });
         return typia.assertEquals<string | null>(data.jwt);
     }
 
     //* Jobs related (GraphQL versions)
     public async getAutoSuggestionsGraphQL(
         query: string,
-        fetchFn?: typeof fetch,
     ): Promise<string[]> {
-        const data = await this.URQLManager.runQuery(
-            GET_AUTO_SUGGESTIONS,
-            { query },
-            undefined,
-            undefined,
-            fetchFn,
-        );
+        const data = await this.URQLManager.runQuery({
+            query: GET_AUTO_SUGGESTIONS,
+            variables: { query },
+        });
         return (data.autoSuggestions ?? []).filter((s): s is string => s !== null);
     }
     public async fetchTaxonomyTermsByTypeGraphQL(
         type: keyof TaxonomyTermsResponse,
-        fetchFn?: typeof fetch,
     ): Promise<TaxonomyTermsResponse[typeof type]> {
         const queryMap: Record<keyof TaxonomyTermsResponse, DocumentInput> = {
             lokasiTerms: GET_LOKASI_TERMS,
@@ -140,23 +140,19 @@ export class BrowserFetch extends SharedFetch {
             throw new Error(`Unsupported taxonomy type: ${type}`);
         }
 
-        const data = await this.URQLManager.runQuery(query, {}, undefined, undefined, fetchFn);
+        const data = await this.URQLManager.runQuery({ query, variables: {} });
         const terms = data[type];
         return typia.assertEquals<TaxonomyTermsResponse[typeof type]>(APIServiceHelper.parseGQLJSON(terms));
     }
     //* Jobs related
     public async searchJobsGraphQL(
         filters: SearchFilters,
-        fetchFn?: typeof fetch,
     ): Promise<SearchResponse> {
         const { context, ...filterFields } = filters;
-        const data = await this.URQLManager.runQuery(
-            GET_SEARCH_JOBS,
-            { context: context ?? 'search', filters: filterFields },
-            undefined,
-            undefined,
-            fetchFn,
-        );
+        const data = await this.URQLManager.runQuery({
+            query: GET_SEARCH_JOBS,
+            variables: { context: context ?? 'search', filters: filterFields },
+        });
         const resp = data.searchJobs;
         if (resp?.jobs && Array.isArray(resp.jobs)) {
             resp.jobs = resp.jobs.map((j) => APIServiceHelper.normalizeJob(j));
@@ -165,16 +161,12 @@ export class BrowserFetch extends SharedFetch {
     }
     public async loadMoreJobsGraphQL(
         filters: LoadMoreFilters,
-        fetchFn?: typeof fetch,
     ): Promise<LoadMoreResponse> {
         const { paged, context, ...filterFields } = filters;
-        const data = await this.URQLManager.runQuery(
-            GET_LOAD_MORE,
-            { paged, context, filters: filterFields },
-            undefined,
-            undefined,
-            fetchFn,
-        );
+        const data = await this.URQLManager.runQuery({
+            query: GET_LOAD_MORE,
+            variables: { paged, context, filters: filterFields },
+        });
         const result = data.loadMore;
         if (result?.jobs && Array.isArray(result.jobs)) {
             result.jobs = result.jobs.map((j) => APIServiceHelper.normalizeJob(j));
@@ -184,14 +176,14 @@ export class BrowserFetch extends SharedFetch {
     }
 
     public async getThemeNonceGraphQL(): Promise<WPLokerBJMThemedData["wpRestNonce"]> {
-        const data = await this.URQLManager.runQuery(GET_THEME_NONCE, {}, undefined, false);
+        const data = await this.URQLManager.runQuery({ query: GET_THEME_NONCE, variables: {}, httpMethodPref: false });
         return typia.assertEquals<string | null>(data.themeData?.wpRestNonce);
     }
 
     public async syncBookmarkGraphQL(
         ids: number[]
     ): Promise<BookmarkResponse> {
-        const data = await this.URQLManager.runQuery(SYNC_BOOKMARK, { ids }, undefined, undefined);
+        const data = await this.URQLManager.runQuery({ query: SYNC_BOOKMARK, variables: { ids } });
         const normalized = (data.syncBookmark)?.map((j) => APIServiceHelper.normalizeJob(j));
 
         return typia.assertEquals<BookmarkResponse>(normalized);
@@ -207,16 +199,13 @@ export class ServerFetch extends SharedFetch {
     public async fetchJobDetailGraphQL(
         slug: string,
         signal?: AbortSignal,
-        fetchFn?: typeof fetch,
     ): Promise<JobDetailResponse> {
         slug = slug.replace(/\/+$/g, ""); // ensure no trailing slash
-        const data = await this.URQLManager.runQuery(
-            GET_JOB_DETAIL,
-            { slug },
-            this.URQLManager.mergedFetchOptionsContext(signal),
-            undefined,
-            fetchFn,
-        );
+        const data = await this.URQLManager.runQuery({
+            query: GET_JOB_DETAIL,
+            variables: { slug },
+            context: this.URQLManager.mergedFetchOptionsContext(signal),
+        });
         const job = data.jobDetail;
 
         return typia.assertEquals<JobDetailResponse>(job);
@@ -225,24 +214,20 @@ export class ServerFetch extends SharedFetch {
     public async getRankMathHeadGraphQL(
         url: string,
         signal?: AbortSignal,
-        fetchFn?: typeof fetch,
     ): Promise<string> {
-        const data = await this.URQLManager.runQuery(
-            GET_RANK_MATH_HEAD,
-            { url },
-            this.URQLManager.mergedFetchOptionsContext(signal),
-            undefined,
-            fetchFn,
-        );
+        const data = await this.URQLManager.runQuery({
+            query: GET_RANK_MATH_HEAD,
+            variables: { url },
+            context: this.URQLManager.mergedFetchOptionsContext(signal),
+        });
 
         return typia.assertEquals<string>(data.rankMathHead ?? "");
     }
 
     public async fetchJobSchemasGraphQL(
         idsOrSlug?: number[] | string,
-        signal?: AbortSignal,
         type?: JobSchemaResponse["type"],
-        fetchFn?: typeof fetch,
+        signal?: AbortSignal,
     ): Promise<JobSchemaResponse["schemas"]> {
 
         const variables: { slug?: string; ids?: number[]; type?: string } = {};
@@ -255,13 +240,11 @@ export class ServerFetch extends SharedFetch {
 
         if (type) variables.type = typia.assertEquals<JobSchemaResponse["type"]>(type);
 
-        const data = await this.URQLManager.runQuery(
-            GET_JOB_SCHEMA,
+        const data = await this.URQLManager.runQuery({
+            query: GET_JOB_SCHEMA,
             variables,
-            this.URQLManager.mergedFetchOptionsContext(signal),
-            undefined,
-            fetchFn,
-        );
+            context: this.URQLManager.mergedFetchOptionsContext(signal),
+        });
 
         const schemas = data.jobSchema?.schemas;
 
@@ -271,15 +254,12 @@ export class ServerFetch extends SharedFetch {
     //* Theme data related
     public async getThemeDataGraphQL(
         signal?: AbortSignal,
-        fetchFn?: typeof fetch,
     ): Promise<WPLokerBJMThemedData> {
-        const data = await this.URQLManager.runQuery(
-            GET_THEME_DATA,
-            {},
-            this.URQLManager.mergedFetchOptionsContext(signal),
-            undefined,
-            fetchFn,
-        );
+        const data = await this.URQLManager.runQuery({
+            query: GET_THEME_DATA,
+            variables: {},
+            context: this.URQLManager.mergedFetchOptionsContext(signal),
+        });
         return typia.assertEquals<WPLokerBJMThemedData>(data.themeData);
     }
 };

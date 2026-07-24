@@ -412,6 +412,9 @@ class CacheInvalidationHooks
     #[Action('transition_post_status', 10, 3)]
     public function purgeGlobalCacheOnce(...$args): void
     {
+        static $alreadyRun = false;
+        if ($alreadyRun) return;
+        $alreadyRun = true;
         $this->hooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
 
         try {
