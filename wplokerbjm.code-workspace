@@ -72,7 +72,7 @@
     "editor.formatOnSave": false,
     "php.workspace.includePath": "wordpress/wp-content/themes/wplokerbjm",
     "html.format.templating": true,
-    "php.suggest.basic": true,
+    "php.suggest.basic": false,
     "php.problems.scope": "opened",
     "php.codeActions.enabled": true,
     "php.problems.exclude": {

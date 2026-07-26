@@ -2,10 +2,8 @@
 
 namespace WPLokerBJM\Core;
 
-use DI\Attribute\Injectable;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Shared\Utilities\PluginList;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
@@ -329,9 +327,6 @@ class CacheInvalidationHooks
             Cache::deleteMultiple([
                 CacheKey::CAROUSEL_JOBS,
                 CacheKey::JOB_LAST_MODIFIED,
-                CacheKey::TAXONOMY_LAST_MODIFIED,
-                CacheKey::ALL_TAXONOMY_TERMS,
-                CacheKey::ALL_TAXONOMY_OPTIONS,
                 CacheKey::TAXONOMY_DEPTH_HANDLE,
                 CacheKey::TAXONOMY_DEPTH_LOKASI,
                 CacheKey::TAXONOMY_DEPTH_GENDER,
@@ -435,6 +430,7 @@ class CacheInvalidationHooks
  */
 class LoggerHooks
 {
+
     #[Action('shutdown', PHP_INT_MAX)]
     public function flushBuffer(): void
     {

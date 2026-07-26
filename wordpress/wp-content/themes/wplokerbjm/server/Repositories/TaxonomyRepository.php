@@ -44,23 +44,19 @@ class TaxonomyRepository
 		return $result;
 	}
 
-	public function getTaxonomyTerms(): array
+	/**
+	 * @return array<string, list<\WP_Term>>
+	 */
+	public function getTaxonomyTerms(?bool $showEmpty = false): array
 	{
-		$cache_key = CacheKey::ALL_TAXONOMY_TERMS;
-		$cached = Cache::get($cache_key);
-		if ($cached !== false) {
-			return $cached;
-		}
-
 		$terms = [];
 		foreach ($this->metaBoxesTaxonomies as $taxonomy) {
 			$terms[$taxonomy] = get_terms([
 				'taxonomy' => $taxonomy,
-				'hide_empty' => true,
+				'hide_empty' => $showEmpty,
 			]);
 		}
 
-		Cache::set($cache_key, $terms, 86400); // Cache for 1 day
 		return $terms;
 	}
 }

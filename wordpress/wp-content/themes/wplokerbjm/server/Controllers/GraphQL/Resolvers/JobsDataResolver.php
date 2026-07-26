@@ -10,6 +10,7 @@ use WPLokerBJM\Services\GraphQL\GraphQLData;
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
+use DI\Attribute\Injectable;
 
 /**
  * @phpstan-import-type CardData from GraphQLData
@@ -33,6 +34,7 @@ use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
  * @phpstan-type LoadMoreResponse array{jobs: CardData[], filters: Filters, total: int, maxNumPages: int}
  * @phpstan-type SearchJobsResponse array{jobs: CardData[], filters: Filters, title: string, total: int, maxNumPages: int}
  */
+#[Injectable(lazy: true)]
 class JobsDataResolver
 {
     public function __construct(

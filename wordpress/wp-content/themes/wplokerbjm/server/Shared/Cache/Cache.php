@@ -378,9 +378,6 @@ class CacheKey
     const JOB_GRID_PREFIX = 'job_grid_';
 
     // Taxonomy
-    const ALL_TAXONOMY_OPTIONS = 'all_taxonomy_options';
-    const TAXONOMY_LAST_MODIFIED = 'taxonomy_last_modified';
-    const ALL_TAXONOMY_TERMS = 'all_taxonomy_terms';
     const POST_TAXONOMIES_PREFIX = 'post_taxonomies_';
     const TAXONOMY_DEPTH_HANDLE = 'taxonomy_depth_handle';
     const TAXONOMY_DEPTH_LOKASI = 'taxonomy_depth_lokasi';

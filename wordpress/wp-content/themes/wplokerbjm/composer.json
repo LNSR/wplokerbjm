@@ -1,25 +1,16 @@
 {
   "require": {
-    "nikic/php-parser": "*",
+    "nette/robot-loader": "*",
     "php-di/php-di": "*",
     "php-standard-library/php-standard-library": "*"
   },
   "require-dev": {
     "brain/monkey": "*",
+    "nikic/php-parser": "*",
     "php-parallel-lint/php-console-highlighter": "*",
     "php-parallel-lint/php-parallel-lint": "*",
     "phpunit/phpunit": "*",
     "vlucas/phpdotenv": "*"
-  },
-  "autoload": {
-    "classmap": [
-      "server"
-    ]
-  },
-  "autoload-dev": {
-    "classmap": [
-      "tests"
-    ]
   },
   "config": {
     "sort-packages": true,

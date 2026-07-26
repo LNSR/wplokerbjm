@@ -6,6 +6,7 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 use DI\Attribute\Injectable;
+use WPLokerBJM\Bootstrap;
 
 /**
  * LiteSpeed custom hooks extend
@@ -45,6 +46,7 @@ final class Litespeed implements PluginConfigInterface
             array_map('unlink', glob("$cacheDir/*"));
         }
         do_action('wpgraphql_cache_purge_all');
+        Bootstrap::getRobotLoader()->rebuild();
         WPLokerBJMContainer::getContainer(true);
     }
 
@@ -52,10 +54,7 @@ final class Litespeed implements PluginConfigInterface
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
     #[Filter('litespeed_is_mobile')]
-    public function customMobileDetect()
-    {
-        return wp_is_mobile();
-    }
+    public $isMobile = static function() { return wp_is_mobile(); };
 
 }
 
@@ -74,8 +73,7 @@ class LiteSpeedGraphQLIntegration implements PluginConfigInterface
      * Call litespeed_purge when graphql_purge is called
      */
     #[Action('graphql_purge')]
-    public $purgeCache = static function ($keys): void {
-            do_action('litespeed_purge', $keys); };
+    public $purgeCache = static function ($keys): void { do_action('litespeed_purge', $keys); };
 
     /**
      * Set GraphQL Queries returned via HTTP GET|OPTIONS requests to be cacheable

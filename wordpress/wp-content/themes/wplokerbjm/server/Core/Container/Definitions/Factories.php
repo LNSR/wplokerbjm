@@ -38,13 +38,8 @@ class Core implements DefinitionProviderInterface
 {
     public static function getDefinitions(): array
     {
-        $args = [
-            get_stylesheet_directory() . '/server',
-            'WPLokerBJM',
-        ];
-
-        $scanner = new AutowireScanner(...$args);
-        $hookScanner = new WPhooksScanner(...$args);
+        $scanner = new AutowireScanner('WPLokerBJM');
+        $hookScanner = new WPhooksScanner('WPLokerBJM');
         $autoWiredDefinitions = $scanner->scanForAutowirableClasses();
         $registrationHooks = $hookScanner->getHookRegistrations();
 

@@ -3,6 +3,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks;
 
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 /**
  * Lazy hook handler — invocable object that defers container resolution to hook-fire time.
  *
@@ -125,7 +126,7 @@ class LazyPropertyHookHandler
                     "Property {$this->label} is not a valid callable or invokable object."
                 );
             }
-
+            // SharedUtils::isDevelopment() && Logger::debug('WPHooksRegistry', "Property hook {$this->label} invoked successfully.");
             return $callable(...$args);
         } catch (\Throwable $e) {
             Logger::error('WPHooksRegistry', "Error invoking property hook {$this->label}: {$e->getMessage()}");

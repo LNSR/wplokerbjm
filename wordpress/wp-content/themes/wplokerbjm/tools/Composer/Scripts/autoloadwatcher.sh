@@ -41,14 +41,11 @@ while read -r file; do
     (
       sleep 3
 
-      echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local Hot Reload Chain..."
-      docker restart "wordpress-${WP_ENV}"
+      echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local Hot Reload Chain..." &
+      docker restart "wordpress-${WP_ENV}" &
 
-      echo "[$(date +'%H:%M:%S')] Flushing Redis..."
+      echo "[$(date +'%H:%M:%S')] Flushing Redis..." &
       docker exec -i wordpress_redis redis-cli -a "${REDIS_PWD}" FLUSHALL > /dev/null 2>&1
-
-      echo "[$(date +'%H:%M:%S')] Dumping Autoload..."
-      composer dump-autoload > /dev/null
 
       if [[ -d cache ]]; then
         echo "[$(date +'%H:%M:%S')] Clearing cache directory."

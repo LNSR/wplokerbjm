@@ -7,7 +7,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\Utilities\FileScannerTrait;
+use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -68,11 +68,11 @@ class WPHooksRegistry
             }
 
             $visibility = $reg['visibility'] ?? 'public';
-            $handler = ($reg['target'] ?? 'method') === 'property'
-                ? new LazyPropertyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type'])
-                : new LazyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type']);
+            $handler = ($reg['target'] ?? 'method') === 'method'
+                ? new LazyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type'])
+                : new LazyPropertyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type']);
 
-            $key = $reg['class'] . '::' . $reg['method'] . '::' . $reg['priority'];
+            $key = $reg['class'] . '::' . $reg['method'] . '::' . $reg['type'] . '::' . $reg['priority']. '::' . $reg['accepted_args'];
             $target = !empty($reg['defer'])
                 ? 'deferredHandlers'
                 : 'handlers';
@@ -179,6 +179,9 @@ class WPHooksRegistry
 
                 unset($hookHandlers[$key]);
             }
+            if (empty($hookHandlers)) {
+                unset($this->deferredHandlers[$hook]);
+            }
         }
         unset($hookHandlers);
     }
@@ -235,6 +238,9 @@ class WPHooksRegistry
                 $this->addSingleHook($hook, $data);
 
                 unset($hookHandlers[$key]);
+            }
+            if (empty($hookHandlers)) {
+                unset($this->deferredHandlers[$hook]);
             }
         }
         unset($hookHandlers);
@@ -455,20 +461,18 @@ class WPHooksRegistry
  *
  * @see Action
  * @see Filter
- * @see Utilities\FileScannerTrait
+ * @see \WPLokerBJM\Bootstrap
  *
- * @phpstan-type HookRegistration array{class: class-string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, defer: bool, target: 'method'|'property', visibility: 'public'|'protected'|'private'}
+ * @phpstan-type HookRegistration array{class: class-string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, defer: bool, target: 'method'|'property'|'property-hook', visibility: 'public'|'protected'|'private'}
  */
 class WPHooksScanner
 {
-    use FileScannerTrait;
 
     /** @var array<int, HookRegistration>|null */
     private ?array $cachedHookRegistrations = null;
 
-    public function __construct(private string $baseDirectory, private string $namespace = 'WPLokerBJM')
+    public function __construct(private string $namespace = 'WPLokerBJM')
     {
-        $this->baseDirectory = rtrim($baseDirectory, '/');
         $this->namespace = trim($namespace, '\\');
     }
 
@@ -503,97 +507,96 @@ class WPHooksScanner
     private function performHookRegistrationScan(): array
     {
         $registrations = [];
-        $phpFiles = $this->findPhpFiles();
 
-        foreach ($phpFiles as $file) {
-            $classNames = $this->getClassNamesFromFile($file);
+        $namespacePrefix = $this->namespace . '\\';
 
-
-            foreach ($classNames as $className) {
-                if (class_exists($className)) {
-                    try {
-                        $reflection = new ReflectionClass($className);
-                        /** @var ReflectionMethod $method */
-                        foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED | ReflectionMethod::IS_PRIVATE) as $method) {
-                            // Skip static methods — hooks must be instance methods
-                            // because the container resolves the owning service lazily.
-                            if ($method->isStatic()) {
-                                continue;
-                            }
-                            $visibility = $method->isPublic() ? 'public' : ($method->isProtected() ? 'protected' : 'private');
-                            /** @var ReflectionClass $attribute */
-                            foreach ($method->getAttributes(Action::class) as $attribute) {
-                                $action = $attribute->newInstance();
-                                /** @var Action $action */
-                                $registrations[] = [
-                                    'class' => $className,
-                                    'method' => $method->getName(),
-                                    'type' => 'action',
-                                    'hook' => $action->hook,
-                                    'priority' => $action->priority,
-                                    'accepted_args' => $action->acceptedArgs,
-                                    'defer' => $action->defer,
-                                    'target' => 'method',
-                                    'visibility' => $visibility,
-                                ];
-                            }
-                            /** @var ReflectionClass $attribute */
-                            foreach ($method->getAttributes(Filter::class) as $attribute) {
-                                $filter = $attribute->newInstance();
-                                /** @var Filter $filter */
-                                $registrations[] = [
-                                    'class' => $className,
-                                    'method' => $method->getName(),
-                                    'type' => 'filter',
-                                    'hook' => $filter->hook,
-                                    'priority' => $filter->priority,
-                                    'accepted_args' => $filter->acceptedArgs,
-                                    'defer' => $filter->defer,
-                                    'target' => 'method',
-                                    'visibility' => $visibility,
-                                ];
-                            }
-                        }
-
-                        /** @var ReflectionProperty $property */
-                        foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC | ReflectionProperty::IS_PROTECTED | ReflectionProperty::IS_PRIVATE) as $property) {
-                            $visibility = $property->isPublic() ? 'public' : ($property->isProtected() ? 'protected' : 'private');
-                            foreach ($property->getAttributes(Action::class) as $attribute) {
-                                $action = $attribute->newInstance();
-                                /** @var Action $action */
-                                $registrations[] = [
-                                    'class' => $className,
-                                    'method' => $property->getName(),
-                                    'type' => 'action',
-                                    'hook' => $action->hook,
-                                    'priority' => $action->priority,
-                                    'accepted_args' => $action->acceptedArgs,
-                                    'defer' => $action->defer,
-                                    'target' => 'property',
-                                    'visibility' => $visibility,
-                                ];
-                            }
-                            /** @var ReflectionClass $attribute */
-                            foreach ($property->getAttributes(Filter::class) as $attribute) {
-                                $filter = $attribute->newInstance();
-                                /** @var Filter $filter */
-                                $registrations[] = [
-                                    'class' => $className,
-                                    'method' => $property->getName(),
-                                    'type' => 'filter',
-                                    'hook' => $filter->hook,
-                                    'priority' => $filter->priority,
-                                    'accepted_args' => $filter->acceptedArgs,
-                                    'defer' => $filter->defer,
-                                    'target' => 'property',
-                                    'visibility' => $visibility,
-                                ];
-                            }
-                        }
-                    } catch (\Exception $e) {
-                        Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());
+        foreach (Bootstrap::getRobotLoader()->getIndexedClasses() as $className => $file) {
+            if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
+                continue;
+            }
+            try {
+                $reflection = new ReflectionClass($className);
+                /** @var ReflectionMethod $method */
+                foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED | ReflectionMethod::IS_PRIVATE) as $method) {
+                    // Skip static methods — hooks must be instance methods
+                    // because the container resolves the owning service lazily.
+                    if ($method->isStatic()) {
+                        continue;
+                    }
+                    $visibility = $method->isPublic() ? 'public' : ($method->isProtected() ? 'protected' : 'private');
+                    /** @var \ReflectionAttribute $attribute */
+                    foreach ($method->getAttributes(Action::class) as $attribute) {
+                        $action = $attribute->newInstance();
+                        /** @var Action $action */
+                        $registrations[] = [
+                            'class' => $className,
+                            'method' => $method->getName(),
+                            'type' => 'action',
+                            'hook' => $action->hook,
+                            'priority' => $action->priority,
+                            'accepted_args' => $action->acceptedArgs,
+                            'defer' => $action->defer,
+                            'target' => 'method',
+                            'visibility' => $visibility,
+                        ];
+                    }
+                    /** @var \ReflectionAttribute $attribute */
+                    foreach ($method->getAttributes(Filter::class) as $attribute) {
+                        $filter = $attribute->newInstance();
+                        /** @var Filter $filter */
+                        $registrations[] = [
+                            'class' => $className,
+                            'method' => $method->getName(),
+                            'type' => 'filter',
+                            'hook' => $filter->hook,
+                            'priority' => $filter->priority,
+                            'accepted_args' => $filter->acceptedArgs,
+                            'defer' => $filter->defer,
+                            'target' => 'method',
+                            'visibility' => $visibility,
+                        ];
                     }
                 }
+
+                /** @var ReflectionProperty $property */
+                foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC | ReflectionProperty::IS_PROTECTED | ReflectionProperty::IS_PRIVATE) as $property) {
+                    $visibility = $property->isPublic() ? 'public' : ($property->isProtected() ? 'protected' : 'private');
+                    $hasPropertyHook = $property->hasHooks();
+                    $target = $hasPropertyHook ? 'property-hook' : 'property';
+                    foreach ($property->getAttributes(Action::class) as $attribute) {
+                        $action = $attribute->newInstance();
+                        /** @var Action $action */
+                        $registrations[] = [
+                            'class' => $className,
+                            'method' => $property->getName(),
+                            'type' => 'action',
+                            'hook' => $action->hook,
+                            'priority' => $action->priority,
+                            'accepted_args' => $action->acceptedArgs,
+                            'defer' => $action->defer,
+                            'target' => $target,
+                            'visibility' => $visibility,
+                        ];
+                    }
+                    /** @var \ReflectionAttribute $attribute */
+                    foreach ($property->getAttributes(Filter::class) as $attribute) {
+                        $filter = $attribute->newInstance();
+                        /** @var Filter $filter */
+                        $registrations[] = [
+                            'class' => $className,
+                            'method' => $property->getName(),
+                            'type' => 'filter',
+                            'hook' => $filter->hook,
+                            'priority' => $filter->priority,
+                            'accepted_args' => $filter->acceptedArgs,
+                            'defer' => $filter->defer,
+                            'target' => $target,
+                            'visibility' => $visibility,
+                        ];
+                    }
+                }
+            } catch (\Exception $e) {
+                Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());
             }
         }
 

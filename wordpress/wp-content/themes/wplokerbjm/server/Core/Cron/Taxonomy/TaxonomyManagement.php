@@ -17,7 +17,7 @@ class TaxonomyManagement
     {
         $taxonomies = get_taxonomies([], 'names');
         foreach ($taxonomies as $taxonomy) {
-            $terms = TaxonomyQuery::allTaxonomiesTermsArgs($taxonomy);
+            $terms = TaxonomyQuery::allTaxonomiesTerms($taxonomy, 'ids');
             foreach ($terms as $term_id) {
                 $last_used = get_term_meta($term_id, 'last_used', true);
                 if ($last_used && $last_used < strtotime('-3 months')) {

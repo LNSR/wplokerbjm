@@ -4,10 +4,12 @@ namespace WPLokerBJM\Controllers\GraphQL\Resolvers\Auth;
 use JWTDataShape;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
+use DI\Attribute\Injectable;
 
 /**
  * @phpstan-type JWTDataShape array{token?: string, username?: string, password?: string}
  */
+#[Injectable(lazy: true)]
 class JWTDataResolver
 {
 
