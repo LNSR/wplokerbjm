@@ -70,5 +70,25 @@
         "Authorization": "Bearer {env:CLOUDFLARE_MCP_API_KEY}"
       }
     }
+  },
+  "permission": {
+    "bash": {
+      "*": "ask",
+      "git *": "allow",
+      "bunx *": "allow",
+      "bun *": "allow",
+      "wrangler *": "allow",
+      "npm *": "deny",
+      "npx *": "deny",
+      "rm *": "allow",
+      "grep *": "allow",
+      "composer *": "allow",
+      "glob *": "allow",
+      "docker *": "allow"
+    },
+    "read": {
+      ".env": "deny",
+      ".env.*": "deny",
+    }
   }
 }

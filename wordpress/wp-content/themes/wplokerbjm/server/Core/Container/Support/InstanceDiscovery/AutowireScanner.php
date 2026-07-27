@@ -3,8 +3,8 @@
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery;
 use ReflectionClass;
 use DI\Attribute\Injectable;
-use WPLokerBJM\Core\Container\Support\Utilities\FileScannerTrait;
 use DI\Definition\AutowireDefinition;
+use WPLokerBJM\Bootstrap;
 
 /**
  * Scans directories for autowirable PHP classes.
@@ -13,19 +13,20 @@ use DI\Definition\AutowireDefinition;
  * and creates PHP-DI autowire definitions for suitable classes. Excludes
  * interfaces, abstracts, static-only classes, and attribute classes.
  *
+ * Relies on WPLokerBJM\Bootstrap's RobotLoader for class discovery
+ * instead of manual file scanning.
+ *
  * @see \WPLokerBJM\Core\Container\Definitions\Core
- * @see Utilities\FileScannerTrait
+ * @see \WPLokerBJM\Bootstrap
  */
 class AutowireScanner
 {
-    use FileScannerTrait;
 
     /** @var array<class-string, AutowireDefinition>|null */
     private ?array $cachedDefinitions = null;
 
-    public function __construct(private string $baseDirectory, private string $namespace = 'WPLokerBJM')
+    public function __construct(private string $namespace = 'WPLokerBJM')
     {
-        $this->baseDirectory = rtrim($baseDirectory, '/');
         $this->namespace = trim($namespace, '\\');
     }
 
@@ -57,23 +58,18 @@ class AutowireScanner
     private function performAutowirableScan(): array
     {
         $definitions = [];
-        $phpFiles = $this->findPhpFiles();
 
-        foreach ($phpFiles as $file) {
-            $classNames = $this->getClassNamesFromFile($file);
+        foreach (Bootstrap::getRobotLoader()->getIndexedClasses() as $className => $file) {
+            $checkList = $this->isAutowirable($className);
 
-            foreach ($classNames as $className) {
-                $checkList = $this->isAutowirable($className);
+            if (!$checkList['autowirable']) {
+                continue;
+            }
 
-                if (!$checkList['autowirable']) {
-                    continue;
-                }
-
-                if ($checkList['lazy']) {
-                    $definitions[$className] = \DI\autowire($className)->lazy();
-                } else {
-                    $definitions[$className] = \DI\autowire($className);
-                }
+            if ($checkList['lazy']) {
+                $definitions[$className] = \DI\autowire($className)->lazy();
+            } else {
+                $definitions[$className] = \DI\autowire($className);
             }
         }
 

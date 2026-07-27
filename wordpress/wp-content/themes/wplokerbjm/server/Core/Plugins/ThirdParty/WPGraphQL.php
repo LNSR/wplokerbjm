@@ -17,8 +17,7 @@ use WP_User;
  * WPGraphQL-related hooks extracted from GlobalHooks.
  * @phpstan-import-type GraphQLDataType from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
  */
-#[Injectable(lazy: true)]
-class WPGraphQL implements PluginConfigInterface
+final class WPGraphQL implements PluginConfigInterface
 {
 
     public static function isActive(): bool
@@ -157,17 +156,18 @@ class WPGraphQL implements PluginConfigInterface
         return array_merge($officalOrigins, $allowed);
     }
 
+    #region Header stuff
     /**
      * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
      */
-    #[Filter('graphql_response_headers_to_send', 11)]
+    #[Filter('graphql_response_headers_to_send', 9)]
     public function ModifyHeaderGraphQL(array $headers): array
     {
         /**
          * @see WPGraphQL\SmartCache\Cache\Results::init
          *  remove WPGraphQL author hooks
          */
-        remove_all_filters('graphql_response_headers_to_send', PHP_INT_MAX);
+        remove_all_filters('graphql_response_headers_to_send');
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
         if (in_array($origin, $this->allowedOrigins(), true)) {
@@ -210,33 +210,44 @@ class WPGraphQL implements PluginConfigInterface
         if (empty($headers['Last-Modified'])) {
             unset($headers['Last-Modified']);
         }
+
         $headers = $this->applyCachePolicy($headers);
 
         if (is_user_logged_in()) {
             $headers['Logged-In'] = 'true';
             $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
-            /** @see WPGraphQL::disableGraphQLNoCacheHeaders */
-            $this->hookRegistry->activateDeferredByMethod(self::class, 'disableGraphQLNoCacheHeaders');
         }
         return $headers;
     }
-
-    #[Filter('graphql_send_nocache_headers', 10, defer: true)]
-    public function disableGraphQLNoCacheHeaders(): bool { return false; }
-
-    // #[Filter('nocache_headers', 11, defer: true)]
-    public function applyCachePolicy(array $headers): array
+    #[Filter('graphql_send_nocache_headers', 9)]
+    private function disableGraphQLNoacheHeader(): bool
     {
+        remove_all_actions('graphql_send_nocache_headers');
+        return false;
+    }
+
+    #[Filter('nocache_headers', 9, defer: true)]
+    private function applyCachePolicy(array $headers): array
+    {
+        static $init = (bool) false;
+
         $loggedIn = is_user_logged_in();
         $isDev = SharedUtils::isDevelopment();
         $cacheValue = match (true) {
             $isDev => $loggedIn ? 'private, no-cache, must-revalidate' : 'public, no-cache, must-revalidate',
             default => $loggedIn ? 'private, max-age=60, must-revalidate' : 'public, max-age=360, stale-while-revalidate=3600',
         };
-
         $headers['Cache-Control'] = $cacheValue;
+        if ($init)
+            return $headers;
+        if ($loggedIn) {
+            remove_all_filters('nocache_headers');
+            $this->hookRegistry->activateDeferredByMethod(self::class, __FUNCTION__);
+        }
+        $init = true;
         return $headers;
     }
+    #endregion
 
     /**
      * @see \WPGraphQL\Router::prepare_headers;
@@ -390,7 +401,8 @@ class WPGraphQLETag
     private function buildRequestHash(): string
     {
         static $hash = null;
-        if ($hash !== null) return $hash; // memoize
+        if ($hash !== null)
+            return $hash; // memoize
 
         $query = $_REQUEST['query'] ?? '';
         $operationName = $_REQUEST['operationName'] ?? '';

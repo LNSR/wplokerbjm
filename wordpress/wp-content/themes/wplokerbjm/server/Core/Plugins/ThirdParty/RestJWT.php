@@ -8,8 +8,7 @@ use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
  * JWT Auth Hooks
  * @link https://github.com/Tmeister/wp-api-jwt-auth
  */
-#[Injectable(lazy: true)]
-class WPRestJWTHooks implements PluginConfigInterface
+final class WPRestJWTHooks implements PluginConfigInterface
 {
     public static function isActive(): bool
     {
@@ -19,7 +18,7 @@ class WPRestJWTHooks implements PluginConfigInterface
     #[Filter('jwt_auth_expire')]
     public function setTokenDuration(): int
     {
-        $duration = 60 * 60 * 24 * 7; // 7 days
+        $duration = 60 * 60 * 24 * 1; // 1 days
         return time() + $duration;
     }
 }

@@ -8,8 +8,7 @@ use WPLokerBJM\Shared\Utilities\PluginList;
 /**
  * MetaBox Plugin Hooks
  */
-#[Injectable(lazy: true)]
-class MetaBox implements PluginConfigInterface
+final class MetaBox implements PluginConfigInterface
 {
 
     public static function isActive(): bool

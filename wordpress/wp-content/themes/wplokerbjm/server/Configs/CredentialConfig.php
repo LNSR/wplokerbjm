@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Configs;
 
+
 /**
  * @phpstan-type RedisCred array{
  *     host: ?string,
@@ -27,7 +28,7 @@ class CredentialConfig
     /**
      * Return Redis connection credentials.
      *
-     * @param array|null $params Optional overrides ('host', 'port', 'password', 'database', 'sock').
+     * @param ?RedisCred $params.
      * @return RedisCred
      */
     public static function RedisCredential(?array $params = null): array
@@ -44,7 +45,7 @@ class CredentialConfig
     /**
      * Return Cloudflare R2 storage bucket credentials.
      *
-     * @param array|null $params Optional overrides ('key', 'secret', 'bucket', 'domain', 'endpoint').
+     * @param ?R2CFCred $params.
      * @return R2CFCred
      */
     public static function R2CFCredential(?array $params = null): array
@@ -64,7 +65,7 @@ class CredentialConfig
      * This keeps the environment constants out of the service layer and
      * centralizes lookup logic for any future rotation or override needs.
      *
-     * @param array|null $params Optional overrides ('token' and/or 'zone').
+     * @param ?CloudflareCred $params
      * @return CloudflareCred
      */
     public static function CloudflareCredential(?array $params = null): array

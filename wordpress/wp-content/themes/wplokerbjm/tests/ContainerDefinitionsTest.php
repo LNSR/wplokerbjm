@@ -17,6 +17,8 @@ use WPLokerBJM\Adapter\RedisAdapter;
 
 class ContainerDefinitionsTest extends WplokerbjmTestCase
 {
+    public static string $NAMESPACE = "WPLokerBJM";
+    
     public function testCoreDefinitions()
     {
         $definitions = Core::getDefinitions();
@@ -76,7 +78,6 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     public function testAutowireScannerCount()
     {
         $scanner = new AutowireScanner(
-            get_stylesheet_directory() . '/server',
             'WPLokerBJM'
         );
 
@@ -136,8 +137,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     {
         // Create scanner like Core.php does
         $scanner = new WPhooksScanner(
-            get_stylesheet_directory() . '/server',
-            'WPLokerBJM'
+            self::$NAMESPACE
         );
 
         // Measure time for first hook scan (cache miss)
@@ -195,8 +195,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     {
         // Get real hook registrations from the scanner
         $scanner = new WPhooksScanner(
-            get_stylesheet_directory() . '/server',
-            'WPLokerBJM'
+            self::$NAMESPACE
         );
         $registrations = $scanner->getHookRegistrations();
         $hookClasses = array_unique(array_column($registrations, 'class'));
@@ -275,8 +274,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     public function testHookRegistryUnregistration(): void
     {
         $scanner = new WPhooksScanner(
-            get_stylesheet_directory() . '/server',
-            'WPLokerBJM'
+            self::$NAMESPACE
         );
         $registrations = $scanner->getHookRegistrations();
 

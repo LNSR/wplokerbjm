@@ -12,8 +12,7 @@ use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
  * Extends RankMath plugin functionality
  * Handles Rank Math SEO plugin integrations including sitemap regeneration
  */
-#[Injectable(lazy: true)]
-class Rankmath implements PluginConfigInterface
+final class Rankmath implements PluginConfigInterface
 {
 	private static ?bool $isActiveCache = null;
 	private static ?array $sitemapUrlsCache = null;

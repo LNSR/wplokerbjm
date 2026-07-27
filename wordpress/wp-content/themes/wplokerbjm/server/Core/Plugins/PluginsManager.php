@@ -145,7 +145,7 @@ class PluginManagement
      * @param array $pluginsToDisable Array of plugin prefixes to disable.
      * @return array Filtered array of active plugins.
      */
-    public function filteredPlugins(array $plugins, array $pluginsToDisable): array
+    private function filteredPlugins(array $plugins, array $pluginsToDisable): array
     {
         $filtered = array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
             foreach ($pluginsToDisable as $disable) {
@@ -166,7 +166,7 @@ class PluginManagement
      * @param array|null $extra Optional array of additional plugin prefixes to disable.
      * @return array Array of plugin prefixes to disable.
      */
-    public function listPluginsToDisable(?array $extra = []): array
+    private function listPluginsToDisable(?array $extra = []): array
     {
         // Subject to change
         static $base = [

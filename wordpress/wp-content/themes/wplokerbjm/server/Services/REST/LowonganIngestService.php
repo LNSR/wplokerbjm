@@ -11,6 +11,7 @@ use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\Sanitizer;
+use DI\Attribute\Injectable;
 
 /**
  * @phpstan-type IngestErrorResult array{status: 400|500, data: array{code: string, message: string, warnings: array}}
@@ -19,6 +20,7 @@ use WPLokerBJM\Shared\Utilities\Sanitizer;
  * @phpstan-type IngestResult IngestErrorResult|IngestDuplicateResult|IngestSuccessResult
  * @template ErrorExtra of array
  */
+#[Injectable(lazy: true)]
 class LowonganIngestService
 {
     private const SOURCE_META_KEY = '_wplokerbjm_ingest_source';

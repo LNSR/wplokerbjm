@@ -1,7 +1,7 @@
 <?php
 namespace WPLokerBJM\Controllers\GraphQL\Resolvers;
-use ThemeData;
 use WPLokerBJM\Shared\Log\Logger;
+use DI\Attribute\Injectable;
 /**
  * Resolver for theme data in GraphQL.
  *
@@ -10,6 +10,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * repeated requests.
  * @phpstan-import-type ThemeData from \WPLokerBJM\Core\Theme\ThemeInject
  */
+#[Injectable(lazy: true)]
 class ThemeDataResolver
 {
     public function __construct(

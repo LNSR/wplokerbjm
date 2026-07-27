@@ -16,7 +16,6 @@ use WPLokerBJM\Core\Container\Attributes\Filter;
  *       primarily through the Meta Box admin interface.
  * @package WPLokerBJM\Models\Schema
  */
-#[Injectable(lazy: true)]
 class CustomFields
 {
 

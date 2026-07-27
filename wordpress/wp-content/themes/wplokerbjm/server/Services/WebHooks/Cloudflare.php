@@ -6,7 +6,6 @@ use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Log\Logger;
-use DI\Attribute\Injectable;
 
 /**
  * Cloudflare cache purging via the purge_everything API.
@@ -25,7 +24,6 @@ use DI\Attribute\Injectable;
  *
  * @phpstan-import-type CloudflareCred from \WPLokerBJM\Configs\CredentialConfig
  */
-#[Injectable(lazy: true)]
 class Cloudflare
 {
     /**

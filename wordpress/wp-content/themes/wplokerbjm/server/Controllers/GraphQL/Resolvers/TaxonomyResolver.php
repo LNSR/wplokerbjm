@@ -6,11 +6,13 @@ use WPLokerBJM\Controllers\Utilities\ControllerUtils;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Log\Logger;
+use DI\Attribute\Injectable;
 
 /**
  * @phpstan-type TaxonomyTerms array{slug: string, name: string, parent: int, children: array}
  * @phpstan-type TaxonomyJobTerms array{lokasiTerms: TaxonomyTerms[], genderTerms: TaxonomyTerms[], pendidikanTerms: TaxonomyTerms[]}
  */
+#[Injectable(lazy: true)]
 class TaxonomyResolver
 {
     public function __construct(

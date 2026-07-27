@@ -6,7 +6,6 @@ use WPLokerBJM\Core\Container\Attributes\Action;
 /**
  * Cron hook key constants for centralized management.
  */
-#[Injectable(lazy: true)]
 class WPCron
 {
     const DELETE_OLD_JOBS = 'wplokerbjm_delete_old_jobs';

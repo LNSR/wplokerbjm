@@ -3,7 +3,6 @@ namespace WPLokerBJM\Core\Theme;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-#[Injectable(lazy: true)]
 /**
  * Leverage Wordpress theme feature for easier assets (logo,favicon,etc) management and integrate to frontend
  * @phpstan-type LogoData array{

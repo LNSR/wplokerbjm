@@ -2,10 +2,8 @@
 
 namespace WPLokerBJM\Core;
 
-use DI\Attribute\Injectable;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Shared\Utilities\PluginList;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
@@ -24,7 +22,6 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  * Handles all template_redirect hooks: SSL bypass, 410 Gone, archive → home,
  * and headless SvelteKit frontend routing.
  */
-#[Injectable(lazy: true)]
 class RedirectHooks
 {
     /**
@@ -179,7 +176,6 @@ class RobotsHooks
  * Used by: DynamicSearch Graphql endpoint, and any WP_Query with 's' parameter
  * on 'lowongan' post type.
  */
-#[Injectable(lazy: true)]
 class SearchHooks
 {
     /**
@@ -264,7 +260,6 @@ class HTTPHooks
  *   without arguments (no post context) and it will only purge global caches.
  * - For meta/taxonomy hooks we pass the `object_id` (post id) when available.
  */
-#[Injectable(lazy: true)]
 class CacheInvalidationHooks
 {
 
@@ -438,6 +433,7 @@ class CacheInvalidationHooks
  */
 class LoggerHooks
 {
+
     #[Action('shutdown', PHP_INT_MAX)]
     public function flushBuffer(): void
     {
