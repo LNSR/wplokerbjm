@@ -7,6 +7,7 @@ use GraphQLDataType;
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookInterface;
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
@@ -216,21 +217,22 @@ final class WPGraphQL implements PluginConfigInterface
         if (is_user_logged_in()) {
             $headers['Logged-In'] = 'true';
             $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
+            $this->hookRegistry->activateDeferredByCallable($this->disableGraphQLNocacheHeader(...));
+            $this->hookRegistry->activateDeferredByCallable($this->applyCachePolicy(...));
         }
         return $headers;
     }
-    #[Filter('graphql_send_nocache_headers', 9)]
-    private function disableGraphQLNoacheHeader(): bool
+    #[Filter('graphql_send_nocache_headers', 9, defer: true)]
+    private function disableGraphQLNocacheHeader(): bool
     {
         remove_all_actions('graphql_send_nocache_headers');
         return false;
     }
 
     #[Filter('nocache_headers', 9, defer: true)]
-    private function applyCachePolicy(array $headers): array
+    public function applyCachePolicy(array $headers): array
     {
-        static $init = (bool) false;
-
+        remove_all_filters('nocache_headers');
         $loggedIn = is_user_logged_in();
         $isDev = SharedUtils::isDevelopment();
         $cacheValue = match (true) {
@@ -238,13 +240,6 @@ final class WPGraphQL implements PluginConfigInterface
             default => $loggedIn ? 'private, max-age=60, must-revalidate' : 'public, max-age=360, stale-while-revalidate=3600',
         };
         $headers['Cache-Control'] = $cacheValue;
-        if ($init)
-            return $headers;
-        if ($loggedIn) {
-            remove_all_filters('nocache_headers');
-            $this->hookRegistry->activateDeferredByMethod(self::class, __FUNCTION__);
-        }
-        $init = true;
         return $headers;
     }
     #endregion

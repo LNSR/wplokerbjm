@@ -321,7 +321,7 @@ class CacheInvalidationHooks
         if ($alreadyRun)
             return;
         $alreadyRun = true;
-        $this->hooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
+        $this->hooksRegistry->unregisterByCallable([$this, __FUNCTION__]);
 
         try {
             Cache::deleteMultiple([

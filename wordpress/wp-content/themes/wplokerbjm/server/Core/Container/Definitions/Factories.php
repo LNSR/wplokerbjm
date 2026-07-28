@@ -2,7 +2,7 @@
 namespace WPLokerBJM\Core\Container\Definitions;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksRegistry, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksRegistry, WPHooksRuntimeRegistry, WPHooksScanner};
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Configs\CredentialConfig;
@@ -38,12 +38,14 @@ class Core implements DefinitionProviderInterface
 {
     public static function getDefinitions(): array
     {
-        $scanner = new AutowireScanner('WPLokerBJM');
-        $hookScanner = new WPhooksScanner('WPLokerBJM');
+        $namespace = 'WPLokerBJM';
+        $scanner = new AutowireScanner($namespace);
+        $hookScanner = new WPhooksScanner($namespace);
         $autoWiredDefinitions = $scanner->scanForAutowirableClasses();
         $registrationHooks = $hookScanner->getHookRegistrations();
 
         $core = [
+            WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class),
             WPHooksRegistry::class => \DI\autowire(WPHooksRegistry::class)
                 ->constructor(
                     \DI\get(ContainerInterface::class),
@@ -72,8 +74,8 @@ class Factory implements DefinitionProviderInterface
     private static function getInstanceWithCredentials(): array
     {
         return [
-            Cloudflare::class => \DI\autowire(Cloudflare::class)->constructor(static fn() => CredentialConfig::CloudflareCredential())->lazy(),
-            RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn() => CredentialConfig::RedisCredential())->lazy(),
+            Cloudflare::class => \DI\autowire(Cloudflare::class)->constructor(static fn() => CredentialConfig::CloudflareCredential()),
+            RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn() => CredentialConfig::RedisCredential()),
         ];
     }
 }

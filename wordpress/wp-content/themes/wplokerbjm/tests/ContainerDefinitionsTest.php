@@ -347,9 +347,8 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $this->assertLessThan($totalBeforeClass, count($this->registeredHooks()), 'Total hook count should decrease after unregisterByClass');
         echo "  \033[0;32m✓\033[0m unregisterByClass('$targetClass') removed hooks\n";
 
-        // Test unregisterByMethod with non-existent class — must not throw
-        $registry2->unregisterByMethod('NonExistentService', 'someMethod');
-        echo "  \033[0;32m✓\033[0m unregisterByMethod() with non-existent service does not throw\n";
+        // unregisterByCallable requires a valid callable at the type level —
+        // the non-existent-class edge case is naturally eliminated by the callable type hint.
 
         echo "\n";
     }

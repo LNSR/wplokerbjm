@@ -1,5 +1,5 @@
 <?php
-
+declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Attributes;
 
 use Attribute;
@@ -20,10 +20,10 @@ class Action
      * @param bool $defer defer activation
      */
     public function __construct(
-        public string $hook,
-        public int $priority = 10,
-        public int $acceptedArgs = 1,
-        public bool $defer = false
+        public readonly string $hook,
+        public readonly int $priority = 10,
+        public readonly int $acceptedArgs = 1,
+        public readonly bool $defer = false
     ) {
     }
 }
@@ -43,10 +43,10 @@ class Filter
      * @param bool $defer defer activation
      */
     public function __construct(
-        public string $hook,
-        public int $priority = 10,
-        public int $acceptedArgs = 1,
-        public bool $defer = false
+        public readonly string $hook,
+        public readonly int $priority = 10,
+        public readonly int $acceptedArgs = 1,
+        public readonly bool $defer = false
     ) {
     }
 }
