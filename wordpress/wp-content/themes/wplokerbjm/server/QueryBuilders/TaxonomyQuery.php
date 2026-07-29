@@ -66,57 +66,22 @@ class TaxonomyQuery
     }
 
     /**
-     * Return args to fetch all terms (ids) for a taxonomy (used for cleanup or listing unused terms).
+     * Return args to fetch all terms for a taxonomy.
      *
-     * @param string $taxonomy
-     * @return list<int>
+     * @param 'all'|'ids'|'names'|'slugs'|'count'|'id=>parent'|'id=>name'|'id=>slug'|'tt_ids'|'all_with_object_id' $field
+     * @return \WP_Term[]|int[]|string[]|string|\WP_Error
      */
-    public static function allTaxonomiesTermsArgs(string $taxonomy): array
+    public static function allTaxonomiesTerms(string $taxonomy, string $field = 'all'): array
     {
         $terms = get_terms([
             'taxonomy' => $taxonomy,
             'hide_empty' => false,
-            'fields' => 'ids',
+            'fields' => $field,
         ]);
         if (is_wp_error($terms) || !is_array($terms)) {
             return [];
         }
         return $terms;
-    }
-
-    /**
-     * Get the last modified date for taxonomies by finding the most recent modification
-     * of posts that have terms in the job-related taxonomies.
-     *
-     * @return string The GMT modified date of the latest post with taxonomy terms, or current GMT time if none exist.
-     */
-    public static function getLastModifiedDateForTaxonomies(): string
-    {
-        $cache_key = CacheKey::TAXONOMY_LAST_MODIFIED;
-        /** @var string|false $cached */
-        $cached = Cache::get($cache_key);
-        if ($cached !== false) {
-            return $cached;
-        }
-
-        global $wpdb;
-        $taxonomies = [Taxonomies::LOKASI_PEKERJAAN, Taxonomies::GENDER, Taxonomies::PENDIDIKAN];
-        $placeholders = implode(',', array_fill(0, count($taxonomies), '%s'));
-        $query = $wpdb->prepare(
-            "
-            SELECT MAX(p.post_modified_gmt) as last_modified
-            FROM {$wpdb->posts} p
-            INNER JOIN {$wpdb->term_relationships} tr ON p.ID = tr.object_id
-            INNER JOIN {$wpdb->term_taxonomy} tt ON tr.term_taxonomy_id = tt.term_taxonomy_id
-            WHERE p.post_type = %s AND tt.taxonomy IN ($placeholders)
-        ",
-            array_merge([PostTypes::POST_TYPE_LOWONGAN], $taxonomies)
-        );
-        $result = $wpdb->get_var($query);
-        $final_result = $result ?: gmdate('c');
-
-        Cache::set($cache_key, $final_result, 86400); // Cache for 1 day
-        return $final_result;
     }
 
     /**
@@ -126,14 +91,7 @@ class TaxonomyQuery
      * @return array<string, list<array{id: int, name: string, slug: string, parent: int}>>
      */
     public static function getTaxonomyOptions(array $taxonomies): array
-    {
-        $cache_key = CacheKey::ALL_TAXONOMY_OPTIONS;
-        /** @var array<string, list<array{id: int, name: string, slug: string, parent: int}>>|false $cached */
-        $cached = Cache::get($cache_key);
-        if ($cached !== false) {
-            return $cached;
-        }
-        
+    {        
         $options = [];
 
         foreach ($taxonomies as $taxonomy) {
@@ -159,7 +117,6 @@ class TaxonomyQuery
                 $terms
             ));
         }
-        Cache::set($cache_key, $options, 86400);
         return $options;
     }
 }

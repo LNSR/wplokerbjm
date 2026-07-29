@@ -1,0 +1,375 @@
+<?php
+
+declare(strict_types=1);
+
+namespace WPLokerBJM\Tests;
+
+use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Container\Attributes\Filter;
+use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeInstanceHookHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRuntimeRegistry;
+use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
+
+class RuntimeRegistryTest extends WplokerbjmTestCase
+{
+    private WPHooksRuntimeRegistry $registry;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        $this->registry = new WPHooksRuntimeRegistry();
+
+        // Extend hook mocks with remove_action / remove_filter support
+        // so unregister actually strips entries from the registered-hooks array.
+        $hooks = &$GLOBALS['__wplokerbjm_registered_hooks'];
+
+        \Brain\Monkey\Functions\when('remove_action')->alias(
+            function (string $hook, $callable, int $priority = 10) use (&$hooks) {
+                $hooks = array_values(array_filter(
+                    $hooks,
+                    fn(array $h): bool =>
+                        !($h['type'] === 'action' && $h['hook'] === $hook
+                          && $h['callable'] === $callable && $h['priority'] === $priority),
+                ));
+            },
+        );
+
+        \Brain\Monkey\Functions\when('remove_filter')->alias(
+            function (string $hook, $callable, int $priority = 10) use (&$hooks) {
+                $hooks = array_values(array_filter(
+                    $hooks,
+                    fn(array $h): bool =>
+                        !($h['type'] === 'filter' && $h['hook'] === $hook
+                          && $h['callable'] === $callable && $h['priority'] === $priority),
+                ));
+            },
+        );
+    }
+
+    // ── Basic registration ────────────────────────────────────────────
+
+    public function testActionHookRegisteredAndFired(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'runtime_action_test', acceptedArgs: 1)]
+            public function doSomething(string $val): void
+            {
+                $this->captured[] = $val;
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $registered = $this->findRegisteredHook('action', 'runtime_action_test');
+        $this->assertNotNull($registered);
+        $this->assertInstanceOf(RuntimeInstanceHookHandler::class, $registered['callable']);
+
+        do_action('runtime_action_test', 'fired');
+
+        $this->assertSame(['fired'], $captured);
+    }
+
+    public function testFilterHookRegisteredAndFired(): void
+    {
+        $anon = new class {
+            #[Filter(hook: 'runtime_filter_test', acceptedArgs: 1)]
+            public function transform(string $value): string
+            {
+                return $value . '_transformed';
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $result = apply_filters('runtime_filter_test', 'input');
+
+        $this->assertSame('input_transformed', $result);
+    }
+
+    // ── Multiple hooks on one instance ─────────────────────────────────
+
+    public function testMultipleHooksOnSameInstance(): void
+    {
+        $actions = [];
+        $filters = [];
+
+        $anon = new class ($actions, $filters) {
+            public function __construct(
+                private array &$actions,
+                private array &$filters,
+            ) {}
+
+            #[Action(hook: 'multi_action_a', acceptedArgs: 1)]
+            public function onActionA(string $v): void { $this->actions[] = "A:$v"; }
+
+            #[Action(hook: 'multi_action_b', acceptedArgs: 1)]
+            public function onActionB(string $v): void { $this->actions[] = "B:$v"; }
+
+            #[Filter(hook: 'multi_filter_x', acceptedArgs: 1)]
+            public function onFilterX(string $v): string { $this->filters[] = "X:$v"; return $v . 'x'; }
+
+            #[Filter(hook: 'multi_filter_y', acceptedArgs: 1)]
+            public function onFilterY(string $v): string { $this->filters[] = "Y:$v"; return $v . 'y'; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        do_action('multi_action_a', 'h1');
+        do_action('multi_action_b', 'h2');
+
+        $fx = apply_filters('multi_filter_x', 'in');
+        $fy = apply_filters('multi_filter_y', 'in');
+
+        $this->assertCount(2, $actions);
+        $this->assertSame('A:h1', $actions[0]);
+        $this->assertSame('B:h2', $actions[1]);
+        $this->assertSame('inx', $fx);
+        $this->assertSame('iny', $fy);
+    }
+
+    // ── Visibility ─────────────────────────────────────────────────────
+
+    public function testProtectedMethodHook(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_protected_action', acceptedArgs: 0)]
+            protected function onProtectedAction(): void
+            {
+                $this->captured[] = 'protected_called';
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+        do_action('rt_protected_action');
+
+        $this->assertSame(['protected_called'], $captured);
+    }
+
+    public function testPrivateMethodHook(): void
+    {
+        $anon = new class {
+            #[Filter(hook: 'rt_private_filter', acceptedArgs: 1)]
+            private function onPrivateFilter(string $value): string
+            {
+                return $value . '_private_suffix';
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $result = apply_filters('rt_private_filter', 'hello');
+
+        $this->assertSame('hello_private_suffix', $result);
+    }
+
+    // ── Unregistration ─────────────────────────────────────────────────
+
+    public function testUnregisterRemovesHooks(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_unreg_action', acceptedArgs: 1)]
+            public function onAction(string $v): void { $this->captured[] = $v; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        // Verify it works before unregistration
+        do_action('rt_unreg_action', 'before');
+        $this->assertCount(1, $captured);
+
+        // Remove it
+        $this->registry->unregisterHooksOn($anon);
+
+        // Should no longer fire
+        do_action('rt_unreg_action', 'after');
+        $this->assertCount(1, $captured, 'Hook should not fire after unregistration');
+    }
+
+    // ── Idempotency / guards ───────────────────────────────────────────
+
+    public function testDoubleRegistrationIsNoOp(): void
+    {
+        $actions = [];
+
+        $anon = new class ($actions) {
+            public function __construct(private array &$actions) {}
+
+            #[Action(hook: 'rt_double_reg', acceptedArgs: 1)]
+            public function onAction(string $v): void { $this->actions[] = $v; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+        $this->registry->registerHooksOn($anon); // second call — no-op
+
+        do_action('rt_double_reg', 'once');
+
+        $this->assertCount(1, $actions, 'Hook should fire exactly once, not twice');
+    }
+
+    public function testUnregisterNonRegisteredInstanceIsNoOp(): void
+    {
+        $anon = new class {};
+
+        // Should not throw
+        $this->registry->unregisterHooksOn($anon);
+
+        $this->assertTrue(true);
+    }
+
+    // ── Static method skip ─────────────────────────────────────────────
+
+    public function testStaticMethodSkipped(): void
+    {
+        // Use a named class — anonymous class static methods behave oddly
+        $testClass = new class {
+            /**
+             * @phpstan-ignore-next-line
+             * @psalm-suppress InaccessibleMethod
+             */
+            #[Action(hook: 'rt_static_skip', acceptedArgs: 0)]
+            public static function ignoredStatic(): void
+            {
+                // static method — should be skipped
+            }
+        };
+
+        $this->registry->registerHooksOn($testClass);
+
+        $this->assertNull(
+            $this->findRegisteredHook('action', 'rt_static_skip'),
+        );
+    }
+
+    // ── Priority ───────────────────────────────────────────────────────
+
+    public function testPriorityOnAction(): void
+    {
+        $anon = new class {
+            #[Action(hook: 'rt_priority_action', priority: 99, acceptedArgs: 0)]
+            public function customPriority(): void {}
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $hook = $this->findRegisteredHook('action', 'rt_priority_action');
+        $this->assertNotNull($hook);
+        $this->assertSame(99, $hook['priority']);
+    }
+
+    public function testPriorityOnFilter(): void
+    {
+        $anon = new class {
+            #[Filter(hook: 'rt_priority_filter', priority: 5, acceptedArgs: 1)]
+            public function lowPriority(string $v): string { return $v; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $hook = $this->findRegisteredHook('filter', 'rt_priority_filter');
+        $this->assertNotNull($hook);
+        $this->assertSame(5, $hook['priority']);
+    }
+
+    // ── Error handling ─────────────────────────────────────────────────
+
+    public function testFilterPassthroughOnError(): void
+    {
+        $anon = new class {
+            #[Filter(hook: 'rt_filter_error', acceptedArgs: 1)]
+            public function willThrow(string $_v): string
+            {
+                throw new \RuntimeException('simulated failure');
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $result = apply_filters('rt_filter_error', 'passthrough');
+
+        $this->assertSame('passthrough', $result);
+    }
+
+    public function testActionDoesNotPropagateError(): void
+    {
+        $anon = new class {
+            #[Action(hook: 'rt_action_error', acceptedArgs: 1)]
+            public function willThrow(string $_v): void
+            {
+                throw new \RuntimeException('simulated failure');
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        do_action('rt_action_error', 'payload');
+
+        $this->assertTrue(true, 'Exception should not propagate');
+    }
+
+    // ── Accepted args ──────────────────────────────────────────────────
+
+    public function testAcceptedArgsLimitsArguments(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Filter(hook: 'rt_limited_args', acceptedArgs: 2)]
+            public function onFilter(string $first, string $second): string
+            {
+                $this->captured[] = [$first, $second];
+                return $first . '_' . $second;
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $result = apply_filters('rt_limited_args', 'a', 'b', 'c');
+
+        $this->assertSame('a_b', $result);
+        $this->assertCount(1, $captured);
+        $this->assertSame(['a', 'b'], $captured[0]);
+    }
+
+    // ── Separate registries ────────────────────────────────────────────
+
+    public function testSeparateRegistriesAreIsolated(): void
+    {
+        $registryA = new WPHooksRuntimeRegistry();
+        $registryB = new WPHooksRuntimeRegistry();
+
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_isolated_action', acceptedArgs: 1)]
+            public function onAction(string $v): void { $this->captured[] = $v; }
+        };
+
+        $registryA->registerHooksOn($anon);
+
+        // registryA should have registered it; registryB is unaware
+        do_action('rt_isolated_action', 'registry_a');
+        $this->assertCount(1, $captured);
+
+        // Unregister from registryA — registryB won't interfere
+        $registryA->unregisterHooksOn($anon);
+        do_action('rt_isolated_action', 'after_unreg');
+        $this->assertCount(1, $captured);
+    }
+}

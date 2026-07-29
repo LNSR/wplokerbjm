@@ -231,7 +231,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         );
 
         // Activate by method name (which also works for property names)
-        $this->registry->activateDeferredByMethod(PropertyDeferredService::class, 'deferredFilter');
+        $this->registry->activateDeferredByCallable([$this->container->get(PropertyDeferredService::class), 'deferredFilter']);
 
         $this->assertNotNull(
             $this->findRegisteredHook('filter', 'deferred_property_filter'),

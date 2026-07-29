@@ -1,14 +1,16 @@
 <?php
 
+declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks;
 
-use Psr\Container\ContainerInterface;
+use HookTargetResolve;
 use ReflectionClass;
-use ReflectionMethod;
-use ReflectionProperty;
-use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Bootstrap;
+use DI\Container;
 use WPLokerBJM\Shared\Log\Logger;
+use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{AnonClassHookPropertyAbstract};
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
 
 /**
  * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
@@ -21,6 +23,8 @@ use WPLokerBJM\Shared\Log\Logger;
  *
  * @phpstan-type HandlerEntry array{handler: LazyHookHandler|LazyPropertyHookHandler, type: 'action'|'filter', priority: int, accepted_args: int}
  * @phpstan-type RemoveHandlerEntry array{handler: LazyHookHandler|LazyPropertyHookHandler, type: 'action'|'filter', priority: int}
+ * @template TargetClass of Object
+ * @phpstan-type HookTargetResolve object<TargetClass>|callable|string|array{object<TargetClass>, string}
  */
 class WPHooksRegistry
 {
@@ -50,42 +54,6 @@ class WPHooksRegistry
     }
 
     /**
-     * Register hook registrations from the scanner.
-     * Pre-builds LazyHookHandler instances and validates container existence.
-     *
-     * @param HookRegistration[] $registrations
-     */
-    private function registerAll(array $registrations): void
-    {
-        foreach ($registrations as $reg) {
-            if (!$this->container->has($reg['class'])) {
-                Logger::warning(
-                    'WPHooksRegistry',
-                    'Skipping hook ' . $reg['hook']
-                    . ' — class not in container: ' . $reg['class']
-                );
-                continue;
-            }
-
-            $visibility = $reg['visibility'] ?? 'public';
-            $handler = ($reg['target'] ?? 'method') === 'method'
-                ? new LazyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type'])
-                : new LazyPropertyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type']);
-
-            $key = $reg['class'] . '::' . $reg['method'] . '::' . $reg['type'] . '::' . $reg['priority'];
-            $target = !empty($reg['defer'])
-                ? 'deferredHandlers'
-                : 'handlers';
-            $this->{$target}[$reg['hook']][$key] = [
-                'handler' => $handler,
-                'type' => $reg['type'],
-                'priority' => $reg['priority'],
-                'accepted_args' => $reg['accepted_args'],
-            ];
-        }
-    }
-
-    /**
      * Register all stored hooks with WordPress via add_action/add_filter.
      */
     public function initialize(): void
@@ -109,6 +77,8 @@ class WPHooksRegistry
 
         $this->initialized = true;
     }
+
+    #region deferred handlers activation methods
 
     /**
      * Activate all deferred handlers registered for a specific WordPress hook.
@@ -155,8 +125,7 @@ class WPHooksRegistry
      * $registry->activateDeferredByClass(WPGraphQL::class);
      * ```
      *
-     * @template T of Object
-     * @param class-string<T> $class Fully qualified class name.
+     * @param class-string $class Fully qualified class name.
      */
     public function activateDeferredByClass(string $class): void
     {
@@ -187,39 +156,59 @@ class WPHooksRegistry
     }
 
     /**
-     * Activate a specific deferred hook method or property on a service class.
+     * Activate deferred hook handlers matching the specified target callable or identifier.
      *
-     * Targets a single member (method or public property closure) — the most
-     * granular activation.  Already-active handlers are silently skipped.
+     * Scans the deferred handlers pool and transfers matching entries to the active pool,
+     * registering them immediately with WordPress via `add_action()` or `add_filter()`.
+     * Works seamlessly across standard instance methods, first-class callables, PHP 8.4
+     * property hooks, array targets, and class-string identifiers.
      *
-     * **Examples:**
+     * Already-activated handlers are silently skipped to prevent duplicate registrations.
      *
-     * *Activate a **method**-based hook:
+     * **Usage Examples:**
+     *
+     ** 1. First-Class Callable (Recommended for External Orchestrators):
+     * Provides full IDE autocompletion, type safety, and static refactoring support.
      * ```php
-     * $registry->activateDeferredByMethod(WPGraphQL::class, 'setCacheHeader');
+     *! $registry->activateDeferredByCallable($this->graphQL->setCacheHeader(...));
      * ```
      *
-     * *Activate a **property closure** hook — given this class:
+     ** 2. Self-Referencing Array (Recommended for Internal Method Self-Activation):
+     * Fast-path resolution when a method manages its own hook status. DRY and refactor-proof via `__FUNCTION__`.
      * ```php
-     * class WPGraphQL {
-     *     #[Filter('graphql_send_nocache_headers', defer: true)]
-     *     public $disableNoCacheHeaders = static function (): bool {
-     *         return false;
-     *     };
-     * }
-     * ```
-     * 
-     * Call:
-     * ```php
-     * $registry->activateDeferredByMethod(WPGraphQL::class, 'disableNoCacheHeaders');
+     *! $registry->activateDeferredByCallable([$this, __FUNCTION__]);
      * ```
      *
-     * @template T of Object
-     * @param class-string<T> $class  Fully qualified class name.
-     * @param key-of<T, string> $method Method or public property name to activate.
+     ** 3. String Identifier (Class::method):**
+     * Useful for static activation or when an active instance reference is not readily available.
+     * ```php
+     *! $registry->activateDeferredByCallable(GraphQLService::class . '::setCacheHeader');
+     * ```
+     *
+     ** 4. Array Lookup (`[$object, 'method']`):**
+     * Traditional PHP callable array syntax for instance method target resolution.
+     * ```php
+     *! $registry->activateDeferredByCallable([$this->graphQL, 'setCacheHeader']);
+     * ```
+     *
+     ** 5. PHP 8.4 Property Hooks & Dynamic Invokables:**
+     * Activates closures or invokable objects held within class properties.
+     * On property: 
+     * ```php
+     * private $disableNoCacheHeaders = static function() { return false; };
+     *
+     *! $registry->activateDeferredByCallable($this->graphQL->disableNoCacheHeaders);
+     * ```
+     *
+     * @param HookTargetResolve $target First-class callable, array `[$object, 'method']`,
+     *                                  string `'Class::method'`, or invokable property reference.
+     *
+     * @return void
+     * @throws \InvalidArgumentException If the target cannot be resolved to a valid class and member.
      */
-    public function activateDeferredByMethod(string $class, string $method): void
+    public function activateDeferredByCallable(callable|string|array $target): void
     {
+        [$class, $method] = ($this->resolverTarget)($target);
         $prefix = $class . '::' . $method . '::';
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
@@ -227,16 +216,13 @@ class WPHooksRegistry
                     continue;
                 }
 
-                // Guard: skip if already activated
                 if (isset($this->handlers[$hook][$key])) {
                     unset($hookHandlers[$key]);
                     continue;
                 }
 
                 $this->handlers[$hook][$key] = $data;
-
                 $this->addSingleHook($hook, $data);
-
                 unset($hookHandlers[$key]);
             }
             if (empty($hookHandlers)) {
@@ -245,15 +231,33 @@ class WPHooksRegistry
         }
         unset($hookHandlers);
     }
+    #endregion
+
+    #region deferred handlers unregisteration methods
+    /**
+     * Unregister a deferred hook using a first-class callable, array lookup,
+     * or class-string identifier.
+     *
+     * @param HookTargetResolve $target
+     */
+    public function unregisterDeferredByCallable(callable|string|array $target): void
+    {
+        [$class, $method] = ($this->resolverTarget)($target);
+        $prefix = $class . '::' . $method . '::';
+
+        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
+            foreach (array_keys($hookHandlers) as $key) {
+                if (str_starts_with($key, $prefix)) {
+                    unset($hookHandlers[$key]);
+                }
+            }
+        }
+    }
 
     /**
      * Unregister all deferred handlers for a specific WordPress hook name.
      *
-     * Removes deferred LazyHookHandler instances that were never registered
-     * with WordPress — no remove_action/remove_filter needed.
-     *
-     ** types autocomplete DX generated by generate-meta-hooks.php
-     * @param string $hook WordPress hook name (e.g. 'init', 'save_post', 'wp_robots').
+     * @param string $hook WordPress hook name.
      */
     public function unregisterDeferredByHook(string $hook): void
     {
@@ -262,16 +266,6 @@ class WPHooksRegistry
 
     /**
      * Unregister all deferred hooks belonging to a specific service class.
-     *
-     * Scans deferred handlers and removes every LazyHookHandler whose
-     * owning class matches the given FQCN. Since these handlers were
-     * never registered with WordPress, no remove_action/remove_filter
-     * calls are needed — just internal cleanup.
-     *
-     * **Example:**
-     * ```php
-     * $registry->unregisterDeferredByClass(Cloudflare::class);
-     * ```
      *
      * @param class-string $class Fully qualified class name.
      */
@@ -286,64 +280,35 @@ class WPHooksRegistry
             }
         }
     }
-
+    #endregion
+    #region main handlers unregisteration methods
     /**
-     * Unregister a specific deferred hook method or property on a service class.
+     * Unregister a registered hook via first-class callable, array lookup,
+     * or class-string identifier.
      *
-     * Targets a single member (method or public property closure) — cleanly
-     * removes deferred registrations before they're ever registered with
-     * WordPress.
-     *
-     * **Examples:**
-     *
-     * *Method-based:
-     * ```php
-     * $registry->unregisterDeferredByMethod(Cloudflare::class, 'purgeCache');
-     * ```
-     *
-     * *Property closure example:
-     * ```php
-     * #[Action('shutdown', defer: true)] 
-     * public $purgeCache = static function(): void { ... };
-     * ```
-     * 
-     * *unregister property closure example:
-     * call:
-     * ```php
-     * $registry->unregisterDeferredByMethod(CacheInvalidationHooks::class, 'purgeCache');
-     * ```
-     *
-     * @template T of Object
-     * @param class-string<T> $class  Fully qualified class name.
-     * @param key-of<T, string> $method Method or public property name to unregister.
+     * @param HookTargetResolve $target
      */
-    public function unregisterDeferredByMethod(string $class, string $method): void
+    public function unregisterByCallable(callable|string|array $target): void
     {
+        [$class, $method] = ($this->resolverTarget)($target);
         $prefix = $class . '::' . $method . '::';
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach (array_keys($hookHandlers) as $key) {
-                if (str_starts_with($key, $prefix)) {
-                    unset($hookHandlers[$key]);
+
+        foreach ($this->handlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if (!str_starts_with($key, $prefix)) {
+                    continue;
                 }
+                $this->removeSingleHook($hook, $data);
+                unset($hookHandlers[$key]);
             }
         }
+        unset($hookHandlers);
     }
 
     /**
      * Unregister all handlers for a specific WordPress hook name.
      *
-     * Removes every LazyHookHandler that was registered for the given hook,
-     * covering both actions and filters on that hook regardless of priority.
-     * After this call, `add_action/add_filter` entries are removed from
-     * WordPress and the internal handler map is cleaned up.
-     *
-     * **Example:**
-     * ```php
-     * $registry->unregisterByHook('save_post');
-     * All save_post action and filter registrations are removed
-     * ```
-     ** types autocomplete DX generated by generate-meta-hooks.php
-     * @param string $hook WordPress hook name (e.g. 'init', 'save_post', 'wp_robots').
+     * @param string $hook WordPress hook name.
      */
     public function unregisterByHook(string $hook): void
     {
@@ -357,17 +322,7 @@ class WPHooksRegistry
     /**
      * Unregister all hooks belonging to a specific service class.
      *
-     * Scans all registered hooks and removes every LazyHookHandler whose
-     * owning class matches the given FQCN. Useful for disabling an entire
-     * service in one call — e.g. during testing or conditional feature toggles.
-     *
-     * **Example:**
-     * ```php
-     * $registry->unregisterByClass(CacheInvalidationHooks::class);
-     * All hooks from CacheInvalidationHooks are removed
-     * ```
-     *
-     * @param class-string $class Fully qualified class name (e.g. 'WPLokerBJM\Core\CacheInvalidationHooks').
+     * @param class-string $class Fully qualified class name.
      */
     public function unregisterByClass(string $class): void
     {
@@ -383,44 +338,148 @@ class WPHooksRegistry
         }
         unset($hookHandlers);
     }
+    #endregion
 
+    #region Resolver Target Logics
     /**
-     * Unregister a specific hook method or property on a service class.
+     * Lazily-created callable target resolver.
      *
-     * Targets a single member (method or public property closure) without
-     * affecting other hooks registered by the same service.
+     * Implemented as an anonymous invokable object so it can serve as
+     * demonstration of invokable object(class) and encapsulate per-request state
+     * Resolves supported hook targets:
+     *  - first-class callables
+     *  - [$object, 'method']
+     *  - 'Class::method'
+     *  - invokable objects
+     *  - PHP 8.4 property hook closures
      *
-     * **Examples:**
-     *
-     * *Method-based:
-     * ```php
-     * $registry->unregisterByMethod(CacheInvalidationHooks::class, 'purgeCacheOnChange');
-     * ```
-     *
-     * *Property closure:
-     * ```php
-     * $registry->unregisterByMethod(WPGraphQL::class, 'disableNoCacheHeaders');
-     * ```
-     *
-     * @template T of Object
-     * @param class-string<T> $class  Fully qualified class name.
-     * @param key-of<T, string> $method Method or public property name to unregister.
+     * @return callable(HookTargetResolve): array{class-string, string}
      */
-    public function unregisterByMethod(string $class, string $method): void
-    {
-        $prefix = $class . '::' . $method . '::';
-        foreach ($this->handlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (!str_starts_with($key, $prefix)) {
-                    continue;
-                }
-                $this->removeSingleHook($hook, $data);
-                unset($hookHandlers[$key]);
+    private $resolverTarget {
+        get => $this->resolverTarget ??= new class () {
+            /**
+             * Per-request cache of resolved callable → [FQCN, memberName].
+             *
+             * WeakMap automatically drops entries when their key (the callable
+             * object) is garbage-collected, avoiding memory leaks.
+             *
+             * @var \WeakMap<object, array{class-string, string}>
+             */
+            private \WeakMap $callableTargetCache;
+
+            public function __construct()
+            {
+                $this->callableTargetCache = new \WeakMap();
             }
-        }
-        unset($hookHandlers);
+
+            /**
+             * @param HookTargetResolve $target
+             * @return array{class-string, string}
+             */
+            public function __invoke(object|callable|array|string $target): array
+            {
+                if (is_object($target) && isset($this->callableTargetCache[$target])) {
+                    return $this->callableTargetCache[$target];
+                }
+
+                $result = $this->doResolveCallableTarget($target);
+
+                if (is_object($target)) {
+                    $this->callableTargetCache[$target] = $result;
+                }
+                return $result;
+            }
+            /**
+             * @param HookTargetResolve $target
+             * @return array{class-string, string}
+             */
+            private function doResolveCallableTarget(object|callable|array|string $target): array
+            {
+                // 1. Array [$object, 'memberName'] — fast path
+                if (is_array($target)) {
+                    return [get_class($target[0]), $target[1]];
+                }
+
+                // 2. String 'Class::method' — static fallback
+                if (is_string($target)) {
+                    $parts = explode('::', $target, 2);
+                    return [$parts[0], $parts[1] ?? '__invoke'];
+                }
+
+                // 3. Invokable Object Instance (anonymous class from a property)
+                if (!$target instanceof \Closure && is_object($target)) {
+                    return $this->analyseObject($target);
+                }
+
+                // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
+                $ref = new \ReflectionFunction($target);
+                $calledClass = $ref->getClosureCalledClass()?->getName();
+
+                if ($calledClass === null) {
+                    throw new \InvalidArgumentException('Callable target must be bound to an object instance.');
+                }
+
+                $name = $ref->getName();
+
+                // Standard Instance Method ($service->method(...))
+                if (!str_contains($name, '{closure')) {
+                    return [$calledClass, $name];
+                }
+
+                // PHP 8.4 Property Hook Closure ("{closure:FQCN::$propertyName::get():line}")
+                if (str_contains($name, '::$')) {
+                    $start = strpos($name, '::$') + 3;
+                    $end = strpos($name, '::', $start);
+
+                    if ($start !== false && $end !== false) {
+                        return [$calledClass, substr($name, $start, $end - $start)];
+                    }
+                }
+
+                throw new \InvalidArgumentException("Unable to resolve hook target for class {$calledClass}.");
+            }
+
+            /**
+             * 
+             * @param object $target
+             * @return array{class-string, string}
+             */
+            private function analyseObject(object $target): array
+            {
+                $className = $target::class;
+
+                // Anonymous class extending AnonClassHookPropertyAbstract —
+                // reads parent class & property directly, no backtrace needed.
+                if ($target instanceof AnonClassHookPropertyAbstract) {
+                    return [$target->parentClass, $target->parentProperty];
+                }
+
+                // Best-effort fallback for anonymous classes that don't
+                // extend the AnonClassHookPropertyAbstract: walk the call stack to find which
+                // object's property holds this instance.
+                if ((new ReflectionClass($target))->isAnonymous()) {
+                    $backtrace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, 10);
+                    foreach ($backtrace as $frame) {
+                        $callerObject = $frame['object'] ?? null;
+                        if ($callerObject === null) {
+                            continue;
+                        }
+                        $refClass = new ReflectionClass($callerObject);
+                        foreach ($refClass->getProperties() as $property) {
+                            if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
+                                Logger::warning("WPHooksRegistry: ", "Anon class without extending AnonClassHookPropertyAbstract, it's recommended to use 'AnonClassHookPropertyAbstract'." . $refClass->getName() . "::" . $property->getName());
+                                return [$refClass->getName(), $property->getName()];
+                            }
+                        }
+                    }
+                }
+
+                return [$className, '__invoke'];
+            }
+        };
     }
 
+    #endregion
     /**
      * Internal: call add_action or add_filter for a single handler entry.
      *
@@ -449,157 +508,183 @@ class WPHooksRegistry
             remove_filter($hook, $data['handler'], $data['priority']);
         }
     }
+
+    /**
+     * Register hook registrations from the scanner.
+     * Pre-builds LazyHookHandler instances and validates container existence.
+     *
+     * @param HookRegistration[] $registrations
+     */
+    private function registerAll(array $registrations): void
+    {
+        foreach ($registrations as $reg) {
+            if (!$this->container->has($reg['class'])) {
+                Logger::warning(
+                    'WPHooksRegistry',
+                    'Skipping hook ' . $reg['hook']
+                    . ' — class not in container: ' . $reg['class']
+                );
+                continue;
+            }
+
+            $visibility = $reg['visibility'] ?? 'public';
+            $handler = ($reg['target'] ?? 'method') === 'method'
+                ? new LazyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type'])
+                : new LazyPropertyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type']);
+
+            $key = $reg['class'] . '::' . $reg['method'] . '::' . $reg['target'] . '::' . $reg['type'] . '::' . $reg['priority'] . '::' . $reg['accepted_args'];
+            $target = !empty($reg['defer'])
+                ? 'deferredHandlers'
+                : 'handlers';
+            $this->{$target}[$reg['hook']][$key] = [
+                'handler' => $handler,
+                'type' => $reg['type'],
+                'priority' => $reg['priority'],
+                'accepted_args' => $reg['accepted_args'],
+            ];
+        }
+    }
 }
 
 /**
- * Scans directories for WordPress hook attribute registrations.
+ * Runtime hook registry for on-the-fly object hook registration.
  *
- * This scanner searches for instance methods and properties annotated with
- * #[Action] or #[Filter] attributes across all autowirable PHP classes.
- * The resulting registrations are used by the Init service to automatically
- * register WordPress hooks via the DI container.
+ * Unlike WPHooksRegistry (which works with file-scanned, container-resolved
+ * classes), this registry registers hooks immediately from an already-
+ * instantiated object. This enables hook registration for anonymous classes
+ * and dynamically-created objects that cannot be discovered by the file-based
+ * WPHooksScanner.
  *
- * @see Action
- * @see Filter
- * @see \WPLokerBJM\Bootstrap
+ * Usage:
+ *   $service = new class($this->registry) {
+ *       #[Action(hook: 'init')]
+ *       public function __construct(WPHooksRuntimeRegistry $registry) { 
+ *           $registry->registerHooksOn($this); // register
+ *           $registry->unregisterHooksOn($this); // unregister (optional)
+ *       }
+ *       public function onInit(): void { ... }
+ *   };
  *
- * @phpstan-type HookRegistration array{class: class-string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, defer: bool, target: 'method'|'property'|'property-hook', visibility: 'public'|'protected'|'private'}
+ * All hooks are registered eagerly — the `defer` flag is ignored, and
+ * static methods are silently skipped.
  */
-class WPHooksScanner
+class WPHooksRuntimeRegistry
 {
+    use HookScannerTrait;
 
-    /** @var array<int, HookRegistration>|null */
-    private ?array $cachedHookRegistrations = null;
+    /**
+     * Maps registered instances directly to their registered hook metadata and handlers.
+     *
+     * @var \WeakMap<object, list<array{
+     *     handler: RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler,
+     *     hook: string,
+     *     priority: int,
+     *     type: 'action'|'filter'
+     * }>>
+     */
+    private \WeakMap $registry;
 
-    public function __construct(private string $namespace = 'WPLokerBJM')
+    public function __construct()
     {
-        $this->namespace = trim($namespace, '\\');
+        $this->registry = new \WeakMap();
     }
 
     /**
-     * Get hook registrations from #[Action] and #[Filter] attributes.
+     * Scan and register hooks on the given object instance.
      *
-     * Scans instance methods and properties for hook attributes across all PHP files
-     * in the base directory. Results are cached in-memory for the request.
+     * Non-static methods and properties annotated with #[Action] or
+     * #[Filter] are registered via add_action() / add_filter()
+     * immediately. Calling this on an already-registered instance is
+     * a no-op.
      *
-     * @return HookRegistration[]
+     * @param object $instance An instantiated object with hook-annotated methods/properties.
      */
-    public function getHookRegistrations(): array
+    public function registerHooksOn(object $instance): void
     {
-        if ($this->cachedHookRegistrations !== null) {
-            return $this->cachedHookRegistrations;
+        // Double-registration guard
+        if (isset($this->registry[$instance])) {
+            return;
         }
 
-        $registrations = $this->performHookRegistrationScan();
-        $this->cachedHookRegistrations = $registrations;
-        return $registrations;
+        $records = [];
+        $ref = new ReflectionClass($instance);
+
+        $this->scanMethodHooks(
+            $ref,
+            function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records): void {
+                $handler = new RuntimeInstanceHookHandler(
+                    $instance,
+                    $method->getName(),
+                    $visibility,
+                    $type
+                );
+
+                if ($type === 'action') {
+                    \add_action($attr->hook, $handler, $attr->priority, $attr->acceptedArgs);
+                } else {
+                    \add_filter($attr->hook, $handler, $attr->priority, $attr->acceptedArgs);
+                }
+
+                $records[] = [
+                    'handler'  => $handler,
+                    'hook'     => $attr->hook,
+                    'priority' => $attr->priority,
+                    'type'     => $type,
+                ];
+            }
+        );
+
+        $this->scanPropertyHooks(
+            $ref,
+            function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records): void {
+                $handler = new RuntimeInstancePropertyHookHandler(
+                    $instance,
+                    $property->getName(),
+                    $visibility,
+                    $type
+                );
+
+                if ($type === 'action') {
+                    \add_action($attr->hook, $handler, $attr->priority, $attr->acceptedArgs);
+                } else {
+                    \add_filter($attr->hook, $handler, $attr->priority, $attr->acceptedArgs);
+                }
+
+                $records[] = [
+                    'handler'  => $handler,
+                    'hook'     => $attr->hook,
+                    'priority' => $attr->priority,
+                    'type'     => $type,
+                ];
+            }
+        );
+
+        $this->registry[$instance] = $records;
     }
 
     /**
-     * Perform the actual hook registration scanning logic.
+     * Remove all hooks previously registered for the given instance.
      *
-     * Scans instance methods and properties across all visibility levels.
-     * Static members are intentionally ignored — hooks are resolved through
-     * the DI container so the owning service must be instantiable.
+     * Calls remove_action() / remove_filter() for each registered hook
+     * and clears internal tracking. Calling this on an instance that was
+     * never registered is a no-op.
      *
-     * @return HookRegistration[]
+     * @param object $instance The instance whose hooks should be removed.
      */
-    private function performHookRegistrationScan(): array
+    public function unregisterHooksOn(object $instance): void
     {
-        $registrations = [];
+        if (!isset($this->registry[$instance])) {
+            return;
+        }
 
-        $namespacePrefix = $this->namespace . '\\';
-
-        foreach (Bootstrap::getRobotLoader()->getIndexedClasses() as $className => $file) {
-            if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
-                continue;
-            }
-            try {
-                $reflection = new ReflectionClass($className);
-                /** @var ReflectionMethod $method */
-                foreach ($reflection->getMethods(ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED | ReflectionMethod::IS_PRIVATE) as $method) {
-                    // Skip static methods — hooks must be instance methods
-                    // because the container resolves the owning service lazily.
-                    if ($method->isStatic()) {
-                        continue;
-                    }
-                    $visibility = $method->isPublic() ? 'public' : ($method->isProtected() ? 'protected' : 'private');
-                    /** @var \ReflectionAttribute $attribute */
-                    foreach ($method->getAttributes(Action::class) as $attribute) {
-                        $action = $attribute->newInstance();
-                        /** @var Action $action */
-                        $registrations[] = [
-                            'class' => $className,
-                            'method' => $method->getName(),
-                            'type' => 'action',
-                            'hook' => $action->hook,
-                            'priority' => $action->priority,
-                            'accepted_args' => $action->acceptedArgs,
-                            'defer' => $action->defer,
-                            'target' => 'method',
-                            'visibility' => $visibility,
-                        ];
-                    }
-                    /** @var \ReflectionAttribute $attribute */
-                    foreach ($method->getAttributes(Filter::class) as $attribute) {
-                        $filter = $attribute->newInstance();
-                        /** @var Filter $filter */
-                        $registrations[] = [
-                            'class' => $className,
-                            'method' => $method->getName(),
-                            'type' => 'filter',
-                            'hook' => $filter->hook,
-                            'priority' => $filter->priority,
-                            'accepted_args' => $filter->acceptedArgs,
-                            'defer' => $filter->defer,
-                            'target' => 'method',
-                            'visibility' => $visibility,
-                        ];
-                    }
-                }
-
-                /** @var ReflectionProperty $property */
-                foreach ($reflection->getProperties(ReflectionProperty::IS_PUBLIC | ReflectionProperty::IS_PROTECTED | ReflectionProperty::IS_PRIVATE) as $property) {
-                    $visibility = $property->isPublic() ? 'public' : ($property->isProtected() ? 'protected' : 'private');
-                    $hasPropertyHook = $property->hasHooks();
-                    $target = $hasPropertyHook ? 'property-hook' : 'property';
-                    foreach ($property->getAttributes(Action::class) as $attribute) {
-                        $action = $attribute->newInstance();
-                        /** @var Action $action */
-                        $registrations[] = [
-                            'class' => $className,
-                            'method' => $property->getName(),
-                            'type' => 'action',
-                            'hook' => $action->hook,
-                            'priority' => $action->priority,
-                            'accepted_args' => $action->acceptedArgs,
-                            'defer' => $action->defer,
-                            'target' => $target,
-                            'visibility' => $visibility,
-                        ];
-                    }
-                    /** @var \ReflectionAttribute $attribute */
-                    foreach ($property->getAttributes(Filter::class) as $attribute) {
-                        $filter = $attribute->newInstance();
-                        /** @var Filter $filter */
-                        $registrations[] = [
-                            'class' => $className,
-                            'method' => $property->getName(),
-                            'type' => 'filter',
-                            'hook' => $filter->hook,
-                            'priority' => $filter->priority,
-                            'accepted_args' => $filter->acceptedArgs,
-                            'defer' => $filter->defer,
-                            'target' => $target,
-                            'visibility' => $visibility,
-                        ];
-                    }
-                }
-            } catch (\Exception $e) {
-                Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());
+        foreach ($this->registry[$instance] as $record) {
+            if ($record['type'] === 'action') {
+                \remove_action($record['hook'], $record['handler'], $record['priority']);
+            } else {
+                \remove_filter($record['hook'], $record['handler'], $record['priority']);
             }
         }
 
-        return $registrations;
+        unset($this->registry[$instance]);
     }
 }

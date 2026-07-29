@@ -174,8 +174,8 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             $this->findRegisteredHook('action', 'deferred_method_action'),
         );
 
-        $this->registry->activateDeferredByMethod(
-            MethodDeferredService::class, 'onDeferredAction',
+        $this->registry->activateDeferredByCallable(
+            [$this->container->get(MethodDeferredService::class), 'onDeferredAction'],
         );
 
         $this->assertNotNull(

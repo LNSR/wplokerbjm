@@ -1,5 +1,5 @@
 <?php
-
+declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery;
 use ReflectionClass;
 use DI\Attribute\Injectable;

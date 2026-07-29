@@ -1,0 +1,103 @@
+<?php
+declare(strict_types=1);
+
+namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
+
+use ReflectionClass;
+use ReflectionProperty;
+use ReflectionMethod;
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksScanner, WPHooksRuntimeRegistry};
+
+/**
+ * Shared method-scanning logic for hook attribute discovery.
+ *
+ * Iterates non-static methods of a ReflectionClass and calls a user-provided
+ * callback for each #[Action] or #[Filter] attribute found.
+ *
+ * Used by:
+ * - @see WPHooksScanner (compiled to HookRegistration arrays)
+ * - @see WPHooksRuntimeRegistry (immediate add_action / add_filter)
+ */
+trait HookScannerTrait
+{
+    /**
+     * Scan all non-static methods on the given class for hook attributes.
+     *
+     * For each #[Action] or #[Filter] attribute found, the callback receives:
+     *   (ReflectionMethod $method, Action|Filter $attr, string $visibility, 'action'|'filter' $type)
+     *
+     * @param ReflectionClass $reflection Class to scan.
+     * @param callable        $callback   Called once per attribute found.
+     */
+    private function scanMethodHooks(ReflectionClass $reflection, callable $callback): void
+    {
+        /** @var ReflectionMethod $method */
+        foreach ($reflection->getMethods(
+            ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED | ReflectionMethod::IS_PRIVATE
+        ) as $method) {
+            // Static methods are skipped — hooks must be instance methods.
+            if ($method->isStatic()) {
+                continue;
+            }
+
+            $visibility = $method->isPublic()
+                ? 'public'
+                : ($method->isProtected() ? 'protected' : 'private');
+
+            foreach ($method->getAttributes(Action::class) as $attribute) {
+                /** @var Action $action */
+                $action = $attribute->newInstance();
+                $callback($method, $action, $visibility, 'action');
+            }
+
+            foreach ($method->getAttributes(Filter::class) as $attribute) {
+                /** @var Filter $filter */
+                $filter = $attribute->newInstance();
+                $callback($method, $filter, $visibility, 'filter');
+            }
+        }
+    }
+    /**
+     * Iterate all non-static properties of a class and invoke $callback
+     * once per #[Action] / #[Filter] discovered.
+     *
+     * @param ReflectionClass $reflection   Class to scan
+     * @param callable        $callback     Handler for each found attribute
+     */
+    private function scanPropertyHooks(
+        ReflectionClass $reflection,
+        callable $callback,
+    ): void {
+        foreach ($reflection->getProperties(
+            ReflectionProperty::IS_PUBLIC
+            | ReflectionProperty::IS_PROTECTED
+            | ReflectionProperty::IS_PRIVATE,
+        ) as $property) {
+            if ($property->isStatic()) {
+                continue;
+            }
+
+            $visibility = $property->isPublic()
+                ? 'public'
+                : ($property->isProtected() ? 'protected' : 'private');
+
+            $target = $property->hasHooks()
+                ? 'property-hook'
+                : 'property';
+
+            /** @var ReflectionProperty $property */
+            foreach ($property->getAttributes(Action::class) as $attribute) {
+                /** @var Action $action */
+                $action = $attribute->newInstance();
+                $callback($property, $action, $visibility, 'action', $target);
+            }
+
+            foreach ($property->getAttributes(Filter::class) as $attribute) {
+                /** @var Filter $filter */
+                $filter = $attribute->newInstance();
+                $callback($property, $filter, $visibility, 'filter', $target);
+            }
+        }
+    }
+}

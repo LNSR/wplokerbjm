@@ -321,15 +321,12 @@ class CacheInvalidationHooks
         if ($alreadyRun)
             return;
         $alreadyRun = true;
-        $this->hooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
+        $this->hooksRegistry->unregisterByCallable([$this, __FUNCTION__]);
 
         try {
             Cache::deleteMultiple([
                 CacheKey::CAROUSEL_JOBS,
                 CacheKey::JOB_LAST_MODIFIED,
-                CacheKey::TAXONOMY_LAST_MODIFIED,
-                CacheKey::ALL_TAXONOMY_TERMS,
-                CacheKey::ALL_TAXONOMY_OPTIONS,
                 CacheKey::TAXONOMY_DEPTH_HANDLE,
                 CacheKey::TAXONOMY_DEPTH_LOKASI,
                 CacheKey::TAXONOMY_DEPTH_GENDER,

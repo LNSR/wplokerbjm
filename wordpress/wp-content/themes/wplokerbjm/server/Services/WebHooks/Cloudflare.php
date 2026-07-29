@@ -64,7 +64,7 @@ class Cloudflare
         static $alreadyRun = false;
         if ($alreadyRun) return true;
         $alreadyRun = true;
-        $this->wpHooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
+        $this->wpHooksRegistry->unregisterByCallable([$this, __FUNCTION__]);
 
         return $this->sendPurgeRequest(['purge_everything' => true]);
     }
@@ -83,7 +83,7 @@ class Cloudflare
         static $alreadyRun = false;
         if ($alreadyRun) return true;
         $alreadyRun = true;
-        $this->wpHooksRegistry->unregisterByMethod(self::class, __FUNCTION__);
+        $this->wpHooksRegistry->unregisterByCallable([$this, __FUNCTION__]);
 
         return $this->sendPurgeRequest(['purge_everything' => true]);
     }

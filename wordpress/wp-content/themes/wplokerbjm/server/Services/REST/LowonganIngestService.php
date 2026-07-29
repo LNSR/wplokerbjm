@@ -5,7 +5,8 @@ declare(strict_types=1);
 namespace WPLokerBJM\Services\REST;
 
 use WPLokerBJM\Models\Schema\CustomFields;
-use WPLokerBJM\QueryBuilders\JobQuery;
+use WPLokerBJM\QueryBuilders\{JobQuery, TaxonomyQuery};
+use WPLokerBJM\Repositories\TaxonomyRepository;
 use WPLokerBJM\Services\Utilities\{ServiceUtils,ServiceIngestUtils};
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Models\Schema\Taxonomies;
@@ -416,18 +417,7 @@ class LowonganIngestTaxonomyResolver
      */
     private function resolveTermIds(string $taxonomy, string $value, array &$warnings): array
     {
-        $availableTerms = get_terms([
-            'taxonomy' => $taxonomy,
-            'hide_empty' => false,
-        ]);
-
-        if (is_wp_error($availableTerms) || !is_array($availableTerms)) {
-            Logger::error(LowonganIngestLogBuilder::LOG_CATEGORY, 'Unable to load controlled taxonomy terms.', array_merge(
-                ['taxonomy' => $taxonomy],
-                $this->logBuilder->getWordPressErrorContext($availableTerms)
-            ));
-            return [];
-        }
+        $availableTerms = TaxonomyQuery::allTaxonomiesTerms((string) $taxonomy, 'all');
 
         $index = [];
         foreach ($availableTerms as $term) {
@@ -500,10 +490,10 @@ class LowonganIngestLogBuilder
     }
 
     /**
-     * @param mixed $value
+     * @param ?\WP_Error $value
      * @return array{wp_error_code?: string, wp_error_message?: string}
      */
-    public function getWordPressErrorContext($value): array
+    public function getWordPressErrorContext(?\WP_Error $value): array
     {
         if (!is_object($value)) {
             return [];

@@ -129,7 +129,7 @@ class JWTDataResolver
      * The cookie domain is derived from the headless frontend URL via
      * SharedUtils::headlessDomainRedirect().
      *
-     * @param JWTDataShape['token'] $token JWT token string to store in cookie
+     * @param string $token JWT token string to store in cookie
      */
     private function setJwtCookie(string $token): void
     {

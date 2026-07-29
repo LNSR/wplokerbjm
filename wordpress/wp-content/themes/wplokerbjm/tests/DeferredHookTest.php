@@ -244,7 +244,7 @@ class DeferredHookTest extends WplokerbjmTestCase
             ],
         ]);
 
-        $this->registry->activateDeferredByMethod(self::class, 'dummyDeferredM');
+        $this->registry->activateDeferredByCallable([$this, 'dummyDeferredM']);
 
         $this->assertNotNull(
             $this->findRegisteredHook('action', 'specific_hook'),
@@ -326,7 +326,7 @@ class DeferredHookTest extends WplokerbjmTestCase
         $beforeCount = count($this->findAllRegisteredHooks('action', 'mixed_hook'));
 
         // Activate the deferred one
-        $this->registry->activateDeferredByMethod(self::class, 'dummyDeferred');
+        $this->registry->activateDeferredByCallable([$this, 'dummyDeferred']);
 
         $afterCount = count($this->findAllRegisteredHooks('action', 'mixed_hook'));
         $this->assertSame(
@@ -470,7 +470,7 @@ class DeferredHookTest extends WplokerbjmTestCase
 
         $this->assertSame(2, $this->deferredHandlersCount());
 
-        $this->registry->unregisterDeferredByMethod(self::class, 'dummyRemove');
+        $this->registry->unregisterDeferredByCallable([$this, 'dummyRemove']);
 
         $this->assertSame(
             1,
@@ -493,7 +493,7 @@ class DeferredHookTest extends WplokerbjmTestCase
             ],
         ]);
 
-        $this->registry->unregisterDeferredByMethod(self::class, 'nonexistentMethod');
+        $this->registry->unregisterDeferredByCallable([$this, 'nonexistentMethod']);
 
         $this->assertSame(
             1,
