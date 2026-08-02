@@ -40,17 +40,15 @@ class Core implements DefinitionProviderInterface
     {
         $namespace = 'WPLokerBJM';
         $scanner = new AutowireScanner($namespace);
-        $hookScanner = new WPhooksScanner($namespace);
         $autoWiredDefinitions = $scanner->scanForAutowirableClasses();
-        $registrationHooks = $hookScanner->getHookRegistrations();
 
         $core = [
+            WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, get_stylesheet_directory() . "/cache"),
             WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class),
-            WPHooksRegistry::class => \DI\autowire(WPHooksRegistry::class)
-                ->constructor(
-                    \DI\get(ContainerInterface::class),
-                    $registrationHooks
-                ),
+            WPHooksRegistry::class => static function (ContainerInterface $c) {
+                $hookScanner = $c->get(WPHooksScanner::class);
+                return new WPHooksRegistry($c, $hookScanner->getHookRegistrations());
+            },
         ];
 
         return array_merge($autoWiredDefinitions, $core);

@@ -3,7 +3,6 @@
 declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks;
 
-use HookTargetResolve;
 use ReflectionClass;
 use DI\Container;
 use WPLokerBJM\Shared\Log\Logger;
@@ -11,6 +10,7 @@ use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{AnonClassHookPropertyAbstract};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
+use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
 
 /**
  * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
@@ -19,9 +19,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
  * enabling unregistration by hook name, class, or specific class::method.
  * Service resolution is deferred to hook-fire time (lazy loading).
  *
- * @phpstan-import-type HookRegistration from WPHooksScanner
- *
- * @phpstan-type HandlerEntry array{handler: LazyHookHandler|LazyPropertyHookHandler, type: 'action'|'filter', priority: int, accepted_args: int}
+ * @phpstan-type HandlerEntry array{key: HookKey, handler: LazyHookHandler|LazyPropertyHookHandler, type: 'action'|'filter', priority: int, accepted_args: int}
  * @phpstan-type RemoveHandlerEntry array{handler: LazyHookHandler|LazyPropertyHookHandler, type: 'action'|'filter', priority: int}
  * @template TargetClass of Object
  * @phpstan-type HookTargetResolve object<TargetClass>|callable|string|array{object<TargetClass>, string}
@@ -43,7 +41,6 @@ class WPHooksRegistry
     private bool $initialized = false;
 
     /**
-     * Summary of __construct
      * @param ContainerInterface $container
      * @param HookRegistration[] $hooksRegistration
      */
@@ -129,10 +126,9 @@ class WPHooksRegistry
      */
     public function activateDeferredByClass(string $class): void
     {
-        $prefix = $class . '::';
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
-                if (!str_starts_with($key, $prefix)) {
+                if (!$data['key']->isForClass($class)) {
                     continue;
                 }
 
@@ -191,7 +187,7 @@ class WPHooksRegistry
      *! $registry->activateDeferredByCallable([$this->graphQL, 'setCacheHeader']);
      * ```
      *
-     ** 5. PHP 8.4 Property Hooks & Dynamic Invokables:**
+     ** 5. PHP 8.4 Property Hooks & Dynamic Invokables & PHP 8.5 inline closure constant expression:**
      * Activates closures or invokable objects held within class properties.
      * On property: 
      * ```php
@@ -209,10 +205,9 @@ class WPHooksRegistry
     public function activateDeferredByCallable(callable|string|array $target): void
     {
         [$class, $method] = ($this->resolverTarget)($target);
-        $prefix = $class . '::' . $method . '::';
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
-                if (!str_starts_with($key, $prefix)) {
+                if (!$data['key']->isForCallable($class, $method)) {
                     continue;
                 }
 
@@ -243,11 +238,10 @@ class WPHooksRegistry
     public function unregisterDeferredByCallable(callable|string|array $target): void
     {
         [$class, $method] = ($this->resolverTarget)($target);
-        $prefix = $class . '::' . $method . '::';
 
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach (array_keys($hookHandlers) as $key) {
-                if (str_starts_with($key, $prefix)) {
+            foreach ($hookHandlers as $key => $data) {
+                if ($data['key']->isForCallable($class, $method)) {
                     unset($hookHandlers[$key]);
                 }
             }
@@ -271,10 +265,9 @@ class WPHooksRegistry
      */
     public function unregisterDeferredByClass(string $class): void
     {
-        $prefix = $class . '::';
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $_) {
-                if (str_starts_with($key, $prefix)) {
+            foreach ($hookHandlers as $key => $data) {
+                if ($data['key']->isForClass($class)) {
                     unset($hookHandlers[$key]);
                 }
             }
@@ -291,11 +284,10 @@ class WPHooksRegistry
     public function unregisterByCallable(callable|string|array $target): void
     {
         [$class, $method] = ($this->resolverTarget)($target);
-        $prefix = $class . '::' . $method . '::';
 
         foreach ($this->handlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
-                if (!str_starts_with($key, $prefix)) {
+                if (!$data['key']->isForCallable($class, $method)) {
                     continue;
                 }
                 $this->removeSingleHook($hook, $data);
@@ -326,10 +318,9 @@ class WPHooksRegistry
      */
     public function unregisterByClass(string $class): void
     {
-        $prefix = $class . '::';
         foreach ($this->handlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
-                if (!str_starts_with($key, $prefix)) {
+                if (!$data['key']->isForClass($class)) {
                     continue;
                 }
                 $this->removeSingleHook($hook, $data);
@@ -515,32 +506,31 @@ class WPHooksRegistry
      *
      * @param HookRegistration[] $registrations
      */
-    private function registerAll(array $registrations): void
+    private function registerAll(array|HookRegistration $registrations): void
     {
         foreach ($registrations as $reg) {
-            if (!$this->container->has($reg['class'])) {
+            $registration = $reg instanceof HookRegistration ? $reg : HookRegistration::fromArray($reg);
+
+            if (!$this->container->has($registration->class)) {
                 Logger::warning(
                     'WPHooksRegistry',
-                    'Skipping hook ' . $reg['hook']
-                    . ' — class not in container: ' . $reg['class']
+                    'Skipping hook ' . $registration->hook
+                    . ' — class not in container: ' . $registration->class
                 );
                 continue;
             }
 
-            $visibility = $reg['visibility'] ?? 'public';
-            $handler = ($reg['target'] ?? 'method') === 'method'
-                ? new LazyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type'])
-                : new LazyPropertyHookHandler($this->container, $reg['class'], $reg['method'], $visibility, $reg['type']);
-
-            $key = $reg['class'] . '::' . $reg['method'] . '::' . $reg['target'] . '::' . $reg['type'] . '::' . $reg['priority'] . '::' . $reg['accepted_args'];
-            $target = !empty($reg['defer'])
-                ? 'deferredHandlers'
-                : 'handlers';
-            $this->{$target}[$reg['hook']][$key] = [
+            $handler = $registration->target === 'method'
+                ? new LazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->condition, $registration->conditionParams)
+                : new LazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->condition, $registration->conditionParams);
+            $key = HookKey::fromRegistration($registration);
+            $target = $registration->defer ? 'deferredHandlers' : 'handlers';
+            $this->{$target}[$registration->hook][$key->toString()] = [
+                'key' => $key,
                 'handler' => $handler,
-                'type' => $reg['type'],
-                'priority' => $reg['priority'],
-                'accepted_args' => $reg['accepted_args'],
+                'type' => $registration->type,
+                'priority' => $registration->priority,
+                'accepted_args' => $registration->acceptedArgs,
             ];
         }
     }
@@ -565,7 +555,7 @@ class WPHooksRegistry
  *       public function onInit(): void { ... }
  *   };
  *
- * All hooks are registered eagerly — the `defer` flag is ignored, and
+ * All hooks are registered eagerly — the `defer` & 'condition' flag is ignored, and
  * static methods are silently skipped.
  */
 class WPHooksRuntimeRegistry
@@ -612,6 +602,15 @@ class WPHooksRuntimeRegistry
         $this->scanMethodHooks(
             $ref,
             function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records): void {
+                if ($attr->condition !== null) {
+                    Logger::warning(
+                        'WPHooksRuntimeRegistry',
+                        'Skipping hook ' . $attr->hook . ' on ' . $method->getName()
+                        . ' — condition closures are unsupported on runtime-registered instances (no container access)'
+                    );
+                    return;
+                }
+
                 $handler = new RuntimeInstanceHookHandler(
                     $instance,
                     $method->getName(),
@@ -637,6 +636,15 @@ class WPHooksRuntimeRegistry
         $this->scanPropertyHooks(
             $ref,
             function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records): void {
+                if ($attr->condition !== null) {
+                    Logger::warning(
+                        'WPHooksRuntimeRegistry',
+                        'Skipping hook ' . $attr->hook . ' on ' . $property->getName()
+                        . ' — condition closures are unsupported on runtime-registered instances (no container access)'
+                    );
+                    return;
+                }
+
                 $handler = new RuntimeInstancePropertyHookHandler(
                     $instance,
                     $property->getName(),

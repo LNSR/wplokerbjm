@@ -3,6 +3,7 @@
 namespace WPLokerBJM\Core\Cron;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 /**
  * Cron hook key constants for centralized management.
  */
@@ -28,7 +29,9 @@ class WPCron
      *
      * @return void
      */
-    #[Action('init')]
+    #[Action('init', condition: static function(): bool {
+        return SharedUtils::isWPCLI();
+    })]
     public function registerCronWP(): void
     {
         $this->scheduleEvent(self::DELETE_OLD_JOBS, 'daily');

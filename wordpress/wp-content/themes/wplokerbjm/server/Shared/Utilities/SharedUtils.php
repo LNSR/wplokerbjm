@@ -54,6 +54,11 @@ class SharedUtils
         return false;
     }
 
+    public static function isWPCLI(): bool
+    {
+        return defined('WP_CLI') && WP_CLI;
+    }
+
     public static function isDevelopment(): bool
     {
         return defined('WP_ENV') && WP_ENV === 'development';

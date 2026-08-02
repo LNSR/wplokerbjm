@@ -18,19 +18,21 @@ class Action
      * @param int $priority
      * @param int $acceptedArgs
      * @param bool $defer defer activation
+     * @param \Closure|null $condition Gate the hook: receives Psr\Container\ContainerInterface, must return bool. 
+     * Intercept and fire hook only when it returns true, Condition are useful to prevent instantiation of whole class
      */
     public function __construct(
         public readonly string $hook,
         public readonly int $priority = 10,
         public readonly int $acceptedArgs = 1,
-        public readonly bool $defer = false
+        public readonly bool $defer = false,
+        public readonly ?\Closure $condition = null
     ) {
     }
 }
 
 /**
  * Attribute for WordPress filters.
- * Annotate a method to register it as a filter hook.
  */
 #[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::IS_REPEATABLE)]
 class Filter
@@ -41,12 +43,15 @@ class Filter
      * @param int $priority
      * @param int $acceptedArgs
      * @param bool $defer defer activation
+     * @param \Closure|null $condition Runtime gate the hook: receives Psr\Container\ContainerInterface, must return bool. 
+     * Intercept and fire hook only when it returns true, Condition are useful to prevent instantiation of class.
      */
     public function __construct(
         public readonly string $hook,
         public readonly int $priority = 10,
         public readonly int $acceptedArgs = 1,
-        public readonly bool $defer = false
+        public readonly bool $defer = false,
+        public readonly ?\Closure $condition = null
     ) {
     }
 }

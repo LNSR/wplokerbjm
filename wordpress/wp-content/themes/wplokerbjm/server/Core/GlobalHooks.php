@@ -211,13 +211,15 @@ class SearchHooks
  */
 class LanguageHooks
 {
-    #[Filter('locale')]
+    #[Filter(
+        'locale',
+        condition: static function (): bool {
+                return !is_admin();
+                }
+    )]
     public function frontendLocalHTMLl10n($locale)
     {
-        if (!is_admin()) { // Only affects the public site, keeps dashboard English
-            return 'id_ID';
-        }
-        return $locale;
+        return $locale = 'id_ID';
     }
 }
 
@@ -227,13 +229,15 @@ class LanguageHooks
 class HTTPHooks
 {
     //** forwarded IP from the SvelteKit frontend
-    #[Action('muplugins_loaded', PHP_INT_MIN)]
+    #[Action(
+        'muplugins_loaded',
+        PHP_INT_MIN,
+        condition: static function (): bool {
+                return !SharedUtils::isDevelopment();
+                }
+    )]
     public function setRemoteAddr(): void
     {
-
-        if (SharedUtils::isDevelopment())
-            return; // @dev local mode, skip this
-
         if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) {
             $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_CF_CONNECTING_IP'];
             return;

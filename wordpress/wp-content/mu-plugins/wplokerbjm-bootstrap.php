@@ -86,7 +86,6 @@ class Bootstrap
     private static function initContainer(): void
     {
         try {
-            /** @var Init $init */
             $init = WPLokerBJMContainer::getContainer()->get(Init::class);
             $init->initialize();
         } catch (\Exception $e) {

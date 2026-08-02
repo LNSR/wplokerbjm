@@ -217,13 +217,13 @@ final class WPGraphQL implements PluginConfigInterface
         if (is_user_logged_in()) {
             $headers['Logged-In'] = 'true';
             $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
-            $this->hookRegistry->activateDeferredByCallable($this->disableGraphQLNocacheHeader(...));
-            $this->hookRegistry->activateDeferredByCallable($this->applyCachePolicy(...));
+            remove_all_filters('nocache_headers');
+            $this->hookRegistry->activateDeferredByClass(self::class);
         }
         return $headers;
     }
     #[Filter('graphql_send_nocache_headers', 9, defer: true)]
-    private function disableGraphQLNocacheHeader(): bool
+    public function disableGraphQLNocacheHeader(): bool
     {
         remove_all_actions('graphql_send_nocache_headers');
         return false;
@@ -232,7 +232,6 @@ final class WPGraphQL implements PluginConfigInterface
     #[Filter('nocache_headers', 9, defer: true)]
     public function applyCachePolicy(array $headers): array
     {
-        remove_all_filters('nocache_headers');
         $loggedIn = is_user_logged_in();
         $isDev = SharedUtils::isDevelopment();
         $cacheValue = match (true) {

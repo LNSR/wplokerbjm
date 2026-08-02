@@ -152,14 +152,14 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         echo "\033[1;33m⏱️  First hook scan time: " . number_format($timeFirst, 4) . " seconds\033[0m\n";
 
         // Group by type
-        $actions = array_filter($hookRegistrations, fn($reg) => $reg['type'] === 'action');
-        $filters = array_filter($hookRegistrations, fn($reg) => $reg['type'] === 'filter');
+        $actions = array_filter($hookRegistrations, fn($reg) => $reg->type === 'action');
+        $filters = array_filter($hookRegistrations, fn($reg) => $reg->type === 'filter');
 
         // Display actions
         if (!empty($actions)) {
             echo "\033[1;32m🔧 Actions:\033[0m\n";
             foreach ($actions as $reg) {
-                echo "  \033[0;32m•\033[0m {$reg['hook']} on {$reg['class']}::{$reg['method']} (priority: {$reg['priority']})\n";
+                echo "  \033[0;32m•\033[0m {$reg->hook} on {$reg->class}::{$reg->method} (priority: {$reg->priority})\n";
             }
         }
 
@@ -167,7 +167,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         if (!empty($filters)) {
             echo "\033[1;34m🔍 Filters:\033[0m\n";
             foreach ($filters as $reg) {
-                echo "  \033[0;34m•\033[0m {$reg['hook']} on {$reg['class']}::{$reg['method']} (priority: {$reg['priority']})\n";
+                echo "  \033[0;34m•\033[0m {$reg->hook} on {$reg->class}::{$reg->method} (priority: {$reg->priority})\n";
             }
         }
 
@@ -217,7 +217,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $registered = $this->registeredHooks();
         // Deferred hooks (defer: true) are not auto-registered by initialize(),
         // so exclude them from the count assertion.
-        $nonDeferred = array_filter($registrations, fn(array $r) => empty($r['defer']));
+        $nonDeferred = array_filter($registrations, fn($r) => empty($r->defer));
         $this->assertCount(count($nonDeferred), $registered, 'All non-deferred registrations should produce a registered hook');
         $this->assertGreaterThan(0, $registered);
 
@@ -325,7 +325,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         echo "  \033[0;33m•\033[0m $totalBefore hooks registered initially\n";
 
         // Test unregisterByHook
-        $targetHook = $registrations[0]['hook'];
+        $targetHook = $registrations[0]->hook;
         $registry->unregisterByHook($targetHook);
 
         $remainingForHook = array_filter($this->registeredHooks(), fn($r) => $r['hook'] === $targetHook);
@@ -341,7 +341,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $registry2->initialize();
 
         $totalBeforeClass = count($this->registeredHooks());
-        $targetClass = $registrations[0]['class'];
+        $targetClass = $registrations[0]->class;
         $registry2->unregisterByClass($targetClass);
 
         $this->assertLessThan($totalBeforeClass, count($this->registeredHooks()), 'Total hook count should decrease after unregisterByClass');

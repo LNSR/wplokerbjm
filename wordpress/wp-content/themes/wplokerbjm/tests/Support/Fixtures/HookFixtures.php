@@ -300,3 +300,93 @@ class PrivateMethodService
         return $value . '_private';
     }
 }
+
+// ── Condition-gate hook fixtures ─────────────────────────────────────
+
+/**
+ * Test fixture: a service with an instance-method action hook gated by a
+ * condition closure.
+ *
+ * The condition closure is supplied via the registration array in
+ * ConditionHookTest (mirroring what WPHooksScanner emits from the
+ * attribute's `condition` argument). The instantiation counter lets tests
+ * assert that a false condition prevents the service from ever being
+ * resolved from the container.
+ */
+class ConditionActionService
+{
+    public static int $instantiationCount = 0;
+    public static array $capturedValues = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onConditionAction(string $value = 'default'): void
+    {
+        self::$capturedValues[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedValues = [];
+    }
+}
+
+/**
+ * Test fixture: a service with an instance-method filter hook gated by a
+ * condition closure.
+ *
+ * Used to verify filter passthrough semantics when the condition fails
+ * or throws — the first argument must flow through untouched.
+ */
+class ConditionFilterService
+{
+    public static int $instantiationCount = 0;
+    public static array $capturedArgs = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onConditionFilter(string $value, string $extra = ''): string
+    {
+        self::$capturedArgs[] = ['value' => $value, 'extra' => $extra];
+        return $value . $extra;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedArgs = [];
+    }
+}
+
+/**
+ * Test fixture: a runtime-registered instance whose #[Action] carries a
+ * condition closure.
+ *
+ * WPHooksRuntimeRegistry has no container access, so such hooks must be
+ * skipped with a warning during registerHooksOn() instead of being
+ * registered unconditionally.
+ */
+class RuntimeConditionService
+{
+    public static array $captured = [];
+
+    #[Action(hook: 'runtime_condition_action', priority: 10, acceptedArgs: 1, condition: static function (\Psr\Container\ContainerInterface $c): bool {
+        return true;
+    })]
+    public function onRuntimeConditionAction(string $value): void
+    {
+        self::$captured[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$captured = [];
+    }
+}
