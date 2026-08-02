@@ -120,6 +120,24 @@ abstract class WplokerbjmTestCase extends TestCase
             }
             return $value;
         });
+
+        \Brain\Monkey\Functions\when('remove_action')->alias(function ($hook, $callable, $priority = 10) {
+            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $i => $reg) {
+                if ($reg['type'] === 'action' && $reg['hook'] === $hook && $reg['callable'] === $callable && (int) $reg['priority'] === (int) $priority) {
+                    array_splice($GLOBALS['__wplokerbjm_registered_hooks'], $i, 1);
+                }
+            }
+            return true;
+        });
+
+        \Brain\Monkey\Functions\when('remove_filter')->alias(function ($hook, $callable, $priority = 10) {
+            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $i => $reg) {
+                if ($reg['type'] === 'filter' && $reg['hook'] === $hook && $reg['callable'] === $callable && (int) $reg['priority'] === (int) $priority) {
+                    array_splice($GLOBALS['__wplokerbjm_registered_hooks'], $i, 1);
+                }
+            }
+            return true;
+        });
     }
 
     /**

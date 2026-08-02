@@ -19,7 +19,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
  * enabling unregistration by hook name, class, or specific class::method.
  * Service resolution is deferred to hook-fire time (lazy loading).
  *
- * @phpstan-type HandlerEntry array{key: HookKey, handler: LazyHookHandler|LazyPropertyHookHandler, type: 'action'|'filter', priority: int, accepted_args: int}
+ * @phpstan-type HandlerEntry array{key: HookKey, handler: LazyHookHandler|LazyPropertyHookHandler, type: 'action'|'filter', priority: int, accepted_args: int, tags: array<int, string>}
  * @phpstan-type RemoveHandlerEntry array{handler: LazyHookHandler|LazyPropertyHookHandler, type: 'action'|'filter', priority: int}
  * @template TargetClass of Object
  * @phpstan-type HookTargetResolve object<TargetClass>|callable|string|array{object<TargetClass>, string}
@@ -226,6 +226,57 @@ class WPHooksRegistry
         }
         unset($hookHandlers);
     }
+
+    /**
+     * Activate all deferred handlers carrying at least one of the given tags.
+     *
+     * Scans the deferred handlers pool and transfers matching entries to the
+     * active pool, registering them immediately with WordPress. Accepts a
+     * single tag string or an array of tags — a hook matches when any of its
+     * tags intersects the query set. Already-active handlers are silently
+     * skipped.
+     *
+     * **Example:**
+     * ```php
+     * $registry->activateDeferredByTags(['cache', 'seo']);
+     * $registry->activateDeferredByTags('cache');
+     * ```
+     *
+     * @param array<string> $tags Tag or list of tags to activate.
+     * @return int Number of handlers activated.
+     */
+    public function activateDeferredByTags(array $tags): int
+    {
+        if ($tags === []) {
+            return 0;
+        }
+
+        $activated = 0;
+        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if (array_intersect($tags, $data['tags']) === []) {
+                    continue;
+                }
+
+                // Guard: skip if already activated
+                if (isset($this->handlers[$hook][$key])) {
+                    unset($hookHandlers[$key]);
+                    continue;
+                }
+
+                $this->handlers[$hook][$key] = $data;
+                $this->addSingleHook($hook, $data);
+                unset($hookHandlers[$key]);
+                $activated++;
+            }
+            if (empty($hookHandlers)) {
+                unset($this->deferredHandlers[$hook]);
+            }
+        }
+        unset($hookHandlers);
+
+        return $activated;
+    }
     #endregion
 
     #region deferred handlers unregisteration methods
@@ -272,6 +323,35 @@ class WPHooksRegistry
                 }
             }
         }
+    }
+
+    /**
+     * Unregister all deferred handlers carrying at least one of the given tags.
+     *
+     * Only touches the deferred pool — active handlers are never affected.
+     * Accepts a single tag string or an array of tags; a hook matches when any
+     * of its tags intersects the query set.
+     *
+     * @param array<string> $tags Tag or list of tags to unregister.
+     */
+    public function unregisterDeferredByTags(array $tags): void
+    {
+
+        if ($tags === []) {
+            return;
+        }
+
+        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if (array_intersect($tags, $data['tags']) !== []) {
+                    unset($hookHandlers[$key]);
+                }
+            }
+            if (empty($hookHandlers)) {
+                unset($this->deferredHandlers[$hook]);
+            }
+        }
+        unset($hookHandlers);
     }
     #endregion
     #region main handlers unregisteration methods
@@ -325,6 +405,36 @@ class WPHooksRegistry
                 }
                 $this->removeSingleHook($hook, $data);
                 unset($hookHandlers[$key]);
+            }
+        }
+        unset($hookHandlers);
+    }
+
+    /**
+     * Unregister all active handlers carrying at least one of the given tags.
+     *
+     * Only touches the active pool — deferred handlers are never affected.
+     * Accepts a single tag string or an array of tags; a hook matches when any
+     * of its tags intersects the query set.
+     *
+     * @param array<string> $tags Tag or list of tags to unregister.
+     */
+    public function unregisterByTags(array $tags): void
+    {
+        if ($tags === []) {
+            return;
+        }
+
+        foreach ($this->handlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if (array_intersect($tags, $data['tags']) === []) {
+                    continue;
+                }
+                $this->removeSingleHook($hook, $data);
+                unset($hookHandlers[$key]);
+            }
+            if (empty($hookHandlers)) {
+                unset($this->handlers[$hook]);
             }
         }
         unset($hookHandlers);
@@ -531,6 +641,7 @@ class WPHooksRegistry
                 'type' => $registration->type,
                 'priority' => $registration->priority,
                 'accepted_args' => $registration->acceptedArgs,
+                'tags' => $registration->tags,
             ];
         }
     }
@@ -625,10 +736,10 @@ class WPHooksRuntimeRegistry
                 }
 
                 $records[] = [
-                    'handler'  => $handler,
-                    'hook'     => $attr->hook,
+                    'handler' => $handler,
+                    'hook' => $attr->hook,
                     'priority' => $attr->priority,
-                    'type'     => $type,
+                    'type' => $type,
                 ];
             }
         );
@@ -659,10 +770,10 @@ class WPHooksRuntimeRegistry
                 }
 
                 $records[] = [
-                    'handler'  => $handler,
-                    'hook'     => $attr->hook,
+                    'handler' => $handler,
+                    'hook' => $attr->hook,
                     'priority' => $attr->priority,
-                    'type'     => $type,
+                    'type' => $type,
                 ];
             }
         );

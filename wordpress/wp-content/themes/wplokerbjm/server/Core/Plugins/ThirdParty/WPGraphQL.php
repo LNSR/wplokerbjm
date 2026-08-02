@@ -2,17 +2,16 @@
 
 namespace WPLokerBJM\Core\Plugins\ThirdParty;
 
-use DI\Attribute\Injectable;
 use GraphQLDataType;
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookInterface;
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
 use GraphQL\Executor\ExecutionResult;
 use WP_User;
+use WPLokerBJM\Core\Container\Support\WPHooks\Constants\HookTags;
 
 /**
  * WPGraphQL-related hooks extracted from GlobalHooks.
@@ -136,7 +135,7 @@ final class WPGraphQL implements PluginConfigInterface
     {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        static $officalOrigins = [
+        static $officialOrigins = [
         'https://dev.lokerbanjarmasin.my.id',
         'https://staging.lokerbanjarmasin.my.id',
         'https://lokerbanjarmasin.my.id',
@@ -144,7 +143,7 @@ final class WPGraphQL implements PluginConfigInterface
         ];
 
         if (!SharedUtils::isDevelopment())
-            return $officalOrigins;
+            return $officialOrigins;
 
         $allowed = [];
         $parts = wp_parse_url($origin);
@@ -154,7 +153,7 @@ final class WPGraphQL implements PluginConfigInterface
         ) {
             $allowed[] = $origin;
         }
-        return array_merge($officalOrigins, $allowed);
+        return array_merge($officialOrigins, $allowed);
     }
 
     #region Header stuff
@@ -218,18 +217,18 @@ final class WPGraphQL implements PluginConfigInterface
             $headers['Logged-In'] = 'true';
             $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
             remove_all_filters('nocache_headers');
-            $this->hookRegistry->activateDeferredByClass(self::class);
+            remove_all_actions('graphql_send_nocache_headers');
+            $this->hookRegistry->activateDeferredByTags([HookTags::GRAPHQL_NOCACHE_HEADERS]);
         }
         return $headers;
     }
-    #[Filter('graphql_send_nocache_headers', 9, defer: true)]
+    #[Filter('graphql_send_nocache_headers', 9, defer: true, tag: [HookTags::GRAPHQL_NOCACHE_HEADERS])]
     public function disableGraphQLNocacheHeader(): bool
     {
-        remove_all_actions('graphql_send_nocache_headers');
         return false;
     }
 
-    #[Filter('nocache_headers', 9, defer: true)]
+    #[Filter('nocache_headers', 9, defer: true, tag: [HookTags::GRAPHQL_NOCACHE_HEADERS])]
     public function applyCachePolicy(array $headers): array
     {
         $loggedIn = is_user_logged_in();

@@ -31,7 +31,8 @@ class HttpUtils {
   ): Promise<string> {
     const baseHash = event.locals.postTime?.trim() || response;
     const authToken = event.locals.authToken || null;
-    const hash = await HttpUtils.calculateHash(`${baseHash}:${authToken}`);
+    const nonce = event.locals.themeData.wpRestNonce;
+    const hash = await HttpUtils.calculateHash(`${baseHash}:${authToken}:${nonce}`);
     return `W/"${hash}"`;
   }
 

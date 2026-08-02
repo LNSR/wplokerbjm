@@ -22,7 +22,7 @@ $allPhases = Async\concurrently([
     'phase1' => static fn(): array => staticPhaseScan($scanDirs, $scanFiles),
     'phase2' => static fn(): array => runtimeHookCapture($container, $dockerWpPath),
     'phase3' => static fn(): array => dynamicHookExpansion($container, $dockerWpPath),
-    // 'phase4' => static fn(): array => themeAttributeScan($themeRoot),
+    'phase4' => static fn(): array => themeAttributeScan($themeRoot),
 ]);
 
     $elapsed = number_format((hrtime(true) - $start) / 1e9, 2);
@@ -32,7 +32,7 @@ $labels = [
     'phase1' => 'Phase 1 — Static grep scan',
     'phase2' => 'Phase 2 — Runtime capture',
     'phase3' => 'Phase 3 — Dynamic expansion',
-    // 'phase4' => 'Phase 4 — Theme attribute scan',
+    'phase4' => 'Phase 4 — Theme attribute scan',
 ];
     foreach ($labels as $key => $label) {
         $p = $allPhases[$key];
@@ -51,12 +51,12 @@ $labels = [
     $authActions = array_unique(array_merge(
         $allPhases['phase1']['actions'],
         $allPhases['phase3']['actions'],
-        // $allPhases['phase4']['actions'],
+        $allPhases['phase4']['actions'],
     ));
     $authFilters = array_unique(array_merge(
         $allPhases['phase1']['filters'],
         $allPhases['phase3']['filters'],
-        // $allPhases['phase4']['filters'],
+        $allPhases['phase4']['filters'],
     ));
 
     // Phase 2: only add hooks that authorities don't disagree about
@@ -83,11 +83,12 @@ $labels = [
     $mergeStart = hrtime(true);
     $actions = normalizeHooks($actions);
     $filters = normalizeHooks($filters);
+    $tags = normalizeHooks($allPhases['phase4']['tags'] ?? []);
     $mergeElapsed = number_format((hrtime(true) - $mergeStart) / 1e9, 2);
     info("Merge + normalize: {$mergeElapsed}s");
 
     $total = number_format((hrtime(true) - $start) / 1e9, 2);
-    info("Final: " . count($actions) . " actions, " . count($filters) . " filters (total: {$total}s)");
+    info("Final: " . count($actions) . " actions, " . count($filters) . " filters, " . count($tags) . " tags (total: {$total}s)");
 
     // ── Phase 6: Generate metadata ─────────────────────────────────────
     $metaFile = $themeRoot . '/.phpstorm.meta.php';
@@ -99,7 +100,7 @@ $labels = [
     }
 
     $metaContent = File\read($metaFile);
-    $generated = renderMetadataSection($actions, $filters);
+    $generated = renderMetadataSection($actions, $filters, $tags);
     $metaContent = replaceGeneratedSection($metaContent, $generated);
 
     File\write($metaFile, $metaContent, WriteMode::Truncate);

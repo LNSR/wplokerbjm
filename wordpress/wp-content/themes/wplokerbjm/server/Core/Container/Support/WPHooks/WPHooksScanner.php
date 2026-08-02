@@ -160,6 +160,7 @@ class WPHooksScanner
                         visibility: $visibility,
                         condition: $attr->condition,
                         conditionParams: self::buildConditionPlan($attr->condition),
+                        tags: $attr->tag,
                     );
                 };
                 $this->scanMethodHooks($reflection, $methodCb);
@@ -177,6 +178,7 @@ class WPHooksScanner
                         visibility: $visibility,
                         condition: $attr->condition,
                         conditionParams: self::buildConditionPlan($attr->condition),
+                        tags: $attr->tag,
                     );
                 };
 
@@ -225,7 +227,7 @@ class WPHooksScanner
 
         $exportedArray = VarExporter::export(
             $registrationsArray,
-            VarExporter::CLOSURE_SNAPSHOT_USES | VarExporter::ADD_RETURN | VarExporter::ADD_TYPE_HINTS
+            VarExporter::CLOSURE_SNAPSHOT_USES | VarExporter::ADD_RETURN | VarExporter::ADD_TYPE_HINTS | VarExporter::NOT_ANY_OBJECT
         );
 
         $phpContent = "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Auto-generated WP Hooks Cache\n * Generated at: " . date('Y-m-d H:i:s') . "\n */\n\n" . $exportedArray;
