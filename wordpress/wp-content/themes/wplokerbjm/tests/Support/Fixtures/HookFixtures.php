@@ -445,3 +445,60 @@ class RuntimeDynamicService
         self::$captured = [];
     }
 }
+
+// ── Inheritance hook fixtures ───
+
+/**
+ * Test fixture: a base service declaring a hook on its own method.
+ *
+ * Hook registration is declared-only — subclasses must re-declare the
+ * method (with their own attribute and `parent::` call) to opt in.
+ */
+class ParentHookService
+{
+    public static int $instantiationCount = 0;
+
+    public static array $capturedValues = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    #[Action(hook: 'parent_hook', priority: 10, acceptedArgs: 1)]
+    public function onParentHook(string $value): void
+    {
+        self::$capturedValues[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedValues = [];
+    }
+}
+
+/**
+ * Test fixture: a subclass that does NOT re-declare the parent hook.
+ *
+ * With declared-only scanning it must NOT receive a registration — the
+ * parent's own registration is the only one.
+ */
+class ChildNoRedeclareService extends ParentHookService
+{
+}
+
+/**
+ * Test fixture: a subclass that re-declares the parent hook explicitly.
+ *
+ * Re-declaring the method with its own #[Action] and a `parent::` call
+ * opts the child in — both the parent and the child register + fire.
+ */
+class ChildRedeclareService extends ParentHookService
+{
+    #[Action(hook: 'parent_hook', priority: 10, acceptedArgs: 1)]
+    public function onParentHook(string $value): void
+    {
+        parent::onParentHook($value);
+    }
+}

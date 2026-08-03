@@ -22,7 +22,11 @@ use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksScanner, WPHooksRuntimeReg
 trait HookScannerTrait
 {
     /**
-     * Scan all non-static methods on the given class for hook attributes.
+     * Scan all non-static methods DECLARED on the given class for hook attributes.
+     *
+     * Inherited methods are deliberately excluded — hook registration is
+     * explicit: a subclass re-declares the method (with its own #[Action] /
+     * #[Filter] attribute and `parent::method()` call) to opt in.
      *
      * For each #[Action] or #[Filter] attribute found, the callback receives:
      *   (ReflectionMethod $method, Action|Filter $attr, string $visibility, 'action'|'filter' $type)
@@ -36,6 +40,10 @@ trait HookScannerTrait
         foreach ($reflection->getMethods(
             ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED | ReflectionMethod::IS_PRIVATE
         ) as $method) {
+            // Declared-only: inherited hook methods are deliberately excluded.
+            if ($method->getDeclaringClass()->getName() !== $reflection->getName()) {
+                continue;
+            }
             // Static methods are skipped — hooks must be instance methods.
             if ($method->isStatic()) {
                 continue;
@@ -59,8 +67,11 @@ trait HookScannerTrait
         }
     }
     /**
-     * Iterate all non-static properties of a class and invoke $callback
+     * Iterate all non-static properties DECLARED on a class and invoke $callback
      * once per #[Action] / #[Filter] discovered.
+     *
+     * Inherited properties are deliberately excluded — same explicitness
+     * contract as scanMethodHooks.
      *
      * @param ReflectionClass $reflection   Class to scan
      * @param callable        $callback     Handler for each found attribute
@@ -74,6 +85,10 @@ trait HookScannerTrait
             | ReflectionProperty::IS_PROTECTED
             | ReflectionProperty::IS_PRIVATE,
         ) as $property) {
+            // Declared-only: inherited hook properties are deliberately excluded.
+            if ($property->getDeclaringClass()->getName() !== $reflection->getName()) {
+                continue;
+            }
             if ($property->isStatic()) {
                 continue;
             }
