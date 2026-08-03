@@ -10,7 +10,7 @@ readonly class HookRegistration
         public string $class,
         public string $method,
         public string $type,
-        public string $hook,
+        public string|\Closure $hook,
         public int $priority,
         public int $acceptedArgs,
         public bool $defer,
@@ -18,6 +18,7 @@ readonly class HookRegistration
         public string $visibility,
         public ?\Closure $condition = null,
         public array $conditionParams = [],
+        public array $hookParams = [],
         public array $tags = [],
     ) {
     }
@@ -36,6 +37,7 @@ readonly class HookRegistration
             visibility: $data['visibility'] ?? 'public',
             condition: $data['condition'] ?? null,
             conditionParams: $data['condition_params'] ?? [],
+            hookParams: $data['hook_params'] ?? [],
             tags: $data['tags'] ?? [],
         );
     }
@@ -54,6 +56,7 @@ readonly class HookRegistration
             'visibility' => $this->visibility,
             'condition' => $this->condition,
             'condition_params' => $this->conditionParams,
+            'hook_params' => $this->hookParams,
             'tags' => $this->tags,
         ];
     }

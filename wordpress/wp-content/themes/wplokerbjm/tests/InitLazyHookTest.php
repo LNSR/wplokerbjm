@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests;
 use DI\ContainerBuilder;
 use DI\Container;
 use WPLokerBJM\Core\Container\Init;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksRegistry, LazyHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry, LazyHookHandler};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\FilterService;
 use WPLokerBJM\Tests\Support\Fixtures\LazyHookService;
@@ -54,7 +54,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
      */
     private function createInit(array $registrations): Init
     {
-        $registry = new WPHooksRegistry($this->container, $registrations);
+        $registry = new WPHooksRegistry($this->container, $registrations, new WPHookPlanProvider());
         return new Init($registry);
     }
 

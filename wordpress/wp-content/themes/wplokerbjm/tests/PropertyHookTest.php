@@ -9,6 +9,7 @@ use DI\Container;
 use ReflectionClass;
 use WPLokerBJM\Core\Container\Support\WPHooks\LazyPropertyHookHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyActionService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyDeferredService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyFilterService;
@@ -44,7 +45,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $this->container = $builder->build();
 
-        $this->registry = new WPHooksRegistry($this->container, []);
+        $this->registry = new WPHooksRegistry($this->container, [], new WPHookPlanProvider());
 
         // Reset fixture static state
         PropertyFilterService::reset();

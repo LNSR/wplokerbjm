@@ -4,9 +4,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks;
 use Brick\VarExporter\VarExporter;
 
 use ReflectionClass;
-use ReflectionFunction;
 use ReflectionMethod;
-use ReflectionNamedType;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
@@ -41,58 +39,12 @@ class WPHooksScanner
     /**
      * @param string $namespace
      * @param string $cacheLocation directory where cache file will be stored
+     * @param WPHookPlanProvider|null $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
-    public function __construct(private string $namespace = 'WPLokerBJM', $cacheLocation = '')
+    public function __construct(private string $namespace = 'WPLokerBJM', $cacheLocation = '', private ?WPHookPlanProvider $hookPlanProvider = null)
     {
         $this->namespace = trim($namespace, '\\');
         $this->cacheLocation = $cacheLocation;
-    }
-
-    /**
-     * Build the parameter resolution plan for a condition closure.
-     *
-     * Each entry describes one parameter: its name, the class type to
-     * resolve from the container (null for builtin/untyped params),
-     * whether a default value exists, and the default value itself.
-     *
-     * Returns an empty plan for null conditions or when a default value
-     * cannot be safely exported to the cache (objects/resources) — in
-     * that case the registry falls back to reflection at fire time.
-     *
-     * @return array<int, array{name: string, type: class-string|null, hasDefault: bool, default: mixed}>
-     */
-    public static function buildConditionPlan(?\Closure $condition): array
-    {
-        if ($condition === null) {
-            return [];
-        }
-
-        try {
-            $reflect = new ReflectionFunction($condition);
-            $plan = [];
-
-            foreach ($reflect->getParameters() as $param) {
-                $type = $param->getType();
-                $hasDefault = $param->isDefaultValueAvailable();
-                $default = $hasDefault ? $param->getDefaultValue() : null;
-
-                // Non-exportable defaults would break the cache — defer to reflection.
-                if ($hasDefault && (is_object($default) || is_resource($default))) {
-                    return [];
-                }
-
-                $plan[] = [
-                    'name' => $param->getName(),
-                    'type' => ($type instanceof ReflectionNamedType && !$type->isBuiltin()) ? $type->getName() : null,
-                    'hasDefault' => $hasDefault,
-                    'default' => $default,
-                ];
-            }
-
-            return $plan;
-        } catch (\ReflectionException) {
-            return [];
-        }
     }
 
     /**
@@ -147,7 +99,8 @@ class WPHooksScanner
             }
             try {
                 $reflection = new ReflectionClass($className);
-                $methodCb = static function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations): void {
+                $hookPlanProvider = $this->hookPlanProvider;
+                $methodCb = static function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, $hookPlanProvider): void {
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $method->getName(),
@@ -159,13 +112,14 @@ class WPHooksScanner
                         target: 'method',
                         visibility: $visibility,
                         condition: $attr->condition,
-                        conditionParams: self::buildConditionPlan($attr->condition),
+                        conditionParams: $hookPlanProvider->buildCallablePlan($attr->condition),
+                        hookParams: $hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                         tags: $attr->tag,
                     );
                 };
                 $this->scanMethodHooks($reflection, $methodCb);
 
-                $propertyCb = static function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations): void {
+                $propertyCb = static function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations, $hookPlanProvider): void {
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $property->getName(),
@@ -177,7 +131,8 @@ class WPHooksScanner
                         target: $target,
                         visibility: $visibility,
                         condition: $attr->condition,
-                        conditionParams: self::buildConditionPlan($attr->condition),
+                        conditionParams: $hookPlanProvider->buildCallablePlan($attr->condition),
+                        hookParams: $hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                         tags: $attr->tag,
                     );
                 };

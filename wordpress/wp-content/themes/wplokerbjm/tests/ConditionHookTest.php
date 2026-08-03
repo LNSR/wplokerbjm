@@ -9,7 +9,7 @@ use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksRegistry, WPHooksRuntimeRegistry, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry, WPHooksRuntimeRegistry};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\ConditionActionService;
 use WPLokerBJM\Tests\Support\Fixtures\ConditionFilterService;
@@ -69,7 +69,7 @@ class ConditionHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksRegistry($this->container, $registrations);
+        $registry = new WPHooksRegistry($this->container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         do_action('condition_action', 'hello');
@@ -89,7 +89,7 @@ class ConditionHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksRegistry($this->container, $registrations);
+        $registry = new WPHooksRegistry($this->container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         $this->assertNotNull($this->findRegisteredHook('action', 'condition_action'));
@@ -112,7 +112,7 @@ class ConditionHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksRegistry($this->container, $registrations);
+        $registry = new WPHooksRegistry($this->container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         // Deferred: not registered during initialize()...
@@ -141,7 +141,7 @@ class ConditionHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksRegistry($this->container, $registrations);
+        $registry = new WPHooksRegistry($this->container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         $result = apply_filters('condition_filter', 'keepme');
@@ -161,7 +161,7 @@ class ConditionHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksRegistry($this->container, $registrations);
+        $registry = new WPHooksRegistry($this->container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         do_action('condition_nonbool', 'hello');
@@ -193,7 +193,7 @@ class ConditionHookTest extends WplokerbjmTestCase
             }
         );
 
-        $plan = WPHooksScanner::buildConditionPlan($attr->condition);
+        $plan = (new WPHookPlanProvider())->buildCallablePlan($attr->condition);
 
         $this->assertCount(1, $plan);
         $this->assertSame('c', $plan[0]['name']);
@@ -202,7 +202,7 @@ class ConditionHookTest extends WplokerbjmTestCase
         $this->assertNull($plan[0]['default']);
 
         // Builtin params carry no type but keep their default value.
-        $builtin = WPHooksScanner::buildConditionPlan(
+        $builtin = (new WPHookPlanProvider())->buildCallablePlan(
             static fn (int $x = 5): bool => true
         );
         $this->assertCount(1, $builtin);
@@ -211,7 +211,7 @@ class ConditionHookTest extends WplokerbjmTestCase
         $this->assertSame(5, $builtin[0]['default']);
 
         // No condition → empty plan.
-        $this->assertSame([], WPHooksScanner::buildConditionPlan(null));
+        $this->assertSame([], (new WPHookPlanProvider())->buildCallablePlan(null));
     }
 
     public function testConditionPlanDrivenResolutionFiresAndSkipsHook(): void
@@ -232,11 +232,11 @@ class ConditionHookTest extends WplokerbjmTestCase
                 'onConditionAction',
                 'plan_action',
                 condition: $attr->condition,
-                conditionParams: WPHooksScanner::buildConditionPlan($attr->condition)
+                conditionParams: (new WPHookPlanProvider())->buildCallablePlan($attr->condition)
             ),
         ];
 
-        $registry = new WPHooksRegistry($this->container, $registrations);
+        $registry = new WPHooksRegistry($this->container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         do_action('plan_action', 'via-plan');
@@ -261,7 +261,7 @@ class ConditionHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksRegistry($this->container, $registrations);
+        $registry = new WPHooksRegistry($this->container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         do_action('plan_bad', 'hello');

@@ -79,6 +79,17 @@
       "**/generate-meta-hooks/captures/": true,
       "**/vendor/": true,
     },
+    "intelephense.codeLens.implementations.enable": true,
+    "intelephense.codeLens.parent.enable": true,
+    "intelephense.codeLens.references.enable": true,
+    "intelephense.codeLens.usages.enable": true,
+    "intelephense.diagnostics.argumentCount": "on",
+    "intelephense.diagnostics.enable": false, // Rely on Devsense instead
+    "intelephense.compatibility.preferPsalmPhpstanPrefixedAnnotations": true,
+    "intelephense.completion.triggerParameterHints": true,
+    "intelephense.maxMemory": 8196,
+    "intelliphp.inlineSuggestionsEnabled": true,
+    "intelephense.environment.documentRoot": "wplokerbjm-backend"
   },
   "extensions": {
     "recommendations": [

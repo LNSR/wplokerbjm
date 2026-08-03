@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks;
 
 use ReflectionClass;
 use DI\Container;
+use ReflectionProperty;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{AnonClassHookPropertyAbstract};
@@ -43,10 +44,12 @@ class WPHooksRegistry
     /**
      * @param ContainerInterface $container
      * @param HookRegistration[] $hooksRegistration
+     * @param WPHookPlanProvider|null $hookPlanProvider Plan provider for condition/hook-name resolution.
      */
     public function __construct(
         private readonly ContainerInterface $container,
         private array $hooksRegistration,
+        private WPHookPlanProvider $planProvider,
     ) {
     }
 
@@ -558,14 +561,15 @@ class WPHooksRegistry
                 // Best-effort fallback for anonymous classes that don't
                 // extend the AnonClassHookPropertyAbstract: walk the call stack to find which
                 // object's property holds this instance.
-                if ((new ReflectionClass($target))->isAnonymous()) {
+                if ((new \ReflectionClass($target))->isAnonymous()) {
                     $backtrace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, 10);
                     foreach ($backtrace as $frame) {
                         $callerObject = $frame['object'] ?? null;
                         if ($callerObject === null) {
                             continue;
                         }
-                        $refClass = new ReflectionClass($callerObject);
+                        $refClass = new \ReflectionClass($callerObject);
+                        /** @var \ReflectionProperty $property */
                         foreach ($refClass->getProperties() as $property) {
                             if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
                                 Logger::warning("WPHooksRegistry: ", "Anon class without extending AnonClassHookPropertyAbstract, it's recommended to use 'AnonClassHookPropertyAbstract'." . $refClass->getName() . "::" . $property->getName());
@@ -611,6 +615,32 @@ class WPHooksRegistry
     }
 
     /**
+     * Resolve the final hook name for a registration.
+     *
+     * A plain string is used as-is; a closure is resolved through the DI
+     * container (via the plan provider) and must return a string.
+     *
+     * @throws \RuntimeException when the closure result is not a string
+     */
+    private function resolveHookName(string|\Closure $hook, array $hookParams, string $label): string
+    {
+        if (is_string($hook)) {
+            return $hook;
+        }
+
+        $values = $this->planProvider->resolveCallableParameters($hook, $hookParams, $this->container, $label);
+        $name = $hook(...$values);
+
+        if (!is_string($name)) {
+            throw new \RuntimeException(
+                'Hook name for ' . $label . ' must return string, got ' . get_debug_type($name)
+            );
+        }
+
+        return $name;
+    }
+
+    /**
      * Register hook registrations from the scanner.
      * Pre-builds LazyHookHandler instances and validates container existence.
      *
@@ -630,12 +660,26 @@ class WPHooksRegistry
                 continue;
             }
 
+            try {
+                $hookName = $this->resolveHookName(
+                    $registration->hook,
+                    $registration->hookParams,
+                    $registration->class . '::' . $registration->method
+                );
+            } catch (\RuntimeException $e) {
+                Logger::error(
+                    'WPHooksRegistry',
+                    'Skipping hook for ' . $registration->class . '::' . $registration->method . ' — ' . $e->getMessage()
+                );
+                continue;
+            }
+
             $handler = $registration->target === 'method'
-                ? new LazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->condition, $registration->conditionParams)
-                : new LazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->condition, $registration->conditionParams);
+                ? new LazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->condition, $registration->conditionParams, $this->planProvider)
+                : new LazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->condition, $registration->conditionParams, $this->planProvider);
             $key = HookKey::fromRegistration($registration);
             $target = $registration->defer ? 'deferredHandlers' : 'handlers';
-            $this->{$target}[$registration->hook][$key->toString()] = [
+            $this->{$target}[$hookName][$key->toString()] = [
                 'key' => $key,
                 'handler' => $handler,
                 'type' => $registration->type,
@@ -713,6 +757,15 @@ class WPHooksRuntimeRegistry
         $this->scanMethodHooks(
             $ref,
             function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records): void {
+                if ($attr->hook instanceof \Closure) {
+                    Logger::warning(
+                        'WPHooksRuntimeRegistry',
+                        'Skipping hook on ' . $method->getName()
+                        . ' — closure hooks are unsupported on runtime-registered instances (no container access)'
+                    );
+                    return;
+                }
+
                 if ($attr->condition !== null) {
                     Logger::warning(
                         'WPHooksRuntimeRegistry',
@@ -747,6 +800,15 @@ class WPHooksRuntimeRegistry
         $this->scanPropertyHooks(
             $ref,
             function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records): void {
+                if ($attr->hook instanceof \Closure) {
+                    Logger::warning(
+                        'WPHooksRuntimeRegistry',
+                        'Skipping hook on ' . $property->getName()
+                        . ' — closure hooks are unsupported on runtime-registered instances (no container access)'
+                    );
+                    return;
+                }
+
                 if ($attr->condition !== null) {
                     Logger::warning(
                         'WPHooksRuntimeRegistry',

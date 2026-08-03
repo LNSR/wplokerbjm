@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use ReflectionClass;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
@@ -42,7 +42,7 @@ class DeferredHookTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $this->container = $builder->build();
 
-        $this->registry = new WPHooksRegistry($this->container, []);
+        $this->registry = new WPHooksRegistry($this->container, [], new WPHookPlanProvider());
     }
 
     /**

@@ -2,7 +2,7 @@
 namespace WPLokerBJM\Core\Container\Definitions;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksRegistry, WPHooksRuntimeRegistry, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry, WPHooksRuntimeRegistry, WPHooksScanner};
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Configs\CredentialConfig;
@@ -43,12 +43,16 @@ class Core implements DefinitionProviderInterface
         $autoWiredDefinitions = $scanner->scanForAutowirableClasses();
 
         $core = [
-            WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, get_stylesheet_directory() . "/cache"),
+            WPHookPlanProvider::class => \DI\Autowire(WPHookPlanProvider::class),
+            WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class)),
             WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class),
-            WPHooksRegistry::class => static function (ContainerInterface $c) {
-                $hookScanner = $c->get(WPHooksScanner::class);
-                return new WPHooksRegistry($c, $hookScanner->getHookRegistrations());
-            },
+            WPHooksRegistry::class => \DI\autowire(WPHooksRegistry::class)->constructor(
+                \DI\get(ContainerInterface::class),
+                \DI\factory(static function (WPHooksScanner $scanner) {
+                    return $scanner->getHookRegistrations();
+                }),
+                \DI\get(WPHookPlanProvider::class)
+            ),
         ];
 
         return array_merge($autoWiredDefinitions, $core);

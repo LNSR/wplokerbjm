@@ -390,3 +390,58 @@ class RuntimeConditionService
         self::$captured = [];
     }
 }
+
+// ── Dynamic hook-name fixtures ───
+
+/**
+ * Test fixture: a service whose hook name is resolved from a closure at
+ * registration time via the DI container (WPHookPlanProvider).
+ */
+class DynamicHookService
+{
+    public static int $instantiationCount = 0;
+
+    public static array $capturedValues = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onDynamicAction(string $value = 'default'): void
+    {
+        self::$capturedValues[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedValues = [];
+    }
+}
+
+/**
+ * Test fixture: a runtime-registered instance whose #[Action] carries a
+ * closure hook name.
+ *
+ * WPHooksRuntimeRegistry has no container access, so such hooks must be
+ * skipped with a warning during registerHooksOn() instead of being
+ * registered unconditionally.
+ */
+class RuntimeDynamicService
+{
+    public static array $captured = [];
+
+    #[Action(hook: static function (): string {
+        return 'runtime_dynamic_action';
+    }, priority: 10, acceptedArgs: 1)]
+    public function onRuntimeDynamicAction(string $value): void
+    {
+        self::$captured[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$captured = [];
+    }
+}

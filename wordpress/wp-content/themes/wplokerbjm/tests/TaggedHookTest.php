@@ -8,7 +8,7 @@ use Closure;
 use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\ConditionActionService;
 
@@ -55,7 +55,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'tag_active',
                 tags: ['cache'],
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         $this->assertNotNull($this->findRegisteredHook('action', 'tag_active'));
@@ -81,7 +81,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 tags: ['cache'],
                 defer: true,
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         $this->assertNotNull($this->findRegisteredHook('action', 'tag_active'));
@@ -117,7 +117,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 tags: ['seo'],
                 defer: true,
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         $registry->unregisterDeferredByTags(['seo']);
@@ -143,7 +143,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 tags: ['cache'],
                 defer: true,
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         $this->assertNull(
@@ -182,7 +182,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'tag_none',
                 defer: true,
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         $activated = $registry->activateDeferredByTags(['cache']);
@@ -210,7 +210,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 tags: ['cache', 'seo'],
                 defer: true,
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         $this->assertSame(1, $registry->activateDeferredByTags(['seo']));
@@ -228,7 +228,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 tags: ['cache'],
                 defer: true,
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
         $this->assertSame(1, $registry->activateDeferredByTags(['cache']));
 
@@ -242,7 +242,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 tags: ['cache'],
                 defer: true,
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
         $this->assertSame(1, $registry->activateDeferredByTags(['cache']));
     }
@@ -263,7 +263,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'tag_keep_active',
                 tags: ['cache'],
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         // Unknown tag: nothing activated, nothing unregistered.
@@ -294,7 +294,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 defer: true,
                 condition: static fn (ContainerInterface $c): bool => false,
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         $registry->activateDeferredByTags(['cache']);
@@ -316,7 +316,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 defer: true,
                 condition: static fn (ContainerInterface $c): bool => true,
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         $registry->activateDeferredByTags(['seo']);
@@ -335,7 +335,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'tag_bulk',
                 tags: ['cache'],
             ),
-        ]);
+        ], new WPHookPlanProvider());
         $registry->initialize();
 
         do_action('tag_bulk', 'before');

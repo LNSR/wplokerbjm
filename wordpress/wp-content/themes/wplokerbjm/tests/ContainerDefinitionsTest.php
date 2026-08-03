@@ -9,7 +9,7 @@ use WPLokerBJM\Core\Container\Definitions\Factory;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\Core;
 use WPLokerBJM\Core\Container\Definitions\DefinitionProviderInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{LazyHookHandler, LazyPropertyHookHandler, WPHooksRegistry, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\{LazyHookHandler, LazyPropertyHookHandler, WPHookPlanProvider, WPHooksRegistry, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Services\WebHooks\Cloudflare;
@@ -137,7 +137,9 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     {
         // Create scanner like Core.php does
         $scanner = new WPhooksScanner(
-            self::$NAMESPACE
+            self::$NAMESPACE,
+            '',
+            new WPHookPlanProvider()
         );
 
         // Measure time for first hook scan (cache miss)
@@ -159,7 +161,8 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         if (!empty($actions)) {
             echo "\033[1;32m🔧 Actions:\033[0m\n";
             foreach ($actions as $reg) {
-                echo "  \033[0;32m•\033[0m {$reg->hook} on {$reg->class}::{$reg->method} (priority: {$reg->priority})\n";
+                $hookLabel = $reg->hook instanceof \Closure ? '(dynamic closure)' : $reg->hook;
+                echo "  \033[0;32m•\033[0m {$hookLabel} on {$reg->class}::{$reg->method} (priority: {$reg->priority})\n";
             }
         }
 
@@ -167,7 +170,8 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         if (!empty($filters)) {
             echo "\033[1;34m🔍 Filters:\033[0m\n";
             foreach ($filters as $reg) {
-                echo "  \033[0;34m•\033[0m {$reg->hook} on {$reg->class}::{$reg->method} (priority: {$reg->priority})\n";
+                $hookLabel = $reg->hook instanceof \Closure ? '(dynamic closure)' : $reg->hook;
+                echo "  \033[0;34m•\033[0m {$hookLabel} on {$reg->class}::{$reg->method} (priority: {$reg->priority})\n";
             }
         }
 
@@ -195,7 +199,9 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     {
         // Get real hook registrations from the scanner
         $scanner = new WPhooksScanner(
-            self::$NAMESPACE
+            self::$NAMESPACE,
+            '',
+            new WPHookPlanProvider()
         );
         $registrations = $scanner->getHookRegistrations();
         $hookClasses = array_unique(array_column($registrations, 'class'));
@@ -211,7 +217,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             ->willReturnCallback(fn(string $class) => $this->createMock($class));
 
         // Create registry with registrations via constructor, then initialize
-        $registry = new WPHooksRegistry($container, $registrations);
+        $registry = new WPHooksRegistry($container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         $registered = $this->registeredHooks();
@@ -262,7 +268,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             'hook' => 'init',
             'priority' => 10,
             'accepted_args' => 1,
-        ]]);
+        ]], new WPHookPlanProvider());
         $registry->initialize();
 
         $this->assertCount(0, $this->registeredHooks(), 'Hooks for classes not in container should be skipped');
@@ -274,7 +280,9 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     public function testHookRegistryUnregistration(): void
     {
         $scanner = new WPhooksScanner(
-            self::$NAMESPACE
+            self::$NAMESPACE,
+            '',
+            new WPHookPlanProvider()
         );
         $registrations = $scanner->getHookRegistrations();
 
@@ -318,7 +326,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         // Fresh registry
         $GLOBALS['__wplokerbjm_registered_hooks'] = [];
-        $registry = new WPHooksRegistry($container, $registrations);
+        $registry = new WPHooksRegistry($container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         $totalBefore = count($this->registeredHooks());
@@ -337,7 +345,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         // Test unregisterByClass (fresh setup)
         $GLOBALS['__wplokerbjm_registered_hooks'] = [];
-        $registry2 = new WPHooksRegistry($container, $registrations);
+        $registry2 = new WPHooksRegistry($container, $registrations, new WPHookPlanProvider());
         $registry2->initialize();
 
         $totalBeforeClass = count($this->registeredHooks());
