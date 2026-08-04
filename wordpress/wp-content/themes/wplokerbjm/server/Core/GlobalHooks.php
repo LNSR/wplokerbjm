@@ -8,7 +8,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 /*======================================================================
  | Collection of Global Hooks Classes
@@ -213,7 +213,7 @@ class LanguageHooks
 {
     #[Filter(
         'locale',
-        condition: static function (): bool {
+        registerIf: static function (): bool {
                 return !is_admin();
                 }
     )]
@@ -232,7 +232,7 @@ class HTTPHooks
     #[Action(
         'muplugins_loaded',
         PHP_INT_MIN,
-        condition: static function (): bool {
+        registerIf: static function (): bool {
                 return !SharedUtils::isDevelopment();
                 }
     )]

@@ -9,11 +9,12 @@ use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
-use WPLokerBJM\Tests\Support\Fixtures\ConditionActionService;
-use WPLokerBJM\Tests\Support\Fixtures\ConditionFilterService;
-use WPLokerBJM\Tests\Support\Fixtures\RuntimeConditionService;
+use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
+use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfFilterService;
+use WPLokerBJM\Tests\Support\Fixtures\RuntimeExecuteIfService;
 
 /**
  * Test suite for the `condition` gate on hook registrations.
@@ -31,7 +32,7 @@ use WPLokerBJM\Tests\Support\Fixtures\RuntimeConditionService;
  *  - WPHooksRuntimeRegistry skips condition-gated hooks with a warning,
  *    since runtime-registered instances have no container access.
  */
-class ConditionHookTest extends WplokerbjmTestCase
+class ExecuteIfHookTest extends WplokerbjmTestCase
 {
     private Container $container;
 
@@ -44,75 +45,75 @@ class ConditionHookTest extends WplokerbjmTestCase
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
         $builder->addDefinitions([
-            ConditionActionService::class => \DI\autowire(),
-            ConditionFilterService::class => \DI\autowire(),
+            ExecuteIfActionService::class => \DI\autowire(),
+            ExecuteIfFilterService::class => \DI\autowire(),
         ]);
         $this->container = $builder->build();
 
-        ConditionActionService::reset();
-        ConditionFilterService::reset();
-        RuntimeConditionService::reset();
+        ExecuteIfActionService::reset();
+        ExecuteIfFilterService::reset();
+        RuntimeExecuteIfService::reset();
     }
 
-    public function testConditionReceivesContainerAndFiresHook(): void
+    public function testExecuteIfReceivesContainerAndFiresHook(): void
     {
         $registrations = [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'condition_action',
-                condition: static function (ContainerInterface $c): bool {
+                executeIf: static function (ContainerInterface $c): bool {
                     // The gate must receive the DI container and be able
                     // to query it for services.
-                    return $c->has(ConditionActionService::class);
+                    return $c->has(ExecuteIfActionService::class);
                 }
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         do_action('condition_action', 'hello');
 
-        $this->assertSame(1, ConditionActionService::$instantiationCount);
-        $this->assertSame(['hello'], ConditionActionService::$capturedValues);
+        $this->assertSame(1, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame(['hello'], ExecuteIfActionService::$capturedValues);
     }
 
-    public function testConditionFalseSkipsHookWithoutResolvingService(): void
+    public function testExecuteIfFalseSkipsHookWithoutResolvingService(): void
     {
         $registrations = [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'condition_action',
-                condition: static fn (ContainerInterface $c): bool => false
+                executeIf: static fn (ContainerInterface $c): bool => false
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $this->assertNotNull($this->findRegisteredHook('action', 'condition_action'));
 
         do_action('condition_action', 'hello');
 
-        $this->assertSame(0, ConditionActionService::$instantiationCount);
-        $this->assertSame([], ConditionActionService::$capturedValues);
+        $this->assertSame(0, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame([], ExecuteIfActionService::$capturedValues);
     }
 
-    public function testConditionFalseSkipsDeferredHookEvenAfterActivation(): void
+    public function testExecuteIfFalseSkipsDeferredHookEvenAfterActivation(): void
     {
         $registrations = [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'condition_deferred',
                 defer: true,
-                condition: static fn (ContainerInterface $c): bool => false
+                executeIf: static fn (ContainerInterface $c): bool => false
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         // Deferred: not registered during initialize()...
@@ -124,76 +125,76 @@ class ConditionHookTest extends WplokerbjmTestCase
 
         do_action('condition_deferred', 'hello');
 
-        $this->assertSame(0, ConditionActionService::$instantiationCount);
-        $this->assertSame([], ConditionActionService::$capturedValues);
+        $this->assertSame(0, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame([], ExecuteIfActionService::$capturedValues);
     }
 
-    public function testConditionExceptionLogsErrorAndPassesFilterThrough(): void
+    public function testExecuteIfExceptionLogsErrorAndPassesFilterThrough(): void
     {
         $registrations = [
             $this->filter(
-                ConditionFilterService::class,
-                'onConditionFilter',
+                ExecuteIfFilterService::class,
+                'onExecuteIfFilter',
                 'condition_filter',
-                condition: static function (ContainerInterface $c): bool {
+                executeIf: static function (ContainerInterface $c): bool {
                     throw new \RuntimeException('Simulated condition failure');
                 }
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $result = apply_filters('condition_filter', 'keepme');
 
         $this->assertSame('keepme', $result, 'Filter must pass the value through when the condition fails');
-        $this->assertSame(0, ConditionFilterService::$instantiationCount);
+        $this->assertSame(0, ExecuteIfFilterService::$instantiationCount);
     }
 
-    public function testNonBoolConditionResultSkipsHook(): void
+    public function testNonBoolExecuteIfResultSkipsHook(): void
     {
         $registrations = [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'condition_nonbool',
-                condition: static fn (ContainerInterface $c) => 'yes'
+                executeIf: static fn (ContainerInterface $c) => 'yes'
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         do_action('condition_nonbool', 'hello');
 
-        $this->assertSame(0, ConditionActionService::$instantiationCount);
-        $this->assertSame([], ConditionActionService::$capturedValues);
+        $this->assertSame(0, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame([], ExecuteIfActionService::$capturedValues);
     }
 
-    public function testRuntimeRegistrySkipsConditionGatedHooks(): void
+    public function testRuntimeRegistrySkipsExecuteIfGatedHooks(): void
     {
         $registry = new WPHooksRuntimeRegistry();
-        $registry->registerHooksOn(new RuntimeConditionService());
+        $registry->registerHooksOn(new RuntimeExecuteIfService());
 
         $this->assertNull(
-            $this->findRegisteredHook('action', 'runtime_condition_action'),
-            'Condition-gated hook must NOT be registered on runtime instances'
+            $this->findRegisteredHook('action', 'runtime_executeIf_action'),
+            'ExecuteIf-gated hook must NOT be registered on runtime instances'
         );
 
-        do_action('runtime_condition_action', 'hello');
-        $this->assertSame([], RuntimeConditionService::$captured);
+        do_action('runtime_executeIf_action', 'hello');
+        $this->assertSame([], RuntimeExecuteIfService::$captured);
     }
 
-    public function testConditionPlanIsPrecomputedByScanner(): void
+    public function testExecuteIfPlanIsPrecomputedByScanner(): void
     {
         $attr = new Action(
             hook: 'plan_test',
-            condition: static function (ContainerInterface $c): bool {
+            executeIf: static function (ContainerInterface $c): bool {
                 return true;
             }
         );
 
-        $plan = (new WPHookPlanProvider())->buildCallablePlan($attr->condition);
+        $plan = (new WPHookPlanProvider())->buildCallablePlan($attr->executeIf);
 
         $this->assertCount(1, $plan);
         $this->assertSame('c', $plan[0]['name']);
@@ -214,60 +215,60 @@ class ConditionHookTest extends WplokerbjmTestCase
         $this->assertSame([], (new WPHookPlanProvider())->buildCallablePlan(null));
     }
 
-    public function testConditionPlanDrivenResolutionFiresAndSkipsHook(): void
+    public function testExecuteIfPlanDrivenResolutionFiresAndSkipsHook(): void
     {
         // Plan-driven path (what the scanner exports to the cache): the
         // attribute pre-computes the plan, the registry consumes it
         // without any reflection at fire time.
         $attr = new Action(
             hook: 'plan_action',
-            condition: static function (ContainerInterface $c): bool {
-                return $c->has(ConditionActionService::class);
+            executeIf: static function (ContainerInterface $c): bool {
+                return $c->has(ExecuteIfActionService::class);
             }
         );
 
         $registrations = [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'plan_action',
-                condition: $attr->condition,
-                conditionParams: (new WPHookPlanProvider())->buildCallablePlan($attr->condition)
+                executeIf: $attr->executeIf,
+                executeIfParams: (new WPHookPlanProvider())->buildCallablePlan($attr->executeIf)
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         do_action('plan_action', 'via-plan');
 
-        $this->assertSame(1, ConditionActionService::$instantiationCount);
-        $this->assertSame(['via-plan'], ConditionActionService::$capturedValues);
+        $this->assertSame(1, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame(['via-plan'], ExecuteIfActionService::$capturedValues);
 
         // Unresolvable plan entry (class not in container, no default) →
         // RuntimeException → logged, hook skipped — same contract as the
         // reflection fallback path.
-        ConditionActionService::reset();
+        ExecuteIfActionService::reset();
 
         $registrations = [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'plan_bad',
-                condition: static fn (): bool => true,
-                conditionParams: [
+                executeIf: static fn (): bool => true,
+                executeIfParams: [
                     ['name' => 'missing', 'type' => '\App\MissingService', 'hasDefault' => false, 'default' => null],
                 ]
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         do_action('plan_bad', 'hello');
 
-        $this->assertSame(0, ConditionActionService::$instantiationCount);
-        $this->assertSame([], ConditionActionService::$capturedValues);
+        $this->assertSame(0, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame([], ExecuteIfActionService::$capturedValues);
     }
 
     /**
@@ -279,9 +280,9 @@ class ConditionHookTest extends WplokerbjmTestCase
         string $hook,
         int $priority = 10,
         int $acceptedArgs = 1,
-        ?Closure $condition = null,
+        ?Closure $executeIf = null,
         bool $defer = false,
-        array $conditionParams = []
+        array $executeIfParams = []
     ): array {
         return [
             'class' => $class,
@@ -291,8 +292,8 @@ class ConditionHookTest extends WplokerbjmTestCase
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
             'defer' => $defer,
-            'condition' => $condition,
-            'condition_params' => $conditionParams,
+            'execute_if' => $executeIf,
+            'execute_if_params' => $executeIfParams,
         ];
     }
 
@@ -305,9 +306,9 @@ class ConditionHookTest extends WplokerbjmTestCase
         string $hook,
         int $priority = 10,
         int $acceptedArgs = 1,
-        ?Closure $condition = null,
+        ?Closure $executeIf = null,
         bool $defer = false,
-        array $conditionParams = []
+        array $executeIfParams = []
     ): array {
         return [
             'class' => $class,
@@ -317,8 +318,8 @@ class ConditionHookTest extends WplokerbjmTestCase
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
             'defer' => $defer,
-            'condition' => $condition,
-            'condition_params' => $conditionParams,
+            'execute_if' => $executeIf,
+            'execute_if_params' => $executeIfParams,
         ];
     }
 }

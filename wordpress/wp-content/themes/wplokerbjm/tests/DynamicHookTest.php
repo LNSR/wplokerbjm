@@ -9,9 +9,8 @@ use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRuntimeRegistry;
-use WPLokerBJM\Tests\Support\Fixtures\ConditionActionService;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\Fixtures\DynamicHookService;
 use WPLokerBJM\Tests\Support\Fixtures\RuntimeDynamicService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -40,14 +39,14 @@ class DynamicHookTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $builder->addDefinitions([
             DynamicHookService::class => \DI\autowire(),
-            ConditionActionService::class => \DI\autowire(),
+            ExecuteIfActionService::class => \DI\autowire(),
         ]);
 
         $this->container = $builder->build();
         $this->planProvider = new WPHookPlanProvider();
 
         DynamicHookService::reset();
-        ConditionActionService::reset();
+        ExecuteIfActionService::reset();
         RuntimeDynamicService::reset();
     }
 
@@ -59,7 +58,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         self::assertNotNull($this->findRegisteredHook('action', 'dynamic_action'));
@@ -74,7 +73,7 @@ class DynamicHookTest extends WplokerbjmTestCase
     {
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', 'plain_string_action'),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         self::assertNotNull($this->findRegisteredHook('action', 'plain_string_action'));
@@ -90,7 +89,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         // The registration was skipped — nothing was registered at all.
@@ -108,7 +107,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         self::assertSame([], $this->registeredHooks());
@@ -120,7 +119,7 @@ class DynamicHookTest extends WplokerbjmTestCase
     public function testClosureHookComposesWithConditionGate(): void
     {
         $hook = static fn (): string => 'dynamic_combo';
-        $condition = static function (ConditionActionService $service): bool {
+        $executeIf = static function (ExecuteIfActionService $service): bool {
             return $service !== null;
         };
 
@@ -129,9 +128,9 @@ class DynamicHookTest extends WplokerbjmTestCase
                 DynamicHookService::class,
                 'onDynamicAction',
                 $hook,
-                condition: $condition,
+                executeIf: $executeIf,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         self::assertNotNull($this->findRegisteredHook('action', 'dynamic_combo'));
@@ -147,7 +146,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook, defer: true),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         // Deferred — not registered yet.
@@ -183,7 +182,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         self::assertNotNull($this->findRegisteredHook('action', self::class . '_boot'));
@@ -197,8 +196,8 @@ class DynamicHookTest extends WplokerbjmTestCase
      * Build a registration array for an action hook.
      *
      * @param string|\Closure $hook Static hook name or a closure resolving to one.
-     * @param \Closure|null $condition Gate evaluated before the hook fires.
-     * @param array<int, mixed> $conditionParams Pre-computed plan for the condition closure.
+     * @param \Closure|null $executeIf Gate evaluated before the hook fires.
+     * @param array<int, mixed> $executeIfParams Pre-computed plan for the condition closure.
      * @param array<int, string> $tags Grouping tags for bulk activation/unregistration.
      */
     private function action(
@@ -207,9 +206,9 @@ class DynamicHookTest extends WplokerbjmTestCase
         string|\Closure $hook,
         int $priority = 10,
         int $acceptedArgs = 1,
-        ?Closure $condition = null,
+        ?Closure $executeIf = null,
         bool $defer = false,
-        array $conditionParams = [],
+        array $executeIfParams = [],
         array $tags = [],
     ): array {
         return [
@@ -220,8 +219,8 @@ class DynamicHookTest extends WplokerbjmTestCase
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
             'defer' => $defer,
-            'condition' => $condition,
-            'condition_params' => $conditionParams,
+            'execute_if' => $executeIf,
+            'execute_if_params' => $executeIfParams,
             'hook_params' => $hook instanceof Closure
                 ? $this->planProvider->buildCallablePlan($hook)
                 : [],

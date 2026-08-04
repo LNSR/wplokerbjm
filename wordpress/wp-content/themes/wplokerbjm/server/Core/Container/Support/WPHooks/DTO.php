@@ -3,7 +3,27 @@
 declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 
+/**
+ * @phpstan-type HookType array{
+ *  class: string,
+ *  method: string,
+ *  type: string,
+ *  hook: string|\Closure,
+ *  priority: int,
+ *  accepted_args: int,
+ *  defer: bool,
+ *  target: string,
+ *  visibility: string,
+ *  execute_if: \Closure|null,
+ *  execute_if_params: array,
+ *  register_if: \Closure|null,
+ *  register_if_params: array,
+ *  hook_params: array,
+ *  tags: array,
+ * }
+ */
 readonly class HookRegistration
 {
     public function __construct(
@@ -16,13 +36,20 @@ readonly class HookRegistration
         public bool $defer,
         public string $target,
         public string $visibility,
-        public ?\Closure $condition = null,
-        public array $conditionParams = [],
+        public ?\Closure $executeIf = null,
+        public array $executeIfParams = [],
+        public ?\Closure $registerIf = null,
+        public array $registerIfParams = [],
         public array $hookParams = [],
         public array $tags = [],
     ) {
     }
 
+    /**
+     * Summary of fromArray
+     * @param HookType $data
+     * @return HookRegistration
+     */
     public static function fromArray(array $data): self
     {
         return new self(
@@ -35,13 +62,19 @@ readonly class HookRegistration
             defer: $data['defer'] ?? false,
             target: $data['target'] ?? 'method',
             visibility: $data['visibility'] ?? 'public',
-            condition: $data['condition'] ?? null,
-            conditionParams: $data['condition_params'] ?? [],
+            executeIf: $data['execute_if'] ?? null,
+            executeIfParams: $data['execute_if_params'] ?? [],
+            registerIf: $data['register_if'] ?? null,
+            registerIfParams: $data['register_if_params'] ?? [],
             hookParams: $data['hook_params'] ?? [],
             tags: $data['tags'] ?? [],
         );
     }
 
+    /**
+     * Summary of toArray
+     * @return HookType
+     */
     public function toArray(): array
     {
         return [
@@ -54,8 +87,10 @@ readonly class HookRegistration
             'defer' => $this->defer,
             'target' => $this->target,
             'visibility' => $this->visibility,
-            'condition' => $this->condition,
-            'condition_params' => $this->conditionParams,
+            'execute_if' => $this->executeIf,
+            'execute_if_params' => $this->executeIfParams,
+            'register_if' => $this->registerIf,
+            'register_if_params' => $this->registerIfParams,
             'hook_params' => $this->hookParams,
             'tags' => $this->tags,
         ];

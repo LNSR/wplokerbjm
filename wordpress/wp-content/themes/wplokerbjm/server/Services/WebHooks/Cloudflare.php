@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Services\WebHooks;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Log\Logger;
 

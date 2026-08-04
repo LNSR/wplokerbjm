@@ -18,8 +18,9 @@ class Action
      * @param int $priority
      * @param int $acceptedArgs
      * @param bool $defer defer activation
-     * @param \Closure|null $condition Gate the hook: receives Psr\Container\ContainerInterface, must return bool. 
+     * @param \Closure|null $executeIf Gate the hook: receives Psr\Container\ContainerInterface, must return bool. 
      * Intercept and fire hook only when it returns true, Condition are useful to prevent instantiation of whole class
+     * @param \Closure|null $registerIf Registration gate: evaluated once at registration time; must return bool. Hook is skipped when false.
      * @param array<string> $tag Grouping tag(s) for bulk activation/unregistration.
      */
     public function __construct(
@@ -27,7 +28,8 @@ class Action
         public readonly int $priority = 10,
         public readonly int $acceptedArgs = 1,
         public readonly bool $defer = false,
-        public readonly ?\Closure $condition = null,
+        public readonly ?\Closure $executeIf = null,
+        public readonly ?\Closure $registerIf = null,
         public readonly array $tag = []
     ) {
     }
@@ -45,8 +47,9 @@ class Filter
      * @param int $priority
      * @param int $acceptedArgs
      * @param bool $defer defer activation
-     * @param \Closure|null $condition Runtime gate the hook: receives Psr\Container\ContainerInterface, must return bool. 
+     * @param \Closure|null $executeIf Runtime gate the hook: receives Psr\Container\ContainerInterface, must return bool. 
      * Intercept and fire hook only when it returns true, Condition are useful to prevent instantiation of class.
+     * @param \Closure|null $registerIf Registration gate: evaluated once at registration time; must return bool. Hook is skipped when false.
      * @param array<string> $tag Grouping tag(s) for bulk activation/unregistration.
      */
     public function __construct(
@@ -54,7 +57,8 @@ class Filter
         public readonly int $priority = 10,
         public readonly int $acceptedArgs = 1,
         public readonly bool $defer = false,
-        public readonly ?\Closure $condition = null,
+        public readonly ?\Closure $executeIf = null,
+        public readonly ?\Closure $registerIf = null,
         public readonly array $tag = []
     ) {
     }

@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeInstanceHookHandler;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRuntimeRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksRuntimeRegistry;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 class RuntimeRegistryTest extends WplokerbjmTestCase
@@ -453,7 +453,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     public function testOwnerlessStaticClosureThrows(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Cannot infer owner for hook registration — pass owner: explicitly.');
+        $this->expectExceptionMessageIsOrContains('Cannot infer owner for hook registration — pass owner: explicitly.');
 
         $this->registry->registerAction(
             hook: 'rt_manual_no_owner',
@@ -520,7 +520,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $this->registry->registerAction(
             hook: 'rt_manual_cond_true',
             callback: [$owner, 'boot'],
-            condition: fn (): bool => true,
+            executeIf: fn (): bool => true,
         );
         do_action('rt_manual_cond_true', 'yes');
         $this->assertSame(['yes'], $captured);
@@ -529,7 +529,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $this->registry->registerAction(
             hook: 'rt_manual_cond_false',
             callback: [$owner, 'boot'],
-            condition: fn (): bool => false,
+            executeIf: fn (): bool => false,
         );
         do_action('rt_manual_cond_false', 'no');
         $this->assertSame(['yes'], $captured, 'Condition false must skip the hook');
@@ -544,7 +544,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $this->registry->registerFilter(
             hook: 'rt_manual_cond_bad',
             callback: [$owner, 'transform'],
-            condition: fn () => 'not-a-bool',
+            executeIf: fn () => 'not-a-bool',
         );
 
         // Non-bool condition → RuntimeException caught → logged + passthrough.
@@ -574,7 +574,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         };
 
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('callback is not callable');
+        $this->expectExceptionMessageIsOrContains('callback is not callable');
 
         $this->registry->registerAction(hook: 'rt_manual_invalid', callback: [$owner, 'missingMethod']);
     }

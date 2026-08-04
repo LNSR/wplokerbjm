@@ -301,19 +301,19 @@ class PrivateMethodService
     }
 }
 
-// ── Condition-gate hook fixtures ─────────────────────────────────────
+// ── ExecuteIf-gate hook fixtures ─────────────────────────────────────
 
 /**
  * Test fixture: a service with an instance-method action hook gated by a
- * condition closure.
+ * executeIf closure.
  *
- * The condition closure is supplied via the registration array in
- * ConditionHookTest (mirroring what WPHooksScanner emits from the
- * attribute's `condition` argument). The instantiation counter lets tests
- * assert that a false condition prevents the service from ever being
+ * The executeIf closure is supplied via the registration array in
+ * ExecuteIfHookTest (mirroring what WPHooksScanner emits from the
+ * attribute's `executeIf` argument). The instantiation counter lets tests
+ * assert that a false executeIf prevents the service from ever being
  * resolved from the container.
  */
-class ConditionActionService
+class ExecuteIfActionService
 {
     public static int $instantiationCount = 0;
     public static array $capturedValues = [];
@@ -323,7 +323,7 @@ class ConditionActionService
         self::$instantiationCount++;
     }
 
-    public function onConditionAction(string $value = 'default'): void
+    public function onExecuteIfAction(string $value = 'default'): void
     {
         self::$capturedValues[] = $value;
     }
@@ -337,12 +337,12 @@ class ConditionActionService
 
 /**
  * Test fixture: a service with an instance-method filter hook gated by a
- * condition closure.
+ * executeIf closure.
  *
- * Used to verify filter passthrough semantics when the condition fails
+ * Used to verify filter passthrough semantics when the executeIf fails
  * or throws — the first argument must flow through untouched.
  */
-class ConditionFilterService
+class ExecuteIfFilterService
 {
     public static int $instantiationCount = 0;
     public static array $capturedArgs = [];
@@ -352,7 +352,7 @@ class ConditionFilterService
         self::$instantiationCount++;
     }
 
-    public function onConditionFilter(string $value, string $extra = ''): string
+    public function onExecuteIfFilter(string $value, string $extra = ''): string
     {
         self::$capturedArgs[] = ['value' => $value, 'extra' => $extra];
         return $value . $extra;
@@ -367,20 +367,20 @@ class ConditionFilterService
 
 /**
  * Test fixture: a runtime-registered instance whose #[Action] carries a
- * condition closure.
+ * executeIf closure.
  *
  * WPHooksRuntimeRegistry has no container access, so such hooks must be
  * skipped with a warning during registerHooksOn() instead of being
- * registered unconditionally.
+ * registered unexecuteIfally.
  */
-class RuntimeConditionService
+class RuntimeExecuteIfService
 {
     public static array $captured = [];
 
-    #[Action(hook: 'runtime_condition_action', priority: 10, acceptedArgs: 1, condition: static function (\Psr\Container\ContainerInterface $c): bool {
+    #[Action(hook: 'runtime_executeIf_action', priority: 10, acceptedArgs: 1, executeIf: static function (\Psr\Container\ContainerInterface $c): bool {
         return true;
     })]
-    public function onRuntimeConditionAction(string $value): void
+    public function onRuntimeExecuteIfAction(string $value): void
     {
         self::$captured[] = $value;
     }
@@ -426,7 +426,7 @@ class DynamicHookService
  *
  * WPHooksRuntimeRegistry has no container access, so such hooks must be
  * skipped with a warning during registerHooksOn() instead of being
- * registered unconditionally.
+ * registered unexecuteIfally.
  */
 class RuntimeDynamicService
 {

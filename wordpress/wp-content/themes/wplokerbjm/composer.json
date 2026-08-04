@@ -3,7 +3,9 @@
     "brick/varexporter": "^0.7.0",
     "nette/robot-loader": "*",
     "php-di/php-di": "*",
-    "php-standard-library/php-standard-library": "*"
+    "php-standard-library/php-standard-library": "*",
+    "spatie/backtrace": "*",
+    "spatie/invade": "*"
   },
   "require-dev": {
     "brain/monkey": "*",

@@ -1,6 +1,6 @@
 <?php
 namespace WPLokerBJM\Core\Plugins;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{PluginList, SharedUtils};
 use WPLokerBJM\Core\Plugins\ThirdParty\{

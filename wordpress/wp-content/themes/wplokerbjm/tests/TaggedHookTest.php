@@ -8,9 +8,11 @@ use Closure;
 use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksContainerRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookManager;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
-use WPLokerBJM\Tests\Support\Fixtures\ConditionActionService;
+use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 
 /**
  * Test suite for the `tag` grouping metadata on hook registrations.
@@ -39,49 +41,49 @@ class TaggedHookTest extends WplokerbjmTestCase
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
         $builder->addDefinitions([
-            ConditionActionService::class => \DI\autowire(),
+            ExecuteIfActionService::class => \DI\autowire(),
         ]);
         $this->container = $builder->build();
 
-        ConditionActionService::reset();
+        ExecuteIfActionService::reset();
     }
 
     public function testTaggedHookWithoutDeferRegistersImmediately(): void
     {
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_active',
                 tags: ['cache'],
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $this->assertNotNull($this->findRegisteredHook('action', 'tag_active'));
 
         do_action('tag_active', 'hello');
-        $this->assertSame(1, ConditionActionService::$instantiationCount);
-        $this->assertSame(['hello'], ConditionActionService::$capturedValues);
+        $this->assertSame(1, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame(['hello'], ExecuteIfActionService::$capturedValues);
     }
 
     public function testUnregisterByTagsRemovesActiveButLeavesDeferredIntact(): void
     {
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_active',
                 tags: ['cache'],
             ),
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_deferred',
                 tags: ['cache'],
                 defer: true,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $this->assertNotNull($this->findRegisteredHook('action', 'tag_active'));
@@ -97,27 +99,27 @@ class TaggedHookTest extends WplokerbjmTestCase
         $this->assertNotNull($this->findRegisteredHook('action', 'tag_deferred'));
 
         do_action('tag_deferred', 'still-here');
-        $this->assertSame(1, ConditionActionService::$instantiationCount);
-        $this->assertSame(['still-here'], ConditionActionService::$capturedValues);
+        $this->assertSame(1, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame(['still-here'], ExecuteIfActionService::$capturedValues);
     }
 
     public function testUnregisterDeferredByTagsRemovesDeferredButLeavesActiveIntact(): void
     {
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_active',
                 tags: ['seo'],
             ),
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_deferred',
                 tags: ['seo'],
                 defer: true,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $registry->unregisterDeferredByTags(['seo']);
@@ -130,20 +132,20 @@ class TaggedHookTest extends WplokerbjmTestCase
         $this->assertNotNull($this->findRegisteredHook('action', 'tag_active'));
 
         do_action('tag_active', 'hello');
-        $this->assertSame(1, ConditionActionService::$instantiationCount);
+        $this->assertSame(1, ExecuteIfActionService::$instantiationCount);
     }
 
     public function testTaggedHookWithDeferLandsInDeferredPool(): void
     {
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_lazy',
                 tags: ['cache'],
                 defer: true,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $this->assertNull(
@@ -156,33 +158,33 @@ class TaggedHookTest extends WplokerbjmTestCase
         $this->assertNotNull($this->findRegisteredHook('action', 'tag_lazy'));
 
         do_action('tag_lazy', 'hello');
-        $this->assertSame(['hello'], ConditionActionService::$capturedValues);
+        $this->assertSame(['hello'], ExecuteIfActionService::$capturedValues);
     }
 
     public function testActivateDeferredByTagsActivatesOnlyMatchingGroup(): void
     {
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_cache',
                 tags: ['cache'],
                 defer: true,
             ),
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_seo',
                 tags: ['seo'],
                 defer: true,
             ),
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_none',
                 defer: true,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $activated = $registry->activateDeferredByTags(['cache']);
@@ -204,13 +206,13 @@ class TaggedHookTest extends WplokerbjmTestCase
     {
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_multi',
                 tags: ['cache', 'seo'],
                 defer: true,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $this->assertSame(1, $registry->activateDeferredByTags(['seo']));
@@ -222,27 +224,27 @@ class TaggedHookTest extends WplokerbjmTestCase
         // String form.
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_str',
                 tags: ['cache'],
                 defer: true,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
         $this->assertSame(1, $registry->activateDeferredByTags(['cache']));
 
         // Array form — identical behavior.
-        ConditionActionService::reset();
+        ExecuteIfActionService::reset();
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_arr',
                 tags: ['cache'],
                 defer: true,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
         $this->assertSame(1, $registry->activateDeferredByTags(['cache']));
     }
@@ -251,19 +253,19 @@ class TaggedHookTest extends WplokerbjmTestCase
     {
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_keep',
                 tags: ['cache'],
                 defer: true,
             ),
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_keep_active',
                 tags: ['cache'],
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         // Unknown tag: nothing activated, nothing unregistered.
@@ -287,14 +289,14 @@ class TaggedHookTest extends WplokerbjmTestCase
         // but the condition gate still suppresses every fire.
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_cond',
                 tags: ['cache'],
                 defer: true,
-                condition: static fn (ContainerInterface $c): bool => false,
+                executeIf: static fn (ContainerInterface $c): bool => false,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $registry->activateDeferredByTags(['cache']);
@@ -302,53 +304,53 @@ class TaggedHookTest extends WplokerbjmTestCase
 
         do_action('tag_cond', 'hello');
 
-        $this->assertSame(0, ConditionActionService::$instantiationCount);
-        $this->assertSame([], ConditionActionService::$capturedValues);
+        $this->assertSame(0, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame([], ExecuteIfActionService::$capturedValues);
 
         // Condition true: fires normally after tag activation.
-        ConditionActionService::reset();
+        ExecuteIfActionService::reset();
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_cond2',
                 tags: ['seo'],
                 defer: true,
-                condition: static fn (ContainerInterface $c): bool => true,
+                executeIf: static fn (ContainerInterface $c): bool => true,
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         $registry->activateDeferredByTags(['seo']);
         do_action('tag_cond2', 'gated');
 
-        $this->assertSame(1, ConditionActionService::$instantiationCount);
-        $this->assertSame(['gated'], ConditionActionService::$capturedValues);
+        $this->assertSame(1, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame(['gated'], ExecuteIfActionService::$capturedValues);
     }
 
     public function testUnregisterByTagsUnregistersActiveHandlers(): void
     {
         $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
-                ConditionActionService::class,
-                'onConditionAction',
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
                 'tag_bulk',
                 tags: ['cache'],
             ),
-        ], new WPHookPlanProvider());
+        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
         $registry->initialize();
 
         do_action('tag_bulk', 'before');
-        $this->assertSame(['before'], ConditionActionService::$capturedValues);
+        $this->assertSame(['before'], ExecuteIfActionService::$capturedValues);
 
-        ConditionActionService::reset();
+        ExecuteIfActionService::reset();
 
         $registry->unregisterByTags(['cache']);
         $this->assertNull($this->findRegisteredHook('action', 'tag_bulk'));
 
         do_action('tag_bulk', 'after');
-        $this->assertSame(0, ConditionActionService::$instantiationCount);
-        $this->assertSame([], ConditionActionService::$capturedValues);
+        $this->assertSame(0, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame([], ExecuteIfActionService::$capturedValues);
     }
 
     /**
@@ -361,7 +363,7 @@ class TaggedHookTest extends WplokerbjmTestCase
         int $priority = 10,
         int $acceptedArgs = 1,
         array $tags = [],
-        ?Closure $condition = null,
+        ?Closure $executeIf = null,
         bool $defer = false,
     ): array {
         return [
@@ -372,8 +374,8 @@ class TaggedHookTest extends WplokerbjmTestCase
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
             'defer' => $defer,
-            'condition' => $condition,
-            'condition_params' => [],
+            'execute_if' => $executeIf,
+            'execute_if_params' => [],
             'tags' => $tags,
         ];
     }

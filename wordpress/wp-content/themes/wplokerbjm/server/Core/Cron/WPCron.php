@@ -29,7 +29,7 @@ class WPCron
      *
      * @return void
      */
-    #[Action('init', condition: static function(): bool {
+    #[Action('init', registerIf: static function(): bool {
         return SharedUtils::isWPCLI();
     })]
     public function registerCronWP(): void

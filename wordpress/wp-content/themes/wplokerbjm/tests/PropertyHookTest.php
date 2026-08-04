@@ -6,9 +6,9 @@ namespace WPLokerBJM\Tests;
 
 use DI\ContainerBuilder;
 use DI\Container;
-use ReflectionClass;
 use WPLokerBJM\Core\Container\Support\WPHooks\ContainerLazyPropertyHookHandler;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookManager;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyActionService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyDeferredService;
@@ -45,7 +45,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $this->container = $builder->build();
 
-        $this->registry = new WPHooksContainerRegistry($this->container, [], new WPHookPlanProvider());
+        $this->registry = new WPHooksContainerRegistry($this->container, [], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
 
         // Reset fixture static state
         PropertyFilterService::reset();
@@ -55,25 +55,19 @@ class PropertyHookTest extends WplokerbjmTestCase
     }
 
     /**
-     * Seed hook registrations into the registry via reflection.
+     * Seed registrations via a bound closure (bypassing the container check),
+     * then verify internal state.
      *
-     * @param array<int, array> $registrations
+     * @param array<int, array{class: string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, defer: bool}> $registrations
      */
     private function seedRegistrations(array $registrations): void
     {
-        $ref = new ReflectionClass($this->registry);
-        $method = $ref->getMethod('registerAll');
-        $method->invoke($this->registry, $registrations);
-    }
-
-    /**
-     * Read a private property from the registry.
-     */
-    private function getRegistryProperty(string $name): mixed
-    {
-        $ref = new ReflectionClass($this->registry);
-        $prop = $ref->getProperty($name);
-        return $prop->getValue($this->registry);
+        $bind = \Closure::bind(
+            static fn (WPHooksContainerRegistry $registry, array $hooksRegistration) => $registry->registerAll($hooksRegistration),
+            null,
+            WPHooksContainerRegistry::class
+        );
+        $bind($this->registry, $registrations);
     }
 
     // ── Filter tests ─────────────────────────────────────────────────

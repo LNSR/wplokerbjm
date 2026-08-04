@@ -6,8 +6,9 @@ namespace WPLokerBJM\Tests;
 
 use DI\ContainerBuilder;
 use DI\Container;
-use ReflectionClass;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksContainerRegistry, ContainerLazyHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookManager;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, ContainerLazyHookHandler};
 use WPLokerBJM\Tests\Support\Fixtures\FilterService;
 use WPLokerBJM\Tests\Support\Fixtures\LazyHookService;
 use WPLokerBJM\Tests\Support\Fixtures\MethodDeferredService;
@@ -32,7 +33,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $this->container = $builder->build();
 
-        $this->registry = new WPHooksContainerRegistry($this->container, [], new WPHookPlanProvider());
+        $this->registry = new WPHooksContainerRegistry($this->container, [], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
 
         LazyHookService::reset();
         FilterService::reset();
@@ -43,9 +44,12 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
 
     private function seedRegistrations(array $registrations): void
     {
-        $ref = new ReflectionClass($this->registry);
-        $method = $ref->getMethod('registerAll');
-        $method->invoke($this->registry, $registrations);
+        $bind = \Closure::bind(
+            static fn (WPHooksContainerRegistry $registry, array $hooksRegistration) => $registry->registerAll($hooksRegistration),
+            null,
+            WPHooksContainerRegistry::class
+        );
+        $bind($this->registry, $registrations);
     }
 
     public function testMethodActionProducesSideEffect(): void

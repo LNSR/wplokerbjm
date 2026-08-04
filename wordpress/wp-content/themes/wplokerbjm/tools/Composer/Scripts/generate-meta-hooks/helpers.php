@@ -241,17 +241,17 @@ function renderMetadataSection(array $actions, array $filters, array $tags = [])
             ["argumentsSet('{$listHooksFilter}')"],
         ],
         'List hooks (deferred) to register' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::activateDeferredByHook()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksContainerRegistry::activateDeferredByHook()',
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
         'List hooks to unregister' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::unregisterByHook()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksContainerRegistry::unregisterByHook()',
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
         'List hooks (deferred) to unregister' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::unregisterDeferredByHook()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksContainerRegistry::unregisterDeferredByHook()',
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],

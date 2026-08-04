@@ -9,7 +9,8 @@ use WPLokerBJM\Core\Container\Definitions\Factory;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\Core;
 use WPLokerBJM\Core\Container\Definitions\DefinitionProviderInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, WPHookPlanProvider, WPHooksContainerRegistry, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Services\WebHooks\Cloudflare;
@@ -217,13 +218,36 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             ->willReturnCallback(fn(string $class) => $this->createMock($class));
 
         // Create registry with registrations via constructor, then initialize
-        $registry = new WPHooksContainerRegistry($container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $container));
         $registry->initialize();
 
         $registered = $this->registeredHooks();
         // Deferred hooks (defer: true) are not auto-registered by initialize(),
-        // so exclude them from the count assertion.
-        $nonDeferred = array_filter($registrations, fn($r) => empty($r->defer));
+        // so exclude them from the count assertion. RegisterIf-gated hooks whose
+        // gate evaluates to false (environment-dependent, e.g. !isWPCLI() in
+        // tests) are also skipped by the registry — mirror those semantics.
+        $planProvider = new WPHookPlanProvider();
+        $nonDeferred = array_filter(
+            $registrations,
+            function ($r) use ($planProvider, $container) {
+                if (!empty($r->defer)) {
+                    return false;
+                }
+                if ($r->registerIf === null) {
+                    return true;
+                }
+                try {
+                    return $planProvider->evaluateRegistrationGate(
+                        $r->registerIf,
+                        $r->registerIfParams ?? [],
+                        $container,
+                        $r->class . '::' . $r->method
+                    );
+                } catch (\Throwable) {
+                    return false;
+                }
+            }
+        );
         $this->assertCount(count($nonDeferred), $registered, 'All non-deferred registrations should produce a registered hook');
         $this->assertGreaterThan(0, $registered);
 
@@ -268,7 +292,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             'hook' => 'init',
             'priority' => 10,
             'accepted_args' => 1,
-        ]], new WPHookPlanProvider());
+        ]], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $container));
         $registry->initialize();
 
         $this->assertCount(0, $this->registeredHooks(), 'Hooks for classes not in container should be skipped');
@@ -326,7 +350,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         // Fresh registry
         $GLOBALS['__wplokerbjm_registered_hooks'] = [];
-        $registry = new WPHooksContainerRegistry($container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $container));
         $registry->initialize();
 
         $totalBefore = count($this->registeredHooks());
@@ -345,7 +369,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         // Test unregisterByClass (fresh setup)
         $GLOBALS['__wplokerbjm_registered_hooks'] = [];
-        $registry2 = new WPHooksContainerRegistry($container, $registrations, new WPHookPlanProvider());
+        $registry2 = new WPHooksContainerRegistry($container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $container));
         $registry2->initialize();
 
         $totalBeforeClass = count($this->registeredHooks());

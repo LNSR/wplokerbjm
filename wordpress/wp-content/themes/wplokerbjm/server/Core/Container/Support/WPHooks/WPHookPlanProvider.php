@@ -95,27 +95,27 @@ class WPHookPlanProvider
     }
 
     /**
-     * Evaluate a condition gate for a hook.
+     * Evaluate an executeIf gate for a hook.
      *
-     * A null condition always allows the hook. The condition closure must
-     * return a bool; anything else raises a RuntimeException (callers catch
-     * and log it, keeping the hook pipeline intact).
+     * A null gate always allows the hook. The closure must return a bool;
+     * anything else raises a RuntimeException (callers catch and log it,
+     * keeping the hook pipeline intact).
      *
-     * @param array<int, CallableHookParams> $conditionParams
+     * @param array<int, CallableHookParams> $executeIfParams
      *
-     * @throws RuntimeException when the condition does not return bool
+     * @throws RuntimeException when the gate does not return bool
      */
-    public function evaluateCondition(?\Closure $condition, array $conditionParams, ContainerInterface $container, string $label): bool
+    public function evaluateExecuteIf(?\Closure $executeIf, array $executeIfParams, ContainerInterface $container, string $label): bool
     {
-        if ($condition === null) {
+        if ($executeIf === null) {
             return true;
         }
 
-        // Fast path: zero-parameter conditions are invoked directly,
+        // Fast path: zero-parameter gates are invoked directly,
         // without any reflection or DI resolution.
-        if ($conditionParams === []) {
+        if ($executeIfParams === []) {
             try {
-                $allowed = $condition();
+                $allowed = $executeIf();
                 if (is_bool($allowed)) {
                     return $allowed;
                 }
@@ -124,12 +124,52 @@ class WPHookPlanProvider
             }
         }
 
-        $values = $this->resolveCallableParameters($condition, $conditionParams, $container, $label);
-        $allowed = $condition(...$values);
+        $values = $this->resolveCallableParameters($executeIf, $executeIfParams, $container, $label);
+        $allowed = $executeIf(...$values);
 
         if (!is_bool($allowed)) {
             throw new RuntimeException(
-                'Condition for ' . $label . ' must return bool, got ' . get_debug_type($allowed)
+                'executeIf for ' . $label . ' must return bool, got ' . get_debug_type($allowed)
+            );
+        }
+
+        return $allowed;
+    }
+
+    /**
+     * Evaluate a registerIf registration gate for a hook.
+     *
+     * Evaluated ONCE at registration time (not per fire). A null gate always
+     * allows registration; the closure must return a bool.
+     *
+     * @param array<int, CallableHookParams> $registerIfParams
+     *
+     * @throws RuntimeException when the gate does not return bool
+     */
+    public function evaluateRegistrationGate(?\Closure $registerIf, array $registerIfParams, ContainerInterface $container, string $label): bool
+    {
+        if ($registerIf === null) {
+            return true;
+        }
+
+        // Fast path: zero-parameter gates are invoked directly.
+        if ($registerIfParams === []) {
+            try {
+                $allowed = $registerIf();
+                if (is_bool($allowed)) {
+                    return $allowed;
+                }
+            } catch (\ArgumentCountError) {
+                // Closure actually has parameters — fall through to resolution.
+            }
+        }
+
+        $values = $this->resolveCallableParameters($registerIf, $registerIfParams, $container, $label);
+        $allowed = $registerIf(...$values);
+
+        if (!is_bool($allowed)) {
+            throw new RuntimeException(
+                'registerIf gate for ' . $label . ' must return bool, got ' . get_debug_type($allowed)
             );
         }
 

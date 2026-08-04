@@ -30,8 +30,8 @@ final class ContainerLazyHookHandler
      * @param string $method
      * @param 'public'|'protected'|'private' $visibility
      * @param 'action'|'filter' $type
-     * @param \Closure():bool|null $condition Gate evaluated before the hook fires; must return bool.
-     * @param CallableHookParams $conditionParams Pre-computed DI plan for the condition closure.
+     * @param \Closure():bool|null $executeIf Gate evaluated before the hook fires; must return bool.
+     * @param CallableHookParams $executeIfParams Pre-computed DI plan for the executeIf closure.
      * @param WPHookPlanProvider|null $hookPlanProvider Plan provider for condition/hook-name resolution.
      */
     public function __construct(
@@ -40,8 +40,8 @@ final class ContainerLazyHookHandler
         private readonly string $method,
         private readonly string $visibility = 'public',
         private readonly string $type = 'action',
-        private readonly ?\Closure $condition = null,
-        private readonly array $conditionParams = [],
+        private readonly ?\Closure $executeIf = null,
+        private readonly array $executeIfParams = [],
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
     ) {
         $this->label = $this->class . '::' . $this->method;
@@ -63,7 +63,7 @@ final class ContainerLazyHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
-            if (!$this->planProvider->evaluateCondition($this->condition, $this->conditionParams, $this->container, $this->label)) {
+            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label)) {
                 // Skip the hook — return original value for filters so pipeline remains intact
                 return ($this->type === 'filter' && array_key_exists(0, $args)) ? $args[0] : null;
             }
@@ -111,8 +111,8 @@ final class ContainerLazyPropertyHookHandler
      * @param string $property
      * @param 'public'|'protected'|'private' $visibility
      * @param 'action'|'filter' $type
-     * @param \Closure():bool|null $condition Gate evaluated before the hook fires; must return bool.
-     * @param CallableHookParams $conditionParams Pre-computed DI plan for the condition closure.
+     * @param \Closure():bool|null $executeIf Gate evaluated before the hook fires; must return bool.
+     * @param CallableHookParams $executeIfParams Pre-computed DI plan for the executeIf closure.
      * @param WPHookPlanProvider|null $hookPlanProvider Plan provider for condition/hook-name resolution.
      */
     public function __construct(
@@ -121,8 +121,8 @@ final class ContainerLazyPropertyHookHandler
         private readonly string $property,
         private readonly string $visibility = 'public',
         private readonly string $type = 'action',
-        private readonly ?\Closure $condition = null,
-        private readonly array $conditionParams = [],
+        private readonly ?\Closure $executeIf = null,
+        private readonly array $executeIfParams = [],
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
     ) {
         $this->label = $this->class . '::$' . $this->property;
@@ -143,7 +143,7 @@ final class ContainerLazyPropertyHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
-            if (!$this->planProvider->evaluateCondition($this->condition, $this->conditionParams, $this->container, $this->label)) {
+            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label)) {
                 // Skip the hook entirely — even for deferred hooks — the gate predates activation.
                 return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
             }
@@ -319,13 +319,13 @@ final class RuntimeCallableHookHandler
 
     /**
      * @param callable        $callback  Callable invoked when the hook fires.
-     * @param \Closure|null   $condition Optional gate: invoked directly, must return bool.
+     * @param \Closure|null   $executeIf Optional gate: invoked directly, must return bool.
      * @param 'action'|'filter' $type
      */
     public function __construct(
         // `callable` is not a valid property type — validated by the registry before construction.
         private readonly mixed $callback,
-        private readonly ?\Closure $condition = null,
+        private readonly ?\Closure $executeIf = null,
         private readonly string $type = 'action',
     ) {
         if (is_array($callback)) {
@@ -340,8 +340,8 @@ final class RuntimeCallableHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
-            if ($this->condition !== null) {
-                $allowed = ($this->condition)();
+            if ($this->executeIf !== null) {
+                $allowed = ($this->executeIf)();
                 if (!is_bool($allowed)) {
                     throw new \RuntimeException(
                         'Condition for ' . $this->label . ' must return bool, got ' . get_debug_type($allowed)

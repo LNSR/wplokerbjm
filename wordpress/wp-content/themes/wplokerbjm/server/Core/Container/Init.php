@@ -2,7 +2,7 @@
 
 namespace WPLokerBJM\Core\Container;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 
 /**
  * Initializes core services in the wplokerbjm theme by registering WordPress hooks.

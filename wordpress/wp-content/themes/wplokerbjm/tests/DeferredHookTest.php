@@ -6,8 +6,9 @@ namespace WPLokerBJM\Tests;
 
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
-use ReflectionClass;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksContainerRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookManager;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
@@ -32,6 +33,8 @@ class DeferredHookTest extends WplokerbjmTestCase
 {
     private ContainerInterface $container;
     private WPHooksContainerRegistry $registry;
+    private DeferredHookManager $deferredHookManager;
+    private WPHookPlanProvider $planProvider;
 
     protected function setUp(): void
     {
@@ -41,8 +44,9 @@ class DeferredHookTest extends WplokerbjmTestCase
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
         $this->container = $builder->build();
-
-        $this->registry = new WPHooksContainerRegistry($this->container, [], new WPHookPlanProvider());
+        $this->planProvider = new WPHookPlanProvider();
+        $this->deferredHookManager = new DeferredHookManager($this->planProvider, $this->container);
+        $this->registry = new WPHooksContainerRegistry($this->container, [], $this->planProvider, $this->deferredHookManager);
     }
 
     /**
@@ -53,22 +57,8 @@ class DeferredHookTest extends WplokerbjmTestCase
      */
     private function seedRegistrations(array $registrations): void
     {
-        // Call registerAll via reflection to bypass the container existence check
-        $ref = new ReflectionClass($this->registry);
-        $method = $ref->getMethod('registerAll');
-        $method->invoke($this->registry, $registrations);
-    }
-
-    /**
-     * Read a private property from the registry.
-     *
-     * @return mixed
-     */
-    private function getRegistryProperty(string $name): mixed
-    {
-        $ref = new ReflectionClass($this->registry);
-        $prop = $ref->getProperty($name);
-        return $prop->getValue($this->registry);
+        $bind = \Closure::bind(static fn(WPHooksContainerRegistry $registry, array $hooksRegistration) => $registry->registerAll($hooksRegistration), null, WPHooksContainerRegistry::class);
+        $bind($this->registry, $registrations);
     }
 
     /**
@@ -76,9 +66,9 @@ class DeferredHookTest extends WplokerbjmTestCase
      */
     private function deferredHandlersCount(): int
     {
-        $deferred = $this->getRegistryProperty('deferredHandlers');
+        $deferred = \Closure::bind(static fn(DeferredHookManager $manager) => $manager->deferredHandlers, null, DeferredHookManager::class);
         $count = 0;
-        foreach ($deferred as $hookHandlers) {
+        foreach ($deferred($this->deferredHookManager) as $hookHandlers) {
             $count += count($hookHandlers);
         }
         return $count;
