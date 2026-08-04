@@ -9,7 +9,7 @@ use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
@@ -70,7 +70,8 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        $targetResolver = new HookTargetResolver();
+        $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
         do_action('condition_action', 'hello');
@@ -90,7 +91,8 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        $targetResolver = new HookTargetResolver();
+        $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
         $this->assertNotNull($this->findRegisteredHook('action', 'condition_action'));
@@ -113,7 +115,8 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        $targetResolver = new HookTargetResolver();
+        $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
         // Deferred: not registered during initialize()...
@@ -142,7 +145,8 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        $targetResolver = new HookTargetResolver();
+        $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
         $result = apply_filters('condition_filter', 'keepme');
@@ -162,7 +166,8 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        $targetResolver = new HookTargetResolver();
+        $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
         do_action('condition_nonbool', 'hello');
@@ -185,6 +190,86 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $this->assertSame([], RuntimeExecuteIfService::$captured);
     }
 
+    public function testExecuteIfBindToTargetEnablesPrivateAccess(): void
+    {
+        // Static closure typed with the TARGET class but defined OUTSIDE it
+        // (scopeClass = ExecuteIfHookTest). bindToTarget's plan-driven
+        // scope-only bind gives it access to ExecuteIfActionService privates.
+        $gate = static function (ExecuteIfActionService $target): bool {
+            return $target->isPrivateEnabled();
+        };
+
+        $registrations = [
+            $this->action(
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
+                'bind_target_action',
+                executeIf: $gate,
+                executeIfParams: (new WPHookPlanProvider())->buildCallablePlan($gate)
+            ),
+        ];
+
+        $registry = $this->createRegistry($registrations, $this->container);
+        $registry->initialize();
+
+        do_action('bind_target_action', 'scoped');
+
+        $this->assertSame(['scoped'], ExecuteIfActionService::$capturedValues);
+    }
+
+    public function testRegisterIfBindToTargetAtRegistrationAndDeferredActivation(): void
+    {
+        $gate = static function (ExecuteIfActionService $target): bool {
+            return $target->isPrivateEnabled();
+        };
+
+        // Registration path: gate evaluated in registerAll (target class from
+        // $registration->class), private access via scope bind.
+        $registrations = [
+            $this->action(
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
+                'register_if_bound',
+                executeIf: static fn (): bool => true,
+                registerIf: $gate,
+                registerIfParams: (new WPHookPlanProvider())->buildCallablePlan($gate)
+            ),
+        ];
+
+        $registry = $this->createRegistry($registrations, $this->container);
+        $registry->initialize();
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'register_if_bound'));
+
+        do_action('register_if_bound', 'reg');
+        $this->assertSame(['reg'], ExecuteIfActionService::$capturedValues);
+
+        // Deferred path: gate re-evaluated at activation time (target class
+        // from $data['key']->class inside gateDeferredActivation).
+        ExecuteIfActionService::reset();
+
+        $deferred = [
+            $this->action(
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
+                'register_if_deferred_bound',
+                defer: true,
+                executeIf: static fn (): bool => true,
+                registerIf: $gate,
+                registerIfParams: (new WPHookPlanProvider())->buildCallablePlan($gate)
+            ),
+        ];
+
+        $deferredRegistry = $this->createRegistry($deferred, $this->container);
+        $deferredRegistry->initialize();
+        $deferredRegistry->activateDeferredByHook('register_if_deferred_bound');
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'register_if_deferred_bound'));
+
+        do_action('register_if_deferred_bound', 'defer');
+        $this->assertSame(['defer'], ExecuteIfActionService::$capturedValues);
+    }
+
     public function testExecuteIfPlanIsPrecomputedByScanner(): void
     {
         $attr = new Action(
@@ -196,23 +281,29 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
 
         $plan = (new WPHookPlanProvider())->buildCallablePlan($attr->executeIf);
 
-        $this->assertCount(1, $plan);
-        $this->assertSame('c', $plan[0]['name']);
-        $this->assertSame(ContainerInterface::class, $plan[0]['type']);
-        $this->assertFalse($plan[0]['hasDefault']);
-        $this->assertNull($plan[0]['default']);
+        $this->assertTrue($plan['isStatic']);
+        $this->assertSame(ExecuteIfHookTest::class, $plan['scopeClass']);
+        $this->assertCount(1, $plan['params']);
+        $this->assertSame('c', $plan['params'][0]['name']);
+        $this->assertSame(ContainerInterface::class, $plan['params'][0]['type']);
+        $this->assertFalse($plan['params'][0]['hasDefault']);
+        $this->assertNull($plan['params'][0]['default']);
 
         // Builtin params carry no type but keep their default value.
         $builtin = (new WPHookPlanProvider())->buildCallablePlan(
             static fn (int $x = 5): bool => true
         );
-        $this->assertCount(1, $builtin);
-        $this->assertNull($builtin[0]['type']);
-        $this->assertTrue($builtin[0]['hasDefault']);
-        $this->assertSame(5, $builtin[0]['default']);
+        $this->assertTrue($builtin['isStatic']);
+        $this->assertCount(1, $builtin['params']);
+        $this->assertNull($builtin['params'][0]['type']);
+        $this->assertTrue($builtin['params'][0]['hasDefault']);
+        $this->assertSame(5, $builtin['params'][0]['default']);
 
         // No condition → empty plan.
-        $this->assertSame([], (new WPHookPlanProvider())->buildCallablePlan(null));
+        $empty = (new WPHookPlanProvider())->buildCallablePlan(null);
+        $this->assertSame([], $empty['params']);
+        $this->assertTrue($empty['isStatic']);
+        $this->assertNull($empty['scopeClass']);
     }
 
     public function testExecuteIfPlanDrivenResolutionFiresAndSkipsHook(): void
@@ -236,8 +327,9 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 executeIfParams: (new WPHookPlanProvider())->buildCallablePlan($attr->executeIf)
             ),
         ];
-
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        
+        $targetResolver = new HookTargetResolver();
+        $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
         do_action('plan_action', 'via-plan');
@@ -257,12 +349,16 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 'plan_bad',
                 executeIf: static fn (): bool => true,
                 executeIfParams: [
-                    ['name' => 'missing', 'type' => '\App\MissingService', 'hasDefault' => false, 'default' => null],
+                    'isStatic' => true,
+                    'scopeClass' => null,
+                    'params' => [
+                        ['name' => 'missing', 'type' => '\App\MissingService', 'hasDefault' => false, 'default' => null],
+                    ],
                 ]
             ),
         ];
 
-        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
         do_action('plan_bad', 'hello');
@@ -282,7 +378,9 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         int $acceptedArgs = 1,
         ?Closure $executeIf = null,
         bool $defer = false,
-        array $executeIfParams = []
+        array $executeIfParams = [],
+        ?Closure $registerIf = null,
+        array $registerIfParams = []
     ): array {
         return [
             'class' => $class,
@@ -294,6 +392,8 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             'defer' => $defer,
             'execute_if' => $executeIf,
             'execute_if_params' => $executeIfParams,
+            'register_if' => $registerIf,
+            'register_if_params' => $registerIfParams,
         ];
     }
 

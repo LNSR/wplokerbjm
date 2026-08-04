@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
-
+use Spatie\Backtrace\Backtrace;
+use Spatie\Backtrace\Frame;
 use ReflectionClass;
 use ReflectionFunction;
 use DI\Container;
 use ReflectionProperty;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, HookRegistration, ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, HookKey, WPHooksContainerRegistry as WPHooksWPHooksContainerRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, HookRegistration, ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, HookKey};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{AnonClassHookPropertyAbstract};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
@@ -37,14 +38,16 @@ class WPHooksContainerRegistry
     /**
      * @param ContainerInterface $container
      * @param HookRegistration[] $hooksRegistration
-     * @param WPHookPlanProvider|null $planProvider Plan provider for condition/hook-name resolution.
+     * @param WPHookPlanProvider $planProvider Plan provider for condition/hook-name resolution.
      * @param DeferredHookManager $deferredHookManager Deferred hook manager.
+     * @param HookTargetResolver $resolverTarget Resolves callable targets to class/method pairs.
      */
     public function __construct(
         private readonly ContainerInterface $container,
         private array $hooksRegistration,
         private WPHookPlanProvider $planProvider,
-        private DeferredHookManager $deferredHookManager
+        private DeferredHookManager $deferredHookManager,
+        private HookTargetResolver $resolverTarget,
     ) {
     }
 
@@ -93,7 +96,7 @@ class WPHooksContainerRegistry
     {
         $this->deferredHookManager->activateDeferredByHook(
             $hook,
-            fn (string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
+            fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
         );
     }
 
@@ -114,7 +117,7 @@ class WPHooksContainerRegistry
     {
         $this->deferredHookManager->activateDeferredByClass(
             $class,
-            fn (string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
+            fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
         );
     }
 
@@ -173,7 +176,7 @@ class WPHooksContainerRegistry
     {
         $this->deferredHookManager->activateDeferredByCallable(
             $target,
-            fn (string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
+            fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
         );
     }
 
@@ -199,7 +202,7 @@ class WPHooksContainerRegistry
     {
         return $this->deferredHookManager->activateDeferredByTags(
             $tags,
-            fn (string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
+            fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
         );
     }
     #endregion
@@ -259,7 +262,7 @@ class WPHooksContainerRegistry
      */
     public function unregisterByCallable(callable|string|array $target): void
     {
-        [$class, $method] = ($this->resolverTarget)($target);
+        [$class, $method] = $this->resolverTarget->resolve($target);
 
         foreach ($this->handlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
@@ -335,148 +338,6 @@ class WPHooksContainerRegistry
         }
         unset($hookHandlers);
     }
-    #endregion
-
-    #region Resolver Target Logics
-    /**
-     * Lazily-created callable target resolver.
-     *
-     * Implemented as an anonymous invokable object so it can serve as
-     * demonstration of invokable object(class) and encapsulate per-request state
-     * Resolves supported hook targets:
-     *  - first-class callables
-     *  - [$object, 'method']
-     *  - 'Class::method'
-     *  - invokable objects
-     *  - PHP 8.4 property hook closures
-     *
-     * @return callable(HookTargetResolve): array{class-string, string}
-     */
-    private $resolverTarget {
-        get => $this->resolverTarget ??= new class () {
-            /**
-             * Per-request cache of resolved callable → [FQCN, memberName].
-             *
-             * WeakMap automatically drops entries when their key (the callable
-             * object) is garbage-collected, avoiding memory leaks.
-             *
-             * @var \WeakMap<object, array{class-string, string}>
-             */
-            private \WeakMap $callableTargetCache;
-
-            public function __construct()
-            {
-                $this->callableTargetCache = new \WeakMap();
-            }
-
-            /**
-             * @param HookTargetResolve $target
-             * @return array{class-string, string}
-             */
-            public function __invoke(object|callable|array|string $target): array
-            {
-                if (is_object($target) && isset($this->callableTargetCache[$target])) {
-                    return $this->callableTargetCache[$target];
-                }
-
-                $result = $this->doResolveCallableTarget($target);
-
-                if (is_object($target)) {
-                    $this->callableTargetCache[$target] = $result;
-                }
-                return $result;
-            }
-            /**
-             * @param HookTargetResolve $target
-             * @return array{class-string, string}
-             */
-            private function doResolveCallableTarget(object|callable|array|string $target): array
-            {
-                // 1. Array [$object, 'memberName'] — fast path
-                if (is_array($target)) {
-                    return [get_class($target[0]), $target[1]];
-                }
-
-                // 2. String 'Class::method' — static fallback
-                if (is_string($target)) {
-                    $parts = explode('::', $target, 2);
-                    return [$parts[0], $parts[1] ?? '__invoke'];
-                }
-
-                // 3. Invokable Object Instance (anonymous class from a property)
-                if (!$target instanceof \Closure && is_object($target)) {
-                    return $this->analyseObject($target);
-                }
-
-                // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
-                $ref = new \ReflectionFunction($target);
-                $calledClass = $ref->getClosureCalledClass()?->getName();
-
-                if ($calledClass === null) {
-                    throw new \InvalidArgumentException('Callable target must be bound to an object instance.');
-                }
-
-                $name = $ref->getName();
-
-                // Standard Instance Method ($service->method(...))
-                if (!str_contains($name, '{closure')) {
-                    return [$calledClass, $name];
-                }
-
-                // PHP 8.4 Property Hook Closure ("{closure:FQCN::$propertyName::get():line}")
-                if (str_contains($name, '::$')) {
-                    $start = strpos($name, '::$') + 3;
-                    $end = strpos($name, '::', $start);
-
-                    if ($start !== false && $end !== false) {
-                        return [$calledClass, substr($name, $start, $end - $start)];
-                    }
-                }
-
-                throw new \InvalidArgumentException("Unable to resolve hook target for class {$calledClass}.");
-            }
-
-            /**
-             * 
-             * @param object $target
-             * @return array{class-string, string}
-             */
-            private function analyseObject(object $target): array
-            {
-                $className = $target::class;
-
-                // Anonymous class extending AnonClassHookPropertyAbstract —
-                // reads parent class & property directly, no backtrace needed.
-                if ($target instanceof AnonClassHookPropertyAbstract) {
-                    return [$target->parentClass, $target->parentProperty];
-                }
-
-                // Best-effort fallback for anonymous classes that don't
-                // extend the AnonClassHookPropertyAbstract: walk the call stack to find which
-                // object's property holds this instance.
-                if ((new \ReflectionClass($target))->isAnonymous()) {
-                    $backtrace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, 10);
-                    foreach ($backtrace as $frame) {
-                        $callerObject = $frame['object'] ?? null;
-                        if ($callerObject === null) {
-                            continue;
-                        }
-                        $refClass = new \ReflectionClass($callerObject);
-                        /** @var \ReflectionProperty $property */
-                        foreach ($refClass->getProperties() as $property) {
-                            if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
-                                Logger::warning("WPHooksContainerRegistry: ", "Anon class without extending AnonClassHookPropertyAbstract, it's recommended to use 'AnonClassHookPropertyAbstract'." . $refClass->getName() . "::" . $property->getName());
-                                return [$refClass->getName(), $property->getName()];
-                            }
-                        }
-                    }
-                }
-
-                return [$className, '__invoke'];
-            }
-        };
-    }
-
     #endregion
     /**
      * Internal: call add_action or add_filter for a single handler entry.
@@ -594,7 +455,8 @@ class WPHooksContainerRegistry
                     $registration->registerIf,
                     $registration->registerIfParams,
                     $this->container,
-                    $registration->class . '::' . $registration->method
+                    $registration->class . '::' . $registration->method,
+                    $registration->class
                 );
             } catch (\Throwable $e) {
                 Logger::error(
@@ -657,6 +519,7 @@ class DeferredHookManager
     public function __construct(
         private WPHookPlanProvider $planProvider,
         private ContainerInterface $container,
+        private HookTargetResolver $resolverTarget,
     ) {
     }
 
@@ -736,7 +599,7 @@ class DeferredHookManager
      */
     public function activateDeferredByCallable(callable|string|array $target, callable $activateEntry): void
     {
-        [$class, $method] = ($this->resolverTarget)($target);
+        [$class, $method] = $this->resolverTarget->resolve($target);
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
                 if (!$data['key']->isForCallable($class, $method)) {
@@ -805,7 +668,7 @@ class DeferredHookManager
      */
     public function unregisterDeferredByCallable(callable|string|array $target): void
     {
-        [$class, $method] = ($this->resolverTarget)($target);
+        [$class, $method] = $this->resolverTarget->resolve($target);
 
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
@@ -889,7 +752,8 @@ class DeferredHookManager
                 $data['registerIf'],
                 $data['registerIfParams'] ?? [],
                 $this->container,
-                $key
+                $key,
+                $data['key']->class
             );
         } catch (\Throwable $e) {
             Logger::error(
@@ -909,129 +773,139 @@ class DeferredHookManager
 
         return true;
     }
+}
+/**
+ * @internal not for use beyond \WPLokerBJM\Core\Container\Support\WPHooks\Registry\
+ * @phpstan-import-type HookTargetResolve from DeferredHookManager
+ */
+class HookTargetResolver
+{
+    /**
+     * Per-request cache of resolved callable → [FQCN, memberName].
+     *
+     * WeakMap automatically drops entries when their key (the callable
+     * object) is garbage-collected, avoiding memory leaks.
+     *
+     * @var \WeakMap<object, array{class-string, string}>
+     */
+    private \WeakMap $callableTargetCache;
 
-    private $resolverTarget {
-        get => $this->resolverTarget ??= new class () {
-            /**
-             * Per-request cache of resolved callable → [FQCN, memberName].
-             *
-             * WeakMap automatically drops entries when their key (the callable
-             * object) is garbage-collected, avoiding memory leaks.
-             *
-             * @var \WeakMap<object, array{class-string, string}>
-             */
-            private \WeakMap $callableTargetCache;
+    public function __construct()
+    {
+        $this->callableTargetCache = new \WeakMap();
+    }
 
-            public function __construct()
-            {
-                $this->callableTargetCache = new \WeakMap();
+    /**
+     * @param HookTargetResolve $target
+     * @return array{class-string, string}
+     */
+    public function resolve(object|callable|array|string $target): array
+    {
+        if (is_object($target) && isset($this->callableTargetCache[$target])) {
+            return $this->callableTargetCache[$target];
+        }
+
+        $result = $this->doResolveCallableTarget($target);
+
+        if (is_object($target)) {
+            $this->callableTargetCache[$target] = $result;
+        }
+        return $result;
+    }
+
+    /**
+     * @param HookTargetResolve $target
+     * @return array{class-string, string}
+     */
+    private function doResolveCallableTarget(object|callable|array|string $target): array
+    {
+        // 1. Array [$object, 'memberName'] — fast path
+        if (is_array($target)) {
+            return [get_class($target[0]), $target[1]];
+        }
+
+        // 2. String 'Class::method' — static fallback
+        if (is_string($target)) {
+            $parts = explode('::', $target, 2);
+            return [$parts[0], $parts[1] ?? '__invoke'];
+        }
+
+        // 3. Invokable Object Instance (anonymous class from a property)
+        if (!$target instanceof \Closure && is_object($target)) {
+            return $this->analyseObject($target);
+        }
+
+        // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
+        $ref = new \ReflectionFunction($target);
+        $calledClass = $ref->getClosureCalledClass()?->getName();
+
+        if ($calledClass === null) {
+            throw new \InvalidArgumentException('Callable target must be bound to an object instance.');
+        }
+
+        $name = $ref->getName();
+
+        // Standard Instance Method ($service->method(...))
+        if (!str_contains($name, '{closure')) {
+            return [$calledClass, $name];
+        }
+
+        // PHP 8.4 Property Hook Closure ("{closure:FQCN::$propertyName::get():line}")
+        if (str_contains($name, '::$')) {
+            $start = strpos($name, '::$') + 3;
+            $end = strpos($name, '::', $start);
+
+            if ($start !== false && $end !== false) {
+                return [$calledClass, substr($name, $start, $end - $start)];
             }
+        }
 
-            /**
-             * @param HookTargetResolve $target
-             * @return array{class-string, string}
-             */
-            public function __invoke(object|callable|array|string $target): array
-            {
-                if (is_object($target) && isset($this->callableTargetCache[$target])) {
-                    return $this->callableTargetCache[$target];
+        throw new \InvalidArgumentException("Unable to resolve hook target for class {$calledClass}.");
+    }
+
+    /**
+     * 
+     * @param object $target
+     * @return array{class-string, string}
+     */
+    private function analyseObject(object $target): array
+    {
+        $className = $target::class;
+
+        // Anonymous class extending AnonClassHookPropertyAbstract —
+        // reads parent class & property directly, no backtrace needed.
+        if ($target instanceof AnonClassHookPropertyAbstract) {
+            return [$target->parentClass, $target->parentProperty];
+        }
+
+        // Best-effort fallback for anonymous classes: walk the call stack
+        // to find which object's property holds this instance.
+        if ((new \ReflectionClass($target))->isAnonymous()) {
+            $frames = Backtrace::create()
+                ->withArguments(false)
+                ->limit(10)
+                ->frames();
+
+            /** @var Frame $frame */
+            foreach ($frames as $frame) {
+                $callerObject = $frame->object;
+                if ($callerObject === null) {
+                    continue;
                 }
 
-                $result = $this->doResolveCallableTarget($target);
-
-                if (is_object($target)) {
-                    $this->callableTargetCache[$target] = $result;
-                }
-                return $result;
-            }
-            /**
-             * @param HookTargetResolve $target
-             * @return array{class-string, string}
-             */
-            private function doResolveCallableTarget(object|callable|array|string $target): array
-            {
-                // 1. Array [$object, 'memberName'] — fast path
-                if (is_array($target)) {
-                    return [get_class($target[0]), $target[1]];
-                }
-
-                // 2. String 'Class::method' — static fallback
-                if (is_string($target)) {
-                    $parts = explode('::', $target, 2);
-                    return [$parts[0], $parts[1] ?? '__invoke'];
-                }
-
-                // 3. Invokable Object Instance (anonymous class from a property)
-                if (!$target instanceof \Closure && is_object($target)) {
-                    return $this->analyseObject($target);
-                }
-
-                // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
-                $ref = new \ReflectionFunction($target);
-                $calledClass = $ref->getClosureCalledClass()?->getName();
-
-                if ($calledClass === null) {
-                    throw new \InvalidArgumentException('Callable target must be bound to an object instance.');
-                }
-
-                $name = $ref->getName();
-
-                // Standard Instance Method ($service->method(...))
-                if (!str_contains($name, '{closure')) {
-                    return [$calledClass, $name];
-                }
-
-                // PHP 8.4 Property Hook Closure ("{closure:FQCN::$propertyName::get():line}")
-                if (str_contains($name, '::$')) {
-                    $start = strpos($name, '::$') + 3;
-                    $end = strpos($name, '::', $start);
-
-                    if ($start !== false && $end !== false) {
-                        return [$calledClass, substr($name, $start, $end - $start)];
+                $refClass = new \ReflectionClass($callerObject);
+                foreach ($refClass->getProperties() as $property) {
+                    if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
+                        Logger::warning(
+                            "WPHooksContainerRegistry: ",
+                            "Anon class without extending AnonClassHookPropertyAbstract, it's recommended to use 'AnonClassHookPropertyAbstract'." . $refClass->getName() . "::" . $property->getName()
+                        );
+                        return [$refClass->getName(), $property->getName()];
                     }
                 }
-
-                throw new \InvalidArgumentException("Unable to resolve hook target for class {$calledClass}.");
             }
+        }
 
-            /**
-             * 
-             * @param object $target
-             * @return array{class-string, string}
-             */
-            private function analyseObject(object $target): array
-            {
-                $className = $target::class;
-
-                // Anonymous class extending AnonClassHookPropertyAbstract —
-                // reads parent class & property directly, no backtrace needed.
-                if ($target instanceof AnonClassHookPropertyAbstract) {
-                    return [$target->parentClass, $target->parentProperty];
-                }
-
-                // Best-effort fallback for anonymous classes that don't
-                // extend the AnonClassHookPropertyAbstract: walk the call stack to find which
-                // object's property holds this instance.
-                if ((new \ReflectionClass($target))->isAnonymous()) {
-                    $backtrace = debug_backtrace(DEBUG_BACKTRACE_PROVIDE_OBJECT, 10);
-                    foreach ($backtrace as $frame) {
-                        $callerObject = $frame['object'] ?? null;
-                        if ($callerObject === null) {
-                            continue;
-                        }
-                        $refClass = new \ReflectionClass($callerObject);
-                        /** @var \ReflectionProperty $property */
-                        foreach ($refClass->getProperties() as $property) {
-                            if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
-                                Logger::warning("WPHooksContainerRegistry: ", "Anon class without extending AnonClassHookPropertyAbstract, it's recommended to use 'AnonClassHookPropertyAbstract'." . $refClass->getName() . "::" . $property->getName());
-                                return [$refClass->getName(), $property->getName()];
-                            }
-                        }
-                    }
-                }
-
-                return [$className, '__invoke'];
-            }
-        };
+        return [$className, '__invoke'];
     }
 }

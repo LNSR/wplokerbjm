@@ -20,31 +20,51 @@ use RuntimeException;
  * reflection unless a plan is missing (stale cache / unexportable defaults).
  *
  * @phpstan-type CallableHookParams array{name: string, type: class-string|null, hasDefault: bool, default: mixed}
+ * @phpstan-type CallablePlan array{isStatic: bool, scopeClass: class-string|null, params: array<int, CallableHookParams>}
  */
 class WPHookPlanProvider
 {
     /**
-     * Build the parameter resolution plan for a callable closure.
+     * Scope-bound gate closures, memoized per (closure, target class) pair.
      *
-     * Each entry describes one parameter: its name, the class type to
-     * resolve from the container (null for builtin/untyped params),
-     * whether a default value exists, and the default value itself.
+     * Attribute-argument closures are always static (constant-expression
+     * rule), so scope-only binds are immutable — each pair binds at most
+     * once per provider lifetime. Entries are dropped automatically when
+     * the source closure is garbage-collected.
      *
-     * Returns an empty plan for null callables or when a default value
-     * cannot be safely exported to the cache (objects/resources) — in
-     * that case the registry falls back to reflection at fire time.
+     * @var \WeakMap<\Closure, array<string, \Closure>>
+     */
+    private \WeakMap $boundClosureCache;
+
+    public function __construct()
+    {
+        $this->boundClosureCache = new \WeakMap();
+    }
+    /**
+     * Build the resolution plan for a callable closure.
      *
-     * @return array<int, CallableHookParams>
+     * The plan carries BOTH parameter metadata (name, container class type,
+     * default availability/value) AND closure-level metadata (isStatic,
+     * scopeClass) captured once at scan time — so the hook-fire hot path
+     * needs no reflection at all.
+     *
+     * Returns an empty-shaped plan for null callables or when a default value
+     * cannot be safely exported to the cache (objects/resources) — in that
+     * case the registry falls back to reflection at fire time.
+     *
+     * @return CallablePlan
      */
     public function buildCallablePlan(?\Closure $callable): array
     {
+        $empty = ['isStatic' => true, 'scopeClass' => null, 'params' => []];
+
         if ($callable === null) {
-            return [];
+            return $empty;
         }
 
         try {
             $reflect = new ReflectionFunction($callable);
-            $plan = [];
+            $params = [];
 
             foreach ($reflect->getParameters() as $param) {
                 $type = $param->getType();
@@ -53,10 +73,10 @@ class WPHookPlanProvider
 
                 // Non-exportable defaults would break the cache — defer to reflection.
                 if ($hasDefault && (is_object($default) || is_resource($default))) {
-                    return [];
+                    return $empty;
                 }
 
-                $plan[] = [
+                $params[] = [
                     'name' => $param->getName(),
                     'type' => ($type instanceof ReflectionNamedType && !$type->isBuiltin()) ? $type->getName() : null,
                     'hasDefault' => $hasDefault,
@@ -64,9 +84,13 @@ class WPHookPlanProvider
                 ];
             }
 
-            return $plan;
+            return [
+                'isStatic' => $reflect->isStatic(),
+                'scopeClass' => $reflect->getClosureScopeClass()?->getName(),
+                'params' => $params,
+            ];
         } catch (ReflectionException) {
-            return [];
+            return $empty;
         }
     }
 
@@ -74,7 +98,7 @@ class WPHookPlanProvider
      * Resolve a callable's parameters from the container, using the
      * pre-computed plan when available and reflection as a fallback.
      *
-     * @param array<int, CallableHookParams> $plan
+     * @param CallablePlan $plan
      *
      * @return array<int, mixed>
      *
@@ -82,9 +106,11 @@ class WPHookPlanProvider
      */
     public function resolveCallableParameters(\Closure $callable, array $plan, ContainerInterface $container, string $label): array
     {
-        if ($plan !== []) {
+        $params = $plan['params'] ?? [];
+
+        if ($params !== []) {
             $values = [];
-            foreach ($plan as $param) {
+            foreach ($params as $param) {
                 $values[] = $this->resolveCallableParam($param, $container, $label);
             }
 
@@ -101,19 +127,32 @@ class WPHookPlanProvider
      * anything else raises a RuntimeException (callers catch and log it,
      * keeping the hook pipeline intact).
      *
-     * @param array<int, CallableHookParams> $executeIfParams
+     * When a target class is given, the closure is bound to that scope
+     * before invocation: a non-static closure receives the resolved
+     * service instance as `$this` (private/protected access), a static
+     * closure is scope-bound only. `self` type-hints stay unresolvable —
+     * use the direct class hint instead.
+     *
+     * @param CallablePlan $executeIfParams
      *
      * @throws RuntimeException when the gate does not return bool
      */
-    public function evaluateExecuteIf(?\Closure $executeIf, array $executeIfParams, ContainerInterface $container, string $label): bool
-    {
+    public function evaluateExecuteIf(
+        ?\Closure $executeIf,
+        array $executeIfParams,
+        ContainerInterface $container,
+        string $label,
+        ?string $targetClass = null,
+    ): bool {
         if ($executeIf === null) {
             return true;
         }
 
+        $executeIf = $this->bindToTarget($executeIf, $executeIfParams, $targetClass);
+
         // Fast path: zero-parameter gates are invoked directly,
         // without any reflection or DI resolution.
-        if ($executeIfParams === []) {
+        if (($executeIfParams['params'] ?? []) === []) {
             try {
                 $allowed = $executeIf();
                 if (is_bool($allowed)) {
@@ -142,18 +181,29 @@ class WPHookPlanProvider
      * Evaluated ONCE at registration time (not per fire). A null gate always
      * allows registration; the closure must return a bool.
      *
-     * @param array<int, CallableHookParams> $registerIfParams
+     * Scope binding behaves exactly like {@see evaluateExecuteIf()}: a
+     * non-static gate closure receives the resolved service instance as
+     * `$this`, a static one is scope-bound only.
+     *
+     * @param CallablePlan $registerIfParams
      *
      * @throws RuntimeException when the gate does not return bool
      */
-    public function evaluateRegistrationGate(?\Closure $registerIf, array $registerIfParams, ContainerInterface $container, string $label): bool
-    {
+    public function evaluateRegistrationGate(
+        ?\Closure $registerIf,
+        array $registerIfParams,
+        ContainerInterface $container,
+        string $label,
+        ?string $targetClass = null,
+    ): bool {
         if ($registerIf === null) {
             return true;
         }
 
+        $registerIf = $this->bindToTarget($registerIf, $registerIfParams, $targetClass);
+
         // Fast path: zero-parameter gates are invoked directly.
-        if ($registerIfParams === []) {
+        if (($registerIfParams['params'] ?? []) === []) {
             try {
                 $allowed = $registerIf();
                 if (is_bool($allowed)) {
@@ -174,6 +224,38 @@ class WPHookPlanProvider
         }
 
         return $allowed;
+    }
+
+    /**
+     * Bind a gate closure to the target class scope before invocation.
+     *
+     * Plan-driven: uses the closure metadata captured at scan time, so no
+     * reflection happens on the hot path.
+     *
+     * The scopeClass captured at scan time is deliberately NOT trusted as a
+     * no-op signal: when the exported hooks cache is `require`d from inside
+     * the scanner, `scopeClass` only used for unit test. Binding is ALWAYS applied
+     * when a target class is given — the WeakMap memoizes one bound closure
+     * per (closure, target) pair, so repeated evaluations (per fire, per
+     * deferred activation) reuse it instead of re-allocating.
+     *
+     * Attribute-argument closures are static by rule, so only a scope-only
+     * bind is needed (no instantiation).
+     *
+     * @param CallablePlan $plan
+     */
+    private function bindToTarget(\Closure $closure, array $plan, ?string $targetClass): \Closure
+    {
+        if ($targetClass === null) {
+            return $closure;
+        }
+
+        if (!isset($this->boundClosureCache[$closure])) {
+            $this->boundClosureCache[$closure] = [];
+        }
+
+        return $this->boundClosureCache[$closure][$targetClass]
+            ??= \Closure::bind($closure, null, $targetClass);
     }
 
     /**

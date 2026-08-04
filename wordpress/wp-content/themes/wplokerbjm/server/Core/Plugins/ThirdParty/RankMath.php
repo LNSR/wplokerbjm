@@ -36,10 +36,6 @@ final class Rankmath implements PluginConfigInterface
 	#[Filter('rank_math/opengraph/facebook/image_array')]
 	public function FixImageTypeOG($input)
 	{
-		if (!self::isActive()) {
-			return $input;
-		}
-
 		if (is_array($input)) {
 			// Handle image_array filter
 			if (isset($input['url']) && strpos($input['url'], '.avif') !== false) {
@@ -69,7 +65,7 @@ final class Rankmath implements PluginConfigInterface
 	#[Filter('rank_math/indexing_api/publish_url')]
 	public function RewritePublishUrl($url, $post = null, $provider = '')
 	{
-		if (!self::isActive() || empty($url)) {
+		if (empty($url)) {
 			return $url;
 		}
 		$headless = SharedUtils::headlessDomainRedirect();
@@ -94,7 +90,7 @@ final class Rankmath implements PluginConfigInterface
 	#[Filter('rank_math/indexing_api/delete_url')]
 	public function RewriteDeleteUrl($url, $post = null)
 	{
-		if (!self::isActive() || empty($url)) {
+		if (empty($url)) {
 			return $url;
 		}
 		$headless = SharedUtils::headlessDomainRedirect();

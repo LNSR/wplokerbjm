@@ -1,14 +1,14 @@
 {
   "require": {
-    "brick/varexporter": "^0.7.0",
+    "brick/varexporter": "*",
     "nette/robot-loader": "*",
     "php-di/php-di": "*",
     "php-standard-library/php-standard-library": "*",
-    "spatie/backtrace": "*",
-    "spatie/invade": "*"
+    "spatie/backtrace": "*"
   },
   "require-dev": {
     "brain/monkey": "*",
+    "spatie/invade": "*",
     "nikic/php-parser": "*",
     "php-parallel-lint/php-console-highlighter": "*",
     "php-parallel-lint/php-parallel-lint": "*",

@@ -11,6 +11,8 @@ use WPLokerBJM\Core\Plugins\ThirdParty\{
     WPRestJWTHooks,
     WPGraphQL
 };
+use WPLokerBJM\Shared\Log\Logger;
+
 /* ==========================================================================
    INTERFACE CONFIG
    ========================================================================== */
@@ -64,8 +66,9 @@ class PluginManagement
         foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
             if ($integrationClass::isActive())
                 continue;
-            $this->hooksRegistry->unregisterByClass($integrationClass);
-            $this->hooksRegistry->unregisterDeferredByClass($integrationClass);
+            Logger::warning("Plugin status", $integrationClass::class . 'is' . $integrationClass::isActive() ? 'active' : 'inactive');
+            $this->hooksRegistry->unregisterByClass($integrationClass::class);
+            $this->hooksRegistry->unregisterDeferredByClass($integrationClass::class);
         }
     }
 

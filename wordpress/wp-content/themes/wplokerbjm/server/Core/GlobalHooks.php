@@ -56,12 +56,8 @@ class RedirectHooks
         }
 
         if (
-            (defined('REST_REQUEST') && REST_REQUEST) ||
-            (defined('DOING_AJAX') && DOING_AJAX) ||
-            (defined('WP_CLI') && WP_CLI) ||
             wp_doing_cron() ||
-            is_preview() ||
-            isset($_GET['_wfsf']) // WordFence query
+            is_preview()
         ) {
             return true;
         }
@@ -69,22 +65,40 @@ class RedirectHooks
         return false;
     }
 
+    private function shouldRegister(): bool
+    {
+
+        if (
+            (defined('GRAPHQL_REQUEST') && GRAPHQL_REQUEST) ||
+            (defined('REST_REQUEST') && REST_REQUEST) ||
+            (defined('DOING_AJAX') && DOING_AJAX) ||
+            (defined('WP_CLI') && WP_CLI) ||
+            is_admin() ||
+            isset($_GET['_wfsf']) // WordFence query
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Return 410 Gone for old job posts that have been trashed due to age.
      * * For deleted job posts (404 on single lowongan), return 410 Gone.
      * ! Notify search engines with 410 Gone for removed job posts.
      */
-    #[Action('template_redirect', 2)]
+    #[Action('template_redirect', 2,
+        registerIf: static function (RedirectHooks $hooks): bool {
+                return $hooks->shouldRegister();
+                },
+        executeIf: static function (RedirectHooks $hooks): bool {
+                return !$hooks->shouldSkipRedirect() && is_404() && is_singular('lowongan');
+                },
+    )]
     public function oldPost410Redirect(): void
     {
-        if ($this->shouldSkipRedirect() || !is_404() || is_admin()) {
-            return;
-        }
-
-        if (is_singular('lowongan') || strpos($_SERVER['REQUEST_URI'] ?? '', '/lowongan/') !== false) {
-            status_header(410);
-            wp_die('This job posting has been expired or removed.', 'Gone', ['response' => 410]);
-        }
+        status_header(410);
+        wp_die('This job posting has been expired or removed.', 'Gone', ['response' => 410]);
 
         // Other 404s: redirect to the headless Svelte frontend
         $baseUrl = SharedUtils::headlessDomainRedirect();
@@ -97,13 +111,16 @@ class RedirectHooks
      * Runs early during `template_redirect` so the theme always forwards
      * public requests to the Svelte frontend (dev vs prod).
      */
-    #[Action('template_redirect', 3)]
+    #[Action('template_redirect', 3,
+        registerIf: static function (RedirectHooks $h): bool {
+                return $h->shouldRegister();
+                },
+        executeIf: static function (RedirectHooks $hooks): bool {
+                return !$hooks->shouldSkipRedirect();
+                },
+    )]
     public function headlessFrontendAdminSideRedirect(): void
     {
-        if ($this->shouldSkipRedirect() || is_admin()) {
-            return;
-        }
-
         $baseUrl = SharedUtils::headlessDomainRedirect();
 
         $path = '/';
@@ -183,20 +200,24 @@ class SearchHooks
      * @param \WP_Query     $wp_query The WP_Query object being executed.
      * @return string Modified search SQL fragment.
      */
-    #[Filter('posts_search', 10, 2)]
+    #[Filter('posts_search', 10, 2, registerIf: static function (): bool {
+            return !is_admin() && !SharedUtils::isWPCLI();
+            })]
     public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
 
-        // Get the search query from WP_Query vars
-        $q = $wp_query->query_vars['s'] ?? '';
-
-        if ($wpdb !== null && $q !== '') {
-            // Delegate to JobQuery for building the custom search SQL
-            $search = JobQuery::buildPostsSearchSql($wpdb, $q);
+        $q = (string) ($wp_query->query_vars['s'] ?? '');
+        if ($wpdb === null || $q === '' || !defined('GRAPHQL_REQUEST')) {
+            return $search;
         }
 
-        return $search;
+        $postTypes = (array) ($wp_query->get('post_type') ?: []);
+        if (!in_array('lowongan', $postTypes, true)) {
+            return $search;
+        }
+
+        return JobQuery::buildPostsSearchSql($wpdb, $q);
     }
 }
 
@@ -288,8 +309,8 @@ class CacheInvalidationHooks
      *
      * Registered only on hooks that carry post context.
      */
-    #[Action('save_post', 10, 2)]
-    #[Action('delete_post', 10, 1)]
+    #[Action('save_post_lowongan', 10, 2)]
+    #[Action('delete_post_lowongan', 10, 1)]
     #[Action('trashed_post', 10, 1)]
     #[Action('delete_attachment', 10, 1)]
     #[Action('transition_post_status', 10, 3)]
@@ -309,8 +330,8 @@ class CacheInvalidationHooks
      * first fire, this handler removes itself from WordPress so that term/
      * meta changes later in the same request don't trigger redundant purges.
      */
-    #[Action('save_post', 10, 2)]
-    #[Action('delete_post', 10, 1)]
+    #[Action('save_post_lowongan', 10, 2)]
+    #[Action('delete_post_lowongan', 10, 1)]
     #[Action('trashed_post', 10, 1)]
     #[Action('delete_attachment', 10, 1)]
     #[Action('created_term', 10, 0)]

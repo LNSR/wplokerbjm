@@ -31,8 +31,8 @@ class WPHooksScanner
     public private(set) string $cacheLocation {
         set(string $value) {
             $this->cacheLocation = is_dir($value) || str_ends_with($value, '/') || str_ends_with($value, '\\')
-                ? rtrim($value, '/\\') . '/WPHooksCache.php'
-                : $value;
+            ? rtrim($value, '/\\') . '/WPHooksCache.php'
+            : $value;
         }
     }
 
@@ -93,13 +93,13 @@ class WPHooksScanner
 
         $namespacePrefix = $this->namespace . '\\';
 
+        $hookPlanProvider = $this->hookPlanProvider;
         foreach (Bootstrap::getRobotLoader()->getIndexedClasses() as $className => $file) {
             if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
                 continue;
             }
             try {
                 $reflection = new ReflectionClass($className);
-                $hookPlanProvider = $this->hookPlanProvider;
                 $methodCb = static function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, $hookPlanProvider): void {
                     $registrations[] = new HookRegistration(
                         class: $className,

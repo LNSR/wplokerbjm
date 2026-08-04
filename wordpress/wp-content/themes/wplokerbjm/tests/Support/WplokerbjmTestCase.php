@@ -6,6 +6,9 @@ namespace WPLokerBJM\Tests\Support;
 
 use PHPUnit\Framework\TestCase;
 use \DI\Container;
+use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookTargetResolver, WPHooksContainerRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
 
 abstract class WplokerbjmTestCase extends TestCase
 {
@@ -180,5 +183,27 @@ abstract class WplokerbjmTestCase extends TestCase
     protected function container(): Container
     {
         return ProxyContainer::container();
+    }
+
+    /**
+     * Central factory for building the container-backed hook registry.
+     *
+     * Holds the full collaborator wiring (plan provider, deferred-hook
+     * manager, hook-target resolver) so new constructor parameters only
+     * ever need to be added here — not at every test construction site.
+     */
+    protected function createRegistry(array $registrations, ?ContainerInterface $container = null): WPHooksContainerRegistry
+    {
+        $container ??= $this->container();
+        $planProvider = new WPHookPlanProvider();
+        $resolver = new HookTargetResolver();
+
+        return new WPHooksContainerRegistry(
+            $container,
+            $registrations,
+            $planProvider,
+            new DeferredHookManager($planProvider, $container, $resolver),
+            $resolver,
+        );
     }
 }

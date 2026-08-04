@@ -63,8 +63,11 @@ final class ContainerLazyHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
-            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label)) {
-                // Skip the hook — return original value for filters so pipeline remains intact
+            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class)) {
+                Logger::warning(
+                    'ContainerLazyHookHandler',
+                    'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
+                );
                 return ($this->type === 'filter' && array_key_exists(0, $args)) ? $args[0] : null;
             }
 
@@ -143,8 +146,11 @@ final class ContainerLazyPropertyHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
-            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label)) {
-                // Skip the hook entirely — even for deferred hooks — the gate predates activation.
+            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class)) {
+                Logger::warning(
+                    'ContainerLazyHookHandler',
+                    'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
+                );
                 return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
             }
 
@@ -349,7 +355,10 @@ final class RuntimeCallableHookHandler
                 }
 
                 if ($allowed === false) {
-                    // Skip the hook entirely — pass filters through untouched.
+                    Logger::warning(
+                        'RuntimeCallableHookHandler',
+                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
+                    );
                     return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
                 }
             }

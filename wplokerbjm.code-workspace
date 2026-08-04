@@ -21,44 +21,94 @@
     "php.version": "8.5",
     "php.format.rules.addCommaAfterLastArrayElement": true,
     "editor.codeLens": true,
+
+    // GLOBAL FILE WATCHER EXCLUSIONS
     "files.watcherExclude": {
-      "**/dist": true,
-      "**/build": true,
-      "**/uploads": true,
-      "**/cache": true,
-      "**/.svelte-kit": true,
-      "**/.git": true,
+      "**/dist/**": true,
+      "**/build/**": true,
+      "**/uploads/**": true,
+      "**/cache/**": true,
+      "**/.svelte-kit/**": true,
+      "**/.git/**": true,
       "**/node_modules/**": true,
-      "**/vendor": true,
-      "**/.wrangler": true,
+      "**/vendor/**": true,
+      "**/.wrangler/**": true,
+      "**/wordpress/wp-admin/**": true,
+      "**/wordpress/wp-includes/**": true
     },
+
+    // DEVSENSE INDEXER CONFIG
+    "php.stubs": ["*", "wordpress"],
+    "php.workspace.includePath": "wordpress/",
+    "php.problems.scope": "opened",
+    "php.suggest.basic": false, // Handled by Intelephense
+    "php.files.exclude": {
+      "**/node_modules/**": true,
+      "**/vendor/**": true,
+      "**/sveltekit/**": true,
+      "**/wplokerbjm-post-automation/**": true,
+      "**/wordpress/wp-admin/**": true,
+      "**/wordpress/wp-includes/**": true
+    },
+    "php.problems.exclude": {
+      "**/generate-meta-hooks/captures/": true,
+      "**/vendor/": true
+    },
+    "[php]": {
+      "editor.defaultFormatter": "DEVSENSE.phptools-vscode"
+    },
+
+    // INTELEPHENSE INDEXER CONFIG
+    "intelephense.environment.documentRoot": "wordpress",
+    "intelephense.maxMemory": 4096, // 4GB is plenty when unneeded folders are excluded
+    "intelephense.diagnostics.enable": false, // Leave diagnostics to Devsense to prevent conflicts
+    "intelephense.diagnostics.argumentCount": "on",
+    "intelephense.codeLens.implementations.enable": false, // Disable to prevent duplicate CodeLens with Devsense
+    "intelephense.codeLens.parent.enable": false,
+    "intelephense.codeLens.references.enable": false,
+    "intelephense.codeLens.usages.enable": false,
+    "intelephense.files.maxSize": 1000000,
+    "intelephense.files.exclude": [
+      "**/.git/**",
+      "**/node_modules/**",
+      "**/vendor/**",
+      "**/sveltekit/**",
+      "**/wplokerbjm-post-automation/**",
+      "**/wordpress/wp-admin/**",
+      "**/wordpress/wp-includes/**"
+    ],
+
+    // Svelte & JS/TS Configs
     "[svelte]": {
-      "editor.defaultFormatter": "svelte.svelte-vscode",
+      "editor.defaultFormatter": "svelte.svelte-vscode"
     },
     "files.associations": {
-      "*.css": "tailwindcss",
+      "*.css": "tailwindcss"
     },
     "editor.quickSuggestions": {
       "other": "on",
       "comments": "on",
-      "strings": "on",
+      "strings": "on"
     },
     "eslint.options": {
-      "overrideConfigFile": "eslint.config.ts",
+      "overrideConfigFile": "eslint.config.ts"
     },
     "eslint.workingDirectories": ["${workspaceFolder:wplokerbjm-frontend}"],
-    "php.stubs": ["all"],
-    "[php]": {
-      "editor.defaultFormatter": "DEVSENSE.phptools-vscode",
-    },
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "typescript.tsdk": "wplokerbjm-frontend/node_modules/typescript/lib",
+    "graphql-config.load.rootDir": "sveltekit",
+    "js/ts.implicitProjectConfig.target": "ESNext",
+    
+    // Formatting & Font
+    "editor.formatOnSave": false,
+    "html.format.templating": true,
     "editor.fontFamily": "'Cascadia Code NF'",
     "editor.fontSize": 14,
     "debug.console.fontSize": 12,
     "scm.inputFontSize": 12,
     "terminal.integrated.fontSize": 13,
-    "typescript.enablePromptUseWorkspaceTsdk": true,
-    "graphql-config.load.rootDir": "sveltekit",
-    "js/ts.implicitProjectConfig.target": "ESNext",
+
+    // Python Configs
     "python.analysis.enableParallelIndexing": true,
     "python.analysis.inlayHints.functionReturnTypes": true,
     "python.analysis.inlayHints.pytestParameters": true,
@@ -67,29 +117,7 @@
     "python.analysis.typeEvaluation.enableReachabilityAnalysis": true,
     "python.analysis.typeEvaluation.strictDictionaryInference": true,
     "python.analysis.typeEvaluation.strictListInference": true,
-    "python.analysis.typeEvaluation.strictSetInference": true,
-    "typescript.tsdk": "wplokerbjm-frontend/node_modules/typescript/lib",
-    "editor.formatOnSave": false,
-    "php.workspace.includePath": "wordpress/wp-content/themes/wplokerbjm",
-    "html.format.templating": true,
-    "php.suggest.basic": false,
-    "php.problems.scope": "opened",
-    "php.codeActions.enabled": true,
-    "php.problems.exclude": {
-      "**/generate-meta-hooks/captures/": true,
-      "**/vendor/": true,
-    },
-    "intelephense.codeLens.implementations.enable": true,
-    "intelephense.codeLens.parent.enable": true,
-    "intelephense.codeLens.references.enable": true,
-    "intelephense.codeLens.usages.enable": true,
-    "intelephense.diagnostics.argumentCount": "on",
-    "intelephense.diagnostics.enable": false, // Rely on Devsense instead
-    "intelephense.compatibility.preferPsalmPhpstanPrefixedAnnotations": true,
-    "intelephense.completion.triggerParameterHints": true,
-    "intelephense.maxMemory": 8196,
-    "intelliphp.inlineSuggestionsEnabled": true,
-    "intelephense.environment.documentRoot": "wplokerbjm-backend"
+    "python.analysis.typeEvaluation.strictSetInference": true
   },
   "extensions": {
     "recommendations": [

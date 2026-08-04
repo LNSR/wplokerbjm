@@ -9,7 +9,7 @@ use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\Fixtures\DynamicHookService;
 use WPLokerBJM\Tests\Support\Fixtures\RuntimeDynamicService;
@@ -55,10 +55,11 @@ class DynamicHookTest extends WplokerbjmTestCase
         $hook = static function (ContainerInterface $c): string {
             return 'dynamic_action';
         };
+        $targetResolver = new HookTargetResolver();
 
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
-        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        ], $this->container);
         $registry->initialize();
 
         self::assertNotNull($this->findRegisteredHook('action', 'dynamic_action'));
@@ -71,9 +72,11 @@ class DynamicHookTest extends WplokerbjmTestCase
 
     public function testStringHookIsUnchanged(): void
     {
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $targetResolver = new HookTargetResolver();
+
+        $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', 'plain_string_action'),
-        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        ], $this->container);
         $registry->initialize();
 
         self::assertNotNull($this->findRegisteredHook('action', 'plain_string_action'));
@@ -86,10 +89,11 @@ class DynamicHookTest extends WplokerbjmTestCase
     public function testNonStringClosureResultIsLoggedAndSkipped(): void
     {
         $hook = static fn (): int => 42;
+        $targetResolver = new HookTargetResolver();
 
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
-        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        ], $this->container);
         $registry->initialize();
 
         // The registration was skipped — nothing was registered at all.
@@ -104,10 +108,11 @@ class DynamicHookTest extends WplokerbjmTestCase
         $hook = static function (self $service): string {
             return 'never_registered';
         };
+        $targetResolver = new HookTargetResolver();
 
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
-        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        ], $this->container);
         $registry->initialize();
 
         self::assertSame([], $this->registeredHooks());
@@ -122,15 +127,16 @@ class DynamicHookTest extends WplokerbjmTestCase
         $executeIf = static function (ExecuteIfActionService $service): bool {
             return $service !== null;
         };
+        $targetResolver = new HookTargetResolver();
 
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $registry = $this->createRegistry([
             $this->action(
                 DynamicHookService::class,
                 'onDynamicAction',
                 $hook,
                 executeIf: $executeIf,
             ),
-        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        ], $this->container);
         $registry->initialize();
 
         self::assertNotNull($this->findRegisteredHook('action', 'dynamic_combo'));
@@ -144,9 +150,10 @@ class DynamicHookTest extends WplokerbjmTestCase
     {
         $hook = static fn (): string => 'dynamic_deferred';
 
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $targetResolver = new HookTargetResolver();
+        $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook, defer: true),
-        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        ], $this->container);
         $registry->initialize();
 
         // Deferred — not registered yet.
@@ -180,9 +187,9 @@ class DynamicHookTest extends WplokerbjmTestCase
         // reference (self::class) at registration time, plain PHP.
         $hook = static fn (): string => self::class . '_boot';
 
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
-        ], new WPHookPlanProvider(), new DeferredHookManager(new WPHookPlanProvider(), $this->container));
+        ], $this->container);
         $registry->initialize();
 
         self::assertNotNull($this->findRegisteredHook('action', self::class . '_boot'));

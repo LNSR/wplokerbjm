@@ -328,6 +328,15 @@ class ExecuteIfActionService
         self::$capturedValues[] = $value;
     }
 
+    /**
+     * Private context helper — reachable from gate closures via the
+     * bindToTarget scope binding, not via direct invocation.
+     */
+    private function isPrivateEnabled(): bool
+    {
+        return true;
+    }
+
     public static function reset(): void
     {
         self::$instantiationCount = 0;

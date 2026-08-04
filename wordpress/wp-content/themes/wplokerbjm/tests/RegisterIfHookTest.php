@@ -8,8 +8,7 @@ use Closure;
 use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookManager;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -45,14 +44,15 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfTrueRegistersAndFires(): void
     {
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $resolver = new HookTargetResolver();
+        $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'register_if_true',
                 registerIf: static fn (): bool => true
             ),
-        ], $this->planProvider, new DeferredHookManager($this->planProvider, $this->container));
+        ], $this->container);
         $registry->initialize();
 
         self::assertNotNull($this->findRegisteredHook('action', 'register_if_true'));
@@ -63,14 +63,15 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfFalseSkipsRegistrationEntirely(): void
     {
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $resolver = new HookTargetResolver();
+        $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'register_if_false',
                 registerIf: static fn (): bool => false
             ),
-        ], $this->planProvider, new DeferredHookManager($this->planProvider, $this->container));
+        ], $this->container);
         $registry->initialize();
 
         // Never registered — no add_action call, nothing fires.
@@ -83,7 +84,8 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfFalseSkipsDeferredHookEvenAfterActivation(): void
     {
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $resolver = new HookTargetResolver();
+        $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
@@ -91,7 +93,7 @@ class RegisterIfHookTest extends WplokerbjmTestCase
                 defer: true,
                 registerIf: static fn (): bool => false
             ),
-        ], $this->planProvider, new DeferredHookManager($this->planProvider, $this->container));
+        ], $this->container);
         $registry->initialize();
 
         // The gate runs BEFORE defer-pool placement — the hook never exists.
@@ -104,14 +106,15 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfNonBoolResultIsLoggedAndSkipped(): void
     {
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $resolver = new HookTargetResolver();
+        $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'register_if_nonbool',
                 registerIf: static fn (): string => 'not-a-bool'
             ),
-        ], $this->planProvider, new DeferredHookManager($this->planProvider, $this->container));
+        ], $this->container);
         $registry->initialize();
 
         self::assertNull($this->findRegisteredHook('action', 'register_if_nonbool'));
@@ -122,7 +125,8 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfThrowingGateIsLoggedAndSkipped(): void
     {
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $resolver = new HookTargetResolver();
+        $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
@@ -131,7 +135,7 @@ class RegisterIfHookTest extends WplokerbjmTestCase
                     throw new \RuntimeException('Simulated registration gate failure');
                 }
             ),
-        ], $this->planProvider, new DeferredHookManager($this->planProvider, $this->container));
+        ], $this->container);
         $registry->initialize();
 
         self::assertNull($this->findRegisteredHook('action', 'register_if_throws'));
@@ -139,7 +143,8 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfReceivesContainerResolvedParams(): void
     {
-        $registry = new WPHooksContainerRegistry($this->container, [
+        $resolver = new HookTargetResolver();
+        $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
@@ -148,7 +153,7 @@ class RegisterIfHookTest extends WplokerbjmTestCase
                     return $service !== null;
                 }
             ),
-        ], $this->planProvider, new DeferredHookManager($this->planProvider, $this->container));
+        ], $this->container);
         $registry->initialize();
 
         // registerIf params resolve from the container (reflection fallback path).
@@ -166,16 +171,21 @@ class RegisterIfHookTest extends WplokerbjmTestCase
                 return $c->has(ExecuteIfActionService::class);
             }
         );
-        self::assertCount(1, $plan);
-        self::assertSame('c', $plan[0]['name']);
-        self::assertSame(ContainerInterface::class, $plan[0]['type']);
-        self::assertFalse($plan[0]['hasDefault']);
+        self::assertTrue($plan['isStatic']);
+        self::assertCount(1, $plan['params']);
+        self::assertSame('c', $plan['params'][0]['name']);
+        self::assertSame(ContainerInterface::class, $plan['params'][0]['type']);
+        self::assertFalse($plan['params'][0]['hasDefault']);
 
-        // Zero-parameter gate → empty plan.
-        self::assertSame([], $this->planProvider->buildCallablePlan(static fn (): bool => true));
+        // Zero-parameter gate → empty params.
+        $zero = $this->planProvider->buildCallablePlan(static fn (): bool => true);
+        self::assertTrue($zero['isStatic']);
+        self::assertSame([], $zero['params']);
 
         // Null gate → empty plan.
-        self::assertSame([], $this->planProvider->buildCallablePlan(null));
+        $nullPlan = $this->planProvider->buildCallablePlan(null);
+        self::assertSame([], $nullPlan['params']);
+        self::assertNull($nullPlan['scopeClass']);
     }
 
     /**
