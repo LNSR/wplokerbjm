@@ -1,6 +1,6 @@
 <?php
 namespace WPLokerBJM\Core\Plugins;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{PluginList, SharedUtils};
 use WPLokerBJM\Core\Plugins\ThirdParty\{
@@ -47,7 +47,7 @@ class PluginManagement
         WPGraphQL::class,
     ];
 
-    public function __construct(private WPHooksRegistry $hooksRegistry)
+    public function __construct(private WPHooksContainerRegistry $hooksRegistry)
     {
     }
 

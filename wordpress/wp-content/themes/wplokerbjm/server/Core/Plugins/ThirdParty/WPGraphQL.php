@@ -8,7 +8,7 @@ use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
 use GraphQL\Executor\ExecutionResult;
 use WP_User;
 use WPLokerBJM\Core\Container\Support\WPHooks\Constants\HookTags;
@@ -26,7 +26,7 @@ final class WPGraphQL implements PluginConfigInterface
     }
 
     public function __construct(
-        private WPHooksRegistry $hookRegistry,
+        private WPHooksContainerRegistry $hookRegistry,
         private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration,
         private WPGraphQLETag $eTag
     ) {

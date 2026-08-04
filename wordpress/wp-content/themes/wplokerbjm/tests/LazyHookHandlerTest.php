@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests;
 use DI\ContainerBuilder;
 use DI\Container;
 use ReflectionClass;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry, LazyHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksContainerRegistry, ContainerLazyHookHandler};
 use WPLokerBJM\Tests\Support\Fixtures\FilterService;
 use WPLokerBJM\Tests\Support\Fixtures\LazyHookService;
 use WPLokerBJM\Tests\Support\Fixtures\MethodDeferredService;
@@ -18,10 +18,10 @@ use WPLokerBJM\Tests\Support\Fixtures\ThrowingActionService;
 use WPLokerBJM\Tests\Support\Fixtures\ThrowingFilterService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
-class LazyHookHandlerTest extends WplokerbjmTestCase
+class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
 {
     private Container $container;
-    private WPHooksRegistry $registry;
+    private WPHooksContainerRegistry $registry;
 
     protected function setUp(): void
     {
@@ -32,7 +32,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $this->container = $builder->build();
 
-        $this->registry = new WPHooksRegistry($this->container, [], new WPHookPlanProvider());
+        $this->registry = new WPHooksContainerRegistry($this->container, [], new WPHookPlanProvider());
 
         LazyHookService::reset();
         FilterService::reset();
@@ -206,7 +206,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
         $this->assertNull($this->findRegisteredHook('filter', 'ghost_hook'));
     }
 
-    public function testMethodHookUsesLazyHookHandlerInstance(): void
+    public function testMethodHookUsesContainerLazyHookHandlerInstance(): void
     {
         $service = new LazyHookService();
         $this->container->set(LazyHookService::class, $service);
@@ -229,7 +229,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
         $this->assertNotNull($hook);
 
         $handler = $hook['callable'];
-        $this->assertInstanceOf(LazyHookHandler::class, $handler);
+        $this->assertInstanceOf(ContainerLazyHookHandler::class, $handler);
         $this->assertStringContainsString('onAction', $handler->label);
     }
 

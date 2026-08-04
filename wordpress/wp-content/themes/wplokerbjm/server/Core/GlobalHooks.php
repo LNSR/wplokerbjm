@@ -8,7 +8,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 /*======================================================================
  | Collection of Global Hooks Classes
@@ -268,12 +268,12 @@ class CacheInvalidationHooks
 {
 
     /**
-     * @param WPHooksRegistry $hooksRegistry Used for self-unregistration of the
+     * @param WPHooksContainerRegistry $hooksRegistry Used for self-unregistration of the
      *                                       global purge after first fire per request.
      * @param RedisAdapter    $redisAdapter  Used for direct Redis pattern-based cache deletion.
      */
     public function __construct(
-        private WPHooksRegistry $hooksRegistry,
+        private WPHooksContainerRegistry $hooksRegistry,
         private RedisAdapter $redisAdapter,
     ) {
 

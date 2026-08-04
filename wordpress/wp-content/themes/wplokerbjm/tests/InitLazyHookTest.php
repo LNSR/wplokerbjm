@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests;
 use DI\ContainerBuilder;
 use DI\Container;
 use WPLokerBJM\Core\Container\Init;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry, LazyHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksContainerRegistry, ContainerLazyHookHandler};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\FilterService;
 use WPLokerBJM\Tests\Support\Fixtures\LazyHookService;
@@ -48,13 +48,13 @@ class InitLazyHookTest extends WplokerbjmTestCase
     }
 
     /**
-     * Create an Init instance wired to WPHooksRegistry for the given registrations.
+     * Create an Init instance wired to WPHooksContainerRegistry for the given registrations.
      *
      * @param array<int,array<string,mixed>> $registrations
      */
     private function createInit(array $registrations): Init
     {
-        $registry = new WPHooksRegistry($this->container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($this->container, $registrations, new WPHookPlanProvider());
         return new Init($registry);
     }
 
@@ -70,7 +70,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
         // The hook must be registered...
         $reg = $this->findRegisteredHook('action', 'lazy_action_hook');
         $this->assertNotNull($reg, 'Hook should be registered');
-        $this->assertInstanceOf(LazyHookHandler::class, $reg['callable'], 'Hook callable should be a LazyHookHandler');
+        $this->assertInstanceOf(ContainerLazyHookHandler::class, $reg['callable'], 'Hook callable should be a ContainerLazyHookHandler');
 
         // ...but the service MUST NOT have been instantiated yet.
         $this->assertSame(

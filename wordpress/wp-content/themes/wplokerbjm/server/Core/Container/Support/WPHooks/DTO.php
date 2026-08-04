@@ -65,7 +65,7 @@ readonly class HookRegistration
  * Immutable structural key identifying a hook registration.
  *
  * Generates the canonical string used as the array key in the registry
- * ({@see WPHooksRegistry}) and answers structural match questions
+ * ({@see WPHooksContainerRegistry}) and answers structural match questions
  * (by class, or class+method) without string prefix parsing.
  */
 readonly class HookKey

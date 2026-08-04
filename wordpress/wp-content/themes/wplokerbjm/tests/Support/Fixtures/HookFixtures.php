@@ -84,7 +84,7 @@ class FilterService
  * Test fixture: a service with a #[Filter] on a public property closure.
  *
  * The closure modifies the filtered value — used to verify that
- * LazyPropertyHookHandler reads the property and invokes the closure
+ * ContainerLazyPropertyHookHandler reads the property and invokes the closure
  * at hook-fire time.
  */
 class PropertyFilterService
@@ -107,7 +107,7 @@ class PropertyFilterService
  * Test fixture: a service with a #[Action] on a public property closure.
  *
  * The closure logs a side effect only — used to verify action hooks
- * are properly invoked through LazyPropertyHookHandler.
+ * are properly invoked through ContainerLazyPropertyHookHandler.
  */
 class PropertyActionService
 {
@@ -173,7 +173,7 @@ class PropertyDeferredService
 /**
  * Test fixture: a service with a public property that is NOT a Closure.
  *
- * Used to verify graceful failure — LazyPropertyHookHandler should log
+ * Used to verify graceful failure — ContainerLazyPropertyHookHandler should log
  * an error and return the fallback value.
  */
 class PropertyNonClosureService
@@ -182,7 +182,7 @@ class PropertyNonClosureService
     public string $notAClosure = 'i_am_not_a_closure';
 }
 
-// ── Method-based hook fixtures for LazyHookHandlerTest ──────────────
+// ── Method-based hook fixtures for ContainerLazyHookHandlerTest ──────────────
 
 /**
  * Test fixture: a service with a deferred #[Action] on an instance method.
@@ -234,7 +234,7 @@ class MethodMultiPriorityService
 /**
  * Test fixture: a service whose action method always throws.
  *
- * Used to verify that LazyHookHandler's catch block returns null
+ * Used to verify that ContainerLazyHookHandler's catch block returns null
  * for actions (fire-and-forget, no passthrough semantics).
  */
 class ThrowingActionService
@@ -249,7 +249,7 @@ class ThrowingActionService
 /**
  * Test fixture: a service whose filter method always throws.
  *
- * Used to verify that LazyHookHandler's catch block returns the
+ * Used to verify that ContainerLazyHookHandler's catch block returns the
  * first argument as a passthrough for filters.
  */
 class ThrowingFilterService
@@ -266,7 +266,7 @@ class ThrowingFilterService
  * with #[Action].
  *
  * Used to verify that non-public methods are invocable via
- * LazyHookHandler's Closure::bind-based invoker.
+ * ContainerLazyHookHandler's Closure::bind-based invoker.
  */
 class ProtectedMethodService
 {
@@ -289,7 +289,7 @@ class ProtectedMethodService
  * with #[Filter].
  *
  * Used to verify that private methods are invocable via
- * LazyHookHandler's Closure::bind-based invoker and that filter
+ * ContainerLazyHookHandler's Closure::bind-based invoker and that filter
  * return values are passed through correctly.
  */
 class PrivateMethodService

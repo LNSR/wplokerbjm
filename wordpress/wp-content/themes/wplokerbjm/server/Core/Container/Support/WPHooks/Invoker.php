@@ -14,7 +14,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  * remove_action()/remove_filter().
  * @phpstan-import-type CallableHookParams from WPHookPlanProvider
  */
-final class LazyHookHandler
+final class ContainerLazyHookHandler
 {
     public readonly string $label;
 
@@ -73,10 +73,10 @@ final class LazyHookHandler
             $execute = $this->visibility === 'public'
                 ? $instance->{$this->method}(...$args)
                 : ($this->invoker)($instance, ...$args);
-            SharedUtils::isDevelopment() && Logger::debug("LazyHookHandler", "Hook invoke {$this->label}");
+            SharedUtils::isDevelopment() && Logger::debug("ContainerLazyHookHandler", "Hook invoke {$this->label}");
             return $execute;
         } catch (\Throwable $e) {
-            Logger::error('WPHooksRegistry', 'Error invoking hook for class ' . $this->class . ' and method ' . $this->method . ': ' . $e->getMessage());
+            Logger::error('WPHooksContainerRegistry', 'Error invoking hook for class ' . $this->class . ' and method ' . $this->method . ': ' . $e->getMessage());
             // Filters must pass through the first argument; actions are fire-and-forget.
             return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
         }
@@ -94,7 +94,7 @@ final class LazyHookHandler
  * for remove_action()/remove_filter().
  * @phpstan-import-type CallableHookParams from WPHookPlanProvider
  */
-final class LazyPropertyHookHandler
+final class ContainerLazyPropertyHookHandler
 {
 
     public readonly string $label;
@@ -161,10 +161,10 @@ final class LazyPropertyHookHandler
                     "Property {$this->label} is not a valid callable or invokable object."
                 );
             }
-            SharedUtils::isDevelopment() && Logger::debug('WPHooksRegistry', "Property hook {$this->label} invoked successfully.");
+            SharedUtils::isDevelopment() && Logger::debug('WPHooksContainerRegistry', "Property hook {$this->label} invoked successfully.");
             return $callable(...$args);
         } catch (\Throwable $e) {
-            Logger::error('WPHooksRegistry', "Error invoking property hook {$this->label}: {$e->getMessage()}");
+            Logger::error('WPHooksContainerRegistry', "Error invoking property hook {$this->label}: {$e->getMessage()}");
             // Filters must pass through the first argument; actions are fire-and-forget.
             return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
         }
@@ -174,7 +174,7 @@ final class LazyPropertyHookHandler
 /**
  * Runtime hook handler — invocable object that holds a direct instance reference.
  *
- * Unlike LazyHookHandler (which resolves the service from the container at
+ * Unlike ContainerLazyHookHandler (which resolves the service from the container at
  * hook-fire time), this handler is bound to an already-instantiated object.
  * Designed for use with WPHooksRuntimeRegistry for anonymous class hooks
  * that cannot be discovered by the file-based WPHooksScanner.
@@ -296,6 +296,70 @@ final class RuntimeInstancePropertyHookHandler
         } catch (\Throwable $e) {
             Logger::error(
                 'RuntimeInstancePropertyHookHandler',
+                'Error invoking hook ' . $this->label . ': ' . $e->getMessage(),
+            );
+            // Filters must pass through the first argument; actions are fire-and-forget.
+            return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
+        }
+    }
+}
+
+/**
+ * Invocable wrapper for callables registered manually on the runtime registry.
+ *
+ * Used by WPHooksRuntimeRegistry::registerAction()/registerFilter() so the
+ * callback (closure, array-callable, invokable object) can capture the
+ * surrounding scope directly — no container resolution involved. An optional
+ * condition closure is invoked directly before the callback and must return
+ * bool.
+ */
+final class RuntimeCallableHookHandler
+{
+    public readonly string $label;
+
+    /**
+     * @param callable        $callback  Callable invoked when the hook fires.
+     * @param \Closure|null   $condition Optional gate: invoked directly, must return bool.
+     * @param 'action'|'filter' $type
+     */
+    public function __construct(
+        // `callable` is not a valid property type — validated by the registry before construction.
+        private readonly mixed $callback,
+        private readonly ?\Closure $condition = null,
+        private readonly string $type = 'action',
+    ) {
+        if (is_array($callback)) {
+            $this->label = get_debug_type($callback[0]) . '::' . $callback[1];
+        } elseif ($callback instanceof \Closure) {
+            $this->label = 'closure:' . spl_object_hash($callback);
+        } else {
+            $this->label = get_debug_type($callback);
+        }
+    }
+
+    public function __invoke(mixed ...$args): mixed
+    {
+        try {
+            if ($this->condition !== null) {
+                $allowed = ($this->condition)();
+                if (!is_bool($allowed)) {
+                    throw new \RuntimeException(
+                        'Condition for ' . $this->label . ' must return bool, got ' . get_debug_type($allowed)
+                    );
+                }
+
+                if ($allowed === false) {
+                    // Skip the hook entirely — pass filters through untouched.
+                    return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
+                }
+            }
+
+            $callback = $this->callback;
+
+            return $callback(...$args);
+        } catch (\Throwable $e) {
+            Logger::error(
+                'RuntimeCallableHookHandler',
                 'Error invoking hook ' . $this->label . ': ' . $e->getMessage(),
             );
             // Filters must pass through the first argument; actions are fire-and-forget.

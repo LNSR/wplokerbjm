@@ -9,7 +9,7 @@ use WPLokerBJM\Core\Container\Definitions\Factory;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\Core;
 use WPLokerBJM\Core\Container\Definitions\DefinitionProviderInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{LazyHookHandler, LazyPropertyHookHandler, WPHookPlanProvider, WPHooksRegistry, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, WPHookPlanProvider, WPHooksContainerRegistry, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Services\WebHooks\Cloudflare;
@@ -34,7 +34,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         $this->assertGreaterThanOrEqual(3, $count, 'Core Registered');
         $this->assertArrayHasKey(Init::class, $definitions, 'Init should be in core definitions');
-        $this->assertArrayHasKey(WPHooksRegistry::class, $definitions, 'WPHooksRegistry should be in core definitions');
+        $this->assertArrayHasKey(WPHooksContainerRegistry::class, $definitions, 'WPHooksContainerRegistry should be in core definitions');
     }
 
     public function testFactoryDefinitions()
@@ -70,7 +70,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         $this->assertGreaterThanOrEqual(3, $count, 'Core + Factory should have at least 3 definitions');
         $this->assertArrayHasKey(Init::class, $definitions);
-        $this->assertArrayHasKey(WPHooksRegistry::class, $definitions);
+        $this->assertArrayHasKey(WPHooksContainerRegistry::class, $definitions);
         $this->assertArrayHasKey(Cloudflare::class, $definitions);
         $this->assertArrayHasKey(RedisAdapter::class, $definitions);
     }
@@ -206,7 +206,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $registrations = $scanner->getHookRegistrations();
         $hookClasses = array_unique(array_column($registrations, 'class'));
 
-        echo "\n\033[1;34m📦 WPHooksRegistry\033[0m\n";
+        echo "\n\033[1;34m📦 WPHooksContainerRegistry\033[0m\n";
         echo "\033[1;32m✓ Processing " . count($registrations) . " hook registrations...\033[0m\n";
 
         // Mock container: has() returns true for hook service classes
@@ -217,7 +217,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             ->willReturnCallback(fn(string $class) => $this->createMock($class));
 
         // Create registry with registrations via constructor, then initialize
-        $registry = new WPHooksRegistry($container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         $registered = $this->registeredHooks();
@@ -227,14 +227,14 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $this->assertCount(count($nonDeferred), $registered, 'All non-deferred registrations should produce a registered hook');
         $this->assertGreaterThan(0, $registered);
 
-        // Verify each registered hook has a matching registration and a LazyHookHandler callable.
-        // Comparison is by hook name + type rather than index because WPHooksRegistry
+        // Verify each registered hook has a matching registration and a ContainerLazyHookHandler callable.
+        // Comparison is by hook name + type rather than index because WPHooksContainerRegistry
         // groups handlers by hook name internally, which changes iteration order.
         foreach ($registered as $hookData) {
-            // Each callable must be a LazyHookHandler or LazyPropertyHookHandler, not an anonymous closure
+            // Each callable must be a ContainerLazyHookHandler or ContainerLazyPropertyHookHandler, not an anonymous closure
             $this->assertTrue(
-                $hookData['callable'] instanceof LazyHookHandler || $hookData['callable'] instanceof LazyPropertyHookHandler,
-                "Callable for {$hookData['hook']} should be LazyHookHandler or LazyPropertyHookHandler (not anonymous closure)"
+                $hookData['callable'] instanceof ContainerLazyHookHandler || $hookData['callable'] instanceof ContainerLazyPropertyHookHandler,
+                "Callable for {$hookData['hook']} should be ContainerLazyHookHandler or ContainerLazyPropertyHookHandler (not anonymous closure)"
             );
 
             // Verify type is valid
@@ -242,7 +242,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             $this->assertIsInt($hookData['priority']);
         }
 
-        echo "  \033[0;32m•\033[0m All " . count($registrations) . " hooks use named LazyHookHandler / LazyPropertyHookHandler callables (ordered by hook name)\n";
+        echo "  \033[0;32m•\033[0m All " . count($registrations) . " hooks use named ContainerLazyHookHandler / ContainerLazyPropertyHookHandler callables (ordered by hook name)\n";
 
         // Verify initialize() is idempotent
         $countBefore = count($this->registeredHooks());
@@ -259,9 +259,9 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $container = $this->createMock(ContainerInterface::class);
         $container->method('has')->willReturn(false);
 
-        echo "\n\033[1;34m⏭️  WPHooksRegistry — Skip Behavior\033[0m\n";
+        echo "\n\033[1;34m⏭️  WPHooksContainerRegistry — Skip Behavior\033[0m\n";
 
-        $registry = new WPHooksRegistry($container, [[
+        $registry = new WPHooksContainerRegistry($container, [[
             'class' => 'NonExistentService',
             'method' => 'handle',
             'type' => 'action',
@@ -322,11 +322,11 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             ));
         });
 
-        echo "\n\033[1;34m🗑️  WPHooksRegistry — Unregistration\033[0m\n";
+        echo "\n\033[1;34m🗑️  WPHooksContainerRegistry — Unregistration\033[0m\n";
 
         // Fresh registry
         $GLOBALS['__wplokerbjm_registered_hooks'] = [];
-        $registry = new WPHooksRegistry($container, $registrations, new WPHookPlanProvider());
+        $registry = new WPHooksContainerRegistry($container, $registrations, new WPHookPlanProvider());
         $registry->initialize();
 
         $totalBefore = count($this->registeredHooks());
@@ -345,7 +345,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         // Test unregisterByClass (fresh setup)
         $GLOBALS['__wplokerbjm_registered_hooks'] = [];
-        $registry2 = new WPHooksRegistry($container, $registrations, new WPHookPlanProvider());
+        $registry2 = new WPHooksContainerRegistry($container, $registrations, new WPHookPlanProvider());
         $registry2->initialize();
 
         $totalBeforeClass = count($this->registeredHooks());

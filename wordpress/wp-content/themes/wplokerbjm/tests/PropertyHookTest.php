@@ -7,8 +7,8 @@ namespace WPLokerBJM\Tests;
 use DI\ContainerBuilder;
 use DI\Container;
 use ReflectionClass;
-use WPLokerBJM\Core\Container\Support\WPHooks\LazyPropertyHookHandler;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\ContainerLazyPropertyHookHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyActionService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyDeferredService;
@@ -23,7 +23,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  * Test suite for property-closure hooks via #[Action]/#[Filter] attributes.
  *
  * Verifies that:
- *  - LazyPropertyHookHandler reads a public property and invokes the closure.
+ *  - ContainerLazyPropertyHookHandler reads a public property and invokes the closure.
  *  - Filter closures return values correctly (apply_filters).
  *  - Action closures produce side effects (do_action).
  *  - Multiple #[Filter] on the same property (IS_REPEATABLE) work.
@@ -34,7 +34,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 class PropertyHookTest extends WplokerbjmTestCase
 {
     private Container $container;
-    private WPHooksRegistry $registry;
+    private WPHooksContainerRegistry $registry;
 
     protected function setUp(): void
     {
@@ -45,7 +45,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $this->container = $builder->build();
 
-        $this->registry = new WPHooksRegistry($this->container, [], new WPHookPlanProvider());
+        $this->registry = new WPHooksContainerRegistry($this->container, [], new WPHookPlanProvider());
 
         // Reset fixture static state
         PropertyFilterService::reset();
@@ -263,7 +263,7 @@ class PropertyHookTest extends WplokerbjmTestCase
 
         $this->registry->initialize();
 
-        // Should not throw — LazyPropertyHookHandler catches the error
+        // Should not throw — ContainerLazyPropertyHookHandler catches the error
         $result = apply_filters('non_closure_filter', 'fallback_test');
 
         // Should return the first argument as fallback
@@ -296,7 +296,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         );
     }
 
-    public function testPropertyHookUsesLazyPropertyHookHandlerInstance(): void
+    public function testPropertyHookUsesContainerLazyPropertyHookHandlerInstance(): void
     {
         $service = new PropertyFilterService();
         $this->container->set(PropertyFilterService::class, $service);
@@ -320,7 +320,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         $this->assertNotNull($hook, 'Handler should be registered');
 
         $handler = $hook['callable'];
-        $this->assertInstanceOf(LazyPropertyHookHandler::class, $handler, 'Property hooks should use LazyPropertyHookHandler');
+        $this->assertInstanceOf(ContainerLazyPropertyHookHandler::class, $handler, 'Property hooks should use ContainerLazyPropertyHookHandler');
         $this->assertStringContainsString(
             'appendSuffix',
             $handler->label,

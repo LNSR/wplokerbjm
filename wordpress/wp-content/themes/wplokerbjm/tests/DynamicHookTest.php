@@ -9,7 +9,7 @@ use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRuntimeRegistry;
 use WPLokerBJM\Tests\Support\Fixtures\ConditionActionService;
 use WPLokerBJM\Tests\Support\Fixtures\DynamicHookService;
@@ -57,7 +57,7 @@ class DynamicHookTest extends WplokerbjmTestCase
             return 'dynamic_action';
         };
 
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
         ], new WPHookPlanProvider());
         $registry->initialize();
@@ -72,7 +72,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
     public function testStringHookIsUnchanged(): void
     {
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', 'plain_string_action'),
         ], new WPHookPlanProvider());
         $registry->initialize();
@@ -88,7 +88,7 @@ class DynamicHookTest extends WplokerbjmTestCase
     {
         $hook = static fn (): int => 42;
 
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
         ], new WPHookPlanProvider());
         $registry->initialize();
@@ -106,7 +106,7 @@ class DynamicHookTest extends WplokerbjmTestCase
             return 'never_registered';
         };
 
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
         ], new WPHookPlanProvider());
         $registry->initialize();
@@ -124,7 +124,7 @@ class DynamicHookTest extends WplokerbjmTestCase
             return $service !== null;
         };
 
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 DynamicHookService::class,
                 'onDynamicAction',
@@ -145,7 +145,7 @@ class DynamicHookTest extends WplokerbjmTestCase
     {
         $hook = static fn (): string => 'dynamic_deferred';
 
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook, defer: true),
         ], new WPHookPlanProvider());
         $registry->initialize();
@@ -181,7 +181,7 @@ class DynamicHookTest extends WplokerbjmTestCase
         // reference (self::class) at registration time, plain PHP.
         $hook = static fn (): string => self::class . '_boot';
 
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
         ], new WPHookPlanProvider());
         $registry->initialize();

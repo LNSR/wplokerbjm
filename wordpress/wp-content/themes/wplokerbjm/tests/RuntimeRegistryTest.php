@@ -372,4 +372,210 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         do_action('rt_isolated_action', 'after_unreg');
         $this->assertCount(1, $captured);
     }
+
+    // ── Manual registration (registerAction / registerFilter) ─────────
+
+    public function testManualRegisterActionInfersOwnerFromArrayCallable(): void
+    {
+        $captured = [];
+
+        $owner = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            public function boot(string $value): void
+            {
+                $this->captured[] = $value;
+            }
+        };
+
+        $this->registry->registerAction(hook: 'rt_manual_action', callback: [$owner, 'boot']);
+
+        $registered = $this->findRegisteredHook('action', 'rt_manual_action');
+        $this->assertNotNull($registered);
+        $this->assertInstanceOf(\WPLokerBJM\Core\Container\Support\WPHooks\RuntimeCallableHookHandler::class, $registered['callable']);
+
+        do_action('rt_manual_action', 'manual');
+        $this->assertSame(['manual'], $captured);
+    }
+
+    public function testManualRegisterInfersOwnerFromFirstClassCallable(): void
+    {
+        $captured = [];
+
+        $owner = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            public function boot(string $value): void
+            {
+                $this->captured[] = $value;
+            }
+        };
+
+        $this->registry->registerAction(hook: 'rt_manual_first_class', callback: $owner->boot(...));
+
+        do_action('rt_manual_first_class', 'fc');
+        $this->assertSame(['fc'], $captured);
+    }
+
+    public function testExplicitOwnerWinsOverInference(): void
+    {
+        $captured = [];
+
+        $feature = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            public function warm(string $value): void
+            {
+                $this->captured[] = $value;
+            }
+        };
+
+        $cache = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            public function warm(string $value): void
+            {
+                $this->captured[] = $value;
+            }
+        };
+
+        // Explicit owner: $feature — even though the callback belongs to $cache.
+        $this->registry->registerAction(hook: 'rt_manual_owner', callback: [$cache, 'warm'], owner: $feature);
+
+        do_action('rt_manual_owner', 'explicit');
+        $this->assertSame(['explicit'], $captured);
+
+        // Unregister via the EXPLICIT owner — the hook must disappear.
+        $this->registry->unregisterHooksOn($feature);
+        $this->assertNull($this->findRegisteredHook('action', 'rt_manual_owner'));
+    }
+
+    public function testOwnerlessStaticClosureThrows(): void
+    {
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('Cannot infer owner for hook registration — pass owner: explicitly.');
+
+        $this->registry->registerAction(
+            hook: 'rt_manual_no_owner',
+            callback: static fn (): string => 'noop',
+        );
+    }
+
+    public function testManualAndAttributeRegistrationMergeUnderOneOwner(): void
+    {
+        $captured = [];
+
+        $owner = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_merge_attr', acceptedArgs: 1)]
+            public function fromAttribute(string $v): void { $this->captured[] = "attr:$v"; }
+
+            public function fromManual(string $v): void { $this->captured[] = "manual:$v"; }
+        };
+
+        // Manual registration FIRST, then attribute scan — order must not matter.
+        $this->registry->registerAction(hook: 'rt_merge_manual', callback: [$owner, 'fromManual']);
+        $this->registry->registerHooksOn($owner);
+
+        do_action('rt_merge_attr', 'a');
+        do_action('rt_merge_manual', 'm');
+        $this->assertSame(['attr:a', 'manual:m'], $captured);
+
+        // Unregistration removes BOTH owned hooks.
+        $this->registry->unregisterHooksOn($owner);
+        $this->assertNull($this->findRegisteredHook('action', 'rt_merge_attr'));
+        $this->assertNull($this->findRegisteredHook('action', 'rt_merge_manual'));
+    }
+
+    public function testManualRegistrationDeduplicatesIdenticalHookHandlerPriority(): void
+    {
+        $captured = [];
+
+        $owner = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            public function boot(string $v): void { $this->captured[] = $v; }
+        };
+
+        $callback = [$owner, 'boot'];
+        $this->registry->registerAction(hook: 'rt_manual_dedupe', callback: $callback, priority: 10);
+        $this->registry->registerAction(hook: 'rt_manual_dedupe', callback: $callback, priority: 10);
+
+        do_action('rt_manual_dedupe', 'once');
+        $this->assertSame(['once'], $captured, 'Identical registration must fire exactly once');
+    }
+
+    public function testManualConditionGateControlsFiring(): void
+    {
+        $captured = [];
+
+        $owner = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            public function boot(string $v): void { $this->captured[] = $v; }
+        };
+
+        // Condition true → fires.
+        $this->registry->registerAction(
+            hook: 'rt_manual_cond_true',
+            callback: [$owner, 'boot'],
+            condition: fn (): bool => true,
+        );
+        do_action('rt_manual_cond_true', 'yes');
+        $this->assertSame(['yes'], $captured);
+
+        // Condition false → skipped entirely.
+        $this->registry->registerAction(
+            hook: 'rt_manual_cond_false',
+            callback: [$owner, 'boot'],
+            condition: fn (): bool => false,
+        );
+        do_action('rt_manual_cond_false', 'no');
+        $this->assertSame(['yes'], $captured, 'Condition false must skip the hook');
+    }
+
+    public function testManualNonBoolConditionPassesFilterThrough(): void
+    {
+        $owner = new class {
+            public function transform(string $v): string { return $v . '_transformed'; }
+        };
+
+        $this->registry->registerFilter(
+            hook: 'rt_manual_cond_bad',
+            callback: [$owner, 'transform'],
+            condition: fn () => 'not-a-bool',
+        );
+
+        // Non-bool condition → RuntimeException caught → logged + passthrough.
+        $result = apply_filters('rt_manual_cond_bad', 'input');
+        $this->assertSame('input', $result);
+    }
+
+    public function testManualFilterPassthroughOnHandlerThrow(): void
+    {
+        $owner = new class {
+            public function transform(string $_v): string
+            {
+                throw new \RuntimeException('simulated manual failure');
+            }
+        };
+
+        $this->registry->registerFilter(hook: 'rt_manual_throw', callback: [$owner, 'transform']);
+
+        $result = apply_filters('rt_manual_throw', 'passthrough');
+        $this->assertSame('passthrough', $result);
+    }
+
+    public function testInvalidCallableThrowsAndLogs(): void
+    {
+        $owner = new class {
+            public function boot(): void {}
+        };
+
+        $this->expectException(\RuntimeException::class);
+        $this->expectExceptionMessage('callback is not callable');
+
+        $this->registry->registerAction(hook: 'rt_manual_invalid', callback: [$owner, 'missingMethod']);
+    }
 }

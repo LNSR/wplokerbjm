@@ -8,7 +8,7 @@ use Closure;
 use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksContainerRegistry};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\ConditionActionService;
 
@@ -48,7 +48,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testTaggedHookWithoutDeferRegistersImmediately(): void
     {
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -67,7 +67,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testUnregisterByTagsRemovesActiveButLeavesDeferredIntact(): void
     {
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -103,7 +103,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testUnregisterDeferredByTagsRemovesDeferredButLeavesActiveIntact(): void
     {
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -135,7 +135,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testTaggedHookWithDeferLandsInDeferredPool(): void
     {
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -161,7 +161,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testActivateDeferredByTagsActivatesOnlyMatchingGroup(): void
     {
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -202,7 +202,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testMultiTagHookIsMatchedByAnyTag(): void
     {
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -220,7 +220,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testStringAndArrayTagFormsAreEquivalent(): void
     {
         // String form.
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -234,7 +234,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
         // Array form — identical behavior.
         ConditionActionService::reset();
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -249,7 +249,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testUnknownOrEmptyTagsAreNoOps(): void
     {
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -285,7 +285,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     {
         // Tagged + deferred + condition false: activation registers the hook,
         // but the condition gate still suppresses every fire.
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -307,7 +307,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
         // Condition true: fires normally after tag activation.
         ConditionActionService::reset();
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',
@@ -328,7 +328,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testUnregisterByTagsUnregistersActiveHandlers(): void
     {
-        $registry = new WPHooksRegistry($this->container, [
+        $registry = new WPHooksContainerRegistry($this->container, [
             $this->action(
                 ConditionActionService::class,
                 'onConditionAction',

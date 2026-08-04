@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Services\WebHooks;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksContainerRegistry;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -28,13 +28,13 @@ class Cloudflare
 {
     /**
      * @param CloudflareCred $credential filled by PHP-DI
-     * @param WPHooksRegistry $wpHooksRegistry autowired by PHP-DI
+     * @param WPHooksContainerRegistry $WPHooksContainerRegistry autowired by PHP-DI
      */
     public function __construct(
         private array $credential,
-        private WPHooksRegistry $wpHooksRegistry,
+        private WPHooksContainerRegistry $WPHooksContainerRegistry,
     ) {
-        empty(array_filter($credential)) && $wpHooksRegistry->unregisterByClass(self::class);
+        empty(array_filter($credential)) && $WPHooksContainerRegistry->unregisterByClass(self::class);
     }
 
     /**
@@ -64,7 +64,7 @@ class Cloudflare
         static $alreadyRun = false;
         if ($alreadyRun) return true;
         $alreadyRun = true;
-        $this->wpHooksRegistry->unregisterByCallable([$this, __FUNCTION__]);
+        $this->WPHooksContainerRegistry->unregisterByCallable([$this, __FUNCTION__]);
 
         return $this->sendPurgeRequest(['purge_everything' => true]);
     }
@@ -83,7 +83,7 @@ class Cloudflare
         static $alreadyRun = false;
         if ($alreadyRun) return true;
         $alreadyRun = true;
-        $this->wpHooksRegistry->unregisterByCallable([$this, __FUNCTION__]);
+        $this->WPHooksContainerRegistry->unregisterByCallable([$this, __FUNCTION__]);
 
         return $this->sendPurgeRequest(['purge_everything' => true]);
     }

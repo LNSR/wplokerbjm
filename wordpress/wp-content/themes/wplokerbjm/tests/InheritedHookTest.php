@@ -6,7 +6,7 @@ namespace WPLokerBJM\Tests;
 
 use DI\Container;
 use DI\ContainerBuilder;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry, WPHooksRuntimeRegistry, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksContainerRegistry, WPHooksRuntimeRegistry, WPHooksScanner};
 use WPLokerBJM\Tests\Support\Fixtures\{ChildNoRedeclareService, ChildRedeclareService, ParentHookService};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
@@ -81,7 +81,7 @@ class InheritedHookTest extends WplokerbjmTestCase
 
         // Only the three inheritance fixtures exist in the container — the
         // registry registers them and skips everything else.
-        $registry = new WPHooksRegistry($this->container, $registrations, $this->planProvider);
+        $registry = new WPHooksContainerRegistry($this->container, $registrations, $this->planProvider);
         $registry->initialize();
 
         do_action('parent_hook', 'ping');

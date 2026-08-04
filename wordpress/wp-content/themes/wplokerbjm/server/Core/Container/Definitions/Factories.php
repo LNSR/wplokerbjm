@@ -2,7 +2,7 @@
 namespace WPLokerBJM\Core\Container\Definitions;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksRegistry, WPHooksRuntimeRegistry, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksContainerRegistry, WPHooksRuntimeRegistry, WPHooksScanner};
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Configs\CredentialConfig;
@@ -24,13 +24,13 @@ interface DefinitionProviderInterface
  * ## Hook Registry & Init
  *
  * This class provides manual definitions for key services that require special handling,
- * such as the WPHooksRegistry and Init services.
+ * such as the WPHooksContainerRegistry and Init services.
  *
  * How it works:
  * 1. WPhooksScanner scans the server/ directory for #[Action] and #[Filter] attributes.
- * 2. WPHooksRegistry receives the scanner results and pre-builds LazyHookHandler and LazyPropertyHookHandler instances
+ * 2. WPHooksContainerRegistry receives the scanner results and pre-builds ContainerLazyHookHandler and ContainerLazyPropertyHookHandler instances
  *    (named invocable objects that defer container resolution to hook-fire time).
- * 3. Init delegates to WPHooksRegistry::initialize() which registers hooks with WordPress
+ * 3. Init delegates to WPHooksContainerRegistry::initialize() which registers hooks with WordPress
  *    via add_action/add_filter using the stored handler instances.
  *
  */
@@ -46,7 +46,7 @@ class Core implements DefinitionProviderInterface
             WPHookPlanProvider::class => \DI\Autowire(WPHookPlanProvider::class),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class)),
             WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class),
-            WPHooksRegistry::class => \DI\autowire(WPHooksRegistry::class)->constructor(
+            WPHooksContainerRegistry::class => \DI\autowire(WPHooksContainerRegistry::class)->constructor(
                 \DI\get(ContainerInterface::class),
                 \DI\factory(static function (WPHooksScanner $scanner) {
                     return $scanner->getHookRegistrations();

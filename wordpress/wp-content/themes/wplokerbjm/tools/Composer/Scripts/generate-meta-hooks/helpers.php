@@ -241,17 +241,17 @@ function renderMetadataSection(array $actions, array $filters, array $tags = [])
             ["argumentsSet('{$listHooksFilter}')"],
         ],
         'List hooks (deferred) to register' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksRegistry::activateDeferredByHook()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::activateDeferredByHook()',
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
         'List hooks to unregister' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksRegistry::unregisterByHook()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::unregisterByHook()',
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
         'List hooks (deferred) to unregister' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksRegistry::unregisterDeferredByHook()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::unregisterDeferredByHook()',
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
@@ -282,17 +282,17 @@ function renderMetadataSection(array $actions, array $filters, array $tags = [])
                 ["argumentsSet('{$listHooksTags}')"],
             ],
             'Hook tags (deferred) to activate' => [
-                '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksRegistry::activateDeferredByTags()',
+                '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::activateDeferredByTags()',
                 0,
                 ["argumentsSet('{$listHooksTags}')"],
             ],
             'Hook tags to unregister' => [
-                '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksRegistry::unregisterByTags()',
+                '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::unregisterByTags()',
                 0,
                 ["argumentsSet('{$listHooksTags}')"],
             ],
             'Hook tags (deferred) to unregister' => [
-                '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksRegistry::unregisterDeferredByTags()',
+                '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::unregisterDeferredByTags()',
                 0,
                 ["argumentsSet('{$listHooksTags}')"],
             ],
