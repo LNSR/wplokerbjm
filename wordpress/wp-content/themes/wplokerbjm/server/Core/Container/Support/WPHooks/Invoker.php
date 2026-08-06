@@ -43,6 +43,7 @@ final class ContainerLazyHookHandler
         private readonly ?\Closure $executeIf = null,
         private readonly array $executeIfParams = [],
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
+        private readonly array $hookArgNames = [],
     ) {
         $this->label = $this->class . '::' . $this->method;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
@@ -62,8 +63,12 @@ final class ContainerLazyHookHandler
 
     public function __invoke(mixed ...$args): mixed
     {
+        $hookArgs = $this->hookArgNames === []
+            ? []
+            : array_combine(array_slice($this->hookArgNames, 0, count($args)), $args);
+
         try {
-            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class)) {
+            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class, $hookArgs)) {
                 Logger::warning(
                     'ContainerLazyHookHandler',
                     'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
@@ -127,6 +132,7 @@ final class ContainerLazyPropertyHookHandler
         private readonly ?\Closure $executeIf = null,
         private readonly array $executeIfParams = [],
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
+        private readonly array $hookArgNames = [],
     ) {
         $this->label = $this->class . '::$' . $this->property;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
@@ -145,8 +151,12 @@ final class ContainerLazyPropertyHookHandler
 
     public function __invoke(mixed ...$args): mixed
     {
+        $hookArgs = $this->hookArgNames === []
+            ? []
+            : array_combine(array_slice($this->hookArgNames, 0, count($args)), $args);
+
         try {
-            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class)) {
+            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class, $hookArgs)) {
                 Logger::warning(
                     'ContainerLazyHookHandler',
                     'Skipping hook ' . $this->label . ' — executeIf gate returned false.'

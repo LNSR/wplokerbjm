@@ -1,6 +1,7 @@
 {
   "require": {
     "brick/varexporter": "*",
+    "cweagans/composer-patches": "^2.0",
     "nette/robot-loader": "*",
     "php-di/php-di": "*",
     "php-standard-library/php-standard-library": "*",
@@ -17,7 +18,10 @@
   },
   "config": {
     "sort-packages": true,
-    "process-timeout": 0
+    "process-timeout": 0,
+    "allow-plugins": {
+      "cweagans/composer-patches": true
+    }
   },
   "scripts": {
     "watch:autoload": [

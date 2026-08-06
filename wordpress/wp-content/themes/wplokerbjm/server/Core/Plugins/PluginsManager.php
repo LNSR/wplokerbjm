@@ -64,11 +64,15 @@ class PluginManagement
     public function unregisterInactivePluginHooks(): void
     {
         foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
-            if ($integrationClass::isActive())
+            if ($integrationClass::isActive()) {
                 continue;
-            Logger::warning("Plugin status", $integrationClass::class . 'is' . $integrationClass::isActive() ? 'active' : 'inactive');
-            $this->hooksRegistry->unregisterByClass($integrationClass::class);
-            $this->hooksRegistry->unregisterDeferredByClass($integrationClass::class);
+            }
+
+            $status = $integrationClass::isActive() ? 'active' : 'inactive';
+            Logger::warning("Plugin status", $integrationClass . ' is ' . $status);
+
+            $this->hooksRegistry->unregisterByClass($integrationClass);
+            $this->hooksRegistry->unregisterDeferredByClass($integrationClass);
         }
     }
 

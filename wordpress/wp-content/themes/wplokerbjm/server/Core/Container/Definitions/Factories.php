@@ -45,10 +45,10 @@ class Core implements DefinitionProviderInterface
 
         $core = [
             WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class),
-            HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
-            WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, static fn() => get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class)),
-            WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class),
-            DeferredHookManager::class => \DI\autowire(DeferredHookManager::class)->constructor(\DI\get(WPHookPlanProvider::class), \DI\get(ContainerInterface::class), \DI\get(HookTargetResolver::class)),
+            HookTargetResolver::class => \DI\autowire(HookTargetResolver::class)->lazy(),
+            WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, static fn() => get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class))->lazy(),
+            WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class)->lazy(),
+            DeferredHookManager::class => \DI\autowire(DeferredHookManager::class)->constructor(\DI\get(WPHookPlanProvider::class), \DI\get(ContainerInterface::class), \DI\get(HookTargetResolver::class))->lazy(),
             WPHooksContainerRegistry::class => \DI\autowire(WPHooksContainerRegistry::class)->constructor(
                 \DI\get(ContainerInterface::class),
                 \DI\factory(static function (WPHooksScanner $scanner) {

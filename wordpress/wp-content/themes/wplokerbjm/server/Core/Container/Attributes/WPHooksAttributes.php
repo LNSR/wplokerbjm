@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Attributes;
 
 use Attribute;
+use TObject;
 
 /**
  * Attribute for WordPress actions.
@@ -27,7 +28,8 @@ class Action
      * @param (\Closure(TObject...): bool)|null $registerIf
      * @param-closure-this $registerIf TObject
      * 
-     * @param array<string> $tag
+     * @param array<int, string|\BackedEnum|\Closure(TObject...): array> $tag
+     * @param-closure-this $tag
      */
     public function __construct(
         public readonly string|\Closure $hook,
@@ -36,7 +38,7 @@ class Action
         public readonly bool $defer = false,
         public readonly ?\Closure $executeIf = null,
         public readonly ?\Closure $registerIf = null,
-        public readonly array $tag = []
+        public readonly array|\Closure $tag = []
     ) {
     }
 }
@@ -61,7 +63,8 @@ class Filter
      * @param (\Closure(TObject...): bool)|null $registerIf
      * @param-closure-this $registerIf TObject
      * 
-     * @param array<string> $tag
+     * @param array<int, string|\BackedEnum|\Closure(TObject...): array> $tag
+     * @param-closure-this $tag
      */
     public function __construct(
         public readonly string|\Closure $hook,
@@ -70,7 +73,7 @@ class Filter
         public readonly bool $defer = false,
         public readonly ?\Closure $executeIf = null,
         public readonly ?\Closure $registerIf = null,
-        public readonly array $tag = []
+        public readonly array|\Closure $tag = []
     ) {
     }
 }

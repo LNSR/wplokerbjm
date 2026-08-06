@@ -116,7 +116,10 @@ class WPHooksScanner
                         registerIf: $attr->registerIf,
                         registerIfParams: $hookPlanProvider->buildCallablePlan($attr->registerIf),
                         hookParams: $hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        tags: $attr->tag,
+                        hookArgs: array_map(static fn ($p) => $p->getName(), $method->getParameters()),
+                        tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
+                        tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
+                        tagCallableParams: $hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                     );
                 };
                 $this->scanMethodHooks($reflection, $methodCb);
@@ -137,10 +140,12 @@ class WPHooksScanner
                         registerIf: $attr->registerIf,
                         registerIfParams: $hookPlanProvider->buildCallablePlan($attr->registerIf),
                         hookParams: $hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        tags: $attr->tag,
+                        hookArgs: [],
+                        tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
+                        tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
+                        tagCallableParams: $hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                     );
                 };
-
                 $this->scanPropertyHooks($reflection, $propertyCb);
             } catch (\Exception $e) {
                 Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());

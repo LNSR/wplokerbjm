@@ -511,3 +511,24 @@ class ChildRedeclareService extends ParentHookService
         parent::onParentHook($value);
     }
 }
+
+// ── Hook-argument gate fixtures ───
+
+/**
+ * Test fixture: handler with two named parameters, used to verify
+ * executeIf gates receive hook arguments by exact parameter name.
+ */
+class HookArgSearchService
+{
+    public static array $capturedValues = [];
+
+    public function onSearch(string $search, string $extra = ''): void
+    {
+        self::$capturedValues[] = $search;
+    }
+
+    public static function reset(): void
+    {
+        self::$capturedValues = [];
+    }
+}

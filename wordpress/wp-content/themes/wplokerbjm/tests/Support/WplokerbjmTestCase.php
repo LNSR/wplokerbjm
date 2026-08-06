@@ -77,72 +77,82 @@ abstract class WplokerbjmTestCase extends TestCase
      * @return void
      */
     protected function setupWordPressHookMocks(): void
-    {
-        $GLOBALS['__wplokerbjm_registered_hooks'] = [];
+{
+    $GLOBALS['__wplokerbjm_registered_hooks'] = [];
 
-        \Brain\Monkey\Functions\when('add_action')->alias(function ($hook, $callable, $priority = 10, $accepted_args = 1) {
-            $GLOBALS['__wplokerbjm_registered_hooks'][] = [
-                'type' => 'action',
-                'hook' => $hook,
-                'callable' => $callable,
-                'priority' => $priority,
-                'accepted_args' => $accepted_args,
-            ];
-            return true;
-        });
+    \Brain\Monkey\Functions\when('add_action')->alias(function ($hook, $callable, $priority = 10, $accepted_args = 1) {
+        $GLOBALS['__wplokerbjm_registered_hooks'][] = [
+            'type'          => 'action',
+            'hook'          => $hook,
+            'callable'      => $callable,
+            'priority'      => (int) $priority,
+            'accepted_args' => (int) $accepted_args,
+        ];
+        return true;
+    });
 
-        \Brain\Monkey\Functions\when('add_filter')->alias(function ($hook, $callable, $priority = 10, $accepted_args = 1) {
-            $GLOBALS['__wplokerbjm_registered_hooks'][] = [
-                'type' => 'filter',
-                'hook' => $hook,
-                'callable' => $callable,
-                'priority' => $priority,
-                'accepted_args' => $accepted_args,
-            ];
-            return true;
-        });
+    \Brain\Monkey\Functions\when('add_filter')->alias(function ($hook, $callable, $priority = 10, $accepted_args = 1) {
+        $GLOBALS['__wplokerbjm_registered_hooks'][] = [
+            'type'          => 'filter',
+            'hook'          => $hook,
+            'callable'      => $callable,
+            'priority'      => (int) $priority,
+            'accepted_args' => (int) $accepted_args,
+        ];
+        return true;
+    });
 
-        \Brain\Monkey\Functions\when('do_action')->alias(function ($hook, ...$args) {
-            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $reg) {
-                if ($reg['type'] !== 'action' || $reg['hook'] !== $hook) {
-                    continue;
-                }
-                $callable = $reg['callable'];
-                $limited = array_slice($args, 0, (int) $reg['accepted_args']);
-                $callable(...$limited);
+    \Brain\Monkey\Functions\when('do_action')->alias(function ($hook, ...$args) {
+        $callbacks = array_filter(
+            $GLOBALS['__wplokerbjm_registered_hooks'],
+            fn($reg) => $reg['type'] === 'action' && $reg['hook'] === $hook
+        );
+
+        // Sort by priority ascending
+        usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
+
+        foreach ($callbacks as $reg) {
+            $limited = array_slice($args, 0, $reg['accepted_args']);
+            ($reg['callable'])(...$limited);
+        }
+    });
+
+    \Brain\Monkey\Functions\when('apply_filters')->alias(function ($hook, $value, ...$args) {
+        $callbacks = array_filter(
+            $GLOBALS['__wplokerbjm_registered_hooks'],
+            fn($reg) => $reg['type'] === 'filter' && $reg['hook'] === $hook
+        );
+
+        // Sort by priority ascending
+        usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
+
+        foreach ($callbacks as $reg) {
+            $limited = array_slice([$value, ...$args], 0, $reg['accepted_args']);
+            $value = ($reg['callable'])(...$limited);
+        }
+
+        return $value;
+    });
+
+    $removeHook = function ($type, $hook, $callable, $priority = 10) {
+        foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $i => $reg) {
+            if (
+                $reg['type'] === $type &&
+                $reg['hook'] === $hook &&
+                $reg['callable'] == $callable && // Loose comparison allows object array comparisons
+                $reg['priority'] === (int) $priority
+            ) {
+                unset($GLOBALS['__wplokerbjm_registered_hooks'][$i]);
+                $GLOBALS['__wplokerbjm_registered_hooks'] = array_values($GLOBALS['__wplokerbjm_registered_hooks']);
+                return true;
             }
-        });
+        }
+        return false;
+    };
 
-        \Brain\Monkey\Functions\when('apply_filters')->alias(function ($hook, $value, ...$args) {
-            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $reg) {
-                if ($reg['type'] !== 'filter' || $reg['hook'] !== $hook) {
-                    continue;
-                }
-                $callable = $reg['callable'];
-                $limited = array_slice([$value, ...$args], 0, (int) $reg['accepted_args']);
-                $value = $callable(...$limited);
-            }
-            return $value;
-        });
-
-        \Brain\Monkey\Functions\when('remove_action')->alias(function ($hook, $callable, $priority = 10) {
-            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $i => $reg) {
-                if ($reg['type'] === 'action' && $reg['hook'] === $hook && $reg['callable'] === $callable && (int) $reg['priority'] === (int) $priority) {
-                    array_splice($GLOBALS['__wplokerbjm_registered_hooks'], $i, 1);
-                }
-            }
-            return true;
-        });
-
-        \Brain\Monkey\Functions\when('remove_filter')->alias(function ($hook, $callable, $priority = 10) {
-            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $i => $reg) {
-                if ($reg['type'] === 'filter' && $reg['hook'] === $hook && $reg['callable'] === $callable && (int) $reg['priority'] === (int) $priority) {
-                    array_splice($GLOBALS['__wplokerbjm_registered_hooks'], $i, 1);
-                }
-            }
-            return true;
-        });
-    }
+    \Brain\Monkey\Functions\when('remove_action')->alias(fn($hook, $callable, $priority = 10) => $removeHook('action', $hook, $callable, $priority));
+    \Brain\Monkey\Functions\when('remove_filter')->alias(fn($hook, $callable, $priority = 10) => $removeHook('filter', $hook, $callable, $priority));
+}
 
     /**
      * Return the list of hooks registered via `add_action` / `add_filter`

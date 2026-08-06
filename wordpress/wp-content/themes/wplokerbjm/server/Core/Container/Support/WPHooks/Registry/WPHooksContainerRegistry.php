@@ -14,6 +14,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, HookRegistrat
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{AnonClassHookPropertyAbstract};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
+use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\HookTagUtilities;
 
 /**
  * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
@@ -200,6 +201,8 @@ class WPHooksContainerRegistry
      */
     public function activateDeferredByTags(array $tags): int
     {
+        $tags = HookTagUtilities::normalizeTags($tags);
+
         return $this->deferredHookManager->activateDeferredByTags(
             $tags,
             fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
@@ -250,7 +253,7 @@ class WPHooksContainerRegistry
      */
     public function unregisterDeferredByTags(array $tags): void
     {
-        $this->deferredHookManager->unregisterDeferredByTags($tags);
+        $this->deferredHookManager->unregisterDeferredByTags(HookTagUtilities::normalizeTags($tags));
     }
     #endregion
     #region main handlers unregisteration methods
@@ -320,6 +323,8 @@ class WPHooksContainerRegistry
      */
     public function unregisterByTags(array $tags): void
     {
+        $tags = HookTagUtilities::normalizeTags($tags);
+
         if ($tags === []) {
             return;
         }
@@ -389,32 +394,6 @@ class WPHooksContainerRegistry
     }
 
     /**
-     * Resolve the final hook name for a registration.
-     *
-     * A plain string is used as-is; a closure is resolved through the DI
-     * container (via the plan provider) and must return a string.
-     *
-     * @throws \RuntimeException when the closure result is not a string
-     */
-    private function resolveHookName(string|\Closure $hook, array $hookParams, string $label): string
-    {
-        if (is_string($hook)) {
-            return $hook;
-        }
-
-        $values = $this->planProvider->resolveCallableParameters($hook, $hookParams, $this->container, $label);
-        $name = $hook(...$values);
-
-        if (!is_string($name)) {
-            throw new \RuntimeException(
-                'Hook name for ' . $label . ' must return string, got ' . get_debug_type($name)
-            );
-        }
-
-        return $name;
-    }
-
-    /**
      * Register hook registrations from the scanner.
      * Pre-builds ContainerLazyHookHandler instances and validates container existence.
      *
@@ -435,8 +414,9 @@ class WPHooksContainerRegistry
             }
 
             try {
-                $hookName = $this->resolveHookName(
+                $hookName = $this->planProvider->resolveHookName(
                     $registration->hook,
+                    $this->container,
                     $registration->hookParams,
                     $registration->class . '::' . $registration->method
                 );
@@ -473,9 +453,38 @@ class WPHooksContainerRegistry
                 continue;
             }
 
+            // Resolve dynamic tags: the attribute accepts either a static tag
+            // list or a single callable returning the full resolved list.
+            // Entries are normalized to strings (string | string-backed enum).
+            try {
+                if ($registration->tagCallable !== null) {
+                    $resolvedTags = $this->planProvider->resolveTagCallable(
+                        $registration->tagCallable,
+                        $registration->tagCallableParams ?? [],
+                        $this->container,
+                        $registration->class . '::' . $registration->method,
+                        $registration->class
+                    );
+                } else {
+                    $resolvedTags = $registration->tags;
+                }
+
+                $resolvedTags = array_map(
+                    static fn ($tag) => HookTagUtilities::normalizeTagValue($tag),
+                    $resolvedTags
+                );
+            } catch (\Throwable $e) {
+                Logger::error(
+                    'WPHooksContainerRegistry',
+                    'Skipping hook for ' . $registration->class . '::' . $registration->method
+                    . ' — ' . $e->getMessage()
+                );
+                continue;
+            }
+
             $handler = $registration->target === 'method'
-                ? new ContainerLazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider)
-                : new ContainerLazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider);
+                ? new ContainerLazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs)
+                : new ContainerLazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs);
             $key = HookKey::fromRegistration($registration);
             $entry = [
                 'key' => $key,
@@ -483,7 +492,7 @@ class WPHooksContainerRegistry
                 'type' => $registration->type,
                 'priority' => $registration->priority,
                 'accepted_args' => $registration->acceptedArgs,
-                'tags' => $registration->tags,
+                'tags' => $resolvedTags,
                 'registerIf' => $registration->registerIf,
                 'registerIfParams' => $registration->registerIfParams,
             ];

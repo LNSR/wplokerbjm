@@ -8,7 +8,7 @@ use DI\Attribute\Injectable;
  * Fetches theme-related data for GraphQL queries, including site title,
  * description, and logo information. Caches results internally to optimize
  * repeated requests.
- * @phpstan-import-type ThemeData from \WPLokerBJM\Core\Theme\ThemeInject
+ * @phpstan-import-type ThemeData from \WPLokerBJM\Core\Theme\ThemeProp
  */
 #[Injectable(lazy: true)]
 class ThemeDataResolver

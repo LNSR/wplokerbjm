@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace WPLokerBJM;
 
 use Nette\Loaders\RobotLoader;
-use WPLokerBJM\Core\Theme\ThemeInject;
+use WPLokerBJM\Core\Theme\ThemeProp;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 use WPLokerBJM\Core\Container\Init;
@@ -18,7 +18,7 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
  *
  * Runs as an MU plugin so hooks are registered before theme activation.
  *
- * @see ThemeInject
+ * @see ThemeProp
  */
 class Bootstrap
 {

@@ -15,6 +15,7 @@ use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
+use WPLokerBJM\Bootstrap;
 
 class ContainerDefinitionsTest extends WplokerbjmTestCase
 {
@@ -386,5 +387,135 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         // the non-existent-class edge case is naturally eliminated by the callable type hint.
 
         echo "\n";
+    }
+
+    /**
+     * Boot summary: prints a compact tree of scan/registry statistics and a
+     * usage map (tags / executeIf / registerIf / dynamic hook names).
+     *
+     * Numbers come from the same scanner + registry pipeline the production
+     * boot uses, so the tree doubles as an integrity check:
+     * discovered = registered + deferred + skipped (broken down by reason).
+     */
+    public function testBootStatsSummary(): void
+    {
+        // ── Scan phase ─────────────────────────────────────────────────────
+        $scanner = new WPhooksScanner(self::$NAMESPACE, '', new WPHookPlanProvider());
+        $registrations = $scanner->getHookRegistrations();
+
+        $namespacePrefix = self::$NAMESPACE . '\\';
+        $scannedClasses = 0;
+        foreach (Bootstrap::getRobotLoader()->getIndexedClasses() as $className => $file) {
+            if (str_starts_with($className, $namespacePrefix) && class_exists($className)) {
+                $scannedClasses++;
+            }
+        }
+
+        $discovered = count($registrations);
+        $actions = count(array_filter($registrations, static fn($reg) => $reg->type === 'action'));
+        $filters = $discovered - $actions;
+        $deferredCount = count(array_filter($registrations, static fn($reg) => !empty($reg->defer)));
+
+        // Usage map
+        $taggedRegs = array_filter($registrations, static fn($reg) => !empty($reg->tags) || $reg->tagCallable !== null);
+        $executeIfRegs = array_filter($registrations, static fn($reg) => $reg->executeIf !== null);
+        $registerIfRegs = array_filter($registrations, static fn($reg) => $reg->registerIf !== null);
+        $dynamicRegs = array_filter($registrations, static fn($reg) => $reg->hook instanceof \Closure);
+
+        // ── Registry phase ──────────────────────────────────────────────────
+        $hookClasses = array_unique(array_column($registrations, 'class'));
+        $container = $this->createMock(ContainerInterface::class);
+        $container->method('has')
+            ->willReturnCallback(fn(string $class) => in_array($class, $hookClasses, true));
+        $container->method('get')
+            ->willReturnCallback(fn(string $class) => $this->createMock($class));
+
+        $registry = $this->createRegistry($registrations, $container);
+        $registry->initialize();
+
+        $registeredCount = count($this->registeredHooks());
+
+        // Skip breakdown — mirrors registry semantics (deferred excluded first)
+        $planProvider = new WPHookPlanProvider();
+        $gateSkipped = 0;
+        $notInContainer = 0;
+        foreach ($registrations as $reg) {
+            if (!empty($reg->defer)) {
+                continue;
+            }
+            if (!in_array($reg->class, $hookClasses, true)) {
+                $notInContainer++;
+                continue;
+            }
+            if ($reg->registerIf === null) {
+                continue;
+            }
+            try {
+                $allowed = $planProvider->evaluateRegistrationGate(
+                    $reg->registerIf,
+                    $reg->registerIfParams ?? [],
+                    $container,
+                    $reg->class . '::' . $reg->method
+                );
+                if ($allowed !== true) {
+                    $gateSkipped++;
+                }
+            } catch (\Throwable) {
+                $gateSkipped++;
+            }
+        }
+        $skipped = $gateSkipped + $notInContainer;
+
+        // ── Integrity ───────────────────────────────────────────────────────
+        $this->assertGreaterThan(0, $scannedClasses, 'Boot should scan at least one class');
+        $this->assertGreaterThan(0, $registeredCount, 'Boot should register at least one hook');
+        $this->assertSame(
+            $discovered,
+            $registeredCount + $deferredCount + $skipped,
+            'discovered must equal registered + deferred + skipped'
+        );
+        $this->assertLessThanOrEqual($discovered, count($taggedRegs), 'tagged registrations are a subset of discovered');
+        $this->assertLessThanOrEqual($discovered, count($executeIfRegs), 'executeIf registrations are a subset of discovered');
+        $this->assertLessThanOrEqual($discovered, count($registerIfRegs), 'registerIf registrations are a subset of discovered');
+
+        // ── Pretty-printed tree ─────────────────────────────────────────────
+        $cyan = "\033[0;36m";
+        $dim = "\033[0;37m";
+        $green = "\033[1;32m";
+        $reset = "\033[0m";
+
+        echo "\n" . $cyan . "🚀 Boot" . $reset . "\n";
+        echo $dim . "├── " . $reset . "🔍 scanned      " . $green . $scannedClasses . $reset . " classes\n";
+        echo $dim . "├── " . $reset . "🏷️  discovered   " . $green . $discovered . $reset . " hook attributes\n";
+        echo $dim . "│   ├── " . $reset . "🔧 actions     " . $green . $actions . $reset . "\n";
+        echo $dim . "│   └── " . $reset . "🔍 filters     " . $green . $filters . $reset . "\n";
+        echo $dim . "├── " . $reset . "⏸️  deferred     " . $green . $deferredCount . $reset . " (pending — not activated)\n";
+        echo $dim . "├── " . $reset . "✅ registered   " . $green . $registeredCount . $reset . "\n";
+        echo $dim . "├── " . $reset . "⏭️  skipped      " . $green . $skipped . $reset . "\n";
+        echo $dim . "│   ├── " . $reset . "🚫 registerIf false     " . $green . $gateSkipped . $reset . "\n";
+        echo $dim . "│   └── " . $reset . "⚠️  not in container    " . $green . $notInContainer . $reset . "\n";
+        echo $dim . "└── " . $reset . "💾 cache        " . $green . "in-memory (miss)" . $reset . "\n";
+
+        echo "\n" . $cyan . "🧭 Usage map" . $reset . "\n";
+        echo $dim . "├── " . $reset . "🏷️  tags        " . $green . count($taggedRegs) . $reset . " hooks → " . $this->formatHookList($taggedRegs) . "\n";
+        echo $dim . "├── " . $reset . "🎯 executeIf    " . $green . count($executeIfRegs) . $reset . " hooks → " . $this->formatHookList($executeIfRegs) . "\n";
+        echo $dim . "├── " . $reset . "🚦 registerIf   " . $green . count($registerIfRegs) . $reset . " hooks → " . $this->formatHookList($registerIfRegs) . "\n";
+        echo $dim . "└── " . $reset . "🌀 dynamic hook " . $green . count($dynamicRegs) . $reset . " hooks → " . $this->formatHookList($dynamicRegs) . "\n";
+        echo "\n";
+    }
+
+    /**
+     * Format registrations as "hookName (Class::method)" entries for the usage map.
+     *
+     * @param array<int, mixed> $registrations
+     */
+    private function formatHookList(array $registrations): string
+    {
+        $labels = [];
+        foreach ($registrations as $reg) {
+            $hook = $reg->hook instanceof \Closure ? '(dynamic closure)' : $reg->hook;
+            $labels[] = $hook . ' (' . $reg->class . '::' . $reg->method . ')';
+        }
+        return implode(', ', $labels);
     }
 }

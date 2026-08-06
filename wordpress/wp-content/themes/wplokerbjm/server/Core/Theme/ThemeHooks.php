@@ -19,7 +19,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  *  wpRestNonce?: string
  * }
  */
-class ThemeInject
+class ThemeProp
 {
 
     /**

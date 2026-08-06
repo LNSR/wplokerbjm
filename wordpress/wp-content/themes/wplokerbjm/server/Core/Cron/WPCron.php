@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Core\Cron;
 use DI\Attribute\Injectable;
+use RankMath\Rest\Shared;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 /**
@@ -17,7 +18,8 @@ class WPCron
      * @param self::DELETE_OLD_JOBS | self::UPDATE_JOB_STATUSES | self::CLEANUP_TAXONOMY $hook
      * @param 'hourly' | 'twicedaily' | 'daily' | 'weekly' | 'monthly' $recurrence
      */
-    private function scheduleEvent(string $hook, string $recurrence): void {
+    private function scheduleEvent(string $hook, string $recurrence): void
+    {
         if (!wp_next_scheduled($hook)) {
             wp_schedule_event(time(), $recurrence, $hook);
         }
@@ -29,9 +31,11 @@ class WPCron
      *
      * @return void
      */
-    #[Action('init', registerIf: static function(): bool {
-        return SharedUtils::isWPCLI();
-    })]
+    #[Action('init',
+        registerIf: static function (): bool {
+                return SharedUtils::isWPCLI();
+                }
+    )]
     public function registerCronWP(): void
     {
         $this->scheduleEvent(self::DELETE_OLD_JOBS, 'daily');

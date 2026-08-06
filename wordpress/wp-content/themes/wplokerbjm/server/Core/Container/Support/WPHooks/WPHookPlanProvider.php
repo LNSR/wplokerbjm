@@ -95,6 +95,32 @@ class WPHookPlanProvider
     }
 
     /**
+     * Resolve the final hook name for a registration.
+     *
+     * A plain string is used as-is; a closure is resolved through the DI
+     * container (via the plan provider) and must return a string.
+     *
+     * @throws \RuntimeException when the closure result is not a string
+     */
+    public function resolveHookName(string|\Closure $hook, ContainerInterface $container, array $hookParams, string $label): string
+    {
+        if (is_string($hook)) {
+            return $hook;
+        }
+
+        $values = $this->resolveCallableParameters($hook, $hookParams, $container, $label);
+        $name = $hook(...$values);
+
+        if (!is_string($name)) {
+            throw new \RuntimeException(
+                'Hook name for ' . $label . ' must return string, got ' . get_debug_type($name)
+            );
+        }
+
+        return $name;
+    }
+
+    /**
      * Resolve a callable's parameters from the container, using the
      * pre-computed plan when available and reflection as a fallback.
      *
@@ -104,13 +130,21 @@ class WPHookPlanProvider
      *
      * @throws RuntimeException when a parameter cannot be resolved
      */
-    public function resolveCallableParameters(\Closure $callable, array $plan, ContainerInterface $container, string $label): array
+    public function resolveCallableParameters(\Closure $callable, array $plan, ContainerInterface $container, string $label, array $hookArgs = []): array
     {
         $params = $plan['params'] ?? [];
 
         if ($params !== []) {
             $values = [];
             foreach ($params as $param) {
+                // Exact parameter-name match wins — hook arguments are injected
+                // by name (e.g. `string $search` receives the handler's $search
+                // argument), removing any scalar-ambiguity.
+                if (array_key_exists($param['name'], $hookArgs)) {
+                    $values[] = $hookArgs[$param['name']];
+                    continue;
+                }
+
                 $values[] = $this->resolveCallableParam($param, $container, $label);
             }
 
@@ -143,6 +177,7 @@ class WPHookPlanProvider
         ContainerInterface $container,
         string $label,
         ?string $targetClass = null,
+        array $hookArgs = [],
     ): bool {
         if ($executeIf === null) {
             return true;
@@ -163,7 +198,7 @@ class WPHookPlanProvider
             }
         }
 
-        $values = $this->resolveCallableParameters($executeIf, $executeIfParams, $container, $label);
+        $values = $this->resolveCallableParameters($executeIf, $executeIfParams, $container, $label, $hookArgs);
         $allowed = $executeIf(...$values);
 
         if (!is_bool($allowed)) {
@@ -173,6 +208,39 @@ class WPHookPlanProvider
         }
 
         return $allowed;
+    }
+
+    /**
+     * Resolve a dynamic tag callable at registration time.
+     *
+     * The callable receives the target instance (typed params resolve from
+     * the container; bindToTarget scope-binds for private access) and must
+     * return the full resolved tag list.
+     *
+     * @param CallablePlan $plan
+     *
+     * @return array<int, string>
+     *
+     * @throws RuntimeException when the callable does not return an array
+     */
+    public function resolveTagCallable(
+        \Closure $tagCallable,
+        array $plan,
+        ContainerInterface $container,
+        string $label,
+        ?string $targetClass = null,
+    ): array {
+        $tagCallable = $this->bindToTarget($tagCallable, $plan, $targetClass);
+        $values = $this->resolveCallableParameters($tagCallable, $plan, $container, $label);
+        $result = $tagCallable(...$values);
+
+        if (!is_array($result)) {
+            throw new RuntimeException(
+                'Tag callable for ' . $label . ' must return array, got ' . get_debug_type($result)
+            );
+        }
+
+        return $result;
     }
 
     /**

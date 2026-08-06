@@ -22,6 +22,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
  *  register_if_params: array,
  *  hook_params: array,
  *  tags: array,
+ *  tag_callable: \Closure|null,
+ *  tag_callable_params: array,
  * }
  */
 readonly class HookRegistration
@@ -41,7 +43,10 @@ readonly class HookRegistration
         public ?\Closure $registerIf = null,
         public array $registerIfParams = [],
         public array $hookParams = [],
+        public array $hookArgs = [],
         public array $tags = [],
+        public ?\Closure $tagCallable = null,
+        public array $tagCallableParams = [],
     ) {
     }
 
@@ -67,7 +72,10 @@ readonly class HookRegistration
             registerIf: $data['register_if'] ?? null,
             registerIfParams: $data['register_if_params'] ?? [],
             hookParams: $data['hook_params'] ?? [],
+            hookArgs: $data['hook_args'] ?? [],
             tags: $data['tags'] ?? [],
+            tagCallable: $data['tag_callable'] ?? null,
+            tagCallableParams: $data['tag_callable_params'] ?? [],
         );
     }
 
@@ -92,7 +100,10 @@ readonly class HookRegistration
             'register_if' => $this->registerIf,
             'register_if_params' => $this->registerIfParams,
             'hook_params' => $this->hookParams,
+            'hook_args' => $this->hookArgs,
             'tags' => $this->tags,
+            'tag_callable' => $this->tagCallable,
+            'tag_callable_params' => $this->tagCallableParams,
         ];
     }
 }

@@ -240,12 +240,13 @@ class WPHooksRuntimeRegistry
      * The hook name, callback and executeIf closure may capture the surrounding
      * scope directly — no container is involved on the runtime registry.
      * @template T of callable
+     * @template O of Object
      * @param string      $hook        Hook name.
      * @param T           $callback    Callable invoked when the hook fires.
      * @param int         $priority    Hook priority.
      * @param int         $acceptedArgs Number of accepted arguments.
      * @param \Closure|null $executeIf   Optional gate: invoked directly, must return bool.
-     * @param object|null $owner       Owning object (defaults to inference).
+     * @param O|null $owner       Owning object (defaults to inference).
      *
      * @throws \RuntimeException when the owner cannot be inferred or the callback is not callable.
      */
@@ -281,17 +282,18 @@ class WPHooksRuntimeRegistry
      * returned to the filter pipeline, and the original value passes through
      * untouched when the handler (or its executeIf) fails.
      * @template T of callable
+     * @template O of Object
      * @param string $hook Hook name
      * @param T $callback Callable invoked when the hook fires.
      * @param int $priority Hook priority
      * @param int $acceptedArgs Number of accepted arguments.
      * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
-     * @param object|null $owner Owning object (defaults to inference).
+     * @param O|null $owner Owning object (defaults to inference).
      * @throws \RuntimeException when the owner cannot be inferred or the callback is not callable.
      */
     public function registerFilter(
         string $hook,
-        mixed $callback,
+        callable $callback,
         int $priority = 10,
         int $acceptedArgs = 1,
         ?\Closure $executeIf = null,
@@ -319,13 +321,15 @@ class WPHooksRuntimeRegistry
      * RuntimeCallableHookHandler, registers it with WordPress immediately and
      * records it under the owner for lifetime-scoped unregistration.
      *
+     * @template T of callable
+     * @template O of Object
      * @param string        $type        'action' or 'filter'.
      * @param string        $hook        Hook name.
-     * @param callable      $callback    Callable invoked when the hook fires.
+     * @param T             $callback    Callable invoked when the hook fires.
      * @param int           $priority    Hook priority.
      * @param int           $acceptedArgs Number of accepted arguments.
      * @param \Closure|null $executeIf   Optional gate: invoked directly, must return bool.
-     * @param object        $owner       Owning object (resolved by the caller).
+     * @param O        $owner       Owning object (resolved by the caller).
      *
      * @throws \RuntimeException when the callback is not callable.
      */

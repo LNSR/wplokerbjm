@@ -4,14 +4,14 @@ namespace WPLokerBJM\Services\GraphQL;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Controllers\GraphQL\Resolvers\{TaxonomyResolver, JobsDataResolver, ThemeDataResolver};
 use WPLokerBJM\Controllers\GraphQL\Resolvers\Auth\JWTDataResolver;
-use WPLokerBJM\Core\Theme\ThemeInject;
+use WPLokerBJM\Core\Theme\ThemeProp;
 use WPLokerBJM\Services\GraphQL\GraphQLData;
 use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Core\Container\Attributes\Action;
 /**
- * @phpstan-import-type ThemeData from ThemeInject
+ * @phpstan-import-type ThemeData from ThemeProp
  * @phpstan-import-type TaxonomyJobTerms from TaxonomyResolver
  * @phpstan-import-type TaxonomyTerms from TaxonomyResolver
  * @phpstan-import-type Filters from JobsDataResolver
@@ -334,25 +334,25 @@ final class GraphQLRegistration
         register_graphql_field(self::TYPE_ROOT_QUERY, 'taxonomyTerms', [
             'type' => self::TYPE_TAXONOMY_TERMS_RESPONSE,
             'description' => 'Get all taxonomy terms grouped by type',
-            'resolve' => fn() => $this->taxonomyResolver->resolveAllTerms(),
+            'resolve' => $this->taxonomyResolver->resolveAllTerms(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'lokasiTerms', [
             'type' => self::TYPE_JSON,
             'description' => 'Get location taxonomy terms',
-            'resolve' => fn() => $this->taxonomyResolver->resolveLokasiTerms(),
+            'resolve' => $this->taxonomyResolver->resolveLokasiTerms(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'genderTerms', [
             'type' => self::TYPE_JSON,
             'description' => 'Get gender taxonomy terms',
-            'resolve' => fn() => $this->taxonomyResolver->resolveGenderTerms(),
+            'resolve' => $this->taxonomyResolver->resolveGenderTerms(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'pendidikanTerms', [
             'type' => self::TYPE_JSON,
             'description' => 'Get education taxonomy terms',
-            'resolve' => fn() => $this->taxonomyResolver->resolvePendidikanTerms(),
+            'resolve' => $this->taxonomyResolver->resolvePendidikanTerms(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'autoSuggestions', [
@@ -364,14 +364,14 @@ final class GraphQLRegistration
                     'description' => 'The search query',
                 ],
             ],
-            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveAutoSuggestions(...$args),
+            'resolve' => $this->jobsDataResolver->resolveAutoSuggestions(...),
         ]);
 
         // Jobs data queries
         register_graphql_field(self::TYPE_ROOT_QUERY, 'carousel', [
             'type' => self::TYPE_CAROUSEL_RESPONSE,
             'description' => 'Get carousel jobs data',
-            'resolve' => fn() => $this->jobsDataResolver->resolveCarousel(),
+            'resolve' => $this->jobsDataResolver->resolveCarousel(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'loadMore', [
@@ -393,7 +393,7 @@ final class GraphQLRegistration
                     'description' => 'Job filters',
                 ],
             ],
-            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveLoadMore(...$args),
+            'resolve' => $this->jobsDataResolver->resolveLoadMore(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'jobGrid', [
@@ -425,7 +425,7 @@ final class GraphQLRegistration
                     'description' => 'Job filters',
                 ],
             ],
-            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveJobGrid(...$args),
+            'resolve' => $this->jobsDataResolver->resolveJobGrid(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'jobDetail', [
@@ -437,7 +437,7 @@ final class GraphQLRegistration
                     'description' => 'Job slug',
                 ],
             ],
-            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveJobDetail(...$args),
+            'resolve' => $this->jobsDataResolver->resolveJobDetail(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'jobSchema', [
@@ -457,13 +457,13 @@ final class GraphQLRegistration
                     'description' => 'Optional schema type. Allowed values: "ItemList" (returns a single ItemList) or "JobPosting" (returns per-id JobPosting schemas). Defaults to per-id JobPosting behavior when omitted.',
                 ],
             ],
-            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveSchema(...$args),
+            'resolve' => $this->jobsDataResolver->resolveSchema(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'themeData', [
             'type' => self::TYPE_THEME_DATA,
             'description' => 'Get theme data',
-            'resolve' => fn() => $this->themeDataResolver->resolveThemeData(),
+            'resolve' => $this->themeDataResolver->resolveThemeData(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'searchJobs', [
@@ -480,7 +480,7 @@ final class GraphQLRegistration
                     'description' => 'Job filters',
                 ],
             ],
-            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveSearchJobs(...$args),
+            'resolve' => $this->jobsDataResolver->resolveSearchJobs(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'rankMathHead', [
@@ -492,7 +492,7 @@ final class GraphQLRegistration
                     'description' => 'URL for RankMath',
                 ],
             ],
-            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveRankMathHead(...$args),
+            'resolve' => $this->jobsDataResolver->resolveRankMathHead(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'syncBookmark', [
@@ -504,7 +504,7 @@ final class GraphQLRegistration
                     'description' => 'Job IDs to retrieve',
                 ],
             ],
-            'resolve' => fn(...$args) => $this->jobsDataResolver->resolveSyncBookmark(...$args),
+            'resolve' => $this->jobsDataResolver->resolveSyncBookmark(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_MUTATION, 'jwt', [
@@ -515,7 +515,7 @@ final class GraphQLRegistration
                 'password' => ['type' => self::TYPE_STRING],
                 'token' => ['type' => self::TYPE_STRING],
             ],
-            'resolve' => fn(...$args) => $this->jwtDataResolver->resolveJWTorValidate(...$args),
+            'resolve' => $this->jwtDataResolver->resolveJWTorValidate(...),
         ]);
     }
 }

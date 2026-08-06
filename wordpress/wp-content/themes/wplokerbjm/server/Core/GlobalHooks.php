@@ -27,7 +27,7 @@ class RedirectHooks
     /**
      * Skip redirect logic for ACME challenge requests and AutoSSL probe user agents.
      */
-    private function shouldBypassAutoSsl(): bool
+    private static function shouldBypassAutoSsl(): bool
     {
         $requestUri = $_SERVER['REQUEST_URI'] ?? '';
         if ($requestUri !== '' && str_starts_with($requestUri, '/.well-known/acme-challenge/')) {
@@ -49,9 +49,9 @@ class RedirectHooks
      * backend-only contexts (REST, AJAX, CLI, cron, preview), and
      * special query-parameter bypass flags.
      */
-    private function shouldSkipRedirect(): bool
+    private static function shouldSkipRedirect(): bool
     {
-        if ($this->shouldBypassAutoSsl()) {
+        if (self::shouldBypassAutoSsl()) {
             return true;
         }
 
@@ -65,7 +65,7 @@ class RedirectHooks
         return false;
     }
 
-    private function shouldRegister(): bool
+    private static function shouldRegister(): bool
     {
 
         if (
@@ -88,11 +88,11 @@ class RedirectHooks
      * ! Notify search engines with 410 Gone for removed job posts.
      */
     #[Action('template_redirect', 2,
-        registerIf: static function (RedirectHooks $hooks): bool {
-                return $hooks->shouldRegister();
+        registerIf: static function (): bool {
+                return self::shouldRegister();
                 },
-        executeIf: static function (RedirectHooks $hooks): bool {
-                return !$hooks->shouldSkipRedirect() && is_404() && is_singular('lowongan');
+        executeIf: static function (): bool {
+                return !self::shouldSkipRedirect() && is_404() && is_singular('lowongan');
                 },
     )]
     public function oldPost410Redirect(): void
@@ -112,11 +112,11 @@ class RedirectHooks
      * public requests to the Svelte frontend (dev vs prod).
      */
     #[Action('template_redirect', 3,
-        registerIf: static function (RedirectHooks $h): bool {
-                return $h->shouldRegister();
+        registerIf: static function (): bool {
+                return self::shouldRegister();
                 },
-        executeIf: static function (RedirectHooks $hooks): bool {
-                return !$hooks->shouldSkipRedirect();
+        executeIf: static function (): bool {
+                return !self::shouldSkipRedirect();
                 },
     )]
     public function headlessFrontendAdminSideRedirect(): void
@@ -200,20 +200,25 @@ class SearchHooks
      * @param \WP_Query     $wp_query The WP_Query object being executed.
      * @return string Modified search SQL fragment.
      */
-    #[Filter('posts_search', 10, 2, registerIf: static function (): bool {
-            return !is_admin() && !SharedUtils::isWPCLI();
-            })]
+    #[Filter('posts_search', 10, 2,
+        registerIf: static function (): bool {
+                return !is_admin() && !SharedUtils::isWPCLI();
+                },
+        executeIf: static function (\WP_Query $wp_query): bool {
+                    if (!defined('GRAPHQL_REQUEST')) {
+                    return false;
+                    }
+
+                $postTypes = (array) ($wp_query->get('post_type') ?: []);
+                return in_array('lowongan', $postTypes, true);
+                },
+
+    )]
     public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
-
         $q = (string) ($wp_query->query_vars['s'] ?? '');
-        if ($wpdb === null || $q === '' || !defined('GRAPHQL_REQUEST')) {
-            return $search;
-        }
-
-        $postTypes = (array) ($wp_query->get('post_type') ?: []);
-        if (!in_array('lowongan', $postTypes, true)) {
+        if ($wpdb === null || $q === '') {
             return $search;
         }
 

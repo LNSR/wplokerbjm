@@ -27,13 +27,13 @@ final class LowonganIngestRoute
 
         register_rest_route(self::NAMESPACE , self::ROUTE_OPTIONS, [
         'methods' => 'GET',
-            'callback' => fn() => $this->optionsController->options(),
-            'permission_callback' => fn($request) => $this->optionsController->permissionsCheck($request),
+            'callback' => $this->optionsController->options(...),
+            'permission_callback' => $this->optionsController->permissionsCheck(...),
         ]);
         register_rest_route(self::NAMESPACE , self::ROUTE, [
             'methods' => 'POST',
-            'callback' => fn($request) => $this->controller->ingest($request),
-            'permission_callback' => fn($request) => $this->controller->permissionsCheck($request),
+            'callback' => $this->controller->ingest(...),
+            'permission_callback' => $this->controller->permissionsCheck(...),
         ]);
     }
 }

@@ -7,7 +7,7 @@ use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Factories\JobDataFactory;
-use WPLokerBJM\Core\Theme\ThemeInject;
+use WPLokerBJM\Core\Theme\ThemeProp;
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
 
 /**
@@ -50,7 +50,7 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  *     dpNonce?: string,
  *     post_time?: string,
  * }
- * @phpstan-import-type ThemeData from 
+ * @phpstan-import-type ThemeData from ThemeProp
  * @phpstan-import-type JobData from JobDataFactory
  * @phpstan-import-type JobPostingSchema from JobSchemaOrg
  * @phpstan-import-type ItemListSchema from JobSchemaOrg
@@ -60,7 +60,7 @@ class GraphQLData
     public function __construct(
         private JobDataFactory $jobDataFactory,
         private JobSchemaOrg $jobSchema,
-        private ThemeInject $themeInject
+        private ThemeProp $ThemeProp
     ) {
     }
 
@@ -207,7 +207,7 @@ class GraphQLData
      */
     public function getThemeData(): array
     {
-        return $this->themeInject->themeData();
+        return $this->ThemeProp->themeData();
     }
 
     /**
