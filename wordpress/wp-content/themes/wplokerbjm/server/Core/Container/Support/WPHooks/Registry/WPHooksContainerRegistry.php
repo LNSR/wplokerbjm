@@ -23,8 +23,21 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\HookTagUtilities;
  * Stores all hook registrations as identifiable ContainerLazyHookHandler instances,
  * enabling unregistration by hook name, class, or specific class::method.
  * Service resolution is deferred to hook-fire time (lazy loading).
- *
- * @phpstan-type HandlerEntry array{key: HookKey, handler: ContainerLazyHookHandler|ContainerLazyPropertyHookHandler, type: 'action'|'filter', priority: int, accepted_args: int, tags: array<int, string>, registerIf: \Closure|null, registerIfParams: array<int, array{name: string, type: class-string|null, hasDefault: bool, default: mixed}>}
+ * @phpstan-type HookConditionParam array{name: string, type: class-string|null, hasDefault: bool, default: mixed}
+ * @phpstan-type SchedulerHookAttributeType array{
+ *  key: HookKey,
+ *  handler: ContainerLazyHookHandler|ContainerLazyPropertyHookHandler,
+ *  type: 'action'|'filter',
+ *  priority: int,
+ *  accepted_args: int,
+ *  tags: array<int, string>,
+ *  registerIf: \Closure|null,
+ *  registerIfParams: array<int, HookConditionParam>,
+ *  executeIf: \Closure|null,
+ *  executeIfParams: array<int, HookConditionParam>,
+ *  once: bool,
+ * }
+ * @phpstan-type HandlerEntry array{key: HookKey, handler: ContainerLazyHookHandler|ContainerLazyPropertyHookHandler, type: 'action'|'filter', priority: int, accepted_args: int, tags: array<int, string>, registerIf: \Closure|null, registerIfParams: array<int, HookConditionParam>, executeIf: \Closure|null, executeIfParams: array<int, HookConditionParam>, once: bool}
  * @phpstan-type RemoveHandlerEntry array{handler: ContainerLazyHookHandler|ContainerLazyPropertyHookHandler, type: 'action'|'filter', priority: int}
  * @phpstan-import-type HookTargetResolve from DeferredHookManager
  */
@@ -36,6 +49,15 @@ class WPHooksContainerRegistry
     private array $handlers = [];
 
     private bool $initialized = false;
+
+    /**
+     * deferRegisterUntilHook entries whose trigger hook already fired before
+     * initialize(). Processed after registerAll's handler loop so no handler
+     * is registered twice.
+     *
+     * @var list<array{string, string}> [hook, key] pairs.
+     */
+    private array $pendingDeferredActivation = [];
 
     /**
      * @param ContainerInterface $container
@@ -74,6 +96,15 @@ class WPHooksContainerRegistry
                 }
             }
         }
+
+        // Trigger hooks that had already fired before boot: activate the
+        // entries now that the active pool is fully registered (deferring this
+        // avoids double-registering handlers that were activated mid-registerAll).
+        $activate = fn (string $h, array $d, string $k) => $this->activateEntry($h, $d, $k);
+        foreach ($this->pendingDeferredActivation as [$hook, $key]) {
+            $this->deferredHookManager->activateDeferredByKey($hook, $key, $activate);
+        }
+        $this->pendingDeferredActivation = [];
 
         $this->initialized = true;
     }
@@ -450,6 +481,24 @@ class WPHooksContainerRegistry
     }
 
     /**
+     * Internal: remove a once-registration from the active pool after its
+     * first fire (consume-on-any-evaluation). Idempotent.
+     */
+    private function removeOnceEntry(string $hook, string $key): void
+    {
+        if (!isset($this->handlers[$hook][$key])) {
+            return;
+        }
+
+        $this->removeSingleHook($hook, $this->handlers[$hook][$key]);
+        unset($this->handlers[$hook][$key]);
+
+        if (empty($this->handlers[$hook])) {
+            unset($this->handlers[$hook]);
+        }
+    }
+
+    /**
      * Register hook registrations from the scanner.
      * Pre-builds ContainerLazyHookHandler instances and validates container existence.
      *
@@ -486,27 +535,32 @@ class WPHooksContainerRegistry
 
             // Registration gate: evaluated ONCE at registration time — a false
             // result means the hook is never registered (deferred or not).
-            try {
-                $allowed = $this->planProvider->evaluateRegistrationGate(
-                    $registration->registerIf,
-                    $registration->registerIfParams,
-                    $this->container,
-                    $registration->class . '::' . $registration->method,
-                    $registration->class
-                );
-            } catch (\Throwable $e) {
-                Logger::error(
-                    'WPHooksContainerRegistry',
-                    'Skipping hook for ' . $registration->class . '::' . $registration->method . ' — ' . $e->getMessage()
-                );
-                continue;
-            }
-            if (!$allowed) {
-                Logger::warning(
-                    'WPHooksContainerRegistry',
-                    'Skipping hook ' . $hookName . ' — registerIf gate returned false.'
-                );
-                continue;
+            // Entries carrying deferRegisterUntilHook skip this gate entirely:
+            // they defer to the named trigger hook, where the gate is evaluated
+            // at activation time (when request context exists).
+            if ($registration->deferRegisterUntilHook === null) {
+                try {
+                    $allowed = $this->planProvider->evaluateRegistrationGate(
+                        $registration->registerIf,
+                        $registration->registerIfParams,
+                        $this->container,
+                        $registration->class . '::' . $registration->method,
+                        $registration->class
+                    );
+                } catch (\Throwable $e) {
+                    Logger::error(
+                        'WPHooksContainerRegistry',
+                        'Skipping hook for ' . $registration->class . '::' . $registration->method . ' — ' . $e->getMessage()
+                    );
+                    continue;
+                }
+                if (!$allowed) {
+                    Logger::warning(
+                        'WPHooksContainerRegistry',
+                        'Skipping hook ' . $hookName . ' — registerIf gate returned false.'
+                    );
+                    continue;
+                }
             }
 
             // Resolve dynamic tags: the attribute accepts either a static tag
@@ -538,10 +592,20 @@ class WPHooksContainerRegistry
                 continue;
             }
 
-            $handler = $registration->target === 'method'
-                ? new ContainerLazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs)
-                : new ContainerLazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs);
             $key = HookKey::fromRegistration($registration);
+
+            $handler = $registration->target === 'method'
+                ? new ContainerLazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs, $registration->once)
+                : new ContainerLazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs, $registration->once);
+
+            if ($registration->once) {
+                $handler->setRemoveCallback(
+                    fn () => $this->removeOnceEntry($hookName, $key->toString())
+                );
+            }
+            /**
+             * @var SchedulerHookAttributeType
+             */
             $entry = [
                 'key' => $key,
                 'handler' => $handler,
@@ -551,14 +615,83 @@ class WPHooksContainerRegistry
                 'tags' => $resolvedTags,
                 'registerIf' => $registration->registerIf,
                 'registerIfParams' => $registration->registerIfParams,
+                'executeIf' => $registration->executeIf,
+                'executeIfParams' => $registration->executeIfParams,
+                'once' => $registration->once,
             ];
 
-            if ($registration->defer) {
+            // deferRegisterUntilHook implies deferral: the entry is held in the
+            // deferred pool until the trigger hook fires, regardless of how the
+            // registration array was built (attribute, scanner cache, runtime).
+            if ($registration->defer || $registration->deferRegisterUntilHook !== null) {
                 $this->deferredHookManager->addDeferred($hookName, $key->toString(), $entry);
+
+                if ($registration->deferRegisterUntilHook !== null) {
+                    $triggerHook = $registration->deferRegisterUntilHook;
+                    if ($triggerHook instanceof \Closure) {
+                        try {
+                            $triggerHook = $this->planProvider->resolveHookName(
+                                $registration->deferRegisterUntilHook,
+                                $this->container,
+                                $registration->deferRegisterUntilHookParams ?? [],
+                                $registration->class . '::' . $registration->method
+                            );
+                        } catch (\RuntimeException $e) {
+                            Logger::error(
+                                'WPHooksContainerRegistry',
+                                'Skipping hook for ' . $registration->class . '::' . $registration->method
+                                . ' — ' . $e->getMessage()
+                            );
+                            continue;
+                        }
+                    }
+                    $this->scheduleDeferredActivation(
+                        $triggerHook,
+                        $hookName,
+                        $key->toString()
+                    );
+                }
             } else {
                 $this->handlers[$hookName][$key->toString()] = $entry;
             }
         }
+    }
+
+    /**
+     * Schedule one-shot activation of a deferRegisterUntilHook entry when the
+     * trigger hook fires. If the trigger already fired (did_action), the entry
+     * is activated immediately.
+     *
+     * The listener stays attached while the gates keep failing, so a later
+     * fire of the trigger hook gets another chance. Once activation succeeds
+     * the listener removes itself.
+     *
+     * @param string $triggerHook WordPress hook that gates activation.
+     * @param string $hook        The deferred entry's own hook name.
+     * @param string $key         The deferred entry's key string.
+     */
+    private function scheduleDeferredActivation(string $triggerHook, string $hook, string $key): void
+    {
+        $activate = fn (string $h, array $d, string $k) => $this->activateEntry($h, $d, $k);
+
+        if (did_action($triggerHook)) {
+            // The trigger already fired before boot — defer to initialize()'s
+            // pending queue so the entry activates exactly once, after the
+            // active handler loop has run.
+            $this->pendingDeferredActivation[] = [$hook, $key];
+            return;
+        }
+
+        $listener = null;
+        $listener = function () use (&$listener, $triggerHook, $hook, $key, $activate): void {
+            $activated = $this->deferredHookManager->activateDeferredByKey($hook, $key, $activate);
+
+            if ($activated) {
+                remove_action($triggerHook, $listener, PHP_INT_MIN);
+            }
+        };
+
+        add_action($triggerHook, $listener, PHP_INT_MIN, 0);
     }
 }
 /**
@@ -567,6 +700,7 @@ class WPHooksContainerRegistry
  * @template TargetClass of Object|class-string
  * @phpstan-type HookTargetResolve TargetClass|callable|string|array{TargetClass, string}
  * @phpstan-import-type HandlerEntry from WPHooksContainerRegistry
+ * @phpstan-import-type SchedulerHookAttributeType from WPHooksContainerRegistry
  */
 class DeferredHookManager
 {
@@ -591,7 +725,7 @@ class DeferredHookManager
     /**
      * Store a deferred hook entry under its hook + key.
      *
-     * @param array<string, mixed> $entry
+     * @param SchedulerHookAttributeType $entry
      */
     public function addDeferred(string $hook, string $key, array $entry): void
     {
@@ -764,6 +898,94 @@ class DeferredHookManager
     }
 
     /**
+     * Activate a single deferred handler by exact hook + key.
+     *
+     * One-shot entry point for deferRegisterUntilHook entries: the trigger
+     * hook listener calls this when the trigger fires. registerIf is
+     * re-evaluated as with every activation; executeIf is additionally
+     * evaluated at activation time, but only when all its parameters are
+     * resolvable from the container — request-scoped parameters (e.g.
+     * \WP_Query) are never fabricated, so executeIf stays a per-fire guard
+     * inside the handler for those entries.
+     * @internal
+     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @return bool True when the entry was newly activated; false when the
+     *              entry is unknown, already active, or a gate rejected it.
+     */
+    public function activateDeferredByKey(string $hook, string $key, callable $activateEntry): bool
+    {
+        if (!isset($this->deferredHandlers[$hook][$key])) {
+            return false;
+        }
+
+        $data = $this->deferredHandlers[$hook][$key];
+
+        // Registration gate: re-evaluated at activation time.
+        if (!$this->gateDeferredActivation($data, $hook, $key)) {
+            return false;
+        }
+
+        // executeIf gate: only when every parameter is container-resolvable.
+        if (($data['executeIf'] ?? null) !== null && $this->executeIfResolvable($data['executeIfParams'] ?? [])) {
+            try {
+                $allowed = $this->planProvider->evaluateExecuteIf(
+                    $data['executeIf'],
+                    $data['executeIfParams'],
+                    $this->container,
+                    $key,
+                    $data['key']->class,
+                );
+            } catch (\Throwable $e) {
+                Logger::error(
+                    'WPHooksContainerRegistry',
+                    'Skipping deferred hook activation ' . $hook . ' — executeIf gate threw: ' . $e->getMessage()
+                );
+                return false;
+            }
+
+            if (!$allowed) {
+                Logger::warning(
+                    'WPHooksContainerRegistry',
+                    'Skipping deferred hook activation ' . $hook . ' — executeIf gate returned false.'
+                );
+                return false;
+            }
+        }
+
+        $activated = $activateEntry($hook, $data, $key);
+
+        unset($this->deferredHandlers[$hook][$key]);
+
+        return $activated;
+    }
+
+    /**
+     * Whether every parameter of an executeIf plan is resolvable from the
+     * container. Scalar parameters with defaults resolve to their default;
+     * class-typed parameters must exist in the container. A parameter without
+     * a type and without a default is request-scoped → not resolvable.
+     *
+     * @param array<string, mixed> $executeIfParams
+     */
+    private function executeIfResolvable(array $executeIfParams): bool
+    {
+        foreach (($executeIfParams['params'] ?? []) as $param) {
+            $type = $param['type'] ?? null;
+            if ($type === null) {
+                if (!($param['hasDefault'] ?? false)) {
+                    return false;
+                }
+                continue;
+            }
+            if (!$this->container->has($type)) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Unregister a deferred hook using a first-class callable, array lookup,
      * or class-string identifier.
      *
@@ -864,9 +1086,9 @@ class DeferredHookManager
      * The gate was already evaluated once in registerAll(); activation is the
      * moment the hook actually registers with WordPress, so it is re-checked
      * here. On failure the entry stays in the deferred pool (a later activation
-     * attempt may succeed once the gate flips to true).
+     * attempt may succeed once the gate flips to true except if 'once' is true).
      *
-     * @param array<string, mixed> $data Handler entry.
+     * @param HandlerEntry $data Handler entry.
      */
     private function gateDeferredActivation(array $data, string $hook, string $key): bool
     {

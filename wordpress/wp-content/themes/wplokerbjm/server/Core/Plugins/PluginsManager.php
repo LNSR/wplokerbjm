@@ -60,7 +60,7 @@ class PluginManagement
      * Runs late on `plugins_loaded` (priority) after WP has fully loaded 
      * all active plugins and constants.
      */
-    #[Action('plugins_loaded', 0)]
+    #[Action('plugins_loaded', 0, once: true)]
     public function unregisterInactivePluginHooks(): void
     {
         foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
@@ -76,7 +76,7 @@ class PluginManagement
         }
     }
 
-    #[Filter('option_active_plugins', 0)]
+    #[Filter('option_active_plugins', 0,)]
     public function activePluginsCondition(array $plugins): array
     {
         $plugins = $this->disablePluginsForDevImpl($plugins);
@@ -88,7 +88,7 @@ class PluginManagement
     /**
      * Remove the "Deactivate" action link for required plugins.
      */
-    #[Filter('plugin_action_links', 4, 2)]
+    #[Filter('plugin_action_links', 4, 2, once: true)]
     public function lockPluginActionLinks(array $actions, string $pluginFile): array
     {
         if (in_array($pluginFile, self::MUST_HAVE_PLUGINS) && isset($actions['deactivate'])) {

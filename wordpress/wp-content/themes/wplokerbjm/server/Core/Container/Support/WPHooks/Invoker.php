@@ -24,6 +24,15 @@ final class ContainerLazyHookHandler
     /** Plan provider used for condition gates and hook-name resolution. */
     private readonly WPHookPlanProvider $planProvider;
 
+    /** @var \Closure():void|null Callback invoked when a once-hook consumes its registration (self-removal). */
+    private ?\Closure $removeCallback = null;
+
+    /** True once the first fire has reached gate evaluation; the registration is spent. */
+    private bool $consumed = false;
+
+    /** True once the removal callback has been invoked (idempotency guard). */
+    private bool $removed = false;
+
     /**
      * @param ContainerInterface $container
      * @param class-string $class
@@ -33,6 +42,7 @@ final class ContainerLazyHookHandler
      * @param \Closure():bool|null $executeIf Gate evaluated before the hook fires; must return bool.
      * @param CallableHookParams $executeIfParams Pre-computed DI plan for the executeIf closure.
      * @param WPHookPlanProvider|null $hookPlanProvider Plan provider for condition/hook-name resolution.
+     * @param bool $once When true, the registration removes itself after its first fire where the executeIf gate is evaluated (consume-on-any-evaluation).
      */
     public function __construct(
         private readonly ContainerInterface $container,
@@ -44,6 +54,7 @@ final class ContainerLazyHookHandler
         private readonly array $executeIfParams = [],
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
         private readonly array $hookArgNames = [],
+        private readonly bool $once = false,
     ) {
         $this->label = $this->class . '::' . $this->method;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
@@ -61,18 +72,66 @@ final class ContainerLazyHookHandler
         }
     }
 
+    /**
+     * Set the callback invoked when this once-hook is consumed (registry self-removal).
+     */
+    public function setRemoveCallback(?\Closure $callback): void
+    {
+        $this->removeCallback = $callback;
+    }
+
+    /**
+     * Consume a once-hook registration: fires the removal callback exactly once.
+     */
+    private function consumeOnce(): void
+    {
+        if (!$this->once || $this->removed || $this->removeCallback === null) {
+            return;
+        }
+        $this->removed = true;
+        try {
+            ($this->removeCallback)();
+        } catch (\Throwable $e) {
+            Logger::error('ContainerLazyHookHandler', 'Error removing once-hook ' . $this->label . ': ' . $e->getMessage());
+        }
+    }
+
     public function __invoke(mixed ...$args): mixed
     {
         $hookArgs = $this->hookArgNames === []
             ? []
             : array_combine(array_slice($this->hookArgNames, 0, count($args)), $args);
 
+        // Once-hooks: the first fire that reaches gate evaluation consumes the
+        // registration, regardless of whether the gate passes, fails, or cannot
+        // be resolved. Any later fire is a no-op (registration is already gone).
+        if ($this->once) {
+            if ($this->consumed) {
+                return ($this->type === 'filter' && array_key_exists(0, $args)) ? $args[0] : null;
+            }
+            $this->consumed = true;
+        }
+
         try {
-            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class, $hookArgs)) {
+            try {
+                $gatePassed = $this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class, $hookArgs);
+            } catch (\Throwable $e) {
+                if (!$this->once) {
+                    throw $e;
+                }
+                Logger::warning(
+                    'ContainerLazyHookHandler',
+                    'executeIf gate unresolvable for once-hook ' . $this->label . ' — treated as pass.'
+                );
+                $gatePassed = true;
+            }
+
+            if (!$gatePassed) {
                 Logger::warning(
                     'ContainerLazyHookHandler',
                     'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                 );
+                $this->consumeOnce();
                 return ($this->type === 'filter' && array_key_exists(0, $args)) ? $args[0] : null;
             }
 
@@ -82,8 +141,10 @@ final class ContainerLazyHookHandler
                 ? $instance->{$this->method}(...$args)
                 : ($this->invoker)($instance, ...$args);
             SharedUtils::isDevelopment() && Logger::debug("ContainerLazyHookHandler", "Hook invoke {$this->label}");
+            $this->consumeOnce();
             return $execute;
         } catch (\Throwable $e) {
+            $this->consumeOnce();
             Logger::error('WPHooksContainerRegistry', 'Error invoking hook for class ' . $this->class . ' and method ' . $this->method . ': ' . $e->getMessage());
             // Filters must pass through the first argument; actions are fire-and-forget.
             return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
@@ -113,6 +174,15 @@ final class ContainerLazyPropertyHookHandler
     /** Plan provider used for condition gates and hook-name resolution. */
     private readonly WPHookPlanProvider $planProvider;
 
+    /** @var \Closure():void|null Callback invoked when a once-hook consumes its registration (self-removal). */
+    private ?\Closure $removeCallback = null;
+
+    /** True once the first fire has reached gate evaluation; the registration is spent. */
+    private bool $consumed = false;
+
+    /** True once the removal callback has been invoked (idempotency guard). */
+    private bool $removed = false;
+
     /**
      * @param ContainerInterface $container
      * @param class-string $class
@@ -122,6 +192,7 @@ final class ContainerLazyPropertyHookHandler
      * @param \Closure():bool|null $executeIf Gate evaluated before the hook fires; must return bool.
      * @param CallableHookParams $executeIfParams Pre-computed DI plan for the executeIf closure.
      * @param WPHookPlanProvider|null $hookPlanProvider Plan provider for condition/hook-name resolution.
+     * @param bool $once When true, the registration removes itself after its first fire where the executeIf gate is evaluated (consume-on-any-evaluation).
      */
     public function __construct(
         private readonly ContainerInterface $container,
@@ -133,6 +204,7 @@ final class ContainerLazyPropertyHookHandler
         private readonly array $executeIfParams = [],
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
         private readonly array $hookArgNames = [],
+        private readonly bool $once = false,
     ) {
         $this->label = $this->class . '::$' . $this->property;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
@@ -149,18 +221,66 @@ final class ContainerLazyPropertyHookHandler
         }
     }
 
+    /**
+     * Set the callback invoked when this once-hook is consumed (registry self-removal).
+     */
+    public function setRemoveCallback(?\Closure $callback): void
+    {
+        $this->removeCallback = $callback;
+    }
+
+    /**
+     * Consume a once-hook registration: fires the removal callback exactly once.
+     */
+    private function consumeOnce(): void
+    {
+        if (!$this->once || $this->removed || $this->removeCallback === null) {
+            return;
+        }
+        $this->removed = true;
+        try {
+            ($this->removeCallback)();
+        } catch (\Throwable $e) {
+            Logger::error('ContainerLazyPropertyHookHandler', 'Error removing once-hook ' . $this->label . ': ' . $e->getMessage());
+        }
+    }
+
     public function __invoke(mixed ...$args): mixed
     {
         $hookArgs = $this->hookArgNames === []
             ? []
             : array_combine(array_slice($this->hookArgNames, 0, count($args)), $args);
 
+        // Once-hooks: the first fire that reaches gate evaluation consumes the
+        // registration, regardless of whether the gate passes, fails, or cannot
+        // be resolved. Any later fire is a no-op (registration is already gone).
+        if ($this->once) {
+            if ($this->consumed) {
+                return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
+            }
+            $this->consumed = true;
+        }
+
         try {
-            if (!$this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class, $hookArgs)) {
+            try {
+                $gatePassed = $this->planProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->container, $this->label, $this->class, $hookArgs);
+            } catch (\Throwable $e) {
+                if (!$this->once) {
+                    throw $e;
+                }
+                Logger::warning(
+                    'ContainerLazyPropertyHookHandler',
+                    'executeIf gate unresolvable for once-hook ' . $this->label . ' — treated as pass.'
+                );
+                $gatePassed = true;
+            }
+
+            if (!$gatePassed) {
                 Logger::warning(
                     'ContainerLazyHookHandler',
                     'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                 );
+                $this->consumeOnce();
                 return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
             }
 
@@ -178,8 +298,11 @@ final class ContainerLazyPropertyHookHandler
                 );
             }
             SharedUtils::isDevelopment() && Logger::debug('WPHooksContainerRegistry', "Property hook {$this->label} invoked successfully.");
-            return $callable(...$args);
+            $result = $callable(...$args);
+            $this->consumeOnce();
+            return $result;
         } catch (\Throwable $e) {
+            $this->consumeOnce();
             Logger::error('WPHooksContainerRegistry', "Error invoking property hook {$this->label}: {$e->getMessage()}");
             // Filters must pass through the first argument; actions are fire-and-forget.
             return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;

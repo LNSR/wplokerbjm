@@ -532,3 +532,66 @@ class HookArgSearchService
         self::$capturedValues = [];
     }
 }
+
+// ── Once-hook fixtures ──────────────────────────────────────────────
+
+/**
+ * Test fixture: a service with an instance-method action hook flagged
+ * `once` (consume-on-any-evaluation).
+ *
+ * The first fire where the executeIf gate is evaluated removes the
+ * registration, regardless of gate outcome. The instantiation counter
+ * lets tests assert the service is resolved only when the gate passes;
+ * the captured values show what the hook actually delivered.
+ */
+class OnceActionService
+{
+    public static int $instantiationCount = 0;
+    public static array $capturedValues = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onOnceAction(string $value = 'default'): void
+    {
+        self::$capturedValues[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedValues = [];
+    }
+}
+
+/**
+ * Test fixture: a service with an instance-method filter hook flagged
+ * `once`.
+ *
+ * After the first apply_filters call the registration is removed, so
+ * subsequent calls must pass the value through untouched.
+ */
+class OnceFilterService
+{
+    public static int $instantiationCount = 0;
+    public static array $capturedArgs = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onOnceFilter(string $value, string $extra = ''): string
+    {
+        self::$capturedArgs[] = ['value' => $value, 'extra' => $extra];
+        return $value . $extra;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedArgs = [];
+    }
+}

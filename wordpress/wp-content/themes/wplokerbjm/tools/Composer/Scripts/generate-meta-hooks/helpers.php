@@ -220,10 +220,30 @@ function renderMetadataSection(array $actions, array $filters, array $tags = [])
             0,
             ["argumentsSet('{$listHooksFilter}')"],
         ],
+        'Action hooks for #[Action] attribute for deferUntilHookExecute' => [
+            '\\WPLokerBJM\\Core\\Container\\Attributes\\Action::__construct()',
+            6,
+            ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
+        ],
+        'Filter hooks for #[Filter] attribute for deferUntilHookExecute' => [
+            '\\WPLokerBJM\\Core\\Container\\Attributes\\Filter::__construct()',
+            6,
+            ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
+        ],
         'Hooks for \\do_action()' => [
             '\\do_action()',
             0,
             ["argumentsSet('{$listHooksAction}')"],
+        ],
+        'Hooks for \\remove_all_actions()' => [
+            '\\remove_all_actions()',
+            0,
+            ["argumentsSet('{$listHooksAction}')"],
+        ],
+        'Hooks for \\remove_all_filters()' => [
+            '\\remove_all_filters()',
+            0,
+            ["argumentsSet('{$listHooksFilter}')"],
         ],
         'Hooks for \\apply_filters()' => [
             '\\apply_filters()',

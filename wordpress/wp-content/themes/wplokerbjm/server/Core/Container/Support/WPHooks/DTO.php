@@ -9,7 +9,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
  * @phpstan-type HookType array{
  *  class: string,
  *  method: string,
- *  type: string,
+ *  type: 'action'|'filter',
  *  hook: string|\Closure,
  *  priority: int,
  *  accepted_args: int,
@@ -24,6 +24,9 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
  *  tags: array,
  *  tag_callable: \Closure|null,
  *  tag_callable_params: array,
+ *  defer_register_until_hook: string|\Closure|null,
+ *  defer_register_until_hook_params: array,
+ *  once: bool,
  * }
  */
 readonly class HookRegistration
@@ -47,6 +50,9 @@ readonly class HookRegistration
         public array $tags = [],
         public ?\Closure $tagCallable = null,
         public array $tagCallableParams = [],
+        public string|\Closure|null $deferRegisterUntilHook = null,
+        public array $deferRegisterUntilHookParams = [],
+        public bool $once = false,
     ) {
     }
 
@@ -76,6 +82,9 @@ readonly class HookRegistration
             tags: $data['tags'] ?? [],
             tagCallable: $data['tag_callable'] ?? null,
             tagCallableParams: $data['tag_callable_params'] ?? [],
+            deferRegisterUntilHook: $data['defer_register_until_hook'] ?? null,
+            deferRegisterUntilHookParams: $data['defer_register_until_hook_params'] ?? [],
+            once: $data['once'] ?? false,
         );
     }
 
@@ -104,6 +113,9 @@ readonly class HookRegistration
             'tags' => $this->tags,
             'tag_callable' => $this->tagCallable,
             'tag_callable_params' => $this->tagCallableParams,
+            'defer_register_until_hook' => $this->deferRegisterUntilHook,
+            'defer_register_until_hook_params' => $this->deferRegisterUntilHookParams,
+            'once' => $this->once,
         ];
     }
 }

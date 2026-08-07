@@ -167,7 +167,7 @@ final class WPGraphQL implements PluginConfigInterface
          * @see WPGraphQL\SmartCache\Cache\Results::init
          *  remove WPGraphQL author hooks
          */
-        remove_all_filters('graphql_response_headers_to_send');
+        \remove_all_filters('graphql_response_headers_to_send');
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
         if (in_array($origin, $this->allowedOrigins(), true)) {
@@ -216,22 +216,26 @@ final class WPGraphQL implements PluginConfigInterface
         if (is_user_logged_in()) {
             $headers['Logged-In'] = 'true';
             $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
-            remove_all_filters('nocache_headers');
-            remove_all_actions('graphql_send_nocache_headers');
-            $this->hookRegistry->activateDeferredByTags([HookTags::GRAPHQL_NOCACHE_HEADERS]);
+            \remove_all_filters('graphql_send_nocache_headers');
+            (void) $this->disableGraphQLNocacheHeader();
         }
         return $headers;
     }
-    #[Filter('graphql_send_nocache_headers', 9, defer: true, tag: [HookTags::GRAPHQL_NOCACHE_HEADERS])]
+    #[Filter('graphql_send_nocache_headers', 9, defer: true)]
     public function disableGraphQLNocacheHeader(): bool
     {
+        $this->hookRegistry->activateDeferredByCallable([$this, __FUNCTION__]);
         return false;
     }
 
-    #[Filter('nocache_headers', 9, defer: true, tag: [HookTags::GRAPHQL_NOCACHE_HEADERS])]
+    #[Filter('nocache_headers', 9, defer: true)]
     public function applyCachePolicy(array $headers): array
     {
         $loggedIn = is_user_logged_in();
+        if ($loggedIn) {
+            remove_all_filters('nocache_headers');
+            $loggedIn && $this->hookRegistry->activateDeferredByCallable([$this, __FUNCTION__]);
+        }
         $isDev = SharedUtils::isDevelopment();
         $cacheValue = match (true) {
             $isDev => $loggedIn ? 'private, no-cache, must-revalidate' : 'public, no-cache, must-revalidate',

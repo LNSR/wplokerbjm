@@ -120,6 +120,9 @@ class WPHooksScanner
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
+                        deferRegisterUntilHook: $attr->deferRegisterUntilHook,
+                        deferRegisterUntilHookParams: $hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
+                        once: $attr->once,
                     );
                 };
                 $this->scanMethodHooks($reflection, $methodCb);
@@ -144,9 +147,16 @@ class WPHooksScanner
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
+                        deferRegisterUntilHook: $attr->deferRegisterUntilHook,
+                        deferRegisterUntilHookParams: $hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
+                        once: $attr->once,
                     );
                 };
                 $this->scanPropertyHooks($reflection, $propertyCb);
+            } catch (\RuntimeException $e) {
+                // Configuration misuse (e.g. a hook attribute on a magic
+                // method) must fail loudly instead of being swallowed.
+                throw $e;
             } catch (\Exception $e) {
                 Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());
             }

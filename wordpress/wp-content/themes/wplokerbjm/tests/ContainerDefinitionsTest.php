@@ -224,6 +224,15 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $registry->initialize();
 
         $registered = $this->registeredHooks();
+        // deferRegisterUntilHook entries arm an internal trigger-hook listener
+        // at boot; those anonymous-closure listeners are registry machinery,
+        // not user hook registrations — exclude them so counts stay aligned
+        // with the scanned registrations.
+        $registered = array_values(array_filter(
+            $registered,
+            static fn (array $hookData) => $hookData['callable'] instanceof ContainerLazyHookHandler
+                || $hookData['callable'] instanceof ContainerLazyPropertyHookHandler
+        ));
         // Deferred hooks (defer: true) are not auto-registered by initialize(),
         // so exclude them from the count assertion. RegisterIf-gated hooks whose
         // gate evaluates to false (environment-dependent, e.g. !isWPCLI() in
@@ -480,7 +489,16 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $registry = $this->createRegistry($registrations, $container);
         $registry->initialize();
 
-        $registeredCount = count($this->registeredHooks());
+        // Internal trigger-hook listeners (armed by deferRegisterUntilHook) are
+        // anonymous closures, not user hook registrations — exclude them from
+        // the registered count so the integrity equation stays aligned with
+        // the scanned registrations.
+        $registeredHooks = array_filter(
+            $this->registeredHooks(),
+            static fn (array $hookData) => $hookData['callable'] instanceof ContainerLazyHookHandler
+                || $hookData['callable'] instanceof ContainerLazyPropertyHookHandler
+        );
+        $registeredCount = count($registeredHooks);
 
         // Skip breakdown — mirrors registry semantics (deferred excluded first)
         $planProvider = new WPHookPlanProvider();

@@ -47,13 +47,13 @@ class TaxonomyRepository
 	/**
 	 * @return array<string, list<\WP_Term>>
 	 */
-	public function getTaxonomyTerms(?bool $showEmpty = false): array
+	public function getTaxonomyTerms(bool $hideEmpty = true): array
 	{
 		$terms = [];
 		foreach ($this->metaBoxesTaxonomies as $taxonomy) {
 			$terms[$taxonomy] = get_terms([
 				'taxonomy' => $taxonomy,
-				'hide_empty' => $showEmpty,
+				'hide_empty' => $hideEmpty,
 			]);
 		}
 

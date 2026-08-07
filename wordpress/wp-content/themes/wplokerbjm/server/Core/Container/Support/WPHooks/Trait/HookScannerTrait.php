@@ -49,6 +49,23 @@ trait HookScannerTrait
                 continue;
             }
 
+            // Magic methods (except __invoke) cannot be hooked: the lazy
+            // handler would call them on a container-built instance, which
+            // misfires for __construct (double construction) and is nonsense
+            // for __get/__set/__call/__toString/... Fail fast with a clear
+            // message instead of silently registering something broken.
+            $methodName = $method->getName();
+            if (
+                str_starts_with($methodName, '__')
+                && $methodName !== '__invoke'
+                && ($method->getAttributes(Action::class) !== [] || $method->getAttributes(Filter::class) !== [])
+            ) {
+                throw new \RuntimeException(
+                    'Hook attribute on magic method ' . $reflection->getName() . '::' . $methodName
+                    . ' is not allowed — only __invoke can be hooked'
+                );
+            }
+
             $visibility = $method->isPublic()
                 ? 'public'
                 : ($method->isProtected() ? 'protected' : 'private');

@@ -10,6 +10,8 @@ use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Shared\Utilities\PluginList;
+
 /*======================================================================
  | Collection of Global Hooks Classes
  ======================================================================*/
@@ -65,6 +67,25 @@ class RedirectHooks
         return false;
     }
 
+    /**
+     * @param WPHooksContainerRegistry $hooksRegistry
+     */
+    public function __construct(private WPHooksContainerRegistry $hooksRegistry)
+    {
+        $hooksRegistry->activateDeferredByClass(__CLASS__);
+    }
+
+    #[Action('init', PHP_INT_MIN,
+        once: true,
+        registerIf: static function (): bool {
+                return self::shouldRegister();
+                },
+    )]
+    public function __invoke()
+    {
+        // trigger constructor
+    }
+
     private static function shouldRegister(): bool
     {
 
@@ -88,9 +109,7 @@ class RedirectHooks
      * ! Notify search engines with 410 Gone for removed job posts.
      */
     #[Action('template_redirect', 2,
-        registerIf: static function (): bool {
-                return self::shouldRegister();
-                },
+        defer: true,
         executeIf: static function (): bool {
                 return !self::shouldSkipRedirect() && is_404() && is_singular('lowongan');
                 },
@@ -112,9 +131,7 @@ class RedirectHooks
      * public requests to the Svelte frontend (dev vs prod).
      */
     #[Action('template_redirect', 3,
-        registerIf: static function (): bool {
-                return self::shouldRegister();
-                },
+        defer: true,
         executeIf: static function (): bool {
                 return !self::shouldSkipRedirect();
                 },
@@ -207,14 +224,16 @@ class SearchHooks
      * @return string Modified search SQL fragment.
      */
     #[Filter('posts_search', 10, 2,
+        deferRegisterUntilHook: 'init_graphql_request',
+        once: true,
         registerIf: static function (): bool {
+                    if (!\defined('GRAPHQL_REQUEST')) {
+                    return false;
+                    }
                 return !is_admin() && !SharedUtils::isWPCLI();
                 },
-        executeIf: static function (\WP_Query $wp_query, WPHooksContainerRegistry $registry): bool {
-                $result = self::checkPostType($wp_query);
-                    if (!$result)
-                    $registry->unregisterByCallable([SearchHooks::class, 'jobPostsSearchFilterImpl']);
-                return $result;
+        executeIf: static function (\WP_Query $wp_query): bool {
+                return self::checkPostType($wp_query);
                 }
 
     )]
@@ -318,18 +337,21 @@ class CacheInvalidationHooks
      *
      * Registered only on hooks that carry post context.
      */
-    #[Action('save_post_lowongan', 10, 2)]
-    #[Action('delete_post_lowongan', 10, 1)]
+    #[Action('save_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 2)]
+    #[Action('delete_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 1)]
     #[Action('trashed_post', 10, 1)]
     #[Action('delete_attachment', 10, 1)]
     #[Action('transition_post_status', 10, 3)]
     public function invalidatePostCache(...$args): void
     {
+        static $_snapshot_postId;
         $post_id = $this->extractPostId($args);
-
-        if ($post_id !== null) {
-            $this->invalidateJobDataCache((int) $post_id);
+        if ((isset($_snapshot_postId) && $_snapshot_postId === $post_id) || $post_id === null) {
+            return;
         }
+        $_snapshot_postId = $post_id;
+
+        $this->invalidateJobDataCache((int) $post_id);
     }
 
     /**
@@ -339,8 +361,8 @@ class CacheInvalidationHooks
      * first fire, this handler removes itself from WordPress so that term/
      * meta changes later in the same request don't trigger redundant purges.
      */
-    #[Action('save_post_lowongan', 10, 2)]
-    #[Action('delete_post_lowongan', 10, 1)]
+    #[Action('save_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 2)]
+    #[Action('delete_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 1)]
     #[Action('trashed_post', 10, 1)]
     #[Action('delete_attachment', 10, 1)]
     #[Action('created_term', 10, 0)]
