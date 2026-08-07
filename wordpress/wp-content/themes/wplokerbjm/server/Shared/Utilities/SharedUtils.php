@@ -15,6 +15,18 @@ enum PluginList: string
         $activePlugins ??= get_option('active_plugins') ?: [];
         return is_array($activePlugins) && in_array($this->value, $activePlugins, true);
     }
+
+    public function deactivePlugin(): void {
+        if($this->isActive()) {
+            deactivate_plugins($this->value, false);
+        }
+    }
+
+    public function activePlugin(): void {
+        if(!$this->isActive()) {
+            activate_plugins($this->value, false);
+        }
+    }
 }
 
 class SharedUtils

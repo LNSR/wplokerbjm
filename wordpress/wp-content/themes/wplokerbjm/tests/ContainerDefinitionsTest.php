@@ -389,6 +389,53 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         echo "\n";
     }
 
+    public function testUnregisterByNamespace(): void
+    {
+        $scanner = new WPhooksScanner(self::$NAMESPACE, '', new WPHookPlanProvider());
+        $registrations = $scanner->getHookRegistrations();
+
+        if (empty($registrations)) {
+            $this->markTestSkipped('No hook registrations discovered to test namespace unregistration.');
+        }
+
+        $hookClasses = array_unique(array_column($registrations, 'class'));
+
+        $container = $this->createMock(ContainerInterface::class);
+        $container->method('has')->willReturnCallback(fn (string $class): bool => in_array($class, $hookClasses, true));
+        $container->method('get')->willReturnCallback(fn (string $class): object => $this->createMock($class));
+
+        $fixturesNs = 'WPLokerBJM\Tests\Support\Fixtures';
+        $expectedRemoved = count(array_filter(
+            $registrations,
+            static fn ($reg): bool => str_starts_with($reg->class, $fixturesNs . '\\') && empty($reg->defer),
+        ));
+
+        $this->assertGreaterThan(0, $expectedRemoved, 'Fixture hooks should exist to unregister');
+
+        $GLOBALS['__wplokerbjm_registered_hooks'] = [];
+
+        $registry = $this->createRegistry($registrations, $container);
+        $registry->initialize();
+        $before = count($this->registeredHooks());
+
+        $registry->unregisterByNamespace($fixturesNs);
+
+        $this->assertSame(
+            $before - $expectedRemoved,
+            count($this->registeredHooks()),
+            'All active Fixtures-namespace hooks should be removed',
+        );
+
+        // Boundary: singular 'Fixture' must not match the plural 'Fixtures' namespace.
+        $registry->unregisterByNamespace('WPLokerBJM\Tests\Support\Fixture');
+
+        $this->assertSame(
+            $before - $expectedRemoved,
+            count($this->registeredHooks()),
+            'Boundary namespace must be a no-op',
+        );
+    }
+
     /**
      * Boot summary: prints a compact tree of scan/registry statistics and a
      * usage map (tags / executeIf / registerIf / dynamic hook names).

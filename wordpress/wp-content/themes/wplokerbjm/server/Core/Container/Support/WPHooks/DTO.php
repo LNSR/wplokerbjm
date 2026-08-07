@@ -112,7 +112,7 @@ readonly class HookRegistration
  *
  * Generates the canonical string used as the array key in the registry
  * ({@see WPHooksContainerRegistry}) and answers structural match questions
- * (by class, or class+method) without string prefix parsing.
+ * (by class, class+method, or namespace) without string prefix parsing.
  */
 readonly class HookKey
 {
@@ -157,5 +157,12 @@ readonly class HookKey
     public function isForCallable(string $class, string $method): bool
     {
         return $this->class === $class && $this->method === $method;
+    }
+
+    public function isWithinNamespace(string $namespace): bool
+    {
+        $namespace = rtrim($namespace, '\\');
+
+        return $namespace !== '' && ($this->class === $namespace || str_starts_with($this->class, $namespace . '\\'));
     }
 }

@@ -221,6 +221,41 @@ class DeferredHookTest extends WplokerbjmTestCase
         );
     }
 
+    public function testActivateDeferredByNamespace(): void
+    {
+        $this->seedRegistrations([
+            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\LazyHookService', 'method' => 'onAction', 'type' => 'action', 'hook' => 'ns_action_a', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
+            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\FilterService', 'method' => 'onFilter', 'type' => 'filter', 'hook' => 'ns_filter_b', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
+            ['class' => self::class, 'method' => 'dummyDeferredC', 'type' => 'action', 'hook' => 'ns_action_c', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
+        ]);
+
+        $this->assertSame(3, $this->deferredHandlersCount(), 'Should start with 3 deferred handlers');
+
+        $activated = $this->registry->activateDeferredByNamespace('WPLokerBJM\Tests\Support\Fixtures');
+
+        $this->assertSame(2, $activated, 'Only the two Fixtures-namespace handlers should activate');
+        $this->assertNotNull(
+            $this->findRegisteredHook('action', 'ns_action_a'),
+            'Fixtures action should be activated by namespace',
+        );
+        $this->assertNotNull(
+            $this->findRegisteredHook('filter', 'ns_filter_b'),
+            'Fixtures filter should be activated by namespace',
+        );
+        $this->assertNull(
+            $this->findRegisteredHook('action', 'ns_action_c'),
+            'self::class handler must stay deferred',
+        );
+        $this->assertSame(1, $this->deferredHandlersCount(), 'Only the self::class handler should remain deferred');
+
+        // Boundary: singular 'Fixture' must not match the plural 'Fixtures' namespace.
+        $this->assertSame(
+            0,
+            $this->registry->activateDeferredByNamespace('WPLokerBJM\Tests\Support\Fixture'),
+            'Boundary namespace must match nothing',
+        );
+    }
+
     public function testActivateDeferredByMethod(): void
     {
         $this->seedRegistrations([
@@ -434,6 +469,26 @@ class DeferredHookTest extends WplokerbjmTestCase
             $this->deferredHandlersCount(),
             'All deferred handlers for self::class should be removed',
         );
+    }
+
+    public function testUnregisterDeferredByNamespace(): void
+    {
+        $this->seedRegistrations([
+            ['class' => self::class, 'method' => 'dummyDeferredA', 'type' => 'action', 'hook' => 'ns_d_a', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
+            ['class' => self::class, 'method' => 'dummyDeferredB', 'type' => 'filter', 'hook' => 'ns_d_b', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
+            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\LazyHookService', 'method' => 'onAction', 'type' => 'action', 'hook' => 'ns_d_c', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
+        ]);
+
+        $this->assertSame(3, $this->deferredHandlersCount(), 'Should start with 3 deferred handlers');
+
+        $this->registry->unregisterDeferredByNamespace('WPLokerBJM\Tests\Support\Fixtures');
+
+        $this->assertSame(2, $this->deferredHandlersCount(), 'Only the Fixtures-namespace handler should be removed');
+
+        // Boundary: singular 'Fixture' must not match the plural 'Fixtures' namespace.
+        $this->registry->unregisterDeferredByNamespace('WPLokerBJM\Tests\Support\Fixture');
+
+        $this->assertSame(2, $this->deferredHandlersCount(), 'Boundary namespace must be a no-op');
     }
 
     public function testUnregisterDeferredByMethod(): void

@@ -72,7 +72,7 @@ class RedirectHooks
             (defined('GRAPHQL_REQUEST') && GRAPHQL_REQUEST) ||
             (defined('REST_REQUEST') && REST_REQUEST) ||
             (defined('DOING_AJAX') && DOING_AJAX) ||
-            (defined('WP_CLI') && WP_CLI) ||
+            SharedUtils::isWPCLI() ||
             is_admin() ||
             isset($_GET['_wfsf']) // WordFence query
         ) {
@@ -195,6 +195,12 @@ class RobotsHooks
  */
 class SearchHooks
 {
+    private static function checkPostType(\WP_Query $wp_query): bool
+    {
+        $postTypes = (array) ($wp_query->get('post_type') ?: []);
+        return in_array(PostTypes::POST_TYPE_LOWONGAN, $postTypes, true);
+    }
+
     /**
      * @param string        $search   The current search SQL fragment (may be empty).
      * @param \WP_Query     $wp_query The WP_Query object being executed.
@@ -204,14 +210,12 @@ class SearchHooks
         registerIf: static function (): bool {
                 return !is_admin() && !SharedUtils::isWPCLI();
                 },
-        executeIf: static function (\WP_Query $wp_query): bool {
-                    if (!defined('GRAPHQL_REQUEST')) {
-                    return false;
-                    }
-
-                $postTypes = (array) ($wp_query->get('post_type') ?: []);
-                return in_array('lowongan', $postTypes, true);
-                },
+        executeIf: static function (\WP_Query $wp_query, WPHooksContainerRegistry $registry): bool {
+                $result = self::checkPostType($wp_query);
+                    if (!$result)
+                    $registry->unregisterByCallable([SearchHooks::class, 'jobPostsSearchFilterImpl']);
+                return $result;
+                }
 
     )]
     public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
@@ -259,7 +263,7 @@ class HTTPHooks
         'muplugins_loaded',
         PHP_INT_MIN,
         registerIf: static function (): bool {
-                return !SharedUtils::isDevelopment();
+                return !SharedUtils::isDevelopment() && !SharedUtils::isWPCLI();
                 }
     )]
     public function setRemoteAddr(): void

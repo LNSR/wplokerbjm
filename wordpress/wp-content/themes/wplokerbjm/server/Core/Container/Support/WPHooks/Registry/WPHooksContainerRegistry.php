@@ -8,6 +8,7 @@ use ReflectionClass;
 use ReflectionFunction;
 use DI\Container;
 use ReflectionProperty;
+use TargetClass;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, HookRegistration, ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, HookKey};
@@ -208,6 +209,23 @@ class WPHooksContainerRegistry
             fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
         );
     }
+
+    /**
+     * Activate all deferred handlers belonging to a service namespace.
+     *
+     * A class matches when it equals the namespace or starts with it followed
+     * by a backslash, so 'App\Core' never matches 'App\CoreExtra\Foo'.
+     *
+     * @param string $namespace Fully qualified namespace prefix.
+     * @return int Number of handlers activated.
+     */
+    public function activateDeferredByNamespace(string $namespace): int
+    {
+        return $this->deferredHookManager->activateDeferredByNamespace(
+            $namespace,
+            fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
+        );
+    }
     #endregion
 
     #region deferred handlers unregisteration methods
@@ -240,6 +258,18 @@ class WPHooksContainerRegistry
     public function unregisterDeferredByClass(string $class): void
     {
         $this->deferredHookManager->unregisterDeferredByClass($class);
+    }
+
+    /**
+     * Unregister all deferred hooks belonging to a service namespace.
+     *
+     * Only touches the deferred pool — active handlers are never affected.
+     *
+     * @param string $namespace Fully qualified namespace prefix.
+     */
+    public function unregisterDeferredByNamespace(string $namespace): void
+    {
+        $this->deferredHookManager->unregisterDeferredByNamespace($namespace);
     }
 
     /**
@@ -307,6 +337,32 @@ class WPHooksContainerRegistry
                 }
                 $this->removeSingleHook($hook, $data);
                 unset($hookHandlers[$key]);
+            }
+        }
+        unset($hookHandlers);
+    }
+
+    /**
+     * Unregister all active hooks belonging to a service namespace.
+     *
+     * Only touches the active pool — deferred handlers are never affected.
+     * A class matches when it equals the namespace or starts with it followed
+     * by a backslash, so 'App\Core' never matches 'App\CoreExtra\Foo'.
+     *
+     * @param string $namespace Fully qualified namespace prefix.
+     */
+    public function unregisterByNamespace(string $namespace): void
+    {
+        foreach ($this->handlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if (!$data['key']->isWithinNamespace($namespace)) {
+                    continue;
+                }
+                $this->removeSingleHook($hook, $data);
+                unset($hookHandlers[$key]);
+            }
+            if (empty($hookHandlers)) {
+                unset($this->handlers[$hook]);
             }
         }
         unset($hookHandlers);
@@ -508,8 +564,8 @@ class WPHooksContainerRegistry
 /**
  * @internal not for external use beyond @see WPHooksContainerRegistry
  * 
- * @template TargetClass of Object
- * @phpstan-type HookTargetResolve object<TargetClass>|callable|string|array{object<TargetClass>, string}
+ * @template TargetClass of Object|class-string
+ * @phpstan-type HookTargetResolve TargetClass|callable|string|array{TargetClass, string}
  * @phpstan-import-type HandlerEntry from WPHooksContainerRegistry
  */
 class DeferredHookManager
@@ -596,6 +652,44 @@ class DeferredHookManager
             }
         }
         unset($hookHandlers);
+    }
+
+    /**
+     * Activate all deferred handlers belonging to a service namespace.
+     *
+     * A class matches when it equals the namespace or starts with it followed
+     * by a backslash, so 'App\Core' never matches 'App\CoreExtra\Foo'.
+     *
+     * @param string $namespace Fully qualified namespace prefix.
+     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @return int Number of handlers activated.
+     */
+    public function activateDeferredByNamespace(string $namespace, callable $activateEntry): int
+    {
+        $activated = 0;
+
+        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if (!$data['key']->isWithinNamespace($namespace)) {
+                    continue;
+                }
+
+                // Registration gate: re-evaluated at activation time.
+                if (!$this->gateDeferredActivation($data, $hook, $key)) {
+                    continue;
+                }
+
+                $activateEntry($hook, $data, $key);
+                unset($hookHandlers[$key]);
+                $activated++;
+            }
+            if (empty($hookHandlers)) {
+                unset($this->deferredHandlers[$hook]);
+            }
+        }
+        unset($hookHandlers);
+
+        return $activated;
     }
 
     /**
@@ -715,6 +809,30 @@ class DeferredHookManager
     }
 
     /**
+     * Unregister all deferred hooks belonging to a service namespace.
+     *
+     * Only touches the deferred pool — active handlers are never affected.
+     * A class matches when it equals the namespace or starts with it followed
+     * by a backslash.
+     *
+     * @param string $namespace Fully qualified namespace prefix.
+     */
+    public function unregisterDeferredByNamespace(string $namespace): void
+    {
+        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if ($data['key']->isWithinNamespace($namespace)) {
+                    unset($hookHandlers[$key]);
+                }
+            }
+            if (empty($hookHandlers)) {
+                unset($this->deferredHandlers[$hook]);
+            }
+        }
+        unset($hookHandlers);
+    }
+
+    /**
      * Unregister all deferred handlers carrying at least one of the given tags.
      *
      * Only touches the deferred pool — active handlers are never affected.
@@ -830,7 +948,11 @@ class HookTargetResolver
     {
         // 1. Array [$object, 'memberName'] — fast path
         if (is_array($target)) {
-            return [get_class($target[0]), $target[1]];
+            if (is_object($target[0])) {
+                return [get_class($target[0]), $target[1]];
+            } elseif (is_string($target[0])) {
+                return [$target[0], $target[1]];
+            }
         }
 
         // 2. String 'Class::method' — static fallback

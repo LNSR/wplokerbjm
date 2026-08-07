@@ -9,11 +9,13 @@ wordpress/wp-content/mu-plugins/*
 !wordpress/wp-content/themes/
 wordpress/wp-content/themes/*
 !wordpress/wp-content/themes/wplokerbjm/
-
+**/.context-manager
 **/.svelte-kit
 **/.wrangler
 **/.tmp
-**/.opencode
+!**/.opencode/
+**/.opencode/*
+!**/.opencode/context/
 **/build
 **/dist
 **/.playwright-mcp

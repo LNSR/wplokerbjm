@@ -59,8 +59,8 @@
     },
 
     // INTELEPHENSE INDEXER CONFIG
-    "intelephense.environment.documentRoot": "wordpress",
-    "intelephense.maxMemory": 4096, // 4GB is plenty when unneeded folders are excluded
+    "intelephense.environment.documentRoot": "wordpress/",
+    "intelephense.maxMemory": 8196,
     "intelephense.diagnostics.enable": false, // Leave diagnostics to Devsense to prevent conflicts
     "intelephense.diagnostics.argumentCount": "on",
     "intelephense.codeLens.implementations.enable": false, // Disable to prevent duplicate CodeLens with Devsense
