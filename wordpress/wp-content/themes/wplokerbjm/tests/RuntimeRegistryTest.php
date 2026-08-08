@@ -578,4 +578,120 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $this->registry->registerAction(hook: 'rt_manual_invalid', callback: [$owner, 'missingMethod']);
     }
+
+    // ── Closure support on the attribute path (hook / registerIf / executeIf) ────
+
+    public function testClosureHookNameResolvedAndFires(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: static function (): string { return 'rt_closure_hook'; }, acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $registered = $this->findRegisteredHook('action', 'rt_closure_hook');
+        $this->assertNotNull($registered, 'Closure-resolved hook must be registered under the resolved name');
+        $this->assertInstanceOf(RuntimeInstanceHookHandler::class, $registered['callable']);
+
+        do_action('rt_closure_hook', 'fired');
+        $this->assertSame(['fired'], $captured);
+    }
+
+    public function testClosureHookCanAccessPrivateClassStateViaScope(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            private const HOOK_NAME = 'rt_scope_closure_hook';
+
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: static function (): string { return self::HOOK_NAME; }, acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_scope_closure_hook'));
+
+        do_action('rt_scope_closure_hook', 'fired');
+        $this->assertSame(['fired'], $captured);
+    }
+
+    public function testClosureRegisterIfSkipsRegistrationWhenFalse(): void
+    {
+        $anon = new class {
+            #[Action(hook: 'rt_closure_register_false', registerIf: static function (): bool { return false; })]
+            public function doSomething(): void {}
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNull($this->findRegisteredHook('action', 'rt_closure_register_false'));
+    }
+
+    public function testClosureRegisterIfRegistersWhenTrue(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_closure_register_true', registerIf: static function (): bool { return true; }, acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_closure_register_true'));
+
+        do_action('rt_closure_register_true', 'fired');
+        $this->assertSame(['fired'], $captured);
+    }
+
+    public function testClosureExecuteIfGatesAttributeAction(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_closure_execute_gated', executeIf: static function (): bool { return false; }, acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+
+            #[Action(hook: 'rt_closure_execute_open', executeIf: static function (): bool { return true; }, acceptedArgs: 1)]
+            public function doOther(string $val): void { $this->captured[] = $val; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        // Gate false → registered but never fires.
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_closure_execute_gated'));
+        do_action('rt_closure_execute_gated', 'blocked');
+        $this->assertSame([], $captured);
+
+        // Gate true → fires.
+        do_action('rt_closure_execute_open', 'open');
+        $this->assertSame(['open'], $captured);
+    }
+
+    public function testClosureExecuteIfFilterPassesThroughWhenFalse(): void
+    {
+        $anon = new class {
+            #[Filter(hook: 'rt_closure_execute_filter', executeIf: static function (): bool { return false; }, acceptedArgs: 2)]
+            public function transform(string $val, string $extra = ''): string { return $val . $extra; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('filter', 'rt_closure_execute_filter'));
+
+        $result = apply_filters('rt_closure_execute_filter', 'original');
+        $this->assertSame('original', $result);
+    }
 }

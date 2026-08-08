@@ -266,20 +266,15 @@ function renderMetadataSection(array $actions, array $filters, array $tags = [])
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
-        'List hooks Action runtime to register' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::registerAction()',
-            0,
-            ["argumentsSet('{$listHooksAction}')"],
-        ],
-        'List hooks Filter runtime to register' => [
+        'List Filter to register for runtime instance' => [
             '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::registerFilter()',
             0,
             ["argumentsSet('{$listHooksFilter}')"],
         ],
-        'List hooks Filter runtime to combined' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::register()',
+        'List Action hooks to register for runtime instance' => [
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::registerAction()',
             0,
-            ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
+            ["argumentsSet('{$listHooksAction}')"],
         ],
         'List hooks to unregister' => [
             '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksContainerRegistry::unregisterByHook()',

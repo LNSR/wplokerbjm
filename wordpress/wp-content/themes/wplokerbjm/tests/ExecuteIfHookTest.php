@@ -176,14 +176,14 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $this->assertSame([], ExecuteIfActionService::$capturedValues);
     }
 
-    public function testRuntimeRegistrySkipsExecuteIfGatedHooks(): void
+    public function testRuntimeRegistryRegistersExecuteIfGatedHooksButGatesAtFireTime(): void
     {
         $registry = new WPHooksRuntimeRegistry();
         $registry->registerHooksOn(new RuntimeExecuteIfService());
 
-        $this->assertNull(
+        $this->assertNotNull(
             $this->findRegisteredHook('action', 'runtime_executeIf_action'),
-            'ExecuteIf-gated hook must NOT be registered on runtime instances'
+            'ExecuteIf-gated hook must be registered on runtime instances (gate evaluated at fire time)'
         );
 
         do_action('runtime_executeIf_action', 'hello');

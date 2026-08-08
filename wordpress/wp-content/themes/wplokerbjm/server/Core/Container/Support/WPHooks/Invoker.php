@@ -333,12 +333,14 @@ final class RuntimeInstanceHookHandler
      * @param string $method   The method name.
      * @param 'public'|'protected'|'private' $visibility
      * @param 'action'|'filter' $type
+     * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
      */
     public function __construct(
         private readonly object $instance,
         private readonly string $method,
         private readonly string $visibility = 'public',
         private readonly string $type = 'action',
+        private readonly ?\Closure $executeIf = null,
     ) {
         $this->label = $this->instance::class . '::' . $this->method;
 
@@ -358,6 +360,23 @@ final class RuntimeInstanceHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
+            if ($this->executeIf !== null) {
+                $allowed = ($this->executeIf)();
+                if (!is_bool($allowed)) {
+                    throw new \RuntimeException(
+                        'Condition for ' . $this->label . ' must return bool, got ' . get_debug_type($allowed)
+                    );
+                }
+
+                if ($allowed === false) {
+                    Logger::warning(
+                        'RuntimeInstanceHookHandler',
+                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
+                    );
+                    return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
+                }
+            }
+
             $execute = $this->visibility === 'public'
                 ? $this->instance->{$this->method}(...$args)
                 : ($this->invoker)($this->instance, ...$args);
@@ -396,12 +415,14 @@ final class RuntimeInstancePropertyHookHandler
      * @param string $property   The property name.
      * @param 'public'|'protected'|'private' $visibility
      * @param 'action'|'filter' $type
+     * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
      */
     public function __construct(
         private readonly object $instance,
         private readonly string $property,
         private readonly string $visibility = 'public',
         private readonly string $type = 'action',
+        private readonly ?\Closure $executeIf = null,
     ) {
         $this->label = $this->instance::class . '::$' . $this->property;
 
@@ -421,6 +442,23 @@ final class RuntimeInstancePropertyHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
+            if ($this->executeIf !== null) {
+                $allowed = ($this->executeIf)();
+                if (!is_bool($allowed)) {
+                    throw new \RuntimeException(
+                        'Condition for ' . $this->label . ' must return bool, got ' . get_debug_type($allowed)
+                    );
+                }
+
+                if ($allowed === false) {
+                    Logger::warning(
+                        'RuntimeInstancePropertyHookHandler',
+                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
+                    );
+                    return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
+                }
+            }
+
             $callable = $this->visibility === 'public'
                 ? $this->instance->{$this->property}
                 : ($this->reader)($this->instance);

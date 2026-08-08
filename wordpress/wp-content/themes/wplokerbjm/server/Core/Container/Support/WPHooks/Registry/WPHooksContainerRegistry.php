@@ -975,7 +975,7 @@ class DeferredHookManager
     /**
      * Activate all deferred handlers carrying at least one of the given tags.
      *
-     * @param array<string> $tags Tag or list of tags to activate.
+     * @param array $tags Tag or list of tags to activate.
      * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
      * @return int Number of handlers activated.
      */
@@ -1255,7 +1255,7 @@ class DeferredHookManager
      *
      * Only touches the deferred pool — active handlers are never affected.
      *
-     * @param array<string> $tags Tag or list of tags to unregister.
+     * @param array $tags Tag or list of tags to unregister.
      */
     public function unregisterDeferredByTags(array $tags): void
     {
@@ -1333,6 +1333,7 @@ class DeferredHookManager
      * attempt may succeed once the gate flips to true except if 'once' is true).
      *
      * @param HandlerEntry $data Handler entry.
+     * @param string $hook
      */
     private function gateDeferredActivation(array $data, string $hook, string $key): bool
     {

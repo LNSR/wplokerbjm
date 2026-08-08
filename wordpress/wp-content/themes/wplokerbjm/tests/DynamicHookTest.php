@@ -168,17 +168,17 @@ class DynamicHookTest extends WplokerbjmTestCase
         self::assertSame(['activated'], DynamicHookService::$capturedValues);
     }
 
-    public function testRuntimeRegistrySkipsClosureHooks(): void
+    public function testRuntimeRegistryRegistersClosureHooks(): void
     {
         $runtimeRegistry = new WPHooksRuntimeRegistry();
         $runtimeRegistry->registerHooksOn(new RuntimeDynamicService());
 
-        // Closure hooks are unsupported on runtime-registered instances
-        // (no container access) — the hook must be skipped with a warning.
-        self::assertNull($this->findRegisteredHook('action', 'runtime_dynamic_action'));
+        // Closure hooks are supported on runtime-registered instances — the
+        // static attribute closure is invoked directly (scope = declaring class).
+        self::assertNotNull($this->findRegisteredHook('action', 'runtime_dynamic_action'));
 
-        do_action('runtime_dynamic_action', 'nope');
-        self::assertSame([], RuntimeDynamicService::$captured);
+        do_action('runtime_dynamic_action', 'fired');
+        self::assertSame(['fired'], RuntimeDynamicService::$captured);
     }
 
     public function testZeroParamClosureHookWithStaticClassReference(): void

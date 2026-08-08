@@ -29,14 +29,18 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
  *       public function onInit(): void { ... }
  *   };
  *
- *! All attribute hooks are registered eagerly — the `deferRegister` & 'condition' flags are
- *! ignored on the attribute path (no container access), and static methods are
- *! silently skipped.
- ** But for compensation:
- *! Manual registration (registerAction() / registerFilter()) is the escape hatch
- *! for runtime state: hook names, callbacks and condition closures may capture
- *! the surrounding scope directly, and `condition` closures ARE supported there
- *! (invoked directly, must return bool).
+ *! All attribute hooks are registered eagerly — the `deferRegister` flag is
+ *! still ignored on the attribute path (no defer machinery), and static
+ *! methods are silently skipped.
+ *! Closures in attribute parameters (hook name, registerIf, executeIf) ARE
+ *! supported: per PHP 8.1 RFC 'Closures in constant expressions' they are
+ *! scoped to the declaring class, so they are rebound to the instance via
+ *! \Closure::bind() and may access the instance's private members directly —
+ *! no container access required.
+ *! Manual registration (registerAction() / registerFilter()) remains the
+ *! escape hatch for runtime state: hook names, callbacks and condition
+ *! closures may capture the surrounding scope directly, and `condition`
+ *! closures are invoked directly there too (must return bool).
  *
  */
 class WPHooksRuntimeRegistry
@@ -97,30 +101,12 @@ class WPHooksRuntimeRegistry
         $this->scanMethodHooks(
             $ref,
             function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records): void {
-                if ($attr->hook instanceof \Closure) {
-                    Logger::warning(
-                        'WPHooksRuntimeRegistry',
-                        'Skipping hook on ' . $method->getName()
-                        . ' — closure hooks are unsupported on runtime-registered instances (no container access)'
-                    );
+                $hook = $this->resolveClosureHook($attr->hook, $instance, $method->getName());
+                if ($hook === null) {
                     return;
                 }
 
-                if ($attr->registerIf !== null) {
-                    Logger::warning(
-                        'WPHooksRuntimeRegistry',
-                        'Skipping hook on ' . $method->getName()
-                        . ' — registerIf closures are unsupported on runtime-registered instances (no container access)'
-                    );
-                    return;
-                }
-
-                if ($attr->executeIf !== null) {
-                    Logger::warning(
-                        'WPHooksRuntimeRegistry',
-                        'Skipping hook ' . $attr->hook . ' on ' . $method->getName()
-                        . ' — executeIf closures are unsupported on runtime-registered instances (no container access)'
-                    );
+                if (!$this->evaluateRegisterIf($attr->registerIf, $instance, $method->getName())) {
                     return;
                 }
 
@@ -128,13 +114,14 @@ class WPHooksRuntimeRegistry
                     $instance,
                     $method->getName(),
                     $visibility,
-                    $type
+                    $type,
+                    $attr->executeIf,
                 );
 
                 if ($type === 'action') {
-                    \add_action($attr->hook, $handler, $attr->priority, $attr->acceptedArgs);
+                    \add_action($hook, $handler, $attr->priority, $attr->acceptedArgs);
                 } else {
-                    \add_filter($attr->hook, $handler, $attr->priority, $attr->acceptedArgs);
+                    \add_filter($hook, $handler, $attr->priority, $attr->acceptedArgs);
                 }
 
                 $records[] = [
@@ -149,30 +136,12 @@ class WPHooksRuntimeRegistry
         $this->scanPropertyHooks(
             $ref,
             function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records): void {
-                if ($attr->hook instanceof \Closure) {
-                    Logger::warning(
-                        'WPHooksRuntimeRegistry',
-                        'Skipping hook on ' . $property->getName()
-                        . ' — closure hooks are unsupported on runtime-registered instances (no container access)'
-                    );
+                $hook = $this->resolveClosureHook($attr->hook, $instance, $property->getName());
+                if ($hook === null) {
                     return;
                 }
 
-                if ($attr->registerIf !== null) {
-                    Logger::warning(
-                        'WPHooksRuntimeRegistry',
-                        'Skipping hook on ' . $property->getName()
-                        . ' — registerIf closures are unsupported on runtime-registered instances (no container access)'
-                    );
-                    return;
-                }
-
-                if ($attr->executeIf !== null) {
-                    Logger::warning(
-                        'WPHooksRuntimeRegistry',
-                        'Skipping hook ' . $attr->hook . ' on ' . $property->getName()
-                        . ' — executeIf closures are unsupported on runtime-registered instances (no container access)'
-                    );
+                if (!$this->evaluateRegisterIf($attr->registerIf, $instance, $property->getName())) {
                     return;
                 }
 
@@ -180,13 +149,14 @@ class WPHooksRuntimeRegistry
                     $instance,
                     $property->getName(),
                     $visibility,
-                    $type
+                    $type,
+                    $attr->executeIf,
                 );
 
                 if ($type === 'action') {
-                    \add_action($attr->hook, $handler, $attr->priority, $attr->acceptedArgs);
+                    \add_action($hook, $handler, $attr->priority, $attr->acceptedArgs);
                 } else {
-                    \add_filter($attr->hook, $handler, $attr->priority, $attr->acceptedArgs);
+                    \add_filter($hook, $handler, $attr->priority, $attr->acceptedArgs);
                 }
 
                 $records[] = [
@@ -201,6 +171,89 @@ class WPHooksRuntimeRegistry
         $this->scanned[$instance] = true;
         $this->registry[$instance] = array_merge($this->registry[$instance] ?? [], $records);
     }
+
+    /**
+     * Resolve a hook name from a static string or an attribute-parameter closure.
+     *
+     * Closures declared in attribute parameters are static and already scoped
+     * to the declaring class (PHP 8.1 RFC 'Closures in constant expressions'),
+     * so private members resolve via self:: and the closure is invoked directly.
+     *
+     * @param string|\Closure $hook       Static hook name or closure resolving to one.
+     * @param object          $instance   Owner instance.
+     * @param string          $targetName Method/property name (for log messages).
+     *
+     * @return string|null The resolved hook name, or null when it could not be resolved.
+     */
+    private function resolveClosureHook(string|\Closure $hook, object $instance, string $targetName): ?string
+    {
+        if (\is_string($hook)) {
+            return $hook;
+        }
+
+        try {
+            $resolved = $hook();
+        } catch (\Throwable $e) {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — hook closure failed: ' . $e->getMessage()
+            );
+            return null;
+        }
+
+        if (!\is_string($resolved) || $resolved === '') {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — hook closure did not resolve to a non-empty string'
+            );
+            return null;
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Evaluate an attribute-parameter registerIf gate (static closure invoked directly).
+     *
+     * @param \Closure|null $registerIf Gate closure (null = no gate).
+     * @param object        $instance  Owner instance.
+     * @param string        $targetName Method/property name (for log messages).
+     */
+    private function evaluateRegisterIf(?\Closure $registerIf, object $instance, string $targetName): bool
+    {
+        if ($registerIf === null) {
+            return true;
+        }
+
+        try {
+            $allowed = $registerIf();
+        } catch (\Throwable $e) {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — registerIf closure failed: ' . $e->getMessage()
+            );
+            return false;
+        }
+
+        if (!\is_bool($allowed)) {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — registerIf must return bool, got ' . get_debug_type($allowed)
+            );
+            return false;
+        }
+
+        if ($allowed === false) {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — registerIf gate returned false.'
+            );
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * Remove all hooks previously registered for the given instance.
      *

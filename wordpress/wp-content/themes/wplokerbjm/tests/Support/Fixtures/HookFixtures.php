@@ -375,19 +375,19 @@ class ExecuteIfFilterService
 }
 
 /**
- * Test fixture: a runtime-registered instance whose #[Action] carries a
+ * Test fixture: a runtime-registered instance whose #[Action] carries an
  * executeIf closure.
  *
- * WPHooksRuntimeRegistry has no container access, so such hooks must be
- * skipped with a warning during registerHooksOn() instead of being
- * registered unexecuteIfally.
+ * Attribute closures are static and scoped to the declaring class (PHP 8.1
+ * RFC 'Closures in constant expressions'); the runtime registry invokes them
+ * directly at fire time — no container access involved.
  */
 class RuntimeExecuteIfService
 {
     public static array $captured = [];
 
-    #[Action(hook: 'runtime_executeIf_action', priority: 10, acceptedArgs: 1, executeIf: static function (\Psr\Container\ContainerInterface $c): bool {
-        return true;
+    #[Action(hook: 'runtime_executeIf_action', priority: 10, acceptedArgs: 1, executeIf: static function (): bool {
+        return false;
     })]
     public function onRuntimeExecuteIfAction(string $value): void
     {
@@ -433,9 +433,9 @@ class DynamicHookService
  * Test fixture: a runtime-registered instance whose #[Action] carries a
  * closure hook name.
  *
- * WPHooksRuntimeRegistry has no container access, so such hooks must be
- * skipped with a warning during registerHooksOn() instead of being
- * registered unexecuteIfally.
+ * Attribute closures are static and scoped to the declaring class (PHP 8.1
+ * RFC 'Closures in constant expressions'); the runtime registry invokes them
+ * directly at registration time to resolve the hook name.
  */
 class RuntimeDynamicService
 {
