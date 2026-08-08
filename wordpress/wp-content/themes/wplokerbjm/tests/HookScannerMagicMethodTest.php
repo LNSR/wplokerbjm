@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Tests;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 

@@ -5,7 +5,8 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
 
 use ReflectionClass;
 use ReflectionFunction;
-use WPLokerBJM\Core\Container\Support\WPHooks\{RuntimeInstancePropertyHookHandler, RuntimeInstanceHookHandler, RuntimeCallableHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstancePropertyHookHandler, RuntimeInstanceHookHandler, RuntimeCallableHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
@@ -33,10 +34,13 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
  *! still ignored on the attribute path (no defer machinery), and static
  *! methods are silently skipped.
  *! Closures in attribute parameters (hook name, registerIf, executeIf) ARE
- *! supported: per PHP 8.1 RFC 'Closures in constant expressions' they are
- *! scoped to the declaring class, so they are rebound to the instance via
- *! \Closure::bind() and may access the instance's private members directly —
- *! no container access required.
+ *! supported: per PHP 8.1 RFC 'Closures in constant expressions' they must be
+ *! static closures, scoped to the declaring class — private members resolve
+ *! via self:: and the closure is invoked directly (no instance binding).
+ *! When a RuntimeWPHookProvider is injected it resolves closure parameters
+ *! (hook args by name, then the container, then defaults); without one,
+ *! closures are invoked with no arguments (only zero-parameter or
+ *! defaulted-parameter closures work).
  *! Manual registration (registerAction() / registerFilter()) remains the
  *! escape hatch for runtime state: hook names, callbacks and condition
  *! closures may capture the surrounding scope directly, and `condition`
@@ -71,8 +75,9 @@ class WPHooksRuntimeRegistry
      */
     private \WeakMap $scanned;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly ?RuntimeWPHookProvider $provider = null,
+    ) {
         $this->registry = new \WeakMap();
         $this->scanned = new \WeakMap();
     }
@@ -101,12 +106,18 @@ class WPHooksRuntimeRegistry
         $this->scanMethodHooks(
             $ref,
             function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records): void {
-                $hook = $this->resolveClosureHook($attr->hook, $instance, $method->getName());
+                $hook = $this->provider !== null && $attr->hook instanceof \Closure
+                    ? $this->provider->resolveRuntimeHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $method->getName())
+                    : $this->resolveClosureHook($attr->hook, $instance, $method->getName());
                 if ($hook === null) {
                     return;
                 }
 
-                if (!$this->evaluateRegisterIf($attr->registerIf, $instance, $method->getName())) {
+                if ($this->provider !== null) {
+                    if (!$this->provider->evaluateRuntimeRegisterIf($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf), $method->getName())) {
+                        return;
+                    }
+                } elseif (!$this->evaluateRegisterIf($attr->registerIf, $instance, $method->getName())) {
                     return;
                 }
 
@@ -116,6 +127,9 @@ class WPHooksRuntimeRegistry
                     $visibility,
                     $type,
                     $attr->executeIf,
+                    $this->provider,
+                    $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
+                    $this->provider !== null ? $this->resolveHookArgNames($instance, $method->getName()) : [],
                 );
 
                 if ($type === 'action') {
@@ -126,7 +140,7 @@ class WPHooksRuntimeRegistry
 
                 $records[] = [
                     'handler' => $handler,
-                    'hook' => $attr->hook,
+                    'hook' => $hook,
                     'priority' => $attr->priority,
                     'type' => $type,
                 ];
@@ -136,12 +150,18 @@ class WPHooksRuntimeRegistry
         $this->scanPropertyHooks(
             $ref,
             function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records): void {
-                $hook = $this->resolveClosureHook($attr->hook, $instance, $property->getName());
+                $hook = $this->provider !== null && $attr->hook instanceof \Closure
+                    ? $this->provider->resolveRuntimeHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $property->getName())
+                    : $this->resolveClosureHook($attr->hook, $instance, $property->getName());
                 if ($hook === null) {
                     return;
                 }
 
-                if (!$this->evaluateRegisterIf($attr->registerIf, $instance, $property->getName())) {
+                if ($this->provider !== null) {
+                    if (!$this->provider->evaluateRuntimeRegisterIf($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf), $property->getName())) {
+                        return;
+                    }
+                } elseif (!$this->evaluateRegisterIf($attr->registerIf, $instance, $property->getName())) {
                     return;
                 }
 
@@ -151,6 +171,9 @@ class WPHooksRuntimeRegistry
                     $visibility,
                     $type,
                     $attr->executeIf,
+                    $this->provider,
+                    $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
+                    [],
                 );
 
                 if ($type === 'action') {
@@ -161,7 +184,7 @@ class WPHooksRuntimeRegistry
 
                 $records[] = [
                     'handler' => $handler,
-                    'hook' => $attr->hook,
+                    'hook' => $hook,
                     'priority' => $attr->priority,
                     'type' => $type,
                 ];
@@ -170,6 +193,20 @@ class WPHooksRuntimeRegistry
 
         $this->scanned[$instance] = true;
         $this->registry[$instance] = array_merge($this->registry[$instance] ?? [], $records);
+    }
+
+    /**
+     * Resolve the parameter names of a hook-annotated method, used to build
+     * named hook args for executeIf parameter resolution.
+     *
+     * @return array<int, string>
+     */
+    private function resolveHookArgNames(object $instance, string $method): array
+    {
+        return array_map(
+            static fn (\ReflectionParameter $param): string => $param->getName(),
+            (new \ReflectionMethod($instance, $method))->getParameters(),
+        );
     }
 
     /**

@@ -7,6 +7,7 @@ use ReflectionClass;
 use ReflectionMethod;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Shared\Log\Logger;

@@ -6,9 +6,9 @@ namespace WPLokerBJM\Tests;
 
 use DI\ContainerBuilder;
 use DI\Container;
-use WPLokerBJM\Core\Container\Support\WPHooks\ContainerLazyPropertyHookHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyPropertyHookHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookTargetResolver, WPHooksContainerRegistry};
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyActionService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyDeferredService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyFilterService;

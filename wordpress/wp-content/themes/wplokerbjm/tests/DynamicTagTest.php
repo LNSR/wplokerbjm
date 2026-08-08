@@ -8,7 +8,7 @@ use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 

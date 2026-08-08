@@ -10,7 +10,7 @@ use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookManager;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\HookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 

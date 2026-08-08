@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests;
 use DI\Container;
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\HookArgSearchService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 

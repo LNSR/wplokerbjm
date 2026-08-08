@@ -11,7 +11,6 @@ use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use GraphQL\Executor\ExecutionResult;
 use WP_User;
-use WPLokerBJM\Core\Container\Support\WPHooks\Constants\HookTags;
 
 /**
  * WPGraphQL-related hooks extracted from GlobalHooks.

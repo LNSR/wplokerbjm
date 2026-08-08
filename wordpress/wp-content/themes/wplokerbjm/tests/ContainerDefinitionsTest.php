@@ -10,17 +10,22 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\Core;
 use WPLokerBJM\Core\Container\Definitions\DefinitionProviderInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
-use WPLokerBJM\Core\Container\Support\WPHooks\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, WPHookPlanProvider, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
+    ContainerLazyHookHandler,
+    ContainerLazyPropertyHookHandler,
+};
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Bootstrap;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 
 class ContainerDefinitionsTest extends WplokerbjmTestCase
 {
     public static string $NAMESPACE = "WPLokerBJM";
-    
+
     public function testCoreDefinitions()
     {
         $definitions = Core::getDefinitions();
@@ -138,7 +143,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     public function testHookAttributesFound()
     {
         // Create scanner like Core.php does
-        $scanner = new WPhooksScanner(
+        $scanner = new WPHooksScanner(
             self::$NAMESPACE,
             '',
             new WPHookPlanProvider()
@@ -230,8 +235,8 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         // with the scanned registrations.
         $registered = array_values(array_filter(
             $registered,
-            static fn (array $hookData) => $hookData['callable'] instanceof ContainerLazyHookHandler
-                || $hookData['callable'] instanceof ContainerLazyPropertyHookHandler
+            static fn(array $hookData) => $hookData['callable'] instanceof ContainerLazyHookHandler
+            || $hookData['callable'] instanceof ContainerLazyPropertyHookHandler
         ));
         // Deferred hooks (deferRegister: true) are not auto-registered by initialize(),
         // so exclude them from the count assertion. RegisterIf-gated hooks whose
@@ -296,14 +301,16 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         echo "\n\033[1;34m⏭️  WPHooksContainerRegistry — Skip Behavior\033[0m\n";
         $targetResolver = new HookTargetResolver();
-        $registry = $this->createRegistry([[
-            'class' => 'NonExistentService',
-            'method' => 'handle',
-            'type' => 'action',
-            'hook' => 'init',
-            'priority' => 10,
-            'accepted_args' => 1,
-        ]], $container);
+        $registry = $this->createRegistry([
+            [
+                'class' => 'NonExistentService',
+                'method' => 'handle',
+                'type' => 'action',
+                'hook' => 'init',
+                'priority' => 10,
+                'accepted_args' => 1,
+            ],
+        ], $container);
         $registry->initialize();
 
         $this->assertCount(0, $this->registeredHooks(), 'Hooks for classes not in container should be skipped');
@@ -410,13 +417,13 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $hookClasses = array_unique(array_column($registrations, 'class'));
 
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->willReturnCallback(fn (string $class): bool => in_array($class, $hookClasses, true));
-        $container->method('get')->willReturnCallback(fn (string $class): object => $this->createMock($class));
+        $container->method('has')->willReturnCallback(fn(string $class): bool => in_array($class, $hookClasses, true));
+        $container->method('get')->willReturnCallback(fn(string $class): object => $this->createMock($class));
 
         $fixturesNs = 'WPLokerBJM\Tests\Support\Fixtures';
         $expectedRemoved = count(array_filter(
             $registrations,
-            static fn ($reg): bool => str_starts_with($reg->class, $fixturesNs . '\\') && empty($reg->deferRegister),
+            static fn($reg): bool => str_starts_with($reg->class, $fixturesNs . '\\') && empty($reg->deferRegister),
         ));
 
         $this->assertGreaterThan(0, $expectedRemoved, 'Fixture hooks should exist to unregister');
@@ -495,8 +502,8 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         // the scanned registrations.
         $registeredHooks = array_filter(
             $this->registeredHooks(),
-            static fn (array $hookData) => $hookData['callable'] instanceof ContainerLazyHookHandler
-                || $hookData['callable'] instanceof ContainerLazyPropertyHookHandler
+            static fn(array $hookData) => $hookData['callable'] instanceof ContainerLazyHookHandler
+            || $hookData['callable'] instanceof ContainerLazyPropertyHookHandler
         );
         $registeredCount = count($registeredHooks);
 

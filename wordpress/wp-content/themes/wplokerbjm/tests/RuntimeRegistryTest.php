@@ -6,7 +6,9 @@ namespace WPLokerBJM\Tests;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Attributes\Filter;
-use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeInstanceHookHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstanceHookHandler, RuntimeCallableHookHandler, RuntimeInstancePropertyHookHandler};
+use DI\ContainerBuilder;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksRuntimeRegistry;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
@@ -392,7 +394,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $registered = $this->findRegisteredHook('action', 'rt_manual_action');
         $this->assertNotNull($registered);
-        $this->assertInstanceOf(\WPLokerBJM\Core\Container\Support\WPHooks\RuntimeCallableHookHandler::class, $registered['callable']);
+        $this->assertInstanceOf(RuntimeCallableHookHandler::class, $registered['callable']);
 
         do_action('rt_manual_action', 'manual');
         $this->assertSame(['manual'], $captured);
@@ -693,5 +695,90 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $result = apply_filters('rt_closure_execute_filter', 'original');
         $this->assertSame('original', $result);
+    }
+
+    // ── RuntimeWPHookProvider dependency resolution ────
+
+    public function testProviderResolvesExecuteIfContainerDependencies(): void
+    {
+        $container = (new ContainerBuilder())
+            ->useAutowiring(true)
+            ->addDefinitions([RuntimeProviderFlagService::class => \DI\autowire(RuntimeProviderFlagService::class)])
+            ->build();
+
+        $registry = new WPHooksRuntimeRegistry(new RuntimeWPHookProvider($container));
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_provider_execute', executeIf: static function (RuntimeProviderFlagService $flag): bool { return $flag->isEnabled(); }, acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+        };
+
+        $registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_provider_execute'));
+        do_action('rt_provider_execute', 'fired');
+        $this->assertSame(['fired'], $captured);
+    }
+
+    public function testProviderExecuteIfGateFalseSkipsFire(): void
+    {
+        $container = (new ContainerBuilder())
+            ->useAutowiring(true)
+            ->addDefinitions([RuntimeProviderFlagService::class => \DI\autowire(RuntimeProviderFlagService::class)])
+            ->build();
+        $container->get(RuntimeProviderFlagService::class)->enabled = false;
+
+        $registry = new WPHooksRuntimeRegistry(new RuntimeWPHookProvider($container));
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_provider_execute_false', executeIf: static function (RuntimeProviderFlagService $flag): bool { return $flag->isEnabled(); }, acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+        };
+
+        $registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_provider_execute_false'));
+        do_action('rt_provider_execute_false', 'blocked');
+        $this->assertSame([], $captured);
+    }
+
+    public function testProviderRegisterIfUsesDefaultParameters(): void
+    {
+        $registry = new WPHooksRuntimeRegistry(new RuntimeWPHookProvider());
+
+        $anon = new class {
+            #[Action(hook: 'rt_provider_register_default_false', registerIf: static function (bool $flag = false): bool { return $flag; })]
+            public function doFalse(): void {}
+
+            #[Action(hook: 'rt_provider_register_default_true', registerIf: static function (bool $flag = true): bool { return $flag; })]
+            public function doTrue(): void {}
+        };
+
+        $registry->registerHooksOn($anon);
+
+        // Default false → gate false → skipped.
+        $this->assertNull($this->findRegisteredHook('action', 'rt_provider_register_default_false'));
+        // Default true → gate true → registered.
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_provider_register_default_true'));
+    }
+}
+
+/**
+ * Simple container service used to prove RuntimeWPHookProvider dependency
+ * resolution on the runtime attribute path.
+ */
+class RuntimeProviderFlagService
+{
+    public bool $enabled = true;
+
+    public function isEnabled(): bool
+    {
+        return $this->enabled;
     }
 }

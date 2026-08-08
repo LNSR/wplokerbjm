@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests;
 use DI\Container;
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, WPHooksScanner};
+use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Tests\Support\Fixtures\{ChildNoRedeclareService, ChildRedeclareService, ParentHookService};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 

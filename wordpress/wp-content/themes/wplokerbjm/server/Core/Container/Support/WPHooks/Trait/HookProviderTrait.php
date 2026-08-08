@@ -104,7 +104,7 @@ trait HookProviderTrait
      *
      * @throws \RuntimeException when the closure result is not a string
      */
-    public function resolveHookName(string|\Closure $hook, ContainerInterface $container, array $hookParams, string $label): string
+    public function resolveHookName(string|\Closure $hook, ?ContainerInterface $container = null, array $hookParams = [], string $label = ''): string
     {
         if (is_string($hook)) {
             return $hook;
@@ -132,7 +132,7 @@ trait HookProviderTrait
      *
      * @throws RuntimeException when a parameter cannot be resolved
      */
-    public function resolveCallableParameters(\Closure $callable, array $plan, ContainerInterface $container, string $label, array $hookArgs = []): array
+    public function resolveCallableParameters(\Closure $callable, array $plan, ?ContainerInterface $container = null, string $label = '', array $hookArgs = []): array
     {
         $params = $plan['params'] ?? [];
 
@@ -176,8 +176,8 @@ trait HookProviderTrait
     public function evaluateExecuteIf(
         ?\Closure $executeIf,
         array $executeIfParams,
-        ContainerInterface $container,
-        string $label,
+        ?ContainerInterface $container = null,
+        string $label = '',
         ?string $targetClass = null,
         array $hookArgs = [],
     ): bool {
@@ -228,8 +228,8 @@ trait HookProviderTrait
     public function resolveTagCallable(
         \Closure $tagCallable,
         array $plan,
-        ContainerInterface $container,
-        string $label,
+        ?ContainerInterface $container = null,
+        string $label = '',
         ?string $targetClass = null,
     ): array {
         $tagCallable = $this->bindToTarget($tagCallable, $plan, $targetClass);
@@ -262,8 +262,8 @@ trait HookProviderTrait
     public function evaluateRegistrationGate(
         ?\Closure $registerIf,
         array $registerIfParams,
-        ContainerInterface $container,
-        string $label,
+        ?ContainerInterface $container = null,
+        string $label = '',
         ?string $targetClass = null,
     ): bool {
         if ($registerIf === null) {
@@ -320,6 +320,13 @@ trait HookProviderTrait
             return $closure;
         }
 
+        // Defensive lazy init: a using class may override the trait constructor
+        // (e.g. to take a container), leaving the WeakMap uninitialized — a
+        // WeakMap typed property cannot be auto-initialized on offset write.
+        if (!isset($this->boundClosureCache)) {
+            $this->boundClosureCache = new \WeakMap();
+        }
+
         if (!isset($this->boundClosureCache[$closure])) {
             $this->boundClosureCache[$closure] = [];
         }
@@ -333,11 +340,11 @@ trait HookProviderTrait
      *
      * @throws RuntimeException when the parameter cannot be resolved
      */
-    private function resolveCallableParam(array $param, ContainerInterface $container, string $label): mixed
+    private function resolveCallableParam(array $param, ?ContainerInterface $container = null, string $label = ''): mixed
     {
         $type = $param['type'] ?? null;
 
-        if (is_string($type) && $type !== '' && $container->has($type)) {
+        if (is_string($type) && $type !== '' && $container !== null && $container->has($type)) {
             return $container->get($type);
         }
 
@@ -359,7 +366,7 @@ trait HookProviderTrait
      *
      * @throws RuntimeException when a parameter cannot be resolved
      */
-    private function resolveCallableFallback(\Closure $callable, ContainerInterface $container, string $label): array
+    private function resolveCallableFallback(\Closure $callable, ?ContainerInterface $container = null, string $label = ''): array
     {
         $reflect = new ReflectionFunction($callable);
         $values = [];
@@ -370,7 +377,7 @@ trait HookProviderTrait
 
             if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
                 $className = $type->getName();
-                if ($container->has($className)) {
+                if ($container !== null && $container->has($className)) {
                     $values[] = $container->get($className);
                     $resolved = true;
                 }

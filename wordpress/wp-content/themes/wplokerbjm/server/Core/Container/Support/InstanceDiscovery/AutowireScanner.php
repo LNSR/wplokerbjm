@@ -139,6 +139,14 @@ class AutowireScanner
             return false;
         }
 
+        // Test fixtures live under the Tests namespace — never autowire them.
+        // The test RobotLoader scans tests/ alongside server/, so without this
+        // exclusion WPLokerBJM\Tests\* classes leak into container definitions
+        // and make test-env autowiring flaky. No-op in production.
+        if (str_starts_with($className, $this->namespace . '\\Tests\\')) {
+            return false;
+        }
+
         return true;
     }
 
