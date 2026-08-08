@@ -23,4 +23,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 class WPHookPlanProvider
 {
     use HookProviderTrait;
+    public function __construct()
+    {
+        $this->boundClosureCache = new \WeakMap();
+    }
 }

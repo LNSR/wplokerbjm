@@ -45,7 +45,6 @@ class Core implements DefinitionProviderInterface
 
         $core = [
             WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class),
-            RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             HookTargetResolver::class => \DI\autowire(HookTargetResolver::class)->lazy(),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class))->lazy(),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, static fn() => get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class))->lazy(),

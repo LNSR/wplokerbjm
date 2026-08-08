@@ -767,6 +767,75 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         // Default true → gate true → registered.
         $this->assertNotNull($this->findRegisteredHook('action', 'rt_provider_register_default_true'));
     }
+
+    // ── Runtime once (consume-on-any-evaluation) ──
+
+    public function testOnceActionFiresOnceThenAutoRemoves(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_once_action', once: true, acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_once_action'));
+
+        do_action('rt_once_action', 'fired');
+        $this->assertSame(['fired'], $captured);
+
+        // The registration consumed itself on the first fire.
+        $this->assertNull($this->findRegisteredHook('action', 'rt_once_action'));
+
+        do_action('rt_once_action', 'again');
+        $this->assertSame(['fired'], $captured);
+    }
+
+    public function testOnceActionWithFailingExecuteIfConsumesWithoutFiring(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_once_execute_false', once: true, executeIf: static function (): bool { return false; }, acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_once_execute_false'));
+
+        do_action('rt_once_execute_false', 'blocked');
+        $this->assertSame([], $captured);
+
+        // Gate false still consumes the once-fire — no retry.
+        $this->assertNull($this->findRegisteredHook('action', 'rt_once_execute_false'));
+    }
+
+    public function testOnceFilterInterceptsOnceThenPassesThrough(): void
+    {
+        $anon = new class {
+            #[Filter(hook: 'rt_once_filter', once: true, acceptedArgs: 1)]
+            public function transform(string $val): string { return strtoupper($val); }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('filter', 'rt_once_filter'));
+
+        $first = apply_filters('rt_once_filter', 'alpha');
+        $this->assertSame('ALPHA', $first);
+
+        $this->assertNull($this->findRegisteredHook('filter', 'rt_once_filter'));
+
+        $second = apply_filters('rt_once_filter', 'beta');
+        $this->assertSame('beta', $second);
+    }
 }
 
 /**

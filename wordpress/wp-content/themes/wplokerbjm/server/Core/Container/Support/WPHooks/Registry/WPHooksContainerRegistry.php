@@ -16,7 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler,
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{AnonClassHookPropertyAbstract};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
 
 /**
  * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
@@ -819,12 +819,7 @@ class WPHooksContainerRegistry
  */
 class DeferredHookManager
 {
-    /**
-     * Deferred handlers pool, keyed by [hook][key-string] like the active pool.
-     *
-     * @var array<string, array<string, HandlerEntry>>
-     */
-    private array $deferredHandlers = [];
+    use DeferredHooksTrait;
 
     /**
      * @param WPHookPlanProvider  $planProvider Plan provider used for registerIf gates.
@@ -838,16 +833,6 @@ class DeferredHookManager
     }
 
     /**
-     * Store a deferred hook entry under its hook + key.
-     *
-     * @param SchedulerHookAttributeType $entry
-     */
-    public function addDeferred(string $hook, string $key, array $entry): void
-    {
-        $this->deferredHandlers[$hook][$key] = $entry;
-    }
-
-    /**
      * Activate all deferred handlers registered for a specific WordPress hook.
      *
      * @param callable(string, array, string): bool $activateEntry Registry callback: moves the
@@ -858,20 +843,10 @@ class DeferredHookManager
      */
     public function activateDeferredByHook(string $hook, callable $activateEntry): void
     {
-        if (empty($this->deferredHandlers[$hook])) {
-            return;
-        }
-
-        foreach ($this->deferredHandlers[$hook] as $key => $data) {
-            // Registration gate: re-evaluated at activation time.
-            if (!$this->gateDeferredActivation($data, $hook, $key)) {
-                continue;
-            }
-
-            $activateEntry($hook, $data, $key);
-        }
-
-        unset($this->deferredHandlers[$hook]);
+        $this->activateMatchingDeferredEntries(
+            static fn (string $h): bool => $h === $hook,
+            $activateEntry,
+        );
     }
 
     /**
@@ -882,25 +857,10 @@ class DeferredHookManager
      */
     public function activateDeferredByClass(string $class, callable $activateEntry): void
     {
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (!$data['key']->isForClass($class)) {
-                    continue;
-                }
-
-                // Registration gate: re-evaluated at activation time.
-                if (!$this->gateDeferredActivation($data, $hook, $key)) {
-                    continue;
-                }
-
-                $activateEntry($hook, $data, $key);
-                unset($hookHandlers[$key]);
-            }
-            if (empty($hookHandlers)) {
-                unset($this->deferredHandlers[$hook]);
-            }
-        }
-        unset($hookHandlers);
+        $this->activateMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => $d['key']->isForClass($class),
+            $activateEntry,
+        );
     }
 
     /**
@@ -915,30 +875,10 @@ class DeferredHookManager
      */
     public function activateDeferredByNamespace(string $namespace, callable $activateEntry): int
     {
-        $activated = 0;
-
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (!$data['key']->isWithinNamespace($namespace)) {
-                    continue;
-                }
-
-                // Registration gate: re-evaluated at activation time.
-                if (!$this->gateDeferredActivation($data, $hook, $key)) {
-                    continue;
-                }
-
-                $activateEntry($hook, $data, $key);
-                unset($hookHandlers[$key]);
-                $activated++;
-            }
-            if (empty($hookHandlers)) {
-                unset($this->deferredHandlers[$hook]);
-            }
-        }
-        unset($hookHandlers);
-
-        return $activated;
+        return $this->activateMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => $d['key']->isWithinNamespace($namespace),
+            $activateEntry,
+        );
     }
 
     /**
@@ -952,25 +892,11 @@ class DeferredHookManager
     public function activateDeferredByCallable(callable|string|array $target, callable $activateEntry): void
     {
         [$class, $method] = $this->resolverTarget->resolve($target);
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (!$data['key']->isForCallable($class, $method)) {
-                    continue;
-                }
 
-                // Registration gate: re-evaluated at activation time.
-                if (!$this->gateDeferredActivation($data, $hook, $key)) {
-                    continue;
-                }
-
-                $activateEntry($hook, $data, $key);
-                unset($hookHandlers[$key]);
-            }
-            if (empty($hookHandlers)) {
-                unset($this->deferredHandlers[$hook]);
-            }
-        }
-        unset($hookHandlers);
+        $this->activateMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => $d['key']->isForCallable($class, $method),
+            $activateEntry,
+        );
     }
 
     /**
@@ -986,30 +912,10 @@ class DeferredHookManager
             return 0;
         }
 
-        $activated = 0;
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (array_intersect($tags, $data['tags']) === []) {
-                    continue;
-                }
-
-                // Registration gate: re-evaluated at activation time.
-                if (!$this->gateDeferredActivation($data, $hook, $key)) {
-                    continue;
-                }
-
-                if ($activateEntry($hook, $data, $key)) {
-                    $activated++;
-                }
-                unset($hookHandlers[$key]);
-            }
-            if (empty($hookHandlers)) {
-                unset($this->deferredHandlers[$hook]);
-            }
-        }
-        unset($hookHandlers);
-
-        return $activated;
+        return $this->activateMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => array_intersect($tags, $d['tags']) !== [],
+            $activateEntry,
+        );
     }
 
     /**
@@ -1027,28 +933,10 @@ class DeferredHookManager
     {
         HookPattern::assertValid($pattern);
 
-        $activated = 0;
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            if (!HookPattern::matches($hook, $pattern)) {
-                continue;
-            }
-            foreach ($hookHandlers as $key => $data) {
-                // Registration gate: re-evaluated at activation time.
-                if (!$this->gateDeferredActivation($data, $hook, $key)) {
-                    continue;
-                }
-                if ($activateEntry($hook, $data, $key)) {
-                    $activated++;
-                }
-                unset($hookHandlers[$key]);
-            }
-            if (empty($hookHandlers)) {
-                unset($this->deferredHandlers[$hook]);
-            }
-        }
-        unset($hookHandlers);
-
-        return $activated;
+        return $this->activateMatchingDeferredEntries(
+            static fn (string $h): bool => HookPattern::matches($h, $pattern),
+            $activateEntry,
+        );
     }
 
     /**
@@ -1069,29 +957,10 @@ class DeferredHookManager
         }
         HookPattern::assertValidAll($patterns);
 
-        $activated = 0;
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (!HookPattern::matchesAny($data['tags'], $patterns)) {
-                    continue;
-                }
-
-                // Registration gate: re-evaluated at activation time.
-                if (!$this->gateDeferredActivation($data, $hook, $key)) {
-                    continue;
-                }
-                if ($activateEntry($hook, $data, $key)) {
-                    $activated++;
-                }
-                unset($hookHandlers[$key]);
-            }
-            if (empty($hookHandlers)) {
-                unset($this->deferredHandlers[$hook]);
-            }
-        }
-        unset($hookHandlers);
-
-        return $activated;
+        return $this->activateMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => HookPattern::matchesAny($d['tags'], $patterns),
+            $activateEntry,
+        );
     }
 
     /**
@@ -1192,13 +1061,9 @@ class DeferredHookManager
     {
         [$class, $method] = $this->resolverTarget->resolve($target);
 
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if ($data['key']->isForCallable($class, $method)) {
-                    unset($hookHandlers[$key]);
-                }
-            }
-        }
+        $this->unregisterMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => $d['key']->isForCallable($class, $method),
+        );
     }
 
     /**
@@ -1218,13 +1083,9 @@ class DeferredHookManager
      */
     public function unregisterDeferredByClass(string $class): void
     {
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if ($data['key']->isForClass($class)) {
-                    unset($hookHandlers[$key]);
-                }
-            }
-        }
+        $this->unregisterMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => $d['key']->isForClass($class),
+        );
     }
 
     /**
@@ -1238,17 +1099,9 @@ class DeferredHookManager
      */
     public function unregisterDeferredByNamespace(string $namespace): void
     {
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if ($data['key']->isWithinNamespace($namespace)) {
-                    unset($hookHandlers[$key]);
-                }
-            }
-            if (empty($hookHandlers)) {
-                unset($this->deferredHandlers[$hook]);
-            }
-        }
-        unset($hookHandlers);
+        $this->unregisterMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => $d['key']->isWithinNamespace($namespace),
+        );
     }
 
     /**
@@ -1264,17 +1117,9 @@ class DeferredHookManager
             return;
         }
 
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (array_intersect($tags, $data['tags']) !== []) {
-                    unset($hookHandlers[$key]);
-                }
-            }
-            if (empty($hookHandlers)) {
-                unset($this->deferredHandlers[$hook]);
-            }
-        }
-        unset($hookHandlers);
+        $this->unregisterMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => array_intersect($tags, $d['tags']) !== [],
+        );
     }
 
     /**
@@ -1288,13 +1133,9 @@ class DeferredHookManager
     {
         HookPattern::assertValid($pattern);
 
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            if (!HookPattern::matches($hook, $pattern)) {
-                continue;
-            }
-            unset($this->deferredHandlers[$hook]);
-        }
-        unset($hookHandlers);
+        $this->unregisterMatchingDeferredEntries(
+            static fn (string $h): bool => HookPattern::matches($h, $pattern),
+        );
     }
 
     /**
@@ -1312,17 +1153,9 @@ class DeferredHookManager
         }
         HookPattern::assertValidAll($patterns);
 
-        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (HookPattern::matchesAny($data['tags'], $patterns)) {
-                    unset($hookHandlers[$key]);
-                }
-            }
-            if (empty($hookHandlers)) {
-                unset($this->deferredHandlers[$hook]);
-            }
-        }
-        unset($hookHandlers);
+        $this->unregisterMatchingDeferredEntries(
+            static fn (string $h, array $d): bool => HookPattern::matchesAny($d['tags'], $patterns),
+        );
     }
 
     /**
@@ -1336,7 +1169,7 @@ class DeferredHookManager
      * @param HandlerEntry $data Handler entry.
      * @param string $hook
      */
-    private function gateDeferredActivation(array $data, string $hook, string $key): bool
+    protected function gateDeferredActivation(array $data, string $hook, string $key): bool
     {
         if (($data['registerIf'] ?? null) === null) {
             return true;

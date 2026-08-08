@@ -19,7 +19,7 @@ require_once __DIR__ . '/../../../mu-plugins/wplokerbjm-bootstrap.php';
 $testRl = (new \Nette\Loaders\RobotLoader)
     ->addDirectory(__DIR__)
     ->addDirectory(__DIR__ . '/../server')
-    ->setTempDirectory(__DIR__ . '/../cache/wplokerbjm-tests')
+    ->setTempDirectory(__DIR__ . '/cache/wplokerbjm-tests')
     ->setAutoRefresh(true)
     ->reportParseErrors(true);
 $testRl->register();

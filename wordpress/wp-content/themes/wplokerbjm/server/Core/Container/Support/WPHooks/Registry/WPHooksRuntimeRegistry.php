@@ -130,7 +130,12 @@ class WPHooksRuntimeRegistry
                     $this->provider,
                     $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
                     $this->provider !== null ? $this->resolveHookArgNames($instance, $method->getName()) : [],
+                    $attr->once,
                 );
+
+                if ($attr->once) {
+                    $handler->setRemoveCallback(fn () => $this->removeOnceRecord($instance, $handler));
+                }
 
                 if ($type === 'action') {
                     \add_action($hook, $handler, $attr->priority, $attr->acceptedArgs);
@@ -174,7 +179,12 @@ class WPHooksRuntimeRegistry
                     $this->provider,
                     $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
                     [],
+                    $attr->once,
                 );
+
+                if ($attr->once) {
+                    $handler->setRemoveCallback(fn () => $this->removeOnceRecord($instance, $handler));
+                }
 
                 if ($type === 'action') {
                     \add_action($hook, $handler, $attr->priority, $attr->acceptedArgs);
@@ -207,6 +217,39 @@ class WPHooksRuntimeRegistry
             static fn (\ReflectionParameter $param): string => $param->getName(),
             (new \ReflectionMethod($instance, $method))->getParameters(),
         );
+    }
+
+    /**
+     * Remove a once-consumed runtime hook: detach the handler from WordPress
+     * and drop its record from the owner's registry list.
+     *
+     * Idempotent — the record may already be gone (e.g. the owner was
+     * unregistered before the hook ever fired).
+     *
+     * @param object $instance Owner instance.
+     * @param object $handler  The handler that consumed its once-fire.
+     */
+    private function removeOnceRecord(object $instance, object $handler): void
+    {
+        if (!isset($this->registry[$instance])) {
+            return;
+        }
+
+        foreach ($this->registry[$instance] as $record) {
+            if ($record['handler'] === $handler) {
+                if ($record['type'] === 'action') {
+                    \remove_action($record['hook'], $record['handler'], $record['priority']);
+                } else {
+                    \remove_filter($record['hook'], $record['handler'], $record['priority']);
+                }
+                break;
+            }
+        }
+
+        $this->registry[$instance] = array_values(array_filter(
+            $this->registry[$instance],
+            static fn (array $record): bool => $record['handler'] !== $handler,
+        ));
     }
 
     /**
