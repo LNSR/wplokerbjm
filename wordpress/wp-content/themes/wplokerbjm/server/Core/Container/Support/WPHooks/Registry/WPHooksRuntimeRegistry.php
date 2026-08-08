@@ -173,88 +173,6 @@ class WPHooksRuntimeRegistry
     }
 
     /**
-     * Resolve a hook name from a static string or an attribute-parameter closure.
-     *
-     * Closures declared in attribute parameters are static and already scoped
-     * to the declaring class (PHP 8.1 RFC 'Closures in constant expressions'),
-     * so private members resolve via self:: and the closure is invoked directly.
-     *
-     * @param string|\Closure $hook       Static hook name or closure resolving to one.
-     * @param object          $instance   Owner instance.
-     * @param string          $targetName Method/property name (for log messages).
-     *
-     * @return string|null The resolved hook name, or null when it could not be resolved.
-     */
-    private function resolveClosureHook(string|\Closure $hook, object $instance, string $targetName): ?string
-    {
-        if (\is_string($hook)) {
-            return $hook;
-        }
-
-        try {
-            $resolved = $hook();
-        } catch (\Throwable $e) {
-            Logger::warning(
-                'WPHooksRuntimeRegistry',
-                'Skipping hook on ' . $targetName . ' — hook closure failed: ' . $e->getMessage()
-            );
-            return null;
-        }
-
-        if (!\is_string($resolved) || $resolved === '') {
-            Logger::warning(
-                'WPHooksRuntimeRegistry',
-                'Skipping hook on ' . $targetName . ' — hook closure did not resolve to a non-empty string'
-            );
-            return null;
-        }
-
-        return $resolved;
-    }
-
-    /**
-     * Evaluate an attribute-parameter registerIf gate (static closure invoked directly).
-     *
-     * @param \Closure|null $registerIf Gate closure (null = no gate).
-     * @param object        $instance  Owner instance.
-     * @param string        $targetName Method/property name (for log messages).
-     */
-    private function evaluateRegisterIf(?\Closure $registerIf, object $instance, string $targetName): bool
-    {
-        if ($registerIf === null) {
-            return true;
-        }
-
-        try {
-            $allowed = $registerIf();
-        } catch (\Throwable $e) {
-            Logger::warning(
-                'WPHooksRuntimeRegistry',
-                'Skipping hook on ' . $targetName . ' — registerIf closure failed: ' . $e->getMessage()
-            );
-            return false;
-        }
-
-        if (!\is_bool($allowed)) {
-            Logger::warning(
-                'WPHooksRuntimeRegistry',
-                'Skipping hook on ' . $targetName . ' — registerIf must return bool, got ' . get_debug_type($allowed)
-            );
-            return false;
-        }
-
-        if ($allowed === false) {
-            Logger::warning(
-                'WPHooksRuntimeRegistry',
-                'Skipping hook on ' . $targetName . ' — registerIf gate returned false.'
-            );
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
      * Remove all hooks previously registered for the given instance.
      *
      * Calls remove_action() / remove_filter() for each registered hook
@@ -432,6 +350,51 @@ class WPHooksRuntimeRegistry
         $this->registry[$owner] = $existing;
     }
 
+
+    /**
+     * Evaluate an attribute-parameter registerIf gate (static closure invoked directly).
+     *
+     * @param \Closure|null $registerIf Gate closure (null = no gate).
+     * @param object        $instance  Owner instance.
+     * @param string        $targetName Method/property name (for log messages).
+     */
+    private function evaluateRegisterIf(?\Closure $registerIf, object $instance, string $targetName): bool
+    {
+        if ($registerIf === null) {
+            return true;
+        }
+
+        try {
+            $allowed = $registerIf();
+        } catch (\Throwable $e) {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — registerIf closure failed: ' . $e->getMessage()
+            );
+            return false;
+        }
+
+        if (!\is_bool($allowed)) {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — registerIf must return bool, got ' . get_debug_type($allowed)
+            );
+            return false;
+        }
+
+        if ($allowed === false) {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — registerIf gate returned false.'
+            );
+            return false;
+        }
+
+        return true;
+    }
+
+    #region ResolverUtils
+
     /**
      * Resolve the owner of a manual registration.
      *
@@ -470,4 +433,45 @@ class WPHooksRuntimeRegistry
             'Cannot infer owner for hook registration — pass owner: explicitly.'
         );
     }
+
+    /**
+     * Resolve a hook name from a static string or an attribute-parameter closure.
+     *
+     * Closures declared in attribute parameters are static and already scoped
+     * to the declaring class (PHP 8.1 RFC 'Closures in constant expressions'),
+     * so private members resolve via self:: and the closure is invoked directly.
+     *
+     * @param string|\Closure $hook       Static hook name or closure resolving to one.
+     * @param object          $instance   Owner instance.
+     * @param string          $targetName Method/property name (for log messages).
+     *
+     * @return string|null The resolved hook name, or null when it could not be resolved.
+     */
+    private function resolveClosureHook(string|\Closure $hook, object $instance, string $targetName): ?string
+    {
+        if (\is_string($hook)) {
+            return $hook;
+        }
+
+        try {
+            $resolved = $hook();
+        } catch (\Throwable $e) {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — hook closure failed: ' . $e->getMessage()
+            );
+            return null;
+        }
+
+        if (!\is_string($resolved) || $resolved === '') {
+            Logger::warning(
+                'WPHooksRuntimeRegistry',
+                'Skipping hook on ' . $targetName . ' — hook closure did not resolve to a non-empty string'
+            );
+            return null;
+        }
+
+        return $resolved;
+    }
+    #endregion
 }

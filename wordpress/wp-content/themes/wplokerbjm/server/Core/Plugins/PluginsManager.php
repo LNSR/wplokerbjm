@@ -49,7 +49,7 @@ class PluginManagement
         WPGraphQL::class,
     ];
 
-    public function __construct(private WPHooksContainerRegistry $hooksRegistry)
+    public function __construct(private WPHooksContainerRegistry $hooksRegistry, private PluginsManagerUtility $pluginManagerUtils)
     {
     }
 
@@ -64,12 +64,11 @@ class PluginManagement
     public function unregisterInactivePluginHooks(): void
     {
         foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
-            if ($integrationClass::isActive()) {
+            $isActive = $integrationClass::isActive();
+            if ($isActive) {
                 continue;
             }
-
-            $status = $integrationClass::isActive() ? 'active' : 'inactive';
-            Logger::warning("Plugin status", $integrationClass . ' is ' . $status);
+            Logger::warning("Plugin status", $integrationClass . ' is ' . ($isActive ? 'active' : 'inactive'));
 
             $this->hooksRegistry->unregisterByClass($integrationClass);
             $this->hooksRegistry->unregisterDeferredByClass($integrationClass);
@@ -86,8 +85,8 @@ class PluginManagement
     }
 
     #[Filter('option_active_plugins', 1, once: true, registerIf: static function () {
-        return empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], '/graphql') && !\is_admin();
-    })]
+            return empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], '/graphql') && !\is_admin();
+            })]
     public function disableWpGraphqlPlugin(array $plugins): array
     {
         unset($plugins[array_search(PluginList::WpGraphql->value, $plugins)]);
@@ -121,8 +120,8 @@ class PluginManagement
         $extra = [
         ];
 
-        $pluginsToDisable = $this->listPluginsToDisable($extra);
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
+        $pluginsToDisable = $this->pluginManagerUtils->listPluginsToDisable($extra);
+        return $this->pluginManagerUtils->filteredPlugins($plugins, $pluginsToDisable);
     }
 
     /**
@@ -147,12 +146,18 @@ class PluginManagement
     {
         $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
 
-        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
+        $pluginsToDisable = $isDev ? $this->pluginManagerUtils->listPluginsToDisable() : [];
 
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
+        return $this->pluginManagerUtils->filteredPlugins($plugins, $pluginsToDisable);
     }
+}
 
-    #region utilitiesHelper
+/**
+ * @internal \WPLokerBJM\Core\Plugins;
+ */
+class PluginsManagerUtility
+{
+
 
     /**
      * Filters the list of active plugins by removing specified plugins.
@@ -161,7 +166,7 @@ class PluginManagement
      * @param array $pluginsToDisable Array of plugin prefixes to disable.
      * @return array Filtered array of active plugins.
      */
-    private function filteredPlugins(array $plugins, array $pluginsToDisable): array
+    public function filteredPlugins(array $plugins, array $pluginsToDisable): array
     {
         $filtered = array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
             foreach ($pluginsToDisable as $disable) {
@@ -182,7 +187,7 @@ class PluginManagement
      * @param array|null $extra Optional array of additional plugin prefixes to disable.
      * @return array Array of plugin prefixes to disable.
      */
-    private function listPluginsToDisable(?array $extra = []): array
+    public function listPluginsToDisable(?array $extra = []): array
     {
         // Subject to change
         static $base = [
@@ -192,6 +197,4 @@ class PluginManagement
         ];
         return array_merge($base, $extra);
     }
-    #endregion
-
 }

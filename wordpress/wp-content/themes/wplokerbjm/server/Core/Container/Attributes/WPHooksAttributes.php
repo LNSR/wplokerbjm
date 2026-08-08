@@ -25,10 +25,10 @@ class Action
      * @param int $acceptedArgs
      * @param bool $deferRegister defer activation (forced true when $deferRegisterUntilHook is set)
      * 
-     * @param (\Closure(TObject...): bool)|null $executeIf
+     * @param (\Closure(TObject...): bool)|null $executeIf // limited capability if used with RuntimeRegistry
      * @param-closure-this $executeIf TObject
      * 
-     * @param (\Closure(TObject...): bool)|null $registerIf
+     * @param (\Closure(TObject...): bool)|null $registerIf // limited capability if used with RuntimeRegistry
      * @param-closure-this $registerIf TObject
      * 
      * @param array<int, string|\BackedEnum|\Closure(TObject...): array> $tag
@@ -69,10 +69,10 @@ class Filter
      * @param int $acceptedArgs
      * @param bool $deferRegister defer activation (forced true when $deferRegisterUntilHook is set)
      * 
-     * @param (\Closure(TObject...): bool)|null $executeIf
+     * @param (\Closure(TObject...): bool)|null $executeIf // limited capability if used with RuntimeRegistry
      * @param-closure-this $executeIf TObject
      * 
-     * @param (\Closure(TObject...): bool)|null $registerIf
+     * @param (\Closure(TObject...): bool)|null $registerIf // limited capability if used with RuntimeRegistry
      * @param-closure-this $registerIf TObject
      * 
      * @param array<int, string|\BackedEnum|\Closure(TObject...): array> $tag
