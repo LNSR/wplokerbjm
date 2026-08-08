@@ -152,7 +152,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
         $targetResolver = new HookTargetResolver();
         $registry = $this->createRegistry([
-            $this->action(DynamicHookService::class, 'onDynamicAction', $hook, defer: true),
+            $this->action(DynamicHookService::class, 'onDynamicAction', $hook, deferRegister: true),
         ], $this->container);
         $registry->initialize();
 
@@ -214,7 +214,7 @@ class DynamicHookTest extends WplokerbjmTestCase
         int $priority = 10,
         int $acceptedArgs = 1,
         ?Closure $executeIf = null,
-        bool $defer = false,
+        bool $deferRegister = false,
         array $executeIfParams = [],
         array $tags = [],
     ): array {
@@ -225,7 +225,7 @@ class DynamicHookTest extends WplokerbjmTestCase
             'hook' => $hook,
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
-            'defer' => $defer,
+            'defer_register' => $deferRegister,
             'execute_if' => $executeIf,
             'execute_if_params' => $executeIfParams,
             'hook_params' => $hook instanceof Closure

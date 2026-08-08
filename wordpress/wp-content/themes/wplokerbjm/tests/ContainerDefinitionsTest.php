@@ -233,7 +233,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             static fn (array $hookData) => $hookData['callable'] instanceof ContainerLazyHookHandler
                 || $hookData['callable'] instanceof ContainerLazyPropertyHookHandler
         ));
-        // Deferred hooks (defer: true) are not auto-registered by initialize(),
+        // Deferred hooks (deferRegister: true) are not auto-registered by initialize(),
         // so exclude them from the count assertion. RegisterIf-gated hooks whose
         // gate evaluates to false (environment-dependent, e.g. !isWPCLI() in
         // tests) are also skipped by the registry — mirror those semantics.
@@ -241,7 +241,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $nonDeferred = array_filter(
             $registrations,
             function ($r) use ($planProvider, $container) {
-                if (!empty($r->defer)) {
+                if (!empty($r->deferRegister)) {
                     return false;
                 }
                 if ($r->registerIf === null) {
@@ -416,7 +416,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $fixturesNs = 'WPLokerBJM\Tests\Support\Fixtures';
         $expectedRemoved = count(array_filter(
             $registrations,
-            static fn ($reg): bool => str_starts_with($reg->class, $fixturesNs . '\\') && empty($reg->defer),
+            static fn ($reg): bool => str_starts_with($reg->class, $fixturesNs . '\\') && empty($reg->deferRegister),
         ));
 
         $this->assertGreaterThan(0, $expectedRemoved, 'Fixture hooks should exist to unregister');
@@ -470,7 +470,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $discovered = count($registrations);
         $actions = count(array_filter($registrations, static fn($reg) => $reg->type === 'action'));
         $filters = $discovered - $actions;
-        $deferredCount = count(array_filter($registrations, static fn($reg) => !empty($reg->defer)));
+        $deferredCount = count(array_filter($registrations, static fn($reg) => !empty($reg->deferRegister)));
 
         // Usage map
         $taggedRegs = array_filter($registrations, static fn($reg) => !empty($reg->tags) || $reg->tagCallable !== null);
@@ -505,7 +505,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $gateSkipped = 0;
         $notInContainer = 0;
         foreach ($registrations as $reg) {
-            if (!empty($reg->defer)) {
+            if (!empty($reg->deferRegister)) {
                 continue;
             }
             if (!in_array($reg->class, $hookClasses, true)) {

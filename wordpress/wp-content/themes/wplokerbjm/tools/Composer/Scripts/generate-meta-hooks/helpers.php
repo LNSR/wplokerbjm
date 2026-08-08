@@ -12,6 +12,7 @@ use Psl\Shell;
 use Psl\Shell\Exception\FailedExecutionException;
 use Psl\Str;
 use Psl\Vec;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksRuntimeRegistry;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -262,6 +263,21 @@ function renderMetadataSection(array $actions, array $filters, array $tags = [])
         ],
         'List hooks (deferred) to register' => [
             '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksContainerRegistry::activateDeferredByHook()',
+            0,
+            ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
+        ],
+        'List hooks Action runtime to register' => [
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::registerAction()',
+            0,
+            ["argumentsSet('{$listHooksAction}')"],
+        ],
+        'List hooks Filter runtime to register' => [
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::registerFilter()',
+            0,
+            ["argumentsSet('{$listHooksFilter}')"],
+        ],
+        'List hooks Filter runtime to combined' => [
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::register()',
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],

@@ -29,7 +29,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
  *       public function onInit(): void { ... }
  *   };
  *
- *! All attribute hooks are registered eagerly — the `defer` & 'condition' flags are
+ *! All attribute hooks are registered eagerly — the `deferRegister` & 'condition' flags are
  *! ignored on the attribute path (no container access), and static methods are
  *! silently skipped.
  ** But for compensation:

@@ -90,13 +90,13 @@ class RegisterIfHookTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'register_if_deferred',
-                defer: true,
+                deferRegister: true,
                 registerIf: static fn (): bool => false
             ),
         ], $this->container);
         $registry->initialize();
 
-        // The gate runs BEFORE defer-pool placement — the hook never exists.
+        // The gate runs BEFORE deferRegister-pool placement — the hook never exists.
         $registry->activateDeferredByHook('register_if_deferred');
         self::assertNull($this->findRegisteredHook('action', 'register_if_deferred'));
 
@@ -198,7 +198,7 @@ class RegisterIfHookTest extends WplokerbjmTestCase
         int $priority = 10,
         int $acceptedArgs = 1,
         ?Closure $executeIf = null,
-        bool $defer = false,
+        bool $deferRegister = false,
         ?Closure $registerIf = null,
         array $executeIfParams = [],
         array $registerIfParams = [],
@@ -211,7 +211,7 @@ class RegisterIfHookTest extends WplokerbjmTestCase
             'hook' => $hook,
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
-            'defer' => $defer,
+            'defer_register' => $deferRegister,
             'execute_if' => $executeIf,
             'execute_if_params' => $executeIfParams,
             'register_if' => $registerIf,

@@ -76,12 +76,21 @@ class PluginManagement
         }
     }
 
-    #[Filter('option_active_plugins', 0,)]
+    #[Filter('option_active_plugins', 0, once: true)]
     public function activePluginsCondition(array $plugins): array
     {
         $plugins = $this->disablePluginsForDevImpl($plugins);
         $plugins = $this->disablePluginsforSimulatedProdImpl($plugins);
         $plugins = $this->forceActivePlugin($plugins);
+        return $plugins;
+    }
+
+    #[Filter('option_active_plugins', 1, once: true, registerIf: static function () {
+        return empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], '/graphql') && !\is_admin();
+    })]
+    public function disableWpGraphqlPlugin(array $plugins): array
+    {
+        unset($plugins[array_search(PluginList::WpGraphql->value, $plugins)]);
         return $plugins;
     }
 

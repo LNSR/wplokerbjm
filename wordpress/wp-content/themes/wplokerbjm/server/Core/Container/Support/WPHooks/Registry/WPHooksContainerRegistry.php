@@ -12,10 +12,10 @@ use TargetClass;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{WPHookPlanProvider, HookRegistration, ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, HookKey};
+use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{AnonClassHookPropertyAbstract};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
-use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\HookTagUtilities;
 
 /**
  * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
@@ -257,6 +257,42 @@ class WPHooksContainerRegistry
             fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
         );
     }
+
+    /**
+     * Activate all deferred handlers whose hook name matches a wildcard pattern.
+     *
+     * The pattern must contain exactly one trailing asterisk with a literal
+     * prefix of at least two characters, e.g. 'mail_*'. Already-active
+     * handlers are silently skipped.
+     *
+     * @param string $pattern Wildcard hook-name pattern.
+     * @return int Number of handlers activated.
+     */
+    public function activateDeferredByHookPattern(string $pattern): int
+    {
+        return $this->deferredHookManager->activateDeferredByHookPattern(
+            $pattern,
+            fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
+        );
+    }
+
+    /**
+     * Activate all deferred handlers carrying at least one tag matching any of
+     * the given wildcard patterns.
+     *
+     * Each pattern is its own tag family to wipe: an entry matches when any of
+     * its tags matches any pattern (union of families).
+     *
+     * @param array<string> $patterns Tag wildcard patterns.
+     * @return int Number of handlers activated.
+     */
+    public function activateDeferredByTagPattern(array $patterns): int
+    {
+        return $this->deferredHookManager->activateDeferredByTagPattern(
+            $patterns,
+            fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k)
+        );
+    }
     #endregion
 
     #region deferred handlers unregisteration methods
@@ -315,6 +351,31 @@ class WPHooksContainerRegistry
     public function unregisterDeferredByTags(array $tags): void
     {
         $this->deferredHookManager->unregisterDeferredByTags(HookTagUtilities::normalizeTags($tags));
+    }
+
+    /**
+     * Unregister all deferred handlers whose hook name matches a wildcard pattern.
+     *
+     * Only touches the deferred pool — active handlers are never affected.
+     *
+     * @param string $pattern Wildcard hook-name pattern (see HookPattern).
+     */
+    public function unregisterDeferredByHookPattern(string $pattern): void
+    {
+        $this->deferredHookManager->unregisterDeferredByHookPattern($pattern);
+    }
+
+    /**
+     * Unregister all deferred handlers carrying at least one tag matching any
+     * of the given wildcard patterns.
+     *
+     * Only touches the deferred pool — active handlers are never affected.
+     *
+     * @param array<string> $patterns Tag wildcard patterns.
+     */
+    public function unregisterDeferredByTagPattern(array $patterns): void
+    {
+        $this->deferredHookManager->unregisterDeferredByTagPattern($patterns);
     }
     #endregion
     #region main handlers unregisteration methods
@@ -419,6 +480,59 @@ class WPHooksContainerRegistry
         foreach ($this->handlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
                 if (array_intersect($tags, $data['tags']) === []) {
+                    continue;
+                }
+                $this->removeSingleHook($hook, $data);
+                unset($hookHandlers[$key]);
+            }
+            if (empty($hookHandlers)) {
+                unset($this->handlers[$hook]);
+            }
+        }
+        unset($hookHandlers);
+    }
+
+    /**
+     * Unregister all active handlers whose hook name matches a wildcard pattern.
+     *
+     * Only touches the active pool — deferred handlers are never affected.
+     *
+     * @param string $pattern Wildcard hook-name pattern (see HookPattern).
+     */
+    public function unregisterByHookPattern(string $pattern): void
+    {
+        HookPattern::assertValid($pattern);
+
+        foreach ($this->handlers as $hook => &$hookHandlers) {
+            if (!HookPattern::matches($hook, $pattern)) {
+                continue;
+            }
+            foreach ($hookHandlers as $key => $data) {
+                $this->removeSingleHook($hook, $data);
+            }
+            unset($this->handlers[$hook]);
+        }
+        unset($hookHandlers);
+    }
+
+    /**
+     * Unregister all active handlers carrying at least one tag matching any of
+     * the given wildcard patterns.
+     *
+     * Only touches the active pool — deferred handlers are never affected.
+     *
+     * @param array<string> $patterns Tag wildcard patterns.
+     */
+    public function unregisterByTagPattern(array $patterns): void
+    {
+        if ($patterns === []) {
+            return;
+        }
+        HookPattern::assertValidAll($patterns);
+
+        foreach ($this->handlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if (!HookPattern::matchesAny($data['tags'], $patterns)) {
                     continue;
                 }
                 $this->removeSingleHook($hook, $data);
@@ -623,7 +737,7 @@ class WPHooksContainerRegistry
             // deferRegisterUntilHook implies deferral: the entry is held in the
             // deferred pool until the trigger hook fires, regardless of how the
             // registration array was built (attribute, scanner cache, runtime).
-            if ($registration->defer || $registration->deferRegisterUntilHook !== null) {
+            if ($registration->deferRegister || $registration->deferRegisterUntilHook !== null) {
                 $this->deferredHookManager->addDeferred($hookName, $key->toString(), $entry);
 
                 if ($registration->deferRegisterUntilHook !== null) {
@@ -898,6 +1012,88 @@ class DeferredHookManager
     }
 
     /**
+     * Activate all deferred handlers whose hook name matches a wildcard pattern.
+     *
+     * The pattern must contain exactly one trailing asterisk with a literal
+     * prefix of at least two characters, e.g. 'mail_*'. Already-active
+     * handlers are silently skipped.
+     *
+     * @param string $pattern Wildcard hook-name pattern.
+     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @return int Number of handlers activated.
+     */
+    public function activateDeferredByHookPattern(string $pattern, callable $activateEntry): int
+    {
+        HookPattern::assertValid($pattern);
+
+        $activated = 0;
+        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
+            if (!HookPattern::matches($hook, $pattern)) {
+                continue;
+            }
+            foreach ($hookHandlers as $key => $data) {
+                // Registration gate: re-evaluated at activation time.
+                if (!$this->gateDeferredActivation($data, $hook, $key)) {
+                    continue;
+                }
+                if ($activateEntry($hook, $data, $key)) {
+                    $activated++;
+                }
+                unset($hookHandlers[$key]);
+            }
+            if (empty($hookHandlers)) {
+                unset($this->deferredHandlers[$hook]);
+            }
+        }
+        unset($hookHandlers);
+
+        return $activated;
+    }
+
+    /**
+     * Activate all deferred handlers carrying at least one tag matching any of
+     * the given wildcard patterns.
+     *
+     * Each pattern is its own tag family to wipe: an entry matches when any of
+     * its tags matches any pattern (union of families).
+     *
+     * @param array<string> $patterns Tag wildcard patterns.
+     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @return int Number of handlers activated.
+     */
+    public function activateDeferredByTagPattern(array $patterns, callable $activateEntry): int
+    {
+        if ($patterns === []) {
+            return 0;
+        }
+        HookPattern::assertValidAll($patterns);
+
+        $activated = 0;
+        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if (!HookPattern::matchesAny($data['tags'], $patterns)) {
+                    continue;
+                }
+
+                // Registration gate: re-evaluated at activation time.
+                if (!$this->gateDeferredActivation($data, $hook, $key)) {
+                    continue;
+                }
+                if ($activateEntry($hook, $data, $key)) {
+                    $activated++;
+                }
+                unset($hookHandlers[$key]);
+            }
+            if (empty($hookHandlers)) {
+                unset($this->deferredHandlers[$hook]);
+            }
+        }
+        unset($hookHandlers);
+
+        return $activated;
+    }
+
+    /**
      * Activate a single deferred handler by exact hook + key.
      *
      * One-shot entry point for deferRegisterUntilHook entries: the trigger
@@ -1070,6 +1266,54 @@ class DeferredHookManager
         foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
             foreach ($hookHandlers as $key => $data) {
                 if (array_intersect($tags, $data['tags']) !== []) {
+                    unset($hookHandlers[$key]);
+                }
+            }
+            if (empty($hookHandlers)) {
+                unset($this->deferredHandlers[$hook]);
+            }
+        }
+        unset($hookHandlers);
+    }
+
+    /**
+     * Unregister all deferred handlers whose hook name matches a wildcard pattern.
+     *
+     * Only touches the deferred pool — active handlers are never affected.
+     *
+     * @param string $pattern Wildcard hook-name pattern (see HookPattern).
+     */
+    public function unregisterDeferredByHookPattern(string $pattern): void
+    {
+        HookPattern::assertValid($pattern);
+
+        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
+            if (!HookPattern::matches($hook, $pattern)) {
+                continue;
+            }
+            unset($this->deferredHandlers[$hook]);
+        }
+        unset($hookHandlers);
+    }
+
+    /**
+     * Unregister all deferred handlers carrying at least one tag matching any
+     * of the given wildcard patterns.
+     *
+     * Only touches the deferred pool — active handlers are never affected.
+     *
+     * @param array<string> $patterns Tag wildcard patterns.
+     */
+    public function unregisterDeferredByTagPattern(array $patterns): void
+    {
+        if ($patterns === []) {
+            return;
+        }
+        HookPattern::assertValidAll($patterns);
+
+        foreach ($this->deferredHandlers as $hook => &$hookHandlers) {
+            foreach ($hookHandlers as $key => $data) {
+                if (HookPattern::matchesAny($data['tags'], $patterns)) {
                     unset($hookHandlers[$key]);
                 }
             }

@@ -12,7 +12,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Abstract;
  *
  * **Usage in a property hook:**
  * ```php
- * #[Filter('nocache_headers', 9, defer: true)]
+ * #[Filter('nocache_headers', 9, deferRegister: true)]
  * private $test = null {
  *     get => $this->test ??= new class (self::class, __PROPERTY__) extends AnonClassHookPropertyAbstract {
  *         public function __invoke(): bool {

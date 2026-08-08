@@ -158,7 +158,7 @@ class PropertyDeferredService
 {
     public static array $capturedValues = [];
 
-    #[Filter(hook: 'deferred_property_filter', priority: 10, acceptedArgs: 1, defer: true)]
+    #[Filter(hook: 'deferred_property_filter', priority: 10, acceptedArgs: 1, deferRegister: true)]
     public $deferredFilter = static function (string $value): string {
         self::$capturedValues[] = $value;
         return $value . '_deferred';
@@ -194,7 +194,7 @@ class MethodDeferredService
 {
     public static array $captured = [];
 
-    #[Action(hook: 'deferred_method_action', priority: 10, acceptedArgs: 1, defer: true)]
+    #[Action(hook: 'deferred_method_action', priority: 10, acceptedArgs: 1, deferRegister: true)]
     public function onDeferredAction(string $value): void
     {
         self::$captured[] = $value;

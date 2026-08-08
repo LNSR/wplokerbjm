@@ -183,7 +183,7 @@ class OnceHookTest extends WplokerbjmTestCase
                 'onOnceAction',
                 'once_deferred',
                 once: true,
-                defer: true
+                deferRegister: true
             ),
         ];
 
@@ -216,7 +216,7 @@ class OnceHookTest extends WplokerbjmTestCase
         int $acceptedArgs = 1,
         bool $once = false,
         ?Closure $executeIf = null,
-        bool $defer = false,
+        bool $deferRegister = false,
         array $executeIfParams = []
     ): array {
         return [
@@ -227,7 +227,7 @@ class OnceHookTest extends WplokerbjmTestCase
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
             'once' => $once,
-            'defer' => $defer,
+            'defer_register' => $deferRegister,
             'execute_if' => $executeIf,
             'execute_if_params' => $executeIfParams,
         ];
@@ -244,7 +244,7 @@ class OnceHookTest extends WplokerbjmTestCase
         int $acceptedArgs = 1,
         bool $once = false,
         ?Closure $executeIf = null,
-        bool $defer = false,
+        bool $deferRegister = false,
         array $executeIfParams = []
     ): array {
         return [
@@ -255,7 +255,7 @@ class OnceHookTest extends WplokerbjmTestCase
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
             'once' => $once,
-            'defer' => $defer,
+            'defer_register' => $deferRegister,
             'execute_if' => $executeIf,
             'execute_if_params' => $executeIfParams,
         ];

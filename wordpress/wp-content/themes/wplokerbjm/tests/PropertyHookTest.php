@@ -57,7 +57,7 @@ class PropertyHookTest extends WplokerbjmTestCase
      * Seed registrations via a bound closure (bypassing the container check),
      * then verify internal state.
      *
-     * @param array<int, array{class: string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, defer: bool}> $registrations
+     * @param array<int, array{class: string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, deferRegister: bool}> $registrations
      */
     private function seedRegistrations(array $registrations): void
     {
@@ -84,7 +84,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'property_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -115,7 +115,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'property_action',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -140,7 +140,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'property_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -166,7 +166,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'multi_priority_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
             [
@@ -176,7 +176,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'multi_priority_filter',
                 'priority'      => 20,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -212,7 +212,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'deferred_property_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
                 'target'        => 'property',
             ],
         ]);
@@ -249,7 +249,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'non_closure_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -276,7 +276,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'ghost_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -302,7 +302,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'handler_type_check',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -344,7 +344,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'static_closure_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);

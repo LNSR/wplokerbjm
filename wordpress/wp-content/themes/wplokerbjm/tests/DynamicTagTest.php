@@ -81,7 +81,7 @@ class DynamicTagTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'dynamic_tag_deferred',
-                defer: true,
+                deferRegister: true,
                 tagCallable: $tagCallable,
             ),
         ];
@@ -182,7 +182,7 @@ class DynamicTagTest extends WplokerbjmTestCase
         string $hook,
         int $priority = 10,
         int $acceptedArgs = 1,
-        bool $defer = false,
+        bool $deferRegister = false,
         array $tags = [],
         ?\Closure $tagCallable = null
     ): array {
@@ -193,7 +193,7 @@ class DynamicTagTest extends WplokerbjmTestCase
             'hook' => $hook,
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
-            'defer' => $defer,
+            'defer_register' => $deferRegister,
             'execute_if' => null,
             'execute_if_params' => [],
             'register_if' => null,

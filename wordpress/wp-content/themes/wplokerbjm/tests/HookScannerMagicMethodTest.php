@@ -34,6 +34,6 @@ class HookScannerMagicMethodTest extends WplokerbjmTestCase
         self::assertSame('__invoke', $registration->method);
         self::assertSame('invoke_hook', $registration->hook);
         self::assertSame('action', $registration->type);
-        self::assertFalse($registration->defer);
+        self::assertFalse($registration->deferRegister);
     }
 }

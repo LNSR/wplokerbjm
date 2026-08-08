@@ -110,7 +110,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'condition_deferred',
-                defer: true,
+                deferRegister: true,
                 executeIf: static fn (ContainerInterface $c): bool => false
             ),
         ];
@@ -253,7 +253,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'register_if_deferred_bound',
-                defer: true,
+                deferRegister: true,
                 executeIf: static fn (): bool => true,
                 registerIf: $gate,
                 registerIfParams: (new WPHookPlanProvider())->buildCallablePlan($gate)
@@ -377,7 +377,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         int $priority = 10,
         int $acceptedArgs = 1,
         ?Closure $executeIf = null,
-        bool $defer = false,
+        bool $deferRegister = false,
         array $executeIfParams = [],
         ?Closure $registerIf = null,
         array $registerIfParams = []
@@ -389,7 +389,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             'hook' => $hook,
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
-            'defer' => $defer,
+            'defer_register' => $deferRegister,
             'execute_if' => $executeIf,
             'execute_if_params' => $executeIfParams,
             'register_if' => $registerIf,
@@ -407,7 +407,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         int $priority = 10,
         int $acceptedArgs = 1,
         ?Closure $executeIf = null,
-        bool $defer = false,
+        bool $deferRegister = false,
         array $executeIfParams = []
     ): array {
         return [
@@ -417,7 +417,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             'hook' => $hook,
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
-            'defer' => $defer,
+            'defer_register' => $deferRegister,
             'execute_if' => $executeIf,
             'execute_if_params' => $executeIfParams,
         ];

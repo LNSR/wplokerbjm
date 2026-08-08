@@ -12,7 +12,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
  * Test suite for deferred hook activation via #[Action]/#[Filter] attributes
- * with defer: true.
+ * with deferRegister: true.
  *
  * Verifies that:
  *  - Deferred hooks are NOT registered with WordPress during initialize().
@@ -54,7 +54,7 @@ class DeferredHookTest extends WplokerbjmTestCase
      * Seed deferred and non-deferred hook registrations, call registerAll
      * via reflection (bypassing container check), then verify internal state.
      *
-     * @param array<int, array{class: string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, defer: bool}> $registrations
+     * @param array<int, array{class: string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, deferRegister: bool}> $registrations
      */
     private function seedRegistrations(array $registrations): void
     {
@@ -85,7 +85,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'deferred_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -108,7 +108,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'normal_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
             ],
         ]);
 
@@ -131,7 +131,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'deferred_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -152,7 +152,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'shared_hook',
                 'priority'      => 20,
                 'accepted_args' => 2,
-                'defer'         => true,
+                'defer_register' => true,
             ],
             [
                 'class'         => self::class,
@@ -161,7 +161,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'shared_hook',
                 'priority'      => 15,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -195,7 +195,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'filter_one',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
             [
                 'class'         => self::class,
@@ -204,7 +204,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'action_two',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -224,9 +224,9 @@ class DeferredHookTest extends WplokerbjmTestCase
     public function testActivateDeferredByNamespace(): void
     {
         $this->seedRegistrations([
-            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\LazyHookService', 'method' => 'onAction', 'type' => 'action', 'hook' => 'ns_action_a', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
-            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\FilterService', 'method' => 'onFilter', 'type' => 'filter', 'hook' => 'ns_filter_b', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
-            ['class' => self::class, 'method' => 'dummyDeferredC', 'type' => 'action', 'hook' => 'ns_action_c', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
+            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\LazyHookService', 'method' => 'onAction', 'type' => 'action', 'hook' => 'ns_action_a', 'priority' => 10, 'accepted_args' => 1, 'defer_register' => true],
+            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\FilterService', 'method' => 'onFilter', 'type' => 'filter', 'hook' => 'ns_filter_b', 'priority' => 10, 'accepted_args' => 1, 'defer_register' => true],
+            ['class' => self::class, 'method' => 'dummyDeferredC', 'type' => 'action', 'hook' => 'ns_action_c', 'priority' => 10, 'accepted_args' => 1, 'defer_register' => true],
         ]);
 
         $this->assertSame(3, $this->deferredHandlersCount(), 'Should start with 3 deferred handlers');
@@ -266,7 +266,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'specific_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -288,7 +288,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'dup_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -305,7 +305,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'dup_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
         $this->registry->activateDeferredByHook('dup_hook');
@@ -328,7 +328,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'mixed_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
             ],
             [
                 'class'         => self::class,
@@ -337,7 +337,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'mixed_hook',
                 'priority'      => 20,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -372,7 +372,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'purge_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
             [
                 'class'         => self::class,
@@ -381,7 +381,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'purge_hook',
                 'priority'      => 20,
                 'accepted_args' => 2,
-                'defer'         => true,
+                'defer_register' => true,
             ],
             [
                 'class'         => self::class,
@@ -390,7 +390,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'other_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -415,7 +415,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'real_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -438,7 +438,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'hook_a',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
             [
                 'class'         => self::class,
@@ -447,7 +447,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'hook_b',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
             [
                 'class'         => self::class,
@@ -456,7 +456,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'hook_c',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -474,9 +474,9 @@ class DeferredHookTest extends WplokerbjmTestCase
     public function testUnregisterDeferredByNamespace(): void
     {
         $this->seedRegistrations([
-            ['class' => self::class, 'method' => 'dummyDeferredA', 'type' => 'action', 'hook' => 'ns_d_a', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
-            ['class' => self::class, 'method' => 'dummyDeferredB', 'type' => 'filter', 'hook' => 'ns_d_b', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
-            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\LazyHookService', 'method' => 'onAction', 'type' => 'action', 'hook' => 'ns_d_c', 'priority' => 10, 'accepted_args' => 1, 'defer' => true],
+            ['class' => self::class, 'method' => 'dummyDeferredA', 'type' => 'action', 'hook' => 'ns_d_a', 'priority' => 10, 'accepted_args' => 1, 'defer_register' => true],
+            ['class' => self::class, 'method' => 'dummyDeferredB', 'type' => 'filter', 'hook' => 'ns_d_b', 'priority' => 10, 'accepted_args' => 1, 'defer_register' => true],
+            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\LazyHookService', 'method' => 'onAction', 'type' => 'action', 'hook' => 'ns_d_c', 'priority' => 10, 'accepted_args' => 1, 'defer_register' => true],
         ]);
 
         $this->assertSame(3, $this->deferredHandlersCount(), 'Should start with 3 deferred handlers');
@@ -501,7 +501,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'shared_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
             [
                 'class'         => self::class,
@@ -510,7 +510,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'shared_hook',
                 'priority'      => 20,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -535,7 +535,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'real_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 
@@ -558,7 +558,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'mixed_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
             ],
             [
                 'class'         => self::class,
@@ -567,7 +567,7 @@ class DeferredHookTest extends WplokerbjmTestCase
                 'hook'          => 'mixed_hook',
                 'priority'      => 20,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
             ],
         ]);
 

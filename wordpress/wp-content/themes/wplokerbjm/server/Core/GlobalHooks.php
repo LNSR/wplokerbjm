@@ -109,7 +109,7 @@ class RedirectHooks
      * ! Notify search engines with 410 Gone for removed job posts.
      */
     #[Action('template_redirect', 2,
-        defer: true,
+        deferRegister: true,
         executeIf: static function (): bool {
                 return !self::shouldSkipRedirect() && is_404() && is_singular('lowongan');
                 },
@@ -131,7 +131,7 @@ class RedirectHooks
      * public requests to the Svelte frontend (dev vs prod).
      */
     #[Action('template_redirect', 3,
-        defer: true,
+        deferRegister: true,
         executeIf: static function (): bool {
                 return !self::shouldSkipRedirect();
                 },

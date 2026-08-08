@@ -64,7 +64,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'lazy_action_hook',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -94,7 +94,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'lazy_filter_hook',
             'priority' => 10,
             'accepted_args' => 2,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -119,7 +119,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'throwing_action_hook',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -143,7 +143,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'throwing_filter_hook',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -167,7 +167,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'deferred_method_action',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => true,
+            'defer_register' => true,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -200,7 +200,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'ghost_hook',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -222,7 +222,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'handler_type_check',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -250,7 +250,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
                 'hook' => 'multi_priority_method_filter',
                 'priority' => 10,
                 'accepted_args' => 1,
-                'defer' => false,
+                'defer_register' => false,
                 'target' => 'method',
                 'visibility' => 'public',
             ],
@@ -261,7 +261,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
                 'hook' => 'multi_priority_method_filter',
                 'priority' => 20,
                 'accepted_args' => 1,
-                'defer' => false,
+                'defer_register' => false,
                 'target' => 'method',
                 'visibility' => 'public',
             ],
@@ -296,7 +296,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'protected_method_action',
             'priority' => 10,
             'accepted_args' => 0,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'protected',
         ]]);
@@ -322,7 +322,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'private_method_filter',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'private',
         ]]);

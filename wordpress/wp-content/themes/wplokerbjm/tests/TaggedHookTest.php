@@ -17,9 +17,9 @@ use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
  * Test suite for the `tag` grouping metadata on hook registrations.
  *
  * Verifies that:
- *  - A tagged hook without defer registers immediately and can be bulk
+ *  - A tagged hook without deferRegister registers immediately and can be bulk
  *    unregistered from the active pool.
- *  - A tagged hook with defer lands in the deferred pool.
+ *  - A tagged hook with deferRegister lands in the deferred pool.
  *  - activateDeferredByTags activates only the matching tag group.
  *  - A hook with multiple tags is matched by any of them.
  *  - String and array tag forms are equivalent.
@@ -84,7 +84,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_deferred',
                 tags: ['cache'],
-                defer: true,
+                deferRegister: true,
             ),
         ], $this->container);
         $registry->initialize();
@@ -122,7 +122,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_deferred',
                 tags: ['seo'],
-                defer: true,
+                deferRegister: true,
             ),
         ], $this->container);
         $registry->initialize();
@@ -150,7 +150,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_lazy',
                 tags: ['cache'],
-                defer: true,
+                deferRegister: true,
             ),
         ], $this->container);
         $registry->initialize();
@@ -178,20 +178,20 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_cache',
                 tags: ['cache'],
-                defer: true,
+                deferRegister: true,
             ),
             $this->action(
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'tag_seo',
                 tags: ['seo'],
-                defer: true,
+                deferRegister: true,
             ),
             $this->action(
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'tag_none',
-                defer: true,
+                deferRegister: true,
             ),
         ], $this->container);
         $registry->initialize();
@@ -221,7 +221,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_multi',
                 tags: ['cache', 'seo'],
-                defer: true,
+                deferRegister: true,
             ),
         ], $this->container);
         $registry->initialize();
@@ -241,7 +241,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_str',
                 tags: ['cache'],
-                defer: true,
+                deferRegister: true,
             ),
         ], $this->container);
         $registry->initialize();
@@ -255,7 +255,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_arr',
                 tags: ['cache'],
-                defer: true,
+                deferRegister: true,
             ),
         ], $this->container);
         $registry->initialize();
@@ -272,7 +272,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_keep',
                 tags: ['cache'],
-                defer: true,
+                deferRegister: true,
             ),
             $this->action(
                 ExecuteIfActionService::class,
@@ -310,7 +310,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_cond',
                 tags: ['cache'],
-                defer: true,
+                deferRegister: true,
                 executeIf: static fn(ContainerInterface $c): bool => false,
             ),
         ], $this->container);
@@ -332,7 +332,7 @@ class TaggedHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'tag_cond2',
                 tags: ['seo'],
-                defer: true,
+                deferRegister: true,
                 executeIf: static fn(ContainerInterface $c): bool => true,
             ),
         ], $this->container);
@@ -383,7 +383,7 @@ class TaggedHookTest extends WplokerbjmTestCase
         int $acceptedArgs = 1,
         array $tags = [],
         ?Closure $executeIf = null,
-        bool $defer = false,
+        bool $deferRegister = false,
     ): array {
         return [
             'class' => $class,
@@ -392,7 +392,7 @@ class TaggedHookTest extends WplokerbjmTestCase
             'hook' => $hook,
             'priority' => $priority,
             'accepted_args' => $acceptedArgs,
-            'defer' => $defer,
+            'defer_register' => $deferRegister,
             'execute_if' => $executeIf,
             'execute_if_params' => [],
             'tags' => $tags,

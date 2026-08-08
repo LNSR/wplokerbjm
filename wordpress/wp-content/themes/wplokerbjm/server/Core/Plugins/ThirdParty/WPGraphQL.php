@@ -221,14 +221,14 @@ final class WPGraphQL implements PluginConfigInterface
         }
         return $headers;
     }
-    #[Filter('graphql_send_nocache_headers', 9, defer: true)]
+    #[Filter('graphql_send_nocache_headers', 9, deferRegister: true)]
     public function disableGraphQLNocacheHeader(): bool
     {
         $this->hookRegistry->activateDeferredByCallable([$this, __FUNCTION__]);
         return false;
     }
 
-    #[Filter('nocache_headers', 9, defer: true)]
+    #[Filter('nocache_headers', 9, deferRegister: true)]
     public function applyCachePolicy(array $headers): array
     {
         $loggedIn = is_user_logged_in();
