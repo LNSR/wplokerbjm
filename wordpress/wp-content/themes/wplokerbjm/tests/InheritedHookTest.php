@@ -102,11 +102,16 @@ class InheritedHookTest extends WplokerbjmTestCase
         $runtime = new WPHooksRuntimeRegistry();
 
         // Inherited parent hook is NOT registered on the child instance.
-        $runtime->registerHooksOn(new ChildNoRedeclareService());
+        $childNoRedeclare = new ChildNoRedeclareService();
+        $runtime->registerHooksOn($childNoRedeclare);
         self::assertNull($this->findRegisteredHook('action', 'parent_hook'));
 
-        // A re-declared hook IS registered on the child instance.
-        $runtime->registerHooksOn(new ChildRedeclareService());
+        // A re-declared hook IS registered on the child instance. The instance
+        // must be kept alive — runtime hooks are instance-lifetime scoped
+        // (weak references), so an unreferenced instance dies and its hooks
+        // nuke themselves.
+        $childRedeclare = new ChildRedeclareService();
+        $runtime->registerHooksOn($childRedeclare);
         self::assertNotNull($this->findRegisteredHook('action', 'parent_hook'));
 
         do_action('parent_hook', 'runtime');

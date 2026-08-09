@@ -18,6 +18,19 @@ use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
  * unregisterDeferredBy*) stays on the container-side DeferredHookManager; the
  * runtime registry consumes the same mechanics behind an automatic-only
  * surface.
+ * @phpstan-type DeferredHookEntry array{
+ *     key: HookKey,
+ *     handler: object,
+ *     type: 'action'|'filter',
+ *     priority: int,
+ *     accepted_args: int,
+ *     tags: array<int, string>,
+ *     registerIf: \Closure|null,
+ *     registerIfParams: array<int, array<string, mixed>>,
+ *     executeIf: \Closure|null,
+ *     executeIfParams: array<string, mixed>,
+ *     once: bool
+ * }>>
  *
  * @internal
  */
@@ -26,26 +39,14 @@ trait DeferredHooksTrait
     /**
      * Deferred handlers pool, keyed by [hook][key-string] like the active pool.
      *
-     * @var array<string, array<string, array{
-     *     key: HookKey,
-     *     handler: object,
-     *     type: 'action'|'filter',
-     *     priority: int,
-     *     accepted_args: int,
-     *     tags: array<int, string>,
-     *     registerIf: \Closure|null,
-     *     registerIfParams: array<int, array<string, mixed>>,
-     *     executeIf: \Closure|null,
-     *     executeIfParams: array<string, mixed>,
-     *     once: bool
-     * }>>
+     * @var array<string, array<string, DeferredHookEntry>>
      */
     private array $deferredHandlers = [];
 
     /**
      * Store a deferred hook entry under its hook + key.
      *
-     * @param array<string, mixed> $entry
+     * @param DeferredHookEntry $entry
      */
     public function addDeferred(string $hook, string $key, array $entry): void
     {

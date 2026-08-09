@@ -171,7 +171,12 @@ class DynamicHookTest extends WplokerbjmTestCase
     public function testRuntimeRegistryRegistersClosureHooks(): void
     {
         $runtimeRegistry = new WPHooksRuntimeRegistry();
-        $runtimeRegistry->registerHooksOn(new RuntimeDynamicService());
+
+        // The instance must be kept alive — runtime hooks are instance-lifetime
+        // scoped (weak references), so an unreferenced instance dies and its
+        // hooks nuke themselves.
+        $service = new RuntimeDynamicService();
+        $runtimeRegistry->registerHooksOn($service);
 
         // Closure hooks are supported on runtime-registered instances — the
         // static attribute closure is invoked directly (scope = declaring class).

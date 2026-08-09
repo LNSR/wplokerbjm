@@ -39,8 +39,11 @@ final class RuntimeInstanceHookHandler
     /** @var bool True once the removal callback fired (idempotency guard). */
     private bool $removed = false;
 
+    /** @var \WeakReference<object> Weak reference to the owner instance — keeps it collectible (instance-lifetime scoping). */
+    private readonly \WeakReference $instanceRef;
+
     public function __construct(
-        private readonly object $instance,
+        object $instance,
         private readonly string $method,
         private readonly string $visibility = 'public',
         private readonly string $type = 'action',
@@ -50,7 +53,12 @@ final class RuntimeInstanceHookHandler
         private readonly array $hookArgNames = [],
         private readonly bool $once = false,
     ) {
-        $this->label = $this->instance::class . '::' . $this->method;
+        // Keep the owner collectible: only a weak reference is retained, so
+        // the instance can be garbage-collected while the hook is registered.
+        // On death the hook nukes itself (instance-lifetime scoping).
+        $this->instanceRef = \WeakReference::create($instance);
+
+        $this->label = $instance::class . '::' . $this->method;
 
         if ($this->visibility !== 'public') {
             $methodName = $this->method;
@@ -60,7 +68,7 @@ final class RuntimeInstanceHookHandler
             $this->invoker = \Closure::bind(
                 static fn(object $target, mixed ...$args): mixed => $target->{$methodName}(...$args),
                 null,
-                $this->instance::class,
+                $instance::class,
             );
         }
     }
@@ -90,7 +98,30 @@ final class RuntimeInstanceHookHandler
         } catch (\Throwable $e) {
             Logger::error(
                 'RuntimeInstanceHookHandler',
-                'Error removing once-hook ' . $this->label . ': ' . $e->getMessage()
+                'Error removing once-hook ' . $this->label . ': ' . $e->getMessage(),
+            );
+        }
+    }
+
+    /**
+     * Nuke the registration when its owning instance has been garbage-collected
+     * (instance-lifetime scoping). Idempotent — shares the $removed guard with
+     * the once flow.
+     */
+    private function consumeLifetime(): void
+    {
+        if ($this->removed || $this->removeCallback === null) {
+            return;
+        }
+
+        $this->removed = true;
+
+        try {
+            ($this->removeCallback)();
+        } catch (\Throwable $e) {
+            Logger::error(
+                'RuntimeInstanceHookHandler',
+                'Error removing lifetime hook ' . $this->label . ': ' . $e->getMessage(),
             );
         }
     }
@@ -98,6 +129,13 @@ final class RuntimeInstanceHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
+            $instance = $this->instanceRef->get();
+            if ($instance === null) {
+                // Owner instance is gone — nuke the hook (instance-lifetime scoping).
+                $this->consumeLifetime();
+                return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
+            }
+
             if ($this->once) {
                 if ($this->consumed) {
                     return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
@@ -111,7 +149,7 @@ final class RuntimeInstanceHookHandler
                         $this->executeIf,
                         $this->executeIfParams,
                         $this->label,
-                        $this->instance::class,
+                        $instance::class,
                         $this->buildHookArgs($args),
                     )
                     : ($this->executeIf)();
@@ -133,8 +171,8 @@ final class RuntimeInstanceHookHandler
             }
 
             $execute = $this->visibility === 'public'
-                ? $this->instance->{$this->method}(...$args)
-                : ($this->invoker)($this->instance, ...$args);
+                ? $instance->{$this->method}(...$args)
+                : ($this->invoker)($instance, ...$args);
 
             $this->consumeOnce();
 
@@ -200,8 +238,11 @@ final class RuntimeInstancePropertyHookHandler
     /** @var bool True once the removal callback fired (idempotency guard). */
     private bool $removed = false;
 
+    /** @var \WeakReference<object> Weak reference to the owner instance — keeps it collectible (instance-lifetime scoping). */
+    private readonly \WeakReference $instanceRef;
+
     public function __construct(
-        private readonly object $instance,
+        object $instance,
         private readonly string $property,
         private readonly string $visibility = 'public',
         private readonly string $type = 'action',
@@ -211,7 +252,12 @@ final class RuntimeInstancePropertyHookHandler
         private readonly array $hookArgNames = [],
         private readonly bool $once = false,
     ) {
-        $this->label = $this->instance::class . '::$' . $this->property;
+        // Keep the owner collectible: only a weak reference is retained, so
+        // the instance can be garbage-collected while the hook is registered.
+        // On death the hook nukes itself (instance-lifetime scoping).
+        $this->instanceRef = \WeakReference::create($instance);
+
+        $this->label = $instance::class . '::$' . $this->property;
 
         if ($this->visibility !== 'public') {
             $propertyName = $this->property;
@@ -221,7 +267,7 @@ final class RuntimeInstancePropertyHookHandler
             $this->reader = \Closure::bind(
                 static fn(object $target): mixed => $target->{$propertyName},
                 null,
-                $this->instance::class,
+                $instance::class,
             );
         }
     }
@@ -251,7 +297,30 @@ final class RuntimeInstancePropertyHookHandler
         } catch (\Throwable $e) {
             Logger::error(
                 'RuntimeInstancePropertyHookHandler',
-                'Error removing once-hook ' . $this->label . ': ' . $e->getMessage()
+                'Error removing once-hook ' . $this->label . ': ' . $e->getMessage(),
+            );
+        }
+    }
+
+    /**
+     * Nuke the registration when its owning instance has been garbage-collected
+     * (instance-lifetime scoping). Idempotent — shares the $removed guard with
+     * the once flow.
+     */
+    private function consumeLifetime(): void
+    {
+        if ($this->removed || $this->removeCallback === null) {
+            return;
+        }
+
+        $this->removed = true;
+
+        try {
+            ($this->removeCallback)();
+        } catch (\Throwable $e) {
+            Logger::error(
+                'RuntimeInstancePropertyHookHandler',
+                'Error removing lifetime hook ' . $this->label . ': ' . $e->getMessage(),
             );
         }
     }
@@ -259,6 +328,13 @@ final class RuntimeInstancePropertyHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
+            $instance = $this->instanceRef->get();
+            if ($instance === null) {
+                // Owner instance is gone — nuke the hook (instance-lifetime scoping).
+                $this->consumeLifetime();
+                return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
+            }
+
             if ($this->once) {
                 if ($this->consumed) {
                     return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
@@ -272,7 +348,7 @@ final class RuntimeInstancePropertyHookHandler
                         $this->executeIf,
                         $this->executeIfParams,
                         $this->label,
-                        $this->instance::class,
+                        $instance::class,
                         $this->buildHookArgs($args),
                     )
                     : ($this->executeIf)();
@@ -294,8 +370,8 @@ final class RuntimeInstancePropertyHookHandler
             }
 
             $callable = $this->visibility === 'public'
-                ? $this->instance->{$this->property}
-                : ($this->reader)($this->instance);
+                ? $instance->{$this->property}
+                : ($this->reader)($instance);
 
             if (!\is_callable($callable)) {
                 throw new \RuntimeException(

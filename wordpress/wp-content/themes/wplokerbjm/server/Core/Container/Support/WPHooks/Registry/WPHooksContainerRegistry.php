@@ -824,6 +824,7 @@ class DeferredHookManager
     /**
      * @param WPHookPlanProvider  $planProvider Plan provider used for registerIf gates.
      * @param ContainerInterface $container    Container used by gate closures.
+     * @param HookTargetResolver $resolverTarget 
      */
     public function __construct(
         private WPHookPlanProvider $planProvider,

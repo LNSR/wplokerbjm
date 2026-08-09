@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Services\GraphQL;
 
+use WPLokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Log\Logger;

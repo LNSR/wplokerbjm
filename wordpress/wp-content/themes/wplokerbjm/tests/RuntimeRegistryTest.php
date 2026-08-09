@@ -836,6 +836,109 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $second = apply_filters('rt_once_filter', 'beta');
         $this->assertSame('beta', $second);
     }
+
+    // ── Runtime registerUnderHook (deferRegisterUntilHook) ────
+
+    public function testRegisterUnderHookDefersUntilTriggerFires(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_deferred_hook', deferRegisterUntilHook: 'rt_trigger', acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        // Not registered yet — waiting for the trigger hook.
+        $this->assertNull($this->findRegisteredHook('action', 'rt_deferred_hook'));
+
+        do_action('rt_trigger');
+
+        // Trigger fired → auto-activated.
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_deferred_hook'));
+
+        do_action('rt_deferred_hook', 'fired');
+        $this->assertSame(['fired'], $captured);
+    }
+
+    public function testRegisterUnderHookRespectsRegisterIfAtActivation(): void
+    {
+        $anon = new class {
+            #[Action(hook: 'rt_deferred_gated_hook', deferRegisterUntilHook: 'rt_trigger', registerIf: static function (): bool { return false; })]
+            public function doSomething(): void {}
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        do_action('rt_trigger');
+
+        // Gate rejected at activation → never registers.
+        $this->assertNull($this->findRegisteredHook('action', 'rt_deferred_gated_hook'));
+    }
+
+    public function testUnregisterHooksOnSweepsDeferredPool(): void
+    {
+        $anon = new class {
+            #[Action(hook: 'rt_deferred_swept_hook', deferRegisterUntilHook: 'rt_trigger')]
+            public function doSomething(): void {}
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->registry->unregisterHooksOn($anon);
+
+        do_action('rt_trigger');
+
+        // Deferred entry was swept — the trigger must not activate it.
+        $this->assertNull($this->findRegisteredHook('action', 'rt_deferred_swept_hook'));
+    }
+
+    // ── Runtime instance-lifetime (GC-aware auto-cleanup) ────
+
+    public function testInstanceDeathNukesActiveHooks(): void
+    {
+        $captured = [];
+
+        $anon = new class ($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(hook: 'rt_lifetime_action', acceptedArgs: 1)]
+            public function doSomething(string $val): void { $this->captured[] = $val; }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_lifetime_action'));
+
+        // Drop the only strong reference — the handler holds a WeakReference,
+        // so the owner is garbage-collected and the hook nukes itself.
+        unset($anon);
+        gc_collect_cycles();
+
+        do_action('rt_lifetime_action', 'x');
+        $this->assertSame([], $captured);
+        $this->assertNull($this->findRegisteredHook('action', 'rt_lifetime_action'));
+    }
+
+    public function testInstanceDeathPreventsDeferredActivation(): void
+    {
+        $anon = new class {
+            #[Action(hook: 'rt_lifetime_deferred', deferRegisterUntilHook: 'rt_trigger', acceptedArgs: 1)]
+            public function doSomething(string $val): void {}
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        unset($anon);
+        gc_collect_cycles();
+
+        // Owner is dead — the deferred entry must never activate.
+        do_action('rt_trigger');
+        $this->assertNull($this->findRegisteredHook('action', 'rt_lifetime_deferred'));
+    }
 }
 
 /**
