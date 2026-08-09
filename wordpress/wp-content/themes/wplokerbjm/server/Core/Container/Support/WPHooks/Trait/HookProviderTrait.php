@@ -7,6 +7,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 use Psr\Container\ContainerInterface;
 use ReflectionException;
 use ReflectionFunction;
+use ReflectionMethod;
 use ReflectionNamedType;
 use RuntimeException;
 
@@ -397,5 +398,93 @@ trait HookProviderTrait
         }
 
         return $values;
+    }
+
+    /**
+     * Extract the parameter names of any callable shape, used to build named
+     * hook args for executeIf resolution (property hooks, dynamic callables).
+     *
+     * Supports closures, invokable objects, array callables and string
+     * callables ('Class::method' or plain function names). Anything not
+     * callable yields an empty result.
+     *
+     * @param mixed $callable The callable value to introspect.
+     *
+     * @return array<int, string> Parameter names in declaration order.
+     */
+    public function callableParamNames(mixed $callable): array
+    {
+        if (!is_callable($callable)) {
+            return [];
+        }
+
+        try {
+            $reflect = match (true) {
+                $callable instanceof \Closure =>
+                new \ReflectionFunction($callable),
+
+                is_object($callable) =>
+                new \ReflectionMethod($callable, '__invoke'),
+
+                is_array($callable) =>
+                new \ReflectionMethod($callable[0], $callable[1]),
+
+                is_string($callable) && str_contains($callable, '::') =>
+                new \ReflectionFunction($callable),
+
+                is_string($callable) =>
+                new \ReflectionFunction($callable),
+
+                default => null,
+            };
+
+            if ($reflect === null) {
+                return [];
+            }
+
+            return array_map(
+                static fn(\ReflectionParameter $param): string => $param->getName(),
+                $reflect->getParameters(),
+            );
+        } catch (\ReflectionException) {
+            return [];
+        }
+
+    }
+    /**
+     * Extract parameter names from a property's callable value or default value.
+     *
+     * Handles standard properties (default values), initialized property hooks,
+     * and live object instances.
+     *
+     * @param \ReflectionProperty $property
+     * @param object|null $instance Optional runtime instance to execute getters/hooks.
+     *
+     * @return array<int, string>
+     */
+    public function extractPropertyCallableParamNames(\ReflectionProperty $property, ?object $instance = null): array
+    {
+
+        $propertyName = $property->getName();
+
+        if ($instance !== null) {
+            // For hooked properties, reading the property executes the `get` hook.
+            // For non-hooked properties, ensure it's initialized before reading to avoid Error.
+            $isHooked = $property->hasHook(\PropertyHookType::Get);
+            $isInitialized = $property->isInitialized($instance);
+
+            if ($isHooked || $isInitialized) {
+                $value = $instance->{$propertyName} ?? null;
+                if (is_callable($value)) {
+                    return $this->callableParamNames($value);
+                }
+            }
+        }
+
+        if ($property->hasDefaultValue()) {
+            return $this->callableParamNames($property->getDefaultValue());
+        }
+
+        return [];
     }
 }

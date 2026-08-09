@@ -6,7 +6,7 @@ namespace WPLokerBJM\Tests;
 
 use DI\Container;
 use DI\ContainerBuilder;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Tests\Support\Fixtures\{ChildNoRedeclareService, ChildRedeclareService, ParentHookService};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -99,7 +99,10 @@ class InheritedHookTest extends WplokerbjmTestCase
 
     public function testRuntimeRegistryIsDeclaredOnly(): void
     {
-        $runtime = new WPHooksRuntimeRegistry();
+        $runtime = $this->container()->make(WPHooksRuntimeRegistry::class, [
+            'runtimeResolver' => new HookRuntimeResolver(),
+            'provider' => null,
+        ]);
 
         // Inherited parent hook is NOT registered on the child instance.
         $childNoRedeclare = new ChildNoRedeclareService();

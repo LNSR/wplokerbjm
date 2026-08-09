@@ -53,7 +53,7 @@ class DeferRegisterUntilHookTest extends WplokerbjmTestCase
             ExecuteIfActionService::class => \DI\autowire(),
         ]);
         $this->container = $builder->build();
-        $this->planProvider = new WPHookPlanProvider();
+        $this->planProvider = $this->container->get(WPHookPlanProvider::class);
 
         ExecuteIfActionService::reset();
     }

@@ -212,6 +212,7 @@ class ThemeProp
      *   head elements when hydrating client code.
      * @return ThemeData
      */
+    #[Filter(hook: static function(): string { return \get_stylesheet() . '_graphql_theme_data'; })]
     public function themeData(): array
     {
         $loggedIn = is_user_logged_in();

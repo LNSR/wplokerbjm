@@ -41,6 +41,7 @@
     "php.stubs": ["*", "wordpress"],
     "php.workspace.includePath": "wordpress/",
     "php.problems.scope": "opened",
+    "php.inlayHints.parameters.enabled": true,
     "php.suggest.basic": false, // Handled by Intelephense
     "php.files.exclude": {
       "**/node_modules/**": true,

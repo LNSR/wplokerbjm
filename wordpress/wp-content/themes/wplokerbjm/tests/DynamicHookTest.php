@@ -9,7 +9,7 @@ use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\Fixtures\DynamicHookService;
 use WPLokerBJM\Tests\Support\Fixtures\RuntimeDynamicService;
@@ -170,7 +170,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
     public function testRuntimeRegistryRegistersClosureHooks(): void
     {
-        $runtimeRegistry = new WPHooksRuntimeRegistry();
+        $runtimeRegistry = new WPHooksRuntimeRegistry(new HookRuntimeResolver());
 
         // The instance must be kept alive — runtime hooks are instance-lifetime
         // scoped (weak references), so an unreferenced instance dies and its

@@ -4,6 +4,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks;
 use Brick\VarExporter\VarExporter;
 
 use ReflectionClass;
+use ReflectionFunction;
 use ReflectionMethod;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
@@ -144,7 +145,7 @@ class WPHooksScanner
                         registerIf: $attr->registerIf,
                         registerIfParams: $hookPlanProvider->buildCallablePlan($attr->registerIf),
                         hookParams: $hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        hookArgs: [],
+                        hookArgs: $hookPlanProvider->extractPropertyCallableParamNames($property),
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),

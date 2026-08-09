@@ -72,7 +72,7 @@ final class Rankmath implements PluginConfigInterface
 	 * @return string Rewritten URL using headless domain.
 	 */
 	#[Filter('rank_math/indexing_api/publish_url',
-		executeIf: static function (string $url, array|\WP_Post|null $post, string $provider):bool {
+		executeIf: static function (string $url): bool {
 				return self::checkUrl($url);
 				}
 	)]
@@ -98,7 +98,7 @@ final class Rankmath implements PluginConfigInterface
 	 * @return string Rewritten URL using headless domain.
 	 */
 	#[Filter('rank_math/indexing_api/delete_url',
-		executeIf: static function (string $url, array|\WP_Post|null $post):bool {
+		executeIf: static function (string $url): bool {
 				return self::checkUrl($url);
 				}
 	)]
@@ -119,17 +119,18 @@ final class Rankmath implements PluginConfigInterface
 	 * @param SEO_Analyzer $analyzer.
 	 * @return void
 	 */
-	#[Filter('seo_analysis/after_set_url', executeIf: static function (SEO_Analyzer $analyzer): bool {
-				if (empty($analyzer) || !property_exists($analyzer, 'analyse_url')) {
-				return false;
-				}
+	#[Filter('seo_analysis/after_set_url',
+		executeIf: static function (SEO_Analyzer $analyzer): bool {
+					if (empty($analyzer) || !property_exists($analyzer, 'analyse_url')) {
+					return false;
+					}
 
-			$original = $analyzer->analyse_url;
-				if (empty($original)) {
-				return false;
+				$original = $analyzer->analyse_url;
+					if (empty($original)) {
+					return false;
+					}
+				return true;
 				}
-			return true;
-			}
 	)]
 	public function rewriteSeoAnalyzerInstanceUrl(SEO_Analyzer $analyzer): void
 	{

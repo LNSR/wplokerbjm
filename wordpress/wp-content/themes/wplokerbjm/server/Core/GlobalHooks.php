@@ -67,25 +67,6 @@ class RedirectHooks
         return false;
     }
 
-    /**
-     * @param WPHooksContainerRegistry $hooksRegistry
-     */
-    public function __construct(private WPHooksContainerRegistry $hooksRegistry)
-    {
-        $hooksRegistry->activateDeferredByClass(__CLASS__);
-    }
-
-    #[Action('init', PHP_INT_MIN,
-        once: true,
-        registerIf: static function (): bool {
-                return self::shouldRegister();
-                },
-    )]
-    public function __invoke()
-    {
-        // trigger constructor
-    }
-
     private static function shouldRegister(): bool
     {
 
@@ -109,7 +90,10 @@ class RedirectHooks
      * ! Notify search engines with 410 Gone for removed job posts.
      */
     #[Action('template_redirect', 2,
-        deferRegister: true,
+        once: true,
+        registerIf: static function (): bool {
+                return self::shouldRegister();
+                },
         executeIf: static function (): bool {
                 return !self::shouldSkipRedirect() && is_404() && is_singular('lowongan');
                 },
@@ -131,7 +115,10 @@ class RedirectHooks
      * public requests to the Svelte frontend (dev vs prod).
      */
     #[Action('template_redirect', 3,
-        deferRegister: true,
+        once: true,
+        registerIf: static function (): bool {
+                return self::shouldRegister();
+                },
         executeIf: static function (): bool {
                 return !self::shouldSkipRedirect();
                 },
@@ -175,7 +162,7 @@ class RedirectHooks
 class RobotsHooks
 {
     #[Filter('wp_robots')]
-    public function robotsMetaImpl(array $robots): array
+    public function __invoke(array $robots): array
     {
         if (is_post_type_archive('lowongan')) {
             $robots['noindex'] = true;
@@ -212,11 +199,6 @@ class RobotsHooks
  */
 class SearchHooks
 {
-    private static function checkPostType(\WP_Query $wp_query): bool
-    {
-        $postTypes = (array) ($wp_query->get('post_type') ?: []);
-        return in_array(PostTypes::POST_TYPE_LOWONGAN, $postTypes, true);
-    }
 
     /**
      * @param string        $search   The current search SQL fragment (may be empty).
@@ -225,15 +207,12 @@ class SearchHooks
      */
     #[Filter('posts_search', 10, 2,
         deferRegisterUntilHook: 'init_graphql_request',
-        once: true,
         registerIf: static function (): bool {
-                    if (!\defined('GRAPHQL_REQUEST')) {
-                    return false;
-                    }
                 return !is_admin() && !SharedUtils::isWPCLI();
                 },
         executeIf: static function (\WP_Query $wp_query): bool {
-                return self::checkPostType($wp_query);
+                $postTypes = (array) ($wp_query->get('post_type') ?: []);
+                return in_array(PostTypes::POST_TYPE_LOWONGAN, $postTypes, true);
                 }
 
     )]
@@ -487,7 +466,7 @@ class CacheInvalidationHooks
 class LoggerHooks
 {
 
-    #[Action('shutdown', PHP_INT_MAX)]
+    #[Action('shutdown', PHP_INT_MAX, once: true)]
     public function flushBuffer(): void
     {
         // ONLY detach the browser connection if we are running in an HTTP context (not WP-CLI)

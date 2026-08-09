@@ -21,12 +21,17 @@ final class LowonganIngestRoute
     ) {
     }
 
-    #[Action('rest_api_init', acceptedArgs: 0)]
+    #[Action('rest_api_init', acceptedArgs: 0,
+        deferRegisterUntilHook: 'parse_request',
+        registerIf: static function (): bool {
+                return isset($_SERVER['REQUEST_URI']) && \str_contains($_SERVER['REQUEST_URI'], rest_get_url_prefix() . '/' . self::NAMESPACE);
+                }
+    )]
     public function registerRoutes(): void
     {
 
         register_rest_route(self::NAMESPACE , self::ROUTE_OPTIONS, [
-        'methods' => 'GET',
+            'methods' => 'GET',
             'callback' => $this->optionsController->options(...),
             'permission_callback' => $this->optionsController->permissionsCheck(...),
         ]);

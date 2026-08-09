@@ -10,9 +10,9 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  */
 class WPCron
 {
-    const DELETE_OLD_JOBS = 'wplokerbjm_delete_old_jobs';
-    const UPDATE_JOB_STATUSES = 'wplokerbjm_update_job_statuses';
-    const CLEANUP_TAXONOMY = 'wplokerbjm_cleanup_taxonomy';
+    public const DELETE_OLD_JOBS = 'wplokerbjm_delete_old_jobs';
+    public const UPDATE_JOB_STATUSES = 'wplokerbjm_update_job_statuses';
+    public const CLEANUP_TAXONOMY = 'wplokerbjm_cleanup_taxonomy';
 
     /**
      * @param self::DELETE_OLD_JOBS | self::UPDATE_JOB_STATUSES | self::CLEANUP_TAXONOMY $hook
@@ -33,7 +33,7 @@ class WPCron
      */
     #[Action('init',
         registerIf: static function (): bool {
-                return SharedUtils::isWPCLI();
+                return SharedUtils::isWPCLI() || (defined('DOING_CRON') && DOING_CRON);
                 }
     )]
     public function registerCronWP(): void

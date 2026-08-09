@@ -3,6 +3,101 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{RuntimeWPHookProvider};
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
+
+/**
+ * Shared lifecycle + gate evaluation for runtime instance handlers
+ * (method-based and property-based hooks).
+ *
+ * Cross-domain members (once-removal plumbing, named hook-args builder,
+ * filter passthrough) come from the shared {@see HookInvokerTrait}; the
+ * actual invocation step is domain-specific via {@see invokeOn()}.
+ */
+trait RuntimeInstanceInvokerTrait
+{
+    use HookInvokerTrait;
+
+    /**
+     * Invoke the actual hook callback on the (alive) owner instance.
+     *
+     * @param object $instance The resolved owner instance.
+     * @param mixed  ...$args  Hook arguments received at fire time.
+     */
+    abstract protected function invokeOn(object $instance, mixed ...$args): mixed;
+
+    public function __invoke(mixed ...$args): mixed
+    {
+        try {
+            $instance = $this->instanceRef->get();
+            if ($instance === null) {
+                // Owner instance is gone — nuke the hook (instance-lifetime scoping).
+                $this->consumeLifetime();
+                return $this->filterPassthrough($args);
+            }
+
+            if ($this->once) {
+                if ($this->consumed) {
+                    return $this->filterPassthrough($args);
+                }
+                $this->consumed = true;
+            }
+
+            if ($this->executeIf !== null) {
+                $allowed = $this->hookPlanProvider !== null
+                    ? $this->hookPlanProvider->evaluateRuntimeExecuteIf($this->executeIf, $this->executeIfParams, $this->label, $instance::class, $this->buildHookArgs($args))
+                    : ($this->executeIf)();
+                if (!is_bool($allowed)) {
+                    throw new \RuntimeException(
+                        'Condition for ' . $this->label . ' must return bool, got ' . get_debug_type($allowed)
+                    );
+                }
+
+                if ($allowed === false) {
+                    Logger::warning(
+                        static::class,
+                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
+                    );
+                    $this->consumeOnce();
+                    return $this->filterPassthrough($args);
+                }
+            }
+
+            $result = $this->invokeOn($instance, ...$args);
+            $this->consumeOnce();
+            return $result;
+        } catch (\Throwable $e) {
+            $this->consumeOnce();
+            Logger::error(
+                static::class,
+                'Error invoking hook ' . $this->label . ': ' . $e->getMessage(),
+            );
+            return $this->filterPassthrough($args);
+        }
+    }
+
+    /**
+     * Nuke the registration when its owning instance has been garbage-collected
+     * (instance-lifetime scoping). Idempotent — shares the $removed guard with
+     * the once flow.
+     */
+    private function consumeLifetime(): void
+    {
+        if ($this->removed || $this->removeCallback === null) {
+            return;
+        }
+
+        $this->removed = true;
+
+        try {
+            ($this->removeCallback)();
+        } catch (\Throwable $e) {
+            Logger::error(
+                static::class,
+                'Error removing lifetime hook ' . $this->label . ': ' . $e->getMessage(),
+            );
+        }
+    }
+}
 
 
 /**
@@ -18,6 +113,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{RuntimeWPHookProvider};
  */
 final class RuntimeInstanceHookHandler
 {
+    use RuntimeInstanceInvokerTrait;
+
     public readonly string $label;
 
     /** @var \Closure|null Closure to invoke the method on the stored instance (for non-public methods) */
@@ -30,15 +127,6 @@ final class RuntimeInstanceHookHandler
      * @param 'action'|'filter' $type
      * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
      */
-    /** @var \Closure|null Callback that nukes this registration once the once-hook is consumed. */
-    private ?\Closure $removeCallback = null;
-
-    /** @var bool True once the first fire reached gate evaluation (consume-on-any-evaluation). */
-    private bool $consumed = false;
-
-    /** @var bool True once the removal callback fired (idempotency guard). */
-    private bool $removed = false;
-
     /** @var \WeakReference<object> Weak reference to the owner instance — keeps it collectible (instance-lifetime scoping). */
     private readonly \WeakReference $instanceRef;
 
@@ -73,136 +161,14 @@ final class RuntimeInstanceHookHandler
         }
     }
 
-    /**
-     * Register the callback that nukes this registration after a once-hook
-     * has been consumed (first fire where the executeIf gate was evaluated).
-     */
-    public function setRemoveCallback(?\Closure $callback): void
+
+    protected function invokeOn(object $instance, mixed ...$args): mixed
     {
-        $this->removeCallback = $callback;
+        return $this->visibility === 'public'
+            ? $instance->{$this->method}(...$args)
+            : ($this->invoker)($instance, ...$args);
     }
 
-    /**
-     * Consume the once-hook: fire the removal callback exactly once.
-     */
-    private function consumeOnce(): void
-    {
-        if (!$this->once || $this->removed || $this->removeCallback === null) {
-            return;
-        }
-
-        $this->removed = true;
-
-        try {
-            ($this->removeCallback)();
-        } catch (\Throwable $e) {
-            Logger::error(
-                'RuntimeInstanceHookHandler',
-                'Error removing once-hook ' . $this->label . ': ' . $e->getMessage(),
-            );
-        }
-    }
-
-    /**
-     * Nuke the registration when its owning instance has been garbage-collected
-     * (instance-lifetime scoping). Idempotent — shares the $removed guard with
-     * the once flow.
-     */
-    private function consumeLifetime(): void
-    {
-        if ($this->removed || $this->removeCallback === null) {
-            return;
-        }
-
-        $this->removed = true;
-
-        try {
-            ($this->removeCallback)();
-        } catch (\Throwable $e) {
-            Logger::error(
-                'RuntimeInstanceHookHandler',
-                'Error removing lifetime hook ' . $this->label . ': ' . $e->getMessage(),
-            );
-        }
-    }
-
-    public function __invoke(mixed ...$args): mixed
-    {
-        try {
-            $instance = $this->instanceRef->get();
-            if ($instance === null) {
-                // Owner instance is gone — nuke the hook (instance-lifetime scoping).
-                $this->consumeLifetime();
-                return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
-            }
-
-            if ($this->once) {
-                if ($this->consumed) {
-                    return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
-                }
-                $this->consumed = true;
-            }
-
-            if ($this->executeIf !== null) {
-                $allowed = $this->hookPlanProvider !== null
-                    ? $this->hookPlanProvider->evaluateRuntimeExecuteIf(
-                        $this->executeIf,
-                        $this->executeIfParams,
-                        $this->label,
-                        $instance::class,
-                        $this->buildHookArgs($args),
-                    )
-                    : ($this->executeIf)();
-
-                if (!is_bool($allowed)) {
-                    throw new \RuntimeException(
-                        'Condition for ' . $this->label . ' must return bool, got ' . get_debug_type($allowed)
-                    );
-                }
-
-                if ($allowed === false) {
-                    Logger::warning(
-                        'RuntimeInstanceHookHandler',
-                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
-                    );
-                    $this->consumeOnce();
-                    return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
-                }
-            }
-
-            $execute = $this->visibility === 'public'
-                ? $instance->{$this->method}(...$args)
-                : ($this->invoker)($instance, ...$args);
-
-            $this->consumeOnce();
-
-            return $execute;
-        } catch (\Throwable $e) {
-            $this->consumeOnce();
-            Logger::error(
-                'RuntimeInstanceHookHandler',
-                'Error invoking hook ' . $this->label . ': ' . $e->getMessage(),
-            );
-            // Filters must pass through the first argument; actions are fire-and-forget.
-            return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
-        }
-    }
-
-    /**
-     * Build named hook arguments for executeIf parameter resolution.
-     *
-     * @param array<int, mixed> $args Hook arguments received at fire time.
-     *
-     * @return array<string, mixed> Named args (empty when no names are known).
-     */
-    private function buildHookArgs(array $args): array
-    {
-        if ($this->hookArgNames === []) {
-            return [];
-        }
-
-        return \array_combine(\array_slice($this->hookArgNames, 0, \count($args)), $args) ?: [];
-    }
 }
 
 /**
@@ -217,6 +183,8 @@ final class RuntimeInstanceHookHandler
  */
 final class RuntimeInstancePropertyHookHandler
 {
+    use RuntimeInstanceInvokerTrait;
+
     public readonly string $label;
 
     /** @var \Closure(object):mixed|null */
@@ -229,15 +197,6 @@ final class RuntimeInstancePropertyHookHandler
      * @param 'action'|'filter' $type
      * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
      */
-    /** @var \Closure|null Callback that nukes this registration once the once-hook is consumed. */
-    private ?\Closure $removeCallback = null;
-
-    /** @var bool True once the first fire reached gate evaluation (consume-on-any-evaluation). */
-    private bool $consumed = false;
-
-    /** @var bool True once the removal callback fired (idempotency guard). */
-    private bool $removed = false;
-
     /** @var \WeakReference<object> Weak reference to the owner instance — keeps it collectible (instance-lifetime scoping). */
     private readonly \WeakReference $instanceRef;
 
@@ -273,143 +232,23 @@ final class RuntimeInstancePropertyHookHandler
     }
 
     /**
-     * Register the callback that nukes this registration after a once-hook
-     * has been consumed (first fire where the executeIf gate was evaluated).
+     * Invoke the property's callable with the given arguments.
      */
-    public function setRemoveCallback(?\Closure $callback): void
+    protected function invokeOn(object $instance, mixed ...$args): mixed
     {
-        $this->removeCallback = $callback;
-    }
+        $callable = $this->visibility === 'public'
+            ? $instance->{$this->property}
+            : ($this->reader)($instance);
 
-    /**
-     * Consume the once-hook: fire the removal callback exactly once.
-     */
-    private function consumeOnce(): void
-    {
-        if (!$this->once || $this->removed || $this->removeCallback === null) {
-            return;
-        }
-
-        $this->removed = true;
-
-        try {
-            ($this->removeCallback)();
-        } catch (\Throwable $e) {
-            Logger::error(
-                'RuntimeInstancePropertyHookHandler',
-                'Error removing once-hook ' . $this->label . ': ' . $e->getMessage(),
+        if (!\is_callable($callable)) {
+            throw new \RuntimeException(
+                "Property {$this->label} is not a valid callable."
             );
         }
+
+        return $callable(...$args);
     }
 
-    /**
-     * Nuke the registration when its owning instance has been garbage-collected
-     * (instance-lifetime scoping). Idempotent — shares the $removed guard with
-     * the once flow.
-     */
-    private function consumeLifetime(): void
-    {
-        if ($this->removed || $this->removeCallback === null) {
-            return;
-        }
-
-        $this->removed = true;
-
-        try {
-            ($this->removeCallback)();
-        } catch (\Throwable $e) {
-            Logger::error(
-                'RuntimeInstancePropertyHookHandler',
-                'Error removing lifetime hook ' . $this->label . ': ' . $e->getMessage(),
-            );
-        }
-    }
-
-    public function __invoke(mixed ...$args): mixed
-    {
-        try {
-            $instance = $this->instanceRef->get();
-            if ($instance === null) {
-                // Owner instance is gone — nuke the hook (instance-lifetime scoping).
-                $this->consumeLifetime();
-                return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
-            }
-
-            if ($this->once) {
-                if ($this->consumed) {
-                    return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
-                }
-                $this->consumed = true;
-            }
-
-            if ($this->executeIf !== null) {
-                $allowed = $this->hookPlanProvider !== null
-                    ? $this->hookPlanProvider->evaluateRuntimeExecuteIf(
-                        $this->executeIf,
-                        $this->executeIfParams,
-                        $this->label,
-                        $instance::class,
-                        $this->buildHookArgs($args),
-                    )
-                    : ($this->executeIf)();
-
-                if (!is_bool($allowed)) {
-                    throw new \RuntimeException(
-                        'Condition for ' . $this->label . ' must return bool, got ' . get_debug_type($allowed)
-                    );
-                }
-
-                if ($allowed === false) {
-                    Logger::warning(
-                        'RuntimeInstancePropertyHookHandler',
-                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
-                    );
-                    $this->consumeOnce();
-                    return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
-                }
-            }
-
-            $callable = $this->visibility === 'public'
-                ? $instance->{$this->property}
-                : ($this->reader)($instance);
-
-            if (!\is_callable($callable)) {
-                throw new \RuntimeException(
-                    "Property {$this->label} is not a valid callable."
-                );
-            }
-
-            $result = $callable(...$args);
-
-            $this->consumeOnce();
-
-            return $result;
-        } catch (\Throwable $e) {
-            $this->consumeOnce();
-            Logger::error(
-                'RuntimeInstancePropertyHookHandler',
-                'Error invoking hook ' . $this->label . ': ' . $e->getMessage(),
-            );
-            // Filters must pass through the first argument; actions are fire-and-forget.
-            return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
-        }
-    }
-
-    /**
-     * Build named hook arguments for executeIf parameter resolution.
-     *
-     * @param array<int, mixed> $args Hook arguments received at fire time.
-     *
-     * @return array<string, mixed> Named args (empty when no names are known).
-     */
-    private function buildHookArgs(array $args): array
-    {
-        if ($this->hookArgNames === []) {
-            return [];
-        }
-
-        return \array_combine(\array_slice($this->hookArgNames, 0, \count($args)), $args) ?: [];
-    }
 }
 
 /**
@@ -423,18 +262,23 @@ final class RuntimeInstancePropertyHookHandler
  */
 final class RuntimeCallableHookHandler
 {
+    use HookInvokerTrait;
+
     public readonly string $label;
 
     /**
      * @param callable        $callback  Callable invoked when the hook fires.
      * @param \Closure|null   $executeIf Optional gate: invoked directly, must return bool.
      * @param 'action'|'filter' $type
+     * @param bool            $once      When true, the registration removes itself after its first
+     *                                   fire where the executeIf gate is evaluated (consume-on-any-evaluation).
      */
     public function __construct(
         // `callable` is not a valid property type — validated by the registry before construction.
         private readonly mixed $callback,
         private readonly ?\Closure $executeIf = null,
         private readonly string $type = 'action',
+        private readonly bool $once = false,
     ) {
         if (is_array($callback)) {
             $this->label = get_debug_type($callback[0]) . '::' . $callback[1];
@@ -448,6 +292,13 @@ final class RuntimeCallableHookHandler
     public function __invoke(mixed ...$args): mixed
     {
         try {
+            if ($this->once) {
+                if ($this->consumed) {
+                    return $this->filterPassthrough($args);
+                }
+                $this->consumed = true;
+            }
+
             if ($this->executeIf !== null) {
                 $allowed = ($this->executeIf)();
                 if (!is_bool($allowed)) {
@@ -461,20 +312,26 @@ final class RuntimeCallableHookHandler
                         'RuntimeCallableHookHandler',
                         'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                     );
-                    return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
+                    $this->consumeOnce();
+                    return $this->filterPassthrough($args);
                 }
             }
 
             $callback = $this->callback;
 
-            return $callback(...$args);
+            $result = $callback(...$args);
+
+            $this->consumeOnce();
+
+            return $result;
         } catch (\Throwable $e) {
+            $this->consumeOnce();
             Logger::error(
                 'RuntimeCallableHookHandler',
                 'Error invoking hook ' . $this->label . ': ' . $e->getMessage(),
             );
             // Filters must pass through the first argument; actions are fire-and-forget.
-            return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
+            return $this->filterPassthrough($args);
         }
     }
 }

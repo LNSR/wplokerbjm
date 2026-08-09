@@ -27,7 +27,7 @@ composer generate-meta-hooks             # Regenerate hook types
 
 **Symptom**: `#[Action]` or `#[Filter]` method never executes. No error.
 
-**Cause**: Wrong namespace, `$defer = true` without registration, or class not in scan path.
+**Cause**: Wrong namespace, `deferRegister` hooks never activated, or class not in scan path.
 
 **Solution**:
 ```php
@@ -42,7 +42,7 @@ class MyController { #[Action('init')] public function onInit() {} }
 
 1. Verify class is in `server/` under `WPLokerBJM\` namespace
 2. Check filename matches class name (PSR-4)
-3. If `defer: true`, must call `WPHooksContainerRegistry::registerByMethod()` explicitly
+3. If using `deferRegister`, activate explicitly via `DeferredHookManager::activateMatchingDeferredEntries()`
 4. Delete `cache/CompiledContainer.php` + reload
 
 **Prevention**: Always use `WPLokerBJM\` root namespace.

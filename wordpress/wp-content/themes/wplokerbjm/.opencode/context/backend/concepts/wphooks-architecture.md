@@ -18,16 +18,26 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 
 ## Runtime flow
 
-`WPHooksRuntimeRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. Manual `registerAction()` / `registerFilter()` calls use `RuntimeCallableHookHandler`, allowing closures and callbacks that capture runtime state without container resolution.
+`WPHooksRuntimeRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. When a `RuntimeWPHookProvider` is injected, attribute closures (hook name, `registerIf`, `executeIf`) are resolved with optional container / named hook-argument injection; without one, closures must be zero-parameter. Manual `registerAction()` / `registerFilter()` use `RuntimeCallableHookHandler`, letting closures capture runtime state without container resolution.
+
+## Deferred pool (shared)
+
+`DeferredHooksTrait` owns the deferred-handler pool used by both paths:
+
+- `addDeferred()` stores an entry under `[hook][key]`.
+- `activateMatchingDeferredEntries()` sweeps the pool, re-evaluates the registration gate via the abstract `gateDeferredActivation()`, and hands matches to an activate callback.
+- `unregisterMatchingDeferredEntries()` removes entries without touching active handlers.
+
+`DeferredHookManager` (container path) exposes the micromanage selectors; `WPHooksRuntimeRegistry` consumes the same mechanics behind an automatic-only surface (`deferRegisterUntilHook` only).
 
 ## The important boundary
 
 | Concern | Container path | Runtime path |
 |---|---|---|
-| Target lifetime | Resolved lazily at hook fire | Existing object is retained in a `WeakMap` registry |
-| Dynamic hook names | Supported through `WPHookPlanProvider` | Attribute closures are skipped |
-| Conditions | `registerIf` once; `executeIf` per fire | Attribute conditions skipped; manual `executeIf` runs directly |
-| Deferred hooks | Supported and activatable by several selectors | Not supported; registration is immediate |
+| Target lifetime | Resolved lazily at hook fire | Existing object held via `WeakMap`; handler self-nukes on owner GC |
+| Dynamic hook names | Supported through `WPHookPlanProvider` | Supported through `RuntimeWPHookProvider` |
+| Conditions | `registerIf` once; `executeIf` per fire | Attribute `registerIf`/`executeIf` resolved via provider |
+| Deferred hooks | `deferRegister` + `deferRegisterUntilHook`, many selectors | `deferRegisterUntilHook` auto-activates on trigger |
 | Anonymous classes | Use resolver metadata or `AnonClassHookPropertyAbstract` | Direct instance handlers work naturally |
 
 ## Minimal shape
@@ -49,6 +59,8 @@ The attribute declares intent; the registry owns lifecycle and the invoker owns 
 
 - `server/Core/Container/Support/WPHooks/WPHooksScanner.php` — scans classes and writes the PHP cache.
 - `server/Core/Container/Support/WPHooks/Trait/HookScannerTrait.php` — shared declared-member scanner.
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — container, deferred, and target-resolution registries.
+- `server/Core/Container/Support/WPHooks/Trait/DeferredHooksTrait.php` — shared deferred pool mechanics.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — container registry, deferred manager, and target resolver.
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksRuntimeRegistry.php` — immediate object/runtime registration path.
-- `server/Core/Container/Support/WPHooks/Invoker.php` — named lazy and runtime invoker wrappers.
+- `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — ContainerLazyHookInvokerTrait, ContainerLazyHookHandler, ContainerLazyPropertyHookHandler.
+- `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — RuntimeInstanceInvokerTrait, RuntimeInstanceHookHandler, RuntimeInstancePropertyHookHandler, RuntimeCallableHookHandler.

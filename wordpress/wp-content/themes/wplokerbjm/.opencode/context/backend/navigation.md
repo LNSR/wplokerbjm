@@ -12,6 +12,7 @@ backend/
 ├── concepts/
 │   ├── architecture.md
 │   ├── hook-system.md
+│   ├── hook-provider-layer.md
 │   ├── wphooks-architecture.md
 │   ├── autoloading.md
 │   └── caching.md
@@ -30,7 +31,8 @@ backend/
 │   ├── wphooks-api.md
 │   └── dependencies.md
 └── errors/
-    └── common-issues.md
+    ├── common-issues.md
+    └── hook-attribute-on-magic-method.md
 ```
 
 ---
@@ -42,6 +44,7 @@ backend/
 |------|-------------|----------|
 | `concepts/architecture.md` | DI container, bootstrap, directory layout | critical |
 | `concepts/hook-system.md` | Attribute-driven hooks, scanner, registry | critical |
+| `concepts/hook-provider-layer.md` | Plan core for gates, dynamic names, tag closures | high |
 | `concepts/wphooks-architecture.md` | Scanner, plans, lazy/runtime registries, invokers | high |
 | `concepts/autoloading.md` | Nette RobotLoader integration | high |
 | `concepts/caching.md` | Redis cache, Cloudflare purge, keys | high |
@@ -73,6 +76,7 @@ backend/
 | File | Description | Priority |
 |------|-------------|----------|
 | `errors/common-issues.md` | Bootstrap, cache, container errors | high |
+| `errors/hook-attribute-on-magic-method.md` | Magic-method hook attributes, scanner contract | medium |
 
 ---
 

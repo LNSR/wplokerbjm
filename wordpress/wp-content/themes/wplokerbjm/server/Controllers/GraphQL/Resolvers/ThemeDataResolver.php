@@ -24,12 +24,10 @@ class ThemeDataResolver
     public function resolveThemeData(): array
     {
         try {
-            return $this->graphqlData->getThemeData(); // cached internally
+            return \apply_filters(\get_stylesheet() . '_graphql_theme_data', []); // cached internally
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'ThemeDataResolver::resolveThemeData error: ' . $e->getMessage());
-            return [
-                'data' => null,
-            ];
+            return [];
         }
     }
 }

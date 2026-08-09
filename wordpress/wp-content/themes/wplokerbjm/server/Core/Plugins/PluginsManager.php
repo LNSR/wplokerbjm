@@ -49,9 +49,11 @@ class PluginManagement
         WPGraphQL::class,
     ];
 
-    public function __construct(private WPHooksContainerRegistry $hooksRegistry, private PluginsManagerUtility $pluginManagerUtils)
+    public function __construct(private WPHooksContainerRegistry $hooksRegistry)
     {
     }
+
+    #region must do hooks
 
     /**
      * Purge all registered and deferred hooks for third-party integrations 
@@ -84,15 +86,6 @@ class PluginManagement
         return $plugins;
     }
 
-    #[Filter('option_active_plugins', 1, once: true, registerIf: static function () {
-            return empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], '/graphql') && !\is_admin();
-            })]
-    public function disableWpGraphqlPlugin(array $plugins): array
-    {
-        unset($plugins[array_search(PluginList::WpGraphql->value, $plugins)]);
-        return $plugins;
-    }
-
     /**
      * Remove the "Deactivate" action link for required plugins.
      */
@@ -108,6 +101,22 @@ class PluginManagement
         return $actions;
     }
 
+    #endregion
+
+    #region 3rd party choice hooks
+    #[Filter('option_active_plugins', once: true, registerIf: static function () {
+            return empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql') && !\is_admin();
+            })]
+    public function disableWpGraphqlPlugin(array $plugins): array
+    {
+        unset($plugins[array_search(PluginList::WpGraphql->value, $plugins)]);
+        $this->hooksRegistry->unregisterByClass(WPGraphQL::class);
+        $this->hooksRegistry->unregisterDeferredByClass(WPGraphQL::class);
+        return $plugins;
+    }
+
+    #endregion
+
     /**
      * Temporarily disable specific plugins if in development environment.
      */
@@ -120,8 +129,8 @@ class PluginManagement
         $extra = [
         ];
 
-        $pluginsToDisable = $this->pluginManagerUtils->listPluginsToDisable($extra);
-        return $this->pluginManagerUtils->filteredPlugins($plugins, $pluginsToDisable);
+        $pluginsToDisable = $this->listPluginsToDisable($extra);
+        return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
 
     /**
@@ -146,19 +155,27 @@ class PluginManagement
     {
         $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
 
-        $pluginsToDisable = $isDev ? $this->pluginManagerUtils->listPluginsToDisable() : [];
+        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
 
-        return $this->pluginManagerUtils->filteredPlugins($plugins, $pluginsToDisable);
+        return $this->filteredPlugins($plugins, $pluginsToDisable);
     }
-}
 
-/**
- * @internal \WPLokerBJM\Core\Plugins;
- */
-class PluginsManagerUtility
-{
-
-
+    /**
+     * Returns the list of plugins to disable, optionally merged with extra plugins.
+     *
+     * @param array|null $extra Optional array of additional plugin prefixes to disable.
+     * @return array Array of plugin prefixes to disable.
+     */
+    private function listPluginsToDisable(?array $extra = []): array
+    {
+        // Subject to change
+        static $base = [
+        'wordfence/',
+        'tinywp-mobile-detect/',
+        'fast-indexing-api/',
+        ];
+        return array_merge($base, $extra);
+    }
     /**
      * Filters the list of active plugins by removing specified plugins.
      *
@@ -166,7 +183,7 @@ class PluginsManagerUtility
      * @param array $pluginsToDisable Array of plugin prefixes to disable.
      * @return array Filtered array of active plugins.
      */
-    public function filteredPlugins(array $plugins, array $pluginsToDisable): array
+    private function filteredPlugins(array $plugins, array $pluginsToDisable): array
     {
         $filtered = array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
             foreach ($pluginsToDisable as $disable) {
@@ -178,23 +195,5 @@ class PluginsManagerUtility
         });
 
         return array_values($filtered);
-    }
-
-
-    /**
-     * Returns the list of plugins to disable, optionally merged with extra plugins.
-     *
-     * @param array|null $extra Optional array of additional plugin prefixes to disable.
-     * @return array Array of plugin prefixes to disable.
-     */
-    public function listPluginsToDisable(?array $extra = []): array
-    {
-        // Subject to change
-        static $base = [
-        'wordfence/',
-        'tinywp-mobile-detect/',
-        'fast-indexing-api/',
-        ];
-        return array_merge($base, $extra);
     }
 }

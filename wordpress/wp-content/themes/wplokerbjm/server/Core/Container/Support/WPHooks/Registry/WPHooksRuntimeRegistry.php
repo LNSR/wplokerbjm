@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
 
 use ReflectionClass;
 use ReflectionFunction;
+use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstancePropertyHookHandler, RuntimeInstanceHookHandler, RuntimeCallableHookHandler};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Shared\Log\Logger;
@@ -83,6 +84,7 @@ class WPHooksRuntimeRegistry
     private \WeakMap $scanned;
 
     public function __construct(
+        private HookRuntimeResolver $runtimeResolver,
         private readonly ?RuntimeWPHookProvider $provider = null,
     ) {
         $this->registry = new \WeakMap();
@@ -96,7 +98,13 @@ class WPHooksRuntimeRegistry
      * #[Filter] are registered via add_action() / add_filter()
      * immediately. Calling this on an already-registered instance is
      * a no-op.
-     *
+     * @example ```php
+     *  $service = new class(...$args) {
+     *      #[Action(hook:'init')]
+     *      public function init():void  { ... }
+     * };
+     * $runtimeRegistry->registerHooksOn($service); // register hooks
+     * ```
      * @param object $instance An instantiated object with hook-annotated methods/properties.
      */
     public function registerHooksOn(object $instance): void
@@ -115,7 +123,7 @@ class WPHooksRuntimeRegistry
             function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records): void {
                 $hook = $this->provider !== null && $attr->hook instanceof \Closure
                     ? $this->provider->resolveRuntimeHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $method->getName())
-                    : $this->resolveClosureHook($attr->hook, $instance, $method->getName());
+                    : $this->runtimeResolver->resolveClosureHook($attr->hook, $instance, $method->getName());
                 if ($hook === null) {
                     return;
                 }
@@ -129,19 +137,19 @@ class WPHooksRuntimeRegistry
                 }
 
                 $handler = new RuntimeInstanceHookHandler(
-                    $instance,
-                    $method->getName(),
-                    $visibility,
-                    $type,
-                    $attr->executeIf,
-                    $this->provider,
-                    $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
-                    $this->provider !== null ? $this->resolveHookArgNames($instance, $method->getName()) : [],
-                    $attr->once,
+                    instance: $instance,
+                    method: $method->getName(),
+                    visibility: $visibility,
+                    type: $type,
+                    executeIf: $attr->executeIf,
+                    hookPlanProvider: $this->provider,
+                    executeIfParams: $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
+                    hookArgNames: $this->provider !== null ? $this->runtimeResolver->resolveHookArgNames($instance, $method->getName()) : [],
+                    once: $attr->once,
                 );
 
                 $ownerRef = \WeakReference::create($instance);
-                $handler->setRemoveCallback(fn () => $this->removeRuntimeHook($hook, $handler, $attr->priority, $type, $ownerRef));
+                $handler->setRemoveCallback(fn() => $this->removeRuntimeHook($hook, $handler, $attr->priority, $type, $ownerRef));
 
                 if ($attr->deferRegisterUntilHook !== null) {
                     $this->deferUntilTriggerHook($hook, $attr, $handler, $instance, $type, $method->getName());
@@ -168,7 +176,7 @@ class WPHooksRuntimeRegistry
             function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records): void {
                 $hook = $this->provider !== null && $attr->hook instanceof \Closure
                     ? $this->provider->resolveRuntimeHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $property->getName())
-                    : $this->resolveClosureHook($attr->hook, $instance, $property->getName());
+                    : $this->runtimeResolver->resolveClosureHook($attr->hook, $instance, $property->getName());
                 if ($hook === null) {
                     return;
                 }
@@ -182,19 +190,19 @@ class WPHooksRuntimeRegistry
                 }
 
                 $handler = new RuntimeInstancePropertyHookHandler(
-                    $instance,
-                    $property->getName(),
-                    $visibility,
-                    $type,
-                    $attr->executeIf,
-                    $this->provider,
-                    $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
-                    [],
-                    $attr->once,
+                    instance: $instance,
+                    property: $property->getName(),
+                    visibility: $visibility,
+                    type: $type,
+                    executeIf: $attr->executeIf,
+                    hookPlanProvider: $this->provider,
+                    executeIfParams: $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
+                    hookArgNames: $this->provider !== null ? $this->provider->extractPropertyCallableParamNames($property, $instance) : [],
+                    once: $attr->once,
                 );
 
                 $ownerRef = \WeakReference::create($instance);
-                $handler->setRemoveCallback(fn () => $this->removeRuntimeHook($hook, $handler, $attr->priority, $type, $ownerRef));
+                $handler->setRemoveCallback(fn() => $this->removeRuntimeHook($hook, $handler, $attr->priority, $type, $ownerRef));
 
                 if ($attr->deferRegisterUntilHook !== null) {
                     $this->deferUntilTriggerHook($hook, $attr, $handler, $instance, $type, $property->getName());
@@ -221,20 +229,6 @@ class WPHooksRuntimeRegistry
     }
 
     /**
-     * Resolve the parameter names of a hook-annotated method, used to build
-     * named hook args for executeIf parameter resolution.
-     *
-     * @return array<int, string>
-     */
-    private function resolveHookArgNames(object $instance, string $method): array
-    {
-        return array_map(
-            static fn (\ReflectionParameter $param): string => $param->getName(),
-            (new \ReflectionMethod($instance, $method))->getParameters(),
-        );
-    }
-
-    /**
      * Register a deferRegisterUntilHook (registerUnderHook) entry on the
      * runtime path: the handler is held in the deferred pool until the trigger
      * hook fires, then activated automatically — no manual activation API.
@@ -258,7 +252,7 @@ class WPHooksRuntimeRegistry
         if ($triggerHook instanceof \Closure) {
             $triggerHook = $this->provider !== null
                 ? $this->provider->resolveRuntimeHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook), $targetName)
-                : $this->resolveClosureHook($triggerHook, $instance, $targetName);
+                : $this->runtimeResolver->resolveClosureHook($triggerHook, $instance, $targetName);
             if ($triggerHook === null) {
                 return;
             }
@@ -280,12 +274,12 @@ class WPHooksRuntimeRegistry
             'instance' => \WeakReference::create($instance),
         ]);
 
-        $activate = fn (string $h, array $d, string $k) => $this->activateRuntimeEntry($h, $d, $k);
+        $activate = fn(string $h, array $d, string $k) => $this->activateRuntimeEntry($h, $d, $k);
 
         if (did_action($triggerHook)) {
             // Trigger already fired — activate immediately.
             $this->activateMatchingDeferredEntries(
-                static fn (string $h, array $d, string $k): bool => $h === $hook && $k === $key,
+                static fn(string $h, array $d, string $k): bool => $h === $hook && $k === $key,
                 $activate,
             );
             return;
@@ -294,7 +288,7 @@ class WPHooksRuntimeRegistry
         $listener = null;
         $listener = function () use (&$listener, $triggerHook, $hook, $key, $activate): void {
             $activated = $this->activateMatchingDeferredEntries(
-                static fn (string $h, array $d, string $k): bool => $h === $hook && $k === $key,
+                static fn(string $h, array $d, string $k): bool => $h === $hook && $k === $key,
                 $activate,
             );
 
@@ -330,7 +324,7 @@ class WPHooksRuntimeRegistry
         if ($owner !== null && isset($this->registry[$owner])) {
             $this->registry[$owner] = array_values(array_filter(
                 $this->registry[$owner],
-                static fn (array $record): bool => $record['handler'] !== $handler,
+                static fn(array $record): bool => $record['handler'] !== $handler,
             ));
         }
     }
@@ -456,7 +450,7 @@ class WPHooksRuntimeRegistry
 
         $this->registry[$instance] = array_values(array_filter(
             $this->registry[$instance],
-            static fn (array $record): bool => $record['handler'] !== $handler,
+            static fn(array $record): bool => $record['handler'] !== $handler,
         ));
     }
 
@@ -474,7 +468,7 @@ class WPHooksRuntimeRegistry
         // Sweep the deferred pool too — entries still waiting for their
         // trigger hook (registerUnderHook) belong to this owner.
         $this->unregisterMatchingDeferredEntries(
-            fn (string $hook, array $data): bool => $this->deferredEntryOwner($data) === $instance,
+            fn(string $hook, array $data): bool => $this->deferredEntryOwner($data) === $instance,
         );
 
         if (!isset($this->registry[$instance])) {
@@ -504,23 +498,27 @@ class WPHooksRuntimeRegistry
      *
      * The hook name, callback and executeIf closure may capture the surrounding
      * scope directly — no container is involved on the runtime registry.
-     * @template T of callable
+     * @template T of callable|array
      * @template O of Object
      * @param string      $hook        Hook name.
      * @param T           $callback    Callable invoked when the hook fires.
      * @param int         $priority    Hook priority.
      * @param int         $acceptedArgs Number of accepted arguments.
      * @param \Closure|null $executeIf   Optional gate: invoked directly, must return bool.
+     * @param bool $once remove self after any executeIf eval fire.
+     * @param string|\Closure|null $deferRegisterUntilHook Defer hook registration until certain hook fire
      * @param O|null $owner       Owning object (defaults to inference).
      *
      * @throws \RuntimeException when the owner cannot be inferred or the callback is not callable.
      */
     public function registerAction(
         string $hook,
-        mixed $callback,
+        callable|array $callback,
         int $priority = 10,
         int $acceptedArgs = 1,
         ?\Closure $executeIf = null,
+        bool $once = false,
+        string|\Closure|null $deferRegisterUntilHook = null,
         ?object $owner = null,
     ): void {
         if (!is_callable($callback)) {
@@ -536,7 +534,9 @@ class WPHooksRuntimeRegistry
             priority: $priority,
             acceptedArgs: $acceptedArgs,
             executeIf: $executeIf,
-            owner: $this->resolveOwner($callback, $owner),
+            once: $once,
+            deferRegisterUntilHook: $deferRegisterUntilHook,
+            owner: $this->runtimeResolver->resolveOwner($callback, $owner),
         );
     }
 
@@ -546,22 +546,26 @@ class WPHooksRuntimeRegistry
      * Semantics identical to {@see registerAction()} — the callback result is
      * returned to the filter pipeline, and the original value passes through
      * untouched when the handler (or its executeIf) fails.
-     * @template T of callable
+     * @template T of callable|array
      * @template O of Object
      * @param string $hook Hook name
      * @param T $callback Callable invoked when the hook fires.
      * @param int $priority Hook priority
      * @param int $acceptedArgs Number of accepted arguments.
      * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
+     * @param bool $once remove self after any executeIf eval fire.
+     * @param string|\Closure|null $deferRegisterUntilHook Defer hook registration until certain hook fire
      * @param O|null $owner Owning object (defaults to inference).
      * @throws \RuntimeException when the owner cannot be inferred or the callback is not callable.
      */
     public function registerFilter(
         string $hook,
-        callable $callback,
+        callable|array $callback,
         int $priority = 10,
         int $acceptedArgs = 1,
         ?\Closure $executeIf = null,
+        bool $once = false,
+        string|\Closure|null $deferRegisterUntilHook = null,
         ?object $owner = null,
     ): void {
         if (!is_callable($callback)) {
@@ -577,7 +581,9 @@ class WPHooksRuntimeRegistry
             priority: $priority,
             acceptedArgs: $acceptedArgs,
             executeIf: $executeIf,
-            owner: $this->resolveOwner($callback, $owner),
+            once: $once,
+            deferRegisterUntilHook: $deferRegisterUntilHook,
+            owner: $this->runtimeResolver->resolveOwner($callback, $owner),
         );
     }
 
@@ -594,6 +600,8 @@ class WPHooksRuntimeRegistry
      * @param int           $priority    Hook priority.
      * @param int           $acceptedArgs Number of accepted arguments.
      * @param \Closure|null $executeIf   Optional gate: invoked directly, must return bool.
+     * @param bool $once remove self after any executeIf eval fire.
+     * @param string|\Closure|null $deferRegisterUntilHook Defer hook registration until certain hook fire
      * @param O        $owner       Owning object (resolved by the caller).
      *
      * @throws \RuntimeException when the callback is not callable.
@@ -606,6 +614,8 @@ class WPHooksRuntimeRegistry
         int $acceptedArgs,
         ?\Closure $executeIf,
         object $owner,
+        bool $once = false,
+        string|\Closure|null $deferRegisterUntilHook = null,
     ): void {
         if (!is_callable($callback)) {
             $error = 'Cannot register ' . $type . ' hook ' . $hook . ' — callback is not callable.';
@@ -626,7 +636,17 @@ class WPHooksRuntimeRegistry
             }
         }
 
-        $handler = new RuntimeCallableHookHandler($callback, $executeIf, $type);
+        $handler = new RuntimeCallableHookHandler($callback, $executeIf, $type, $once);
+
+        if ($once) {
+            $ownerRef = \WeakReference::create($owner);
+            $handler->setRemoveCallback(fn() => $this->removeRuntimeHook($hook, $handler, $priority, $type, $ownerRef));
+        }
+
+        if ($deferRegisterUntilHook !== null) {
+            $this->deferManualUntilHook($hook, $deferRegisterUntilHook, $handler, $owner, $type, $priority, $acceptedArgs, $executeIf, $once);
+            return;
+        }
 
         if ($type === 'action') {
             \add_action($hook, $handler, $priority, $acceptedArgs);
@@ -642,6 +662,74 @@ class WPHooksRuntimeRegistry
             'type' => $type,
         ];
         $this->registry[$owner] = $existing;
+    }
+
+    /**
+     * Defer a MANUAL registration (registerAction/registerFilter with
+     * deferRegisterUntilHook) until the trigger hook fires — mirrors the
+     * attribute-path deferUntilTriggerHook for the manual API.
+     */
+    private function deferManualUntilHook(
+        string $hook,
+        string|\Closure|null $deferRegisterUntilHook,
+        object $handler,
+        object $instance,
+        string $type,
+        int $priority,
+        int $acceptedArgs,
+        ?\Closure $executeIf,
+        bool $once,
+    ): void {
+        $triggerHook = $deferRegisterUntilHook;
+        if ($triggerHook instanceof \Closure) {
+            $triggerHook = $this->provider !== null
+                ? $this->provider->resolveRuntimeHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook), 'manual')
+                : $this->runtimeResolver->resolveClosureHook($triggerHook, $instance, 'manual');
+            if ($triggerHook === null) {
+                return;
+            }
+        }
+
+        $key = $instance::class . '::manual#' . spl_object_hash($instance);
+
+        $this->addDeferred($hook, $key, [
+            'handler' => $handler,
+            'type' => $type,
+            'priority' => $priority,
+            'accepted_args' => $acceptedArgs,
+            'tags' => [],
+            'registerIf' => null,
+            'registerIfParams' => [],
+            'executeIf' => $executeIf,
+            'executeIfParams' => $this->provider !== null ? $this->provider->buildCallablePlan($executeIf) : [],
+            'once' => $once,
+            'instance' => \WeakReference::create($instance),
+        ]);
+
+        $activate = fn(string $h, array $d, string $k) => $this->activateRuntimeEntry($h, $d, $k);
+
+        if (did_action($triggerHook)) {
+            // Trigger already fired — activate immediately.
+            $this->activateMatchingDeferredEntries(
+                static fn(string $h, array $d, string $k): bool => $h === $hook && $k === $key,
+                $activate,
+            );
+            return;
+        }
+
+        $listener = null;
+        $listener = function () use (&$listener, $triggerHook, $hook, $key, $activate): void {
+            $activated = $this->activateMatchingDeferredEntries(
+                static fn(string $h, array $d, string $k): bool => $h === $hook && $k === $key,
+                $activate,
+            );
+
+            if ($activated > 0) {
+                \remove_action($triggerHook, $listener, PHP_INT_MIN);
+            }
+        };
+
+        \add_action($triggerHook, $listener, PHP_INT_MIN, 0);
     }
 
 
@@ -686,8 +774,10 @@ class WPHooksRuntimeRegistry
 
         return true;
     }
+}
 
-    #region ResolverUtils
+class HookRuntimeResolver
+{
 
     /**
      * Resolve the owner of a manual registration.
@@ -697,7 +787,7 @@ class WPHooksRuntimeRegistry
      *
      * @throws \RuntimeException when no owner can be inferred.
      */
-    private function resolveOwner(callable $callback, ?object $owner): object
+    public function resolveOwner(callable $callback, ?object $owner): object
     {
         if ($owner !== null) {
             return $owner;
@@ -741,7 +831,7 @@ class WPHooksRuntimeRegistry
      *
      * @return string|null The resolved hook name, or null when it could not be resolved.
      */
-    private function resolveClosureHook(string|\Closure $hook, object $instance, string $targetName): ?string
+    public function resolveClosureHook(string|\Closure $hook, object $instance, string $targetName): ?string
     {
         if (\is_string($hook)) {
             return $hook;
@@ -767,5 +857,18 @@ class WPHooksRuntimeRegistry
 
         return $resolved;
     }
-    #endregion
+
+    /**
+     * Resolve the parameter names of a hook-annotated method, used to build
+     * named hook args for executeIf parameter resolution.
+     *
+     * @return array<int, string>
+     */
+    public function resolveHookArgNames(object $instance, string $method): array
+    {
+        return array_map(
+            static fn(\ReflectionParameter $param): string => $param->getName(),
+            (new \ReflectionMethod($instance, $method))->getParameters(),
+        );
+    }
 }

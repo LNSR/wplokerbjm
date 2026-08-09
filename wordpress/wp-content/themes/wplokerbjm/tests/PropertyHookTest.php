@@ -354,4 +354,41 @@ class PropertyHookTest extends WplokerbjmTestCase
         $result = apply_filters('static_closure_filter', 'static_test');
         $this->assertSame('static_test_static', $result, 'Static closure on property should work');
     }
+
+    // ── Property hook args (executeIf name-matching) ─────────────────
+
+    public function testPropertyHookExecuteIfResolvesHookArgsByName(): void
+    {
+        $service = new PropertyFilterService();
+        $this->container->set(PropertyFilterService::class, $service);
+
+        $gate = static function (string $value): bool {
+            return $value === 'go';
+        };
+        $plan = (new WPHookPlanProvider())->buildCallablePlan($gate);
+
+        $this->seedRegistrations([
+            [
+                'class'             => PropertyFilterService::class,
+                'method'            => 'appendSuffix',
+                'type'              => 'filter',
+                'hook'              => 'property_execute_hook',
+                'priority'          => 10,
+                'accepted_args'     => 1,
+                'defer_register'    => false,
+                'target'            => 'property',
+                'execute_if'        => $gate,
+                'execute_if_params' => $plan,
+                'hook_args'         => ['value'],
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        // Gate name-matches 'go' into $value → passes → the callable runs.
+        $this->assertSame('go_suffixed', apply_filters('property_execute_hook', 'go'));
+
+        // Gate false → the filter passes the original value through untouched.
+        $this->assertSame('no', apply_filters('property_execute_hook', 'no'));
+    }
 }

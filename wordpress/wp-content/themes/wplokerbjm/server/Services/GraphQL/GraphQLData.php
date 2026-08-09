@@ -61,7 +61,6 @@ class GraphQLData
     public function __construct(
         private JobDataFactory $jobDataFactory,
         private JobSchemaOrg $jobSchema,
-        private ThemeProp $ThemeProp
     ) {
     }
 
@@ -199,16 +198,6 @@ class GraphQLData
             CustomFields::UMUR_MAX => $jobdata[CustomFields::UMUR_MAX] ?? null,
             CustomFields::DEADLINE => $jobdata[CustomFields::DEADLINE] ?? null,
         ];
-    }
-
-    /**
-     * Get theme data for REST/GraphQL responses
-     * Useful in future for headless setups
-     * @return ThemeData
-     */
-    public function getThemeData(): array
-    {
-        return $this->ThemeProp->themeData();
     }
 
     /**
