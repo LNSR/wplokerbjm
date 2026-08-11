@@ -62,6 +62,7 @@
     // INTELEPHENSE INDEXER CONFIG
     "intelephense.environment.documentRoot": "wordpress/",
     "intelephense.maxMemory": 8196,
+    "intelephense.diagnostics.memberAccess": false,
     "intelephense.diagnostics.enable": false, // Leave diagnostics to Devsense to prevent conflicts
     "intelephense.diagnostics.argumentCount": "on",
     "intelephense.codeLens.implementations.enable": false, // Disable to prevent duplicate CodeLens with Devsense

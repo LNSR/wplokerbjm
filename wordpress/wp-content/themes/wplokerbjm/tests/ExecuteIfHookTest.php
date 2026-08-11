@@ -178,7 +178,9 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
 
     public function testRuntimeRegistryRegistersExecuteIfGatedHooksButGatesAtFireTime(): void
     {
-        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver());
+        $registry = $this->container->make(WPHooksRuntimeRegistry::class, [
+            'provider' => null
+        ]);
         $registry->registerHooksOn(new RuntimeExecuteIfService());
 
         $this->assertNotNull(
@@ -282,7 +284,8 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $plan = (new WPHookPlanProvider())->buildCallablePlan($attr->executeIf);
 
         $this->assertTrue($plan['isStatic']);
-        $this->assertSame(ExecuteIfHookTest::class, $plan['scopeClass']);
+        $this->assertInstanceOf(\Closure::class, $plan['scopeClass']);
+        $this->assertSame(ExecuteIfHookTest::class, ($plan['scopeClass'])($this));
         $this->assertCount(1, $plan['params']);
         $this->assertSame('c', $plan['params'][0]['name']);
         $this->assertSame(ContainerInterface::class, $plan['params'][0]['type']);

@@ -113,6 +113,10 @@ class AutowireScanner
                 return $checkList;
             }
 
+            if ($this->hasNonAutowirableConstructor($reflection)) {
+                return $checkList;
+            }
+
             // Since it passed all concrete structural checks, inspect its lazy attribute status
             $checkList['autowirable'] = true;
             $checkList['lazy'] = $this->isAsLazyClass($reflection);
@@ -165,7 +169,8 @@ class AutowireScanner
         return !$reflection->isInterface()
             && !$reflection->isAbstract()
             && !$reflection->isTrait()
-            && !$reflection->isEnum();
+            && !$reflection->isEnum()
+            && !$reflection->isReadOnly();
     }
 
     /**
@@ -183,6 +188,35 @@ class AutowireScanner
         }
 
         return $constructor->isPublic();
+    }
+
+    /**
+     * Check if the class has a constructor that cannot be autowired by PHP-DI.
+     *
+     * Excludes classes with no constructor, or whose constructor parameters are
+     * all either optional or resolvable types (classes, arrays, callbacks, etc.).
+     * Only flags classes with required primitive-type arguments.
+     *
+     * @param ReflectionClass $reflection The class reflection
+     * @return bool True if constructor cannot be autowired
+     */
+    private function hasNonAutowirableConstructor(ReflectionClass $reflection): bool
+    {
+        $constructor = $reflection->getConstructor();
+        if ($constructor === null) {
+            return false;
+        }
+
+        foreach ($constructor->getParameters() as $param) {
+            if (!$param->isOptional() && $param->hasType()) {
+                $type = $param->getType();
+                if ($type instanceof \ReflectionNamedType && $type->isBuiltin()) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

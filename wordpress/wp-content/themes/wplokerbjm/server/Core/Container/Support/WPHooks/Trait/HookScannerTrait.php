@@ -32,7 +32,7 @@ trait HookScannerTrait
      *   (ReflectionMethod $method, Action|Filter $attr, string $visibility, 'action'|'filter' $type)
      *
      * @param ReflectionClass $reflection Class to scan.
-     * @param callable        $callback   Called once per attribute found.
+     * @param callable(ReflectionMethod $method, Action|Filter $attr, string $visibility, 'action'|'filter' $type): void $callback
      */
     private function scanMethodHooks(ReflectionClass $reflection, callable $callback): void
     {
@@ -91,7 +91,7 @@ trait HookScannerTrait
      * contract as scanMethodHooks.
      *
      * @param ReflectionClass $reflection   Class to scan
-     * @param callable        $callback     Handler for each found attribute
+     * @param callable(ReflectionProperty $property, Action|Filter $attr, string $visibility, 'action'|'filter' $type, 'property'|'property-hook' $target): void $callback
      */
     private function scanPropertyHooks(
         ReflectionClass $reflection,

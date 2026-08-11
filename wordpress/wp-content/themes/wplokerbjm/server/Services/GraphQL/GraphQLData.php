@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Services\GraphQL;
 
+use TShape;
 use WPLokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
@@ -12,6 +13,14 @@ use WPLokerBJM\Core\Theme\ThemeProp;
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
 
 /**
+ * @phpstan-type WordpressBaseData array{
+ *     id: int|null,
+ *     slug: string,
+ *     title: string,
+ *     permalink: string,
+ *     post_time: string,
+ * }
+ * 
  * @phpstan-type RingkasanPekerjaan array{
  *     jenis_pekerjaan?: string|null,
  *     pendidikan?: string|null,
@@ -24,24 +33,15 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  *     umur_max?: int|null,
  *     deadline?: string|null,
  * }
- * @phpstan-type CardData array{
- *     id: int,
- *     slug: string,
- *     title: string,
+ * 
+ * @phpstan-type CardData WordpressBaseData&array{
  *     nama_perusahaan?: string,
  *     ringkasanPekerjaan: RingkasanPekerjaan,
  *     status_pekerjaan?: int,
- *     permalink: string,
- *     post_time?: string,
  * }
- * @phpstan-type JobDetailData array{
- *     id: int,
- *     slug: string,
- *     permalink: string,
- *     title: string,
- *     nama_perusahaan?: string,
+ * 
+ * @phpstan-type JobDetailData CardData&array{
  *     tentang_perusahaan?: string|null,
- *     ringkasanPekerjaan: RingkasanPekerjaan,
  *     deskripsi_pekerjaan?: string|null,
  *     persyaratan?: string|null,
  *     cara_melamar?: string|null,
@@ -49,7 +49,6 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  *     contacts?: array{email_kontak?: string, nomor_kontak?: string, situs_kontak?: string},
  *     social_media?: string|null,
  *     dpNonce?: string,
- *     post_time?: string,
  * }
  * @phpstan-import-type ThemeData from ThemeProp
  * @phpstan-import-type JobData from JobDataFactory
@@ -58,6 +57,7 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  */
 class GraphQLData
 {
+    
     public function __construct(
         private JobDataFactory $jobDataFactory,
         private JobSchemaOrg $jobSchema,
@@ -97,7 +97,6 @@ class GraphQLData
             ];
 
             $data = SharedUtils::filterEmptyValues($data);
-
             Cache::set($cacheKey, $data, 86400); // Cache for 1 day
             return $data;
         } catch (\Exception $e) {

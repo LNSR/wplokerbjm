@@ -232,7 +232,7 @@ final class WPGraphQL implements PluginConfigInterface
     {
         $loggedIn = is_user_logged_in();
         if ($loggedIn) {
-            remove_all_filters('nocache_headers');
+            \remove_all_filters('nocache_headers');
             $loggedIn && $this->hookRegistry->activateDeferredByCallable([$this, __FUNCTION__]);
         }
         $isDev = SharedUtils::isDevelopment();

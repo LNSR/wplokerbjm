@@ -66,6 +66,17 @@ class SharedUtils
         return false;
     }
 
+    public static function doActivityAtBackground(callable $activity): void {
+        if (defined('PHP_SAPI') && PHP_SAPI !== 'cli') {
+            if (function_exists('litespeed_finish_request')) {
+                litespeed_finish_request();
+            } elseif (function_exists('fastcgi_finish_request')) {
+                fastcgi_finish_request();
+            }
+        }
+        $activity();
+    }
+
     public static function isWPCLI(): bool
     {
         return defined('WP_CLI') && WP_CLI;

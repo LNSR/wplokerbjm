@@ -2,6 +2,8 @@
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{RuntimeWPHookProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
 
@@ -52,6 +54,8 @@ trait RuntimeInstanceInvokerTrait
                     );
                 }
 
+                Logger::debug(static::class, 'executeIf for ' . $this->label . ': ' . ($allowed ? 'PASS' : 'FAIL'));
+
                 if ($allowed === false) {
                     Logger::warning(
                         static::class,
@@ -63,6 +67,9 @@ trait RuntimeInstanceInvokerTrait
             }
 
             $result = $this->invokeOn($instance, ...$args);
+
+            SharedUtils::isDevelopment() && Logger::debug(static::class, 'Hook invoke ' . $this->label);
+
             $this->consumeOnce();
             return $result;
         } catch (\Throwable $e) {
@@ -146,7 +153,9 @@ final class RuntimeInstanceHookHandler
         // On death the hook nukes itself (instance-lifetime scoping).
         $this->instanceRef = \WeakReference::create($instance);
 
-        $this->label = $instance::class . '::' . $this->method;
+        $this->label = $instance instanceof AnonClassHookMetadata
+            ? $instance->getParentClass() . '::$' . $instance->parentProperty . '::' . $this->method
+            : $instance::class . '::' . $this->method;
 
         if ($this->visibility !== 'public') {
             $methodName = $this->method;
@@ -216,7 +225,9 @@ final class RuntimeInstancePropertyHookHandler
         // On death the hook nukes itself (instance-lifetime scoping).
         $this->instanceRef = \WeakReference::create($instance);
 
-        $this->label = $instance::class . '::$' . $this->property;
+        $this->label = $instance instanceof AnonClassHookMetadata
+            ? $instance->getParentClass() . '::$' . $instance->parentProperty
+            : $instance::class . '::$' . $this->property;
 
         if ($this->visibility !== 'public') {
             $propertyName = $this->property;
@@ -307,6 +318,8 @@ final class RuntimeCallableHookHandler
                     );
                 }
 
+                Logger::debug('RuntimeCallableHookHandler', 'executeIf for ' . $this->label . ': ' . ($allowed ? 'PASS' : 'FAIL'));
+
                 if ($allowed === false) {
                     Logger::warning(
                         'RuntimeCallableHookHandler',
@@ -320,6 +333,8 @@ final class RuntimeCallableHookHandler
             $callback = $this->callback;
 
             $result = $callback(...$args);
+
+            SharedUtils::isDevelopment() && Logger::debug('RuntimeCallableHookHandler', 'Hook invoke ' . $this->label);
 
             $this->consumeOnce();
 

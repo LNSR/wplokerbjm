@@ -3,6 +3,7 @@
 declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Provider;
 
+use CallableHookParams;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 
@@ -20,6 +21,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
  * Attribute-argument closures are static and already scoped to the declaring
  * class (PHP 8.1 RFC 'Closures in constant expressions'), so private members
  * resolve via self:: and no instance binding is needed.
+ * @phpstan-import-type CallableHookParams from HookProviderTrait
  */
 class RuntimeWPHookProvider
 {
@@ -28,17 +30,13 @@ class RuntimeWPHookProvider
     public function __construct(
         private readonly ?ContainerInterface $container = null,
     ) {
-        // The trait's own constructor is overridden here (container param), so
-        // the bound-closure cache must be initialized explicitly — a WeakMap
-        // typed property cannot be auto-initialized.
-        $this->boundClosureCache = new \WeakMap();
     }
 
     /**
      * Resolve the hook name, optionally supplying dependencies to the closure.
      *
      * @param string|\Closure $hook       Static hook name or closure resolving to one.
-     * @param array<int, array{name: string, type: class-string|null, hasDefault: bool, default: mixed}> $hookParams Callable plan params.
+     * @param CallableHookParams $hookParams Callable plan params.
      * @param string          $label      Descriptive label for error messages.
      *
      * @return string The resolved hook name.
@@ -52,7 +50,7 @@ class RuntimeWPHookProvider
      * Evaluate a registerIf gate, optionally supplying dependencies to the closure.
      *
      * @param \Closure|null $registerIf   Gate closure (null = no gate).
-     * @param array<int, array{name: string, type: class-string|null, hasDefault: bool, default: mixed}> $params Callable plan params.
+     * @param CallableHookParams $params Callable plan params.
      * @param string        $label        Descriptive label for error messages.
      * @param string|null   $targetClass  Class whose scope the closure was declared in.
      */
@@ -66,7 +64,7 @@ class RuntimeWPHookProvider
      * dependencies (container or named hook arguments) to the closure.
      *
      * @param \Closure|null $executeIf    Gate closure (null = no gate).
-     * @param array<int, array{name: string, type: class-string|null, hasDefault: bool, default: mixed}> $params Callable plan params.
+     * @param CallableHookParams $params Callable plan params.
      * @param string        $label        Descriptive label for error messages.
      * @param string|null   $targetClass  Class whose scope the closure was declared in.
      * @param array<string, mixed> $hookArgs Named hook arguments (hook parameter name → value).

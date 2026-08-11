@@ -18,6 +18,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
  * unregisterDeferredBy*) stays on the container-side DeferredHookManager; the
  * runtime registry consumes the same mechanics behind an automatic-only
  * surface.
+ * @phpstan-import-type CallableHookParams from HookProviderTrait
+ * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-type DeferredHookEntry array{
  *     key: HookKey,
  *     handler: object,
@@ -26,9 +28,9 @@ use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
  *     accepted_args: int,
  *     tags: array<int, string>,
  *     registerIf: \Closure|null,
- *     registerIfParams: array<int, array<string, mixed>>,
+ *     registerIfParams: CallablePlan,
  *     executeIf: \Closure|null,
- *     executeIfParams: array<string, mixed>,
+ *     executeIfParams: CallablePlan,
  *     once: bool
  * }>>
  *
@@ -48,7 +50,7 @@ trait DeferredHooksTrait
      *
      * @param DeferredHookEntry $entry
      */
-    public function addDeferred(string $hook, string $key, array $entry): void
+    private function addDeferred(string $hook, string $key, array $entry): void
     {
         $this->deferredHandlers[$hook][$key] = $entry;
     }
@@ -60,8 +62,8 @@ trait DeferredHooksTrait
      * $activateEntry; the key is removed from the pool afterwards and empty
      * hook buckets are dropped.
      *
-     * @param callable(string, array, string): bool $matches      Predicate over ($hook, $entry, $key).
-     * @param callable(string, array, string): bool $activateEntry Moves the entry to the active pool and
+     * @param callable(string, DeferredHookEntry, string): bool $matches      Predicate over ($hook, $entry, $key).
+     * @param callable(string, DeferredHookEntry, string): bool $activateEntry Moves the entry to the active pool and
      *                                                             registers it; returns true when newly
      *                                                             activated, false when already active.
      *
@@ -101,7 +103,7 @@ trait DeferredHooksTrait
      *
      * Only touches the deferred pool — active handlers are never affected.
      *
-     * @param callable(string, array, string): bool $matches Predicate over ($hook, $entry, $key).
+     * @param callable(string, DeferredHookEntry, string): bool $matches Predicate over ($hook, $entry, $key).
      */
     protected function unregisterMatchingDeferredEntries(callable $matches): void
     {
@@ -125,7 +127,7 @@ trait DeferredHooksTrait
      * WPHookPlanProvider; the runtime path evaluates registerIf through its
      * RuntimeHookProvider.
      *
-     * @param array<string, mixed> $data Deferred entry.
+     * @param DeferredHookEntry $data Deferred entry.
      */
     abstract protected function gateDeferredActivation(array $data, string $hook, string $key): bool;
 }

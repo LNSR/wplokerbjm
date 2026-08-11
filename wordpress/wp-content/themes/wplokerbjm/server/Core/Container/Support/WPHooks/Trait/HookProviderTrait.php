@@ -22,7 +22,7 @@ use RuntimeException;
  * defaults).
  *
  * @phpstan-type CallableHookParams array{name: string, type: class-string|null, hasDefault: bool, default: mixed}
- * @phpstan-type CallablePlan array{isStatic: bool, scopeClass: class-string|null, params: array<int, CallableHookParams>}
+ * @phpstan-type CallablePlan array{isStatic: bool, scopeClass: \Closure|null, params: array<int, CallableHookParams>}
  */
 trait HookProviderTrait
 {
@@ -36,11 +36,10 @@ trait HookProviderTrait
      *
      * @var \WeakMap<\Closure, array<string, \Closure>>
      */
-    private \WeakMap $boundClosureCache;
+    private \WeakMap $boundClosureCache { get => $this->boundClosureCache ??= new \WeakMap(); }
 
     public function __construct()
     {
-        $this->boundClosureCache = new \WeakMap();
     }
 
     /**
@@ -59,6 +58,10 @@ trait HookProviderTrait
      */
     public function buildCallablePlan(?\Closure $callable): array
     {
+        /**
+         * Strictly used for test scope discovery
+         * @var CallablePlan $empty
+         */
         $empty = ['isStatic' => true, 'scopeClass' => null, 'params' => []];
 
         if ($callable === null) {
@@ -67,6 +70,9 @@ trait HookProviderTrait
 
         try {
             $reflect = new ReflectionFunction($callable);
+            /**
+             * @var list<CallableHookParams> $params
+             */
             $params = [];
 
             foreach ($reflect->getParameters() as $param) {
@@ -89,7 +95,9 @@ trait HookProviderTrait
 
             return [
                 'isStatic' => $reflect->isStatic(),
-                'scopeClass' => $reflect->getClosureScopeClass()?->getName(),
+                'scopeClass' => static function (object $instance): string {
+                    return \get_class($instance);
+                },
                 'params' => $params,
             ];
         } catch (ReflectionException) {
@@ -319,13 +327,6 @@ trait HookProviderTrait
     {
         if ($targetClass === null) {
             return $closure;
-        }
-
-        // Defensive lazy init: a using class may override the trait constructor
-        // (e.g. to take a container), leaving the WeakMap uninitialized — a
-        // WeakMap typed property cannot be auto-initialized on offset write.
-        if (!isset($this->boundClosureCache)) {
-            $this->boundClosureCache = new \WeakMap();
         }
 
         if (!isset($this->boundClosureCache[$closure])) {

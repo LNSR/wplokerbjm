@@ -22,10 +22,10 @@ class Action
      * @param int $acceptedArgs
      * @param bool $deferRegister defer activation (forced true when $deferRegisterUntilHook is set)
      * 
-     * @param (\Closure(TObject...): bool)|null $executeIf
+     * @param (\Closure(TObject...): bool)|null $executeIf decide whether to execute callback, potentially instantiating the object
      * @param-closure-this $executeIf TObject
      * 
-     * @param (\Closure(TObject...): bool)|null $registerIf
+     * @param (\Closure(TObject...): bool)|null $registerIf decide whether to register the hook
      * @param-closure-this $registerIf TObject
      * 
      * @param array<int, string|\BackedEnum|\Closure(TObject...): array> $tag
@@ -64,10 +64,10 @@ class Filter
      * @param int $acceptedArgs
      * @param bool $deferRegister defer activation (forced true when $deferRegisterUntilHook is set)
      * 
-     * @param (\Closure(TObject...): bool)|null $executeIf
+     * @param (\Closure(TObject...): bool)|null $executeIf decide whether to execute callback, potentially instantiating the object
      * @param-closure-this $executeIf TObject
      * 
-     * @param (\Closure(TObject...): bool)|null $registerIf
+     * @param (\Closure(TObject...): bool)|null $registerIf decide whether to register the hook
      * @param-closure-this $registerIf TObject
      * 
      * @param array<int, string|\BackedEnum|\Closure(TObject...): array> $tag

@@ -100,7 +100,7 @@ class Logger
         }
 
         // Format all entries
-        $formatted = array_map([self::class, 'formatEntry'], $entries);
+        $formatted = array_map(self::formatEntry(...), $entries);
         $batch = implode("\n", $formatted);
 
         // Try batch write; fall back to individual writes on failure

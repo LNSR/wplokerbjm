@@ -89,7 +89,7 @@ class JWTDataResolver
      *
      * @phpstan-param JWTDataShape['username'] $username WordPress username
      * @phpstan-param JWTDataShape['password'] $password WordPress password
-     * @return string|null 'ok' on successful authentication, null on failure
+     * @return 'ok'|null on successful authentication, null on failure
      */
     private function validateCredentialWP(string $username, string $password): string|null
     {

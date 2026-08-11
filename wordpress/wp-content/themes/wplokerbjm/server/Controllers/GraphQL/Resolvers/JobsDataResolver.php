@@ -78,7 +78,9 @@ class JobsDataResolver
     {
         try {
             $paged = $args['paged'] ?? 1;
+            /** @var LoadMoreArgs['context'] $context */
             $context = $args['context'] ?? 'latest';
+            /** @var LoadMoreArgs['filters'] $filters */
             $filters = $args['filters'] ?? [];
 
             if ($paged < 1) {
@@ -90,10 +92,12 @@ class JobsDataResolver
             $cached = Cache::get($cacheKey);
 
             if ($cached !== false) {
-                return ($cached['data'] + ['filters' => $filters]) + [
+                /** @var LoadMoreResponse $result */
+                $result = $cached['data'] + ['filters' => $filters] + [
                     'total' => $cached['total'],
                     'maxNumPages' => $cached['maxNumPages'],
                 ];
+                return $result;
             }
 
             $argsQuery = match ($context) {
@@ -102,7 +106,7 @@ class JobsDataResolver
             };
 
             $result = $this->jobRepository->queryJob($argsQuery);
-
+            /** @var CardData[] $jobs */
             $jobs = $result['jobs'] ?? [];
             $query = $result['query'] ?? new \WP_Query();
 

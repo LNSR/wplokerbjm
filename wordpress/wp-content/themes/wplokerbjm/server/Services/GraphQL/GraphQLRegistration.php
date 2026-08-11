@@ -24,11 +24,11 @@ use WPLokerBJM\Core\Container\Attributes\Action;
  * @phpstan-import-type JobDetailData from GraphQLData
  * @phpstan-type ArrayFilters array{cari?: string, lokasi_pekerjaan?: list<string>, gender?: list<string>, pendidikan?: list<string>, sort?: array{value?: string, label?: string}}
  * @phpstan-type AutoSuggestionsArgs array{query?: string}
- * @phpstan-type LoadMoreArgs array{paged?: int, context?: string, filters?: ArrayFilters}
- * @phpstan-type JobGridArgs array{paged?: int, context?: string, title?: string, total_jobs?: int, filters?: ArrayFilters}
+ * @phpstan-type LoadMoreArgs array{paged?: int, context?: 'search'|'latest', filters?: ArrayFilters}
+ * @phpstan-type JobGridArgs array{paged?: int, context?: 'search'|'latest', title?: string, total_jobs?: int, filters?: ArrayFilters}
  * @phpstan-type JobDetailArgs array{slug?: string}
  * @phpstan-type JobSchemaArgs array{ids?: list<int>, slug?: string, type?: string}
- * @phpstan-type SearchJobsArgs array{context?: string, filters?: ArrayFilters}
+ * @phpstan-type SearchJobsArgs array{context?: 'search'|'latest', filters?: ArrayFilters}
  * @phpstan-type RankMathHeadArgs array{url?: string}
  * @phpstan-type SyncBookmarkArgs array{ids?: list<int>}
  * @phpstan-type GraphQLDataType array{

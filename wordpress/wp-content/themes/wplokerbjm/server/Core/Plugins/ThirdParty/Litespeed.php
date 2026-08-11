@@ -7,6 +7,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
 use DI\Attribute\Injectable;
 use WPLokerBJM\Bootstrap;
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * LiteSpeed custom hooks extend
@@ -25,27 +26,45 @@ final class Litespeed implements PluginConfigInterface
      * * Useful when deploying new code to ensure no stale cached code is used.
      * @return void
      */
-    #[Action('litespeed_purged_all')]
+    #[Action('litespeed_purged_all', once: true)]
     public function clearObjectCache(): void
     {
-        // Clear APCu cache first
+
+        do_action('wpgraphql_cache_purge_all');
+        Cache::flushGroup(CacheKey::OBJECT_CACHE_PREFIX);
+        // Clear entire cache folder
+        $cacheDir = WPLokerBJMContainer::$CACHE_DIR;
+        static $deleteDirRecursive = static function (string $dir): bool {
+            if (!is_dir($dir)) {
+                return false;
+            }
+
+            $iterator = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::FOLLOW_SYMLINKS),
+                \RecursiveIteratorIterator::CHILD_FIRST
+            );
+
+            /** @var \SplFileInfo $file */
+            foreach ($iterator as $file) {
+                $path = $file->getRealPath();
+
+                Logger::debug('Deleting item: ', $path);
+
+                $file->isDir() && !$file->isLink() ? rmdir($path) : unlink($path);
+            }
+
+            return rmdir($dir);
+        };
+        $deleteDirRecursive($cacheDir);
+
         if (function_exists('apcu_clear_cache')) {
             apcu_clear_cache();
         }
 
-        // Invalidate OPCache
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
             wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
 
-        Cache::flushGroup(CacheKey::OBJECT_CACHE_PREFIX);
-
-        // Clear entire cache folder last
-        $cacheDir = WPLokerBJMContainer::$CACHE_DIR;
-        if (is_dir($cacheDir)) {
-            array_map('unlink', glob("$cacheDir/*"));
-        }
-        do_action('wpgraphql_cache_purge_all');
         Bootstrap::getRobotLoader()->rebuild();
         WPLokerBJMContainer::getContainer(true);
     }
@@ -54,7 +73,9 @@ final class Litespeed implements PluginConfigInterface
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
     #[Filter('litespeed_is_mobile')]
-    public $isMobile = static function() { return wp_is_mobile(); };
+    public $isMobile = static function () {
+            return wp_is_mobile();
+        };
 
 }
 
@@ -73,7 +94,9 @@ class LiteSpeedGraphQLIntegration implements PluginConfigInterface
      * Call litespeed_purge when graphql_purge is called
      */
     #[Action('graphql_purge')]
-    public $purgeCache = static function ($keys): void { do_action('litespeed_purge', $keys); };
+    public $purgeCache = static function ($keys): void {
+            do_action('litespeed_purge', $keys);
+        };
 
     /**
      * Set GraphQL Queries returned via HTTP GET|OPTIONS requests to be cacheable

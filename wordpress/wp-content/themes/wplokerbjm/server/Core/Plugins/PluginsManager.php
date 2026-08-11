@@ -1,7 +1,8 @@
 <?php
 namespace WPLokerBJM\Core\Plugins;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksRuntimeRegistry};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
 use WPLokerBJM\Shared\Utilities\{PluginList, SharedUtils};
 use WPLokerBJM\Core\Plugins\ThirdParty\{
     Litespeed,
@@ -26,7 +27,7 @@ interface PluginConfigInterface
    ========================================================================== */
 class PluginManagement
 {
-    private const MUST_HAVE_PLUGINS = [
+    public const MUST_HAVE_PLUGINS = [
         PluginList::LiteSpeed->value,
         PluginList::WpGraphql->value,
         PluginList::RankMath->value,
@@ -40,7 +41,7 @@ class PluginManagement
      * @var array<class-string<PluginConfigInterface>>
      * @phpstan-assert-if-true PluginConfigInterface
      */
-    private const THIRD_PARTY_INTEGRATIONS = [
+    public const THIRD_PARTY_INTEGRATIONS = [
         Litespeed::class,
         LiteSpeedGraphQLIntegration::class,
         MetaBox::class,
@@ -49,18 +50,14 @@ class PluginManagement
         WPGraphQL::class,
     ];
 
-    public function __construct(private WPHooksContainerRegistry $hooksRegistry)
+    public function __construct(private WPHooksContainerRegistry $hooksRegistry, private WPHooksRuntimeRegistry $runtimeRegistry)
     {
     }
-
-    #region must do hooks
 
     /**
      * Purge all registered and deferred hooks for third-party integrations 
      * whose underlying WordPress plugins are inactive.
-     * 
-     * Runs late on `plugins_loaded` (priority) after WP has fully loaded 
-     * all active plugins and constants.
+     *
      */
     #[Action('plugins_loaded', 0, once: true)]
     public function unregisterInactivePluginHooks(): void
@@ -76,16 +73,6 @@ class PluginManagement
             $this->hooksRegistry->unregisterDeferredByClass($integrationClass);
         }
     }
-
-    #[Filter('option_active_plugins', 0, once: true)]
-    public function activePluginsCondition(array $plugins): array
-    {
-        $plugins = $this->disablePluginsForDevImpl($plugins);
-        $plugins = $this->disablePluginsforSimulatedProdImpl($plugins);
-        $plugins = $this->forceActivePlugin($plugins);
-        return $plugins;
-    }
-
     /**
      * Remove the "Deactivate" action link for required plugins.
      */
@@ -101,8 +88,6 @@ class PluginManagement
         return $actions;
     }
 
-    #endregion
-
     #region 3rd party choice hooks
     #[Filter('option_active_plugins', once: true, registerIf: static function () {
             return empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql') && !\is_admin();
@@ -117,83 +102,114 @@ class PluginManagement
 
     #endregion
 
-    /**
-     * Temporarily disable specific plugins if in development environment.
-     */
-    private function disablePluginsForDevImpl(array $plugins): array
-    {
-        $isDev = SharedUtils::isDevelopment();
-        if (!$isDev) {
-            return $plugins;
-        }
-        $extra = [
-        ];
 
-        $pluginsToDisable = $this->listPluginsToDisable($extra);
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
-    }
-
+    #region filter hooks sequence
     /**
-     * Force active plugins
+     * activation hooks steps
+     * @var static::class
      */
-    private function forceActivePlugin(array $plugins): array
-    {
-        if (SharedUtils::isDevelopment())
-            return $plugins;
-        foreach (self::MUST_HAVE_PLUGINS as $plugin) {
-            if (!in_array($plugin, $plugins)) {
-                array_push($plugins, $plugin);
+    #[Action('muplugins_loaded', once: true)]
+    public private(set) AnonClassHookMetadata $optionActivePlugins {
+        get => $this->optionActivePlugins ??= new class (self::class, __PROPERTY__, $this->runtimeRegistry) extends AnonClassHookMetadata {
+            public function __construct(
+                $parentClass,
+                $parentProperty,
+                private WPHooksRuntimeRegistry $runtimeRegistry
+            ) {
+                parent::__construct($parentClass, $parentProperty);
             }
-        }
-        return $plugins;
-    }
+            public function __invoke()
+            {
+                $this->runtimeRegistry->registerHooksOn($this);
+            }
 
-    /**
-     * Temporarily disable specific plugins if simulating production environment on local machine.
-     */
-    private function disablePluginsforSimulatedProdImpl(array $plugins): array
-    {
-        $isDev = !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
+            /**
+             * Temporarily disable specific plugins if in development environment.
+             */
+            #[Filter('option_active_plugins', 0, once: true,
+            registerIf: static function (): bool {
+                            return SharedUtils::isDevelopment();
+                        }
+            )]
+            public function disablePluginsForDevImpl(array $plugins): array
+            {
+                $pluginsToDisable = $this->listPluginsToDisable();
+                return $this->filteredPlugins($plugins, $pluginsToDisable);
+            }
 
-        $pluginsToDisable = $isDev ? $this->listPluginsToDisable() : [];
 
-        return $this->filteredPlugins($plugins, $pluginsToDisable);
-    }
+            /**
+             * Temporarily disable specific plugins if simulating production environment on local machine.
+             */
+            #[Filter('option_active_plugins', 1, once: true,
+            registerIf: static function (): bool {
+                            return !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
+                        }
+            )]
+            public function disablePluginsforSimulatedProdImpl(array $plugins): array
+            {
+                $pluginsToDisable = $this->listPluginsToDisable();
 
-    /**
-     * Returns the list of plugins to disable, optionally merged with extra plugins.
-     *
-     * @param array|null $extra Optional array of additional plugin prefixes to disable.
-     * @return array Array of plugin prefixes to disable.
-     */
-    private function listPluginsToDisable(?array $extra = []): array
-    {
-        // Subject to change
-        static $base = [
-        'wordfence/',
-        'tinywp-mobile-detect/',
-        'fast-indexing-api/',
-        ];
-        return array_merge($base, $extra);
-    }
-    /**
-     * Filters the list of active plugins by removing specified plugins.
-     *
-     * @param array $plugins          Array of active plugin file paths.
-     * @param array $pluginsToDisable Array of plugin prefixes to disable.
-     * @return array Filtered array of active plugins.
-     */
-    private function filteredPlugins(array $plugins, array $pluginsToDisable): array
-    {
-        $filtered = array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
-            foreach ($pluginsToDisable as $disable) {
-                if (str_starts_with($plugin, $disable)) {
-                    return false;
+                return $this->filteredPlugins($plugins, $pluginsToDisable);
+            }
+
+            /**
+             * Force active plugins for production
+             */
+            #[Filter('option_active_plugins', 2, once: true,
+            registerIf: static function (): bool {
+                            return !SharedUtils::isDevelopment();
+                        }
+            )]
+            public function forceActivePlugin(array $plugins): array
+            {
+                foreach (PluginManagement::MUST_HAVE_PLUGINS as $plugin) {
+                    if (!in_array($plugin, $plugins)) {
+                        array_push($plugins, $plugin);
+                    }
                 }
+                return $plugins;
             }
-            return true;
-        });
 
-        return array_values($filtered);
+
+            /**
+             * Returns the list of plugins to disable, optionally merged with extra plugins.
+             *
+             * @param array|null $extra Optional array of additional plugin prefixes to disable.
+             * @return array Array of plugin prefixes to disable.
+             */
+            private function listPluginsToDisable(?array $extra = []): array
+            {
+                // Subject to change
+                static $base = [
+                'wordfence/',
+                'tinywp-mobile-detect/',
+                'fast-indexing-api/',
+                ];
+                return array_merge($base, $extra);
+            }
+            /**
+             * Filters the list of active plugins by removing specified plugins.
+             *
+             * @param array $plugins          Array of active plugin file paths.
+             * @param array $pluginsToDisable Array of plugin prefixes to disable.
+             * @return array Filtered array of active plugins.
+             */
+            private function filteredPlugins(array $plugins, array $pluginsToDisable): array
+            {
+                $filtered = array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
+                    foreach ($pluginsToDisable as $disable) {
+                        if (str_starts_with($plugin, $disable)) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+
+                return array_values($filtered);
+            }
+        };
     }
+    #endregion
+
 }

@@ -170,7 +170,9 @@ class DynamicHookTest extends WplokerbjmTestCase
 
     public function testRuntimeRegistryRegistersClosureHooks(): void
     {
-        $runtimeRegistry = new WPHooksRuntimeRegistry(new HookRuntimeResolver());
+        $runtimeRegistry = $this->container->make(WPHooksRuntimeRegistry::class, [
+            'provider' => null
+        ]);
 
         // The instance must be kept alive — runtime hooks are instance-lifetime
         // scoped (weak references), so an unreferenced instance dies and its

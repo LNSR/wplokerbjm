@@ -66,7 +66,10 @@ class WPHooksScanner
         if (!empty($this->cacheLocation) && is_file($this->cacheLocation)) {
             $loaded = require $this->cacheLocation;
             if (is_array($loaded)) {
-                return $this->cachedHookRegistrations = $loaded;
+                return $this->cachedHookRegistrations = array_map(
+                    static fn(HookRegistration|array $reg): HookRegistration => $reg instanceof HookRegistration ? $reg : HookRegistration::fromArray($reg),
+                    $loaded,
+                );
             }
         }
 
@@ -196,14 +199,9 @@ class WPHooksScanner
 
         $registrations = $this->getHookRegistrations();
 
-        $registrationsArray = array_map(
-            static fn(HookRegistration $reg) => $reg->toArray(),
-            $registrations
-        );
-
         $exportedArray = VarExporter::export(
-            $registrationsArray,
-            VarExporter::CLOSURE_SNAPSHOT_USES | VarExporter::ADD_RETURN | VarExporter::ADD_TYPE_HINTS | VarExporter::NOT_ANY_OBJECT
+            $registrations,
+            VarExporter::CLOSURE_SNAPSHOT_USES | VarExporter::ADD_RETURN | VarExporter::ADD_TYPE_HINTS
         );
 
         $phpContent = "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Auto-generated WP Hooks Cache\n * Generated at: " . date('Y-m-d H:i:s') . "\n */\n\n" . $exportedArray;

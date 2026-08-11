@@ -43,6 +43,7 @@ abstract class WplokerbjmTestCase extends TestCase
         \Brain\Monkey\Functions\when('wp_kses_post')->alias(function ($value) {
             return (string) $value;
         });
+        \Brain\Monkey\Functions\when('get_stylesheet')->justReturn('wplokerbjm');
         \Brain\Monkey\Functions\when('is_admin')->justReturn(false);
         \Brain\Monkey\Functions\when('sanitize_email')->alias(function ($value) {
             return filter_var((string) $value, FILTER_SANITIZE_EMAIL);

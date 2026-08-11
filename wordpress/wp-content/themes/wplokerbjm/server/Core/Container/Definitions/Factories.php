@@ -2,7 +2,7 @@
 namespace WPLokerBJM\Core\Container\Definitions;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, HookTargetResolver, WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, HookTargetResolver, WPHooksContainerRegistry, WPHooksRuntimeCache, WPHooksRuntimeRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
@@ -45,19 +45,26 @@ class Core implements DefinitionProviderInterface
 
         $core = [
             WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class),
-            HookTargetResolver::class => \DI\autowire(HookTargetResolver::class)->lazy(),
+            HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class))->lazy(),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, static fn() => get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class))->lazy(),
+            WPHooksRuntimeCache::class => \DI\autowire(WPHooksRuntimeCache::class)->constructor(
+                static fn() => get_stylesheet_directory() . '/cache/'
+            ),
             WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class)->constructor(
                 \DI\get(HookRuntimeResolver::class),
+                \DI\get(WPHooksRuntimeCache::class),
                 \DI\get(RuntimeWPHookProvider::class)
-            )->lazy(),
-            DeferredHookManager::class => \DI\autowire(DeferredHookManager::class)->constructor(\DI\get(WPHookPlanProvider::class), \DI\get(ContainerInterface::class), \DI\get(HookTargetResolver::class))->lazy(),
+            ),
+
+            DeferredHookManager::class => \DI\autowire(DeferredHookManager::class)->constructor(
+                \DI\get(WPHookPlanProvider::class),
+                \DI\get(ContainerInterface::class),
+                \DI\get(HookTargetResolver::class)
+            ),
             WPHooksContainerRegistry::class => \DI\autowire(WPHooksContainerRegistry::class)->constructor(
                 \DI\get(ContainerInterface::class),
-                \DI\factory(static function (WPHooksScanner $scanner) {
-                    return $scanner->getHookRegistrations();
-                }),
+                static fn(WPHooksScanner $scanner) => $scanner->getHookRegistrations(),
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(DeferredHookManager::class),
                 \DI\get(HookTargetResolver::class),

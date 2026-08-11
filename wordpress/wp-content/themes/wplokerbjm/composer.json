@@ -1,7 +1,6 @@
 {
   "require": {
     "brick/varexporter": "*",
-    "cweagans/composer-patches": "^2.0",
     "nette/robot-loader": "*",
     "php-di/php-di": "*",
     "php-standard-library/php-standard-library": "*",
@@ -9,7 +8,6 @@
   },
   "require-dev": {
     "brain/monkey": "*",
-    "spatie/invade": "*",
     "nikic/php-parser": "*",
     "php-parallel-lint/php-console-highlighter": "*",
     "php-parallel-lint/php-parallel-lint": "*",
@@ -18,10 +16,7 @@
   },
   "config": {
     "sort-packages": true,
-    "process-timeout": 0,
-    "allow-plugins": {
-      "cweagans/composer-patches": true
-    }
+    "process-timeout": 0
   },
   "scripts": {
     "watch:autoload": [

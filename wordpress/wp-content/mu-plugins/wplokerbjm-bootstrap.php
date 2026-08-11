@@ -54,7 +54,7 @@ class Bootstrap
     {
         $rl = new RobotLoader;
         $rl->addDirectory($themeRoot . '/server/');
-        $rl->addDirectory(__DIR__);
+        $rl->addDirectory(__FILE__);
         $rl->setTempDirectory($themeRoot . '/cache/robotloader/');
         $rl->setAutoRefresh(defined('WP_ENV') && WP_ENV === 'development');
         $rl->reportParseErrors(defined('WP_DEBUG') && WP_DEBUG);

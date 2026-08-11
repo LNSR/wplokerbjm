@@ -83,7 +83,6 @@ trait ContainerLazyHookInvokerTrait
  * Unlike closures, this is a named class that appears in debugging tools
  * WordPress can match it by instance identity (spl_object_hash) for
  * remove_action()/remove_filter().
- * @phpstan-import-type CallableHookParams from WPHookPlanProvider
  */
 final class ContainerLazyHookHandler
 {
@@ -139,7 +138,6 @@ final class ContainerLazyHookHandler
  * Unlike raw closures, this is a named class that appears in debugging
  * tools and WordPress can match it by instance identity (spl_object_hash)
  * for remove_action()/remove_filter().
- * @phpstan-import-type CallableHookParams from WPHookPlanProvider
  */
 final class ContainerLazyPropertyHookHandler
 {

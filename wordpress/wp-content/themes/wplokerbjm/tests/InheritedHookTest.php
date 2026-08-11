@@ -100,7 +100,6 @@ class InheritedHookTest extends WplokerbjmTestCase
     public function testRuntimeRegistryIsDeclaredOnly(): void
     {
         $runtime = $this->container()->make(WPHooksRuntimeRegistry::class, [
-            'runtimeResolver' => new HookRuntimeResolver(),
             'provider' => null,
         ]);
 
