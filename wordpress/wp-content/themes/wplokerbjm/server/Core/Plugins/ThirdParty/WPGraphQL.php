@@ -270,7 +270,7 @@ final class WPGraphQL implements PluginConfigInterface
      * @see \WPGraphQL\SmartCache\Admin\Settings::init()
      */
     #[Filter('graphql_get_setting_section_field_value', 11, 3)]
-    public function setPublicIntrospection($value, $default_value, $option_name)
+    public function setPublicIntrospection(string $value, string $default_value, string $option_name): string
     {
         if ($option_name === 'public_introspection_enabled') {
             return SharedUtils::isDevelopment() ? 'on' : 'off';

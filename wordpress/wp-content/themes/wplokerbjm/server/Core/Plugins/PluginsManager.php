@@ -2,6 +2,7 @@
 namespace WPLokerBJM\Core\Plugins;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksRuntimeRegistry};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
 use WPLokerBJM\Shared\Utilities\{PluginList, SharedUtils};
 use WPLokerBJM\Core\Plugins\ThirdParty\{
@@ -50,7 +51,7 @@ class PluginManagement
         WPGraphQL::class,
     ];
 
-    public function __construct(private WPHooksContainerRegistry $hooksRegistry, private WPHooksRuntimeRegistry $runtimeRegistry)
+    public function __construct(private WPHooksContainerRegistry $hooksRegistry, private WPHooksRuntimeRegistry $hooksRuntimeRegistry)
     {
     }
 
@@ -59,7 +60,7 @@ class PluginManagement
      * whose underlying WordPress plugins are inactive.
      *
      */
-    #[Action('plugins_loaded', 0, once: true)]
+    #[Action('muplugins_loaded', 0, once: true)]
     public function unregisterInactivePluginHooks(): void
     {
         foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
@@ -109,8 +110,9 @@ class PluginManagement
      * @var static::class
      */
     #[Action('muplugins_loaded', once: true)]
-    public private(set) AnonClassHookMetadata $optionActivePlugins {
-        get => $this->optionActivePlugins ??= new class (self::class, __PROPERTY__, $this->runtimeRegistry) extends AnonClassHookMetadata {
+    public private(set) AnonClassHookMetadata $pluginEnvironmentCheck {
+        get => $this->pluginEnvironmentCheck ??= new class (self::class, __PROPERTY__, $this->hooksRuntimeRegistry) extends AnonClassHookMetadata {
+            
             public function __construct(
                 $parentClass,
                 $parentProperty,

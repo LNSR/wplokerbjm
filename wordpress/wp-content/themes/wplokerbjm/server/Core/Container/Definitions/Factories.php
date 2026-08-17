@@ -7,7 +7,10 @@ use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHo
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Configs\CredentialConfig;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
+use WPLokerBJM\Core\Plugins\PluginManagement;
 
 interface DefinitionProviderInterface
 {
@@ -85,6 +88,7 @@ class Factory implements DefinitionProviderInterface
 
         return [
             ...self::getInstanceWithCredentials(),
+            ...self::dependencyService()
         ];
     }
 
@@ -94,6 +98,11 @@ class Factory implements DefinitionProviderInterface
         return [
             Cloudflare::class => \DI\autowire(Cloudflare::class)->constructor(static fn() => CredentialConfig::CloudflareCredential()),
             RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn() => CredentialConfig::RedisCredential()),
+        ];
+    }
+    private static function dependencyService():array {
+        return [
+            DependencyInjector::class => \DI\autowire(DependencyInjector::class)->constructor(\DI\get(ContainerInterface::class), get_stylesheet_directory() . '/cache/DependencyInjectorCache.php')->lazy()
         ];
     }
 }

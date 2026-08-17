@@ -248,9 +248,10 @@ class LanguageHooks
         'locale',
         registerIf: static function (): bool {
                 return !is_admin();
-                }
+                },
+        
     )]
-    public function frontendLocalHTMLl10n($locale)
+    public function frontendLocalHTMLl10n(string $locale): string
     {
         return $locale = 'id_ID';
     }
@@ -264,7 +265,7 @@ class HTTPHooks
     //** forwarded IP from the SvelteKit frontend
     #[Action(
         'muplugins_loaded',
-        PHP_INT_MIN,
+        PHP_INT_MIN,    
         registerIf: static function (): bool {
                 return !SharedUtils::isDevelopment() && !SharedUtils::isWPCLI();
                 }

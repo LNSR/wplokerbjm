@@ -57,7 +57,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         }
         echo "\n";
 
-        $this->assertEquals(2, $count, 'Factory should have exactly 2 definitions');
+        $this->assertEquals(3, $count, 'Factory should have exactly 2 definitions');
         $this->assertArrayHasKey(Cloudflare::class, $definitions, 'Cloudflare should be in factory definitions');
         $this->assertArrayHasKey(RedisAdapter::class, $definitions, 'RedisAdapter should be in factory definitions');
     }

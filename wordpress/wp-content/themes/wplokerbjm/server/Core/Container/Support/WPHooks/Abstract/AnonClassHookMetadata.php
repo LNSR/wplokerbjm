@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Abstract;
 
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -28,17 +29,19 @@ use WPLokerBJM\Shared\Log\Logger;
  * {@see getParentClass()} normalizes an object parent via get_class().
  * @template T of object|class-string
  */
-abstract class AnonClassHookMetadata
+abstract class AnonClassHookMetadata extends AsChildClass
 {
+
      /**
      * @param T $parentClass    The class-string containing this hook, or the
      *                                            parent object to resolve via get_class().
      * @param string              $parentProperty The property name holding this instance.
      */
     public function __construct(
-        protected private(set) readonly string|object $parentClass,
-        public private(set) readonly string $parentProperty,
+        private string|object $parentClass,
+        public private(set) string $parentProperty,
     ) {
+        parent::__construct($parentClass, $parentProperty);
     }
 
     /**
