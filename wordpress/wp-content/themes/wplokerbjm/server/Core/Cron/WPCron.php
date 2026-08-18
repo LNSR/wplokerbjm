@@ -15,7 +15,7 @@ class WPCron
     public const CLEANUP_TAXONOMY = 'wplokerbjm_cleanup_taxonomy';
 
     /**
-     * @param self::DELETE_OLD_JOBS | self::UPDATE_JOB_STATUSES | self::CLEANUP_TAXONOMY $hook
+     * @param key-of<self::*> $hook
      * @param 'hourly' | 'twicedaily' | 'daily' | 'weekly' | 'monthly' $recurrence
      */
     private function scheduleEvent(string $hook, string $recurrence): void

@@ -226,12 +226,13 @@ final class DependencyInjector
      */
     private function createSetter(string $scopeClass): Closure
     {
+        static $cb = static function (ContainerInterface $container, AsChildClass $target, array $properties): void {
+            foreach ($properties as $property => $entry) {
+                $target->{$property} = $container->get($entry);
+            }
+        };
         $setter = Closure::bind(
-            static function (ContainerInterface $container, AsChildClass $target, array $properties): void {
-                foreach ($properties as $property => $entry) {
-                    $target->{$property} = $container->get($entry);
-                }
-            },
+            $cb,
             null,
             $scopeClass,
         );
@@ -249,7 +250,7 @@ final class DependencyInjector
     }
 
     /**
-     * @param array<string, array{targetClass: Closure, properties: array<string, string>}> $plans
+     * @param array<string, array{properties: array<string, string>}> $plans
      */
     private function writePlans(array $plans): void
     {
@@ -264,7 +265,7 @@ final class DependencyInjector
 
         $content = "<?php\n\ndeclare(strict_types=1);\n\n" . VarExporter::export(
             $plans,
-            VarExporter::ADD_RETURN | VarExporter::ADD_TYPE_HINTS,
+            VarExporter::ADD_RETURN | VarExporter::ADD_TYPE_HINTS | VarExporter::CLOSURE_SNAPSHOT_USES | VarExporter::INLINE_ARRAY,
         );
         $temporaryFile = tempnam($directory, '.DependencyInjectorCache.');
         if ($temporaryFile === false || file_put_contents($temporaryFile, $content, LOCK_EX) === false) {

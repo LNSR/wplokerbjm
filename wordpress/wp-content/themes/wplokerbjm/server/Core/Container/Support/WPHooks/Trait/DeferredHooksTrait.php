@@ -3,6 +3,7 @@
 declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
+use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
 
 /**
@@ -31,7 +32,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
  *     registerIfParams: CallablePlan,
  *     executeIf: \Closure|null,
  *     executeIfParams: CallablePlan,
- *     once: bool
+ *     once: bool,
+ *     instance: WeakReference<object>
  * }>>
  *
  * @internal
@@ -61,9 +63,9 @@ trait DeferredHooksTrait
      * Each matching entry is re-gated at activation time, then passed to
      * $activateEntry; the key is removed from the pool afterwards and empty
      * hook buckets are dropped.
-     *
-     * @param callable(string, DeferredHookEntry, string): bool $matches      Predicate over ($hook, $entry, $key).
-     * @param callable(string, DeferredHookEntry, string): bool $activateEntry Moves the entry to the active pool and
+     * @template T of callable(string, DeferredHookEntry, string): bool
+     * @param T $matches      Predicate over ($hook, $entry, $key).
+     * @param T $activateEntry Moves the entry to the active pool and
      *                                                             registers it; returns true when newly
      *                                                             activated, false when already active.
      *

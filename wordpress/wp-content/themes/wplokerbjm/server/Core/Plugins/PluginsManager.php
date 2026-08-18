@@ -51,9 +51,7 @@ class PluginManagement
         WPGraphQL::class,
     ];
 
-    public function __construct(private WPHooksContainerRegistry $hooksRegistry, private WPHooksRuntimeRegistry $hooksRuntimeRegistry)
-    {
-    }
+    public function __construct(private WPHooksContainerRegistry $hooksRegistry, private WPHooksRuntimeRegistry $hooksRuntimeRegistry) {}
 
     /**
      * Purge all registered and deferred hooks for third-party integrations 
@@ -95,9 +93,30 @@ class PluginManagement
             })]
     public function disableWpGraphqlPlugin(array $plugins): array
     {
-        unset($plugins[array_search(PluginList::WpGraphql->value, $plugins)]);
+        unset($plugins[array_search(PluginList::WpGraphql->value, $plugins, true)]);
         $this->hooksRegistry->unregisterByClass(WPGraphQL::class);
         $this->hooksRegistry->unregisterDeferredByClass(WPGraphQL::class);
+        return $plugins;
+    }
+
+    #[Filter('option_active_plugins', once: true,
+        registerIf: static function (): bool {
+                    if (is_admin()) {
+                    $action = $_REQUEST['action'] ?? '';
+                        if (in_array($action, ['upgrade-plugin', 'update-plugin', 'activate', 'deactivate', 'activate-plugin'], true)) {
+                        return true;
+                        }
+                    }
+                $cookie = SharedUtils::getWordpressAuthCookie();
+                    if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookie['name']))
+                    return true;
+                return false;
+                }
+    )]
+    public function disableQueryMonitorPlugin(array $plugins): array
+    {
+        define('QM_DISABLED', true);
+        unset($plugins[array_search(PluginList::QueryMonitor->value, $plugins, true)]);
         return $plugins;
     }
 
@@ -112,11 +131,11 @@ class PluginManagement
     #[Action('muplugins_loaded', once: true)]
     public private(set) AnonClassHookMetadata $pluginEnvironmentCheck {
         get => $this->pluginEnvironmentCheck ??= new class (self::class, __PROPERTY__, $this->hooksRuntimeRegistry) extends AnonClassHookMetadata {
-            
+
             public function __construct(
-                $parentClass,
-                $parentProperty,
-                private WPHooksRuntimeRegistry $runtimeRegistry
+            $parentClass,
+            $parentProperty,
+            private WPHooksRuntimeRegistry $runtimeRegistry,
             ) {
                 parent::__construct($parentClass, $parentProperty);
             }

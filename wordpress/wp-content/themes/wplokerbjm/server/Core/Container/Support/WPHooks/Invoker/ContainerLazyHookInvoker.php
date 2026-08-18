@@ -93,7 +93,6 @@ final class ContainerLazyHookHandler
 
     /** Plan provider used for condition gates and hook-name resolution. */
     private readonly WPHookPlanProvider $planProvider;
-
     public function __construct(
         private readonly ContainerInterface $container,
         private readonly string $class,
@@ -110,13 +109,13 @@ final class ContainerLazyHookHandler
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
-            $methodName = $this->method;
             $this->invoker = \Closure::bind(
-                static fn(object $instance, mixed ...$args): mixed => $instance->{$methodName}(...$args),
+                self::$templateClosure ??= static fn(object $instance, string $methodName, mixed ...$args): mixed => $instance->{$methodName}(...$args),
                 null,
                 $this->class,
             );
         }
+
     }
 
     public function __invoke(mixed ...$args): mixed
@@ -124,7 +123,7 @@ final class ContainerLazyHookHandler
         return $this->executeHook(function (object $instance, mixed ...$args) {
             return $this->visibility === 'public'
                 ? $instance->{$this->method}(...$args)
-                : ($this->invoker)($instance, ...$args);
+                : ($this->invoker)($instance, $this->method, ...$args);
         }, $args);
     }
 }
@@ -143,7 +142,7 @@ final class ContainerLazyPropertyHookHandler
 {
     use ContainerLazyHookInvokerTrait;
 
-    /** @var \Closure(object):mixed|null */
+    /** @var \Closure(object, string):mixed|null */
     private ?\Closure $reader = null;
 
     /** Plan provider used for condition gates and hook-name resolution. */
@@ -165,9 +164,8 @@ final class ContainerLazyPropertyHookHandler
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
-            $propertyName = $this->property;
             $this->reader = \Closure::bind(
-                static fn(object $instance): mixed => $instance->{$propertyName},
+                self::$templateClosure ??= static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
                 null,
                 $this->class,
             );
@@ -179,7 +177,7 @@ final class ContainerLazyPropertyHookHandler
         return $this->executeHook(function (object $instance, mixed ...$args) {
             $callable = $this->visibility === 'public'
                 ? $instance->{$this->property}
-                : ($this->reader)($instance);
+                : ($this->reader)($instance, $this->property);
 
             $isInvokable = $callable instanceof \Closure || (is_object($callable) && method_exists($callable, '__invoke'));
 

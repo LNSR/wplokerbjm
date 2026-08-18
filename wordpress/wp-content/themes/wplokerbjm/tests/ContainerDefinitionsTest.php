@@ -468,7 +468,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         $namespacePrefix = self::$NAMESPACE . '\\';
         $scannedClasses = 0;
-        foreach (Bootstrap::getRobotLoader()->getIndexedClasses() as $className => $file) {
+        foreach (Bootstrap::$robotLoader->getIndexedClasses() as $className => $file) {
             if (str_starts_with($className, $namespacePrefix) && class_exists($className)) {
                 $scannedClasses++;
             }

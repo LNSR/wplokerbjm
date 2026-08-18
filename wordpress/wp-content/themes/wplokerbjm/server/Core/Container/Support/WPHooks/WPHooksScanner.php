@@ -99,7 +99,7 @@ class WPHooksScanner
         $namespacePrefix = $this->namespace . '\\';
 
         $hookPlanProvider = $this->hookPlanProvider;
-        foreach (Bootstrap::getRobotLoader()->getIndexedClasses() as $className => $file) {
+        foreach (Bootstrap::$robotLoader->getIndexedClasses() as $className => $file) {
             if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
                 continue;
             }

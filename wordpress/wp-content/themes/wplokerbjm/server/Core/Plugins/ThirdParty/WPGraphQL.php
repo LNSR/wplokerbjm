@@ -18,7 +18,13 @@ use WP_User;
  */
 final class WPGraphQL implements PluginConfigInterface
 {
-
+    private array $officialOrigins = [
+        'https://dev.lokerbanjarmasin.my.id',
+        'https://staging.lokerbanjarmasin.my.id',
+        'https://lokerbanjarmasin.my.id',
+        'https://wp.lokerbanjarmasin.my.id',
+        ];
+    
     public static function isActive(): bool
     {
         return PluginList::WpGraphql->isActive();
@@ -27,9 +33,8 @@ final class WPGraphQL implements PluginConfigInterface
     public function __construct(
         private WPHooksContainerRegistry $hookRegistry,
         private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration,
-        private WPGraphQLETag $eTag
-    ) {
-    }
+        private WPGraphQLETag $eTag,
+    ) {}
 
     /**
      * Inject the JWT from the HttpOnly cookie as a Bearer token so the JWT
@@ -84,46 +89,17 @@ final class WPGraphQL implements PluginConfigInterface
      */
     private function authenticateViaCookie(): void
     {
-        $cookieValue = '';
-        $cookieName = '';
-
-        // Prefer the normal PHP cookie superglobal and detect WP login cookies by name
-        if (!empty($_COOKIE)) {
-            foreach ($_COOKIE as $name => $val) {
-                // support both the regular login and secure login cookies
-                if (
-                    str_starts_with($name, 'wordpress_logged_in_') ||
-                    str_starts_with($name, 'wordpress_sec_')
-                ) {
-                    $cookieValue = wp_unslash($val);
-                    $cookieName = $name;
-                    break;
-                }
-            }
-        }
-
-        // If we still don't have it, try parsing the raw Cookie header for known WP login cookies
-        if ($cookieValue === '' && !empty($_SERVER['HTTP_COOKIE'])) {
-            $header = $_SERVER['HTTP_COOKIE'];
-            if (preg_match('/(?:^|;\\s*)(wordpress_logged_in_[^=]+|wordpress_sec_[^=]+)=([^;]+)/', $header, $m2)) {
-                $cookieName = $m2[1] ?? '';
-                $cookieValue = rawurldecode($m2[2]);
-            }
-        }
-
-        if ($cookieValue === '') {
-            return;
-        }
+        $cookie = SharedUtils::getWordpressAuthCookie();
 
         // Validate the cookie value using WP helper
         // choose scheme based on cookie type: secure login cookies use the secure_auth scheme
-        $scheme = str_starts_with($cookieName, 'wordpress_sec_') ? 'secure_auth' : 'logged_in';
-        $user_id = wp_validate_auth_cookie($cookieValue, $scheme);
+        $scheme = str_starts_with($cookie['name'], 'wordpress_sec_') ? 'secure_auth' : 'logged_in';
+        $user_id = wp_validate_auth_cookie($cookie['value'], $scheme);
         if ($user_id) {
             wp_set_current_user((int) $user_id);
             wp_get_current_user();
         } else {
-            Logger::error('AuthDebug', 'authenticateViaCookie validation FAILED for cookie_name=' . $cookieName);
+            Logger::error('AuthDebug', 'authenticateViaCookie validation FAILED for cookie_name=' . $cookie['name']);
         }
     }
 
@@ -133,16 +109,8 @@ final class WPGraphQL implements PluginConfigInterface
     private function allowedOrigins(): array
     {
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-
-        static $officialOrigins = [
-        'https://dev.lokerbanjarmasin.my.id',
-        'https://staging.lokerbanjarmasin.my.id',
-        'https://lokerbanjarmasin.my.id',
-        'https://wp.lokerbanjarmasin.my.id',
-        ];
-
         if (!SharedUtils::isDevelopment())
-            return $officialOrigins;
+            return $this->officialOrigins;
 
         $allowed = [];
         $parts = wp_parse_url($origin);
@@ -152,7 +120,7 @@ final class WPGraphQL implements PluginConfigInterface
         ) {
             $allowed[] = $origin;
         }
-        return array_merge($officialOrigins, $allowed);
+        return array_merge($this->officialOrigins, $allowed);
     }
 
     #region Header stuff
@@ -216,7 +184,7 @@ final class WPGraphQL implements PluginConfigInterface
             $headers['Logged-In'] = 'true';
             $headers['X-WP-Nonce'] = wp_create_nonce('wp_rest');
             \remove_all_filters('graphql_send_nocache_headers');
-            (void) $this->disableGraphQLNocacheHeader();
+            (void)$this->disableGraphQLNocacheHeader();
         }
         return $headers;
     }
@@ -307,7 +275,7 @@ final class WPGraphQL implements PluginConfigInterface
 class WPGraphQLETag
 {
     /** @var string The current request ETag, computed from response data. */
-    private string $etag = '' {
+    private string $etag {
         set(string $etag) {
             $this->etag = trim($etag);
         }

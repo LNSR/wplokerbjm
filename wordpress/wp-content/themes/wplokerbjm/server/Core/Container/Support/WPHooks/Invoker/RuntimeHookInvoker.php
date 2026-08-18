@@ -158,12 +158,11 @@ final class RuntimeInstanceHookHandler
             : $instance::class . '::' . $this->method;
 
         if ($this->visibility !== 'public') {
-            $methodName = $this->method;
 
             // Bind inside the instance's class scope so
             // $instance->privateMethod(...) works natively.
             $this->invoker = \Closure::bind(
-                static fn(object $target, mixed ...$args): mixed => $target->{$methodName}(...$args),
+                self::$templateClosure ??= static fn(object $target, string $methodName, mixed ...$args): mixed => $target->{$methodName}(...$args),
                 null,
                 $instance::class,
             );
@@ -175,7 +174,7 @@ final class RuntimeInstanceHookHandler
     {
         return $this->visibility === 'public'
             ? $instance->{$this->method}(...$args)
-            : ($this->invoker)($instance, ...$args);
+            : ($this->invoker)($instance, $this->method, ...$args);
     }
 
 }
@@ -196,7 +195,7 @@ final class RuntimeInstancePropertyHookHandler
 
     public readonly string $label;
 
-    /** @var \Closure(object):mixed|null */
+    /** @var \Closure(object, string):mixed|null */
     private ?\Closure $reader = null;
 
     /**
@@ -230,12 +229,10 @@ final class RuntimeInstancePropertyHookHandler
             : $instance::class . '::$' . $this->property;
 
         if ($this->visibility !== 'public') {
-            $propertyName = $this->property;
-
             // Bind inside the instance's class scope so
             // $instance->privateProp works natively.
             $this->reader = \Closure::bind(
-                static fn(object $target): mixed => $target->{$propertyName},
+                self::$templateClosure ??= static fn(object $target, string $propertyName): mixed => $target->{$propertyName},
                 null,
                 $instance::class,
             );
@@ -249,7 +246,7 @@ final class RuntimeInstancePropertyHookHandler
     {
         $callable = $this->visibility === 'public'
             ? $instance->{$this->property}
-            : ($this->reader)($instance);
+            : ($this->reader)($instance, $this->property);
 
         if (!\is_callable($callable)) {
             throw new \RuntimeException(

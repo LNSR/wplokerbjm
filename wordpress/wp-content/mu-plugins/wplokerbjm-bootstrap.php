@@ -22,7 +22,7 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
  */
 class Bootstrap
 {
-    private static ?RobotLoader $robotLoader = null;
+    public private(set) static ?RobotLoader $robotLoader = null;
 
     /**
      * Entry point. Called once from this file after the class definition.
@@ -61,14 +61,6 @@ class Bootstrap
         $rl->register();
 
         self::$robotLoader = $rl;
-    }
-
-    /**
-     * Expose RobotLoader for use by @see AutowireScanner, @see WPHooksScanner, etc.
-     */
-    public static function getRobotLoader(): RobotLoader
-    {
-        return self::$robotLoader;
     }
 
     /**

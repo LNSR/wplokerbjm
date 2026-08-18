@@ -59,7 +59,7 @@ class AutowireScanner
     {
         $definitions = [];
 
-        foreach (Bootstrap::getRobotLoader()->getIndexedClasses() as $className => $file) {
+        foreach (Bootstrap::$robotLoader->getIndexedClasses() as $className => $file) {
             $checkList = $this->isAutowirable($className);
 
             if (!$checkList['autowirable']) {

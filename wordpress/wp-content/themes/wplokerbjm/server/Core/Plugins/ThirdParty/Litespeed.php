@@ -65,7 +65,7 @@ final class Litespeed implements PluginConfigInterface
             wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
 
-        Bootstrap::getRobotLoader()->rebuild();
+        Bootstrap::$robotLoader->rebuild();
         WPLokerBJMContainer::getContainer(true);
     }
 
@@ -94,9 +94,7 @@ class LiteSpeedGraphQLIntegration implements PluginConfigInterface
      * Call litespeed_purge when graphql_purge is called
      */
     #[Action('graphql_purge')]
-    public $purgeCache = static function ($keys): void {
-            do_action('litespeed_purge', $keys);
-        };
+    public $purgeCache = static function ($keys): void { do_action('litespeed_purge', $keys); };
 
     /**
      * Set GraphQL Queries returned via HTTP GET|OPTIONS requests to be cacheable

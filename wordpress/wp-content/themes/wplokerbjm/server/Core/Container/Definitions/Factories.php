@@ -52,7 +52,7 @@ class Core implements DefinitionProviderInterface
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class))->lazy(),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, static fn() => get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class))->lazy(),
             WPHooksRuntimeCache::class => \DI\autowire(WPHooksRuntimeCache::class)->constructor(
-                static fn() => get_stylesheet_directory() . '/cache/'
+                static fn(): string => get_stylesheet_directory() . '/cache/'
             ),
             WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class)->constructor(
                 \DI\get(HookRuntimeResolver::class),
@@ -67,7 +67,7 @@ class Core implements DefinitionProviderInterface
             ),
             WPHooksContainerRegistry::class => \DI\autowire(WPHooksContainerRegistry::class)->constructor(
                 \DI\get(ContainerInterface::class),
-                static fn(WPHooksScanner $scanner) => $scanner->getHookRegistrations(),
+                static fn(WPHooksScanner $scanner): array => $scanner->getHookRegistrations(),
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(DeferredHookManager::class),
                 \DI\get(HookTargetResolver::class),
@@ -96,13 +96,13 @@ class Factory implements DefinitionProviderInterface
     private static function getInstanceWithCredentials(): array
     {
         return [
-            Cloudflare::class => \DI\autowire(Cloudflare::class)->constructor(static fn() => CredentialConfig::CloudflareCredential()),
-            RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn() => CredentialConfig::RedisCredential()),
+            Cloudflare::class => \DI\autowire(Cloudflare::class)->constructor(static fn(): array => CredentialConfig::CloudflareCredential()),
+            RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn(): array => CredentialConfig::RedisCredential()),
         ];
     }
     private static function dependencyService():array {
         return [
-            DependencyInjector::class => \DI\autowire(DependencyInjector::class)->constructor(\DI\get(ContainerInterface::class), get_stylesheet_directory() . '/cache/DependencyInjectorCache.php')->lazy()
+            DependencyInjector::class => \DI\autowire(DependencyInjector::class)->constructor(\DI\get(ContainerInterface::class), static fn(): string => get_stylesheet_directory() . '/cache/DependencyInjectorCache.php')->lazy()
         ];
     }
 }

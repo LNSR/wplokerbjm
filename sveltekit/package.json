@@ -31,7 +31,7 @@
     "viewerjs": "^1.11.8"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260816.1",
+    "@cloudflare/workers-types": "^5.20260817.1",
     "@eslint/compat": "^2.1.0",
     "@gql.tada/svelte-support": "^1.0.3",
     "@sveltejs/adapter-cloudflare": "^7.2.9",
@@ -43,7 +43,7 @@
     "@typia/unplugin": "^12.1.1",
     "@urql/exchange-persisted": "^5.0.1",
     "daisyui": "^5.7.17",
-    "es-toolkit": "^1.50.0",
+    "es-toolkit": "^1.51.0",
     "eslint": "^10.8.1",
     "eslint-plugin-svelte": "^3.23.0",
     "globals": "^17.11.0",

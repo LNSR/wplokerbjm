@@ -1,5 +1,8 @@
 <?php
 namespace WPLokerBJM\Shared\Utilities;
+
+use WPLokerBJM\Shared\Log\Logger;
+
 enum PluginList: string
 {
     case LiteSpeed = 'litespeed-cache/litespeed-cache.php';
@@ -10,20 +13,23 @@ enum PluginList: string
     case RankMath = 'seo-by-rank-math/rank-math.php';
     case QueryMonitor = 'query-monitor/query-monitor.php';
     case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
-    public function isActive(): bool {
+    public function isActive(): bool
+    {
         static $activePlugins = null;
         $activePlugins ??= get_option('active_plugins') ?: [];
         return is_array($activePlugins) && in_array($this->value, $activePlugins, true);
     }
 
-    public function deactivePlugin(): void {
-        if($this->isActive()) {
+    public function deactivePlugin(): void
+    {
+        if ($this->isActive()) {
             deactivate_plugins($this->value, false);
         }
     }
 
-    public function activePlugin(): void {
-        if(!$this->isActive()) {
+    public function activePlugin(): void
+    {
+        if (!$this->isActive()) {
             activate_plugins($this->value, false);
         }
     }
@@ -40,9 +46,9 @@ class SharedUtils
 
         // Check exact localhost addresses
         static $exactLocalhost = [
-            '127.0.0.1',
-            '::1',
-            'localhost',
+        '127.0.0.1',
+        '::1',
+        'localhost',
         ];
 
         if (in_array($remoteAddr, $exactLocalhost)) {
@@ -66,15 +72,21 @@ class SharedUtils
         return false;
     }
 
-    public static function doActivityAtBackground(callable $activity): void {
-        if (defined('PHP_SAPI') && PHP_SAPI !== 'cli') {
-            if (function_exists('litespeed_finish_request')) {
-                litespeed_finish_request();
-            } elseif (function_exists('fastcgi_finish_request')) {
-                fastcgi_finish_request();
+    public static function doActivityAtBackground(callable $activity): void
+    {
+        try {
+            if (defined('PHP_SAPI') && PHP_SAPI !== 'cli') {
+                if (function_exists('litespeed_finish_request')) {
+                    litespeed_finish_request();
+                } elseif (function_exists('fastcgi_finish_request')) {
+                    fastcgi_finish_request();
+                }
             }
+        } catch (\Exception $e) {
+            Logger::error('SharedUtils::doActivityAtBackground error: ', $e->getMessage());
+        } finally {
+            $activity();
         }
-        $activity();
     }
 
     public static function isWPCLI(): bool
@@ -97,6 +109,31 @@ class SharedUtils
     public static function headlessDomainRedirect(): string
     {
         return self::isDevelopment() ? 'https://localhost:5173' : 'https://lokerbanjarmasin.my.id';
+    }
+
+    /**
+     * @return array{name: string, value: string}
+     */
+    public static function getWordpressAuthCookie(): array
+    {
+        $authCookieName = '';
+        $authCookieValue = '';
+        if (!empty($_COOKIE)) {
+            foreach ($_COOKIE as $name => $val) {
+                if (
+                    str_starts_with($name, 'wordpress_sec_') ||
+                    str_starts_with($name, 'wordpress_logged_in_')
+                ) {
+                    $authCookieName = $name;
+                    $authCookieValue = \stripslashes_deep($val);
+                    break;
+                }
+            }
+        }
+        return [
+            'name' => (string) $authCookieName,
+            'value' => (string) $authCookieValue
+        ];
     }
 
     /**

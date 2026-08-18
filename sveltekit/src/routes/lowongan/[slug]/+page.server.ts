@@ -4,7 +4,7 @@ import { APIServiceServer, APIServiceShared } from "@/services/graphql/APIServic
 import { getCmsOrigin } from "@/utils/environment";
 import { schemaScriptAttach, schemaScriptParser } from "$lib/server/utils/scripts.server";
 import { collectPreloadLinksForJob } from "$lib/server/utils/http.server";
-import type { JobDetailResponse } from "../../../types/API";
+import type { JobDetailResponse } from "@/types/API";
 export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
 {
   const slug = String(params.slug ?? "");

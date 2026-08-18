@@ -169,7 +169,7 @@ class RobotsHooks
     #[Filter('wp_robots')]
     public function __invoke(array $robots): array
     {
-        if (is_post_type_archive('lowongan')) {
+        if (is_post_type_archive(PostTypes::POST_TYPE_LOWONGAN)) {
             $robots['noindex'] = true;
         }
 
@@ -249,7 +249,7 @@ class LanguageHooks
         registerIf: static function (): bool {
                 return !is_admin();
                 },
-        
+
     )]
     public function frontendLocalHTMLl10n(string $locale): string
     {
@@ -265,7 +265,7 @@ class HTTPHooks
     //** forwarded IP from the SvelteKit frontend
     #[Action(
         'muplugins_loaded',
-        PHP_INT_MIN,    
+        PHP_INT_MIN,
         registerIf: static function (): bool {
                 return !SharedUtils::isDevelopment() && !SharedUtils::isWPCLI();
                 }
@@ -309,9 +309,7 @@ class CacheInvalidationHooks
     public function __construct(
         private WPHooksContainerRegistry $hooksRegistry,
         private RedisAdapter $redisAdapter,
-    ) {
-
-    }
+    ) {}
     /**
      * Per-post cache invalidation — fires for EVERY lowongan post change.
      *
@@ -480,9 +478,7 @@ class CacheInvalidationHooks
 class ShutdownHooks
 {
 
-    public function __construct(private WPHooksRuntimeRegistry $runtimeRegistry)
-    {
-    }
+    public function __construct(private WPHooksRuntimeRegistry $runtimeRegistry) {}
 
     #[Action('shutdown', PHP_INT_MAX, once: true)]
     public function flushBuffer(): void

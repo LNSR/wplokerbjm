@@ -24,6 +24,8 @@ trait HookInvokerTrait
 
     /** Whether the removal callback has fired — idempotency guard. */
     private bool $removed = false;
+    /** template closure for caching stateless closure */
+    private static \Closure $templateClosure;
 
     /**
      * Attach the removal callback (set by the owning registry) so the handler
