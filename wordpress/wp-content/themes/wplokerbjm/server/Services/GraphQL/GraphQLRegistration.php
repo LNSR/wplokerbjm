@@ -26,7 +26,7 @@ use WPLokerBJM\Core\Container\Attributes\Action;
  * @phpstan-type AutoSuggestionsArgs array{query?: string}
  * @phpstan-type LoadMoreArgs array{paged?: int, context?: 'search'|'latest', filters?: ArrayFilters}
  * @phpstan-type JobGridArgs array{paged?: int, context?: 'search'|'latest', title?: string, total_jobs?: int, filters?: ArrayFilters}
- * @phpstan-type JobDetailArgs array{slug?: string}
+ * @phpstan-type JobDetailArgs array{slug?: string, id?: int, preview?: bool}
  * @phpstan-type JobSchemaArgs array{ids?: list<int>, slug?: string, type?: string}
  * @phpstan-type SearchJobsArgs array{context?: 'search'|'latest', filters?: ArrayFilters}
  * @phpstan-type RankMathHeadArgs array{url?: string}
@@ -430,11 +430,19 @@ final class GraphQLRegistration
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'jobDetail', [
             'type' => self::TYPE_JOB,
-            'description' => 'Get job detail',
+            'description' => 'Get job detail. Resolve by slug for published jobs, or by id with preview=true for draft/preview access (requires edit_post capability).',
             'args' => [
                 'slug' => [
                     'type' => self::TYPE_STRING,
-                    'description' => 'Job slug',
+                    'description' => 'Job slug (published jobs)',
+                ],
+                'id' => [
+                    'type' => self::TYPE_INT,
+                    'description' => 'Job ID (used for preview of drafts)',
+                ],
+                'preview' => [
+                    'type' => self::TYPE_BOOLEAN,
+                    'description' => 'When true, allows resolving non-published posts by id. Requires the current user to have edit_post capability on the post.',
                 ],
             ],
             'resolve' => $this->jobsDataResolver->resolveJobDetail(...),

@@ -31,18 +31,18 @@
     "viewerjs": "^1.11.8"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20260817.1",
+    "@cloudflare/workers-types": "^5.20260819.1",
     "@eslint/compat": "^2.1.0",
     "@gql.tada/svelte-support": "^1.0.3",
     "@sveltejs/adapter-cloudflare": "^7.2.9",
-    "@sveltejs/kit": "^2.70.2",
+    "@sveltejs/kit": "^2.70.3",
     "@tailwindcss/vite": "4.3.2",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^26.2.0",
     "@typescript-eslint/eslint-plugin": "^8.67.0",
     "@typia/unplugin": "^12.1.1",
     "@urql/exchange-persisted": "^5.0.1",
-    "daisyui": "^5.7.17",
+    "daisyui": "^5.7.19",
     "es-toolkit": "^1.51.0",
     "eslint": "^10.8.1",
     "eslint-plugin-svelte": "^3.23.0",
@@ -63,7 +63,7 @@
     "vite": "^8.2.1",
     "vite-bundle-analyzer": "^1.3.9",
     "vite-plugin-devtools-json": "^1.1.0",
-    "wrangler": "^4.123.0"
+    "wrangler": "^4.124.0"
   },
   "overrides": {
     "ts-patch": "^4.0.1",

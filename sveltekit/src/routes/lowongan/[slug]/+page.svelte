@@ -8,6 +8,7 @@
       job: JobDetailResponse;
       carousel: CarouselProps;
       jobGrid: JobGridProps;
+      isPreview?: boolean;
     };
   }
   const props: Props = $props();
@@ -20,6 +21,12 @@
   const isMobile = $derived(deviceDetector.isPlatformMobile);
   let job: JobDetailResponse | null = $derived(props.data.job ?? null);
 </script>
+
+<svelte:head>
+  {#if props.data.isPreview && job}
+    {@html `<title>${job.title}</title>`}
+  {/if}
+</svelte:head>
 
 {#if job}
   {#if !isMobile}

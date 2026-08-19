@@ -61,10 +61,10 @@ class Cloudflare
      * same request are redundant (the zone was already purged).
      * @var static::class
      */
-    // #[Action('added_post_meta', 10, 4)]
-    // #[Action('updated_post_meta', 10, 4)]
-    // #[Action('deleted_post_meta', 10, 4)]
-    // public private(set) \Closure|false $purgeOnMetaChange { get => $this->purgeOnMetaChange ??= $this->createHandler(__PROPERTY__); }
+    #[Action('added_post_meta', 10, 4)]
+    #[Action('updated_post_meta', 10, 4)]
+    #[Action('deleted_post_meta', 10, 4)]
+    public private(set) \Closure|false $purgeOnMetaChange { get => $this->purgeOnMetaChange ??= $this->createHandler(__PROPERTY__); }
 
     /**
      * Purge the entire zone on the first term change of the request.

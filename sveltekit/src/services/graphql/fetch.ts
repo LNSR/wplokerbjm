@@ -21,7 +21,7 @@ import { GET_JWT } from "@/services/graphql/query/browser/auth";
 import { GET_LOKASI_TERMS, GET_GENDER_TERMS, GET_PENDIDIKAN_TERMS } from "@/services/graphql/query/browser/taxonomy";
 import type { URQLBrowserManager } from "@/services/graphql/config/urql";
 import { APIServiceHelper } from "@/utils/apiservice-helper";
-import { GET_JOB_DETAIL, GET_JOB_SCHEMA, GET_RANK_MATH_HEAD } from "@/services/graphql/query/server/job";
+import { GET_JOB_DETAIL, GET_JOB_DETAIL_PREVIEW, GET_JOB_SCHEMA, GET_RANK_MATH_HEAD } from "@/services/graphql/query/server/job";
 import { GET_THEME_DATA } from "@/services/graphql/query/server/theme";
 import { URQLServerManager } from "@/services/graphql/config/urql";
 type BookmarkResponse = CardJob[];
@@ -204,6 +204,19 @@ export class ServerFetch extends SharedFetch {
         const data = await this.URQLManager.runQuery({
             query: GET_JOB_DETAIL,
             variables: { slug },
+            context: this.URQLManager.mergedFetchOptionsContext(signal),
+        });
+        const job = data.jobDetail;
+
+        return typia.assertEquals<JobDetailResponse>(job);
+    }
+    public async fetchJobDetailPreviewGraphQL(
+        id: number,
+        signal?: AbortSignal,
+    ): Promise<JobDetailResponse> {
+        const data = await this.URQLManager.runQuery({
+            query: GET_JOB_DETAIL_PREVIEW,
+            variables: { id, preview: true },
             context: this.URQLManager.mergedFetchOptionsContext(signal),
         });
         const job = data.jobDetail;

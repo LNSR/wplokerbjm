@@ -109,9 +109,11 @@ class GraphQLData
      * Get detailed data for a single job overlay
      * Also used for SingleView props
      * @param int $post_id Post ID to fetch detailed data for
+     * @param bool $bypassCache When true, skips read/write of the Redis cache
+     *                          (used for draft previews so stale content is never served)
      * @return JobDetailData Processed job detail data
      */
-    public function getJobDetailData(int $post_id): array
+    public function getJobDetailData(int $post_id, bool $bypassCache = false): array
     {
         $post_id = (int) $post_id; // Explicit coercion for type safety
         // Use per-user cache for logged-in users to avoid leaking user-specific nonces
@@ -122,18 +124,20 @@ class GraphQLData
 
         $noncePlugin = static fn(string $action, int $postId): string => wp_create_nonce($action . '_' . $postId);
 
-        /** @var JobDetailData|false $cached */
-        $cached = Cache::get($cacheKey);
-        if ($cached !== false) {
-            if (is_user_logged_in()) {
-                $cached['dpNonce'] = $noncePlugin('duplicate_post_new_draft', $post_id);
-                return $cached;
-            } else {
-                // safety remove in case cached from logged-in
-                if (isset($cached['dpNonce'])) {
-                    unset($cached['dpNonce']);
+        if (!$bypassCache) {
+            /** @var JobDetailData|false $cached */
+            $cached = Cache::get($cacheKey);
+            if ($cached !== false) {
+                if (is_user_logged_in()) {
+                    $cached['dpNonce'] = $noncePlugin('duplicate_post_new_draft', $post_id);
+                    return $cached;
+                } else {
+                    // safety remove in case cached from logged-in
+                    if (isset($cached['dpNonce'])) {
+                        unset($cached['dpNonce']);
+                    }
+                    return $cached;
                 }
-                return $cached;
             }
         }
 
@@ -169,7 +173,9 @@ class GraphQLData
 
             $data = SharedUtils::filterEmptyValues($data);
 
-            Cache::set($cacheKey, $data, 86400); // Cache for 1 day
+            if (!$bypassCache) {
+                Cache::set($cacheKey, $data, 86400); // Cache for 1 day
+            }
             return $data;
         } catch (\Exception $e) {
             Logger::error('REST', 'RESTData::getSingleOverlayData error for post ' . $post_id . ': ' . $e->getMessage());

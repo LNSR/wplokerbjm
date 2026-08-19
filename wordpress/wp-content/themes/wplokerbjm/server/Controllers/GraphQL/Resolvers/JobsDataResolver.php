@@ -42,8 +42,7 @@ class JobsDataResolver
         private readonly JobCarousel $jobCarouselPresenter,
         private readonly JobRepository $jobRepository,
         private readonly JobGrid $jobGridPresenter,
-    ) {
-    }
+    ) {}
 
     /**
      * @return CarouselData
@@ -194,13 +193,54 @@ class JobsDataResolver
     /**
      * Resolve single job detail for GraphQL.
      *
+     * Supports published jobs by slug (default), or draft/preview access by
+     * id with preview=true. Preview requires edit_post capability and bypasses
+     * all caches so the latest draft content is always returned.
+     *
      * @param mixed $root The root Query object (unused)
-     * @param JobDetailArgs $args Query arguments with job slug
+     * @param JobDetailArgs $args Query arguments with job slug or id/preview
      * @return JobDetailData|array{}
      */
     public function resolveJobDetail($root, $args): array
     {
         try {
+            $id = isset($args['id']) ? (int) $args['id'] : 0;
+            $preview = !empty($args['preview']);
+
+            if ($preview || $id > 0) {
+                if ($id <= 0) {
+                    throw new \Exception('Missing id parameter');
+                }
+
+                $post = get_post($id);
+                if (!$post instanceof \WP_Post || $post->post_type !== 'lowongan') {
+                    throw new \Exception('Post not found');
+                }
+
+                if ($preview) {
+                    // Draft/preview access: guard capability and bypass caches.
+                    if (!current_user_can('edit_post', $id)) {
+                        throw new \Exception('Unauthorized preview access');
+                    }
+
+                    $job = $this->graphqlData->getJobDetailData($id, true); // bypassCache
+                    if (!empty($job)) {
+                        // Normalize permalink to the ID-based route so the frontend
+                        // side panel stays on the preview route.
+                        $job['permalink'] = esc_url(home_url('/lowongan/' . $id));
+                    }
+
+                    return $job;
+                }
+
+                // id without preview: published posts only (defense in depth).
+                if ($post->post_status !== 'publish') {
+                    throw new \Exception('Post not found');
+                }
+
+                return $this->graphqlData->getJobDetailData($id);
+            }
+
             $slug = $args['slug'];
             if (!$slug) {
                 throw new \Exception('Missing slug parameter');
@@ -460,6 +500,15 @@ class JobsDataResolver
     {
         try {
             $url = $args['url'];
+            $parsedUrl = parse_url($url);
+            $queryParams = [];
+            if (isset($parsedUrl['query'])) {
+                parse_str($parsedUrl['query'], $queryParams);
+            }
+
+            $postId = $queryParams['p'] ?? $queryParams['preview_id'] ?? $queryParams['id'] ?? null;
+
+            $isPreview = !empty($postId) || isset($queryParams['preview']);
 
             // Validate URL - must be internal
             if (!filter_var($url, FILTER_VALIDATE_URL)) {
@@ -473,11 +522,13 @@ class JobsDataResolver
                 throw new \Exception('URL must be internal to this site');
             }
 
-            $cacheKey = CacheKey::RANKMATH_HEAD_PREFIX . md5($url);
-            /** @var string|false $cached */
-            $cached = Cache::get($cacheKey);
-            if ($cached !== false) {
-                return $cached;
+            if (!$isPreview) {
+                $cacheKey = CacheKey::RANKMATH_HEAD_PREFIX . md5($url);
+                /** @var string|false $cached */
+                $cached = Cache::get($cacheKey);
+                if ($cached !== false) {
+                    return $cached;
+                }
             }
 
             $headless = new \RankMath\Rest\Headless();
@@ -498,8 +549,9 @@ class JobsDataResolver
             }
 
             $html = $data['head'] ?? '';
-
-            Cache::set($cacheKey, $html, 86400); // Cache for 1 day
+            if (!$isPreview) {
+                Cache::set($cacheKey, $html, 86400); // Cache for 1 day
+            }
 
             return $html;
         } catch (\Exception $e) {

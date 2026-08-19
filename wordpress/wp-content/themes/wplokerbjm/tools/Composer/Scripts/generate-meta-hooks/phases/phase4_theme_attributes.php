@@ -14,6 +14,8 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
+use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeHookMetadata;
 
 /**
  * Phase 4 — Collect #[Action] / #[Filter] hook registrations.
@@ -49,16 +51,19 @@ function themeAttributeScan(string $themeRoot): array
  */
 function loadHookRegistrationsFromCache(string $themeRoot): ?array
 {
-    $cacheFile = $themeRoot . '/cache/WPHooksCache.php';
+    $cacheFileContainerRegistry = $themeRoot . '/cache/WPHooksCache.php';
+    $cacheFileRuntimeRegistry = $themeRoot . '/cache/WPHooksRuntimeCache.php';
 
-    if (!is_file($cacheFile)) {
+    if (!is_file($cacheFileContainerRegistry)) {
         return null;
     }
+    require_once $themeRoot . '/server/Core/Container/Support/WPHooks/DTO.php';
+    $registrationContainerRegistry = require $cacheFileContainerRegistry;
+    $registrationRuntimeRegistry = require $cacheFileRuntimeRegistry;
 
-    $registrations = require $cacheFile;
 
-    if (!is_array($registrations)) {
-        warning("WPHooks cache returned no registrations: {$cacheFile}");
+    if (!is_array($registrationContainerRegistry)) {
+        warning("WPHooks cache returned no registrations: {$cacheFileContainerRegistry}");
         return null;
     }
 
@@ -66,23 +71,33 @@ function loadHookRegistrationsFromCache(string $themeRoot): ?array
     $filters = [];
     $tags = [];
 
-    foreach ($registrations as $reg) {
-        if (!is_array($reg)) {
-            continue;
-        }
-        $hook = $reg['hook'] ?? null;
+    foreach ($registrationContainerRegistry as $reg) {
+        $hook = $reg instanceof HookRegistration ? $reg->hook : ($reg['hook'] ?? null);
         if (!is_string($hook)) {
             continue;
         }
-        if (($reg['type'] ?? null) === 'action') {
+        if (($reg instanceof HookRegistration ? $reg->type : ($reg['type'] ?? null)) === 'action') {
             $actions[] = $hook;
-        } elseif (($reg['type'] ?? null) === 'filter') {
+        } elseif (($reg instanceof HookRegistration ? $reg->type : ($reg['type'] ?? null)) === 'filter') {
             $filters[] = $hook;
         }
-        foreach ((array) ($reg['tags'] ?? []) as $tag) {
+        $regTags = $reg instanceof HookRegistration ? $reg->tags : ($reg['tags'] ?? []);
+        foreach ((array) $regTags as $tag) {
             if (is_string($tag) && $tag !== '') {
                 $tags[] = $tag;
             }
+        }
+    }
+
+    foreach ($registrationRuntimeRegistry as $runtime) {
+        $hook = $runtime instanceof RuntimeHookMetadata ? $runtime->hook : ($runtime['hook'] ?? null);
+        if (!is_string($hook)) {
+            continue;
+        }
+        if (($runtime instanceof RuntimeHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'action') {
+            $actions[] = $hook;
+        } elseif (($runtime instanceof RuntimeHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'filter') {
+            $filters[] = $hook;
         }
     }
 

@@ -61,8 +61,7 @@ class RedirectHooks
         }
 
         if (
-            wp_doing_cron() ||
-            is_preview()
+            wp_doing_cron()
         ) {
             return true;
         }
@@ -77,7 +76,6 @@ class RedirectHooks
             (defined('GRAPHQL_REQUEST') && GRAPHQL_REQUEST) ||
             (defined('REST_REQUEST') && REST_REQUEST) ||
             (defined('DOING_AJAX') && DOING_AJAX) ||
-            is_admin() ||
             SharedUtils::isWPCLI() ||
             isset($_GET['_wfsf']) // WordFence query
         ) {
@@ -85,6 +83,26 @@ class RedirectHooks
         }
 
         return true;
+    }
+
+    /**
+     * Detect draft-preview intent: a request to view a non-published lowongan
+     * by ID (e.g. `?post_type=lowongan&p=15941` from the editor's save-draft
+     * flow). These must NOT be treated as 404/410 — they are preview requests
+     * that the headless redirect forwards to the frontend preview route.
+     */
+    private static function isDraftPreviewRequest(): bool
+    {
+        if (empty($_GET['p'])) {
+            return false;
+        }
+
+        $post = get_post((int) $_GET['p']);
+        if (!$post instanceof \WP_Post || $post->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
+            return false;
+        }
+
+        return in_array($post->post_status, ['draft', 'pending', 'future', 'private'], true);
     }
 
     /**
@@ -99,7 +117,7 @@ class RedirectHooks
                 return self::shouldRegister();
                 },
         executeIf: static function (): bool {
-                return !self::shouldSkipRedirect() && is_404() && is_singular('lowongan');
+                return !self::shouldSkipRedirect() && !self::isDraftPreviewRequest() && is_404() && is_singular(PostTypes::POST_TYPE_LOWONGAN);
                 },
     )]
     public function oldPost410Redirect(): void
@@ -137,16 +155,24 @@ class RedirectHooks
             $path = '/pasang-iklan-loker';
         } elseif (is_page('kebijakan-privasi')) {
             $path = '/kebijakan-privasi';
-        } elseif (is_single() && get_post_type() === 'lowongan') {
+        } elseif (self::isDraftPreviewRequest()) {
+            // Draft/pending lowongan: normalize to ID-based URL so the
+            // frontend preview route can resolve it without the redundant
+            // ?post_type=lowongan&p= query string.
+            $path = '/' . PostTypes::POST_TYPE_LOWONGAN . '/' . (int) $_GET['p'];
+        } elseif (is_single() && get_post_type() === PostTypes::POST_TYPE_LOWONGAN) {
             $post = get_post();
             if ($post && !empty($post->post_name)) {
-                $path = '/lowongan/' . $post->post_name;
+                $path = '/' . PostTypes::POST_TYPE_LOWONGAN . '/' . $post->post_name;
             }
-        } elseif (is_post_type_archive('lowongan') || is_front_page() || is_page(146)) {
+        } elseif (is_post_type_archive(PostTypes::POST_TYPE_LOWONGAN) || is_front_page() || is_page(146)) {
             $path = '/';
         }
 
-        $query = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '' ? ('?' . $_SERVER['QUERY_STRING']) : '';
+        $query = '';
+        if (!self::isDraftPreviewRequest()) {
+            $query = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '' ? ('?' . $_SERVER['QUERY_STRING']) : '';
+        }
         $location = rtrim($baseUrl, '/') . $path . $query;
 
         wp_redirect($location, 302);

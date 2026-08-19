@@ -309,6 +309,8 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
       ? privateCache
       : publicCache;
 
+  const isPreview = Boolean(event.locals.isPreview);
+
   let response = await resolve(event);
   const contentType = response.headers.get("Content-Type") || "";
   const isHtml = contentType.startsWith("text/html");
@@ -319,6 +321,8 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
   if (isHtml || isJsonOrXml) response.headers.set("Cache-Control", cachePolicy);
 
   if (isHtml) {
+    // Draft/preview pages must not be indexed by search engines.
+    if (isPreview) response.headers.set("X-Robots-Tag", "noindex, nofollow");
     // Inject links for early hints
     try {
       const links = new Set<string>();
