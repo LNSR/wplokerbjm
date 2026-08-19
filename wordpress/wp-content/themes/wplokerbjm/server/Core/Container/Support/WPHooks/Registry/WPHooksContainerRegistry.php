@@ -612,14 +612,24 @@ class WPHooksContainerRegistry
     /**
      * Internal: remove a once-registration from the active pool after its
      * first fire (consume-on-any-evaluation). Idempotent.
+     * @param 'action'|'filter' $hookType
      */
-    private function removeOnceEntry(string $hook, string $key): void
+    private function removeOnceEntry(string $hook, string $key, string $hookType): void
     {
         if (!isset($this->handlers[$hook][$key])) {
             return;
         }
 
-        $this->removeSingleHook($hook, $this->handlers[$hook][$key]);
+        // Skip the WordPress-side removal while the hook is being dispatched:
+        // remove_action during dispatch corrupts WP_Hook's iteration
+        // (resort_active_iterations skips the immediately-following priority).
+        // The consumed flag already prevents re-firing, so the callback can
+        // safely linger in $wp_filter until the request ends.
+        if ($hookType === 'action' && !doing_action($hook)) {
+            $this->removeSingleHook($hook, $this->handlers[$hook][$key]);
+        } else if ($hookType === 'filter' && !\doing_filter($hook)) {
+            $this->removeSingleHook($hook, $this->handlers[$hook][$key]);
+        }
         unset($this->handlers[$hook][$key]);
 
         if (empty($this->handlers[$hook])) {
@@ -731,7 +741,7 @@ class WPHooksContainerRegistry
 
             if ($registration->once) {
                 $handler->setRemoveCallback(
-                    fn() => $this->removeOnceEntry($hookName, $key->toString())
+                    fn() => $this->removeOnceEntry($hookName, $key->toString(), $key->type)
                 );
             }
             /**

@@ -88,6 +88,14 @@ function loadHookRegistrationsFromCache(string $themeRoot): ?array
             }
         }
     }
+    if (!is_array($registrationRuntimeRegistry)) {
+        warning("WPHooks cache returned no registrations: {$cacheFileRuntimeRegistry}");
+        return [
+            'actions' => Vec\unique($actions),
+            'filters' => Vec\unique($filters),
+            'tags' => Vec\unique($tags),
+        ];
+    }
 
     foreach ($registrationRuntimeRegistry as $runtime) {
         $hook = $runtime instanceof RuntimeHookMetadata ? $runtime->hook : ($runtime['hook'] ?? null);

@@ -26,7 +26,7 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
       const job: JobDetailResponse = await APIServiceServer.fetchJobDetailPreviewGraphQL(previewId);
       if (!job) throw error(410, "Lowongan tidak ditemukan");
       locals.postTime = job.post_time;
-      locals.isPreview = true; // lets hooks apply noindex (and formerly no-store)
+      locals.isPreview = true;
 
       return {
         isPreview: true,

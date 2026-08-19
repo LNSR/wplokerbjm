@@ -49,6 +49,13 @@ class WPHooksScanner
         $this->cacheLocation = $cacheLocation;
     }
 
+    public function __destruct()
+    {
+        if (!empty($this->cacheLocation) && !file_exists($this->cacheLocation)) {
+            $this->exportCache();
+        }
+    }
+
     /**
      * Get hook registrations from #[Action] and #[Filter] attributes.
      *
@@ -75,10 +82,6 @@ class WPHooksScanner
 
         $registrations = $this->performHookRegistrationScan();
         $this->cachedHookRegistrations = $registrations;
-
-        if (!empty($this->cacheLocation)) {
-            $this->exportCache();
-        }
 
         return $registrations;
     }
@@ -121,7 +124,7 @@ class WPHooksScanner
                         registerIf: $attr->registerIf,
                         registerIfParams: $hookPlanProvider->buildCallablePlan($attr->registerIf),
                         hookParams: $hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        hookArgs: array_map(static fn ($p) => $p->getName(), $method->getParameters()),
+                        hookArgs: array_map(static fn($p) => $p->getName(), $method->getParameters()),
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
@@ -159,24 +162,39 @@ class WPHooksScanner
                 };
                 $this->scanPropertyHooks($reflection, $propertyCb);
             } catch (\RuntimeException $e) {
-                // Configuration misuse (e.g. a hook attribute on a magic
-                // method) must fail loudly instead of being swallowed.
-                throw $e;
-            } catch (\Exception $e) {
                 Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());
+                throw $e;
             }
         }
 
         return $registrations;
     }
+
+    public function deleteCache(): bool
+    {
+        $targetFile = $this->cacheLocation;
+
+        if (empty($targetFile)) {
+            Logger::error('WPHooksScanner', 'Delete failed: No target file path provided.');
+            return false;
+        }
+
+        if (!\file_exists($targetFile)) {
+            return true;
+        }
+
+        return unlink($targetFile);
+    }
+
     /**
      * Exports the hook registrations array to a PHP file returning the array.
      *
      * @return bool True on success, false on failure.
      */
-    private function exportCache(): bool
+    public function exportCache(): bool
     {
         $targetFile = $this->cacheLocation;
+        $registrations = $this->getHookRegistrations();
 
         if (empty($targetFile)) {
             Logger::error('WPHooksScanner', 'Export failed: No target file path provided.');
@@ -197,8 +215,6 @@ class WPHooksScanner
             return false;
         }
 
-        $registrations = $this->getHookRegistrations();
-
         $exportedArray = VarExporter::export(
             $registrations,
             VarExporter::CLOSURE_SNAPSHOT_USES | VarExporter::ADD_RETURN | VarExporter::ADD_TYPE_HINTS
@@ -206,7 +222,6 @@ class WPHooksScanner
 
         $phpContent = "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Auto-generated WP Hooks Cache\n * Generated at: " . date('Y-m-d H:i:s') . "\n */\n\n" . $exportedArray;
         $result = file_put_contents($targetFile, $phpContent, LOCK_EX);
-
         return $result !== false;
     }
 }

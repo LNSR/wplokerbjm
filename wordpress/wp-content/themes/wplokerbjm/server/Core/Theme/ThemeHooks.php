@@ -1,6 +1,5 @@
 <?php
 namespace WPLokerBJM\Core\Theme;
-use DI\Attribute\Injectable;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 /**

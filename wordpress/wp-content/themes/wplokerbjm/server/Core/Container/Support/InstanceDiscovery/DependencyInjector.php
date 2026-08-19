@@ -34,7 +34,6 @@ final class DependencyInjector
     /** @var array<string, Closure> */
     private array $setters = [];
 
-
     private readonly string $cacheLocation;
 
     public function __construct(
@@ -42,6 +41,13 @@ final class DependencyInjector
         ?string $cacheLocation = null,
     ) {
         $this->cacheLocation = $cacheLocation ?? throw new Exception('Cache location is not set.');
+    }
+
+    public function __destruct()
+    {
+        if(!empty($this->cacheLocation) && $this->compiledPlans !== null){
+            $this->writePlans($this->compiledPlans);
+        }
     }
 
     /**
@@ -62,6 +68,13 @@ final class DependencyInjector
         $setter($this->container, $target, $plan['properties']);
 
         return $target;
+    }
+
+    public function clearCachedPlans(): void
+    {
+        if (!empty($this->cacheLocation) && file_exists($this->cacheLocation)) {
+            unlink($this->cacheLocation);
+        }
     }
 
     private function assertAnonymousTarget(AsChildClass $target): void
@@ -93,8 +106,6 @@ final class DependencyInjector
         $plan = $this->discoverPlan($reflection);
         $plans[$cacheKey] = $plan;
         $this->compiledPlans = $plans;
-        $this->writePlans($plans);
-
         return $plan;
     }
 

@@ -58,7 +58,7 @@ class PluginManagement
      * whose underlying WordPress plugins are inactive.
      *
      */
-    #[Action('muplugins_loaded', 0, once: true)]
+    #[Action('muplugins_loaded', once: true)]
     public function unregisterInactivePluginHooks(): void
     {
         foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
@@ -128,9 +128,8 @@ class PluginManagement
      * activation hooks steps
      * @var static::class
      */
-    #[Action('muplugins_loaded', once: true)]
-    public private(set) AnonClassHookMetadata $pluginEnvironmentCheck {
-        get => $this->pluginEnvironmentCheck ??= new class (self::class, __PROPERTY__, $this->hooksRuntimeRegistry) extends AnonClassHookMetadata {
+    #[Action('muplugins_loaded', 0, once: true)]
+    public private(set) AnonClassHookMetadata $pluginEnvironmentCheck { get => $this->pluginEnvironmentCheck ??= new class (self::class, __PROPERTY__, $this->hooksRuntimeRegistry) extends AnonClassHookMetadata {
 
             public function __construct(
             $parentClass,

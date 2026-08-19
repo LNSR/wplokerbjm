@@ -1,6 +1,7 @@
 <?php
 namespace WPLokerBJM\Controllers\GraphQL\Resolvers;
 
+use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Models\Schema\Taxonomies;
@@ -213,7 +214,7 @@ class JobsDataResolver
                 }
 
                 $post = get_post($id);
-                if (!$post instanceof \WP_Post || $post->post_type !== 'lowongan') {
+                if (!$post instanceof \WP_Post || $post->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
                     throw new \Exception('Post not found');
                 }
 
@@ -227,7 +228,7 @@ class JobsDataResolver
                     if (!empty($job)) {
                         // Normalize permalink to the ID-based route so the frontend
                         // side panel stays on the preview route.
-                        $job['permalink'] = esc_url(home_url('/lowongan/' . $id));
+                        $job['permalink'] = esc_url(home_url('/' . PostTypes::POST_TYPE_LOWONGAN . '/' . $id));
                     }
 
                     return $job;

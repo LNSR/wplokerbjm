@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Services\WebHooks;
 
+use WPLokerBJM\Configs\CredentialConfig;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
@@ -20,7 +21,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * We rely on QUIC Cloud cache to simplify things. There is no need to
  * purge individual URLs or paths — a full-zone purge is cheap and fast.
  * @see \WPLokerBJM\Core\Container\Definitions\Factory
- * @phpstan-import-type CloudflareCred from \WPLokerBJM\Configs\CredentialConfig
+ * @phpstan-import-type CloudflareCred from CredentialConfig
  * @phpstan-type CFPurgeOptions array{
  *  purge_everything?: bool,
  *  hosts?: array<string>,

@@ -28,16 +28,6 @@ class RedisAdapter
     }
 
     /**
-     * Get a connected Redis instance for direct Redis operations.
-     *
-     * @return \Redis|false Connected Redis instance or false on failure.
-     */
-    public function getConnection(): \Redis|false
-    {
-        return $this->resolveConnection();
-    }
-
-    /**
      * Delete cache keys matching multiple patterns.
      *
      * Builds the full key pattern using the LiteSpeed salt and the

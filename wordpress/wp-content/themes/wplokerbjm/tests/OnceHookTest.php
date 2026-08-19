@@ -68,6 +68,53 @@ class OnceHookTest extends WplokerbjmTestCase
         $this->assertSame(['first'], OnceActionService::$capturedValues);
     }
 
+    public function testConsecutiveOnceActionsOnSameHookBothFireDuringDispatch(): void
+    {
+        // Regression: during a real WordPress dispatch, doing_action() returns
+        // true for the hook currently firing. The once-consume must then SKIP
+        // the WordPress-side removal — otherwise WP_Hook::resort_active_iterations
+        // repositions the iteration pointer and the immediately-following
+        // priority never fires (consecutive once-hooks on the same hook).
+        \Brain\Monkey\Functions\when('doing_action')->alias(
+            static fn (string $hook): bool => $hook === 'once_consecutive'
+        );
+
+        $registrations = [
+            $this->action(OnceActionService::class, 'onOnceAction', 'once_consecutive', priority: 1, once: true),
+            $this->action(OnceActionService::class, 'onOnceAction', 'once_consecutive', priority: 2, once: true),
+        ];
+
+        $registry = $this->createRegistry($registrations, $this->container);
+        $registry->initialize();
+
+        $this->assertCount(2, array_filter(
+            $this->registeredHooks(),
+            static fn (array $r): bool => $r['hook'] === 'once_consecutive'
+        ));
+
+        do_action('once_consecutive', 'first');
+
+        // BOTH fire — the first once-hook's consume must not skip the second.
+        // (PHP-DI resolves OnceActionService as a singleton, so the
+        // instantiation count stays 1; the two captured values prove both
+        // handlers were invoked.)
+        $this->assertSame(1, OnceActionService::$instantiationCount);
+        $this->assertSame(['first', 'first'], OnceActionService::$capturedValues);
+
+        // WordPress-side removal was skipped during dispatch (the guard) —
+        // the callbacks linger, but are inert (consumed → passthrough).
+        $this->assertCount(2, array_filter(
+            $this->registeredHooks(),
+            static fn (array $r): bool => $r['hook'] === 'once_consecutive'
+        ));
+
+        // Second dispatch: the lingering callbacks must not re-fire the service.
+        do_action('once_consecutive', 'second');
+
+        $this->assertSame(1, OnceActionService::$instantiationCount);
+        $this->assertSame(['first', 'first'], OnceActionService::$capturedValues);
+    }
+
     public function testOnceActionWithPassingGateRunsOnceThenRemoved(): void
     {
         $registrations = [

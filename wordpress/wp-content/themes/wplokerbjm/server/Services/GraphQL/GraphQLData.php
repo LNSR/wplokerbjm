@@ -2,7 +2,6 @@
 
 namespace WPLokerBJM\Services\GraphQL;
 
-use TShape;
 use WPLokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
@@ -122,7 +121,7 @@ class GraphQLData
             : CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . $post_id . '_public';
 
 
-        $noncePlugin = static fn(string $action, int $postId): string => wp_create_nonce($action . '_' . $postId);
+        static $noncePlugin = static fn(string $action, int $postId): string => wp_create_nonce($action . '_' . $postId);
 
         if (!$bypassCache) {
             /** @var JobDetailData|false $cached */

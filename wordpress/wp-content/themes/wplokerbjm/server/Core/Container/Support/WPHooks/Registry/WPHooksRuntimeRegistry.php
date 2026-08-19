@@ -475,9 +475,14 @@ class WPHooksRuntimeRegistry
      */
     private function removeRuntimeHook(string $hook, RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler|RuntimeCallableHookHandler $handler, int $priority, string $type, ?\WeakReference $ownerRef = null): void
     {
-        if ($type === 'action') {
+        // Skip the WordPress-side removal while the hook is being dispatched:
+        // remove_action during dispatch corrupts WP_Hook's iteration
+        // (resort_active_iterations skips the immediately-following priority).
+        // The consumed flag already prevents re-firing, so the callback can
+        // safely linger in $wp_filter until the request ends.
+        if ($type === 'action' && !\doing_action($hook)) {
             \remove_action($hook, $handler, $priority);
-        } else {
+        } elseif ($type === 'filter' && !\doing_filter($hook)) {
             \remove_filter($hook, $handler, $priority);
         }
 
@@ -932,7 +937,7 @@ class HookRuntimeResolver
 
             // Static / unbound closure — nothing to infer the owner from.
             throw new \RuntimeException(
-                'Cannot infer owner for hook registration — pass owner: explicitly.'
+                'Cannot infer owner for hook registration — pass owner: explicitly.',
             );
         }
 
@@ -941,7 +946,7 @@ class HookRuntimeResolver
         }
 
         throw new \RuntimeException(
-            'Cannot infer owner for hook registration — pass owner: explicitly.'
+            'Cannot infer owner for hook registration — pass owner: explicitly.',
         );
     }
 
@@ -1038,12 +1043,20 @@ class WPHooksRuntimeCache
         }
     }
 
+    public function __destruct()
+    {
+        if (!empty($this->file) && \file_exists($this->file)) {
+            return;
+        }
+        $this->flush();
+    }
+
     /**
      * Clear all runtime hooks cache.
      */
     public function clearCacheFile(): void
     {
-        if ($this->file && file_exists($this->file)) {
+        if (!empty($this->file) && file_exists($this->file)) {
             unlink($this->file);
         }
     }
@@ -1105,10 +1118,13 @@ class WPHooksRuntimeCache
      */
     public function flush(): void
     {
-        $allCache = array_replace_recursive($this->loaded, $this->buffer);
-
-        if ($this->file === null || $allCache === [] || $allCache === $this->loaded) {
+        if ($this->file === null || $this->buffer === []) {
             return;
+        }
+
+        $allCache = $this->buffer;
+        if (is_file($this->file)) {
+            $allCache = array_replace_recursive($this->loaded, $this->buffer);
         }
 
         $directory = dirname($this->file);

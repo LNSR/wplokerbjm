@@ -11,17 +11,27 @@ use WPLokerBJM\QueryBuilders\TaxonomyQuery;
 use WPLokerBJM\Services\REST\LowonganIngestService;
 use WPLokerBJM\Shared\Log\Logger;
 
-class LowonganIngestController
+trait IngestControllerTrait
 {
-    public function __construct(
-        private readonly LowonganIngestService $service,
-    ) {
-    }
-
+    /**
+     * Return an HTTP status code for permission failures, or null when allowed.
+     * @param \WP_REST_Request|null $request
+     * @return int|null
+     */
     public function getPermissionErrorStatus($request = null): ?int
     {
         return ControllerUtils::getPermissionErrorStatus($request);
     }
+    
+}
+
+class LowonganIngestController
+{
+    use IngestControllerTrait;
+
+    public function __construct(
+        private readonly LowonganIngestService $service,
+    ) {}
 
     /**
      * @return true|\WP_Error
@@ -76,6 +86,9 @@ class LowonganIngestController
 
 class LowonganIngestOptionsController
 {
+
+    use IngestControllerTrait;
+
     private const SCHEMA = 'lowongan_ingest_options.v1';
 
     /**
@@ -93,16 +106,6 @@ class LowonganIngestOptionsController
         Taxonomies::GENDER,
         Taxonomies::PENDIDIKAN,
     ];
-
-    /**
-     * Return an HTTP status code for permission failures, or null when allowed.
-     * @param \WP_REST_Request|null $request
-     * @return int|null
-     */
-    public function getPermissionErrorStatus($request = null): ?int
-    {
-        return ControllerUtils::getPermissionErrorStatus($request);
-    }
 
     /**
      * Permission callback for the REST route.

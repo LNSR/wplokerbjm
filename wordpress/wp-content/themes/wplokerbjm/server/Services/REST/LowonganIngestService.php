@@ -7,7 +7,7 @@ namespace WPLokerBJM\Services\REST;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\QueryBuilders\{JobQuery, TaxonomyQuery};
 use WPLokerBJM\Repositories\TaxonomyRepository;
-use WPLokerBJM\Services\Utilities\{ServiceUtils,ServiceIngestUtils};
+use WPLokerBJM\Services\Utilities\{ServiceUtils, ServiceIngestUtils};
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
@@ -31,8 +31,7 @@ class LowonganIngestService
         private readonly LowonganIngestPayloadHandler $payloadHandler,
         private readonly LowonganIngestTaxonomyResolver $taxonomyResolver,
         private readonly LowonganIngestLogBuilder $logBuilder,
-    ) {
-    }
+    ) {}
 
     /**
      * Orchestrates the lowongan draft ingestion pipeline.
@@ -147,7 +146,7 @@ class LowonganIngestService
                 'code' => $code,
                 'message' => $message,
                 'warnings' => $warnings,
-                ...$extra
+                ...$extra,
             ],
         ];
     }
@@ -162,8 +161,7 @@ class LowonganIngestImageHandler
 
     public function __construct(
         private readonly LowonganIngestLogBuilder $logBuilder,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array{tmp_name?: string, name?: string, error?: int}|null $featuredImage
@@ -234,7 +232,7 @@ class LowonganIngestImageHandler
         if (is_wp_error($attachmentId) || (int) $attachmentId <= 0) {
             Logger::error(LowonganIngestLogBuilder::LOG_CATEGORY, 'Featured image upload failed.', array_merge(
                 $logContext,
-                $this->logBuilder->getWordPressErrorContext($attachmentId)
+                $this->logBuilder->getWordPressErrorContext($attachmentId),
             ));
             return null;
         }
@@ -244,7 +242,7 @@ class LowonganIngestImageHandler
         if ($thumbnailSet === false) {
             Logger::warning(LowonganIngestLogBuilder::LOG_CATEGORY, 'Featured image uploaded but could not be assigned as post thumbnail.', array_merge(
                 $logContext,
-                ['attachment_id' => $attachmentId]
+                ['attachment_id' => $attachmentId],
             ));
         }
 
@@ -273,7 +271,7 @@ class LowonganIngestPayloadHandler
                 CustomFields::PENGALAMAN,
                 CustomFields::GAJI_MINIMAL,
                 CustomFields::GAJI_MAKSIMAL,
-            ]
+            ],
         );
 
         foreach ($meaningfulFields as $field) {
@@ -315,7 +313,7 @@ class LowonganIngestPayloadHandler
         }
 
         if (isset($payload[CustomFields::SOCIAL_MEDIA]) && !empty($payload[CustomFields::SOCIAL_MEDIA])) {
-            $socialMedia = ServiceIngestUtils::sanitizeSocialMediaFieldset($payload[CustomFields::SOCIAL_MEDIA]);
+            $socialMedia = $this->sanitizeSocialMediaFieldset($payload[CustomFields::SOCIAL_MEDIA]);
             if ($socialMedia !== []) {
                 $meta[CustomFields::SOCIAL_MEDIA] = $socialMedia;
             }
@@ -357,6 +355,82 @@ class LowonganIngestPayloadHandler
 
         return $meta;
     }
+    /**
+     * Sanitize social media fieldset data from Meta Box.
+     *
+     * @param string|array<int, array<string, string>>|array<string, string> $value Raw social media data
+     * @return list<array<string, non-empty-string>> Sanitized social media sets
+     */
+    private function sanitizeSocialMediaFieldset($value): array
+    {
+        $allowedIndex = CustomFields::SOCIAL_MEDIA_PLATFORMS;
+
+        if (is_string($value)) {
+            $value = $this->parseSocialMediaString($value);
+        }
+
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $sets = !\array_is_list($value) ? [$value] : $value;
+        $sanitizedSets = [];
+
+        foreach ($sets as $set) {
+            if (!is_array($set)) {
+                continue;
+            }
+
+            $sanitizedSet = [];
+            foreach ($set as $platform => $username) {
+                $platform = sanitize_text_field((string) $platform);
+                if (!isset($allowedIndex[$platform])) {
+                    continue;
+                }
+
+                $username = sanitize_text_field((string) $username);
+                if ($username === '') {
+                    continue;
+                }
+
+                $sanitizedSet[$platform] = $username;
+            }
+
+            if ($sanitizedSet !== []) {
+                $sanitizedSets[] = $sanitizedSet;
+            }
+        }
+
+        return $sanitizedSets;
+    }
+
+    /**
+     * Parse a social media string format "platform:username;platform:username" into an array set.
+     *
+     * @param string $value Semicolon-separated platform:username pairs
+     * @return list<array<string, string>> Single-element list containing the parsed set, or empty list
+     */
+    private function parseSocialMediaString(string $value): array
+    {
+        $set = [];
+
+        $items = Sanitizer::splitAndClean(';', $value);
+
+        foreach ($items as $item) {
+            $parts = explode(':', $item, 2);
+            if (count($parts) !== 2) {
+                continue;
+            }
+
+            $platform = trim($parts[0]);
+            $username = trim($parts[1]);
+            if ($platform !== '' && $username !== '') {
+                $set[$platform] = $username;
+            }
+        }
+
+        return $set === [] ? [] : [$set];
+    }
 }
 
 /**
@@ -374,8 +448,7 @@ class LowonganIngestTaxonomyResolver
 
     public function __construct(
         private readonly LowonganIngestLogBuilder $logBuilder,
-    ) {
-    }
+    ) {}
 
     /**
      * @param array<string, mixed> $payload
@@ -405,7 +478,7 @@ class LowonganIngestTaxonomyResolver
                         'taxonomy' => $taxonomy,
                         'term_ids' => $termIds,
                     ],
-                    $this->logBuilder->getWordPressErrorContext($result)
+                    $this->logBuilder->getWordPressErrorContext($result),
                 ));
             }
         }

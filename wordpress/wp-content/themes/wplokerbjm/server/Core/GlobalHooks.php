@@ -11,9 +11,6 @@ use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksRuntimeRegistry;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRuntimeCache;
-use WPLokerBJM\Shared\Utilities\PluginList;
 
 /*======================================================================
  | Collection of Global Hooks Classes
@@ -292,6 +289,7 @@ class HTTPHooks
     #[Action(
         'muplugins_loaded',
         PHP_INT_MIN,
+        once: true,
         registerIf: static function (): bool {
                 return !SharedUtils::isDevelopment() && !SharedUtils::isWPCLI();
                 }
@@ -494,25 +492,20 @@ class CacheInvalidationHooks
  ======================================================================*/
 
 /**
- * Flushes the Logger's in-memory buffer on WordPress shutdown.
- *
- * All Logger::info/debug/warning/error calls during the request are
- * buffered in memory. This handler writes them to error_log() in a
- * single batch when the request completes, with a graceful fallback
- * to individual writes on failure.
+ * Flushes any heavy/non-important tasks on background after request complete
  */
 class ShutdownHooks
 {
 
-    public function __construct(private WPHooksRuntimeRegistry $runtimeRegistry) {}
-
     #[Action('shutdown', PHP_INT_MAX, once: true)]
-    public function flushBuffer(): void
+    public function __invoke()
     {
-        $fn = function () {
-            $this->runtimeRegistry->cache?->flush();
-            Logger::flush();
-        };
-        SharedUtils::doActivityAtBackground($fn);
+        // noop
     }
+
+    public function __destruct()
+    {
+        Logger::flush();
+    }
+    
 }

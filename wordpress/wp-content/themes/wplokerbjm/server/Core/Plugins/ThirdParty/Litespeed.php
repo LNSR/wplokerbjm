@@ -103,12 +103,11 @@ class LiteSpeedGraphQLIntegration implements PluginConfigInterface
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'OPTIONS')
             return;
+        do_action('litespeed_control_force_cacheable');
         if (is_user_logged_in()) {
-            do_action('litespeed_control_force_cacheable');
             do_action('litespeed_control_set_ttl', 3600);
             return;
         }
-        do_action('litespeed_control_force_cacheable');
         do_action('litespeed_control_set_ttl', 86400);
     }
 

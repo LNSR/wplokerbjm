@@ -16,7 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
  *  priority: int,
  *  accepted_args: int,
  *  defer_register: bool,
- *  target: string,
+ *  target: 'method'|'property'|'property-hook',
  *  visibility: string,
  *  execute_if: \Closure|null,
  *  execute_if_params: CallablePlan,
