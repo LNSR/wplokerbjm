@@ -5,7 +5,7 @@ namespace WPLokerBJM\Tests;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Shared\Cache\CacheKey;
-use WPLokerBJM\Configs\CredentialConfig;
+use WPLokerBJM\Configs\Credential\CredentialConfig;
 
 class CacheTest extends WplokerbjmTestCase
 {

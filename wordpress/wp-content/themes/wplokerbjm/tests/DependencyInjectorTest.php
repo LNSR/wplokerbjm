@@ -4,17 +4,25 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Tests;
 
-use DI\Attribute\Inject;
+use Override;
 use Psr\Container\ContainerInterface;
+use DI\Container;
+use DI\ContainerBuilder;
 use RuntimeException;
+use WPLokerBJM\Core\Container\Attributes\Inject;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\{DependencyInjector, PlanCache, PlanCompiler, ScopeAccessFactory};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 final class DependencyInjectorTest extends WplokerbjmTestCase
 {
     /** @var list<string> */
     private array $cacheFiles = [];
+
+    private function injector(ContainerInterface $container, ?string $cacheFile = null): DependencyInjector
+    {
+        return new DependencyInjector($container, new ScopeAccessFactory(), new PlanCache($cacheFile ?? $this->newCacheFile()), new PlanCompiler());
+    }
 
     public function testInjectsPrivateTypedPropertyInAnonymousChildScope(): void
     {
@@ -75,22 +83,17 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
         $injector->injectOn($this->typedChild());
         $injector->injectOn($this->typedChild());
-
-        $setters = (new \ReflectionProperty(DependencyInjector::class, 'setters'))->getValue($injector);
+        $bind = \Closure::bind(static function(DependencyInjector $injector) {
+            return $injector->scopeAccessFactory->setters;
+        }, null, $injector);
+        $setters = $bind($injector);
         $this->assertCount(1, $setters);
-    }
-
-    public function testRejectsNonAsChildClassTarget(): void
-    {
-        $this->expectException(\TypeError::class);
-
-        $this->injector($this->containerReturning([]))->injectOn(new \stdClass());
     }
 
     public function testRejectsNamedAsChildClassTarget(): void
     {
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('only accepts anonymous classes');
+        $this->expectExceptionMessageIsOrContains('only accepts anonymous classes');
 
         $this->injector($this->containerReturning([]))->injectOn(new NamedDependencyChild('Parent', 'child'));
     }
@@ -103,7 +106,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         };
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Static property injection is not supported');
+        $this->expectExceptionMessageIsOrContains('Static property injection is not supported');
 
         $this->injector($this->containerReturning([]))->injectOn($target);
     }
@@ -116,7 +119,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         };
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Readonly property injection is not supported');
+        $this->expectExceptionMessageIsOrContains('Readonly property injection is not supported');
 
         $this->injector($this->containerReturning([]))->injectOn($target);
     }
@@ -129,7 +132,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         };
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('needs a class/interface type or an explicit');
+        $this->expectExceptionMessageIsOrContains('needs a class/interface type or an explicit');
 
         $this->injector($this->containerReturning([]))->injectOn($target);
     }
@@ -140,7 +143,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $container->method('get')->willThrowException(new RuntimeException('missing dependency'));
 
         $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('missing dependency');
+        $this->expectExceptionMessageIsOrContains('missing dependency');
 
         $this->injector($container)->injectOn($this->typedChild());
     }
@@ -150,7 +153,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
         $target = new class (self::class, 'callable') extends AsChildClass {
-            #[Inject([CallableProvider::class, 'secret'])]
+            #[Inject([CallableProvider::class, 'secret'], lazy: true)]
             private \Closure $secret;
 
             public function secret(int $value): int
@@ -169,7 +172,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
         $target = new class (self::class, 'callable-public') extends AsChildClass {
-            #[Inject([CallableProvider::class, 'publicValue'])]
+            #[Inject([CallableProvider::class, 'publicValue'], lazy: true)]
             private \Closure $publicValue;
 
             public function publicValue(int $value): int
@@ -186,12 +189,12 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testRejectsArrayCallableOnNonClosureProperty(): void
     {
         $target = new class (self::class, 'bad-callable') extends AsChildClass {
-            #[Inject([CallableProvider::class, 'secret'])]
+            #[Inject([CallableProvider::class, 'secret'], lazy: true)]
             private object $dependency;
         };
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('\\Closure-typed');
+        $this->expectExceptionMessageIsOrContains('\\Closure-typed');
 
         $this->injector($this->containerReturning([]))->injectOn($target);
     }
@@ -204,7 +207,199 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         };
 
         $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('does not exist');
+        $this->expectExceptionMessageIsOrContains('does not exist as a method or property');
+
+        $this->injector($this->containerReturning([]))->injectOn($target);
+    }
+
+    public function testInjectsClosureFromPublicProperty(): void
+    {
+        $provider = new CallableProvider();
+        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $target = new class (self::class, 'prop-public') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'publicClosure'])]
+            private \Closure $factory;
+
+            public function factory(int $value): int
+            {
+                return ($this->factory)($value);
+            }
+        };
+
+        $this->injector($container)->injectOn($target);
+
+        $this->assertSame(1005, $target->factory(5));
+    }
+
+    public function testInjectsClosureFromPrivateProperty(): void
+    {
+        $provider = new CallableProvider();
+        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $target = new class (self::class, 'prop-private') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'privateClosure'])]
+            private \Closure $factory;
+
+            public function factory(int $value): int
+            {
+                return ($this->factory)($value);
+            }
+        };
+
+        $this->injector($container)->injectOn($target);
+
+        $this->assertSame(2005, $target->factory(5));
+    }
+
+    public function testInjectsAnonClassFromProperty(): void
+    {
+        $provider = new CallableProvider();
+        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $target = new class (self::class, 'prop-child') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'publicChild'])]
+            private AsChildClass $child;
+
+            public function child(): AsChildClass
+            {
+                return $this->child;
+            }
+        };
+
+        $this->injector($container)->injectOn($target);
+
+        $this->assertSame('hello', $target->child()->greet());
+    }
+
+    public function testRejectsLazyOnPropertyCallable(): void
+    {
+        $target = new class (self::class, 'bad-lazy-prop') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'publicClosure'], lazy: true)]
+            private \Closure $factory;
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('lazy flag is only valid with method callables');
+
+        $this->injector($this->containerReturning([]))->injectOn($target);
+    }
+
+    public function testRejectsPropertyTargetTypeMismatch(): void
+    {
+        $target = new class (self::class, 'bad-prop-type') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'publicChild'])]
+            private \stdClass $child;
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('does not match property type');
+
+        $this->injector($this->containerReturning([]))->injectOn($target);
+    }
+
+    public function testInjectsArrayCallableReturnValue(): void
+    {
+        $provider = new CallableProvider();
+        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $target = new class (self::class, 'callable-value') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'secretValue'])]
+            private int $secretValue;
+
+            public function secretValue(): int
+            {
+                return $this->secretValue;
+            }
+        };
+
+        $this->injector($container)->injectOn($target);
+
+        $this->assertSame(42, $target->secretValue());
+    }
+
+    public function testInjectsClosureReturnedByMethod(): void
+    {
+        $provider = new CallableProvider();
+        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $target = new class (self::class, 'callable-closure') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'closureFactory'])]
+            private \Closure $factory;
+
+            public function factory(int $value): int
+            {
+                return ($this->factory)($value);
+            }
+        };
+
+        $this->injector($container)->injectOn($target);
+
+        $this->assertSame(105, $target->factory(5));
+    }
+
+    public function testInjectsAnonClassReturnedByMethod(): void
+    {
+        $provider = new CallableProvider();
+        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $target = new class (self::class, 'callable-child') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'childInstance'])]
+            private AsChildClass $child;
+
+            public function child(): AsChildClass
+            {
+                return $this->child;
+            }
+        };
+
+        $this->injector($container)->injectOn($target);
+
+        $this->assertSame('hello', $target->child()->greet());
+    }
+
+    public function testRejectsValueTypeMismatch(): void
+    {
+        $target = new class (self::class, 'bad-value-type') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'secretValue'])]
+            private string $secretValue;
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('does not match property type');
+
+        $this->injector($this->containerReturning([]))->injectOn($target);
+    }
+
+    public function testRejectsVoidReturnValueInjection(): void
+    {
+        $target = new class (self::class, 'bad-void') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'nothing'])]
+            private mixed $nothing;
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('void/never');
+
+        $this->injector($this->containerReturning([]))->injectOn($target);
+    }
+
+    public function testRejectsRequiredParamValueInjection(): void
+    {
+        $target = new class (self::class, 'bad-params') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'secret'])]
+            private int $secret;
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('zero-argument method');
+
+        $this->injector($this->containerReturning([]))->injectOn($target);
+    }
+
+    public function testRejectsLazyOnStringEntry(): void
+    {
+        $target = new class (self::class, 'bad-lazy-string') extends AsChildClass {
+            #[Inject('active.plugins', lazy: true)]
+            private \Closure $plugins;
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessageIsOrContains('lazy flag is only valid with an array callable');
 
         $this->injector($this->containerReturning([]))->injectOn($target);
     }
@@ -233,14 +428,9 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         };
     }
 
-    private function injector(ContainerInterface $container, ?string $cacheFile = null): DependencyInjector
-    {
-        return new DependencyInjector($container, $cacheFile ?? $this->newCacheFile());
-    }
-
     private function newCacheFile(): string
     {
-        $cacheFile =  __DIR__ . '/cache/' . bin2hex(random_bytes(8)) . '.php';
+        $cacheFile = __DIR__ . '/cache/' . bin2hex(random_bytes(8)) . '.php';
         $this->cacheFiles[] = $cacheFile;
 
         return $cacheFile;
@@ -264,13 +454,53 @@ final class NamedDependencyChild extends AsChildClass
 
 final class CallableProvider
 {
+    public \Closure $publicClosure;
+
+    private \Closure $privateClosure;
+
+    public AsChildClass $publicChild;
+
+    public function __construct()
+    {
+        $this->publicClosure = static fn(int $value): int => $value + 1000;
+        $this->privateClosure = static fn(int $value): int => $value + 2000;
+        $this->publicChild = new class ('Provider', 'child') extends AsChildClass {
+            public function greet(): string
+            {
+                return 'hello';
+            }
+        };
+    }
+
     private function secret(int $value): int
     {
         return $value * 2;
+    }
+
+    private function secretValue(): int
+    {
+        return 42;
     }
 
     public function publicValue(int $value): int
     {
         return $value + 1;
     }
+
+    public function closureFactory(): \Closure
+    {
+        return static fn(int $value): int => $value + 100;
+    }
+
+    public function childInstance(): AsChildClass
+    {
+        return new class ('Provider', 'child') extends AsChildClass {
+            public function greet(): string
+            {
+                return 'hello';
+            }
+        };
+    }
+
+    public function nothing(): void {}
 }

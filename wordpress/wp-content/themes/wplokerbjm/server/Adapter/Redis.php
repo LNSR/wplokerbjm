@@ -13,7 +13,7 @@ use WPLokerBJM\Shared\Log\Logger;
  *
  * Credentials are injected via the constructor using PHP-DI.
  * @see \WPLokerBJM\Core\Container\Definitions\Factory
- * @phpstan-import-type RedisCred from \WPLokerBJM\Configs\CredentialConfig
+ * @phpstan-import-type RedisCred from \WPLokerBJM\Configs\Credential\CredentialConfig
  */
 class RedisAdapter
 {

@@ -54,7 +54,7 @@ public function __construct(
 - `server/Core/Container/Definitions/Factory.php` — Factory + manual wiring
 
 **Real Service Examples**:
-- `server/Services/GraphQL/GraphQLData.php` — Lazy-injectable GraphQL data service
+- `server/Services/GraphQL/GraphQLJobData.php` — Lazy-injectable GraphQL data service
 - `server/Services/REST/LowonganIngestService.php` — Autowired REST ingest service
 - `server/Services/Schema/JobSchemaOrg.php` — Schema.org JSON-LD generator
 

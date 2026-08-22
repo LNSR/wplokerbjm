@@ -3,27 +3,26 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract;
 
 use WPGraphQL;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Base metadata contract for anonymous child objects owned by a parent property.
+ * @see DependencyInjector
+ * * Intended usage: Passing external deps without needing host class carrying constructor boilerplate.
  *
  * @template T of object|class-string
  */
 abstract class AsChildClass
 {
-    private bool $___configurationAlreadyRun = false;
-
     /**
      * @param T $parentClass The class-string containing this child, or the
      *                       parent object to resolve via get_class().
-     * @param string $identifier The property or method holding this instance.
-     * @param ?\Closure(T $parentClass): void $configuration The initialization closure.
-     * @param-closure-this self $configuration configure via closure instead constructor boilerplate
+     * @param string $identifier The property or method or any magic string holding this instance.
      */
     public function __construct(
-        private string|object $parentClass,
-        public protected(set) string $identifier,
+        private readonly string|object $parentClass,
+        public private(set) readonly string $identifier,
     ) {}
 
     /**

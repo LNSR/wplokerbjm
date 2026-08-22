@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, RuntimeCallableHookHandler, RuntimeInstanceHookHandler, RuntimeInstancePropertyHookHandler};
 
 /**
  * Shared deferred-hook pool mechanics for hook registries.
@@ -21,9 +22,10 @@ use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
  * surface.
  * @phpstan-import-type CallableHookParams from HookProviderTrait
  * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-type AvailaibleHandlerType ContainerLazyHookHandler|ContainerLazyPropertyHookHandler|RuntimeCallableHookHandler|RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler
  * @phpstan-type DeferredHookEntry array{
  *     key: HookKey,
- *     handler: object,
+ *     handler: AvailaibleHandlerType,
  *     type: 'action'|'filter',
  *     priority: int,
  *     accepted_args: int,
@@ -131,5 +133,5 @@ trait DeferredHooksTrait
      *
      * @param DeferredHookEntry $data Deferred entry.
      */
-    abstract protected function gateDeferredActivation(array $data, string $hook, string $key): bool;
+    abstract private function gateDeferredActivation(array $data, string $hook, string $key): bool;
 }

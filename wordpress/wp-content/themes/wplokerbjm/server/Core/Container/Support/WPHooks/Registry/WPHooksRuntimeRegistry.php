@@ -1,4 +1,5 @@
 <?php
+
 declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
@@ -116,7 +117,7 @@ class WPHooksRuntimeRegistry
      * };
      * $runtimeRegistry->registerHooksOn($service); // register hooks
      * ```
-     *
+     * @api
      * @param object|AnonClassHookMetadata $instance An instantiated object with hook-annotated methods/properties.
      */
     public function registerHooksOn(object $instance): void
@@ -309,6 +310,36 @@ class WPHooksRuntimeRegistry
         if ($instance instanceof AnonClassHookMetadata && !$hasDeferred && $metadata !== []) {
             $this->cache?->set($instance->getParentClass(), $instance->parentProperty, $metadata);
         }
+    }
+    /**
+     * Remove all hooks previously registered for the given instance.
+     *
+     * Calls remove_action() / remove_filter() for each registered hook and
+     * clears internal tracking. Calling this on an instance that was never
+     * registered is a no-op.
+     * @api
+     * @param object|AnonClassHookMetadata $instance The instance whose hooks should be removed.
+     */
+    public function unregisterHooksOn(object $instance): void
+    {
+        $this->unregisterMatchingDeferredEntries(
+            fn(string $hook, array $data): bool => $this->deferredEntryOwner($data) === $instance,
+        );
+
+        if (!isset($this->registry[$instance])) {
+            return;
+        }
+
+        foreach ($this->registry[$instance] as $record) {
+            if ($record['type'] === 'action') {
+                \remove_action($record['hook'], $record['handler'], $record['priority']);
+            } else {
+                \remove_filter($record['hook'], $record['handler'], $record['priority']);
+            }
+        }
+
+        unset($this->registry[$instance]);
+        unset($this->scanned[$instance]);
     }
 
     /**
@@ -547,6 +578,7 @@ class WPHooksRuntimeRegistry
         return true;
     }
 
+
     /**
      * Re-evaluate the registerIf registration gate when activating a
      * deferred runtime entry. Without a provider there is no way to evaluate
@@ -557,7 +589,7 @@ class WPHooksRuntimeRegistry
      * @param string $hook
      * @param string $key
      */
-    protected function gateDeferredActivation(array $data, string $hook, string $key): bool
+    private function gateDeferredActivation(array $data, string $hook, string $key): bool
     {
         $registerIf = $data['registerIf'] ?? null;
         if ($registerIf === null || $this->provider === null) {
@@ -584,37 +616,6 @@ class WPHooksRuntimeRegistry
     }
 
     /**
-     * Remove all hooks previously registered for the given instance.
-     *
-     * Calls remove_action() / remove_filter() for each registered hook and
-     * clears internal tracking. Calling this on an instance that was never
-     * registered is a no-op.
-     *
-     * @param object $instance The instance whose hooks should be removed.
-     */
-    public function unregisterHooksOn(object $instance): void
-    {
-        $this->unregisterMatchingDeferredEntries(
-            fn(string $hook, array $data): bool => $this->deferredEntryOwner($data) === $instance,
-        );
-
-        if (!isset($this->registry[$instance])) {
-            return;
-        }
-
-        foreach ($this->registry[$instance] as $record) {
-            if ($record['type'] === 'action') {
-                \remove_action($record['hook'], $record['handler'], $record['priority']);
-            } else {
-                \remove_filter($record['hook'], $record['handler'], $record['priority']);
-            }
-        }
-
-        unset($this->registry[$instance]);
-        unset($this->scanned[$instance]);
-    }
-
-    /**
      * Register an action hook manually for an owner object.
      *
      * Owner inference (when $owner is omitted):
@@ -636,7 +637,7 @@ class WPHooksRuntimeRegistry
      * @param bool $once remove self after any executeIf eval fire.
      * @param string|\Closure|null $deferRegisterUntilHook Defer hook registration until certain hook fire
      * @param O|null $owner Owning object (defaults to inference).
-     *
+     * @internal Manual registration, subject to change
      * @throws \RuntimeException when the owner cannot be inferred or the callback is not callable.
      */
     public function registerAction(
@@ -685,7 +686,7 @@ class WPHooksRuntimeRegistry
      * @param bool $once remove self after any executeIf eval fire.
      * @param string|\Closure|null $deferRegisterUntilHook Defer hook registration until certain hook fire
      * @param O|null $owner Owning object (defaults to inference).
-     *
+     * @internal Manual registration, subject to change
      * @throws \RuntimeException when the owner cannot be inferred or the callback is not callable.
      */
     public function registerFilter(
@@ -724,7 +725,7 @@ class WPHooksRuntimeRegistry
      *
      * @template T of callable
      * @template O of object
-     * @param string $type 'action' or 'filter'.
+     * @param 'action'|'filter' $type 'action' or 'filter'.
      * @param string $hook Hook name.
      * @param T $callback Callable invoked when the hook fires.
      * @param int $priority Hook priority.
@@ -852,7 +853,6 @@ class WPHooksRuntimeRegistry
             return;
         }
 
-        $listener = null;
         $listener = function () use (&$listener, $triggerHook, $hook, $key, $activate): void {
             $activated = $this->activateMatchingDeferredEntries(
                 static fn(string $h, array $d, string $k): bool => $h === $hook && $k === $key,
@@ -1098,7 +1098,10 @@ class WPHooksRuntimeCache
                         // lvl2: parentProperty
                         static fn(array $entries): array => array_map(
                             // lvl3: RuntimeHookMetadata
-                            static fn(/** @var RuntimeHookMetadataData $entry */ RuntimeHookMetadata|array $entry): RuntimeHookMetadata => $entry instanceof RuntimeHookMetadata ? $entry : RuntimeHookMetadata::fromArray($entry),
+                            static fn(
+                                /** @var RuntimeHookMetadataData $entry */
+                                RuntimeHookMetadata|array $entry
+                            ): RuntimeHookMetadata => $entry instanceof RuntimeHookMetadata ? $entry : RuntimeHookMetadata::fromArray($entry),
                             $entries,
                         ),
                         $sites,

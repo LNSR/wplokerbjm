@@ -19,7 +19,7 @@ require_once __DIR__ . '/../../../mu-plugins/wplokerbjm-bootstrap.php';
 $testRl = (new \Nette\Loaders\RobotLoader)
     ->addDirectory(__DIR__)
     ->addDirectory(__DIR__ . '/../server')
-    ->setTempDirectory(__DIR__ . '/cache/wplokerbjm-tests')
+    ->setCacheDirectory(__DIR__ . '/robotloader-cache/wplokerbjm-tests')
     ->setAutoRefresh(true)
     ->reportParseErrors(true);
 $testRl->register();
@@ -35,8 +35,3 @@ require_once __DIR__ . '/Support/WplokerbjmTestCase.php';
 // Initialize Brain Monkey for function mocking
 require_once __DIR__ . '/../vendor/antecedent/patchwork/Patchwork.php';
 require_once __DIR__ . '/../vendor/brain/monkey/inc/api.php';
-
-// Mock essential WordPress functions
-// Note: These are now mocked in WplokerbjmTestCase::setUp() to ensure they run after Brain\Monkey\setup()
-
-\WPLokerBJM\Tests\Support\ProxyContainer::boot();

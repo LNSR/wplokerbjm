@@ -109,7 +109,7 @@ public function resolveNewQuery(array $args): array
 
 **Registration**:
 - `server/Services/GraphQL/GraphQLRegistration.php` — All types + fields (521 lines)
-- `server/Services/GraphQL/GraphQLData.php` — Shared data methods
+- `server/Services/GraphQL/GraphQLJobData.php` — Shared data methods
 
 **Resolvers**:
 - `server/Controllers/GraphQL/Resolvers/JobsDataResolver.php` — Job queries

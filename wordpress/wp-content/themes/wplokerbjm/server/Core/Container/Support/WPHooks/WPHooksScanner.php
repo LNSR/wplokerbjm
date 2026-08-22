@@ -1,6 +1,9 @@
 <?php
+
 declare(strict_types=1);
+
 namespace WPLokerBJM\Core\Container\Support\WPHooks;
+
 use Brick\VarExporter\VarExporter;
 
 use ReflectionClass;
@@ -12,6 +15,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Shared\Log\Logger;
+
 /**
  * Scans directories for WordPress hook attribute registrations.
  *
@@ -33,8 +37,8 @@ class WPHooksScanner
     public private(set) string $cacheLocation {
         set(string $value) {
             $this->cacheLocation = is_dir($value) || str_ends_with($value, '/') || str_ends_with($value, '\\')
-            ? rtrim($value, '/\\') . '/WPHooksCache.php'
-            : $value;
+                ? rtrim($value, '/\\') . '/WPHooksCache.php'
+                : $value;
         }
     }
 
@@ -47,13 +51,6 @@ class WPHooksScanner
     {
         $this->namespace = trim($namespace, '\\');
         $this->cacheLocation = $cacheLocation;
-    }
-
-    public function __destruct()
-    {
-        if (!empty($this->cacheLocation) && !file_exists($this->cacheLocation)) {
-            $this->exportCache();
-        }
     }
 
     /**
@@ -71,7 +68,7 @@ class WPHooksScanner
         }
 
         if (!empty($this->cacheLocation) && is_file($this->cacheLocation)) {
-            $loaded = require $this->cacheLocation;
+            $loaded = require_once $this->cacheLocation;
             if (is_array($loaded)) {
                 return $this->cachedHookRegistrations = array_map(
                     static fn(HookRegistration|array $reg): HookRegistration => $reg instanceof HookRegistration ? $reg : HookRegistration::fromArray($reg),
@@ -82,7 +79,7 @@ class WPHooksScanner
 
         $registrations = $this->performHookRegistrationScan();
         $this->cachedHookRegistrations = $registrations;
-
+        $this->exportCache();
         return $registrations;
     }
 

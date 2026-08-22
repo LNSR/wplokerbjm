@@ -31,7 +31,7 @@ class Action
      * @param array<int, string|\BackedEnum|\Closure(TObject...): array> $tag
      * @param-closure-this $tag
      * 
-     * @param string|(\Closure(TObject...): string)|null $deferRegisterUntilHook !Unusable with RuntimeRegistry
+     * @param string|(\Closure(TObject...): string)|null $deferRegisterUntilHook
      * !defer registration until the named 'action' trigger hook fires (implies defer); a Closure is resolved through the container and must return the trigger hook name
      * @param bool $once consume-on-any-evaluation: the registration removes itself after executeIf is evaluated, regardless of whether the gate passed
      */

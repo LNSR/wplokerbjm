@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Core\Container;
 
+use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 
 /**
@@ -17,7 +18,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
  *
  * ## Usage
  * Call `initialize()` to register all discovered hooks with WordPress.
- * ! initialized in MU_PLUGIN_DIR.'/wplokerbjm-bootstrap.php'
+ * @see Bootstrap
  * @see \WPLokerBJM\Core\Container\Definitions\Core
  */
 class Init

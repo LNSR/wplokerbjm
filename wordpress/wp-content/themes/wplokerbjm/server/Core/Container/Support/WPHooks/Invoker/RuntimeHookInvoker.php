@@ -331,7 +331,7 @@ final class RuntimeCallableHookHandler
 
             $result = $callback(...$args);
 
-            SharedUtils::isDevelopment() && Logger::debug('RuntimeCallableHookHandler', 'Hook invoke ' . $this->label);
+            SharedUtils::isDevelopment() && Logger::debug(static::class, 'Hook invoke ' . $this->label);
 
             $this->consumeOnce();
 

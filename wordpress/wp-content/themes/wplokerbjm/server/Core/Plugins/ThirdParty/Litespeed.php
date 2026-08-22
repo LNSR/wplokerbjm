@@ -1,11 +1,12 @@
 <?php
+
 namespace WPLokerBJM\Core\Plugins\ThirdParty;
+
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
-use DI\Attribute\Injectable;
 use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -13,7 +14,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * LiteSpeed custom hooks extend
  * @link https://docs.litespeedtech.com/lscache/lscwp/api/
  */
-final class Litespeed implements PluginConfigInterface
+class Litespeed implements PluginConfigInterface
 {
     public static function isActive(): bool
     {
@@ -34,7 +35,7 @@ final class Litespeed implements PluginConfigInterface
         Cache::flushGroup(CacheKey::OBJECT_CACHE_PREFIX);
         // Clear entire cache folder
         $cacheDir = WPLokerBJMContainer::$CACHE_DIR;
-        static $deleteDirRecursive = static function (string $dir): bool {
+        $deleteDirRecursive = static function (string $dir): bool {
             if (!is_dir($dir)) {
                 return false;
             }
@@ -65,7 +66,6 @@ final class Litespeed implements PluginConfigInterface
             wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
 
-        Bootstrap::$robotLoader->rebuild();
         WPLokerBJMContainer::getContainer(true);
     }
 
@@ -73,51 +73,8 @@ final class Litespeed implements PluginConfigInterface
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
     #[Filter('litespeed_is_mobile')]
-    public $isMobile = static function () {
-            return wp_is_mobile();
-        };
-
-}
-
-/**
- * LiteSpeed GraphQL Integration
- */
-class LiteSpeedGraphQLIntegration implements PluginConfigInterface
-{
-
-    public static function isActive(): bool
+    public function isMobile():bool
     {
-        return PluginList::LiteSpeed->isActive() && PluginList::WpGraphql->isActive();
-    }
-
-    /**
-     * Call litespeed_purge when graphql_purge is called
-     */
-    #[Action('graphql_purge')]
-    public $purgeCache = static function ($keys): void { do_action('litespeed_purge', $keys); };
-
-    /**
-     * Set GraphQL Queries returned via HTTP GET|OPTIONS requests to be cacheable
-     */
-    public function setCacheable(): void
-    {
-        if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'OPTIONS')
-            return;
-        do_action('litespeed_control_force_cacheable');
-        if (is_user_logged_in()) {
-            do_action('litespeed_control_set_ttl', 3600);
-            return;
-        }
-        do_action('litespeed_control_set_ttl', 86400);
-    }
-
-    public function addTagResponses(array $headers = []): array
-    {
-        if (isset($headers['X-GraphQL-Keys'])) {
-            do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
-            unset($headers['X-GraphQL-Keys']);
-        }
-
-        return $headers;
+        return wp_is_mobile();
     }
 }

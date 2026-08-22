@@ -9,7 +9,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * @phpstan-type JobPostingSchema array{
- *     @context: string,
+ *     @context: 'https://schema.org',
  *     @type: 'JobPosting',
  *     title: string,
  *     url: string|null,
@@ -30,7 +30,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  *     baseSalary?: array{@type: 'MonetaryAmount', currency: 'IDR', value: array{@type: 'QuantitativeValue', value?: int, minValue?: int, maxValue?: int, unitText: 'MONTH'}}
  * }
  * @phpstan-type ItemListSchema array{
- *     @context: string,
+ *     @context: 'https://schema.org',
  *     @type: 'ItemList',
  *     mainEntity: array{@type: 'ItemList'},
  *     itemListElement: list<array{@type: 'ListItem', position: int, name: string, url: string|null}>,

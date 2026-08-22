@@ -471,6 +471,7 @@ trait HookProviderTrait
         if ($instance !== null) {
             // For hooked properties, reading the property executes the `get` hook.
             // For non-hooked properties, ensure it's initialized before reading to avoid Error.
+            /** @suppress PHP0406 */
             $isHooked = $property->hasHook(\PropertyHookType::Get);
             $isInitialized = $property->isInitialized($instance);
 

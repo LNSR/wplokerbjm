@@ -1,23 +1,26 @@
 <?php
+
 namespace WPLokerBJM\Core\Plugins;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
+use WPLokerBJM\Core\ContainerRegistryActions;
+use WPLokerBJM\Core\HooksRuntimeRegistryActions;
 use WPLokerBJM\Shared\Utilities\{PluginList, SharedUtils};
 use WPLokerBJM\Core\Plugins\ThirdParty\{
+    WPGraphQL\WPGraphQL,
+    Integrations\LiteSpeedGraphQLIntegration,
     Litespeed,
-    LiteSpeedGraphQLIntegration,
     MetaBox,
     Rankmath,
     WPRestJWTHooks,
-    WPGraphQL
 };
 use WPLokerBJM\Shared\Log\Logger;
 
 /* ==========================================================================
    INTERFACE CONFIG
    ========================================================================== */
+
 interface PluginConfigInterface
 {
     public static function isActive(): bool;
@@ -51,30 +54,38 @@ class PluginManagement
         WPGraphQL::class,
     ];
 
-    public function __construct(private WPHooksContainerRegistry $hooksRegistry, private WPHooksRuntimeRegistry $hooksRuntimeRegistry) {}
-    
     #[Action('muplugins_loaded', 0, once: true)]
-    public function __invoke(): void {
-        $this->unregisterInactivePluginHooks();
-        $this->hooksRuntimeRegistry->registerHooksOn($this->pluginEnvironmentCheck);
+    private function boot(): void
+    {
+        $activeCount = $this->unregisterInactivePluginHooks();
+        if ($activeCount === 0) {
+            do_action(ContainerRegistryActions::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            do_action(ContainerRegistryActions::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            return;
+        }
+
+        do_action(HooksRuntimeRegistryActions::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
     }
 
     /**
      * Purge all registered and deferred hooks for third-party integrations 
      * whose underlying WordPress plugins are inactive.
+     * @return int number of active plugins
      */
-    public function unregisterInactivePluginHooks(): void
+    private function unregisterInactivePluginHooks(): int
     {
+        $activeCount = 0;
         foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
             $isActive = $integrationClass::isActive();
             if ($isActive) {
+                $activeCount++;
                 continue;
             }
-            Logger::warning("Plugin status", $integrationClass . ' is ' . ($isActive ? 'active' : 'inactive'));
-
-            $this->hooksRegistry->unregisterByClass($integrationClass);
-            $this->hooksRegistry->unregisterDeferredByClass($integrationClass);
+            Logger::warning("Plugin status", $integrationClass . ' is inactive');
+            do_action(ContainerRegistryActions::UNREGISTER_BY_CLASS, $integrationClass);
+            do_action(ContainerRegistryActions::UNREGISTER_DEFERRED_BY_CLASS, $integrationClass);
         }
+        return $activeCount;
     }
     /**
      * Remove the "Deactivate" action link for required plugins.
@@ -93,29 +104,31 @@ class PluginManagement
 
     #region 3rd party choice hooks
     #[Filter('option_active_plugins', once: true, registerIf: static function () {
-            return empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql') && !\is_admin();
-            })]
+        return empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql') && !\is_admin();
+    })]
     public function disableWpGraphqlPlugin(array $plugins): array
     {
         unset($plugins[array_search(PluginList::WpGraphql->value, $plugins, true)]);
-        $this->hooksRegistry->unregisterByClass(WPGraphQL::class);
-        $this->hooksRegistry->unregisterDeferredByClass(WPGraphQL::class);
+        do_action(ContainerRegistryActions::UNREGISTER_BY_CLASS, WPGraphQL::class);
+        do_action(ContainerRegistryActions::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
         return $plugins;
     }
 
-    #[Filter('option_active_plugins', once: true,
+    #[Filter(
+        'option_active_plugins',
+        once: true,
         registerIf: static function (): bool {
-                    if (is_admin()) {
-                    $action = $_REQUEST['action'] ?? '';
-                        if (in_array($action, ['upgrade-plugin', 'update-plugin', 'activate', 'deactivate', 'activate-plugin'], true)) {
-                        return true;
-                        }
-                    }
-                $cookie = SharedUtils::getWordpressAuthCookie();
-                    if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookie['name']))
+            if (is_admin()) {
+                $action = $_REQUEST['action'] ?? '';
+                if (in_array($action, ['upgrade-plugin', 'update-plugin', 'activate', 'deactivate', 'activate-plugin'], true)) {
                     return true;
-                return false;
                 }
+            }
+            $cookie = SharedUtils::getWordpressAuthCookie();
+            if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookie['name']))
+                return true;
+            return false;
+        }
     )]
     public function disableQueryMonitorPlugin(array $plugins): array
     {
@@ -132,15 +145,19 @@ class PluginManagement
      * activation hooks steps
      * @var static::class
      */
-    public private(set) AnonClassHookMetadata $pluginEnvironmentCheck { get => $this->pluginEnvironmentCheck ??= new class (self::class, __PROPERTY__) extends AnonClassHookMetadata {
+    private AnonClassHookMetadata $pluginEnvironmentCheck {
+        get => $this->pluginEnvironmentCheck ??= new class(self::class, __PROPERTY__) extends AnonClassHookMetadata {
 
             /**
              * Temporarily disable specific plugins if in development environment.
              */
-            #[Filter('option_active_plugins', 0, once: true,
-            registerIf: static function (): bool {
-                            return SharedUtils::isDevelopment();
-                        }
+            #[Filter(
+                'option_active_plugins',
+                0,
+                once: true,
+                registerIf: static function (): bool {
+                    return SharedUtils::isDevelopment();
+                }
             )]
             public function disablePluginsForDevImpl(array $plugins): array
             {
@@ -152,10 +169,13 @@ class PluginManagement
             /**
              * Temporarily disable specific plugins if simulating production environment on local machine.
              */
-            #[Filter('option_active_plugins', 1, once: true,
-            registerIf: static function (): bool {
-                            return !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
-                        }
+            #[Filter(
+                'option_active_plugins',
+                1,
+                once: true,
+                registerIf: static function (): bool {
+                    return !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
+                }
             )]
             public function disablePluginsforSimulatedProdImpl(array $plugins): array
             {
@@ -167,10 +187,13 @@ class PluginManagement
             /**
              * Force active plugins for production
              */
-            #[Filter('option_active_plugins', 2, once: true,
-            registerIf: static function (): bool {
-                            return !SharedUtils::isDevelopment();
-                        }
+            #[Filter(
+                'option_active_plugins',
+                2,
+                once: true,
+                registerIf: static function (): bool {
+                    return !SharedUtils::isDevelopment();
+                }
             )]
             public function forceActivePlugin(array $plugins): array
             {
@@ -193,9 +216,9 @@ class PluginManagement
             {
                 // Subject to change
                 static $base = [
-                'wordfence/',
-                'tinywp-mobile-detect/',
-                'fast-indexing-api/',
+                    'wordfence/',
+                    'tinywp-mobile-detect/',
+                    'fast-indexing-api/',
                 ];
                 return array_merge($base, $extra);
             }

@@ -31,6 +31,8 @@ wordpress/wp-content/themes/*
 **/~partytown
 **/*.log
 **/tests/cache
+**/tests/cache-dir
+**/tests/robotloader-cache
 source.zsh
 mkcert
 localhost.pem

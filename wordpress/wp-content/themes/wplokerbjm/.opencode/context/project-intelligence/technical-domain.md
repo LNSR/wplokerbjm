@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.1 | Updated: 2026-08-07 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.2 | Updated: 2026-08-28 -->
 
 # Technical Domain — Lowker Site Theme
 
@@ -168,7 +168,32 @@ public function registerTypes(): void
 - Resolvers always wrap in try/catch, log errors via `Logger`, return empty/default on failure
 - Cache invalidation via `Cache::deleteMultiple()` / `Cache::deletePattern()` with wildcards
 - Input sanitization: `sanitize_text_field()`, `wp_kses_post()`, custom `ControllerUtils` methods
-- All service classes use constructor-based DI (no `new` for services outside container)
+- All service classes use constructor-based DI (no `new` for services outside container); exception: anonymous child objects (`AsChildClass` subclasses) receive property injection via `#[Inject]` + `DependencyInjector::injectOn($this)` — a compiled alternative to constructor DI for anonymous-class private state
+
+## InstanceDiscovery / Compiled Property Injection
+
+**Concept**: Anonymous child objects extending `AsChildClass` get compiled property injection via custom `#[Inject]` + `DependencyInjector::injectOn($this)` — a performance-oriented alternative to constructor DI for anonymous-class private state. Reflection runs once at compile; the hot path is reflection-free.
+
+**Key points**:
+
+- Custom `#[Inject]` (`server/Core/Container/Attributes/AttributesDI.php`): targets property|method|parameter; params `name` (string|array|null) + `lazy` (bool); project-owned, invisible to PHP-DI's scanner
+- `AsChildClass` base (`Support/InstanceDiscovery/Abstract/AsChildClass.php`): readonly `parentClass` (string|object) + `identifier`; `getParentClass()` normalizes object parents; `AnonClassHookMetadata` extends it
+- `injectOn(AsChildClass $target)`: validates anonymous target, resolves plan from compiled cache, assigns via scope-bound setter (private/protected child properties writable)
+- Array-callable entries `[Class::class, 'member']` support methods AND class field properties (`kind: method|property`) — closures/anon classes stored in class properties are injectable
+- `lazy: true` (method callables only): injects a first-class callable closure; target property must be `\Closure`-typed
+- Compile-time validation: named/union/intersection assignability, nullable rules, void/never + required-param methods rejected, static/readonly/inherited-private properties rejected, lazy-on-string rejected
+- Compiled cache: Brick VarExporter plan cache at theme `cache/DependencyInjectorCache.php`; eager write on compile; never exports live container/object references
+
+**Example** (`server/Core/Plugins/PluginsManager.php` + `server/Core/Plugins/ThirdParty/WPGraphQL.php`):
+
+```php
+$injector->injectOn($this); // anonymous child constructor
+
+#[Inject] private ?WPHooksRuntimeRegistry $runtimeRegistry; // typed entry via container
+
+#[Inject([WPGraphQL::class, 'allowedOrigins'], lazy: true)]
+private \Closure $allowedOrigins; // lazy first-class callable
+```
 
 ## Security Requirements
 
@@ -184,11 +209,11 @@ public function registerTypes(): void
 
 **REST**: `server/Services/REST/LowonganIngestRoute.php`, `server/Controllers/REST/LowonganIngestController.php`
 
-**GraphQL**: `server/Services/GraphQL/GraphQLRegistration.php`, `server/Controllers/GraphQL/Resolvers/JobsDataResolver.php`, `server/Services/GraphQL/GraphQLData.php`
+**GraphQL**: `server/Services/GraphQL/GraphQLRegistration.php`, `server/Controllers/GraphQL/Resolvers/JobsDataResolver.php`, `server/Services/GraphQL/GraphQLJobData.php`
 
 **Cache**: `server/Shared/Cache/Cache.php`, `server/Shared/Cache/CacheKey.php`
 
-**DI**: `server/Core/Container/Support/AutowireScanner.php`, `server/Core/Container/Definitions/Core.php`
+**DI**: `server/Core/Container/Support/InstanceDiscovery/AutowireScanner.php`, `server/Core/Container/Definitions/Factories.php`, `server/Core/Container/Attributes/AttributesDI.php`, `server/Core/Container/Support/InstanceDiscovery/DependencyInjector.php`, `server/Core/Container/Support/InstanceDiscovery/Abstract/AsChildClass.php`, `cache/DependencyInjectorCache.php`
 
 **Dev Workflows**: `tools/Composer/Scripts/autoloadwatcher.sh`, `tools/Composer/Scripts/test.sh`, `tools/Composer/Scripts/lint.sh`, `tests/InitLazyHookTest.php`, `tests/DeferredHookTest.php`, `tests/DynamicTagTest.php`
 

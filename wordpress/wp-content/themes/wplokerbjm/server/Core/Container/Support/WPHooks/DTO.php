@@ -92,6 +92,37 @@ readonly class HookRegistration
     }
 
     /**
+     * @param HookRegistration $data
+     * @return HookType
+     */
+    public static function toArray(HookRegistration $data): array
+    {
+        return [
+            'class' => $data->class,
+            'method' => $data->method,
+            'type' => $data->type,
+            'hook' => $data->hook,
+            'priority' => $data->priority,
+            'accepted_args' => $data->acceptedArgs,
+            'defer_register' => $data->deferRegister,
+            'target' => $data->target,
+            'visibility' => $data->visibility,
+            'execute_if' => $data->executeIf,
+            'execute_if_params' => $data->executeIfParams,
+            'register_if' => $data->registerIf,
+            'register_if_params' => $data->registerIfParams,
+            'hook_params' => $data->hookParams,
+            'hook_args' => $data->hookArgs,
+            'tags' => $data->tags,
+            'tag_callable' => $data->tagCallable,
+            'tag_callable_params' => $data->tagCallableParams,
+            'defer_register_until_hook' => $data->deferRegisterUntilHook,
+            'defer_register_until_hook_params' => $data->deferRegisterUntilHookParams,
+            'once' => $data->once,
+        ];
+    }
+
+    /**
      * @param HookRegistration[] $properties
      * @return self
      */
@@ -234,7 +265,32 @@ readonly class RuntimeHookMetadata
     }
 
     /**
-     * @param array<string, mixed> $properties
+     * @param RuntimeHookMetadata $metadata
+     * @return RuntimeHookMetadataData
+     */
+    public static function toArray(RuntimeHookMetadata $metadata): array
+    {
+        return [
+            'hook' => $metadata->hook,
+            'type' => $metadata->type,
+            'priority' => $metadata->priority,
+            'acceptedArgs' => $metadata->acceptedArgs,
+            'once' => $metadata->once,
+            'executeIf' => $metadata->executeIf,
+            'executeIfParams' => $metadata->executeIfParams,
+            'registerIf' => $metadata->registerIf,
+            'registerIfParams' => $metadata->registerIfParams,
+            'deferRegisterUntilHook' => $metadata->deferRegisterUntilHook,
+            'deferRegisterUntilHookParams' => $metadata->deferRegisterUntilHookParams,
+            'hookArgNames' => $metadata->hookArgNames,
+            'target' => $metadata->target,
+            'targetName' => $metadata->targetName,
+            'visibility' => $metadata->visibility,
+        ];
+    }
+
+    /**
+     * @param RuntimeHookMetadataData $properties
      * @return self
      */
     public static function __set_state(array $properties): self

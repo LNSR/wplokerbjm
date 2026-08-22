@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/nav | Priority: high | Version: 1.2 | Updated: 2026-07-02 -->
+<!-- Context: project-intelligence/nav | Priority: high | Version: 1.3 | Updated: 2026-08-28 -->
 
 # Project Intelligence
 
@@ -7,7 +7,7 @@
 ## Structure
 
 ```
-/home/maulana/.config/opencode/context/project-intelligence/
+/home/maulana/Project/Lowker-site/wordpress/wp-content/themes/wplokerbjm/.opencode/context/project-intelligence/
 ├── navigation.md              # This file - quick overview
 ├── business-domain.md         # Business context and problem statement
 ├── technical-domain.md        # Stack, architecture, technical decisions

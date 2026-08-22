@@ -4,12 +4,15 @@ namespace WPLokerBJM\Services\GraphQL;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Controllers\GraphQL\Resolvers\{TaxonomyResolver, JobsDataResolver, ThemeDataResolver};
 use WPLokerBJM\Controllers\GraphQL\Resolvers\Auth\JWTDataResolver;
+use WPLokerBJM\Controllers\GraphQL\Resolvers\SEO\SEOjobsResolver;
 use WPLokerBJM\Core\Theme\ThemeProp;
-use WPLokerBJM\Services\GraphQL\GraphQLData;
+use WPLokerBJM\Services\GraphQL\GraphQLJobData;
 use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Services\Schema\JobSchemaOrg;
+
 /**
  * @phpstan-import-type ThemeData from ThemeProp
  * @phpstan-import-type TaxonomyJobTerms from TaxonomyResolver
@@ -20,17 +23,20 @@ use WPLokerBJM\Core\Container\Attributes\Action;
  * @phpstan-import-type JWTDataShape from JWTDataResolver
  * @phpstan-import-type CarouselData from JobCarousel
  * @phpstan-import-type JobGridData from JobGrid
- * @phpstan-import-type CardData from GraphQLData
- * @phpstan-import-type JobDetailData from GraphQLData
+ * @phpstan-import-type CardData from GraphQLJobData
+ * @phpstan-import-type JobDetailData from GraphQLJobData
+ * @phpstan-import-type JobPostingSchema from JobSchemaOrg
+ * @phpstan-import-type ItemListSchema from JobSchemaOrg
  * @phpstan-type ArrayFilters array{cari?: string, lokasi_pekerjaan?: list<string>, gender?: list<string>, pendidikan?: list<string>, sort?: array{value?: string, label?: string}}
  * @phpstan-type AutoSuggestionsArgs array{query?: string}
  * @phpstan-type LoadMoreArgs array{paged?: int, context?: 'search'|'latest', filters?: ArrayFilters}
  * @phpstan-type JobGridArgs array{paged?: int, context?: 'search'|'latest', title?: string, total_jobs?: int, filters?: ArrayFilters}
  * @phpstan-type JobDetailArgs array{slug?: string, id?: int, preview?: bool}
- * @phpstan-type JobSchemaArgs array{ids?: list<int>, slug?: string, type?: string}
+ * @phpstan-type JobSchemaArgs array{ids?: list<int>, slug?: string, type?: 'ItemList'|'JobPosting'}
  * @phpstan-type SearchJobsArgs array{context?: 'search'|'latest', filters?: ArrayFilters}
  * @phpstan-type RankMathHeadArgs array{url?: string}
  * @phpstan-type SyncBookmarkArgs array{ids?: list<int>}
+ * @phpstan-type JobSchemaResponse array{schemas: list<JobPostingSchema>|list<ItemListSchema>}
  * @phpstan-type GraphQLDataType array{
  *     taxonomyTerms?: TaxonomyJobTerms,
  *     lokasiTerms?: TaxonomyTerms[],
@@ -41,7 +47,7 @@ use WPLokerBJM\Core\Container\Attributes\Action;
  *     loadMore?: LoadMoreResponse,
  *     jobGrid?: JobGridData,
  *     jobDetail?: JobDetailData|array{},
- *     jobSchema?: array{schemas: list<string>},
+ *     jobSchema?: JobSchemaResponse,
  *     themeData?: ThemeData,
  *     searchJobs?: SearchJobsResponse,
  *     rankMathHead?: string,
@@ -59,41 +65,44 @@ use WPLokerBJM\Core\Container\Attributes\Action;
  *     syncBookmark?: SyncBookmarkArgs,
  *     jwt?: JWTDataShape,
  * }
+ * @suppress PHP6613
  */
 final class GraphQLRegistration
 {
     public function __construct(
         private readonly TaxonomyResolver $taxonomyResolver,
+        private readonly SEOjobsResolver $seoJobsResolver,
         private readonly JobsDataResolver $jobsDataResolver,
         private readonly ThemeDataResolver $themeDataResolver,
         private readonly JWTDataResolver $jwtDataResolver
     ) {
     }
 
-    private const TYPE_ROOT_QUERY = 'RootQuery';
-    private const TYPE_ROOT_MUTATION = 'RootMutation';
+    public const TYPE_ROOT_QUERY = 'RootQuery';
+    public const TYPE_ROOT_MUTATION = 'RootMutation';
 
-    private const TYPE_JSON = 'JSON';
-    private const TYPE_STRING = 'String';
-    private const TYPE_INT = 'Int';
-    private const TYPE_BOOLEAN = 'Boolean';
+    public const TYPE_JSON = 'JSON';
+    public const TYPE_STRING = 'String';
+    public const TYPE_INT = 'Int';
+    public const TYPE_BOOLEAN = 'Boolean';
 
-    private const TYPE_SORT_OPTION = 'SortOption';
-    private const TYPE_SORT_OPTION_INPUT = 'SortOptionInput';
-    private const TYPE_TAXONOMY_TERMS_RESPONSE = 'TaxonomyTermsResponse';
-    private const TYPE_JOB = 'Job';
-    private const TYPE_JOB_SUMMARY = 'JobSummary';
-    private const TYPE_JOB_CONTACTS = 'JobContacts';
-    private const TYPE_CAROUSEL_RESPONSE = 'CarouselResponse';
-    private const TYPE_LOAD_MORE_RESPONSE = 'LoadMoreResponse';
-    private const TYPE_JOB_FILTERS = 'JobFilters';
-    private const TYPE_JOB_FILTERS_INPUT = 'JobFiltersInput';
-    private const TYPE_JOB_GRID_RESPONSE = 'JobGridResponse';
-    private const TYPE_JOB_SCHEMA_RESPONSE = 'JobSchemaResponse';
-    private const TYPE_LOGO = 'Logo';
-    private const TYPE_THEME_DATA = 'ThemeData';
-    private const TYPE_SEARCH_JOBS_RESPONSE = 'SearchJobsResponse';
-    private const TYPE_BOOKMARK_RESPONSE = 'BookmarkResponse';
+    public const TYPE_SORT_OPTION = 'SortOption';
+    public const TYPE_SORT_OPTION_INPUT = 'SortOptionInput';
+    public const TYPE_TAXONOMY_TERMS_RESPONSE = 'TaxonomyTermsResponse';
+    public const TYPE_JOB = 'Job';
+    public const TYPE_JOB_SUMMARY = 'JobSummary';
+    public const TYPE_JOB_CONTACTS = 'JobContacts';
+    public const TYPE_CAROUSEL_RESPONSE = 'CarouselResponse';
+    public const TYPE_LOAD_MORE_RESPONSE = 'LoadMoreResponse';
+    public const TYPE_JOB_FILTERS = 'JobFilters';
+    public const TYPE_JOB_FILTERS_INPUT = 'JobFiltersInput';
+    public const TYPE_JOB_GRID_RESPONSE = 'JobGridResponse';
+    public const TYPE_JOB_SCHEMA_RESPONSE = 'JobSchemaResponse';
+    public const TYPE_LOGO = 'Logo';
+    public const TYPE_THEME_DATA = 'ThemeData';
+    public const TYPE_SEARCH_JOBS_RESPONSE = 'SearchJobsResponse';
+    public const TYPE_SEARCH_JOBS = 'searchJobs';
+    public const TYPE_BOOKMARK_RESPONSE = 'BookmarkResponse';
 
     /**
      * Register all GraphQL types, fields, and mutations.
@@ -465,7 +474,7 @@ final class GraphQLRegistration
                     'description' => 'Optional schema type. Allowed values: "ItemList" (returns a single ItemList) or "JobPosting" (returns per-id JobPosting schemas). Defaults to per-id JobPosting behavior when omitted.',
                 ],
             ],
-            'resolve' => $this->jobsDataResolver->resolveSchema(...),
+            'resolve' => $this->seoJobsResolver->resolveSchema(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'themeData', [
@@ -474,7 +483,7 @@ final class GraphQLRegistration
             'resolve' => $this->themeDataResolver->resolveThemeData(...),
         ]);
 
-        register_graphql_field(self::TYPE_ROOT_QUERY, 'searchJobs', [
+        register_graphql_field(self::TYPE_ROOT_QUERY, self::TYPE_SEARCH_JOBS, [
             'type' => self::TYPE_SEARCH_JOBS_RESPONSE,
             'description' => 'Search jobs',
             'args' => [
@@ -500,7 +509,7 @@ final class GraphQLRegistration
                     'description' => 'URL for RankMath',
                 ],
             ],
-            'resolve' => $this->jobsDataResolver->resolveRankMathHead(...),
+            'resolve' => $this->seoJobsResolver->resolveRankMathHead(...),
         ]);
 
         register_graphql_field(self::TYPE_ROOT_QUERY, 'syncBookmark', [

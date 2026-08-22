@@ -2,14 +2,9 @@
 
 namespace WPLokerBJM\Core;
 
-use WPLokerBJM\Adapter\RedisAdapter;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
-use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
-use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 
 /*======================================================================
@@ -26,6 +21,83 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  */
 class RedirectHooks
 {
+    /**
+     * Return 410 Gone for old job posts that have been trashed due to age.
+     * * For deleted job posts (404 on single lowongan), return 410 Gone.
+     * ! Notify search engines with 410 Gone for removed job posts.
+     */
+    #[Action(
+        'template_redirect',
+        2,
+        deferRegisterUntilHook: 'init',
+        once: true,
+        registerIf: static function (): bool {
+            return self::shouldRegister();
+        },
+        executeIf: static function (): bool {
+            return !self::shouldSkipRedirect() && !self::isDraftPreviewRequest() && is_404() && is_singular(PostTypes::POST_TYPE_LOWONGAN);
+        },
+    )]
+    public function oldPost410Redirect(): void
+    {
+        status_header(410);
+        wp_die('This job posting has been expired or removed.', 'Gone', ['response' => 410]);
+
+        // Other 404s: redirect to the headless Svelte frontend
+        $baseUrl = SharedUtils::headlessDomainRedirect();
+        wp_redirect(rtrim($baseUrl, '/') . '/', 302);
+        exit;
+    }
+
+    /**
+     * Headless frontend redirect.
+     * Runs early during `template_redirect` so the theme always forwards
+     * public requests to the Svelte frontend (dev vs prod).
+     */
+    #[Action(
+        'template_redirect',
+        3,
+        deferRegisterUntilHook: 'init',
+        once: true,
+        registerIf: static function (): bool {
+            return self::shouldRegister();
+        },
+        executeIf: static function (): bool {
+            return !self::shouldSkipRedirect();
+        },
+    )]
+    public function headlessFrontendAdminSideRedirect(): void
+    {
+        $baseUrl = SharedUtils::headlessDomainRedirect();
+
+        $path = '/';
+        if ((is_page('pasang-iklan-loker') || is_page(184))) {
+            $path = '/pasang-iklan-loker';
+        } elseif (is_page('kebijakan-privasi')) {
+            $path = '/kebijakan-privasi';
+        } elseif (self::isDraftPreviewRequest()) {
+            // Draft/pending lowongan: normalize to ID-based URL so the
+            // frontend preview route can resolve it without the redundant
+            // ?post_type=lowongan&p= query string.
+            $path = '/' . PostTypes::POST_TYPE_LOWONGAN . '/' . (int) $_GET['p'];
+        } elseif (is_single() && get_post_type() === PostTypes::POST_TYPE_LOWONGAN) {
+            $post = get_post();
+            if ($post && !empty($post->post_name)) {
+                $path = '/' . PostTypes::POST_TYPE_LOWONGAN . '/' . $post->post_name;
+            }
+        } elseif (is_post_type_archive(PostTypes::POST_TYPE_LOWONGAN) || is_front_page() || is_page(146)) {
+            $path = '/';
+        }
+
+        $query = '';
+        if (!self::isDraftPreviewRequest()) {
+            $query = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '' ? ('?' . $_SERVER['QUERY_STRING']) : '';
+        }
+        $location = rtrim($baseUrl, '/') . $path . $query;
+
+        wp_redirect($location, 302);
+        exit;
+    }
     /**
      * Skip redirect logic for ACME challenge requests and AutoSSL probe user agents.
      */
@@ -57,9 +129,7 @@ class RedirectHooks
             return true;
         }
 
-        if (
-            wp_doing_cron()
-        ) {
+        if (wp_doing_cron()) {
             return true;
         }
 
@@ -101,80 +171,6 @@ class RedirectHooks
 
         return in_array($post->post_status, ['draft', 'pending', 'future', 'private'], true);
     }
-
-    /**
-     * Return 410 Gone for old job posts that have been trashed due to age.
-     * * For deleted job posts (404 on single lowongan), return 410 Gone.
-     * ! Notify search engines with 410 Gone for removed job posts.
-     */
-    #[Action('template_redirect', 2,
-        deferRegisterUntilHook: 'init',
-        once: true,
-        registerIf: static function (): bool {
-                return self::shouldRegister();
-                },
-        executeIf: static function (): bool {
-                return !self::shouldSkipRedirect() && !self::isDraftPreviewRequest() && is_404() && is_singular(PostTypes::POST_TYPE_LOWONGAN);
-                },
-    )]
-    public function oldPost410Redirect(): void
-    {
-        status_header(410);
-        wp_die('This job posting has been expired or removed.', 'Gone', ['response' => 410]);
-
-        // Other 404s: redirect to the headless Svelte frontend
-        $baseUrl = SharedUtils::headlessDomainRedirect();
-        wp_redirect(rtrim($baseUrl, '/') . '/', 302);
-        exit;
-    }
-
-    /**
-     * Headless frontend redirect.
-     * Runs early during `template_redirect` so the theme always forwards
-     * public requests to the Svelte frontend (dev vs prod).
-     */
-    #[Action('template_redirect', 3,
-        deferRegisterUntilHook: 'init',
-        once: true,
-        registerIf: static function (): bool {
-                return self::shouldRegister();
-                },
-        executeIf: static function (): bool {
-                return !self::shouldSkipRedirect();
-                },
-    )]
-    public function headlessFrontendAdminSideRedirect(): void
-    {
-        $baseUrl = SharedUtils::headlessDomainRedirect();
-
-        $path = '/';
-        if ((is_page('pasang-iklan-loker') || is_page(184))) {
-            $path = '/pasang-iklan-loker';
-        } elseif (is_page('kebijakan-privasi')) {
-            $path = '/kebijakan-privasi';
-        } elseif (self::isDraftPreviewRequest()) {
-            // Draft/pending lowongan: normalize to ID-based URL so the
-            // frontend preview route can resolve it without the redundant
-            // ?post_type=lowongan&p= query string.
-            $path = '/' . PostTypes::POST_TYPE_LOWONGAN . '/' . (int) $_GET['p'];
-        } elseif (is_single() && get_post_type() === PostTypes::POST_TYPE_LOWONGAN) {
-            $post = get_post();
-            if ($post && !empty($post->post_name)) {
-                $path = '/' . PostTypes::POST_TYPE_LOWONGAN . '/' . $post->post_name;
-            }
-        } elseif (is_post_type_archive(PostTypes::POST_TYPE_LOWONGAN) || is_front_page() || is_page(146)) {
-            $path = '/';
-        }
-
-        $query = '';
-        if (!self::isDraftPreviewRequest()) {
-            $query = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '' ? ('?' . $_SERVER['QUERY_STRING']) : '';
-        }
-        $location = rtrim($baseUrl, '/') . $path . $query;
-
-        wp_redirect($location, 302);
-        exit;
-    }
 }
 
 
@@ -205,58 +201,6 @@ class RobotsHooks
     }
 }
 
-
-/*======================================================================
- | SEARCH
- ======================================================================*/
-
-/**
- * Customizes the SQL WHERE clause for WordPress search queries on job posts.
- *
- * This filter intercepts the default WordPress search behavior and replaces it with
- * custom SQL that searches across multiple fields relevant to job listings:
- * - Post titles
- * - Company names (stored in post meta)
- * - Taxonomy terms (e.g., job categories, locations)
- *
- * This enables more comprehensive search results for the job platform, allowing users
- * to find jobs by company name or category even if those terms aren't in the title.
- *
- * Used by: DynamicSearch Graphql endpoint, and any WP_Query with 's' parameter
- * on 'lowongan' post type.
- */
-class SearchHooks
-{
-
-    /**
-     * @param string        $search   The current search SQL fragment (may be empty).
-     * @param \WP_Query     $wp_query The WP_Query object being executed.
-     * @return string Modified search SQL fragment.
-     */
-    #[Filter('posts_search', 10, 2,
-        deferRegisterUntilHook: 'init_graphql_request',
-        registerIf: static function (): bool {
-                return !is_admin() && !SharedUtils::isWPCLI();
-                },
-        executeIf: static function (\WP_Query $wp_query): bool {
-                    global $wpdb;
-                $q = (string) ($wp_query->query_vars['s'] ?? '');
-                    if ($wpdb === null || $q === '') {
-                    return false;
-                    };
-                return true;
-                }
-
-    )]
-    public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
-    {
-        global $wpdb;
-        $q = (string) ($wp_query->query_vars['s'] ?? '');
-        return JobQuery::buildPostsSearchSql($wpdb, $q);
-    }
-}
-
-
 /*======================================================================
  | LANGUAGE HOOKS
  ======================================================================*/
@@ -270,8 +214,8 @@ class LanguageHooks
     #[Filter(
         'locale',
         registerIf: static function (): bool {
-                return !is_admin();
-                },
+            return !is_admin();
+        },
     )]
     public function frontendLocalHTMLl10n(string $locale): string
     {
@@ -290,8 +234,8 @@ class HTTPHooks
         PHP_INT_MIN,
         once: true,
         registerIf: static function (): bool {
-                return !SharedUtils::isDevelopment() && !SharedUtils::isWPCLI();
-                }
+            return !SharedUtils::isDevelopment() && !SharedUtils::isWPCLI();
+        }
     )]
     public function setRemoteAddr(): void
     {
@@ -308,185 +252,6 @@ class HTTPHooks
 }
 
 /*======================================================================
- | CACHE INVALIDATION
- ======================================================================*/
-
-/**
- * Centralized cache purge when posts, meta, terms, or status change.
- *
- * Calling conventions:
- * - For post hooks (e.g., `save_post`, `delete_post`) we pass `($post_id, $post)` so
- *   the method can perform both global purges and per-job invalidation when applicable.
- * - For term hooks (`created_term`, `edited_term`, `delete_term`) we call this method
- *   without arguments (no post context) and it will only purge global caches.
- * - For meta/taxonomy hooks we pass the `object_id` (post id) when available.
- */
-class CacheInvalidationHooks
-{
-
-    /**
-     * @param WPHooksContainerRegistry $hooksRegistry Used for self-unregistration of the
-     *                                       global purge after first fire per request.
-     * @param RedisAdapter    $redisAdapter  Used for direct Redis pattern-based cache deletion.
-     */
-    public function __construct(
-        private WPHooksContainerRegistry $hooksRegistry,
-        private RedisAdapter $redisAdapter,
-    ) {}
-    /**
-     * Per-post cache invalidation — fires for EVERY lowongan post change.
-     *
-     * Never self-unregisters: in a batch of 50 trashed jobs, each one must
-     * invalidate its own individual cache entries. The global cache sweep
-     * is handled separately by {@see self::purgeGlobalCacheOnce}.
-     *
-     * Registered only on hooks that carry post context.
-     * @var static::class
-     */
-    #[Action('save_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 2)]
-    #[Action('delete_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 1)]
-    #[Action('trashed_post', 10, 1)]
-    #[Action('delete_attachment', 10, 1)]
-    #[Action('transition_post_status', 10, 3)]
-    public private(set) AnonClassHookMetadata $invalidatePostCache { get => $this->invalidatePostCache ??= new class (self::class, __PROPERTY__) extends AnonClassHookMetadata {
-
-            /** @var array<int, bool> */
-            private array $snapshotPostID = [];
-
-            public function __invoke(...$args): void
-            {
-                $post_id = $this->extractPostId($args);
-
-                if ($post_id === null || isset($this->snapshotPostID[$post_id]) && $this->snapshotPostID[$post_id] === true) {
-                    return;
-                }
-
-                $this->snapshotPostID[(int) $post_id] = true;
-
-                $this->invalidateJobDataCache((int) $post_id);
-            }
-
-            /**
-             * Extract a post ID from variadic hook arguments, validating post type.
-             *
-             * @param array $args Hook arguments
-             * @return int|null The resolved lowongan post ID, or null if not applicable
-             */
-            private function extractPostId(array $args): ?int
-            {
-                $post_id = null;
-
-                foreach ($args as $arg) {
-                    if ($arg instanceof \WP_Post) {
-                        if ($arg->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
-                            return null;
-                        }
-                        $post_id = $arg->ID;
-                        continue;
-                    }
-
-                    if (is_int($arg)) {
-                        $post_id = $arg;
-                        continue;
-                    }
-
-                    if (is_string($arg) && ctype_digit($arg)) {
-                        $post_id = (int) $arg;
-                        continue;
-                    }
-                }
-
-                if ($post_id !== null) {
-                    $resolved = get_post($post_id);
-                    if ($resolved === null || $resolved->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
-                        return null;
-                    }
-                }
-
-                return $post_id;
-            }
-
-            /**
-             * Invalidate job data caches for a specific lowongan post.
-             *
-             * @param int $post_id The post ID.
-             * @return bool True if any cache entry was deleted.
-             */
-            private function invalidateJobDataCache(int $post_id): bool
-            {
-                $deleteResults = Cache::deleteMultiple([
-                CacheKey::JOB_DATA_PREFIX . $post_id,
-                CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id,
-                CacheKey::JOB_SCHEMA_PREFIX . $post_id,
-                ]);
-
-                return !empty(array_filter($deleteResults));
-            }
-
-        };
-    }
-
-    /**
-     * Global cache purge — fires once per request, then self-unregisters.
-     *
-     * One comprehensive global sweep per request is sufficient. After the
-     * first fire, this handler removes itself from WordPress so that term/
-     * meta changes later in the same request don't trigger redundant purges.
-     */
-    #[Action('save_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 2)]
-    #[Action('delete_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 1)]
-    #[Action('trashed_post', 10, 1)]
-    #[Action('delete_attachment', 10, 1)]
-    #[Action('created_term', 10, 0)]
-    #[Action('edited_term', 10, 0)]
-    #[Action('delete_term', 10, 0)]
-    #[Action('updated_postmeta', 10, 4)]
-    #[Action('set_object_terms', 10, 6)]
-    #[Action('transition_post_status', 10, 3)]
-    public private(set) \Closure $purgeGlobalCacheOnce {
-        get {
-            $propertyName = __PROPERTY__;
-            return $this->purgeGlobalCacheOnce ??= function () use ($propertyName) {
-                static $alreadyRun = false;
-                if ($alreadyRun)
-                    return;
-                $alreadyRun = true;
-                $this->hooksRegistry->unregisterByCallable([$this, $propertyName]);
-                try {
-                    Cache::deleteMultiple([
-                    CacheKey::CAROUSEL_JOBS,
-                    CacheKey::JOB_LAST_MODIFIED,
-                    CacheKey::TAXONOMY_DEPTH_HANDLE,
-                    CacheKey::TAXONOMY_DEPTH_LOKASI,
-                    CacheKey::TAXONOMY_DEPTH_GENDER,
-                    CacheKey::TAXONOMY_DEPTH_PENDIDIKAN,
-                    ]);
-
-                    $this->redisAdapter->deletePattern([
-                    CacheKey::JOB_GRID_PREFIX . '*',
-                    CacheKey::SEARCH_SQL_PREFIX . '*',
-                    CacheKey::LOAD_MORE_PREFIX . '*',
-                    CacheKey::AUTO_SUGGESTION_PREFIX . '*',
-                    CacheKey::POST_TAXONOMIES_PREFIX . '*',
-                    CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . '*',
-                    CacheKey::GRAPHQL_JOB_CARD_PREFIX . '*',
-                    CacheKey::DYNAMIC_SEARCH_PREFIX . '*',
-                    CacheKey::SYNC_BOOKMARK_PREFIX . '*',
-                    CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . '*',
-                    CacheKey::RANKMATH_HEAD_PREFIX . '*',
-                    CacheKey::GRAPHQL_ETAG_PREFIX . '*',
-                    CacheKey::THEME_DATA . '*',
-                    ]);
-                } catch (\Exception $e) {
-                    Logger::error('Hooks', 'CacheInvalidationHooks::purgeGlobalCacheOnce error: ' . $e->getMessage());
-                }
-            };
-        }
-    }
-}
-
-
-/*======================================================================
  | LOGGER FLUSH
  ======================================================================*/
 
@@ -497,14 +262,10 @@ class ShutdownHooks
 {
 
     #[Action('shutdown', PHP_INT_MAX, once: true)]
-    public function __invoke()
-    {
-        Logger::flush();
-    }
+    public function __invoke() {}
 
     public function __destruct()
     {
-        Logger::flush();
+        SharedUtils::doActivityAtBackground(Logger::flush(...));
     }
-
 }

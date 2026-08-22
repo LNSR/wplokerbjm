@@ -1,6 +1,6 @@
 <?php
 
-namespace WPLokerBJM\Configs;
+namespace WPLokerBJM\Configs\Credential;
 
 
 /**

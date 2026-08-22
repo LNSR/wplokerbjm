@@ -2,11 +2,12 @@
 
 namespace WPLokerBJM\Services\WebHooks;
 
-use WPLokerBJM\Configs\CredentialConfig;
+use WPLokerBJM\Configs\Credential\CredentialConfig;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\ContainerRegistryActions;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Definitions\Factory;
 
 /**
  * Cloudflare cache purging via the purge_everything API.
@@ -20,7 +21,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * 
  * We rely on QUIC Cloud cache to simplify things. There is no need to
  * purge individual URLs or paths — a full-zone purge is cheap and fast.
- * @see \WPLokerBJM\Core\Container\Definitions\Factory
+ * @see Factory::getInstanceWithCredentials()
  * @phpstan-import-type CloudflareCred from CredentialConfig
  * @phpstan-type CFPurgeOptions array{
  *  purge_everything?: bool,
@@ -33,13 +34,8 @@ class Cloudflare
 {
     /**
      * @param CloudflareCred $credential filled by PHP-DI
-     * @param WPHooksContainerRegistry $WPHooksContainerRegistry autowired by PHP-DI
      */
-    public function __construct(
-        private array $credential,
-        private WPHooksContainerRegistry $WPHooksContainerRegistry,
-    ) {
-    }
+    public function __construct(private array $credential) {}
 
     /**
      * Purge the entire Cloudflare zone cache.
@@ -65,7 +61,7 @@ class Cloudflare
     #[Action('added_post_meta', 10, 4)]
     #[Action('updated_post_meta', 10, 4)]
     #[Action('deleted_post_meta', 10, 4)]
-    public private(set) \Closure|false $purgeOnMetaChange { get => $this->purgeOnMetaChange ??= $this->createHandler(__PROPERTY__); }
+    private \Closure|false $purgeOnMetaChange { get => $this->purgeOnMetaChange ??= $this->createHandler(__PROPERTY__); }
 
     /**
      * Purge the entire zone on the first term change of the request.
@@ -77,7 +73,7 @@ class Cloudflare
     #[Action('created_term', 10, 0)]
     #[Action('edit_term', 10, 0)]
     #[Action('delete_term', 10, 0)]
-    public private(set) \Closure|false $purgeOnTermChange { get => $this->purgeOnTermChange ??= $this->createHandler(__PROPERTY__); }
+    private \Closure|false $purgeOnTermChange { get => $this->purgeOnTermChange ??= $this->createHandler(__PROPERTY__); }
 
     /** 
      * @param string $propertyName string magic
@@ -86,14 +82,14 @@ class Cloudflare
     private function createHandler(string $propertyName): \Closure|false
     {
         if (empty(array_filter($this->credential))) {
-            $this->WPHooksContainerRegistry->unregisterByClass(self::class);
+            do_action(ContainerRegistryActions::UNREGISTER_BY_CLASS, self::class);
             return false;
         }
         return function () use ($propertyName): bool {
             static $alreadyRun = false;
             if ($alreadyRun) return true;
             $alreadyRun = true;
-            $this->WPHooksContainerRegistry->unregisterByCallable([$this, $propertyName]);
+            do_action(ContainerRegistryActions::UNREGISTER_BY_CALLABLE, [$this, $propertyName]);
             return $this->purgeAllCache();
         };
     }

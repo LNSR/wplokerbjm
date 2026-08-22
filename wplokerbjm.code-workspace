@@ -34,29 +34,30 @@
       "**/vendor/**": true,
       "**/.wrangler/**": true,
       "**/wordpress/wp-admin/**": true,
-      "**/wordpress/wp-includes/**": true
+      "**/wordpress/wp-includes/**": true,
     },
 
     // DEVSENSE INDEXER CONFIG
-    "php.stubs": ["*", "wordpress"],
+    "php.stubs": ["*"],
     "php.workspace.includePath": "wordpress/",
     "php.problems.scope": "opened",
     "php.inlayHints.parameters.enabled": true,
     "php.suggest.basic": false, // Handled by Intelephense
     "php.files.exclude": {
       "**/node_modules/**": true,
-      "**/vendor/**": true,
       "**/sveltekit/**": true,
       "**/wplokerbjm-post-automation/**": true,
-      "**/wordpress/wp-admin/**": true,
-      "**/wordpress/wp-includes/**": true
     },
     "php.problems.exclude": {
       "**/generate-meta-hooks/captures/": true,
-      "**/vendor/": true
+      "**/vendor/": true,
+      "**/node_modules/**": true,
+      "**/wplokerbjm-post-automation/**": true,
+      "**/wordpress/wp-admin/**": true,
+      "**/wordpress/wp-includes/**": true,
     },
     "[php]": {
-      "editor.defaultFormatter": "DEVSENSE.phptools-vscode"
+      "editor.defaultFormatter": "bmewburn.vscode-intelephense-client",
     },
 
     // INTELEPHENSE INDEXER CONFIG
@@ -65,42 +66,42 @@
     "intelephense.diagnostics.memberAccess": false,
     "intelephense.diagnostics.enable": false, // Leave diagnostics to Devsense to prevent conflicts
     "intelephense.diagnostics.argumentCount": "on",
-    "intelephense.codeLens.implementations.enable": false, // Disable to prevent duplicate CodeLens with Devsense
-    "intelephense.codeLens.parent.enable": false,
-    "intelephense.codeLens.references.enable": false,
-    "intelephense.codeLens.usages.enable": false,
+    "intelephense.codeLens.implementations.enable": true, // Disable to prevent duplicate CodeLens with Devsense
+    "intelephense.codeLens.parent.enable": true,
+    "intelephense.completion.insertUseDeclaration": true,
+    "intelephense.completion.fullyQualifyGlobalConstantsAndFunctions": true,
+    "intelephense.rename.namespaceMode": "all",
+    "intelephense.codeLens.references.enable": true,
+    "intelephense.codeLens.usages.enable": true,
     "intelephense.files.maxSize": 1000000,
     "intelephense.files.exclude": [
       "**/.git/**",
       "**/node_modules/**",
-      "**/vendor/**",
       "**/sveltekit/**",
       "**/wplokerbjm-post-automation/**",
-      "**/wordpress/wp-admin/**",
-      "**/wordpress/wp-includes/**"
     ],
 
     // Svelte & JS/TS Configs
     "[svelte]": {
-      "editor.defaultFormatter": "svelte.svelte-vscode"
+      "editor.defaultFormatter": "svelte.svelte-vscode",
     },
     "files.associations": {
-      "*.css": "tailwindcss"
+      "*.css": "tailwindcss",
     },
     "editor.quickSuggestions": {
       "other": "on",
       "comments": "on",
-      "strings": "on"
+      "strings": "on",
     },
     "eslint.options": {
-      "overrideConfigFile": "eslint.config.ts"
+      "overrideConfigFile": "eslint.config.ts",
     },
     "eslint.workingDirectories": ["${workspaceFolder:wplokerbjm-frontend}"],
     "typescript.enablePromptUseWorkspaceTsdk": true,
     "typescript.tsdk": "wplokerbjm-frontend/node_modules/typescript/lib",
     "graphql-config.load.rootDir": "sveltekit",
     "js/ts.implicitProjectConfig.target": "ESNext",
-    
+
     // Formatting & Font
     "editor.formatOnSave": false,
     "html.format.templating": true,
@@ -119,7 +120,7 @@
     "python.analysis.typeEvaluation.enableReachabilityAnalysis": true,
     "python.analysis.typeEvaluation.strictDictionaryInference": true,
     "python.analysis.typeEvaluation.strictListInference": true,
-    "python.analysis.typeEvaluation.strictSetInference": true
+    "python.analysis.typeEvaluation.strictSetInference": true,
   },
   "extensions": {
     "recommendations": [

@@ -1,15 +1,22 @@
 <?php
+
 namespace WPLokerBJM\Core\Container\Definitions;
+
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, HookTargetResolver, WPHooksContainerRegistry, WPHooksRuntimeCache, WPHooksRuntimeRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
-use WPLokerBJM\Configs\CredentialConfig;
+use WPLokerBJM\Configs\Credential\CredentialConfig;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\PlanCache;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\PlanCompiler;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\ScopeAccessFactory;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
+use WPLokerBJM\Core\DependencyInjectorHookActions;
+use WPLokerBJM\Core\HooksRuntimeRegistryActions;
 use WPLokerBJM\Core\Plugins\PluginManagement;
 
 interface DefinitionProviderInterface
@@ -57,13 +64,13 @@ class Core implements DefinitionProviderInterface
             WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class)->constructor(
                 \DI\get(HookRuntimeResolver::class),
                 \DI\get(WPHooksRuntimeCache::class),
-                \DI\get(RuntimeWPHookProvider::class)
+                \DI\get(RuntimeWPHookProvider::class),
             ),
 
             DeferredHookManager::class => \DI\autowire(DeferredHookManager::class)->constructor(
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(ContainerInterface::class),
-                \DI\get(HookTargetResolver::class)
+                \DI\get(HookTargetResolver::class),
             ),
             WPHooksContainerRegistry::class => \DI\autowire(WPHooksContainerRegistry::class)->constructor(
                 \DI\get(ContainerInterface::class),
@@ -88,7 +95,7 @@ class Factory implements DefinitionProviderInterface
 
         return [
             ...self::getInstanceWithCredentials(),
-            ...self::dependencyService()
+            ...self::dependencyService(),
         ];
     }
 
@@ -100,9 +107,21 @@ class Factory implements DefinitionProviderInterface
             RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn(): array => CredentialConfig::RedisCredential()),
         ];
     }
-    private static function dependencyService():array {
-        return [
-            DependencyInjector::class => \DI\autowire(DependencyInjector::class)->constructor(\DI\get(ContainerInterface::class), static fn(): string => get_stylesheet_directory() . '/cache/DependencyInjectorCache.php')->lazy()
+    private static function dependencyService(): array
+    {
+        $dependencyInjector = [
+            PlanCompiler::class => \DI\autowire(PlanCompiler::class),
+            ScopeAccessFactory::class => \DI\autowire(ScopeAccessFactory::class),
+            PlanCache::class => \DI\autowire(PlanCache::class)->constructor(
+                static fn(): string => get_stylesheet_directory() . '/cache/DependencyInjectorCache.php'
+            ),
+            DependencyInjector::class => \DI\autowire(DependencyInjector::class)->constructor(
+                \DI\get(ContainerInterface::class),
+                \DI\get(ScopeAccessFactory::class),
+                \DI\get(PlanCache::class),
+                \DI\get(PlanCompiler::class),
+            ),
         ];
+        return $dependencyInjector;
     }
 }

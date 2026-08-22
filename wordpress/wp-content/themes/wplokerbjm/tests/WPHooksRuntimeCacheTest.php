@@ -14,7 +14,7 @@ class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
 
     protected function setUp(): void
     {
-        $this->dirPath = __DIR__ . '/cache/';
+        $this->dirPath = __DIR__ . '/cache-dir/';
         $this->file = $this->dirPath . 'WPHooksRuntimeCache.php';
 
         if (is_file($this->file)) {
@@ -24,11 +24,25 @@ class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
 
     protected function tearDown(): void
     {
+        parent::tearDown();
         if (is_file($this->file)) {
             unlink($this->file);
         }
 
         if (is_dir($this->dirPath)) {
+            rmdir($this->dirPath);
+        }
+        if (is_dir($this->dirPath)) {
+            $files = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($this->dirPath, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::CHILD_FIRST,
+            );
+
+            foreach ($files as $fileInfo) {
+                $todo = $fileInfo->isDir() ? 'rmdir' : 'unlink';
+                $todo($fileInfo->getRealPath());
+            }
+
             rmdir($this->dirPath);
         }
     }
@@ -214,7 +228,7 @@ class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
 
     public function testFlushCreatesMissingDirectory(): void
     {
-        $cacheDir = __DIR__ . '/cache';
+        $cacheDir = __DIR__ . '/cache-dir';
         $nestedDir = $cacheDir . '/' . bin2hex(random_bytes(4)) . '/nested/';
         $file = $nestedDir . 'WPHooksRuntimeCache.php';
         $cache = new WPHooksRuntimeCache($file);

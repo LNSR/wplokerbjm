@@ -197,6 +197,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         // Static closure typed with the TARGET class but defined OUTSIDE it
         // (scopeClass = ExecuteIfHookTest). bindToTarget's plan-driven
         // scope-only bind gives it access to ExecuteIfActionService privates.
+        /** @suppress PHP1416 */
         $gate = static function (ExecuteIfActionService $target): bool {
             return $target->isPrivateEnabled();
         };

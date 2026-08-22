@@ -8,7 +8,6 @@ use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Factories\JobDataFactory;
-use WPLokerBJM\Core\Theme\ThemeProp;
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
 
 /**
@@ -49,12 +48,11 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  *     social_media?: string|null,
  *     dpNonce?: string,
  * }
- * @phpstan-import-type ThemeData from ThemeProp
  * @phpstan-import-type JobData from JobDataFactory
  * @phpstan-import-type JobPostingSchema from JobSchemaOrg
  * @phpstan-import-type ItemListSchema from JobSchemaOrg
  */
-class GraphQLData
+class GraphQLJobData
 {
     
     public function __construct(
@@ -164,11 +162,8 @@ class GraphQLData
                 ],
                 CustomFields::SOCIAL_MEDIA => $jobdata[CustomFields::SOCIAL_MEDIA] ?? null,
                 'post_time' => get_post_time('c', false, $post_id),
+                'dpNonce' => is_user_logged_in() ? $noncePlugin('duplicate_post_new_draft', $post_id) : null,
             ];
-
-
-            if (is_user_logged_in())
-                $data['dpNonce'] = $noncePlugin('duplicate_post_new_draft', $post_id);
 
             $data = SharedUtils::filterEmptyValues($data);
 
