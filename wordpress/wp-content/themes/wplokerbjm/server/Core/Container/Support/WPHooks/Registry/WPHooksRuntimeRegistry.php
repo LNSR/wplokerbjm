@@ -1029,16 +1029,12 @@ class WPHooksRuntimeCache
     /** @var array<string, array<string, list<RuntimeHookMetadata>>> */
     private array $loaded = [];
 
-    private ?string $file = null;
-
     /**
-     * @param string $dirPath directory path cache to configure
+     * @param string|null $file file path cache to configure
      */
-    public function __construct(?string $dirPath = null)
+    public function __construct(private ?string $file = null)
     {
-        if ($dirPath) {
-            $nameFile = 'WPHooksRuntimeCache.php';
-            $this->file = is_string($dirPath) ? rtrim($dirPath, '/\\') . '/' . $nameFile : null;
+        if ($file !== null) {
             $this->load();
         }
     }

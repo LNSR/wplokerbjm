@@ -52,13 +52,17 @@ class PluginManagement
     ];
 
     public function __construct(private WPHooksContainerRegistry $hooksRegistry, private WPHooksRuntimeRegistry $hooksRuntimeRegistry) {}
+    
+    #[Action('muplugins_loaded', 0, once: true)]
+    public function __invoke(): void {
+        $this->unregisterInactivePluginHooks();
+        $this->hooksRuntimeRegistry->registerHooksOn($this->pluginEnvironmentCheck);
+    }
 
     /**
      * Purge all registered and deferred hooks for third-party integrations 
      * whose underlying WordPress plugins are inactive.
-     *
      */
-    #[Action('muplugins_loaded', once: true)]
     public function unregisterInactivePluginHooks(): void
     {
         foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
@@ -128,20 +132,7 @@ class PluginManagement
      * activation hooks steps
      * @var static::class
      */
-    #[Action('muplugins_loaded', 0, once: true)]
-    public private(set) AnonClassHookMetadata $pluginEnvironmentCheck { get => $this->pluginEnvironmentCheck ??= new class (self::class, __PROPERTY__, $this->hooksRuntimeRegistry) extends AnonClassHookMetadata {
-
-            public function __construct(
-            $parentClass,
-            $parentProperty,
-            private WPHooksRuntimeRegistry $runtimeRegistry,
-            ) {
-                parent::__construct($parentClass, $parentProperty);
-            }
-            public function __invoke()
-            {
-                $this->runtimeRegistry->registerHooksOn($this);
-            }
+    public private(set) AnonClassHookMetadata $pluginEnvironmentCheck { get => $this->pluginEnvironmentCheck ??= new class (self::class, __PROPERTY__) extends AnonClassHookMetadata {
 
             /**
              * Temporarily disable specific plugins if in development environment.

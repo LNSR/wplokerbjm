@@ -52,7 +52,7 @@ class Core implements DefinitionProviderInterface
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class))->lazy(),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, static fn() => get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class))->lazy(),
             WPHooksRuntimeCache::class => \DI\autowire(WPHooksRuntimeCache::class)->constructor(
-                static fn(): string => get_stylesheet_directory() . '/cache/'
+                static fn(): string => get_stylesheet_directory() . '/cache/WPHooksRuntimeCache.php'
             ),
             WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class)->constructor(
                 \DI\get(HookRuntimeResolver::class),

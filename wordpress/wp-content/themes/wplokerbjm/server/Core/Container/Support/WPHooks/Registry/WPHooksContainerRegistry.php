@@ -838,7 +838,7 @@ class WPHooksContainerRegistry
  * @internal not for external use beyond @see WPHooksContainerRegistry
  * 
  * @template TargetClass of object|class-string
- * @phpstan-type HookTargetResolve TargetClass|callable|string|array{TargetClass, string}
+ * @phpstan-type HookTargetResolve TargetClass|callable|string|array
  * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-import-type CallableHookParams from HookProviderTrait
  * @phpstan-import-type HookType from HookRegistration

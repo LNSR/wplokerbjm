@@ -145,6 +145,70 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $this->injector($container)->injectOn($this->typedChild());
     }
 
+    public function testInjectsArrayCallableAsBoundClosure(): void
+    {
+        $provider = new CallableProvider();
+        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $target = new class (self::class, 'callable') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'secret'])]
+            private \Closure $secret;
+
+            public function secret(int $value): int
+            {
+                return ($this->secret)($value);
+            }
+        };
+
+        $this->injector($container)->injectOn($target);
+
+        $this->assertSame(42, $target->secret(21));
+    }
+
+    public function testInjectsArrayCallablePublicMethod(): void
+    {
+        $provider = new CallableProvider();
+        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $target = new class (self::class, 'callable-public') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'publicValue'])]
+            private \Closure $publicValue;
+
+            public function publicValue(int $value): int
+            {
+                return ($this->publicValue)($value);
+            }
+        };
+
+        $this->injector($container)->injectOn($target);
+
+        $this->assertSame(6, $target->publicValue(5));
+    }
+
+    public function testRejectsArrayCallableOnNonClosureProperty(): void
+    {
+        $target = new class (self::class, 'bad-callable') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'secret'])]
+            private object $dependency;
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('\\Closure-typed');
+
+        $this->injector($this->containerReturning([]))->injectOn($target);
+    }
+
+    public function testRejectsArrayCallableWithUnknownMethod(): void
+    {
+        $target = new class (self::class, 'bad-method') extends AsChildClass {
+            #[Inject([CallableProvider::class, 'nope'])]
+            private \Closure $dependency;
+        };
+
+        $this->expectException(\InvalidArgumentException::class);
+        $this->expectExceptionMessage('does not exist');
+
+        $this->injector($this->containerReturning([]))->injectOn($target);
+    }
+
     protected function tearDown(): void
     {
         foreach ($this->cacheFiles as $cacheFile) {
@@ -176,7 +240,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     private function newCacheFile(): string
     {
-        $cacheFile = './cache' . bin2hex(random_bytes(8)) . '.php';
+        $cacheFile =  __DIR__ . '/cache/' . bin2hex(random_bytes(8)) . '.php';
         $this->cacheFiles[] = $cacheFile;
 
         return $cacheFile;
@@ -196,4 +260,17 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
 final class NamedDependencyChild extends AsChildClass
 {
+}
+
+final class CallableProvider
+{
+    private function secret(int $value): int
+    {
+        return $value * 2;
+    }
+
+    public function publicValue(int $value): int
+    {
+        return $value + 1;
+    }
 }

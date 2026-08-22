@@ -14,8 +14,12 @@ class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
 
     protected function setUp(): void
     {
-        $this->dirPath = __DIR__ . '/cache_dir';
-        $this->file = $this->dirPath . '/WPHooksRuntimeCache.php';
+        $this->dirPath = __DIR__ . '/cache/';
+        $this->file = $this->dirPath . 'WPHooksRuntimeCache.php';
+
+        if (is_file($this->file)) {
+            unlink($this->file);
+        }
     }
 
     protected function tearDown(): void
@@ -58,46 +62,46 @@ class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
 
         // Simulates a cache file written by the pre-DTO version: raw arrays.
         file_put_contents($this->file, <<<'PHP'
-<?php
+            <?php
 
-declare(strict_types=1);
+            declare(strict_types=1);
 
-/**
- * Auto-generated WP Hooks Runtime Cache
- * Generated at: 2026-08-13 10:00:00
- */
+            /**
+             * Auto-generated WP Hooks Runtime Cache
+             * Generated at: 2026-08-13 10:00:00
+             */
 
-return [
-    'Service' => [
-        'prop' => [
-            [
-                'hook' => 'my_hook',
-                'type' => 'action',
-                'priority' => 10,
-                'acceptedArgs' => 1,
-                'once' => false,
-                'executeIf' => static function (): bool {
-                    return true;
-                },
-                'executeIfParams' => [],
-                'registerIf' => null,
-                'registerIfParams' => [],
-                'deferRegisterUntilHook' => null,
-                'deferRegisterUntilHookParams' => [],
-                'hookArgNames' => ['c'],
-                'target' => 'method',
-                'targetName' => 'onMyHook',
-                'visibility' => 'public',
-            ],
-        ],
-    ],
-];
-PHP);
+            return [
+                'Service' => [
+                    'prop' => [
+                        [
+                            'hook' => 'my_hook',
+                            'type' => 'action',
+                            'priority' => 10,
+                            'acceptedArgs' => 1,
+                            'once' => false,
+                            'executeIf' => static function (): bool {
+                                return true;
+                            },
+                            'executeIfParams' => [],
+                            'registerIf' => null,
+                            'registerIfParams' => [],
+                            'deferRegisterUntilHook' => null,
+                            'deferRegisterUntilHookParams' => [],
+                            'hookArgNames' => ['c'],
+                            'target' => 'method',
+                            'targetName' => 'onMyHook',
+                            'visibility' => 'public',
+                        ],
+                    ],
+                ],
+            ];
+            PHP);
     }
 
     public function testSetGetRoundTrip(): void
     {
-        $cache = new WPHooksRuntimeCache($this->dirPath);
+        $cache = new WPHooksRuntimeCache($this->file);
         $meta = $this->sampleMetadata();
 
         $cache->set('Service', 'prop', [$meta]);
@@ -109,7 +113,7 @@ PHP);
 
     public function testFlushWritesFileAndLoadRoundTrips(): void
     {
-        $cache = new WPHooksRuntimeCache($this->dirPath);
+        $cache = new WPHooksRuntimeCache($this->file);
         $cache->set('Service', 'prop', [$this->sampleMetadata()]);
 
         $cache->flush();
@@ -121,7 +125,7 @@ PHP);
         $this->assertStringContainsString('return [', $content);
 
         // A fresh instance loads the flushed file from the configured directory and hydrates DTOs again.
-        $fresh = new WPHooksRuntimeCache($this->dirPath);
+        $fresh = new WPHooksRuntimeCache($this->file);
         $entries = $fresh->get('Service', 'prop');
         $this->assertIsArray($entries);
         $this->assertCount(1, $entries);
@@ -135,11 +139,11 @@ PHP);
 
     public function testGetPrecedenceLoadedOverBuffer(): void
     {
-        $cache = new WPHooksRuntimeCache($this->dirPath);
+        $cache = new WPHooksRuntimeCache($this->file);
         $cache->set('Service', 'prop', [$this->sampleMetadata()]);
         $cache->flush();
 
-        $second = new WPHooksRuntimeCache($this->dirPath);
+        $second = new WPHooksRuntimeCache($this->file);
         $bufferMeta = new RuntimeHookMetadata(
             hook: 'buffered_hook',
             type: 'filter',
@@ -170,14 +174,14 @@ PHP);
     {
         $this->writeStaleArrayFormatFile();
 
-        $cache = new WPHooksRuntimeCache($this->dirPath); // loads stale arrays from directory
+        $cache = new WPHooksRuntimeCache($this->file); // loads stale arrays from directory
 
         $cache->flush(); // must not throw TypeError
 
         $this->assertFileExists($this->file);
 
         // The rewritten file still round-trips into DTOs.
-        $fresh = new WPHooksRuntimeCache($this->dirPath);
+        $fresh = new WPHooksRuntimeCache($this->file);
         $entries = $fresh->get('Service', 'prop');
         $this->assertIsArray($entries);
         $this->assertCount(1, $entries);
@@ -189,7 +193,7 @@ PHP);
 
     public function testClearCacheFile(): void
     {
-        $cache = new WPHooksRuntimeCache($this->dirPath);
+        $cache = new WPHooksRuntimeCache($this->file);
         $cache->set('Service', 'prop', [$this->sampleMetadata()]);
         $cache->flush();
         $this->assertFileExists($this->file);
@@ -210,18 +214,29 @@ PHP);
 
     public function testFlushCreatesMissingDirectory(): void
     {
-        $nestedDir = sys_get_temp_dir() . '/wplokerbjm-rtcache-' . bin2hex(random_bytes(4)) . '/nested';
-        $file = $nestedDir . '/WPHooksRuntimeCache.php';
-        $cache = new WPHooksRuntimeCache($nestedDir);
+        $cacheDir = __DIR__ . '/cache';
+        $nestedDir = $cacheDir . '/' . bin2hex(random_bytes(4)) . '/nested/';
+        $file = $nestedDir . 'WPHooksRuntimeCache.php';
+        $cache = new WPHooksRuntimeCache($file);
         $cache->set('Service', 'prop', [$this->sampleMetadata()]);
 
         try {
             $cache->flush();
             $this->assertFileExists($file);
         } finally {
-            @unlink($file);
-            @rmdir($nestedDir);
-            @rmdir(dirname($nestedDir));
+            if (is_dir($cacheDir)) {
+                $files = new \RecursiveIteratorIterator(
+                    new \RecursiveDirectoryIterator($cacheDir, \RecursiveDirectoryIterator::SKIP_DOTS),
+                    \RecursiveIteratorIterator::CHILD_FIRST,
+                );
+
+                foreach ($files as $fileInfo) {
+                    $todo = $fileInfo->isDir() ? 'rmdir' : 'unlink';
+                    $todo($fileInfo->getRealPath());
+                }
+
+                rmdir($cacheDir);
+            }
         }
     }
 }

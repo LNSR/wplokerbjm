@@ -272,7 +272,6 @@ class LanguageHooks
         registerIf: static function (): bool {
                 return !is_admin();
                 },
-
     )]
     public function frontendLocalHTMLl10n(string $locale): string
     {
@@ -500,12 +499,12 @@ class ShutdownHooks
     #[Action('shutdown', PHP_INT_MAX, once: true)]
     public function __invoke()
     {
-        // noop
+        Logger::flush();
     }
 
     public function __destruct()
     {
         Logger::flush();
     }
-    
+
 }

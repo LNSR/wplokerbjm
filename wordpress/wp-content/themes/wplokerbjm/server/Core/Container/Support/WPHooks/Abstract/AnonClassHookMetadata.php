@@ -32,24 +32,15 @@ use WPLokerBJM\Shared\Log\Logger;
 abstract class AnonClassHookMetadata extends AsChildClass
 {
 
-     /**
+    /**
      * @param T $parentClass    The class-string containing this hook, or the
      *                                            parent object to resolve via get_class().
      * @param string              $parentProperty The property name holding this instance.
      */
     public function __construct(
-        private string|object $parentClass,
-        public private(set) string $parentProperty,
+        private readonly string|object $parentClass,
+        public private(set) readonly string $parentProperty,
     ) {
         parent::__construct($parentClass, $parentProperty);
-    }
-
-    /**
-     * Resolve the parent class-string, normalizing an object parent via get_class().
-     * @return class-string
-     */
-    public function getParentClass(): string
-    {
-        return is_object($this->parentClass) ? get_class($this->parentClass) : $this->parentClass;
     }
 }
