@@ -65,67 +65,6 @@ final class ProxyContainer
         return self::$container;
     }
 
-    /**
-     * Invoke a private/protected method on an object using reflection.
-     *
-     * @param object $object The object instance
-     * @param string $methodName The method name to invoke
-     * @param array $args Arguments to pass to the method
-     * @return mixed The method's return value
-     * @throws \ReflectionException If method doesn't exist or can't be accessed
-     */
-    public static function invokePrivateMethod(object $object, string $methodName, array $args = []): mixed
-    {
-        $reflection = new \ReflectionObject($object);
-        $method = $reflection->getMethod($methodName);
-        return $method->invoke($object, ...$args);
-    }
-
-    /**
-     * Get a private/protected property value from an object using reflection.
-     *
-     * @param object $object The object instance
-     * @param string $propertyName The property name to access
-     * @return mixed The property value
-     * @throws \ReflectionException If property doesn't exist or can't be accessed
-     */
-    public static function getPrivateProperty(object $object, string $propertyName): mixed
-    {
-        $reflection = new \ReflectionObject($object);
-        $property = $reflection->getProperty($propertyName);
-        return $property->getValue($object);
-    }
-
-    /**
-     * Set a private/protected property value on an object using reflection.
-     *
-     * @param object $object The object instance
-     * @param string $propertyName The property name to set
-     * @param mixed $value The value to set
-     * @throws \ReflectionException If property doesn't exist or can't be accessed
-     */
-    public static function setPrivateProperty(object $object, string $propertyName, mixed $value): void
-    {
-        $reflection = new \ReflectionObject($object);
-        $property = $reflection->getProperty($propertyName);
-        $property->setValue($object, $value);
-    }
-
-    /**
-     * Get a private/protected static method using reflection.
-     *
-     * @param string $className The class name
-     * @param string $methodName The method name to access
-     * @return mixed The method's return value
-     * @throws \ReflectionException If method doesn't exist or can't be accessed
-     */
-    public static function getPrivateStaticMethod(string $className, string $methodName): mixed
-    {
-        $reflection = new \ReflectionClass($className);
-        $method = $reflection->getMethod($methodName);
-        return $method->invoke(null);
-    }
-
     private static function themeRoot(): string
     {
         // tests/Support -> tests -> theme root

@@ -12,7 +12,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  * LoggerFlushHooks (see GlobalHooks.php). If the batch write fails, each
  * entry is written individually as a graceful fallback.
  *
- * @phpstan-type LogLevel 'DEBUG'|'INFO'|'WARNING'|'ERROR'
+ * @phpstan-type LogLevel 'DEBUG'|'INFO'|'WARNING'|'ERROR'|key-of<Logger::LEVEL_*>
  * @phpstan-type LogEntry array{timestamp: string, environment: string, level: string, category: string, message: string, context: array}
  */
 class Logger
@@ -81,7 +81,7 @@ class Logger
      * Attempts a single batch write; if it fails, falls back to writing
      * each entry individually. The buffer is cleared regardless of outcome.
      * Safe against re-entry (nested calls during flush are no-ops).
-     * @see \WPLokerBJM\Core\LoggerHooks::flushBuffer() use this to setup logger
+     * @see \WPLokerBJM\Core\ShutdownHooks use this to setup logger
      * ! Strictly used only during Wordpress shutdown hook
      */
     public static function flush(): void
@@ -100,7 +100,7 @@ class Logger
         }
 
         // Format all entries
-        $formatted = array_map([self::class, 'formatEntry'], $entries);
+        $formatted = array_map(self::formatEntry(...), $entries);
         $batch = implode("\n", $formatted);
 
         // Try batch write; fall back to individual writes on failure

@@ -6,8 +6,9 @@ namespace WPLokerBJM\Tests;
 
 use DI\ContainerBuilder;
 use DI\Container;
-use ReflectionClass;
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksRegistry, LazyHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyHookHandler;
 use WPLokerBJM\Tests\Support\Fixtures\FilterService;
 use WPLokerBJM\Tests\Support\Fixtures\LazyHookService;
 use WPLokerBJM\Tests\Support\Fixtures\MethodDeferredService;
@@ -18,10 +19,10 @@ use WPLokerBJM\Tests\Support\Fixtures\ThrowingActionService;
 use WPLokerBJM\Tests\Support\Fixtures\ThrowingFilterService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
-class LazyHookHandlerTest extends WplokerbjmTestCase
+class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
 {
     private Container $container;
-    private WPHooksRegistry $registry;
+    private WPHooksContainerRegistry $registry;
 
     protected function setUp(): void
     {
@@ -32,7 +33,8 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $this->container = $builder->build();
 
-        $this->registry = new WPHooksRegistry($this->container, []);
+        $targetResolver = new HookTargetResolver();
+        $this->registry = $this->createRegistry([], $this->container);
 
         LazyHookService::reset();
         FilterService::reset();
@@ -43,9 +45,12 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
 
     private function seedRegistrations(array $registrations): void
     {
-        $ref = new ReflectionClass($this->registry);
-        $method = $ref->getMethod('registerAll');
-        $method->invoke($this->registry, $registrations);
+        $bind = \Closure::bind(
+            static fn (WPHooksContainerRegistry $registry, array $hooksRegistration) => $registry->registerAll($hooksRegistration),
+            null,
+            WPHooksContainerRegistry::class
+        );
+        $bind($this->registry, $registrations);
     }
 
     public function testMethodActionProducesSideEffect(): void
@@ -60,7 +65,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'lazy_action_hook',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -90,7 +95,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'lazy_filter_hook',
             'priority' => 10,
             'accepted_args' => 2,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -115,7 +120,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'throwing_action_hook',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -139,7 +144,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'throwing_filter_hook',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -163,7 +168,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'deferred_method_action',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => true,
+            'defer_register' => true,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -196,7 +201,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'ghost_hook',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -206,7 +211,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
         $this->assertNull($this->findRegisteredHook('filter', 'ghost_hook'));
     }
 
-    public function testMethodHookUsesLazyHookHandlerInstance(): void
+    public function testMethodHookUsesContainerLazyHookHandlerInstance(): void
     {
         $service = new LazyHookService();
         $this->container->set(LazyHookService::class, $service);
@@ -218,7 +223,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'handler_type_check',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'public',
         ]]);
@@ -229,7 +234,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
         $this->assertNotNull($hook);
 
         $handler = $hook['callable'];
-        $this->assertInstanceOf(LazyHookHandler::class, $handler);
+        $this->assertInstanceOf(ContainerLazyHookHandler::class, $handler);
         $this->assertStringContainsString('onAction', $handler->label);
     }
 
@@ -246,7 +251,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
                 'hook' => 'multi_priority_method_filter',
                 'priority' => 10,
                 'accepted_args' => 1,
-                'defer' => false,
+                'defer_register' => false,
                 'target' => 'method',
                 'visibility' => 'public',
             ],
@@ -257,7 +262,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
                 'hook' => 'multi_priority_method_filter',
                 'priority' => 20,
                 'accepted_args' => 1,
-                'defer' => false,
+                'defer_register' => false,
                 'target' => 'method',
                 'visibility' => 'public',
             ],
@@ -292,7 +297,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'protected_method_action',
             'priority' => 10,
             'accepted_args' => 0,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'protected',
         ]]);
@@ -318,7 +323,7 @@ class LazyHookHandlerTest extends WplokerbjmTestCase
             'hook' => 'private_method_filter',
             'priority' => 10,
             'accepted_args' => 1,
-            'defer' => false,
+            'defer_register' => false,
             'target' => 'method',
             'visibility' => 'private',
         ]]);

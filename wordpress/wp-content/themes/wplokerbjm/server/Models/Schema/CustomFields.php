@@ -3,6 +3,7 @@
 namespace WPLokerBJM\Models\Schema;
 use DI\Attribute\Injectable;
 use WPLokerBJM\Core\Container\Attributes\Filter;
+use WPLokerBJM\Shared\Utilities\PluginList;
 
 /**
  * Custom Fields Schema
@@ -59,7 +60,7 @@ class CustomFields
 
     public const TEXT_FIELDS = [
         self::NAMA_PERUSAHAAN,
-        self::NOMOR_KONTAK
+        self::NOMOR_KONTAK,
     ];
 
     public const WYSIWYG_FIELDS = [
@@ -69,7 +70,7 @@ class CustomFields
         self::CARA_MELAMAR,
         self::BENEFIT,
     ];
-    
+
     public const INT_FIELDS = [
         self::UMUR_MIN,
         self::UMUR_MAX,
@@ -79,7 +80,9 @@ class CustomFields
         self::STATUS_PEKERJAAN,
     ];
 
-    #[Filter('rwmb_meta_boxes')]
+    #[Filter('rwmb_meta_boxes', registerIf: static function (): bool {
+            return PluginList::MetaBox->isActive();
+            })]
     public function lowongan_meta_boxes($meta_boxes)
     {
         $prefix = '';

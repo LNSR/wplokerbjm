@@ -12,6 +12,7 @@ use Psl\Shell;
 use Psl\Shell\Exception\FailedExecutionException;
 use Psl\Str;
 use Psl\Vec;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksRuntimeRegistry;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -178,18 +179,17 @@ function createBoilerplate(): string
 /**
  * Render metadata blocks using registerArgumentsSet for DRY hook lists.
  *
- * Defines sets once, then references them via argumentsSet() in each
- * expectedArguments() block — no more repeating the same long lists.
- *
  * @param list<string> $actions
  * @param list<string> $filters
+ * @param list<string> $tags
  */
-function renderMetadataSection(array $actions, array $filters): string
+function renderMetadataSection(array $actions, array $filters, array $tags = []): string
 {
     $result = '';
     $unit = 0;
     $listHooksAction = 'wp_hooks_actions';
     $listHooksFilter = 'wp_hooks_filters';
+    $listHooksTags = 'wp_hooks_tags';
 
     // ── 1. registerArgumentsSet: actions ────────────────────────────────
     $unit++;
@@ -201,54 +201,140 @@ function renderMetadataSection(array $actions, array $filters): string
     $result .= "    // Unit #{$unit}: registerArgumentsSet — filter hooks\n";
     $result .= renderArgumentsSet($listHooksFilter, $filters) . "\n\n";
 
-    // ── 3. expectedArguments blocks referencing the sets ────────────────
-    // NOTE: argumentsSet() CANNOT nest inside registerArgumentsSet() in
-    // Intelephense. For methods that need both + filters, we pass multiple
-    // argumentsSet() calls as separate positional args
+    // ── 3. registerArgumentsSet: tags (grouping metadata) ───────────────
+    if ($tags !== []) {
+        $unit++;
+        $result .= "    // Unit #{$unit}: registerArgumentsSet — hook tags\n";
+        $result .= renderArgumentsSet($listHooksTags, $tags) . "\n\n";
+    }
+
+    // ── 4. expectedArguments blocks referencing the sets ────────────────
+    // Format: [Comment => [Target, ParamIndex, [ArgumentSets]]]
     $expectedBlocks = [
         'Action hooks for #[Action] attribute' => [
             '\\WPLokerBJM\\Core\\Container\\Attributes\\Action::__construct()',
+            0,
             ["argumentsSet('{$listHooksAction}')"],
         ],
         'Filter hooks for #[Filter] attribute' => [
             '\\WPLokerBJM\\Core\\Container\\Attributes\\Filter::__construct()',
+            0,
             ["argumentsSet('{$listHooksFilter}')"],
         ],
-        'Hooks for \do_action()' => [
-            '\do_action()',
+        'Action hooks for #[Action] attribute for deferUntilHookExecute' => [
+            '\\WPLokerBJM\\Core\\Container\\Attributes\\Action::__construct()',
+            6,
+            ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
+        ],
+        'Filter hooks for #[Filter] attribute for deferUntilHookExecute' => [
+            '\\WPLokerBJM\\Core\\Container\\Attributes\\Filter::__construct()',
+            6,
+            ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
+        ],
+        'Hooks for \\do_action()' => [
+            '\\do_action()',
+            0,
             ["argumentsSet('{$listHooksAction}')"],
         ],
-        'Hooks for \apply_filters()' => [
-            '\apply_filters()',
+        'Hooks for \\remove_all_actions()' => [
+            '\\remove_all_actions()',
+            0,
+            ["argumentsSet('{$listHooksAction}')"],
+        ],
+        'Hooks for \\remove_all_filters()' => [
+            '\\remove_all_filters()',
+            0,
             ["argumentsSet('{$listHooksFilter}')"],
         ],
-        'Hooks for \add_action()' => [
-            '\add_action()',
+        'Hooks for \\apply_filters()' => [
+            '\\apply_filters()',
+            0,
+            ["argumentsSet('{$listHooksFilter}')"],
+        ],
+        'Hooks for \\add_action()' => [
+            '\\add_action()',
+            0,
             ["argumentsSet('{$listHooksAction}')"],
         ],
-        'Hooks for \add_filter()' => [
-            '\add_filter()',
+        'Hooks for \\add_filter()' => [
+            '\\add_filter()',
+            0,
             ["argumentsSet('{$listHooksFilter}')"],
         ],
         'List hooks (deferred) to register' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooksRegistry::activateDeferredByHook()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksContainerRegistry::activateDeferredByHook()',
+            0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
+        'List Filter to register for runtime instance' => [
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::registerFilter()',
+            0,
+            ["argumentsSet('{$listHooksFilter}')"],
+        ],
+        'List Action hooks to register for runtime instance' => [
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::registerAction()',
+            0,
+            ["argumentsSet('{$listHooksAction}')"],
+        ],
         'List hooks to unregister' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooksRegistry::unregisterByHook()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksContainerRegistry::unregisterByHook()',
+            0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
         'List hooks (deferred) to unregister' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooksRegistry::unregisterDeferredByHook()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksContainerRegistry::unregisterDeferredByHook()',
+            0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
     ];
 
-    foreach ($expectedBlocks as $comment => [$target, $args]) {
+    if ($tags !== []) {
+        $expectedBlocks += [
+            // Single String Autocomplete for $tag (index 5)
+            'Tag hooks for #[Action] attribute' => [
+                '\\WPLokerBJM\\Core\\Container\\Attributes\\Action::__construct()',
+                5,
+                ["argumentsSet('{$listHooksTags}')"],
+            ],
+            'Tag hooks for #[Filter] attribute' => [
+                '\\WPLokerBJM\\Core\\Container\\Attributes\\Filter::__construct()',
+                5,
+                ["argumentsSet('{$listHooksTags}')"],
+            ],
+            // Array Element Autocomplete for $tag (tag: ['...'])
+            'Tag array elements for #[Action] attribute' => [
+                'elementType(\\WPLokerBJM\\Core\\Container\\Attributes\\Action::__construct(), 5)',
+                0,
+                ["argumentsSet('{$listHooksTags}')"],
+            ],
+            'Tag array elements for #[Filter] attribute' => [
+                'elementType(\\WPLokerBJM\\Core\\Container\\Attributes\\Filter::__construct(), 5)',
+                0,
+                ["argumentsSet('{$listHooksTags}')"],
+            ],
+            'Hook tags (deferred) to activate' => [
+                '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::activateDeferredByTags()',
+                0,
+                ["argumentsSet('{$listHooksTags}')"],
+            ],
+            'Hook tags to unregister' => [
+                '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::unregisterByTags()',
+                0,
+                ["argumentsSet('{$listHooksTags}')"],
+            ],
+            'Hook tags (deferred) to unregister' => [
+                '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\WPHooksContainerRegistry::unregisterDeferredByTags()',
+                0,
+                ["argumentsSet('{$listHooksTags}')"],
+            ],
+        ];
+    }
+
+    foreach ($expectedBlocks as $comment => [$target, $paramIndex, $args]) {
         $unit++;
         $renderedArgs = Str\join($args, ",\n        ");
         $result .= "    // Unit #{$unit}: {$comment}\n";
-        $result .= "    expectedArguments(\n        {$target},\n        0,\n        {$renderedArgs},\n    );\n\n";
+        $result .= "    expectedArguments(\n        {$target},\n        {$paramIndex},\n        {$renderedArgs},\n    );\n\n";
     }
 
     return Str\trim_right($result, "\n");

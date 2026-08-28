@@ -2,6 +2,7 @@
 namespace WPLokerBJM\Shared\Cache;
 
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * Object Cache management
@@ -52,6 +53,7 @@ class Cache
                 return false;
             }
             $result = wp_cache_get($key, CacheKey::OBJECT_CACHE_PREFIX);
+            SharedUtils::isDevelopment() && Logger::info('Cache', "Cache get result for key '{$key}': " . ($result ? 'success' : 'failure'));
             return $result;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::get error: ' . $e->getMessage());

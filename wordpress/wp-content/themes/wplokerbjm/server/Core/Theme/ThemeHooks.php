@@ -1,12 +1,14 @@
 <?php
+
 namespace WPLokerBJM\Core\Theme;
-use DI\Attribute\Injectable;
+
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+
 /**
  * Leverage Wordpress theme feature for easier assets (logo,favicon,etc) management and integrate to frontend
  * @phpstan-type LogoData array{
- *  logoDecoding: string,
+ *  logoDecoding: 'async'|'auto'|'none',
  *  logoHeight: int,
  *  logoSizes: string,
  *  logoSrcset: string,
@@ -19,8 +21,9 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  *  wpRestNonce?: string
  * }
  */
-class ThemeInject
+class ThemeProp
 {
+    public const THEME_HOOK = 'wplokerbjm_graphql_theme_data';
 
     /**
      * Register theme supports and image sizes.
@@ -212,6 +215,7 @@ class ThemeInject
      *   head elements when hydrating client code.
      * @return ThemeData
      */
+    #[Filter(ThemeProp::THEME_HOOK)]
     public function themeData(): array
     {
         $loggedIn = is_user_logged_in();
@@ -219,6 +223,7 @@ class ThemeInject
         $cacheKey = $loggedIn
             ? CacheKey::THEME_DATA . '_user_' . (int) get_current_user_id()
             : CacheKey::THEME_DATA . '_anonymous';
+        /** @var ThemeData|false */
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             if ($loggedIn) {
@@ -255,11 +260,8 @@ class ThemeInject
                 'logoHeight' => intval($logoData['height'] ?? 0),
             ],
             'siteIconTags' => $siteIconTags,
+            'wpRestNonce' => $loggedIn ? graphql_get_nonce() : null
         ];
-
-        if ($loggedIn) {
-            $wpThemeData['wpRestNonce'] = wp_create_nonce('wp_rest');
-        }
 
         Cache::set($cacheKey, $wpThemeData, 86400); // Cache for 1 day
 

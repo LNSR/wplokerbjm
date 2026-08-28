@@ -9,7 +9,7 @@ type JobDetailPostMetaData = Omit<WPBasePost, keyof Pick<WPBasePost, 'permalink'
 export interface JobDetailResponse extends JobDetailPostMetaData, Pick<MetaBox, 'nama_perusahaan' | 'tentang_perusahaan' | 'deskripsi_pekerjaan' | 'persyaratan' | 'cara_melamar' | 'benefit' | 'social_media'>
 {
   dpNonce?: string | null; // Nonce for plugin 'Yoast Duplicate Post'
-  ringkasanPekerjaan?: JobSummary;
+  ringkasanPekerjaan?: JobSummary | null;
   contacts?: JobContactRow;
   post_time: string;
 }

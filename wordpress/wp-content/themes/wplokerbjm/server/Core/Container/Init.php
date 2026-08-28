@@ -2,13 +2,14 @@
 
 namespace WPLokerBJM\Core\Container;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Bootstrap;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 
 /**
  * Initializes core services in the wplokerbjm theme by registering WordPress hooks.
  *
- * Delegates to WPHooksRegistry which stores hooks as identifiable
- * LazyHookHandler instances, enabling unregistration by class/method.
+ * Delegates to WPHooksContainerRegistry which stores hooks as identifiable
+ * ContainerLazyHookHandler instances, enabling unregistration by class/method.
  *
  * Each hook defers container resolution to the moment WordPress fires it.
  * The underlying service is NOT instantiated during `initialize()` —
@@ -17,7 +18,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
  *
  * ## Usage
  * Call `initialize()` to register all discovered hooks with WordPress.
- * ! initialized in MU_PLUGIN_DIR.'/wplokerbjm-bootstrap.php'
+ * @see Bootstrap
  * @see \WPLokerBJM\Core\Container\Definitions\Core
  */
 class Init
@@ -25,7 +26,7 @@ class Init
     private bool $initialized = false;
 
     public function __construct(
-        private readonly WPHooksRegistry $registry,
+        private readonly WPHooksContainerRegistry $registry,
     ) {}
 
     /**

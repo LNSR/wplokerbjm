@@ -94,6 +94,8 @@ declare global
       clientIp?: string;
       /** wordpress its post last modified time */
       postTime?: string;
+      /** True when serving a draft/preview job (applies no-store + noindex). */
+      isPreview?: boolean;
     }
 
     interface PageData

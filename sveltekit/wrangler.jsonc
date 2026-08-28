@@ -2,7 +2,7 @@
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "wplokerbjm",
   "account_id": "5996bc6e6329a2824240d44bc86bcc03",
-  "compatibility_date": "2026-07-14",
+  "compatibility_date": "2026-08-26",
   "compatibility_flags": [
     "nodejs_compat",
     "enable_nodejs_http_modules",

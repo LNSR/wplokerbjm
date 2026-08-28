@@ -58,7 +58,7 @@ runs:
 
     - name: Update and verify Bun installation
       run: |
-        bun upgrade --canary
+        bun upgrade --stable
         echo "Bun: $(bun --version || echo 'bun not found')"
       shell: bash
 

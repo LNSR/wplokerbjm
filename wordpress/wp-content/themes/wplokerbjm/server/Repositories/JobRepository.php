@@ -1,19 +1,19 @@
 <?php
 
 namespace WPLokerBJM\Repositories;
-use WPLokerBJM\Services\GraphQL\GraphQLData;
+use WPLokerBJM\Services\GraphQL\GraphQLJobData;
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
 /**
  * Job Repository
  * 
  * Provides methods to interact with job meta data using Meta Box functions
- * @phpstan-import-type CardData from GraphQLData
+ * @phpstan-import-type CardData from GraphQLJobData
  * @phpstan-import-type JobPostingSchema from JobSchemaOrg
  */
 class JobRepository
 {
     public function __construct(
-        private GraphQLData $restData,
+        private GraphQLJobData $restData,
         private JobSchemaOrg $jobSchema
     ) {
     }

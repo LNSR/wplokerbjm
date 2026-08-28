@@ -1,33 +1,31 @@
 <?php
 namespace WPLokerBJM\Controllers\GraphQL\Resolvers;
 
+use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-use WPLokerBJM\Services\GraphQL\GraphQLData;
+use WPLokerBJM\Services\GraphQL\GraphQLJobData;
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
 use DI\Attribute\Injectable;
+use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
 
 /**
- * @phpstan-import-type CardData from GraphQLData
- * @phpstan-import-type JobDetailData from GraphQLData
- * @phpstan-import-type JobPostingSchema from JobSchemaOrg
- * @phpstan-import-type ItemListSchema from JobSchemaOrg
+ * @phpstan-import-type CardData from GraphQLJobData
+ * @phpstan-import-type JobDetailData from GraphQLJobData
  * @phpstan-import-type SearchFilters from JobQuery
  * @phpstan-import-type JobGridData from JobGrid
  * @phpstan-import-type CarouselData from JobCarousel
- * @phpstan-import-type AutoSuggestionsArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
- * @phpstan-import-type LoadMoreArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
- * @phpstan-import-type JobGridArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
- * @phpstan-import-type JobDetailArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
- * @phpstan-import-type JobSchemaArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
- * @phpstan-import-type SearchJobsArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
- * @phpstan-import-type RankMathHeadArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
- * @phpstan-import-type SyncBookmarkArgs from \WPLokerBJM\Services\GraphQL\GraphQLRegistration
+ * @phpstan-import-type AutoSuggestionsArgs from GraphQLRegistration
+ * @phpstan-import-type LoadMoreArgs from GraphQLRegistration
+ * @phpstan-import-type JobGridArgs from GraphQLRegistration
+ * @phpstan-import-type JobDetailArgs from GraphQLRegistration
+ * @phpstan-import-type SearchJobsArgs from GraphQLRegistration
+ * @phpstan-import-type SyncBookmarkArgs from GraphQLRegistration
  * 
  * @phpstan-type Context 'latest'|'search'
  * @phpstan-type Filters SearchFilters
@@ -38,12 +36,11 @@ use DI\Attribute\Injectable;
 class JobsDataResolver
 {
     public function __construct(
-        private readonly GraphQLData $graphqlData,
+        private readonly GraphQLJobData $graphqlData,
         private readonly JobCarousel $jobCarouselPresenter,
         private readonly JobRepository $jobRepository,
         private readonly JobGrid $jobGridPresenter,
-    ) {
-    }
+    ) {}
 
     /**
      * @return CarouselData
@@ -78,7 +75,9 @@ class JobsDataResolver
     {
         try {
             $paged = $args['paged'] ?? 1;
+            /** @var LoadMoreArgs['context'] $context */
             $context = $args['context'] ?? 'latest';
+            /** @var LoadMoreArgs['filters'] $filters */
             $filters = $args['filters'] ?? [];
 
             if ($paged < 1) {
@@ -90,10 +89,12 @@ class JobsDataResolver
             $cached = Cache::get($cacheKey);
 
             if ($cached !== false) {
-                return ($cached['data'] + ['filters' => $filters]) + [
+                /** @var LoadMoreResponse $result */
+                $result = $cached['data'] + ['filters' => $filters] + [
                     'total' => $cached['total'],
                     'maxNumPages' => $cached['maxNumPages'],
                 ];
+                return $result;
             }
 
             $argsQuery = match ($context) {
@@ -102,7 +103,7 @@ class JobsDataResolver
             };
 
             $result = $this->jobRepository->queryJob($argsQuery);
-
+            /** @var CardData[] $jobs */
             $jobs = $result['jobs'] ?? [];
             $query = $result['query'] ?? new \WP_Query();
 
@@ -190,13 +191,54 @@ class JobsDataResolver
     /**
      * Resolve single job detail for GraphQL.
      *
+     * Supports published jobs by slug (default), or draft/preview access by
+     * id with preview=true. Preview requires edit_post capability and bypasses
+     * all caches so the latest draft content is always returned.
+     *
      * @param mixed $root The root Query object (unused)
-     * @param JobDetailArgs $args Query arguments with job slug
+     * @param JobDetailArgs $args Query arguments with job slug or id/preview
      * @return JobDetailData|array{}
      */
-    public function resolveJobDetail($root, $args): array
+    public function resolveJobDetail($root, array $args): array
     {
         try {
+            $id = isset($args['id']) ? (int) $args['id'] : 0;
+            $preview = !empty($args['preview']);
+
+            if ($preview || $id > 0) {
+                if ($id <= 0) {
+                    throw new \Exception('Missing id parameter');
+                }
+
+                $post = get_post($id);
+                if (!$post instanceof \WP_Post || $post->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
+                    throw new \Exception('Post not found');
+                }
+
+                if ($preview) {
+                    // Draft/preview access: guard capability and bypass caches.
+                    if (!current_user_can('edit_post', $id)) {
+                        throw new \Exception('Unauthorized preview access');
+                    }
+
+                    $job = $this->graphqlData->getJobDetailData($id, true); // bypassCache
+                    if (!empty($job)) {
+                        // Normalize permalink to the ID-based route so the frontend
+                        // side panel stays on the preview route.
+                        $job['permalink'] = esc_url(home_url('/' . PostTypes::POST_TYPE_LOWONGAN . '/' . $id));
+                    }
+
+                    return $job;
+                }
+
+                // id without preview: published posts only (defense in depth).
+                if ($post->post_status !== 'publish') {
+                    throw new \Exception('Post not found');
+                }
+
+                return $this->graphqlData->getJobDetailData($id);
+            }
+
             $slug = $args['slug'];
             if (!$slug) {
                 throw new \Exception('Missing slug parameter');
@@ -217,121 +259,8 @@ class JobsDataResolver
     }
 
     /**
-     * Resolve Schema.org JSON-LD data for jobs.
-     *
-     * Supports per-id JobPosting schemas or combined ItemList. Can also resolve
-     * by slug to avoid an extra post ID lookup.
-     *
-     * @param mixed $root The root Query object (unused)
-     * @param JobSchemaArgs $args Schema query arguments
-     * @return array{schemas: array<int, string>} Array of JSON-encoded schema strings
-     */
-    public function resolveSchema($root, $args): array
-    {
-        try {
-            $ids = $args['ids'] ?? [];
-            $slug = isset($args['slug']) ? trim((string) $args['slug']) : null;
-
-            // Allow fetching schema by slug to avoid an extra lookup for the post ID.
-            if (empty($ids) && $slug) {
-                $post = get_page_by_path($slug, 'OBJECT', 'lowongan');
-                if ($post && is_object($post)) {
-                    $ids = [(int) $post->ID];
-                }
-            }
-
-            if (empty($ids)) {
-                return ['schemas' => []];
-            }
-
-            // Normalize IDs to integers
-            $ids = array_values(array_filter(array_map('intval', (array) $ids)));
-            if (empty($ids)) {
-                return ['schemas' => []];
-            }
-
-            $type = isset($args['type']) ? trim((string) $args['type']) : null;
-
-            // Require explicit request for ItemList. If not requested, return per-id JobPosting schemas
-            if ($type !== 'ItemList') {
-                $schemas = [];
-                foreach ($ids as $id) {
-                    $singleCacheKey = CacheKey::JOB_SCHEMA_PREFIX . $id;
-                    /** @var JobPostingSchema|false $singleCached */
-                    $singleCached = Cache::get($singleCacheKey);
-                    if ($singleCached !== false) {
-                        $schemas[] = json_encode($singleCached);
-                        continue;
-                    }
-
-                    $schema = $this->graphqlData->JobSchema($id);
-                    Cache::set($singleCacheKey, $schema, 86400);
-                    $schemas[] = json_encode($schema);
-                }
-
-                return ['schemas' => $schemas];
-            }
-
-            // Build ItemList for multiple IDs, or when forced via type='ItemList'
-            $cacheKey = CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . md5(implode(',', $ids) . '|' . ($type ?? 'auto'));
-            /** @var ItemListSchema|false $cached */
-            $cached = Cache::get($cacheKey);
-            if ($cached !== false) {
-                return ['schemas' => [json_encode($cached)]];
-            }
-
-            // Proceed to build ItemList
-            $raw = $this->graphqlData->ItemListJobPostings($ids);
-
-            $elements = [];
-            $itemListOrder = 'https://schema.org/ItemListOrderDescending';
-
-            if (is_array($raw) && isset($raw['@type']) && $raw['@type'] === 'ItemList') {
-                $itemListOrder = $raw['itemListOrder'] ?? $itemListOrder;
-                $elements = is_array($raw['itemListElement']) ? array_values($raw['itemListElement']) : [];
-            } elseif (is_array($raw) && array_values($raw) === $raw) {
-                // Numeric array of JobPosting objects — convert to ListItem elements
-                foreach ($raw as $idx => $jobPosting) {
-                    $elements[] = [
-                        '@type' => 'ListItem',
-                        'position' => $idx + 1,
-                        'item' => $jobPosting,
-                    ];
-                }
-            } else {
-                // Last-resort: try to read itemListElement
-                $elements = isset($raw['itemListElement']) && is_array($raw['itemListElement']) ? array_values($raw['itemListElement']) : [];
-            }
-
-            // Ensure positions are sequential and normalized
-            $mergedElements = [];
-            $position = 1;
-            foreach ($elements as $element) {
-                $element['position'] = $position++;
-                $mergedElements[] = $element;
-            }
-
-            $itemList = [
-                '@context' => 'https://schema.org',
-                '@type' => 'ItemList',
-                'itemListElement' => $mergedElements,
-                'itemListOrder' => $itemListOrder,
-                'numberOfItems' => count($mergedElements),
-            ];
-
-            Cache::set($cacheKey, $itemList, 86400);
-            return ['schemas' => [json_encode($itemList)]];
-        } catch (\Exception $e) {
-            Logger::error('GraphQL', 'JobsDataResolver::resolveJobSchema error: ' . $e->getMessage());
-            return ['schemas' => []];
-        }
-    }
-
-
-
-    /**
      * Resolve search jobs for GraphQL.
-     *
+     * @see SearchHooks::jobPostsSearchFilterImpl for hook query ['s']
      * @param mixed $root The root Query object (unused)
      * @param SearchJobsArgs $args Search filters
      * @return SearchJobsResponse
@@ -440,67 +369,6 @@ class JobsDataResolver
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'JobsDataResolver::resolveSyncBookmark error: ' . $e->getMessage());
             return [];
-        }
-    }
-
-    /**
-     * Resolve RankMath head HTML for a given URL.
-     *
-     * Validates that the URL is internal to this site before fetching.
-     *
-     * @param mixed $root The root Query object (unused)
-     * @param RankMathHeadArgs $args Arguments containing the URL
-     * @return string HTML head tags from RankMath
-     */
-    public function resolveRankMathHead($root, $args): string
-    {
-        try {
-            $url = $args['url'];
-
-            // Validate URL - must be internal
-            if (!filter_var($url, FILTER_VALIDATE_URL)) {
-                Logger::error('GraphQL', 'Invalid URL format: ' . $url);
-                throw new \Exception('Invalid URL format');
-            }
-
-            $home_url = home_url();
-            if (strpos($url, $home_url) !== 0) {
-                Logger::error('GraphQL', 'URL not internal. Home URL: ' . $home_url . ', Provided URL: ' . $url);
-                throw new \Exception('URL must be internal to this site');
-            }
-
-            $cacheKey = CacheKey::RANKMATH_HEAD_PREFIX . md5($url);
-            /** @var string|false $cached */
-            $cached = Cache::get($cacheKey);
-            if ($cached !== false) {
-                return $cached;
-            }
-
-            $headless = new \RankMath\Rest\Headless();
-            $request = new \WP_REST_Request('GET', '/rankmath/v1/getHead');
-            $request->set_param('url', $url);
-            $response = $headless->get_head($request);
-
-            if (is_wp_error($response)) {
-                Logger::error('GraphQL', 'REST handler error: ' . $response->get_error_message());
-                throw new \Exception('Failed to fetch head data');
-            }
-
-            $data = $response->get_data();
-
-            if (!isset($data['success']) || !$data['success']) {
-                Logger::error('GraphQL', 'REST handler returned failure');
-                throw new \Exception('REST handler failed');
-            }
-
-            $html = $data['head'] ?? '';
-
-            Cache::set($cacheKey, $html, 86400); // Cache for 1 day
-
-            return $html;
-        } catch (\Exception $e) {
-            Logger::error('GraphQL', 'JobsDataResolver::resolveRankMathHead error: ' . $e->getMessage());
-            return '';
         }
     }
 

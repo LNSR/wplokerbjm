@@ -31,7 +31,8 @@ class HttpUtils {
   ): Promise<string> {
     const baseHash = event.locals.postTime?.trim() || response;
     const authToken = event.locals.authToken || null;
-    const hash = await HttpUtils.calculateHash(`${baseHash}:${authToken}`);
+    const nonce = event.locals.themeData.wpRestNonce;
+    const hash = await HttpUtils.calculateHash(`${baseHash}:${authToken}:${nonce}`);
     return `W/"${hash}"`;
   }
 
@@ -299,14 +300,16 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
   const authenticated = isAuthenticated(cookie);
 
   const publicCache =
-    "public, max-age=360, s-maxage=2592000, stale-while-revalidate=86400";
-  const privateCache = "private, max-age=60, must-revalidate";
+    "public, max-age=60, s-maxage=2592000, stale-while-revalidate=86400";
+  const privateCache = "private, no-cache, must-revalidate";
   const devModeCache = "no-cache, must-revalidate";
   const cachePolicy = dev
     ? devModeCache
     : authenticated
       ? privateCache
       : publicCache;
+
+  const isPreview = Boolean(event.locals.isPreview);
 
   let response = await resolve(event);
   const contentType = response.headers.get("Content-Type") || "";
@@ -318,6 +321,8 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
   if (isHtml || isJsonOrXml) response.headers.set("Cache-Control", cachePolicy);
 
   if (isHtml) {
+    // Draft/preview pages must not be indexed by search engines.
+    if (isPreview) response.headers.set("X-Robots-Tag", "noindex, nofollow");
     // Inject links for early hints
     try {
       const links = new Set<string>();

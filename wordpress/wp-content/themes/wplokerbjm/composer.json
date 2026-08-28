@@ -1,8 +1,10 @@
 {
   "require": {
+    "brick/varexporter": "*",
     "nette/robot-loader": "*",
     "php-di/php-di": "*",
-    "php-standard-library/php-standard-library": "*"
+    "php-standard-library/php-standard-library": "*",
+    "spatie/backtrace": "*"
   },
   "require-dev": {
     "brain/monkey": "*",

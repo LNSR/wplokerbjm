@@ -62,7 +62,7 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
     ...sharedPlugins,
     devtoolsJson(),
     partytownVite({
-      dest: resolve(__dirname, "public", "~partytown"),
+      dest: resolve(import.meta.dirname, "public", "~partytown"),
     }),
     analyzer({
       enabled: false,
@@ -70,7 +70,7 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
       openAnalyzer: false,
       analyzerMode: "static",
     }),
-    copyPartytownAssets(resolve(__dirname, ".svelte-kit", "cloudflare", "~partytown")),
+    copyPartytownAssets(resolve(import.meta.dirname, ".svelte-kit", "cloudflare", "~partytown")),
   ];
 
   const build: UserConfig["build"] = {

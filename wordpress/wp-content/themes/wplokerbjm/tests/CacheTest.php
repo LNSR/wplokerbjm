@@ -5,7 +5,7 @@ namespace WPLokerBJM\Tests;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Shared\Cache\CacheKey;
-use WPLokerBJM\Configs\CredentialConfig;
+use WPLokerBJM\Configs\Credential\CredentialConfig;
 
 class CacheTest extends WplokerbjmTestCase
 {
@@ -23,6 +23,14 @@ class CacheTest extends WplokerbjmTestCase
         // Create an instance of RedisAdapter for testing
         $credentials = CredentialConfig::RedisCredential();
         $this->adapter = new RedisAdapter($credentials);
+    }
+
+    private function getRedisConnection(): \Redis|false {
+        $bind = \Closure::bind(static function(RedisAdapter $redis){
+            return $redis->resolveConnection();
+        }, null, RedisAdapter::class);
+
+        return $bind($this->adapter);
     }
 
     public function testGetConnection()
@@ -43,7 +51,7 @@ class CacheTest extends WplokerbjmTestCase
         echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . ($credentials['password'] ? "\033[0;32m" . '{REDACTED}' . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
         echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . ($credentials['database'] !== null ? "\033[0;32m" . $credentials['database'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
 
-        $redis = $this->adapter->getConnection();
+        $redis = $this->getRedisConnection();
 
         if ($redis === false) {
             echo "\033[0;31m❌ Redis connection failed\033[0m\n";
@@ -176,7 +184,7 @@ class CacheTest extends WplokerbjmTestCase
         echo "\n\033[1;35m🔴 Cache Delete Pattern Test\033[0m\n";
 
         // Get Redis connection
-        $redis = $this->adapter->getConnection();
+        $redis = $this->getRedisConnection();
         if ($redis === false) {
             echo "\033[0;31m❌ Redis connection failed\033[0m\n";
             $this->fail('Redis connection failed - cannot test deletePattern');

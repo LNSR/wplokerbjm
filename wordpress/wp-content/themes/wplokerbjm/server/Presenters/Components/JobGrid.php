@@ -3,9 +3,10 @@
 namespace WPLokerBJM\Presenters\Components;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Services\GraphQL\GraphQLJobData;
 
 /**
- * @phpstan-import-type CardData from \WPLokerBJM\Services\GraphQL\GraphQLData
+ * @phpstan-import-type CardData from GraphQLJobData
  * 
  * @phpstan-type JobGridData array{
  *     jobs: list<CardData>,

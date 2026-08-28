@@ -6,6 +6,9 @@ namespace WPLokerBJM\Tests\Support;
 
 use PHPUnit\Framework\TestCase;
 use \DI\Container;
+use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookTargetResolver, WPHooksContainerRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 
 abstract class WplokerbjmTestCase extends TestCase
 {
@@ -40,6 +43,8 @@ abstract class WplokerbjmTestCase extends TestCase
         \Brain\Monkey\Functions\when('wp_kses_post')->alias(function ($value) {
             return (string) $value;
         });
+        \Brain\Monkey\Functions\when('get_stylesheet')->justReturn('wplokerbjm');
+        \Brain\Monkey\Functions\when('is_admin')->justReturn(false);
         \Brain\Monkey\Functions\when('sanitize_email')->alias(function ($value) {
             return filter_var((string) $value, FILTER_SANITIZE_EMAIL);
         });
@@ -81,8 +86,8 @@ abstract class WplokerbjmTestCase extends TestCase
                 'type' => 'action',
                 'hook' => $hook,
                 'callable' => $callable,
-                'priority' => $priority,
-                'accepted_args' => $accepted_args,
+                'priority' => (int) $priority,
+                'accepted_args' => (int) $accepted_args,
             ];
             return true;
         });
@@ -92,34 +97,62 @@ abstract class WplokerbjmTestCase extends TestCase
                 'type' => 'filter',
                 'hook' => $hook,
                 'callable' => $callable,
-                'priority' => $priority,
-                'accepted_args' => $accepted_args,
+                'priority' => (int) $priority,
+                'accepted_args' => (int) $accepted_args,
             ];
             return true;
         });
 
         \Brain\Monkey\Functions\when('do_action')->alias(function ($hook, ...$args) {
-            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $reg) {
-                if ($reg['type'] !== 'action' || $reg['hook'] !== $hook) {
-                    continue;
-                }
-                $callable = $reg['callable'];
-                $limited = array_slice($args, 0, (int) $reg['accepted_args']);
-                $callable(...$limited);
+            $callbacks = array_filter(
+                $GLOBALS['__wplokerbjm_registered_hooks'],
+                fn($reg) => $reg['type'] === 'action' && $reg['hook'] === $hook
+            );
+
+            // Sort by priority ascending
+            usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
+
+            foreach ($callbacks as $reg) {
+                $limited = array_slice($args, 0, $reg['accepted_args']);
+                ($reg['callable'])(...$limited);
             }
         });
 
         \Brain\Monkey\Functions\when('apply_filters')->alias(function ($hook, $value, ...$args) {
-            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $reg) {
-                if ($reg['type'] !== 'filter' || $reg['hook'] !== $hook) {
-                    continue;
-                }
-                $callable = $reg['callable'];
-                $limited = array_slice([$value, ...$args], 0, (int) $reg['accepted_args']);
-                $value = $callable(...$limited);
+            $callbacks = array_filter(
+                $GLOBALS['__wplokerbjm_registered_hooks'],
+                fn($reg) => $reg['type'] === 'filter' && $reg['hook'] === $hook
+            );
+
+            // Sort by priority ascending
+            usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
+
+            foreach ($callbacks as $reg) {
+                $limited = array_slice([$value, ...$args], 0, $reg['accepted_args']);
+                $value = ($reg['callable'])(...$limited);
             }
+
             return $value;
         });
+
+        $removeHook = function ($type, $hook, $callable, $priority = 10) {
+            foreach ($GLOBALS['__wplokerbjm_registered_hooks'] as $i => $reg) {
+                if (
+                    $reg['type'] === $type &&
+                    $reg['hook'] === $hook &&
+                    $reg['callable'] == $callable && // Loose comparison allows object array comparisons
+                    $reg['priority'] === (int) $priority
+                ) {
+                    unset($GLOBALS['__wplokerbjm_registered_hooks'][$i]);
+                    $GLOBALS['__wplokerbjm_registered_hooks'] = array_values($GLOBALS['__wplokerbjm_registered_hooks']);
+                    return true;
+                }
+            }
+            return false;
+        };
+
+        \Brain\Monkey\Functions\when('remove_action')->alias(fn($hook, $callable, $priority = 10) => $removeHook('action', $hook, $callable, $priority));
+        \Brain\Monkey\Functions\when('remove_filter')->alias(fn($hook, $callable, $priority = 10) => $removeHook('filter', $hook, $callable, $priority));
     }
 
     /**
@@ -156,10 +189,47 @@ abstract class WplokerbjmTestCase extends TestCase
         \Brain\Monkey\tearDown();
 
         parent::tearDown();
+        $dir = \dirname(__DIR__, 1);
+        $cacheDir = $dir . '/cache';
+        if (is_dir($cacheDir)) {
+            $files = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($cacheDir, \RecursiveDirectoryIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::CHILD_FIRST,
+            );
+
+            foreach ($files as $fileInfo) {
+                $todo = $fileInfo->isDir() ? 'rmdir' : 'unlink';
+                $todo($fileInfo->getRealPath());
+            }
+
+            rmdir($cacheDir);
+        }
     }
 
     protected function container(): Container
     {
         return ProxyContainer::container();
+    }
+
+    /**
+     * Central factory for building the container-backed hook registry.
+     *
+     * Holds the full collaborator wiring (plan provider, deferred-hook
+     * manager, hook-target resolver) so new constructor parameters only
+     * ever need to be added here — not at every test construction site.
+     */
+    protected function createRegistry(array $registrations, ?ContainerInterface $container = null): WPHooksContainerRegistry
+    {
+        $container ??= $this->container();
+        $planProvider = new WPHookPlanProvider();
+        $resolver = new HookTargetResolver();
+
+        return new WPHooksContainerRegistry(
+            $container,
+            $registrations,
+            $planProvider,
+            new DeferredHookManager($planProvider, $container, $resolver),
+            $resolver,
+        );
     }
 }

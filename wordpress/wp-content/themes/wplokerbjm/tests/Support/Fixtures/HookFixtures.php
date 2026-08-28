@@ -84,7 +84,7 @@ class FilterService
  * Test fixture: a service with a #[Filter] on a public property closure.
  *
  * The closure modifies the filtered value — used to verify that
- * LazyPropertyHookHandler reads the property and invokes the closure
+ * ContainerLazyPropertyHookHandler reads the property and invokes the closure
  * at hook-fire time.
  */
 class PropertyFilterService
@@ -107,7 +107,7 @@ class PropertyFilterService
  * Test fixture: a service with a #[Action] on a public property closure.
  *
  * The closure logs a side effect only — used to verify action hooks
- * are properly invoked through LazyPropertyHookHandler.
+ * are properly invoked through ContainerLazyPropertyHookHandler.
  */
 class PropertyActionService
 {
@@ -158,7 +158,7 @@ class PropertyDeferredService
 {
     public static array $capturedValues = [];
 
-    #[Filter(hook: 'deferred_property_filter', priority: 10, acceptedArgs: 1, defer: true)]
+    #[Filter(hook: 'deferred_property_filter', priority: 10, acceptedArgs: 1, deferRegister: true)]
     public $deferredFilter = static function (string $value): string {
         self::$capturedValues[] = $value;
         return $value . '_deferred';
@@ -173,7 +173,7 @@ class PropertyDeferredService
 /**
  * Test fixture: a service with a public property that is NOT a Closure.
  *
- * Used to verify graceful failure — LazyPropertyHookHandler should log
+ * Used to verify graceful failure — ContainerLazyPropertyHookHandler should log
  * an error and return the fallback value.
  */
 class PropertyNonClosureService
@@ -182,7 +182,7 @@ class PropertyNonClosureService
     public string $notAClosure = 'i_am_not_a_closure';
 }
 
-// ── Method-based hook fixtures for LazyHookHandlerTest ──────────────
+// ── Method-based hook fixtures for ContainerLazyHookHandlerTest ──────────────
 
 /**
  * Test fixture: a service with a deferred #[Action] on an instance method.
@@ -194,7 +194,7 @@ class MethodDeferredService
 {
     public static array $captured = [];
 
-    #[Action(hook: 'deferred_method_action', priority: 10, acceptedArgs: 1, defer: true)]
+    #[Action(hook: 'deferred_method_action', priority: 10, acceptedArgs: 1, deferRegister: true)]
     public function onDeferredAction(string $value): void
     {
         self::$captured[] = $value;
@@ -234,7 +234,7 @@ class MethodMultiPriorityService
 /**
  * Test fixture: a service whose action method always throws.
  *
- * Used to verify that LazyHookHandler's catch block returns null
+ * Used to verify that ContainerLazyHookHandler's catch block returns null
  * for actions (fire-and-forget, no passthrough semantics).
  */
 class ThrowingActionService
@@ -249,7 +249,7 @@ class ThrowingActionService
 /**
  * Test fixture: a service whose filter method always throws.
  *
- * Used to verify that LazyHookHandler's catch block returns the
+ * Used to verify that ContainerLazyHookHandler's catch block returns the
  * first argument as a passthrough for filters.
  */
 class ThrowingFilterService
@@ -266,7 +266,7 @@ class ThrowingFilterService
  * with #[Action].
  *
  * Used to verify that non-public methods are invocable via
- * LazyHookHandler's Closure::bind-based invoker.
+ * ContainerLazyHookHandler's Closure::bind-based invoker.
  */
 class ProtectedMethodService
 {
@@ -289,7 +289,7 @@ class ProtectedMethodService
  * with #[Filter].
  *
  * Used to verify that private methods are invocable via
- * LazyHookHandler's Closure::bind-based invoker and that filter
+ * ContainerLazyHookHandler's Closure::bind-based invoker and that filter
  * return values are passed through correctly.
  */
 class PrivateMethodService
@@ -298,5 +298,300 @@ class PrivateMethodService
     private function onPrivateFilter(string $value): string
     {
         return $value . '_private';
+    }
+}
+
+// ── ExecuteIf-gate hook fixtures ─────────────────────────────────────
+
+/**
+ * Test fixture: a service with an instance-method action hook gated by a
+ * executeIf closure.
+ *
+ * The executeIf closure is supplied via the registration array in
+ * ExecuteIfHookTest (mirroring what WPHooksScanner emits from the
+ * attribute's `executeIf` argument). The instantiation counter lets tests
+ * assert that a false executeIf prevents the service from ever being
+ * resolved from the container.
+ */
+class ExecuteIfActionService
+{
+    public static int $instantiationCount = 0;
+    public static array $capturedValues = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onExecuteIfAction(string $value = 'default'): void
+    {
+        self::$capturedValues[] = $value;
+    }
+
+    /**
+     * Private context helper — reachable from gate closures via the
+     * bindToTarget scope binding, not via direct invocation.
+     */
+    private function isPrivateEnabled(): bool
+    {
+        return true;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedValues = [];
+    }
+}
+
+/**
+ * Test fixture: a service with an instance-method filter hook gated by a
+ * executeIf closure.
+ *
+ * Used to verify filter passthrough semantics when the executeIf fails
+ * or throws — the first argument must flow through untouched.
+ */
+class ExecuteIfFilterService
+{
+    public static int $instantiationCount = 0;
+    public static array $capturedArgs = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onExecuteIfFilter(string $value, string $extra = ''): string
+    {
+        self::$capturedArgs[] = ['value' => $value, 'extra' => $extra];
+        return $value . $extra;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedArgs = [];
+    }
+}
+
+/**
+ * Test fixture: a runtime-registered instance whose #[Action] carries an
+ * executeIf closure.
+ *
+ * Attribute closures are static and scoped to the declaring class (PHP 8.1
+ * RFC 'Closures in constant expressions'); the runtime registry invokes them
+ * directly at fire time — no container access involved.
+ */
+class RuntimeExecuteIfService
+{
+    public static array $captured = [];
+
+    #[Action(hook: 'runtime_executeIf_action', priority: 10, acceptedArgs: 1, executeIf: static function (): bool {
+        return false;
+    })]
+    public function onRuntimeExecuteIfAction(string $value): void
+    {
+        self::$captured[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$captured = [];
+    }
+}
+
+// ── Dynamic hook-name fixtures ───
+
+/**
+ * Test fixture: a service whose hook name is resolved from a closure at
+ * registration time via the DI container (WPHookPlanProvider).
+ */
+class DynamicHookService
+{
+    public static int $instantiationCount = 0;
+
+    public static array $capturedValues = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onDynamicAction(string $value = 'default'): void
+    {
+        self::$capturedValues[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedValues = [];
+    }
+}
+
+/**
+ * Test fixture: a runtime-registered instance whose #[Action] carries a
+ * closure hook name.
+ *
+ * Attribute closures are static and scoped to the declaring class (PHP 8.1
+ * RFC 'Closures in constant expressions'); the runtime registry invokes them
+ * directly at registration time to resolve the hook name.
+ */
+class RuntimeDynamicService
+{
+    public static array $captured = [];
+
+    #[Action(hook: static function (): string {
+        return 'runtime_dynamic_action';
+    }, priority: 10, acceptedArgs: 1)]
+    public function onRuntimeDynamicAction(string $value): void
+    {
+        self::$captured[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$captured = [];
+    }
+}
+
+// ── Inheritance hook fixtures ───
+
+/**
+ * Test fixture: a base service declaring a hook on its own method.
+ *
+ * Hook registration is declared-only — subclasses must re-declare the
+ * method (with their own attribute and `parent::` call) to opt in.
+ */
+class ParentHookService
+{
+    public static int $instantiationCount = 0;
+
+    public static array $capturedValues = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    #[Action(hook: 'parent_hook', priority: 10, acceptedArgs: 1)]
+    public function onParentHook(string $value): void
+    {
+        self::$capturedValues[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedValues = [];
+    }
+}
+
+/**
+ * Test fixture: a subclass that does NOT re-declare the parent hook.
+ *
+ * With declared-only scanning it must NOT receive a registration — the
+ * parent's own registration is the only one.
+ */
+class ChildNoRedeclareService extends ParentHookService
+{
+}
+
+/**
+ * Test fixture: a subclass that re-declares the parent hook explicitly.
+ *
+ * Re-declaring the method with its own #[Action] and a `parent::` call
+ * opts the child in — both the parent and the child register + fire.
+ */
+class ChildRedeclareService extends ParentHookService
+{
+    #[Action(hook: 'parent_hook', priority: 10, acceptedArgs: 1)]
+    public function onParentHook(string $value): void
+    {
+        parent::onParentHook($value);
+    }
+}
+
+// ── Hook-argument gate fixtures ───
+
+/**
+ * Test fixture: handler with two named parameters, used to verify
+ * executeIf gates receive hook arguments by exact parameter name.
+ */
+class HookArgSearchService
+{
+    public static array $capturedValues = [];
+
+    public function onSearch(string $search, string $extra = ''): void
+    {
+        self::$capturedValues[] = $search;
+    }
+
+    public static function reset(): void
+    {
+        self::$capturedValues = [];
+    }
+}
+
+// ── Once-hook fixtures ──────────────────────────────────────────────
+
+/**
+ * Test fixture: a service with an instance-method action hook flagged
+ * `once` (consume-on-any-evaluation).
+ *
+ * The first fire where the executeIf gate is evaluated removes the
+ * registration, regardless of gate outcome. The instantiation counter
+ * lets tests assert the service is resolved only when the gate passes;
+ * the captured values show what the hook actually delivered.
+ */
+class OnceActionService
+{
+    public static int $instantiationCount = 0;
+    public static array $capturedValues = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onOnceAction(string $value = 'default'): void
+    {
+        self::$capturedValues[] = $value;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedValues = [];
+    }
+}
+
+/**
+ * Test fixture: a service with an instance-method filter hook flagged
+ * `once`.
+ *
+ * After the first apply_filters call the registration is removed, so
+ * subsequent calls must pass the value through untouched.
+ */
+class OnceFilterService
+{
+    public static int $instantiationCount = 0;
+    public static array $capturedArgs = [];
+
+    public function __construct()
+    {
+        self::$instantiationCount++;
+    }
+
+    public function onOnceFilter(string $value, string $extra = ''): string
+    {
+        self::$capturedArgs[] = ['value' => $value, 'extra' => $extra];
+        return $value . $extra;
+    }
+
+    public static function reset(): void
+    {
+        self::$instantiationCount = 0;
+        self::$capturedArgs = [];
     }
 }

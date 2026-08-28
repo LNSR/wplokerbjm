@@ -110,40 +110,87 @@ wplokerbjm/
 
 ```sh
 wordpress/wp-content/themes/wplokerbjm/server/
+├── Adapter/                   # External service adapters
+│   └── Redis.php
 ├── Configs/                   # Configuration files
-│   └── CredentialConfig.php
+│   └── Credential/
+│       └── CredentialConfig.php
 ├── Controllers/               # Controllers
 │   ├── GraphQL/
-│   │   ├── Resolvers/         # GraphQL resolvers
-│   │   │   ├── JobsDataResolver.php
-│   │   │   ├── TaxonomyResolver.php
-│   │   │   └── ThemeDataResolver.php
-│   │   └── Types/             # GraphQL types
+│   │   └── Resolvers/         # GraphQL resolvers
+│   │       ├── Auth/
+│   │       │   └── JWTDataResolver.php
+│   │       ├── JobsDataResolver.php
+│   │       ├── SEO/
+│   │       │   └── SEOjobsResolver.php
+│   │       ├── TaxonomyResolver.php
+│   │       └── ThemeDataResolver.php
+│   ├── REST/                  # REST controllers
+│   │   └── LowonganIngestController.php
 │   └── Utilities/             # Utility for controllers
 │       └── ControllerUtils.php
 ├── Core/                      # Core framework and dependency injection
+│   ├── CachePurgeHandler.php  # Cache purge handling
 │   ├── Container/             # Container setup and definitions
-│   │   ├── Attributes/        # Hook attributes
+│   │   ├── Attributes/        # DI & hook attributes
+│   │   │   ├── AttributesDI.php
 │   │   │   └── WPHooksAttributes.php
 │   │   ├── Container.php      # Main DI container
 │   │   ├── Definitions/       # Container definitions
-│   │   │   ├── AutoScanned.php
-│   │   │   └── Core.php
+│   │   │   └── Factories.php
 │   │   ├── Init.php           # Container initialization
-│   │   └── Support/           # Container support utilities
-│   │       └── AutowireScanner.php
+│   │   └── Support/           # Container support microframework
+│   │       ├── InstanceDiscovery/   # Autowiring & instance discovery
+│   │       │   ├── Abstract/
+│   │       │   │   └── AsChildClass.php
+│   │       │   ├── AutowireScanner.php
+│   │       │   └── DependencyInjector.php
+│   │       └── WPHooks/             # WP hook scanning & invocation
+│   │           ├── Abstract/
+│   │           │   └── AnonClassHookMetadata.php
+│   │           ├── Constants/
+│   │           │   └── Tags.php
+│   │           ├── DTO.php
+│   │           ├── Invoker/
+│   │           │   ├── ContainerLazyHookInvoker.php
+│   │           │   └── RuntimeHookInvoker.php
+│   │           ├── Provider/
+│   │           │   ├── RuntimeWPHookProvider.php
+│   │           │   └── WPHookPlanProvider.php
+│   │           ├── Registry/
+│   │           │   ├── WPHooksContainerRegistry.php
+│   │           │   └── WPHooksRuntimeRegistry.php
+│   │           ├── Trait/
+│   │           │   ├── DeferredHooksTrait.php
+│   │           │   ├── HookInvokerTrait.php
+│   │           │   ├── HookProviderTrait.php
+│   │           │   └── HookScannerTrait.php
+│   │           ├── Utilities/
+│   │           │   ├── HookPattern.php
+│   │           │   └── Tag.php
+│   │           └── WPHooksScanner.php
 │   ├── Cron/                  # Cron job management
+│   │   ├── Posts/
+│   │   │   └── PostsManagement.php
+│   │   ├── Taxonomy/
+│   │   │   └── TaxonomyManagement.php
 │   │   └── WPCron.php
+│   ├── CustomHooksActions.php # Custom hook actions
 │   ├── GlobalHooks.php        # Global WordPress hooks
 │   ├── Plugins/               # Extend Plugins integrations
-│   │   ├── Litespeed.php
-│   │   └── Rankmath.php
-│   ├── Posts/                 # Post management
-│   │   └── PostsManagement.php
-│   ├── Taxonomy/              # Taxonomy management
-│   │   └── TaxonomyManagement.php
+│   │   ├── PluginsManager.php
+│   │   └── ThirdParty/        # Third-party plugin integrations
+│   │       ├── Integrations/
+│   │       │   └── LiteSpeedGraphQLIntegration.php
+│   │       ├── Litespeed.php
+│   │       ├── MetaBox.php
+│   │       ├── RankMath.php
+│   │       ├── RestJWT.php
+│   │       └── WPGraphQL/
+│   │           ├── Services/
+│   │           │   └── WPGraphQLETag.php
+│   │           └── WPGraphQL.php
 │   └── Theme/                 # Theme-specific functionality
-│       ├── Enqueue.php        # Asset enqueuing
 │       └── ThemeHooks.php     # Theme hooks
 ├── Factories/                 # Factory classes
 │   └── JobDataFactory.php
@@ -153,19 +200,9 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │       ├── PostTypes.php
 │       └── Taxonomies.php
 ├── Presenters/                # Page presenters (provide initial data for CSR)
-│   ├── Components/            # PHP UI components
-│   │   ├── JobCarousel.php
-│   │   └── JobGrid.php
-│   ├── DocumentHTML.php       # HTML document presenter
-│   ├── Pages/                 # Page-specific presenters
-│   │   ├── HomepagePresenter.php
-│   │   ├── PasangIklanLokerPresenter.php
-│   │   └── SinglePresenter.php
-│   └── SEO/                   # SEO-related presenters
-│       ├── Schema/            # Schema.org presenters
-│       │   └── JobPostingSchema.php
-│       └── SkeletonHTML/      # Skeleton HTML for SEO
-│           └── SkeletonForSEO.php
+│   └── Components/            # PHP UI components
+│       ├── JobCarousel.php
+│       └── JobGrid.php
 ├── QueryBuilders/             # Query builder classes
 │   ├── JobQuery.php
 │   └── TaxonomyQuery.php
@@ -175,22 +212,27 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   └── TaxonomyRepository.php
 ├── Services/                  # Business logic/services
 │   ├── GraphQL/               # GraphQL services
-│   │   ├── GraphQLData.php
-│   │   └── GraphQLRegistration.php
-│   └── Schema/                # Schema services
-│       └── JobSchemaOrg.php
-├── Shared/                    # Shared utilities and services
-│   ├── Cache/                 # Caching utilities
-│   │   └── Cache.php
-│   ├── Log/                   # Logging utilities
-│   │   └── Logger.php
-│   └── Utilities/             # General utilities
-│       └── SharedUtils.php
-└── Views/                     # PHP view templates (provide initial data for CSR)
-    └── Page/
-        ├── HomepageView.php
-        ├── PasangIklanLokerView.php
-        └── SingleLowonganView.php
+│   │   ├── GraphQLJobData.php
+│   │   ├── GraphQLRegistration.php
+│   │   └── Hooks/
+│   │       └── Search/
+│   │           └── SearchHooks.php
+│   ├── REST/                  # REST services & routes
+│   │   ├── LowonganIngestService.php
+│   │   └── Route/
+│   │       └── LowonganIngestRoute.php
+│   ├── Schema/                # Schema services
+│   │   └── JobSchemaOrg.php
+│   └── WebHooks/              # Webhook integrations
+│       └── Cloudflare.php
+└── Shared/                    # Shared utilities and services
+    ├── Cache/                 # Caching utilities
+    │   └── Cache.php
+    ├── Log/                   # Logging utilities
+    │   └── Logger.php
+    └── Utilities/             # General utilities
+        ├── Sanitizer.php
+        └── SharedUtils.php
 ```
 
 ---
@@ -199,7 +241,10 @@ wordpress/wp-content/themes/wplokerbjm/server/
 
 ```sh
 sveltekit/src # SvelteKit frontend
+├── app.d.ts                 # SvelteKit app type definitions
 ├── app.html                 # SvelteKit HTML template
+├── graphql-env.d.ts         # GraphQL env type definitions
+├── graphql-env-cache.d.ts   # GraphQL env cache type definitions
 ├── hooks.server.ts          # Server hook entrypoint for SvelteKit
 ├── lib                     # App libraries, shared components, stores, and helpers
 │   ├── assets              # Static frontend assets and CSS
@@ -223,14 +268,10 @@ sveltekit/src # SvelteKit frontend
 │   │       │   ├── JobGrid.svelte
 │   │       │   ├── SearchForm # subcomponents related to SearchForm
 │   │       │   │   └── CustomDropdown.svelte
-│   │       │   ├── SearchForm.svelte
-│   │       │   └── JobCard.svelte
+│   │       │   └── SearchForm.svelte
 │   │       ├── Shared # shared UI components used across components
 │   │       │   ├── BookmarkButton.svelte
 │   │       │   ├── FloatingActionButton.svelte
-│   │       │   ├── JobCard # subcomponents related to JobCard
-│   │       │   │   ├── JobDeadlineBadge.svelte
-│   │       │   │   └── JobStatusBadge.svelte
 │   │       │   ├── JobCard.svelte
 │   │       │   ├── JobDetail.svelte
 │   │       │   ├── LoadingSpinner.svelte
@@ -241,24 +282,29 @@ sveltekit/src # SvelteKit frontend
 │   │   ├── JobUI.svelte.ts
 │   │   └── SidePanel.svelte.ts
 │   ├── features            # Feature modules encapsulating specific functionality
+│   │   ├── DeviceDetector.svelte.ts
+│   │   └── Virtualization.svelte.ts
 │   ├── server              # Server-only constants and utilities
+│   │   ├── cache           # Server-side cache helpers
+│   │   │   ├── eTagCache.ts
+│   │   │   └── themeCache.ts
 │   │   ├── constants
-│   │   │   ├── constants.ts
-│   │   │   └── index.ts
+│   │   │   └── constants.ts
 │   │   └── utils                # Server-only utility scripts
+│   │       ├── http.server.ts
 │   │       └── scripts.server.ts
 │   ├── stores              # Shared Svelte stores for application state
 │   │   ├── Bookmark.svelte.ts
-│   │   ├── DynamicComponent.svelte.ts
+│   │   ├── ComponentRegistry.svelte.ts
 │   │   ├── JobListingStore.svelte.ts
 │   │   ├── Route.svelte.ts
 │   │   ├── Taxonomy.svelte.ts
-│   │   ├── Theme.svelte.ts
-│   │   └── Time.svelte.ts
+│   │   └── Theme.svelte.ts
 │   └── utils               # Shared utilities leveraging Svelte features
 │       ├── elements.svelte.ts
 │       └── window.svelte.ts
 ├── routes                  # SvelteKit page routes and server endpoints
+│   ├── +error.svelte       # Global error page
 │   ├── kebijakan-privasi
 │   │   └── +page.svelte
 │   ├── +layout.server.ts
@@ -282,11 +328,22 @@ sveltekit/src # SvelteKit frontend
 │   ├── Google.ts
 │   ├── graphql # GraphQL queries and API service
 │   │   ├── APIService.ts
-│   │   └── query
-│   │       ├── job.ts
-│   │       ├── taxonomy.ts
-│   │       └── theme.ts
-│   ├── IndexedDB.ts
+│   │   ├── config            # GraphQL client configuration
+│   │   │   ├── tada.ts
+│   │   │   └── urql.ts
+│   │   ├── fetch.ts
+│   │   └── query             # GraphQL queries split by environment
+│   │       ├── browser       # Browser-side queries
+│   │       │   ├── auth.ts
+│   │       │   ├── job.ts
+│   │       │   ├── taxonomy.ts
+│   │       │   └── theme.ts
+│   │       ├── server        # Server-side queries
+│   │       │   ├── job.ts
+│   │       │   └── theme.ts
+│   │       └── shared        # Queries shared between server and browser
+│   │           └── job.ts
+│   └── IndexedDB.ts
 ├── types                   # Shared TypeScript type definitions
 │   ├── API.ts
 │   ├── Component.ts
@@ -296,13 +353,28 @@ sveltekit/src # SvelteKit frontend
 │   ├── Search.ts
 │   ├── Shared.ts
 │   ├── Theme.ts
-│   └── wordpress
-│       ├── MetaBox.ts
-│       └── Wordpress.ts
-└── utils                   # agnostic utilities and helpers
-    ├── elements.ts
-    ├── environment.ts
-    └── search.ts
+│   ├── wordpress
+│   │   ├── MetaBox.ts
+│   │   └── Wordpress.ts
+│   └── worker              # Web worker message contract types
+│       └── bookmark
+│           └── contract.ts
+├── utils                   # agnostic utilities and helpers
+│   ├── apiservice-helper.ts
+│   ├── environment.ts
+│   ├── inlineScript.ts
+│   ├── search.ts
+│   ├── theme.ts
+│   └── window.ts
+└── workers                 # Web workers for background processing
+    ├── bookmark
+    │   ├── bookmark.worker.ts
+    │   └── taskController.ts
+    ├── clock
+    │   └── time.worker.ts
+    └── network
+        └── graphql
+            └── fetch.worker.ts
 ```
 
 ---

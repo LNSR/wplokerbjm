@@ -2,15 +2,23 @@
 
 namespace WPLokerBJM\Services\GraphQL;
 
+use WPLokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Factories\JobDataFactory;
-use WPLokerBJM\Core\Theme\ThemeInject;
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
 
 /**
+ * @phpstan-type WordpressBaseData array{
+ *     id: int|null,
+ *     slug: string,
+ *     title: string,
+ *     permalink: string,
+ *     post_time: string,
+ * }
+ * 
  * @phpstan-type RingkasanPekerjaan array{
  *     jenis_pekerjaan?: string|null,
  *     pendidikan?: string|null,
@@ -23,24 +31,15 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  *     umur_max?: int|null,
  *     deadline?: string|null,
  * }
- * @phpstan-type CardData array{
- *     id: int,
- *     slug: string,
- *     title: string,
+ * 
+ * @phpstan-type CardData WordpressBaseData&array{
  *     nama_perusahaan?: string,
  *     ringkasanPekerjaan: RingkasanPekerjaan,
  *     status_pekerjaan?: int,
- *     permalink: string,
- *     post_time?: string,
  * }
- * @phpstan-type JobDetailData array{
- *     id: int,
- *     slug: string,
- *     permalink: string,
- *     title: string,
- *     nama_perusahaan?: string,
+ * 
+ * @phpstan-type JobDetailData CardData&array{
  *     tentang_perusahaan?: string|null,
- *     ringkasanPekerjaan: RingkasanPekerjaan,
  *     deskripsi_pekerjaan?: string|null,
  *     persyaratan?: string|null,
  *     cara_melamar?: string|null,
@@ -48,19 +47,17 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  *     contacts?: array{email_kontak?: string, nomor_kontak?: string, situs_kontak?: string},
  *     social_media?: string|null,
  *     dpNonce?: string,
- *     post_time?: string,
  * }
- * @phpstan-import-type ThemeData from 
  * @phpstan-import-type JobData from JobDataFactory
  * @phpstan-import-type JobPostingSchema from JobSchemaOrg
  * @phpstan-import-type ItemListSchema from JobSchemaOrg
  */
-class GraphQLData
+class GraphQLJobData
 {
+    
     public function __construct(
         private JobDataFactory $jobDataFactory,
         private JobSchemaOrg $jobSchema,
-        private ThemeInject $themeInject
     ) {
     }
 
@@ -97,7 +94,6 @@ class GraphQLData
             ];
 
             $data = SharedUtils::filterEmptyValues($data);
-
             Cache::set($cacheKey, $data, 86400); // Cache for 1 day
             return $data;
         } catch (\Exception $e) {
@@ -110,9 +106,11 @@ class GraphQLData
      * Get detailed data for a single job overlay
      * Also used for SingleView props
      * @param int $post_id Post ID to fetch detailed data for
+     * @param bool $bypassCache When true, skips read/write of the Redis cache
+     *                          (used for draft previews so stale content is never served)
      * @return JobDetailData Processed job detail data
      */
-    public function getJobDetailData(int $post_id): array
+    public function getJobDetailData(int $post_id, bool $bypassCache = false): array
     {
         $post_id = (int) $post_id; // Explicit coercion for type safety
         // Use per-user cache for logged-in users to avoid leaking user-specific nonces
@@ -121,20 +119,22 @@ class GraphQLData
             : CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . $post_id . '_public';
 
 
-        $noncePlugin = static fn(string $action, int $postId): string => wp_create_nonce($action . '_' . $postId);
+        static $noncePlugin = static fn(string $action, int $postId): string => wp_create_nonce($action . '_' . $postId);
 
-        /** @var JobDetailData|false $cached */
-        $cached = Cache::get($cacheKey);
-        if ($cached !== false) {
-            if (is_user_logged_in()) {
-                $cached['dpNonce'] = $noncePlugin('duplicate_post_new_draft', $post_id);
-                return $cached;
-            } else {
-                // safety remove in case cached from logged-in
-                if (isset($cached['dpNonce'])) {
-                    unset($cached['dpNonce']);
+        if (!$bypassCache) {
+            /** @var JobDetailData|false $cached */
+            $cached = Cache::get($cacheKey);
+            if ($cached !== false) {
+                if (is_user_logged_in()) {
+                    $cached['dpNonce'] = $noncePlugin('duplicate_post_new_draft', $post_id);
+                    return $cached;
+                } else {
+                    // safety remove in case cached from logged-in
+                    if (isset($cached['dpNonce'])) {
+                        unset($cached['dpNonce']);
+                    }
+                    return $cached;
                 }
-                return $cached;
             }
         }
 
@@ -162,15 +162,14 @@ class GraphQLData
                 ],
                 CustomFields::SOCIAL_MEDIA => $jobdata[CustomFields::SOCIAL_MEDIA] ?? null,
                 'post_time' => get_post_time('c', false, $post_id),
+                'dpNonce' => is_user_logged_in() ? $noncePlugin('duplicate_post_new_draft', $post_id) : null,
             ];
-
-
-            if (is_user_logged_in())
-                $data['dpNonce'] = $noncePlugin('duplicate_post_new_draft', $post_id);
 
             $data = SharedUtils::filterEmptyValues($data);
 
-            Cache::set($cacheKey, $data, 86400); // Cache for 1 day
+            if (!$bypassCache) {
+                Cache::set($cacheKey, $data, 86400); // Cache for 1 day
+            }
             return $data;
         } catch (\Exception $e) {
             Logger::error('REST', 'RESTData::getSingleOverlayData error for post ' . $post_id . ': ' . $e->getMessage());
@@ -198,16 +197,6 @@ class GraphQLData
             CustomFields::UMUR_MAX => $jobdata[CustomFields::UMUR_MAX] ?? null,
             CustomFields::DEADLINE => $jobdata[CustomFields::DEADLINE] ?? null,
         ];
-    }
-
-    /**
-     * Get theme data for REST/GraphQL responses
-     * Useful in future for headless setups
-     * @return ThemeData
-     */
-    public function getThemeData(): array
-    {
-        return $this->themeInject->themeData();
     }
 
     /**

@@ -19,7 +19,7 @@ final class MetaBox implements PluginConfigInterface
     /**
      * Fix blank WYSIWYG/TinyMCE editor on fresh post-editor load edit by viewing WYSIWYG/TinyMCE editor html code first
      */
-    #[Filter('wp_default_editor', 8)]
+    #[Filter('wp_default_editor', 8, registerIf: static function(): bool { return is_admin(); })]
     public function switch_tinymce_default_view(): string
     {
         return 'html';

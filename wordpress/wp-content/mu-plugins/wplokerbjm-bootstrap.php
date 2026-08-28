@@ -3,7 +3,7 @@ declare(strict_types=1);
 namespace WPLokerBJM;
 
 use Nette\Loaders\RobotLoader;
-use WPLokerBJM\Core\Theme\ThemeInject;
+use WPLokerBJM\Core\Theme\ThemeProp;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 use WPLokerBJM\Core\Container\Init;
@@ -18,11 +18,11 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
  *
  * Runs as an MU plugin so hooks are registered before theme activation.
  *
- * @see ThemeInject
+ * @see ThemeProp
  */
 class Bootstrap
 {
-    private static ?RobotLoader $robotLoader = null;
+    public private(set) static ?RobotLoader $robotLoader = null;
 
     /**
      * Entry point. Called once from this file after the class definition.
@@ -54,21 +54,13 @@ class Bootstrap
     {
         $rl = new RobotLoader;
         $rl->addDirectory($themeRoot . '/server/');
-        $rl->addDirectory(__DIR__);
+        $rl->addDirectory(__FILE__);
         $rl->setTempDirectory($themeRoot . '/cache/robotloader/');
         $rl->setAutoRefresh(defined('WP_ENV') && WP_ENV === 'development');
         $rl->reportParseErrors(defined('WP_DEBUG') && WP_DEBUG);
         $rl->register();
 
         self::$robotLoader = $rl;
-    }
-
-    /**
-     * Expose RobotLoader for use by @see AutowireScanner, @see WPHooksScanner, etc.
-     */
-    public static function getRobotLoader(): RobotLoader
-    {
-        return self::$robotLoader;
     }
 
     /**
@@ -86,7 +78,6 @@ class Bootstrap
     private static function initContainer(): void
     {
         try {
-            /** @var Init $init */
             $init = WPLokerBJMContainer::getContainer()->get(Init::class);
             $init->initialize();
         } catch (\Exception $e) {

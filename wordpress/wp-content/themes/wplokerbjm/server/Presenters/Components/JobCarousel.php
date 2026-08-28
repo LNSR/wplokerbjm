@@ -5,8 +5,9 @@ namespace WPLokerBJM\Presenters\Components;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Services\GraphQL\GraphQLJobData;
 /**
- * @phpstan-import-type CardData from \WPLokerBJM\Services\GraphQL\GraphQLData
+ * @phpstan-import-type CardData from GraphQLJobData
  * @phpstan-type CarouselData array{
  *    jobs: CardData[],
  *    totalJobs: int

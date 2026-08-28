@@ -4,7 +4,7 @@ import { APIServiceServer, APIServiceShared } from "@/services/graphql/APIServic
 import { getCmsOrigin } from "@/utils/environment";
 import { schemaScriptAttach, schemaScriptParser } from "$lib/server/utils/scripts.server";
 import { collectPreloadLinksForJob } from "$lib/server/utils/http.server";
-import type { JobDetailResponse } from "../../../types/API";
+import type { JobDetailResponse } from "@/types/API";
 export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
 {
   const slug = String(params.slug ?? "");
@@ -12,8 +12,31 @@ export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
 
   const isMobile = Boolean(locals.deviceType?.isMobile);
 
+  // Preview detection: draft saves redirect to /lowongan/{post_id} (numeric slug),
+  // with ?p= kept as a fallback for previously bookmarked preview links.
+  const numericSlug = /^[0-9]+$/.test(slug);
+  const pParam = url.searchParams.get("p");
+  const isPreview = numericSlug || (pParam !== null && /^[0-9]+$/.test(pParam));
+  const previewId = numericSlug ? Number(slug) : Number(pParam);
+
   try
   {
+    if (isPreview)
+    {
+      const job: JobDetailResponse = await APIServiceServer.fetchJobDetailPreviewGraphQL(previewId);
+      if (!job) throw error(410, "Lowongan tidak ditemukan");
+      locals.postTime = job.post_time;
+      locals.isPreview = true;
+
+      return {
+        isPreview: true,
+        job,
+        jobSchemaScript: "",
+        carousel: { jobs: [], totalJobs: 0 },
+        jobGrid: { jobs: [], maxNumPages: 1, totalJobs: 0 },
+      };
+    }
+
     const jobPromise: Promise<JobDetailResponse> = APIServiceServer.fetchJobDetailGraphQL(slug);
     const schemaPromise = APIServiceServer.fetchJobSchemasGraphQL(slug, "JobPosting").catch(
       (e) =>

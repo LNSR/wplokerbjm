@@ -102,7 +102,7 @@
 
   const socialLinks: SocialMediaItem[] = [
     {
-      url: "https://www.instagram.com/loker_banjarmasin",
+      url: "https://www.instagram.com/lokerbanjarmasiin",
       icon: InstagramBrands,
       platform: SocialMediaPlatform.Instagram,
       color: "text-pink-500 dark:text-pink-400",

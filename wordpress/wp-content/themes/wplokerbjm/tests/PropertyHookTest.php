@@ -6,9 +6,9 @@ namespace WPLokerBJM\Tests;
 
 use DI\ContainerBuilder;
 use DI\Container;
-use ReflectionClass;
-use WPLokerBJM\Core\Container\Support\WPHooks\LazyPropertyHookHandler;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyPropertyHookHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookTargetResolver, WPHooksContainerRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyActionService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyDeferredService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyFilterService;
@@ -22,7 +22,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  * Test suite for property-closure hooks via #[Action]/#[Filter] attributes.
  *
  * Verifies that:
- *  - LazyPropertyHookHandler reads a public property and invokes the closure.
+ *  - ContainerLazyPropertyHookHandler reads a public property and invokes the closure.
  *  - Filter closures return values correctly (apply_filters).
  *  - Action closures produce side effects (do_action).
  *  - Multiple #[Filter] on the same property (IS_REPEATABLE) work.
@@ -33,7 +33,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 class PropertyHookTest extends WplokerbjmTestCase
 {
     private Container $container;
-    private WPHooksRegistry $registry;
+    private WPHooksContainerRegistry $registry;
 
     protected function setUp(): void
     {
@@ -43,8 +43,8 @@ class PropertyHookTest extends WplokerbjmTestCase
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
         $this->container = $builder->build();
-
-        $this->registry = new WPHooksRegistry($this->container, []);
+        $resolverTarget = new HookTargetResolver();
+        $this->registry = $this->createRegistry([], $this->container);
 
         // Reset fixture static state
         PropertyFilterService::reset();
@@ -54,25 +54,19 @@ class PropertyHookTest extends WplokerbjmTestCase
     }
 
     /**
-     * Seed hook registrations into the registry via reflection.
+     * Seed registrations via a bound closure (bypassing the container check),
+     * then verify internal state.
      *
-     * @param array<int, array> $registrations
+     * @param array<int, array{class: string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, deferRegister: bool}> $registrations
      */
     private function seedRegistrations(array $registrations): void
     {
-        $ref = new ReflectionClass($this->registry);
-        $method = $ref->getMethod('registerAll');
-        $method->invoke($this->registry, $registrations);
-    }
-
-    /**
-     * Read a private property from the registry.
-     */
-    private function getRegistryProperty(string $name): mixed
-    {
-        $ref = new ReflectionClass($this->registry);
-        $prop = $ref->getProperty($name);
-        return $prop->getValue($this->registry);
+        $bind = \Closure::bind(
+            static fn (WPHooksContainerRegistry $registry, array $hooksRegistration) => $registry->registerAll($hooksRegistration),
+            null,
+            WPHooksContainerRegistry::class
+        );
+        $bind($this->registry, $registrations);
     }
 
     // ── Filter tests ─────────────────────────────────────────────────
@@ -90,7 +84,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'property_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -121,7 +115,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'property_action',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -146,7 +140,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'property_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -172,7 +166,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'multi_priority_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
             [
@@ -182,7 +176,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'multi_priority_filter',
                 'priority'      => 20,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -218,7 +212,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'deferred_property_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => true,
+                'defer_register' => true,
                 'target'        => 'property',
             ],
         ]);
@@ -255,14 +249,14 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'non_closure_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
 
         $this->registry->initialize();
 
-        // Should not throw — LazyPropertyHookHandler catches the error
+        // Should not throw — ContainerLazyPropertyHookHandler catches the error
         $result = apply_filters('non_closure_filter', 'fallback_test');
 
         // Should return the first argument as fallback
@@ -282,7 +276,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'ghost_hook',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -295,7 +289,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         );
     }
 
-    public function testPropertyHookUsesLazyPropertyHookHandlerInstance(): void
+    public function testPropertyHookUsesContainerLazyPropertyHookHandlerInstance(): void
     {
         $service = new PropertyFilterService();
         $this->container->set(PropertyFilterService::class, $service);
@@ -308,7 +302,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'handler_type_check',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -319,7 +313,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         $this->assertNotNull($hook, 'Handler should be registered');
 
         $handler = $hook['callable'];
-        $this->assertInstanceOf(LazyPropertyHookHandler::class, $handler, 'Property hooks should use LazyPropertyHookHandler');
+        $this->assertInstanceOf(ContainerLazyPropertyHookHandler::class, $handler, 'Property hooks should use ContainerLazyPropertyHookHandler');
         $this->assertStringContainsString(
             'appendSuffix',
             $handler->label,
@@ -350,7 +344,7 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'hook'          => 'static_closure_filter',
                 'priority'      => 10,
                 'accepted_args' => 1,
-                'defer'         => false,
+                'defer_register' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -359,5 +353,42 @@ class PropertyHookTest extends WplokerbjmTestCase
 
         $result = apply_filters('static_closure_filter', 'static_test');
         $this->assertSame('static_test_static', $result, 'Static closure on property should work');
+    }
+
+    // ── Property hook args (executeIf name-matching) ─────────────────
+
+    public function testPropertyHookExecuteIfResolvesHookArgsByName(): void
+    {
+        $service = new PropertyFilterService();
+        $this->container->set(PropertyFilterService::class, $service);
+
+        $gate = static function (string $value): bool {
+            return $value === 'go';
+        };
+        $plan = (new WPHookPlanProvider())->buildCallablePlan($gate);
+
+        $this->seedRegistrations([
+            [
+                'class'             => PropertyFilterService::class,
+                'method'            => 'appendSuffix',
+                'type'              => 'filter',
+                'hook'              => 'property_execute_hook',
+                'priority'          => 10,
+                'accepted_args'     => 1,
+                'defer_register'    => false,
+                'target'            => 'property',
+                'execute_if'        => $gate,
+                'execute_if_params' => $plan,
+                'hook_args'         => ['value'],
+            ],
+        ]);
+
+        $this->registry->initialize();
+
+        // Gate name-matches 'go' into $value → passes → the callable runs.
+        $this->assertSame('go_suffixed', apply_filters('property_execute_hook', 'go'));
+
+        // Gate false → the filter passes the original value through untouched.
+        $this->assertSame('no', apply_filters('property_execute_hook', 'no'));
     }
 }

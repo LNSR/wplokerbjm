@@ -22,13 +22,17 @@ use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksScanner, WPHooksRuntimeReg
 trait HookScannerTrait
 {
     /**
-     * Scan all non-static methods on the given class for hook attributes.
+     * Scan all non-static methods DECLARED on the given class for hook attributes.
+     *
+     * Inherited methods are deliberately excluded — hook registration is
+     * explicit: a subclass re-declares the method (with its own #[Action] /
+     * #[Filter] attribute and `parent::method()` call) to opt in.
      *
      * For each #[Action] or #[Filter] attribute found, the callback receives:
      *   (ReflectionMethod $method, Action|Filter $attr, string $visibility, 'action'|'filter' $type)
      *
      * @param ReflectionClass $reflection Class to scan.
-     * @param callable        $callback   Called once per attribute found.
+     * @param callable(ReflectionMethod $method, Action|Filter $attr, string $visibility, 'action'|'filter' $type): void $callback
      */
     private function scanMethodHooks(ReflectionClass $reflection, callable $callback): void
     {
@@ -36,9 +40,30 @@ trait HookScannerTrait
         foreach ($reflection->getMethods(
             ReflectionMethod::IS_PUBLIC | ReflectionMethod::IS_PROTECTED | ReflectionMethod::IS_PRIVATE
         ) as $method) {
+            // Declared-only: inherited hook methods are deliberately excluded.
+            if ($method->getDeclaringClass()->getName() !== $reflection->getName()) {
+                continue;
+            }
             // Static methods are skipped — hooks must be instance methods.
             if ($method->isStatic()) {
                 continue;
+            }
+
+            // Magic methods (except __invoke) cannot be hooked: the lazy
+            // handler would call them on a container-built instance, which
+            // misfires for __construct (double construction) and is nonsense
+            // for __get/__set/__call/__toString/... Fail fast with a clear
+            // message instead of silently registering something broken.
+            $methodName = $method->getName();
+            if (
+                str_starts_with($methodName, '__')
+                && $methodName !== '__invoke'
+                && ($method->getAttributes(Action::class) !== [] || $method->getAttributes(Filter::class) !== [])
+            ) {
+                throw new \RuntimeException(
+                    'Hook attribute on magic method ' . $reflection->getName() . '::' . $methodName
+                    . ' is not allowed — only __invoke can be hooked'
+                );
             }
 
             $visibility = $method->isPublic()
@@ -59,11 +84,14 @@ trait HookScannerTrait
         }
     }
     /**
-     * Iterate all non-static properties of a class and invoke $callback
+     * Iterate all non-static properties DECLARED on a class and invoke $callback
      * once per #[Action] / #[Filter] discovered.
      *
+     * Inherited properties are deliberately excluded — same explicitness
+     * contract as scanMethodHooks.
+     *
      * @param ReflectionClass $reflection   Class to scan
-     * @param callable        $callback     Handler for each found attribute
+     * @param callable(ReflectionProperty $property, Action|Filter $attr, string $visibility, 'action'|'filter' $type, 'property'|'property-hook' $target): void $callback
      */
     private function scanPropertyHooks(
         ReflectionClass $reflection,
@@ -74,6 +102,10 @@ trait HookScannerTrait
             | ReflectionProperty::IS_PROTECTED
             | ReflectionProperty::IS_PRIVATE,
         ) as $property) {
+            // Declared-only: inherited hook properties are deliberately excluded.
+            if ($property->getDeclaringClass()->getName() !== $reflection->getName()) {
+                continue;
+            }
             if ($property->isStatic()) {
                 continue;
             }
