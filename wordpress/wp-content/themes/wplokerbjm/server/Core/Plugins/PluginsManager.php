@@ -43,7 +43,6 @@ class PluginManagement
      * List of integration classes that implement PluginConfigInterface.
      * 
      * @var array<class-string<PluginConfigInterface>>
-     * @phpstan-assert-if-true PluginConfigInterface
      */
     public const THIRD_PARTY_INTEGRATIONS = [
         Litespeed::class,
@@ -104,7 +103,7 @@ class PluginManagement
 
     #region 3rd party choice hooks
     #[Filter('option_active_plugins', once: true, registerIf: static function () {
-        return empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql') && !\is_admin();
+        return !\is_admin() && (empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql'));
     })]
     public function disableWpGraphqlPlugin(array $plugins): array
     {
@@ -137,51 +136,39 @@ class PluginManagement
         return $plugins;
     }
 
+    #[Filter('option_active_plugins', once: true, registerIf: static function (): bool {
+        return !\is_admin();
+    })]
+    public function disablePluginOnNonAdminDashboard(array $plugins): array
+    {
+        $listPlugins = [
+            PluginList::wpCrontrol->value,
+            PluginList::viewAdminAs->value,
+        ];
+        foreach ($listPlugins as $plugin) {
+            unset($plugins[array_search($plugin, $plugins, true)]);
+        }
+        return $plugins;
+    }
+
     #endregion
 
 
     #region filter hooks sequence
     /**
      * activation hooks steps
-     * @var static::class
+     * @var __CLASS__::class
      */
-    private AnonClassHookMetadata $pluginEnvironmentCheck {
-        get => $this->pluginEnvironmentCheck ??= new class(self::class, __PROPERTY__) extends AnonClassHookMetadata {
+    public private(set) AnonClassHookMetadata $pluginEnvironmentCheck {
+        get => $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
+            private array $pluginsToDisable = [
+                PluginList::Wordfence->value,
+                PluginList::FastIndexingApi->value,
+            ];
 
-            /**
-             * Temporarily disable specific plugins if in development environment.
-             */
-            #[Filter(
-                'option_active_plugins',
-                0,
-                once: true,
-                registerIf: static function (): bool {
-                    return SharedUtils::isDevelopment();
-                }
-            )]
-            public function disablePluginsForDevImpl(array $plugins): array
-            {
-                $pluginsToDisable = $this->listPluginsToDisable();
-                return $this->filteredPlugins($plugins, $pluginsToDisable);
-            }
-
-
-            /**
-             * Temporarily disable specific plugins if simulating production environment on local machine.
-             */
-            #[Filter(
-                'option_active_plugins',
-                1,
-                once: true,
-                registerIf: static function (): bool {
-                    return !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
-                }
-            )]
-            public function disablePluginsforSimulatedProdImpl(array $plugins): array
-            {
-                $pluginsToDisable = $this->listPluginsToDisable();
-
-                return $this->filteredPlugins($plugins, $pluginsToDisable);
+            #[Filter('option_active_plugins', 0, once: true)]
+            public ?\Closure $pluginsOption {
+                get => $this->pluginsOption ??= SharedUtils::isDevelopment() ? $this->disablePluginsForDevImpl(...) : $this->disablePluginsforSimulatedProdImpl(...);
             }
 
             /**
@@ -189,7 +176,7 @@ class PluginManagement
              */
             #[Filter(
                 'option_active_plugins',
-                2,
+                1,
                 once: true,
                 registerIf: static function (): bool {
                     return !SharedUtils::isDevelopment();
@@ -205,6 +192,28 @@ class PluginManagement
                 return $plugins;
             }
 
+            /**
+             * Temporarily disable specific plugins if in development environment.
+             */
+            private function disablePluginsForDevImpl(array $plugins): array
+            {
+                // $extra = [];
+                $pluginsToDisable = $this->listPluginsToDisable();
+                return $this->filteredPlugins($plugins, $pluginsToDisable);
+            }
+
+
+            /**
+             * Temporarily disable specific plugins if simulating production environment on local machine.
+             */
+            private function disablePluginsforSimulatedProdImpl(array $plugins): array
+            {
+                // $extra = [];
+                $pluginsToDisable = $this->listPluginsToDisable();
+
+                return $this->filteredPlugins($plugins, $pluginsToDisable);
+            }
+
 
             /**
              * Returns the list of plugins to disable, optionally merged with extra plugins.
@@ -214,13 +223,7 @@ class PluginManagement
              */
             private function listPluginsToDisable(?array $extra = []): array
             {
-                // Subject to change
-                static $base = [
-                    'wordfence/',
-                    'tinywp-mobile-detect/',
-                    'fast-indexing-api/',
-                ];
-                return array_merge($base, $extra);
+                return array_merge($this->pluginsToDisable, $extra);
             }
             /**
              * Filters the list of active plugins by removing specified plugins.
@@ -231,14 +234,15 @@ class PluginManagement
              */
             private function filteredPlugins(array $plugins, array $pluginsToDisable): array
             {
-                $filtered = array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
+                $cb = static function (string $plugin) use ($pluginsToDisable): bool {
                     foreach ($pluginsToDisable as $disable) {
                         if (str_starts_with($plugin, $disable)) {
                             return false;
                         }
                     }
                     return true;
-                });
+                };
+                $filtered = array_filter($plugins, $cb);
 
                 return array_values($filtered);
             }

@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery;
 
+use AnonClassTarget;
 use Brick\VarExporter\VarExporter;
+use CallableResult;
 use Closure;
+use CompiledPlan;
 use Exception;
 use InvalidArgumentException;
 use Psr\Container\ContainerInterface;
@@ -28,18 +31,17 @@ use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
  * Reflection is used only when a plan is missing. The runtime path resolves
  * the already-compiled entries and reuses a closure bound to the anonymous
  * child scope to write private and protected members.
- * @phpstan-type CallableEntry array{class: string, member: string, kind: 'method'|'property', lazy: bool}
- * @phpstan-type CompiledPlan array{properties: array<string, string|CallableEntry>}
+ * @phpstan-type AnonClassTarget
+ * @phpstan-type CompiledPlan array{properties: array<string, string|CallableEntryDTO>}
+ * @phpstan-type TSetterClosure Closure(ContainerInterface $container, AnonClassTarget $target, CompiledPlan $entry, Closure(ContainerInterface $container, CallableEntryDTO $entry): mixed): void
  */
 final class DependencyInjector
 {
-
     /**
-     * @param ContainerInterface $container
-     * @param ScopeAccessFactory $scopeAccessFactory
-     * @param PlanCache $planCache
-     * @param PlanCompiler $planCompiler
+     * @var array<string, TSetterClosure>
      */
+    public private(set) array $cachedSetterClosure = [];
+
     public function __construct(
         private readonly ContainerInterface $container,
         private readonly ScopeAccessFactory $scopeAccessFactory,
@@ -49,8 +51,8 @@ final class DependencyInjector
 
     /**
      * Inject all #[Inject] properties on an existing anonymous child object.
-     *
-     * @return AsChildClass The same target, for fluent usage.
+     * @param AnonClassTarget $target
+     * @return AnonClassTarget The same target, for fluent usage.
      * @throws InvalidArgumentException When the target or injection shape is invalid.
      */
     public function injectOn(AsChildClass $target): AsChildClass
@@ -60,14 +62,16 @@ final class DependencyInjector
         $plan = $this->getOrCompilePlan($cacheKey, $target);
         $scopeClass = $target::class;
         $setterKey = $cacheKey . "\0" . $scopeClass;
+        
+        $setter = $this->cachedSetterClosure[$setterKey] ??= $this->scopeAccessFactory->createSetter($scopeClass);
 
-        $setter = $this->scopeAccessFactory->createSetter($setterKey, $scopeClass);
-        $setter($this->container, $target, $plan['properties'], $this->scopeAccessFactory->callableResolver());
+        $setter($this->container, $target, $plan['properties'], $this->scopeAccessFactory->callableResolver);
 
         return $target;
     }
 
     /**
+     * @param AnonClassTarget $target
      * @return CompiledPlan
      */
     private function getOrCompilePlan(string $cacheKey, AsChildClass $target): array
@@ -85,6 +89,11 @@ final class DependencyInjector
 
         return $plan;
     }
+    /**
+     * @param AnonClassTarget $target
+     * @throws InvalidArgumentException
+     * @return void
+     */
     private function assertAnonymousTarget(AsChildClass $target): void
     {
         if (!str_contains($target::class, '@anonymous')) {
@@ -99,18 +108,17 @@ final class DependencyInjector
     }
 }
 /**
- * @phpstan-import-type CallableEntry from DependencyInjector
  * @phpstan-import-type CompiledPlan from DependencyInjector
+ * @phpstan-import-type AnonClassTarget from DependencyInjector
  */
 class PlanCompiler
 {
     /**
-     * @param ReflectionClass<AsChildClass> $reflection
+     * @param ReflectionClass<AnonClassTarget> $reflection
      * @return CompiledPlan
      */
     public function discoverPlan(ReflectionClass $reflection): array
     {
-        $properties = [];
 
         foreach ($reflection->getProperties() as $property) {
             $attributes = $property->getAttributes(Inject::class);
@@ -142,7 +150,7 @@ class PlanCompiler
     }
 
     /**
-     * @param ReflectionClass<AsChildClass> $reflection
+     * @param ReflectionClass<AnonClassTarget> $reflection
      */
     private function validateProperty(ReflectionProperty $property, ReflectionClass $reflection): void
     {
@@ -161,7 +169,7 @@ class PlanCompiler
         }
     }
 
-    private function resolveDependencyEntry(ReflectionProperty $property, ReflectionAttribute $attribute): string|array
+    private function resolveDependencyEntry(ReflectionProperty $property, ReflectionAttribute $attribute): string|CallableEntryDTO
     {
         /**
          * @var array{name: string|array|null, lazy: bool} $arguments
@@ -225,9 +233,8 @@ class PlanCompiler
     }
     /**
      * @param array{class-string, string} $entry
-     * @return CallableEntry
      */
-    private function validateCallableEntry(ReflectionProperty $property, array $entry, bool $lazy): array
+    private function validateCallableEntry(ReflectionProperty $property, array $entry, bool $lazy): CallableEntryDTO
     {
         [$class, $member] = $entry;
 
@@ -256,14 +263,14 @@ class PlanCompiler
 
             $this->validatePropertyTargetType($property, $class, $member);
 
-            return ['class' => $class, 'member' => $member, 'kind' => $kind, 'lazy' => false];
+            return new CallableEntryDTO($class, $member, $kind, false);
         }
 
         $reflectionMethod = new ReflectionMethod($class, $member);
 
         if ($lazy) {
             $type = $property->getType();
-            if (!$type instanceof ReflectionNamedType || $type->getName() !== \Closure::class) {
+            if (!$type instanceof ReflectionNamedType || $type->getName() !== Closure::class) {
                 throw new InvalidArgumentException(
                     'Lazy callable injection requires a \\Closure-typed property: ' . $property->getName() . '.',
                 );
@@ -272,7 +279,7 @@ class PlanCompiler
             $this->validateValueReturnType($property, $reflectionMethod);
         }
 
-        return ['class' => $class, 'member' => $member, 'kind' => $kind, 'lazy' => $lazy];
+        return new CallableEntryDTO($class, $member, $kind, $lazy);
     }
 
     /**
@@ -426,12 +433,12 @@ class PlanCompiler
 }
 /**
  * @phpstan-import-type CompiledPlan from DependencyInjector
- * @phpstan-import-type CallableEntry from DependencyInjector
+ * @phpstan-import-type AnonClassTarget from DependencyInjector
  */
 class PlanCache
 {
-    /** @var array<string, CompiledPlan>|null */
-    public private(set) ?array $compiledPlans = null;
+    /** @var array<string, CompiledPlan> */
+    public private(set) array $compiledPlans = [];
 
     public function __construct(
         public private(set) string $cacheLocation,
@@ -443,12 +450,17 @@ class PlanCache
             unlink($this->cacheLocation);
         }
 
-        $this->compiledPlans = null;
+        $this->compiledPlans = [];
     }
 
+    /**
+     * @param AnonClassTarget $target
+     * @return string
+     */
     public function buildCacheKey(AsChildClass $target): string
     {
-        return $target->getParentClass() . '::' . $target->identifier;
+        /** @var AsChildClass $target */
+        return $target->getParentClass() . '->' . $target->identifier;
     }
 
     /**
@@ -456,7 +468,7 @@ class PlanCache
      */
     public function loadPlans(): array
     {
-        if ($this->compiledPlans !== null) {
+        if ($this->compiledPlans !== []) {
             return $this->compiledPlans;
         }
 
@@ -521,54 +533,72 @@ class PlanCache
         }
     }
 
-    /**
-     * @param CallableEntry $entry
-     */
-    private function isCallablePlanEntry(array $entry): bool
+    private function isCallablePlanEntry(CallableEntryDTO $entry): bool
     {
-        return is_array($entry)
-            && isset($entry['class'], $entry['member'], $entry['kind'], $entry['lazy'])
-            && is_string($entry['class']) && $entry['class'] !== ''
-            && is_string($entry['member']) && $entry['member'] !== ''
-            && in_array($entry['kind'], ['method', 'property'], true)
-            && is_bool($entry['lazy']);
+        return \isset($entry->class, $entry->member, $entry->kind, $entry->lazy)
+            && \is_string($entry->class) && $entry->class !== ''
+            && \is_string($entry->member) && $entry->member !== ''
+            && \in_array($entry->kind, ['method', 'property'], true)
+            && \is_bool($entry->lazy);
     }
 }
 /**
+ * @phpstan-import-type TSetterClosure from DependencyInjector
  * @phpstan-import-type CompiledPlan from DependencyInjector
- * @phpstan-import-type CallableEntry from DependencyInjector
+ * @phpstan-import-type AnonClassTarget from DependencyInjector
+ * @template CallableResult
+ * @template FactoryClosure of Closure(object $instance): CallableResult
  */
 class ScopeAccessFactory
 {
 
-    /** @var Closure(ContainerInterface $container, CallableEntry $entry): mixed|null */
-    public private(set) ?Closure $callableResolver = null;
-    /** @var array<string, Closure> */
-    public private(set) array $closureFactories = [];
-    /** @var array<string, Closure> */
-    public private(set) array $setters = [];
 
-    public function callableResolver(): Closure
-    {
-        return $this->callableResolver ??= $this->resolveCallable(...);
+    /** @var array<string, FactoryClosure> */
+    public private(set) array $closureFactories = [];
+
+    /** 
+     * Resolve an array callable [class, member] into either the member's
+     * value (property kind), the method's return value (lazy: false), or a
+     * closure bound to the owning instance scope (lazy: true), so private
+     * and protected members stay accessible.
+     * 
+     * @var Closure(ContainerInterface $container, CallableEntryDTO $entry): CallableResult
+     */
+    public private(set) Closure $callableResolver {
+        get => $this->callableResolver ??= function (ContainerInterface $container, CallableEntryDTO $entry): mixed {
+            $instance = $container->get($entry->class);
+            $factoryKey = $entry->class . '::' . $entry->member . '#' . $entry->kind . ($entry->lazy ? '#lazy' : '#value');
+            $factory = $this->closureFactories[$factoryKey] ??= $this->createCallableFactory($entry);
+
+            return $factory($instance);
+        };
     }
 
     /**
-     * @param string 
+     * TODO: if upgraded to PHP8.6, stateless Closure will be memoized automatically, hence we don't need this template.
+     * Prevent needlessly creation of Closure
+     * @var TSetterClosure 
+     * @param CompiledPlan $entry
+     */
+    private Closure $setterTemplateClosure = static function (ContainerInterface $container, AsChildClass $target, array $entry, Closure $resolveCallable): void {
+        foreach ($entry as $properties => $v) {
+            $target->{$properties} = $v instanceof CallableEntryDTO
+                ? $resolveCallable($container, $v)
+                : $container->get($v);
+        }
+    };
+
+    /**
      * @param class-string $scopeClass
      * @throws RuntimeException
-     * @return Closure(ContainerInterface $container, AsChildClass $target, CompiledPlan $properties, Closure(ContainerInterface, CompiledPlan}): mixed $resolveCallable): void
+     * @see ScopeAccessFactory::$callableResolver for Closure's parameters shape for $resolveCallable
+     * @return TSetterClosure
      */
-    public function createSetter(string $setterKey, string $scopeClass): Closure
+    public function createSetter(string $scopeClass): Closure
     {
+        /** @var TSetterClosure $setter */
         $setter = Closure::bind(
-            static function (ContainerInterface $container, AsChildClass $target, array $properties, Closure $resolveCallable): void {
-                foreach ($properties as $property => $entry) {
-                    $target->{$property} = is_array($entry)
-                        ? $resolveCallable($container, $entry)
-                        : $container->get($entry);
-                }
-            },
+            $this->setterTemplateClosure,
             null,
             $scopeClass,
         );
@@ -577,46 +607,31 @@ class ScopeAccessFactory
             throw new RuntimeException('Unable to bind the dependency injector to the anonymous child scope.');
         }
 
-        return $this->setters[$setterKey] ??= $setter;
+        return $setter;
     }
 
     /**
-     * @param class-string $class
-     * @param CallableEntry['kind'] $kind
+     * @param CallableEntryDTO $entry
+     * @return FactoryClosure
      */
-    private function createCallableFactory(string $class, string $member, string $kind, bool $lazy): Closure
+    private function createCallableFactory(CallableEntryDTO $entry): Closure
     {
+        /** @var FactoryClosure $factory */
         $factory = Closure::bind(
-            match ($kind) {
-                'property' => static fn(object $instance): mixed => $instance->{$member},
-                'method' => $lazy
-                    ? static fn(object $instance): Closure => $instance->{$member}(...)
-                    : static fn(object $instance): mixed => $instance->{$member}(),
+            match ($entry->kind) {
+                'property' => static fn(object $instance): mixed => $instance->{$entry->member},
+                'method' => $entry->lazy
+                    ? static fn(object $instance): Closure => $instance->{$entry->member}(...)
+                    : static fn(object $instance): mixed => $instance->{$entry->member}(),
             },
             null,
-            $class,
+            $entry->class,
         );
 
         if (!$factory instanceof Closure) {
-            throw new RuntimeException('Unable to bind callable factory for ' . $class . '::' . $member . '.');
+            throw new RuntimeException('Unable to bind callable factory for ' . $entry->class . '::' . $entry->member . '.');
         }
 
         return $factory;
-    }
-    /**
-     * Resolve an array callable [class, member] into either the member's
-     * value (property kind), the method's return value (lazy: false), or a
-     * closure bound to the owning instance scope (lazy: true), so private
-     * and protected members stay accessible.
-     *
-     * @param CallableEntry $entry
-     */
-    private function resolveCallable(ContainerInterface $container, array $entry): mixed
-    {
-        $instance = $container->get($entry['class']);
-        $factoryKey = $entry['class'] . '::' . $entry['member'] . '#' . $entry['kind'] . ($entry['lazy'] ? '#lazy' : '#value');
-        $factory = $this->closureFactories[$factoryKey] ??= $this->createCallableFactory($entry['class'], $entry['member'], $entry['kind'], $entry['lazy']);
-
-        return $factory($instance);
     }
 }

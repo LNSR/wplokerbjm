@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract;
 
 use WPGraphQL;
@@ -11,7 +13,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * @see DependencyInjector
  * * Intended usage: Passing external deps without needing host class carrying constructor boilerplate.
  *
- * @template T of object|class-string
+ * @template T
  */
 abstract class AsChildClass
 {
@@ -21,7 +23,7 @@ abstract class AsChildClass
      * @param string $identifier The property or method or any magic string holding this instance.
      */
     public function __construct(
-        private readonly string|object $parentClass,
+        public string|object $parentClass,
         public private(set) readonly string $identifier,
     ) {}
 
@@ -33,6 +35,20 @@ abstract class AsChildClass
     {
         return is_object($this->parentClass) ? get_class($this->parentClass) : $this->parentClass;
     }
+
+    /**
+     * For Recursive Anon Classes
+     * @param string $currentClassPropertryIdentifier magic constant
+     * @return array
+     */
+    protected function createIdentityClass(string $currentClassPropertryIdentifier): array
+    {
+        return [
+            sprintf("%s->%s", $this->getParentClass(), $this->identifier),
+            $currentClassPropertryIdentifier
+        ];
+    }
+
     /**
      * ! Must be an instance Closure
      * Binds an initialization closure directly into current context anon class and configures it.

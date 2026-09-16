@@ -226,7 +226,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
             'type' => 'action',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
+            'acceptedArgs' => $acceptedArgs,
         ];
     }
 
@@ -241,7 +241,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
             'type' => 'filter',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
+            'acceptedArgs' => $acceptedArgs,
         ];
     }
 }

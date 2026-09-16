@@ -41,7 +41,7 @@ class ThemeProp
      *
      * @return void
      */
-    #[Action('after_setup_theme')]
+    #[Action('after_setup_theme', once: true)]
     public function addThemeSupport(): void
     {
 
@@ -79,14 +79,14 @@ class ThemeProp
      * - Attempts to read attachment metadata for width/height; if absent, it falls back
      *   to the theme support defaults, then to a safe 128x128 fallback so browsers can
      *   compute aspect ratio reliably.
-     *
-     * @return array{url:string|false,srcset:string|false,sizes:string|false,width:int,height:int}
+     * @phpstan-template TLogo object{url:string|false,srcset:string|false,sizes:string|false,width:int,height:int}
+     * @return TLogo
      */
-    private function getLogoData(): array
+    private function getLogoData(): object
     {
         $custom_logo_id = get_theme_mod('custom_logo');
         if (!$custom_logo_id) {
-            return ['url' => false, 'srcset' => false, 'sizes' => false, 'width' => 0, 'height' => 0];
+            return (object) ['url' => false, 'srcset' => false, 'sizes' => false, 'width' => 0, 'height' => 0];
         }
 
         $url = wp_get_attachment_image_url($custom_logo_id, 'full') ?: '';
@@ -115,7 +115,7 @@ class ThemeProp
             }
         }
 
-        return [
+        return (object) [
             'url' => $url,
             'srcset' => $srcset,
             'sizes' => $sizes,
@@ -239,8 +239,8 @@ class ThemeProp
 
 
         $logoData = $this->getLogoData();
-        if (empty($logoData['sizes'])) {
-            $logoData['sizes'] = '(max-width: 640px) 48px, (max-width: 1024px) 64px, 128px';
+        if (empty($logoData->sizes)) {
+            $logoData->sizes = '(max-width: 640px) 48px, (max-width: 1024px) 64px, 128px';
         }
 
         // compute optional site icon <link> tags using the same filter used in addSiteIconMetaTags()
@@ -249,20 +249,19 @@ class ThemeProp
         if (!empty($tags) && is_array($tags)) {
             $siteIconTags = implode("\n", $tags);
         }
-
+        $logo = [
+            'logoUrl' => $logoData->url ?? '',
+            'logoSrcset' => $logoData->srcset ?? '',
+            'logoSizes' => $logoData->sizes ?? '',
+            'logoDecoding' => 'async',
+            'logoWidth' => intval($logoData->width ?? 0),
+            'logoHeight' => intval($logoData->height ?? 0),
+        ];
         $wpThemeData = [
-            'logo' => [
-                'logoUrl' => $logoData['url'] ?? '',
-                'logoSrcset' => $logoData['srcset'] ?? '',
-                'logoSizes' => $logoData['sizes'] ?? '',
-                'logoDecoding' => 'async',
-                'logoWidth' => intval($logoData['width'] ?? 0),
-                'logoHeight' => intval($logoData['height'] ?? 0),
-            ],
+            'logo' => $logo,
             'siteIconTags' => $siteIconTags,
             'wpRestNonce' => $loggedIn ? graphql_get_nonce() : null
         ];
-
         Cache::set($cacheKey, $wpThemeData, 86400); // Cache for 1 day
 
         return $wpThemeData;

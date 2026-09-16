@@ -2,7 +2,7 @@
 
 namespace WPLokerBJM\Core\Plugins\ThirdParty;
 
-use DI\Attribute\Injectable;
+use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPlokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};

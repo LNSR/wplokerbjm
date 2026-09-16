@@ -33,30 +33,11 @@ class Litespeed implements PluginConfigInterface
 
         do_action('wpgraphql_cache_purge_all');
         Cache::flushGroup(CacheKey::OBJECT_CACHE_PREFIX);
-        // Clear entire cache folder
-        $cacheDir = WPLokerBJMContainer::$CACHE_DIR;
-        $deleteDirRecursive = static function (string $dir): bool {
-            if (!is_dir($dir)) {
-                return false;
-            }
-
-            $iterator = new \RecursiveIteratorIterator(
-                new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::FOLLOW_SYMLINKS),
-                \RecursiveIteratorIterator::CHILD_FIRST
-            );
-
-            /** @var \SplFileInfo $file */
-            foreach ($iterator as $file) {
-                $path = $file->getRealPath();
-
-                Logger::debug('Deleting item: ', $path);
-
-                $file->isDir() && !$file->isLink() ? rmdir($path) : unlink($path);
-            }
-
-            return rmdir($dir);
-        };
-        $deleteDirRecursive($cacheDir);
+        try {
+            $this->deleteRucursive(WPLokerBJMContainer::$CACHE_INFO->cacheDir);
+        } catch (\Exception $e) {
+            Logger::error('Error deleting cache folder: ', $e->getMessage());
+        }
 
         if (function_exists('apcu_clear_cache')) {
             apcu_clear_cache();
@@ -65,7 +46,7 @@ class Litespeed implements PluginConfigInterface
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
             wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
-
+        Bootstrap::$robotLoader->rebuild();
         WPLokerBJMContainer::getContainer(true);
     }
 
@@ -73,8 +54,33 @@ class Litespeed implements PluginConfigInterface
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
     #[Filter('litespeed_is_mobile')]
-    public function isMobile():bool
+    public function isMobile(): bool
     {
         return wp_is_mobile();
+    }
+
+    private function deleteRucursive(string $dir): bool
+    {
+        if (!is_dir($dir)) {
+            return false;
+        }
+
+        $iterator = new \RecursiveIteratorIterator(
+            new \RecursiveDirectoryIterator($dir, \FilesystemIterator::SKIP_DOTS | \FilesystemIterator::FOLLOW_SYMLINKS),
+            \RecursiveIteratorIterator::CHILD_FIRST
+        );
+
+        /** @var \SplFileInfo $file */
+        foreach ($iterator as $file) {
+
+            $path = $file->getRealPath();
+            if (str_contains($path, 'robotloader')) continue;
+
+            Logger::debug('Deleting item: ', $path);
+
+            $file->isDir() && !$file->isLink() ? rmdir($path) : unlink($path);
+        }
+
+        return rmdir($dir);
     }
 }

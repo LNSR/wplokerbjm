@@ -13,11 +13,16 @@ enum PluginList: string
     case RankMath = 'seo-by-rank-math/rank-math.php';
     case QueryMonitor = 'query-monitor/query-monitor.php';
     case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
+    case FastIndexingApi = 'fast-indexing-api/instant-indexing.php';
+    case wpCrontrol = 'wp-crontrol/wp-crontrol.php';
+    case updraftPlus = 'updraftplus/updraftplus.php';
+    case viewAdminAs = 'view-admin-as/view-admin-as.php';
+    case performanceLab = 'performance-lab/load.php';
     public function isActive(): bool
     {
         static $activePlugins = null;
-        $activePlugins ??= get_option('active_plugins') ?: [];
-        return is_array($activePlugins) && in_array($this->value, $activePlugins, true);
+        $activePlugins ??= \get_option('active_plugins') ?: [];
+        return \is_array($activePlugins) && \in_array($this->value, $activePlugins, true);
     }
 
     public function deactivePlugin(): void

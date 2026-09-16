@@ -1,7 +1,7 @@
 <?php
 namespace WPLokerBJM\Services\GraphQL;
 
-use DI\Attribute\Injectable;
+use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Controllers\GraphQL\Resolvers\{TaxonomyResolver, JobsDataResolver, ThemeDataResolver};
 use WPLokerBJM\Controllers\GraphQL\Resolvers\Auth\JWTDataResolver;
 use WPLokerBJM\Controllers\GraphQL\Resolvers\SEO\SEOjobsResolver;
@@ -46,7 +46,7 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  *     carousel?: CarouselData,
  *     loadMore?: LoadMoreResponse,
  *     jobGrid?: JobGridData,
- *     jobDetail?: JobDetailData|array{},
+ *     jobDetail?: JobDetailData,
  *     jobSchema?: JobSchemaResponse,
  *     themeData?: ThemeData,
  *     searchJobs?: SearchJobsResponse,
@@ -143,12 +143,8 @@ final class GraphQLRegistration
     {
         register_graphql_scalar(self::TYPE_JSON, [
             'description' => 'Arbitrary JSON data',
-            'serialize' => static function ($value) {
-                return is_string($value) ? $value : json_encode($value);
-            },
-            'parseValue' => static function ($value) {
-                return is_string($value) ? json_decode($value, true) : $value;
-            },
+            'serialize' => static fn ($value) => is_string($value) ? $value : json_encode($value),
+            'parseValue' => static fn ($value) => is_string($value) ? json_decode($value, true) : $value,
             'parseLiteral' => static function ($ast) {
                 if ($ast instanceof \GraphQL\Language\AST\StringValueNode) {
                     return json_decode($ast->value, true);

@@ -32,13 +32,13 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  *     deadline?: string|null,
  * }
  * 
- * @phpstan-type CardData WordpressBaseData&array{
+ * @phpstan-type CardData WordpressBaseData|array{
  *     nama_perusahaan?: string,
  *     ringkasanPekerjaan: RingkasanPekerjaan,
  *     status_pekerjaan?: int,
  * }
  * 
- * @phpstan-type JobDetailData CardData&array{
+ * @phpstan-type JobDetailData CardData|array{
  *     tentang_perusahaan?: string|null,
  *     deskripsi_pekerjaan?: string|null,
  *     persyaratan?: string|null,
@@ -54,12 +54,11 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  */
 class GraphQLJobData
 {
-    
+
     public function __construct(
         private JobDataFactory $jobDataFactory,
         private JobSchemaOrg $jobSchema,
-    ) {
-    }
+    ) {}
 
     /**
      * Get card data for a Homepage Jobcard listing
@@ -77,9 +76,9 @@ class GraphQLJobData
             return $cached;
         }
 
+        /** @var CardData $data */
         try {
             $jobdata = $this->jobDataFactory->createJobData($post_id);
-
             $data = [
                 'id' => $post_id,
                 'slug' => get_post_field('post_name', $post_id),
@@ -92,7 +91,6 @@ class GraphQLJobData
                 'permalink' => esc_url(get_permalink($post_id)),
                 'post_time' => get_post_time('c', false, $post_id),
             ];
-
             $data = SharedUtils::filterEmptyValues($data);
             Cache::set($cacheKey, $data, 86400); // Cache for 1 day
             return $data;
@@ -137,10 +135,9 @@ class GraphQLJobData
                 }
             }
         }
-
+        /** @var JobDetailData $data */
         try {
             $jobdata = $this->jobDataFactory->createJobData($post_id);
-
             $data = [
                 'id' => $post_id,
                 'slug' => get_post_field('post_name', $post_id),

@@ -32,9 +32,9 @@ trait HookScannerTrait
      *   (ReflectionMethod $method, Action|Filter $attr, string $visibility, 'action'|'filter' $type)
      *
      * @param ReflectionClass $reflection Class to scan.
-     * @param callable(ReflectionMethod $method, Action|Filter $attr, string $visibility, 'action'|'filter' $type): void $callback
+     * @param \Closure(ReflectionMethod $method, Action|Filter $attr, 'public'|'protected'|'private' $visibility, 'action'|'filter' $type): void $callback
      */
-    private function scanMethodHooks(ReflectionClass $reflection, callable $callback): void
+    private function scanMethodHooks(ReflectionClass $reflection, \Closure $callback): void
     {
         /** @var ReflectionMethod $method */
         foreach ($reflection->getMethods(
@@ -91,11 +91,11 @@ trait HookScannerTrait
      * contract as scanMethodHooks.
      *
      * @param ReflectionClass $reflection   Class to scan
-     * @param callable(ReflectionProperty $property, Action|Filter $attr, string $visibility, 'action'|'filter' $type, 'property'|'property-hook' $target): void $callback
+     * @param \Closure(ReflectionProperty $property, Action|Filter $attr, 'public'|'protected'|'private' $visibility, 'action'|'filter' $type, 'property'|'property-hook' $target): void $callback
      */
     private function scanPropertyHooks(
         ReflectionClass $reflection,
-        callable $callback,
+        \Closure $callback,
     ): void {
         foreach ($reflection->getProperties(
             ReflectionProperty::IS_PUBLIC
@@ -110,15 +110,16 @@ trait HookScannerTrait
                 continue;
             }
 
+            /** @var 'public'|'protected'|'private' $visibility */
             $visibility = $property->isPublic()
                 ? 'public'
                 : ($property->isProtected() ? 'protected' : 'private');
 
+            /** @var 'property'|'property-hook' $target */
             $target = $property->hasHooks()
                 ? 'property-hook'
                 : 'property';
 
-            /** @var ReflectionProperty $property */
             foreach ($property->getAttributes(Action::class) as $attribute) {
                 /** @var Action $action */
                 $action = $attribute->newInstance();

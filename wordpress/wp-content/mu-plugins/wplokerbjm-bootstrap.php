@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace WPLokerBJM;
 
 use Nette\Loaders\RobotLoader;
@@ -55,12 +57,12 @@ class Bootstrap
         $rl = new RobotLoader;
         $rl->addDirectory($themeRoot . '/server/');
         $rl->addDirectory(__FILE__);
-        $rl->setTempDirectory($themeRoot . '/cache/robotloader/');
+        $rl->setCacheDirectory($themeRoot . '/cache/robotloader/');
         $rl->setAutoRefresh(defined('WP_ENV') && WP_ENV === 'development');
         $rl->reportParseErrors(defined('WP_DEBUG') && WP_DEBUG);
         $rl->register();
 
-        self::$robotLoader = $rl;
+        self::setRobotLoader($rl);
     }
 
     /**
@@ -85,9 +87,6 @@ class Bootstrap
         }
     }
 }
-
 // *Only auto-boot in WordPress context. Tests and CLI tools define
-// *WPLOKERBJM_SKIP_BOOT to load the class without executing boot().
-if (!defined('WPLOKERBJM_SKIP_BOOT')) {
-    Bootstrap::boot();
-}
+// *WPLOKERBJM_TEST_ENV to load the class without executing boot().
+!defined('WPLOKERBJM_TEST_ENV')  &&  Bootstrap::boot();

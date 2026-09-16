@@ -3,47 +3,78 @@
 declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
+use WPLokerBJM\Shared\Utilities\DTO\AbstractDTO;
+use WeakReference;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, RuntimeCallableHookHandler, RuntimeInstanceHookHandler, RuntimeInstancePropertyHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksRuntimeRegistry};
 
 /**
+ * @template TObject
+ * @template TClass
  * @phpstan-import-type CallablePlan from HookProviderTrait
+ * *Master Hook Type
  * @phpstan-type HookType array{
- *  class: string,
- *  method: string,
+ *  class: class-string<TClass>,
+ *  method: method-string<TClass>|property-string<TClass>,
  *  type: 'action'|'filter',
- *  hook: string|\Closure,
+ *  hook: string|\Closure(TObject...): string,
  *  priority: int,
- *  accepted_args: int,
- *  defer_register: bool,
+ *  acceptedArgs: int,
+ *  deferRegister: bool,
  *  target: 'method'|'property'|'property-hook',
- *  visibility: string,
- *  execute_if: \Closure|null,
- *  execute_if_params: CallablePlan,
- *  register_if: \Closure|null,
- *  register_if_params: CallablePlan,
- *  hook_params: CallablePlan,
+ *  visibility: 'public'|'protected'|'private',
+ *  executeIf: (\Closure(TObject...): bool)|null,
+ *  executeIfParams: CallablePlan,
+ *  registerIf: (\Closure(TObject...): bool)|null,
+ *  registerIfParams: CallablePlan,
+ *  hookParams: CallablePlan,
  *  hookArgs: array,
  *  tags: array,
- *  tag_callable: \Closure|null,
- *  tag_callable_params: CallablePlan,
- *  defer_register_until_hook: string|\Closure|null,
- *  defer_register_until_hook_params: CallablePlan,
+ *  tagCallable: (\Closure(TObject...): array)|null,
+ *  tagCallableParams: CallablePlan,
+ *  deferRegisterUntilHook: string|(\Closure(TObject...): string)|null,
+ *  deferRegisterUntilHookParams: CallablePlan,
  *  once: bool,
  * }
+ * @extends parent<HookType>
  */
-readonly class HookRegistration
+final readonly class HookRegistration extends AbstractDTO
 {
+    /**
+     * @param HookType['class'] $class
+     * @param HookType['method'] $method
+     * @param HookType['type'] $type
+     * @param HookType['hook'] $hook
+     * @param HookType['priority'] $priority
+     * @param HookType['acceptedArgs'] $acceptedArgs
+     * @param HookType['deferRegister'] $deferRegister
+     * @param HookType['target'] $target
+     * @param HookType['visibility'] $visibility
+     * @param HookType['executeIf'] $executeIf
+     * @param HookType['executeIfParams'] $executeIfParams
+     * @param HookType['registerIf'] $registerIf
+     * @param HookType['registerIfParams'] $registerIfParams
+     * @param HookType['hookParams'] $hookParams
+     * @param HookType['hookArgs'] $hookArgs
+     * @param HookType['tags'] $tags
+     * @param HookType['tagCallable'] $tagCallable
+     * @param HookType['tagCallableParams'] $tagCallableParams
+     * @param HookType['deferRegisterUntilHook'] $deferRegisterUntilHook
+     * @param HookType['deferRegisterUntilHookParams'] $deferRegisterUntilHookParams
+     * @param HookType['once'] $once
+     */
     public function __construct(
         public string $class,
         public string $method,
         public string $type,
         public string|\Closure $hook,
-        public int $priority,
-        public int $acceptedArgs,
-        public bool $deferRegister,
-        public string $target,
-        public string $visibility,
+        public int $priority = 10,
+        public int $acceptedArgs = 1,
+        public bool $deferRegister = false,
+        public string $target = 'method',
+        public string $visibility = 'public',
         public ?\Closure $executeIf = null,
         public array $executeIfParams = [],
         public ?\Closure $registerIf = null,
@@ -56,80 +87,7 @@ readonly class HookRegistration
         public string|\Closure|null $deferRegisterUntilHook = null,
         public array $deferRegisterUntilHookParams = [],
         public bool $once = false,
-    ) {
-    }
-
-    /**
-     * Summary of fromArray
-     * @param HookType $data
-     * @return HookRegistration
-     */
-    public static function fromArray(array $data): self
-    {
-        return new self(
-            class: $data['class'],
-            method: $data['method'],
-            type: $data['type'],
-            hook: $data['hook'],
-            priority: $data['priority'],
-            acceptedArgs: $data['accepted_args'],
-            deferRegister: $data['defer_register'] ?? $data['defer'] ?? false,
-            target: $data['target'] ?? 'method',
-            visibility: $data['visibility'] ?? 'public',
-            executeIf: $data['execute_if'] ?? null,
-            executeIfParams: $data['execute_if_params'] ?? [],
-            registerIf: $data['register_if'] ?? null,
-            registerIfParams: $data['register_if_params'] ?? [],
-            hookParams: $data['hook_params'] ?? [],
-            hookArgs: $data['hook_args'] ?? [],
-            tags: $data['tags'] ?? [],
-            tagCallable: $data['tag_callable'] ?? null,
-            tagCallableParams: $data['tag_callable_params'] ?? [],
-            deferRegisterUntilHook: $data['defer_register_until_hook'] ?? null,
-            deferRegisterUntilHookParams: $data['defer_register_until_hook_params'] ?? [],
-            once: $data['once'] ?? false,
-        );
-    }
-
-    /**
-     * @param HookRegistration $data
-     * @return HookType
-     */
-    public static function toArray(HookRegistration $data): array
-    {
-        return [
-            'class' => $data->class,
-            'method' => $data->method,
-            'type' => $data->type,
-            'hook' => $data->hook,
-            'priority' => $data->priority,
-            'accepted_args' => $data->acceptedArgs,
-            'defer_register' => $data->deferRegister,
-            'target' => $data->target,
-            'visibility' => $data->visibility,
-            'execute_if' => $data->executeIf,
-            'execute_if_params' => $data->executeIfParams,
-            'register_if' => $data->registerIf,
-            'register_if_params' => $data->registerIfParams,
-            'hook_params' => $data->hookParams,
-            'hook_args' => $data->hookArgs,
-            'tags' => $data->tags,
-            'tag_callable' => $data->tagCallable,
-            'tag_callable_params' => $data->tagCallableParams,
-            'defer_register_until_hook' => $data->deferRegisterUntilHook,
-            'defer_register_until_hook_params' => $data->deferRegisterUntilHookParams,
-            'once' => $data->once,
-        ];
-    }
-
-    /**
-     * @param HookRegistration[] $properties
-     * @return self
-     */
-    public static function __set_state(array $properties): self
-    {
-        return new self(...$properties);
-    }
+    ) {}
 }
 /**
  * Immutable structural key identifying a hook registration.
@@ -137,9 +95,27 @@ readonly class HookRegistration
  * Generates the canonical string used as the array key in the registry
  * ({@see WPHooksContainerRegistry}) and answers structural match questions
  * (by class, class+method, or namespace) without string prefix parsing.
+ * @phpstan-import-type HookType from HookRegistration
+ * @phpstan-type HookKeyShape array{
+ *    class: HookType['class'],
+ *    method: HookType['method'],
+ *    target: HookType['target'],
+ *    type: HookType['type'],
+ *    priority: HookType['priority'],
+ *    acceptedArgs: HookType['acceptedArgs'],
+ * }
+ * @extends parent<HookKeyShape>
  */
-readonly class HookKey
+final readonly class HookKey extends AbstractDTO
 {
+    /**
+     * @param HookKeyShape['class'] $class
+     * @param HookKeyShape['method'] $method
+     * @param HookKeyShape['target'] $target
+     * @param HookKeyShape['type'] $type
+     * @param HookKeyShape['priority'] $priority
+     * @param HookKeyShape['acceptedArgs'] $acceptedArgs
+     */
     public function __construct(
         public string $class,
         public string $method,
@@ -147,8 +123,7 @@ readonly class HookKey
         public string $type,
         public int $priority,
         public int $acceptedArgs,
-    ) {
-    }
+    ) {}
 
     public static function fromRegistration(HookRegistration $registration): self
     {
@@ -198,28 +173,46 @@ readonly class HookKey
  * and re-hydrated into live handlers on subsequent requests. Only scan-derived
  * metadata lives here — per-instance state (owner instance, WeakReference,
  * remove callbacks) is intentionally NOT part of the DTO.
- *
+ * @phpstan-import-type HookType from HookRegistration
  * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-type RuntimeHookMetadataData array{
  *  hook: string,
- *  type: 'action'|'filter',
- *  priority: int,
- *  acceptedArgs: int,
- *  once: bool,
- *  executeIf: \Closure|null,
- *  executeIfParams: CallablePlan,
- *  registerIf: \Closure|null,
- *  registerIfParams: CallablePlan,
- *  deferRegisterUntilHook: string|\Closure|null,
- *  deferRegisterUntilHookParams: CallablePlan,
- *  hookArgNames: array<int, string>,
- *  target: 'method'|'property'|'property-hook',
- *  targetName: string,
- *  visibility: string,
+ *  type: HookType['type'],
+ *  priority: HookType['priority'],
+ *  acceptedArgs: HookType['acceptedArgs'],
+ *  once: HookType['once'],
+ *  executeIf: HookType['executeIf'],
+ *  executeIfParams: HookType['executeIfParams'],
+ *  registerIf: HookType['registerIf'],
+ *  registerIfParams: HookType['registerIfParams'],
+ *  deferRegisterUntilHook: HookType['deferRegisterUntilHook'],
+ *  deferRegisterUntilHookParams: HookType['deferRegisterUntilHookParams'],
+ *  hookArgNames: HookType['hookArgs'],
+ *  target: HookType['target'],
+ *  targetName: HookType['method'],
+ *  visibility: HookType['visibility'],
  * }
+ * @extends parent<RuntimeHookMetadataData>
  */
-readonly class RuntimeHookMetadata
+readonly class RuntimeHookMetadata extends AbstractDTO
 {
+    /**
+     * @param RuntimeHookMetadataData['hook'] $hook
+     * @param RuntimeHookMetadataData['type'] $type
+     * @param RuntimeHookMetadataData['priority'] $priority
+     * @param RuntimeHookMetadataData['acceptedArgs'] $acceptedArgs
+     * @param RuntimeHookMetadataData['once'] $once
+     * @param RuntimeHookMetadataData['executeIf'] $executeIf
+     * @param RuntimeHookMetadataData['executeIfParams'] $executeIfParams
+     * @param RuntimeHookMetadataData['registerIf'] $registerIf
+     * @param RuntimeHookMetadataData['registerIfParams'] $registerIfParams
+     * @param RuntimeHookMetadataData['deferRegisterUntilHook'] $deferRegisterUntilHook
+     * @param RuntimeHookMetadataData['deferRegisterUntilHookParams'] $deferRegisterUntilHookParams
+     * @param RuntimeHookMetadataData['hookArgNames'] $hookArgNames
+     * @param RuntimeHookMetadataData['target'] $target
+     * @param RuntimeHookMetadataData['targetName'] $targetName
+     * @param RuntimeHookMetadataData['visibility'] $visibility
+     */
     public function __construct(
         public string $hook,
         public string $type,
@@ -236,65 +229,57 @@ readonly class RuntimeHookMetadata
         public string $target = 'method',
         public string $targetName = '',
         public string $visibility = 'public',
-    ) {
-    }
+    ) {}
+}
 
-    /**
-     * @param RuntimeHookMetadataData $data
-     * @return RuntimeHookMetadata
-     */
-    public static function fromArray(array $data): self
-    {
-        return new self(
-            hook: $data['hook'],
-            type: $data['type'],
-            priority: $data['priority'],
-            acceptedArgs: $data['acceptedArgs'],
-            once: $data['once'] ?? false,
-            executeIf: $data['executeIf'] ?? null,
-            executeIfParams: $data['executeIfParams'] ?? [],
-            registerIf: $data['registerIf'] ?? null,
-            registerIfParams: $data['registerIfParams'] ?? [],
-            deferRegisterUntilHook: $data['deferRegisterUntilHook'] ?? null,
-            deferRegisterUntilHookParams: $data['deferRegisterUntilHookParams'] ?? [],
-            hookArgNames: $data['hookArgNames'] ?? [],
-            target: $data['target'] ?? 'method',
-            targetName: $data['targetName'] ?? '',
-            visibility: $data['visibility'] ?? 'public',
-        );
-    }
 
+/**
+ * @phpstan-import-type HookType from HookRegistration
+ * @phpstan-type AvailaibleHandlerType ContainerLazyHookHandler|ContainerLazyPropertyHookHandler|RuntimeCallableHookHandler|RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler
+ * @phpstan-type DeferredHookEntry array{
+ *     key: HookKey,
+ *     handler: AvailaibleHandlerType,
+ *     type: HookType['type'],
+ *     priority: HookType['priority'],
+ *     acceptedArgs: HookType['acceptedArgs'],
+ *     tags: HookType['tags'],
+ *     registerIf: HookType['registerIf'],
+ *     registerIfParams: HookType['registerIfParams'],
+ *     executeIf: HookType['executeIf'],
+ *     executeIfParams: HookType['executeIfParams'],
+ *     once: HookType['once'],
+ *     instance: WeakReference<object>
+ * }>>
+ * @extends parent<DeferredHookEntry>
+ */
+final readonly class DeferredHookEntryDTO extends AbstractDTO
+{
     /**
-     * @param RuntimeHookMetadata $metadata
-     * @return RuntimeHookMetadataData
+     * @param DeferredHookEntry['key'] $key Exclusive for @see WPHooksContainerRegistry
+     * @param DeferredHookEntry['handler'] $handler
+     * @param DeferredHookEntry['type'] $type
+     * @param DeferredHookEntry['priority'] $priority
+     * @param DeferredHookEntry['acceptedArgs'] $acceptedArgs
+     * @param DeferredHookEntry['tags'] $tags
+     * @param DeferredHookEntry['registerIf'] $registerIf
+     * @param DeferredHookEntry['registerIfParams'] $registerIfParams
+     * @param DeferredHookEntry['executeIf'] $executeIf
+     * @param DeferredHookEntry['executeIfParams'] $executeIfParams
+     * @param DeferredHookEntry['once'] $once
+     * @param DeferredHookEntry['instance'] $instance Exclusive for @see WPHooksRuntimeRegistry
      */
-    public static function toArray(RuntimeHookMetadata $metadata): array
-    {
-        return [
-            'hook' => $metadata->hook,
-            'type' => $metadata->type,
-            'priority' => $metadata->priority,
-            'acceptedArgs' => $metadata->acceptedArgs,
-            'once' => $metadata->once,
-            'executeIf' => $metadata->executeIf,
-            'executeIfParams' => $metadata->executeIfParams,
-            'registerIf' => $metadata->registerIf,
-            'registerIfParams' => $metadata->registerIfParams,
-            'deferRegisterUntilHook' => $metadata->deferRegisterUntilHook,
-            'deferRegisterUntilHookParams' => $metadata->deferRegisterUntilHookParams,
-            'hookArgNames' => $metadata->hookArgNames,
-            'target' => $metadata->target,
-            'targetName' => $metadata->targetName,
-            'visibility' => $metadata->visibility,
-        ];
-    }
-
-    /**
-     * @param RuntimeHookMetadataData $properties
-     * @return self
-     */
-    public static function __set_state(array $properties): self
-    {
-        return new self(...$properties);
-    }
+    public function __construct(
+        public ?HookKey $key = null,
+        public ContainerLazyHookHandler|ContainerLazyPropertyHookHandler|RuntimeCallableHookHandler|RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler $handler,
+        public string $type,
+        public int $priority,
+        public int $acceptedArgs,
+        public array $tags,
+        public ?\Closure $registerIf,
+        public array $registerIfParams,
+        public ?\Closure $executeIf,
+        public array $executeIfParams,
+        public bool $once,
+        public ?WeakReference $instance = null
+    ) {}
 }

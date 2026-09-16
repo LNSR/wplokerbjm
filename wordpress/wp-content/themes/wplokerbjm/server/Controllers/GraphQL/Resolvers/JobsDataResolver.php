@@ -11,7 +11,7 @@ use WPLokerBJM\Services\GraphQL\GraphQLJobData;
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
-use DI\Attribute\Injectable;
+use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
 
 /**

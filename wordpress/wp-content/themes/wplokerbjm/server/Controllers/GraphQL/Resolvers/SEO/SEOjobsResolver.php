@@ -6,7 +6,7 @@ use JobSchemaArgs;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
-use DI\Attribute\Injectable;
+use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Services\GraphQL\GraphQLJobData;
 use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
 
@@ -191,7 +191,7 @@ class SEOjobsResolver
         }
     }
 
-    /** @var static::class */
+    /** @var __CLASS__::class */
     private object $rankMathResolver {
         get => $this->rankMathResolver ??= new class() {
             public function getHeadlessRankMathData(string $url): array

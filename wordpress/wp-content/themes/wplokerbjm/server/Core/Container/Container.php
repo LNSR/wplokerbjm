@@ -7,36 +7,22 @@ use DI\Container;
 use WPLokerBJM\Core\Container\Definitions\{Core, Factory};
 use WPLokerBJM\Shared\Log\Logger;
 
+
 class WPLokerBJMContainer
 {
     private static ?Container $container = null;
-    public static ?string $CACHE_DIR = null;
-    public static ?string $CACHE_FILE = null;
+    /** @var __CLASS__::class */
+    public static ?object $CACHE_INFO = null;
 
-    private static function initializeCachePaths(): void
+    private static function initializeCachePaths(?string $cacheDir = null, ?string $cacheFile = null): void
     {
-        if (self::$CACHE_DIR !== null)
-            return;
-
-        $loc = self::cacheLocation();
-        self::$CACHE_DIR = $loc['cacheDir'];
-        self::$CACHE_FILE = $loc['cacheFile'];
-    }
-
-    /**
-     * @return array{cacheDir: string, cacheFile: string}
-     */
-    private static function cacheLocation(): array
-    {
-        $cacheDir = get_stylesheet_directory() . '/cache';
-        $cacheFile = $cacheDir . '/CompiledContainer.php';
-
-        $cache = [
-            'cacheDir' => $cacheDir,
-            'cacheFile' => $cacheFile,
-        ];
-
-        return $cache;
+        self::$CACHE_INFO ??= new class($cacheDir, $cacheFile) {
+            public function __construct(public private(set) ?string $cacheDir, public private(set) ?string $cacheFile)
+            {
+                $this->cacheDir ??= \sprintf("%s/cache", rtrim(get_stylesheet_directory(), '/'));
+                $this->cacheFile ??= \sprintf("%s/CompiledContainer.php", $this->cacheDir);
+            }
+        };
     }
 
     /**
@@ -49,9 +35,9 @@ class WPLokerBJMContainer
      * @return Container The configured DI container
      * @throws \Exception If container creation fails
      */
-    public static function getContainer(?bool $rebuild = null): Container
+    public static function getContainer(bool $rebuild = false): Container
     {
-        if (self::$container !== null && !$rebuild) {
+        if (self::$container !== null && $rebuild === false) {
             return self::$container;
         }
 
@@ -77,13 +63,12 @@ class WPLokerBJMContainer
 
     /**
      * Setup definitions
-     * @param ContainerBuilder $builder
      */
     private static function setupDefinitions(ContainerBuilder $builder): void
     {
         $builder->addDefinitions(
             // Last position will overwrite previous definitions
-            array_merge(
+            \array_merge(
                 Core::getDefinitions(),
                 // factory definitions
                 Factory::getDefinitions(),
@@ -98,21 +83,21 @@ class WPLokerBJMContainer
      */
     private static function setupCache(ContainerBuilder $builder, bool $rebuild): void
     {
-        $hasCache = file_exists(self::$CACHE_FILE);
+        $hasCache = file_exists(self::$CACHE_INFO->cacheFile);
 
         if ($hasCache && !$rebuild) {
-            $builder->enableCompilation(self::$CACHE_DIR);
+            $builder->enableCompilation(self::$CACHE_INFO->cacheDir);
             return;
         }
 
-        if (!is_dir(self::$CACHE_DIR) && !mkdir(self::$CACHE_DIR, 0755, true)) {
-            Logger::error('Container', "Failed to create cache directory: " . self::$CACHE_DIR);
+        if (!is_dir(self::$CACHE_INFO->cacheDir) && !mkdir(self::$CACHE_INFO->cacheDir, 0755, true)) {
+            Logger::error('Container', "Failed to create cache directory: " . self::$CACHE_INFO->cacheDir);
             Logger::flush();
             return;
         }
 
-        if (!is_writable(self::$CACHE_DIR)) {
-            Logger::warning('Container', "Compilation directory not writable, skipping compilation: " . self::$CACHE_DIR);
+        if (!is_writable(self::$CACHE_INFO->cacheDir)) {
+            Logger::warning('Container', "Compilation directory not writable, skipping compilation: " . self::$CACHE_INFO->cacheDir);
             Logger::flush();
             return;
         }
@@ -120,11 +105,10 @@ class WPLokerBJMContainer
         try {
             self::setupDefinitions($builder);
 
-            $builder->enableCompilation(self::$CACHE_DIR);
-            $builder->writeProxiesToFile(true, self::$CACHE_DIR . '/');
-        } catch (\Throwable $e) {
+            $builder->enableCompilation(self::$CACHE_INFO->cacheDir);
+            $builder->writeProxiesToFile(true, self::$CACHE_INFO->cacheFile . '/');
+        } catch (\Exception $e) {
             Logger::warning('Container', 'Failed to enable compilation: ' . $e->getMessage());
-            Logger::flush();
         }
     }
 }

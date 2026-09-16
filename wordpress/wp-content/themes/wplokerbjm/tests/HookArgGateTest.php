@@ -165,16 +165,16 @@ class HookArgGateTest extends WplokerbjmTestCase
             'type' => 'action',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
-            'defer_register' => false,
-            'execute_if' => $executeIf,
-            'execute_if_params' => $executeIfParams,
+            'acceptedArgs' => $acceptedArgs,
+            'deferRegister' => false,
+            'executeIf' => $executeIf,
+            'executeIfParams' => $executeIfParams,
             // The registration array must carry the handler param names —
-            // normally the scanner emits them (hook_args key).
-            'hook_args' => ['search', 'extra'],
-            'register_if' => null,
-            'register_if_params' => [],
-            'hook_params' => [],
+            // normally the scanner emits them (hookArgs key).
+            'hookArgs' => ['search', 'extra'],
+            'registerIf' => null,
+            'registerIfParams' => [],
+            'hookParams' => [],
             'tags' => [],
         ];
     }

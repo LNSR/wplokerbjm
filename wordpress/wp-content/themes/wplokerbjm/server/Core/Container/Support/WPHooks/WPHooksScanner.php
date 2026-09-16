@@ -15,6 +15,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Shared\Log\Logger;
+use \CompiledContainer;
 
 /**
  * Scans directories for WordPress hook attribute registrations.
@@ -68,7 +69,7 @@ class WPHooksScanner
         }
 
         if (!empty($this->cacheLocation) && is_file($this->cacheLocation)) {
-            $loaded = require_once $this->cacheLocation;
+            $loaded = require $this->cacheLocation;
             if (is_array($loaded)) {
                 return $this->cachedHookRegistrations = array_map(
                     static fn(HookRegistration|array $reg): HookRegistration => $reg instanceof HookRegistration ? $reg : HookRegistration::fromArray($reg),
@@ -99,7 +100,9 @@ class WPHooksScanner
         $namespacePrefix = $this->namespace . '\\';
 
         $hookPlanProvider = $this->hookPlanProvider;
-        foreach (Bootstrap::$robotLoader->getIndexedClasses() as $className => $file) {
+        $isTest = defined('WPLOKERBJM_TEST_ENV');
+        $methodMap = $isTest ? Bootstrap::$robotLoader->getIndexedClasses() : CompiledContainer::METHOD_MAPPING;
+        foreach ($methodMap as $className => $entryGet) {
             if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
                 continue;
             }
@@ -121,7 +124,7 @@ class WPHooksScanner
                         registerIf: $attr->registerIf,
                         registerIfParams: $hookPlanProvider->buildCallablePlan($attr->registerIf),
                         hookParams: $hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        hookArgs: array_map(static fn($p) => $p->getName(), $method->getParameters()),
+                        hookArgs: array_map(static fn(\ReflectionParameter $p) => $p->getName(), $method->getParameters()),
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
@@ -160,6 +163,7 @@ class WPHooksScanner
                 $this->scanPropertyHooks($reflection, $propertyCb);
             } catch (\RuntimeException $e) {
                 Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());
+                Logger::flush();
                 throw $e;
             }
         }

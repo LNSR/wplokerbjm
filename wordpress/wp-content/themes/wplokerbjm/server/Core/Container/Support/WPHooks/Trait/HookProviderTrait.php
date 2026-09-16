@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use Psr\Container\ContainerInterface;
+use ReflectionClass;
 use ReflectionException;
 use ReflectionFunction;
 use ReflectionMethod;
@@ -20,9 +21,9 @@ use RuntimeException;
  * file, and resolved from the container at hook-fire time — so the hot path
  * never needs reflection unless a plan is missing (stale cache / unexportable
  * defaults).
- *
- * @phpstan-type CallableHookParams array{name: string, type: class-string|null, hasDefault: bool, default: mixed}
- * @phpstan-type CallablePlan array{isStatic: bool, scopeClass: \Closure|null, params: array<int, CallableHookParams>}
+ * @template TClass
+ * @phpstan-type CallableHookParams array{name: string, type: string|class-string<TClass>|null, hasDefault: bool, default: mixed}
+ * @phpstan-type CallablePlan array{isStatic: bool, scopeClass: \Closure(object<TClass>): class-string<TClass>|null, params: list<CallableHookParams>}
  */
 trait HookProviderTrait
 {
@@ -38,9 +39,7 @@ trait HookProviderTrait
      */
     private \WeakMap $boundClosureCache { get => $this->boundClosureCache ??= new \WeakMap(); }
 
-    public function __construct()
-    {
-    }
+    public function __construct() {}
 
     /**
      * Build the resolution plan for a callable closure.
@@ -77,6 +76,18 @@ trait HookProviderTrait
 
             foreach ($reflect->getParameters() as $param) {
                 $type = $param->getType();
+                $paramType = null;
+                if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
+                    $paramType = $reflect->getClosureScopeClass()->getName();
+                    if ((new ReflectionClass($paramType))->isAnonymous()) {
+                        throw new RuntimeException(
+                            'Anonymous class cannot be used as a parameter type hint \'self\'.'
+                        );
+                    }
+                } else {
+                    $paramType = $type instanceof ReflectionNamedType && !$type->isBuiltin() ? $type->getName() : null;
+                }
+
                 $hasDefault = $param->isDefaultValueAvailable();
                 $default = $hasDefault ? $param->getDefaultValue() : null;
 
@@ -87,7 +98,7 @@ trait HookProviderTrait
 
                 $params[] = [
                     'name' => $param->getName(),
-                    'type' => ($type instanceof ReflectionNamedType && !$type->isBuiltin()) ? $type->getName() : null,
+                    'type' => $paramType,
                     'hasDefault' => $hasDefault,
                     'default' => $default,
                 ];
@@ -175,8 +186,7 @@ trait HookProviderTrait
      * When a target class is given, the closure is bound to that scope
      * before invocation: a non-static closure receives the resolved
      * service instance as `$this` (private/protected access), a static
-     * closure is scope-bound only. `self` type-hints stay unresolvable —
-     * use the direct class hint instead.
+     * closure is scope-bound only.
      *
      * @param CallablePlan $executeIfParams
      *
@@ -377,7 +387,13 @@ trait HookProviderTrait
             $type = $param->getType();
             $resolved = false;
 
-            if ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
+            if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
+                $className = $reflect->getClosureScopeClass()->getName();
+                if ($container !== null && $container->has($className)) {
+                    $values[] = $container->get($className);
+                    $resolved = true;
+                }
+            } elseif ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
                 $className = $type->getName();
                 if ($container !== null && $container->has($className)) {
                     $values[] = $container->get($className);
@@ -450,7 +466,6 @@ trait HookProviderTrait
         } catch (\ReflectionException) {
             return [];
         }
-
     }
     /**
      * Extract parameter names from a property's callable value or default value.

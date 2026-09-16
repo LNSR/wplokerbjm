@@ -22,7 +22,13 @@ trait IngestControllerTrait
     {
         return ControllerUtils::getPermissionErrorStatus($request);
     }
-    
+
+    /**
+     * Permission callback for the REST route.
+     * @param \WP_REST_Request|null $request
+     * @return true|\WP_Error
+     */
+    abstract public function permissionsCheck($request = null);
 }
 
 class LowonganIngestController

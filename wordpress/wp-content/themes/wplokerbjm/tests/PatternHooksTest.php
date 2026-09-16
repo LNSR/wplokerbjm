@@ -256,11 +256,11 @@ class PatternHooksTest extends WplokerbjmTestCase
             'type' => 'action',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
+            'acceptedArgs' => $acceptedArgs,
             'tags' => $tags,
-            'defer_register' => $deferRegister,
-            'execute_if' => $executeIf,
-            'execute_if_params' => $executeIfParams,
+            'deferRegister' => $deferRegister,
+            'executeIf' => $executeIf,
+            'executeIfParams' => $executeIfParams,
         ];
     }
 
@@ -286,11 +286,11 @@ class PatternHooksTest extends WplokerbjmTestCase
             'type' => 'filter',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
+            'acceptedArgs' => $acceptedArgs,
             'tags' => $tags,
-            'defer_register' => $deferRegister,
-            'execute_if' => $executeIf,
-            'execute_if_params' => $executeIfParams,
+            'deferRegister' => $deferRegister,
+            'executeIf' => $executeIf,
+            'executeIfParams' => $executeIfParams,
         ];
     }
 }

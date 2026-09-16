@@ -7,10 +7,10 @@ require_once __DIR__ . '/../vendor/autoload.php';
 
 // Load Bootstrap class manually — we can't let RobotLoader auto-load it
 // because the file also calls Bootstrap::boot() (WordPress functions).
-// Define ABSPATH to satisfy the file's guard, and WPLOKERBJM_SKIP_BOOT
+// Define ABSPATH to satisfy the file's guard, and WPLOKERBJM_TEST_ENV
 // (set in mu-plugins/wplokerbjm-bootstrap.php) to prevent boot().
 define('ABSPATH', true);
-define('WPLOKERBJM_SKIP_BOOT', true);
+define('WPLOKERBJM_TEST_ENV', true);
 require_once __DIR__ . '/../../../mu-plugins/wplokerbjm-bootstrap.php';
 
 // Nette RobotLoader for all WPLokerBJM classes — replaces Composer classmaps.
@@ -23,9 +23,6 @@ $testRl = (new \Nette\Loaders\RobotLoader)
     ->setAutoRefresh(true)
     ->reportParseErrors(true);
 $testRl->register();
-
-// Share the test RobotLoader with Bootstrap so AutowireScanner and
-// WPHooksScanner have access via Bootstrap::getRobotLoader().
 
 Bootstrap::setRobotLoader($testRl);
 

@@ -12,8 +12,7 @@ use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\Sanitizer;
-use DI\Attribute\Injectable;
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
+use WPLokerBJM\Core\Container\Attributes\Injectable;;
 
 /**
  * @phpstan-type IngestErrorResult array{status: 400|500, data: array{code: string, message: string, warnings: array}}
@@ -150,7 +149,7 @@ class LowonganIngestService
         ];
     }
     /**
-     * @var static::class
+     * @var __CLASS__::class
      */
     public private(set) object $taxonomyResolver {
         get => $this->taxonomyResolver ??= new class() {

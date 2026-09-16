@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Services\WebHooks;
 
+use WPLokerBJM\Configs\Credential\CloudflareCred;
 use WPLokerBJM\Configs\Credential\CredentialConfig;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\ContainerRegistryActions;
@@ -22,7 +23,6 @@ use WPLokerBJM\Core\Container\Definitions\Factory;
  * We rely on QUIC Cloud cache to simplify things. There is no need to
  * purge individual URLs or paths — a full-zone purge is cheap and fast.
  * @see Factory::getInstanceWithCredentials()
- * @phpstan-import-type CloudflareCred from CredentialConfig
  * @phpstan-type CFPurgeOptions array{
  *  purge_everything?: bool,
  *  hosts?: array<string>,
@@ -32,10 +32,8 @@ use WPLokerBJM\Core\Container\Definitions\Factory;
  */
 class Cloudflare
 {
-    /**
-     * @param CloudflareCred $credential filled by PHP-DI
-     */
-    public function __construct(private array $credential) {}
+
+    public function __construct(private CloudflareCred $credential) {}
 
     /**
      * Purge the entire Cloudflare zone cache.
@@ -56,7 +54,7 @@ class Cloudflare
      *
      * Self-unregisters after firing: subsequent meta hooks within the
      * same request are redundant (the zone was already purged).
-     * @var static::class
+     * @var __CLASS__::class
      */
     #[Action('added_post_meta', 10, 4)]
     #[Action('updated_post_meta', 10, 4)]
@@ -68,7 +66,7 @@ class Cloudflare
      *
      * Self-unregisters after firing: subsequent term hooks within the
      * same request are redundant (the zone was already purged).
-     * @var static::class
+     * @var __CLASS__::class
      */
     #[Action('created_term', 10, 0)]
     #[Action('edit_term', 10, 0)]
@@ -81,7 +79,7 @@ class Cloudflare
      */
     private function createHandler(string $propertyName): \Closure|false
     {
-        if (empty(array_filter($this->credential))) {
+        if (empty($this->credential->token) || empty($this->credential->zone)) {
             do_action(ContainerRegistryActions::UNREGISTER_BY_CLASS, self::class);
             return false;
         }
@@ -107,21 +105,18 @@ class Cloudflare
             return false;
         }
 
-        $token = $this->credential['token'] ?? '';
-        $zone = $this->credential['zone'] ?? '';
-
-        if (!$token || !$zone) {
+        if (!$this->credential->token || !$this->credential->zone) {
             Logger::warning('WebHook', 'Cloudflare credentials are missing.');
             return false;
         }
 
-        $endpoint = sprintf('https://api.cloudflare.com/client/v4/zones/%s/purge_cache', $zone);
+        $endpoint = sprintf('https://api.cloudflare.com/client/v4/zones/%s/purge_cache', $this->credential->zone);
         $body = wp_json_encode($payload);
 
         $response = wp_remote_request($endpoint, [
             'method' => 'POST',
             'headers' => [
-                'Authorization' => 'Bearer ' . $token,
+                'Authorization' => 'Bearer ' . $this->credential->token,
                 'Content-Type' => 'application/json',
             ],
             'body' => $body,

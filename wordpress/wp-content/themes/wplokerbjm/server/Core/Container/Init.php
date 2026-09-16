@@ -4,6 +4,7 @@ namespace WPLokerBJM\Core\Container;
 
 use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Initializes core services in the wplokerbjm theme by registering WordPress hooks.
@@ -28,6 +29,11 @@ class Init
     public function __construct(
         private readonly WPHooksContainerRegistry $registry,
     ) {}
+
+    public function __destruct()
+    {
+        !defined('WPLOKERBJM_TEST_ENV') && Logger::flush();
+    }
 
     /**
      * Register all WordPress hooks from attributes via the registry.

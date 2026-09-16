@@ -33,7 +33,6 @@ final class ProxyContainer
         }
 
         self::$booted = true;
-
         self::loadEnvFiles();
         self::defineCoreConstants();
 
@@ -60,7 +59,6 @@ final class ProxyContainer
 
         // Ensure runtime is booted before container initialization.
         self::boot();
-
         self::$container = WPLokerBJMContainer::getContainer();
         return self::$container;
     }

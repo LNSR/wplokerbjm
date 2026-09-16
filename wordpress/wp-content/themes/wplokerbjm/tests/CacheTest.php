@@ -45,17 +45,17 @@ class CacheTest extends WplokerbjmTestCase
 
         // Debug: Show what constants are defined
         echo "\033[0;36mConfiguration:\033[0m\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_SOCK: " . ($credentials['sock'] ? "\033[0;32m" . $credentials['sock'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_HOST: " . ($credentials['host'] ? "\033[0;32m" . $credentials['host'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_PORT: " . ($credentials['port'] ? "\033[0;32m" . $credentials['port'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . ($credentials['password'] ? "\033[0;32m" . '{REDACTED}' . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . ($credentials['database'] !== null ? "\033[0;32m" . $credentials['database'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_SOCK: " . ($credentials->sock ? "\033[0;32m" . $credentials->sock . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_HOST: " . ($credentials->host ? "\033[0;32m" . $credentials->host . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_PORT: " . ($credentials->port ? "\033[0;32m" . $credentials->port . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . ($credentials->password ? "\033[0;32m" . '{REDACTED}' . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . ($credentials->database !== null ? "\033[0;32m" . $credentials->database . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
 
         $redis = $this->getRedisConnection();
 
         if ($redis === false) {
             echo "\033[0;31m❌ Redis connection failed\033[0m\n";
-            $this->fail('Redis connection failed - check Redis server and configuration. Is Redis running on ' . ($credentials['host'] ?: 'localhost') . ':' . ($credentials['port'] ?: 6379) . '?');
+            $this->fail('Redis connection failed - check Redis server and configuration. Is Redis running on ' . ($credentials->host ?: 'localhost') . ':' . ($credentials->port ?: 6379) . '?');
         }
 
         echo "\033[0;32m✅ Redis connection successful\033[0m\n";
@@ -104,19 +104,17 @@ class CacheTest extends WplokerbjmTestCase
 
         // Debug: Show TCP configuration
         echo "\033[0;36mTCP Configuration:\033[0m\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_HOST: " . ($credentials['host'] ? "\033[0;32m" . $credentials['host'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_PORT: " . ($credentials['port'] ? "\033[0;32m" . $credentials['port'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . ($credentials['password'] ? "\033[0;32m" . '{REDACTED}' . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
-        echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . ($credentials['database'] !== null ? "\033[0;32m" . $credentials['database'] . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_HOST: " . ($credentials->host ? "\033[0;32m" . $credentials->host . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_PORT: " . ($credentials->port ? "\033[0;32m" . $credentials->port . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_PASSWORD: " . ($credentials->password ? "\033[0;32m" . '{REDACTED}' . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
+        echo "  \033[0;33m•\033[0m WP_REDIS_DATABASE: " . ($credentials->database !== null ? "\033[0;32m" . $credentials->database . "\033[0m" : "\033[0;31mnot defined\033[0m") . "\n";
 
-        $host = $credentials['host'] ?: 'localhost';
-        $port = $credentials['port'] ?: 6379;
+        $host = $credentials->host ?: 'localhost';
+        $port = $credentials->port ?: 6379;
         // In Docker container environment, use 'redis' service name to reach Redis container
         if ((getenv('WP_ENV') === 'development' || getenv('WP_ENV') === 'production') && file_exists('/.dockerenv')) {
             $host = 'redis';
         }
-        $password = $credentials['password'];
-        $database = $credentials['database'] ?: 0;
 
         $redis = new \Redis();
 
@@ -129,8 +127,8 @@ class CacheTest extends WplokerbjmTestCase
         echo "\033[0;32m✅ TCP Redis connection successful\033[0m\n";
 
         // Authenticate if password is set
-        if ($password) {
-            if (!$redis->auth($password)) {
+        if ($credentials->password) {
+            if (!$redis->auth($credentials->password)) {
                 echo "\033[0;31m❌ TCP Redis authentication failed\033[0m\n";
                 $this->fail('TCP Redis authentication failed');
             }
@@ -138,7 +136,7 @@ class CacheTest extends WplokerbjmTestCase
         }
 
         // Select database
-        if (!$redis->select($database)) {
+        if (!$redis->select($credentials->database)) {
             echo "\033[0;31m❌ TCP Redis database selection failed\033[0m\n";
             $this->fail('TCP Redis database selection failed');
         }

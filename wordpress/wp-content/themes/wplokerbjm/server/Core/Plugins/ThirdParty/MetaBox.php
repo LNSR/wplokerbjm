@@ -1,7 +1,6 @@
 <?php
 namespace WPLokerBJM\Core\Plugins\ThirdParty;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use DI\Attribute\Injectable;
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Utilities\PluginList;
 

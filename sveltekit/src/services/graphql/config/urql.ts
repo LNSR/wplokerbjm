@@ -193,13 +193,13 @@ export class URQLServerManager extends URQLBaseManager {
   //     };
   // }
 
-  protected shouldCacheClient(): boolean {
+  protected override shouldCacheClient(): boolean {
     return false;
   }
 }
 
 export class URQLBrowserManager extends URQLBaseManager {
-  protected shouldCacheClient(): boolean {
+  protected override shouldCacheClient(): boolean {
     return true;
   }
 }

@@ -23,13 +23,10 @@ class Action
      * @param bool $deferRegister defer activation (forced true when $deferRegisterUntilHook is set)
      * 
      * @param (\Closure(TObject...): bool)|null $executeIf decide whether to execute callback, potentially instantiating the object
-     * @param-closure-this $executeIf TObject
      * 
      * @param (\Closure(TObject...): bool)|null $registerIf decide whether to register the hook
-     * @param-closure-this $registerIf TObject
      * 
      * @param array<int, string|\BackedEnum|\Closure(TObject...): array> $tag
-     * @param-closure-this $tag
      * 
      * @param string|(\Closure(TObject...): string)|null $deferRegisterUntilHook
      * !defer registration until the named 'action' trigger hook fires (implies defer); a Closure is resolved through the container and must return the trigger hook name
@@ -65,13 +62,10 @@ class Filter
      * @param bool $deferRegister defer activation (forced true when $deferRegisterUntilHook is set)
      * 
      * @param (\Closure(TObject...): bool)|null $executeIf decide whether to execute callback, potentially instantiating the object
-     * @param-closure-this $executeIf TObject
      * 
      * @param (\Closure(TObject...): bool)|null $registerIf decide whether to register the hook
-     * @param-closure-this $registerIf TObject
      * 
      * @param array<int, string|\BackedEnum|\Closure(TObject...): array> $tag
-     * @param-closure-this $tag
      * 
      * @param string|(\Closure(TObject...): string)|null $deferRegisterUntilHook defer registration until the named 'action' trigger hook fires (implies defer); a Closure is resolved through the container and must return the trigger hook name
      * @param bool $once consume-on-any-evaluation: the registration removes itself after executeIf is evaluated, regardless of whether the gate passed

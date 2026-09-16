@@ -34,7 +34,7 @@ class CacheInvalidationHooks
      * is handled separately by {@see self::purgeGlobalCacheOnce}.
      *
      * Registered only on hooks that carry post context.
-     * @var static::class
+     * @var __CLASS__::class
      */
     #[Action('save_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 2)]
     #[Action('delete_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 1)]
@@ -42,7 +42,7 @@ class CacheInvalidationHooks
     #[Action('delete_attachment', 10, 1)]
     #[Action('transition_post_status', 10, 3)]
     private AnonClassHookMetadata $invalidatePostCache {
-        get => $this->invalidatePostCache ??= new class(self::class, __PROPERTY__) extends AnonClassHookMetadata {
+        get => $this->invalidatePostCache ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
 
             /** @var array<int, bool> */
             private array $snapshotPostID = [];

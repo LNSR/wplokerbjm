@@ -21,7 +21,7 @@ class WPGraphQLETag
     /**
      * Fields whose responses depend on user identity/session and must never be ETag-cached.
      * Two users with the same query+variables get different results for these fields.
-     * @var key-of<GraphQLDataType>
+     * @var list<key-of<GraphQLDataType>>
      */
     private const array SKIP_ETAG_FIELDS = ['jwt', 'syncBookmark'];
 

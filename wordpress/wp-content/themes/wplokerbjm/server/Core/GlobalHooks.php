@@ -245,27 +245,7 @@ class HTTPHooks
         }
 
         if (!empty($_SERVER['HTTP_X_FORWARDED_FOR'])) {
-            $ips = explode(',', $_SERVER['HTTP_X_FORWARDED_FOR']);
-            $_SERVER['REMOTE_ADDR'] = trim($ips[0]);
+            $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_X_FORWARDED_FOR'];
         }
-    }
-}
-
-/*======================================================================
- | LOGGER FLUSH
- ======================================================================*/
-
-/**
- * Flushes any heavy/non-important tasks on background after request complete
- */
-class ShutdownHooks
-{
-
-    #[Action('shutdown', PHP_INT_MAX, once: true)]
-    public function __invoke() {}
-
-    public function __destruct()
-    {
-        SharedUtils::doActivityAtBackground(Logger::flush(...));
     }
 }

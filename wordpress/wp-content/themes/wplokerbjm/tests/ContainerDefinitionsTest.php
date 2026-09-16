@@ -308,7 +308,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
                 'type' => 'action',
                 'hook' => 'init',
                 'priority' => 10,
-                'accepted_args' => 1,
+                'acceptedArgs' => 1,
             ],
         ], $container);
         $registry->initialize();

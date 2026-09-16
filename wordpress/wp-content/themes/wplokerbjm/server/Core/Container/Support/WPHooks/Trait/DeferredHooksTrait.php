@@ -1,11 +1,17 @@
 <?php
 
 declare(strict_types=1);
+
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+use WPLokerBJM\Shared\Utilities\DTO\AbstractDTO;
 use WeakReference;
+use WPLokerBJM\Core\Container\Support\WPHooks\DeferredHookEntryDTO;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
+use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, RuntimeCallableHookHandler, RuntimeInstanceHookHandler, RuntimeInstancePropertyHookHandler};
+
 
 /**
  * Shared deferred-hook pool mechanics for hook registries.
@@ -22,21 +28,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler,
  * surface.
  * @phpstan-import-type CallableHookParams from HookProviderTrait
  * @phpstan-import-type CallablePlan from HookProviderTrait
- * @phpstan-type AvailaibleHandlerType ContainerLazyHookHandler|ContainerLazyPropertyHookHandler|RuntimeCallableHookHandler|RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler
- * @phpstan-type DeferredHookEntry array{
- *     key: HookKey,
- *     handler: AvailaibleHandlerType,
- *     type: 'action'|'filter',
- *     priority: int,
- *     accepted_args: int,
- *     tags: array<int, string>,
- *     registerIf: \Closure|null,
- *     registerIfParams: CallablePlan,
- *     executeIf: \Closure|null,
- *     executeIfParams: CallablePlan,
- *     once: bool,
- *     instance: WeakReference<object>
- * }>>
  *
  * @internal
  */
@@ -45,16 +36,14 @@ trait DeferredHooksTrait
     /**
      * Deferred handlers pool, keyed by [hook][key-string] like the active pool.
      *
-     * @var array<string, array<string, DeferredHookEntry>>
+     * @var array<string, array<string, DeferredHookEntryDTO>>
      */
-    private array $deferredHandlers = [];
+    public private(set) array $deferredHandlers = [];
 
     /**
      * Store a deferred hook entry under its hook + key.
-     *
-     * @param DeferredHookEntry $entry
      */
-    private function addDeferred(string $hook, string $key, array $entry): void
+    public function addDeferred(string $hook, string $key, DeferredHookEntryDTO $entry): void
     {
         $this->deferredHandlers[$hook][$key] = $entry;
     }
@@ -65,7 +54,7 @@ trait DeferredHooksTrait
      * Each matching entry is re-gated at activation time, then passed to
      * $activateEntry; the key is removed from the pool afterwards and empty
      * hook buckets are dropped.
-     * @template T of callable(string, DeferredHookEntry, string): bool
+     * @template T of callable(string, DeferredHookEntryDTO, string): bool
      * @param T $matches      Predicate over ($hook, $entry, $key).
      * @param T $activateEntry Moves the entry to the active pool and
      *                                                             registers it; returns true when newly
@@ -107,7 +96,7 @@ trait DeferredHooksTrait
      *
      * Only touches the deferred pool — active handlers are never affected.
      *
-     * @param callable(string, DeferredHookEntry, string): bool $matches Predicate over ($hook, $entry, $key).
+     * @param callable(string, DeferredHookEntryDTO, string): bool $matches Predicate over ($hook, $entry, $key).
      */
     protected function unregisterMatchingDeferredEntries(callable $matches): void
     {
@@ -131,7 +120,7 @@ trait DeferredHooksTrait
      * WPHookPlanProvider; the runtime path evaluates registerIf through its
      * RuntimeHookProvider.
      *
-     * @param DeferredHookEntry $data Deferred entry.
+     * @param DeferredHookEntryDTO $data Deferred entry.
      */
-    abstract private function gateDeferredActivation(array $data, string $hook, string $key): bool;
+    abstract private function gateDeferredActivation(DeferredHookEntryDTO $data, string $hook, string $key): bool;
 }

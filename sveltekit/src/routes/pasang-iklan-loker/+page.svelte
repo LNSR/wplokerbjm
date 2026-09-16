@@ -127,12 +127,12 @@
                     >Instagram:</span
                   >
                   <a
-                    href="https://instagram.com/loker_banjarmasin"
+                    href="https://instagram.com/lokerbanjarmasiin"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="linkClass"
                   >
-                    @loker_banjarmasin
+                    @lokerbanjarmasiin
                   </a>
                 </div>
               </li>
@@ -173,12 +173,12 @@
                     >WhatsApp:</span
                   >
                   <a
-                    href="https://wa.me/6283862447271"
+                    href="https://wa.me/6285212258230"
                     target="_blank"
                     rel="noopener noreferrer"
                     class="linkClass"
                   >
-                    +62 838-6244-7271
+                    +62 852-1225-8230
                   </a>
                 </div>
               </li>

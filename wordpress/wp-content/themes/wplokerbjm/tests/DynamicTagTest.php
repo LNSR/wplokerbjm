@@ -192,17 +192,17 @@ class DynamicTagTest extends WplokerbjmTestCase
             'type' => 'action',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
-            'defer_register' => $deferRegister,
-            'execute_if' => null,
-            'execute_if_params' => [],
-            'register_if' => null,
-            'register_if_params' => [],
-            'hook_params' => [],
-            'hook_args' => [],
+            'acceptedArgs' => $acceptedArgs,
+            'deferRegister' => $deferRegister,
+            'executeIf' => null,
+            'executeIfParams' => [],
+            'registerIf' => null,
+            'registerIfParams' => [],
+            'hookParams' => [],
+            'hookArgs' => [],
             'tags' => $tags,
-            'tag_callable' => $tagCallable,
-            'tag_callable_params' => $tagCallable !== null
+            'tagCallable' => $tagCallable,
+            'tagCallableParams' => $tagCallable !== null
                 ? $this->planProvider->buildCallablePlan($tagCallable)
                 : [],
         ];

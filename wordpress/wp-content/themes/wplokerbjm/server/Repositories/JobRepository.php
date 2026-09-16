@@ -1,8 +1,10 @@
 <?php
 
 namespace WPLokerBJM\Repositories;
+
 use WPLokerBJM\Services\GraphQL\GraphQLJobData;
 use WPLokerBJM\Services\Schema\JobSchemaOrg;
+
 /**
  * Job Repository
  * 
@@ -15,8 +17,7 @@ class JobRepository
     public function __construct(
         private GraphQLJobData $restData,
         private JobSchemaOrg $jobSchema
-    ) {
-    }
+    ) {}
 
     /**
      * Run a WP_Query and return normalized card data and schema.
@@ -42,12 +43,10 @@ class JobRepository
             wp_reset_postdata();
         }
 
-        $result = [
+        return [
             'jobs' => $jobs,
             'query' => $jobs_query,
             'schema_data' => $schema_data,
         ];
-
-        return $result;
     }
 }

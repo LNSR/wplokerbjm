@@ -16,6 +16,10 @@ use WPLokerBJM\Shared\Log\Logger;
  */
 trait HookInvokerTrait
 {
+    /** @var string pathway to callback for observability purpose */
+    public readonly string $label;
+    public int $numberExecutions = 0;
+    
     /** @var \Closure|null Callback that nukes this registration once consumed (once-hook) or the owner dies (lifetime scoping). */
     private ?\Closure $removeCallback = null;
 
@@ -25,7 +29,7 @@ trait HookInvokerTrait
     /** Whether the removal callback has fired — idempotency guard. */
     private bool $removed = false;
     /** template closure for caching stateless closure */
-    private static \Closure $templateClosure;
+    private static ?\Closure $templateClosure = null;
 
     /**
      * Attach the removal callback (set by the owning registry) so the handler
@@ -82,6 +86,6 @@ trait HookInvokerTrait
      */
     private function filterPassthrough(array $args): mixed
     {
-        return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
+        return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
     }
 }

@@ -17,11 +17,28 @@ use Attribute;
  * - #[Inject([Class::class, 'method'], lazy: true)] → inject a closure bound to the instance scope (FCC).
  */
 #[Attribute(Attribute::TARGET_PROPERTY | Attribute::TARGET_METHOD | Attribute::TARGET_PARAMETER)]
-class Inject
+final readonly class Inject
 {
     public function __construct(
         public readonly string|array|null $name = null,
         public readonly bool $lazy = false,
+    ) {
+    }
+}
+/**
+ * "Injectable" attribute.
+ *
+ * Marks a class as injectable
+ */
+#[Attribute(Attribute::TARGET_CLASS)]
+final readonly class Injectable
+{
+    /**
+     * @param bool|null $lazy Should the object be lazy-loaded.
+     */
+    public function __construct(
+        public ?bool $lazy = null,
+        public bool $skip = false
     ) {
     }
 }

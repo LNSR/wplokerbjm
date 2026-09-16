@@ -2,7 +2,7 @@
 namespace WPLokerBJM\Controllers\GraphQL\Resolvers;
 use WPLokerBJM\Core\Theme\ThemeProp;
 use WPLokerBJM\Shared\Log\Logger;
-use DI\Attribute\Injectable;
+use WPLokerBJM\Core\Container\Attributes\Injectable;;
 
 /**
  * Resolver for theme data in GraphQL.

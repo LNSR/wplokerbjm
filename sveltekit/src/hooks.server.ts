@@ -32,7 +32,9 @@ class HttpUtils {
     const baseHash = event.locals.postTime?.trim() || response;
     const authToken = event.locals.authToken || null;
     const nonce = event.locals.themeData.wpRestNonce;
-    const hash = await HttpUtils.calculateHash(`${baseHash}:${authToken}:${nonce}`);
+    const hash = await HttpUtils.calculateHash(
+      `${baseHash}:${authToken}:${nonce}`,
+    );
     return `W/"${hash}"`;
   }
 
@@ -234,7 +236,7 @@ const handleGraphQLETag: Handle = async ({ event, resolve }) => {
 const handleThemeContext: Handle = async ({ event, resolve }) => {
   APIServiceServer.setFetchFn(event.fetch); //! set fetchFn function for server
   let cache: WPLokerBJMThemedData | undefined = getThemeCache();
-  
+
   if (cache) {
     cache.wpRestNonce = APIServiceServer.getNonce;
     event.locals.themeData = { ...cache };
@@ -246,7 +248,10 @@ const handleThemeContext: Handle = async ({ event, resolve }) => {
       await APIServiceServer.getThemeDataGraphQL();
     cache = { ...result, wpRestNonce: undefined };
     setThemeCache(cache);
-    event.locals.themeData = { ...cache, wpRestNonce: APIServiceServer.getNonce };
+    event.locals.themeData = {
+      ...cache,
+      wpRestNonce: APIServiceServer.getNonce,
+    };
   } catch (e) {
     console.warn("hooks.handleThemeContext: failed to fetch theme data", e);
   }
@@ -302,7 +307,9 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
   const publicCache =
     "public, max-age=60, s-maxage=2592000, stale-while-revalidate=86400";
   const privateCache = "private, no-cache, must-revalidate";
-  const devModeCache = "no-cache, must-revalidate";
+  const devModeCache = !!event.locals.themeData.wpRestNonce
+    ? privateCache
+    : "public, no-cache, must-revalidate";
   const cachePolicy = dev
     ? devModeCache
     : authenticated
