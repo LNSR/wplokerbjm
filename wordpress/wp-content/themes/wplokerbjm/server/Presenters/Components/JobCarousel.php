@@ -6,6 +6,7 @@ use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Services\GraphQL\GraphQLJobData;
+
 /**
  * @phpstan-import-type CardData from GraphQLJobData
  * @phpstan-type CarouselData array{
@@ -15,10 +16,7 @@ use WPLokerBJM\Services\GraphQL\GraphQLJobData;
  */
 class JobCarousel
 {
-    public function __construct(
-        private JobRepository $jobRepository,
-    ) {
-    }
+    public function __construct(private JobRepository $jobRepository) {}
 
     /**
      * Get carousel jobs data with caching.

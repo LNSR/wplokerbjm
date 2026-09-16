@@ -27,7 +27,7 @@ use WPLokerBJM\Shared\Log\Logger;
  *
  * `$parentClass` accepts either a class-string or the parent object itself —
  * {@see getParentClass()} normalizes an object parent via get_class().
- * @template T of object|class-string
+ * @template T
  */
 abstract class AnonClassHookMetadata extends AsChildClass
 {
@@ -38,7 +38,7 @@ abstract class AnonClassHookMetadata extends AsChildClass
      * @param string              $parentProperty The property name holding this instance.
      */
     public function __construct(
-        private readonly string|object $parentClass,
+        public string|object $parentClass,
         public private(set) readonly string $parentProperty,
     ) {
         parent::__construct($parentClass, $parentProperty);

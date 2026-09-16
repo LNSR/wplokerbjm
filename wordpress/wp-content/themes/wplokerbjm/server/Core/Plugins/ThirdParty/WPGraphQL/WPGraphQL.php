@@ -29,9 +29,6 @@ final class WPGraphQL implements PluginConfigInterface
     #[Action('graphql_init', once: true)]
     private function boot(): void
     {
-        do_action(DependencyInjectorHookActions::INJECT_ON, $this->graphqlInit);
-        do_action(DependencyInjectorHookActions::INJECT_ON, $this->headersPolicy);
-        do_action(DependencyInjectorHookActions::INJECT_ON, $this->graphQlResponse);
         //register hooks on runtime registry
         do_action(HooksRuntimeRegistryActions::REGISTER_HOOKS, $this->graphqlInit);
         do_action(HooksRuntimeRegistryActions::REGISTER_HOOKS, $this->graphQlPluginSettings);
@@ -41,10 +38,10 @@ final class WPGraphQL implements PluginConfigInterface
 
     #region GraphQL Init
     /**
-     * @var static::class
+     * @var __CLASS__::class
      */
     private AnonClassHookMetadata $graphqlInit {
-        get => $this->graphqlInit ??= new class(self::class, __PROPERTY__) extends AnonClassHookMetadata {
+        get => $this->graphqlInit ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
             #[Inject]
             private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration;
             #[Inject]
@@ -87,14 +84,10 @@ final class WPGraphQL implements PluginConfigInterface
              */
             private function injectJwtFromCookie(): void
             {
-                try {
-                    if (empty($_SERVER['HTTP_AUTHORIZATION']) && !empty($_COOKIE['jwt-token'])) {
-                        $bearer = 'Bearer ' . $_COOKIE['jwt-token'];
-                        $_SERVER['HTTP_AUTHORIZATION'] = $bearer;
-                        $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $bearer;
-                    }
-                } catch (\Exception $e) {
-                    Logger::error('AuthDebug', 'injectJwtFromCookie error: ' . $e->getMessage());
+                if (empty($_SERVER['HTTP_AUTHORIZATION']) && !empty($_COOKIE['jwt-token'])) {
+                    $bearer = 'Bearer ' . $_COOKIE['jwt-token'];
+                    $_SERVER['HTTP_AUTHORIZATION'] = $bearer;
+                    $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $bearer;
                 }
             }
         };
@@ -104,15 +97,15 @@ final class WPGraphQL implements PluginConfigInterface
 
     #region Header stuff
     /**
-     * @var static::class
+     * @var __CLASS__::class
      */
     private AnonClassHookMetadata $headersPolicy {
-        get => $this->headersPolicy ??= new class(self::class, __PROPERTY__) extends AnonClassHookMetadata {
+        get => $this->headersPolicy ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
             #[Inject]
             private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration;
             #[Inject]
             private WPGraphQLETag $eTag;
-            private const OFFICIAL_ORIGINS = [
+            private array $officialOrigins = [
                 'https://dev.lokerbanjarmasin.my.id',
                 'https://staging.lokerbanjarmasin.my.id',
                 'https://lokerbanjarmasin.my.id',
@@ -122,14 +115,23 @@ final class WPGraphQL implements PluginConfigInterface
             /**
              * Restricts GraphQL CORS to same origin for security and adds X-WP-Nonce for logged-in users.
              */
-            #[Filter('graphql_response_headers_to_send', 9)]
+            #[Filter(
+                'graphql_response_headers_to_send',
+                9,
+                registerIf: static function (): bool {
+                    return !\is_admin();
+                },
+                executeIf: static function (): bool {
+                    /**
+                     * remove WPGraphQL author hooks and inbuit core nocache Headers
+                     * @see \WPGraphQL\SmartCache\Cache\Results::init
+                     */
+                    \remove_all_filters('graphql_response_headers_to_send');
+                    return true;
+                }
+            )]
             public function ModifyHeaderGraphQL(array $headers): array
             {
-                /**
-                 * @see WPGraphQL\SmartCache\Cache\Results::init
-                 * remove WPGraphQL author hooks and inbuit core nocache Headers
-                 */
-                \remove_all_filters('graphql_response_headers_to_send');
                 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
                 if (in_array($origin, $this->allowedOrigins(), true)) {
@@ -141,9 +143,12 @@ final class WPGraphQL implements PluginConfigInterface
                 $headers['Access-Control-Allow-Headers'] =
                     ($headers['Access-Control-Allow-Headers'] ?? '') .
                     ', X-WP-Nonce, If-None-Match, If-Match, Authorization';
-                $headers['Access-Control-Max-Age'] = '86400';
+                $headers['Access-Control-Max-Age'] = '360';
 
                 $headers['Access-Control-Allow-Headers'] = $this->removeDuplicateValues($headers['Access-Control-Allow-Headers']);
+
+                $headers['Vary'] = ($headers['Vary'] ?? '') . ', Origin, Authorization';
+                $headers['Vary'] = $this->removeDuplicateValues($headers['Vary']);
 
                 //! Preflight ends here.
                 if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
@@ -153,9 +158,6 @@ final class WPGraphQL implements PluginConfigInterface
                 $headers = $this->eTag->setHeader($headers);
 
                 $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag';
-
-                $headers['Vary'] = ($headers['Vary'] ?? '') . ', Origin, Authorization';
-                $headers['Vary'] = $this->removeDuplicateValues($headers['Vary']);
 
                 $headers = $this->litespeedGraphQLIntegration->addTagResponses($headers);
 
@@ -177,7 +179,11 @@ final class WPGraphQL implements PluginConfigInterface
                 'graphql_send_nocache_headers',
                 9,
                 registerIf: static function (): bool {
-                    return is_user_logged_in() && \remove_all_filters('graphql_send_nocache_headers');
+                    return is_user_logged_in() && !\is_admin();
+                },
+                executeIf: static function (): bool {
+                    \remove_all_filters('graphql_send_nocache_headers');
+                    return true;
                 }
             )]
             public function disableGraphQLNocacheHeader(): bool
@@ -185,9 +191,17 @@ final class WPGraphQL implements PluginConfigInterface
                 return false;
             }
 
-            #[Filter('nocache_headers', 9, registerIf: static function (): bool {
-                return is_user_logged_in() && \remove_all_filters('nocache_headers');
-            })]
+            #[Filter(
+                'nocache_headers',
+                9,
+                registerIf: static function (): bool {
+                    return is_user_logged_in() && !\is_admin();
+                },
+                executeIf: static function (): bool {
+                    \remove_all_filters('nocache_headers');
+                    return true;
+                }
+            )]
             public function applyCachePolicy(array $headers): array
             {
                 $loggedIn = is_user_logged_in();
@@ -203,7 +217,7 @@ final class WPGraphQL implements PluginConfigInterface
             private function removeDuplicateValues(string $key): string
             {
                 return $key
-                |> (static fn($v) => explode(',', $v))
+                |> (static fn($v) => explode(', ', $v))
                 |> (static fn($v) => array_map('trim', $v))
                 |> array_filter(...)
                 |> array_unique(...)
@@ -213,7 +227,7 @@ final class WPGraphQL implements PluginConfigInterface
             private function allowedOrigins(): array
             {
                 $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-                $origins = self::OFFICIAL_ORIGINS;
+                $origins = $this->officialOrigins;
                 if (!SharedUtils::isDevelopment())
                     return $origins;
 
@@ -232,44 +246,40 @@ final class WPGraphQL implements PluginConfigInterface
     #endregion
     #region GraphQlPluginSettings
     /**
-     * @var static::class
+     * @var __CLASS__::class
      */
     private AnonClassHookMetadata $graphQlPluginSettings {
-        get => $this->graphQlPluginSettings ??= new class(self::class, __PROPERTY__) extends AnonClassHookMetadata {
+        get => $this->graphQlPluginSettings ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
             /**
              * @see get_graphql_setting
-             * @see \WPGraphQL\Admin\Settings\Settings::register_settings() -> public_introspection_enabled
+             * @see \WPGraphQL\Admin\Settings\Settings::register_settings() -> {
+             *  public_introspection_enabled,
+             *  debug_mode_enabled,
+             * }
              * @see \WPGraphQL\SmartCache\Admin\Settings::init()
+             * @param 'public_introspection_enabled'|'debug_mode_enabled' $option_name
              */
-            #[Filter('graphql_get_setting_section_field_value', 11, 3)]
-            public function setPublicIntrospection(string $value, string $default_value, string $option_name): string
-            {
-                if ($option_name === 'public_introspection_enabled') {
-                    return SharedUtils::isDevelopment() ? 'on' : 'off';
-                }
-                return $value;
-            }
 
             #[Filter('graphql_get_setting_section_field_value', 11, 3)]
-            public function setDebugMode(string $value, string $default_value, string $option_name): string
+            public function setSettings(?string $value, ?string $default_value, string $option_name): mixed
             {
-                if ($option_name === 'debug_mode_enabled') {
-                    return SharedUtils::isDevelopment() ? 'on' : 'off';
-                }
-                return $value;
+                return match ($option_name) {
+                    'public_introspection_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
+                    'debug_mode_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
+                    default => $value,
+                };
             }
         };
     }
     #endregion
     #region GraphQLResponse
     /**
-     * @var static::class
+     * @var __CLASS__::class
      */
     private AnonClassHookMetadata $graphQlResponse {
-        get => $this->graphQlResponse ??= new class(self::class, __PROPERTY__) extends AnonClassHookMetadata {
+        get => $this->graphQlResponse ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
             #[Inject]
             private WPGraphQLETag $eTag;
-            private ?ExecutionResult $responseResult;
             /**
              * @see \WPGraphQL\Router::prepare_headers;
              * Router passes: $status_code, $_deprecated, $response, $query, $operation_name, $variables, $user
@@ -277,15 +287,14 @@ final class WPGraphQL implements PluginConfigInterface
             #[Filter('graphql_response_status_code', 11, 7)]
             public function setGraphQLResponseStatusCode(
                 int $http_status_code,
-                ExecutionResult $graphql_response,
-                mixed $_deprecated = null,
+                ?ExecutionResult $graphql_response,
+                ?ExecutionResult $_deprecated = null,
                 string $query = '',
                 string $operation_name = '',
                 ?array $variables = null,
                 ?WP_User $user = null,
             ): int {
-                $this->responseResult = $graphql_response;
-                $http_status_code = $this->checkJwt401Response($http_status_code);
+                $http_status_code = $this->checkJwt401Response($http_status_code, $graphql_response);
                 $this->eTag->computeAndStore($graphql_response, $query, $operation_name, (array) $variables, $user);
                 return $http_status_code;
             }
@@ -298,11 +307,12 @@ final class WPGraphQL implements PluginConfigInterface
              */
             private function checkJwt401Response(
                 int $http_status_code,
+                ?ExecutionResult $graphql_response,
             ): int {
                 /**
                  * @var GraphQLDataType $data
                  */
-                $data = $this->responseResult->data ?? null;
+                $data = $graphql_response->data ?? null;
                 if (array_key_exists('jwt', $data) && !$data['jwt']) {
                     return 401;
                 }

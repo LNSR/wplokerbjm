@@ -2,8 +2,7 @@
 
 namespace WPLokerBJM\Core;
 
-use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Attributes\Filter;
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;

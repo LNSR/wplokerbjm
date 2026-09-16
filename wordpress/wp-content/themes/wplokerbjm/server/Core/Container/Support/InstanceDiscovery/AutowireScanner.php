@@ -1,8 +1,11 @@
 <?php
+
 declare(strict_types=1);
+
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery;
+
 use ReflectionClass;
-use DI\Attribute\Injectable;
+use WPLokerBJM\Core\Container\Attributes\Injectable;
 use DI\Definition\AutowireDefinition;
 use WPLokerBJM\Bootstrap;
 
@@ -60,229 +63,252 @@ class AutowireScanner
         $definitions = [];
 
         foreach (Bootstrap::$robotLoader->getIndexedClasses() as $className => $file) {
-            $checkList = $this->isAutowirable($className);
+            $checkList = $this->checkClass->isAutowirable($className);
 
-            if (!$checkList['autowirable']) {
+            if (!$checkList->isAutowirable) {
                 continue;
             }
 
-            if ($checkList['lazy']) {
-                $definitions[$className] = \DI\autowire($className)->lazy();
-            } else {
-                $definitions[$className] = \DI\autowire($className);
-            }
+            $definitions[$className] = $checkList->isLazy ? \DI\autowire($className)->lazy() : \DI\autowire($className);
         }
 
         return $definitions;
     }
 
-    /**
-     * Check if a class is suitable for autowiring and determine if it should be lazy loaded.
-     *
-     * Performs multiple validation checks to determine if a class can be autowired.
-     *
-     * @param class-string $className name of class being inspected
-     * @return list{autowirable: bool, lazy: bool}
-     */
-    private function isAutowirable(string $className): array
-    {
-        $checkList = [
-            'autowirable' => false,
-            'lazy' => false,
-        ];
-        try {
-            if (!$this->passesBasicChecks($className)) {
-                return $checkList;
-            }
+    /** @var __CLASS__::class */
+    public private(set) object $checkClass {
+        get => $this->checkClass ??= new class($this->namespace) {
+            public function __construct(private string $namespace) {}
+            /**
+             * Check if a class is suitable for autowiring and determine if it should be lazy loaded.
+             *
+             * Performs multiple validation checks to determine if a class can be autowired.
+             * @template TObject of object{
+             *  isAutowirable: bool,
+             *  isLazy: bool,
+             * }
+             * @param class-string $className name of class being inspected
+             * @return TObject
+             */
+            public function isAutowirable(string $className): object
+            {
+                /** @var TObject $checkList */
+                $checkList = (object) ['isAutowirable' => false, 'isLazy' => false];
+                try {
+                    if (!$this->passesBasicChecks($className)) {
+                        return $checkList;
+                    }
 
-            $reflection = new ReflectionClass($className);
+                    $reflection = new ReflectionClass($className);
 
-            if ($this->isAttributeClass($reflection)) {
-                return $checkList;
-            }
+                    if ($this->isAttributeClass($reflection)) {
+                        return $checkList;
+                    }
 
-            if (!$this->isConcreteClass($reflection)) {
-                return $checkList;
-            }
+                    if (!$this->isConcreteClass($reflection)) {
+                        return $checkList;
+                    }
 
-            if ($this->isStaticOnlyClass($reflection)) {
-                return $checkList;
-            }
+                    if ($this->isStaticOnlyClass($reflection)) {
+                        return $checkList;
+                    }
 
-            if (!$this->hasAccessibleConstructor($reflection)) {
-                return $checkList;
-            }
+                    if (!$this->hasAccessibleConstructor($reflection)) {
+                        return $checkList;
+                    }
 
-            if ($this->hasNonAutowirableConstructor($reflection)) {
-                return $checkList;
-            }
+                    if ($this->hasNonAutowirableConstructor($reflection)) {
+                        return $checkList;
+                    }
 
-            // Since it passed all concrete structural checks, inspect its lazy attribute status
-            $checkList['autowirable'] = true;
-            $checkList['lazy'] = $this->isAsLazyClass($reflection);
-            return $checkList;
-        } catch (\Exception $e) {
-            return $checkList;
-        }
-    }
-
-    /**
-     * Perform basic validation checks on the class.
-     *
-     * @param class-string $className The class name to check
-     * @return bool True if basic checks pass
-     */
-    private function passesBasicChecks(string $className): bool
-    {
-        if (!class_exists($className)) {
-            return false;
-        }
-
-        $excludeNamespace = $this->namespace . '\\Core\\Container\\Support\\';
-        if (str_starts_with($className, $excludeNamespace)) {
-            return false;
-        }
-
-        // Test fixtures live under the Tests namespace — never autowire them.
-        // The test RobotLoader scans tests/ alongside server/, so without this
-        // exclusion WPLokerBJM\Tests\* classes leak into container definitions
-        // and make test-env autowiring flaky. No-op in production.
-        if (str_starts_with($className, $this->namespace . '\\Tests\\')) {
-            return false;
-        }
-
-        return true;
-    }
-
-    /**
-     * Check if the reflection represents a concrete, instantiable class.
-     *
-     * Excludes interfaces, abstract classes, and traits.
-     * Final classes are included — PHP-DI's ProxyManager (v2.14+) handles
-     * them via UninitializedLazyLoadingValueHolder on PHP 8.5+.
-     *
-     * @param ReflectionClass $reflection The class reflection
-     * @return bool True if it's a concrete class
-     */
-    private function isConcreteClass(ReflectionClass $reflection): bool
-    {
-        return !$reflection->isInterface()
-            && !$reflection->isAbstract()
-            && !$reflection->isTrait()
-            && !$reflection->isEnum()
-            && !$reflection->isReadOnly();
-    }
-
-    /**
-     * Check if the class has an accessible constructor.
-     *
-     * @param ReflectionClass $reflection The class reflection
-     * @return bool True if constructor is accessible (public or none)
-     */
-    private function hasAccessibleConstructor(ReflectionClass $reflection): bool
-    {
-        $constructor = $reflection->getConstructor();
-
-        if ($constructor === null) {
-            return true;
-        }
-
-        return $constructor->isPublic();
-    }
-
-    /**
-     * Check if the class has a constructor that cannot be autowired by PHP-DI.
-     *
-     * Excludes classes with no constructor, or whose constructor parameters are
-     * all either optional or resolvable types (classes, arrays, callbacks, etc.).
-     * Only flags classes with required primitive-type arguments.
-     *
-     * @param ReflectionClass $reflection The class reflection
-     * @return bool True if constructor cannot be autowired
-     */
-    private function hasNonAutowirableConstructor(ReflectionClass $reflection): bool
-    {
-        $constructor = $reflection->getConstructor();
-        if ($constructor === null) {
-            return false;
-        }
-
-        foreach ($constructor->getParameters() as $param) {
-            if (!$param->isOptional() && $param->hasType()) {
-                $type = $param->getType();
-                if ($type instanceof \ReflectionNamedType && $type->isBuiltin()) {
-                    return true;
+                    if ($this->AttributeHasSkipTrue($reflection)) {
+                        return $checkList;
+                    }
+                    $checkList->isLazy = $this->isAsLazyClass($reflection);
+                    $checkList->isAutowirable = true;
+                    return $checkList;
+                } catch (\Exception $e) {
+                    return $checkList;
                 }
             }
-        }
 
-        return false;
-    }
+            /**
+             * Perform basic validation checks on the class.
+             *
+             * @param class-string $className The class name to check
+             * @return bool True if basic checks pass
+             */
+            private function passesBasicChecks(string $className): bool
+            {
+                if (!class_exists($className)) {
+                    return false;
+                }
 
-    /**
-     * Check if a class contains only static methods and no instance methods or properties.
-     *
-     * A static-only class is one that:
-     * - Has no non-static (instance) properties
-     * - Has no non-static (instance) methods (excluding magic methods like __construct)
-     *
-     * Such classes are typically utility classes and cannot be autowired as they don't
-     * have instance state or behavior.
-     *
-     * @param ReflectionClass $reflection The class reflection to analyze
-     * @return bool True if the class is static-only
-     */
-    private function isStaticOnlyClass(ReflectionClass $reflection): bool
-    {
-        $properties = $reflection->getProperties();
-        foreach ($properties as $property) {
-            if (!$property->isStatic()) {
+                $excludeNamespace = $this->namespace . '\\Core\\Container\\Support\\';
+                if (str_starts_with($className, $excludeNamespace)) {
+                    return false;
+                }
+
+                // Test fixtures live under the Tests namespace — never autowire them.
+                // The test RobotLoader scans tests/ alongside server/, so without this
+                // exclusion WPLokerBJM\Tests\* classes leak into container definitions
+                // and make test-env autowiring flaky. No-op in production.
+                if (str_starts_with($className, $this->namespace . '\\Tests\\')) {
+                    return false;
+                }
+
+                return true;
+            }
+
+            /**
+             * Check if the reflection represents a concrete, instantiable class.
+             *
+             * Excludes interfaces, abstract classes, and traits.
+             * Final classes are included — PHP-DI's ProxyManager (v2.14+) handles
+             * them via UninitializedLazyLoadingValueHolder on PHP 8.5+.
+             *
+             * @param ReflectionClass $reflection The class reflection
+             * @return bool True if it's a concrete class
+             */
+            private function isConcreteClass(ReflectionClass $reflection): bool
+            {
+                return !$reflection->isInterface()
+                    && !$reflection->isAbstract()
+                    && !$reflection->isTrait()
+                    && !$reflection->isEnum()
+                    && !$reflection->isReadOnly();
+            }
+
+            /**
+             * Check if the class has an accessible constructor.
+             *
+             * @param ReflectionClass $reflection The class reflection
+             * @return bool True if constructor is accessible (public or none)
+             */
+            private function hasAccessibleConstructor(ReflectionClass $reflection): bool
+            {
+                $constructor = $reflection->getConstructor();
+
+                if ($constructor === null) {
+                    return true;
+                }
+
+                return $constructor->isPublic();
+            }
+
+            /**
+             * Check if the class has a constructor that cannot be autowired by PHP-DI.
+             *
+             * Excludes classes with no constructor, or whose constructor parameters are
+             * all either optional or resolvable types (classes, arrays, callbacks, etc.).
+             * Only flags classes with required primitive-type arguments.
+             *
+             * @param ReflectionClass $reflection The class reflection
+             * @return bool True if constructor cannot be autowired
+             */
+            private function hasNonAutowirableConstructor(ReflectionClass $reflection): bool
+            {
+                $constructor = $reflection->getConstructor();
+                if ($constructor === null) {
+                    return false;
+                }
+
+                foreach ($constructor->getParameters() as $param) {
+                    if (!$param->isOptional() && $param->hasType()) {
+                        $type = $param->getType();
+                        if ($type instanceof \ReflectionNamedType && $type->isBuiltin()) {
+                            return true;
+                        }
+                    }
+                }
+
                 return false;
             }
-        }
 
-        $methods = $reflection->getMethods();
-        foreach ($methods as $method) {
-            if (str_starts_with($method->getName(), '__')) {
-                continue;
+            /**
+             * Check if a class contains only static methods and no instance methods or properties.
+             *
+             * A static-only class is one that:
+             * - Has no non-static (instance) properties
+             * - Has no non-static (instance) methods (excluding magic methods like __construct)
+             *
+             * Such classes are typically utility classes and cannot be autowired as they don't
+             * have instance state or behavior.
+             *
+             * @param ReflectionClass $reflection The class reflection to analyze
+             * @return bool True if the class is static-only
+             */
+            private function isStaticOnlyClass(ReflectionClass $reflection): bool
+            {
+                $properties = $reflection->getProperties();
+                foreach ($properties as $property) {
+                    if (!$property->isStatic()) {
+                        return false;
+                    }
+                }
+
+                $methods = $reflection->getMethods();
+                foreach ($methods as $method) {
+                    if (str_starts_with($method->getName(), '__')) {
+                        continue;
+                    }
+                    if (!$method->isStatic()) {
+                        return false;
+                    }
+                }
+
+                return true;
             }
-            if (!$method->isStatic()) {
-                return false;
+
+            /**
+             * Check if the class is an attribute class.
+             *
+             * Attribute classes are marked with the #[Attribute] attribute and are not meant to be autowired.
+             *
+             * @param ReflectionClass $reflection The class reflection
+             * @return bool True if the class is an attribute class
+             */
+            private function isAttributeClass(ReflectionClass $reflection): bool
+            {
+                return !empty($reflection->getAttributes(\Attribute::class));
             }
-        }
 
-        return true;
-    }
+            /**
+             * Check if a class has PHP-DI #[Injectable] attribute with lazy = true.
+             *
+             * @param ReflectionClass $reflection
+             * @return bool
+             */
+            private function isAsLazyClass(ReflectionClass $reflection): bool
+            {
+                /** @var \ReflectionAttribute[] $attributes */
+                $attributes = $reflection->getAttributes(Injectable::class);
+                if (empty($attributes)) {
+                    return false;
+                }
 
-    /**
-     * Check if the class is an attribute class.
-     *
-     * Attribute classes are marked with the #[Attribute] attribute and are not meant to be autowired.
-     *
-     * @param ReflectionClass $reflection The class reflection
-     * @return bool True if the class is an attribute class
-     */
-    private function isAttributeClass(ReflectionClass $reflection): bool
-    {
-        return !empty($reflection->getAttributes(\Attribute::class));
-    }
+                /** @var Injectable $attribute */
+                $attribute = $attributes[0]->newInstance();
+                return $attribute->lazy;
+            }
+            /**
+             * Check if a class has PHP-DI #[Injectable] attribute with skip = true.
+             *
+             * @param ReflectionClass $reflection
+             * @return bool
+             */
+            private function AttributeHasSkipTrue(ReflectionClass $reflection): bool
+            {
+                /** @var \ReflectionAttribute[] $attributes */
+                $attributes = $reflection->getAttributes(Injectable::class);
+                if (empty($attributes)) {
+                    return false;
+                }
 
-    /**
-     * Check if a class has PHP-DI #[Injectable] attribute with lazy = true.
-     *
-     * @param ReflectionClass $reflection
-     * @return bool
-     */
-    private function isAsLazyClass(ReflectionClass $reflection): bool
-    {
-        /** @var \ReflectionAttribute[] $attributes */
-        $attributes = $reflection->getAttributes(Injectable::class);
-        if (empty($attributes)) {
-            return false;
-        }
-
-        /** @var Injectable $attribute */
-        $attribute = $attributes[0]->newInstance();
-        return $attribute->isLazy();
+                /** @var Injectable $attribute */
+                $attribute = $attributes[0]->newInstance();
+                return $attribute->skip;
+            }
+        };
     }
 }

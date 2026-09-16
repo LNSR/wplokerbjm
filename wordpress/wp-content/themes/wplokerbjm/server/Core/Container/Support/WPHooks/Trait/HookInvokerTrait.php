@@ -3,19 +3,34 @@
 declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
+    ContainerLazyHookHandler,
+    ContainerLazyPropertyHookHandler,
+    RuntimeInstanceHookHandler,
+    RuntimeInstancePropertyHookHandler,
+    RuntimeCallableHookHandler
+};
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Shared invoker mechanics used by BOTH the container-side lazy handlers and
  * the runtime instance handlers: the once/removal callback plumbing and the
  * named hook-args builder.
- *
+ * @mixin (ContainerLazyHookHandler|ContainerLazyPropertyHookHandler|RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler|RuntimeCallableHookHandler)
  * @internal consumed via the container's AbstractLazyHookHandlerTrait (in-file)
  * and the runtime's RuntimeInstanceInvokerTrait (in-file) — the gate evaluation
  * and instance resolution stay domain-specific in each invoker file.
  */
 trait HookInvokerTrait
 {
+    /** @var string pathway to callback for observability purpose */
+    public readonly string $label;
+    /** @var 'action'|'filter' */
+    private readonly string $type;
+    private readonly bool $once;
+    
+    public int $numberExecutions = 0;
+    
     /** @var \Closure|null Callback that nukes this registration once consumed (once-hook) or the owner dies (lifetime scoping). */
     private ?\Closure $removeCallback = null;
 
@@ -25,7 +40,7 @@ trait HookInvokerTrait
     /** Whether the removal callback has fired — idempotency guard. */
     private bool $removed = false;
     /** template closure for caching stateless closure */
-    private static \Closure $templateClosure;
+    private static ?\Closure $templateClosure = null;
 
     /**
      * Attach the removal callback (set by the owning registry) so the handler
@@ -82,6 +97,6 @@ trait HookInvokerTrait
      */
     private function filterPassthrough(array $args): mixed
     {
-        return $this->type === 'filter' && array_key_exists(0, $args) ? $args[0] : null;
+        return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
     }
 }

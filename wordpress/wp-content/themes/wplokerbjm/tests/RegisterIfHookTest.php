@@ -210,12 +210,12 @@ class RegisterIfHookTest extends WplokerbjmTestCase
             'type' => 'action',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
-            'defer_register' => $deferRegister,
-            'execute_if' => $executeIf,
-            'execute_if_params' => $executeIfParams,
-            'register_if' => $registerIf,
-            'register_if_params' => $registerIfParams,
+            'acceptedArgs' => $acceptedArgs,
+            'deferRegister' => $deferRegister,
+            'executeIf' => $executeIf,
+            'executeIfParams' => $executeIfParams,
+            'registerIf' => $registerIf,
+            'registerIfParams' => $registerIfParams,
             'tags' => $tags,
         ];
     }

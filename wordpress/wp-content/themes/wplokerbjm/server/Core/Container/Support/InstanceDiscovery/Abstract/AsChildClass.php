@@ -1,9 +1,11 @@
 <?php
+
 declare(strict_types=1);
+
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract;
 
 use WPGraphQL;
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
+use WPLokerBJM\Core\DependencyInjectorHookActions;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -11,7 +13,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * @see DependencyInjector
  * * Intended usage: Passing external deps without needing host class carrying constructor boilerplate.
  *
- * @template T of object|class-string
+ * @template T
  */
 abstract class AsChildClass
 {
@@ -21,9 +23,12 @@ abstract class AsChildClass
      * @param string $identifier The property or method or any magic string holding this instance.
      */
     public function __construct(
-        private readonly string|object $parentClass,
+        public string|object $parentClass,
         public private(set) readonly string $identifier,
-    ) {}
+    ) {
+        if (defined('WPLOKERBJM_TEST_ENV')) return;
+        do_action(DependencyInjectorHookActions::INJECT_ON, $this);
+    }
 
     /**
      * Resolve the parent class-string, normalizing an object parent via get_class().
@@ -33,6 +38,25 @@ abstract class AsChildClass
     {
         return is_object($this->parentClass) ? get_class($this->parentClass) : $this->parentClass;
     }
+
+    /**
+     * For Recursive Anon Classes
+     * @param property-hook-string<T> $currentClassPropertryIdentifier magic constant
+     * @return array
+     */
+    protected function createIdentityClass(string $currentClassPropertryIdentifier): array
+    {
+        return [
+            sprintf("%s->%s", $this->getParentClass(), $this->identifier),
+            $currentClassPropertryIdentifier
+        ];
+    }
+    
+    public function constructCurrentClassIdentity(): string
+    {
+        return sprintf("%s->%s", $this->getParentClass(), $this->identifier);
+    }
+
     /**
      * ! Must be an instance Closure
      * Binds an initialization closure directly into current context anon class and configures it.

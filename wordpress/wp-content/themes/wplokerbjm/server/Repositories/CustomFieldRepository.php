@@ -1,11 +1,12 @@
 <?php
 
 namespace WPLokerBJM\Repositories;
+
 use WPLokerBJM\Models\Schema\CustomFields;
 
 class CustomFieldRepository
 {
-    public $metaBoxesCustomFields = [
+    public array $metaBoxesCustomFields = [
         CustomFields::NAMA_PERUSAHAAN,
         CustomFields::TENTANG_PERUSAHAAN,
         CustomFields::DESKRIPSI_PEKERJAAN,

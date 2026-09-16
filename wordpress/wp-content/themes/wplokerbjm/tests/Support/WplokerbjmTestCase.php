@@ -72,7 +72,7 @@ abstract class WplokerbjmTestCase extends TestCase
      * Maintains a global registry of `add_action` / `add_filter` calls so tests
      * can assert which hooks were registered and with what callables.
      * `do_action` and `apply_filters` actually invoke the registered callables
-     * (limited by their `accepted_args`) so the lazy resolution path can be
+     * (limited by their `acceptedArgs`) so the lazy resolution path can be
      * exercised end-to-end.
      *
      * @return void
@@ -81,24 +81,24 @@ abstract class WplokerbjmTestCase extends TestCase
     {
         $GLOBALS['__wplokerbjm_registered_hooks'] = [];
 
-        \Brain\Monkey\Functions\when('add_action')->alias(function ($hook, $callable, $priority = 10, $accepted_args = 1) {
+        \Brain\Monkey\Functions\when('add_action')->alias(function ($hook, $callable, $priority = 10, $acceptedArgs = 1) {
             $GLOBALS['__wplokerbjm_registered_hooks'][] = [
                 'type' => 'action',
                 'hook' => $hook,
                 'callable' => $callable,
                 'priority' => (int) $priority,
-                'accepted_args' => (int) $accepted_args,
+                'acceptedArgs' => (int) $acceptedArgs,
             ];
             return true;
         });
 
-        \Brain\Monkey\Functions\when('add_filter')->alias(function ($hook, $callable, $priority = 10, $accepted_args = 1) {
+        \Brain\Monkey\Functions\when('add_filter')->alias(function ($hook, $callable, $priority = 10, $acceptedArgs = 1) {
             $GLOBALS['__wplokerbjm_registered_hooks'][] = [
                 'type' => 'filter',
                 'hook' => $hook,
                 'callable' => $callable,
                 'priority' => (int) $priority,
-                'accepted_args' => (int) $accepted_args,
+                'acceptedArgs' => (int) $acceptedArgs,
             ];
             return true;
         });
@@ -113,7 +113,7 @@ abstract class WplokerbjmTestCase extends TestCase
             usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
 
             foreach ($callbacks as $reg) {
-                $limited = array_slice($args, 0, $reg['accepted_args']);
+                $limited = array_slice($args, 0, $reg['acceptedArgs']);
                 ($reg['callable'])(...$limited);
             }
         });
@@ -128,7 +128,7 @@ abstract class WplokerbjmTestCase extends TestCase
             usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
 
             foreach ($callbacks as $reg) {
-                $limited = array_slice([$value, ...$args], 0, $reg['accepted_args']);
+                $limited = array_slice([$value, ...$args], 0, $reg['acceptedArgs']);
                 $value = ($reg['callable'])(...$limited);
             }
 

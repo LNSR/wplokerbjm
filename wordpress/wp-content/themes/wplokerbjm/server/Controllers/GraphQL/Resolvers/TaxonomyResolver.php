@@ -6,7 +6,7 @@ use WPLokerBJM\Controllers\Utilities\ControllerUtils;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Log\Logger;
-use DI\Attribute\Injectable;
+use WPLokerBJM\Core\Container\Attributes\Injectable;;
 
 /**
  * @phpstan-type TaxonomyTerms array{slug: string, name: string, parent: int, children: array}
@@ -32,6 +32,7 @@ class TaxonomyResolver
     public function resolveAllTerms(): array
     {
         try {
+            /** @var TaxonomyJobTerms|false */
             $cached = Cache::get(CacheKey::TAXONOMY_DEPTH_HANDLE);
             if ($cached !== false) {
                 return $cached;

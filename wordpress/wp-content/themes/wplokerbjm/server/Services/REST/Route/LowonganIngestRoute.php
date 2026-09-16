@@ -7,7 +7,6 @@ namespace WPLokerBJM\Services\REST\Route;
 use WPLokerBJM\Controllers\REST\LowonganIngestController;
 use WPLokerBJM\Controllers\REST\LowonganIngestOptionsController;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use DI\Attribute\Injectable;
 
 final class LowonganIngestRoute
 {

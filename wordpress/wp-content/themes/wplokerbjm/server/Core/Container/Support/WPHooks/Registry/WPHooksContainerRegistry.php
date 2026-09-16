@@ -8,18 +8,18 @@ use Spatie\Backtrace\Backtrace;
 use Spatie\Backtrace\Frame;
 use ReflectionClass;
 use ReflectionFunction;
-use DI\Container;
 use ReflectionProperty;
 use TargetClass;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, HookRegistration, HookKey};
+use WPLokerBJM\Core\Container\Support\WPHooks\{ContainerRegistryHandlerEntry, DeferredHookEntryDTO, HookRegistration, HookKey, Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{AnonClassHookMetadata};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait};
+
 
 /**
  * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
@@ -27,43 +27,30 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookSca
  * Stores all hook registrations as identifiable ContainerLazyHookHandler instances,
  * enabling unregistration by hook name, class, or specific class::method.
  * Service resolution is deferred to hook-fire time (lazy loading).
- * @template TObject of object
- * @phpstan-import-type CallablePlan from HookProviderTrait
- * @phpstan-type SchedulerHookAttributeType array{
- *  key: HookKey,
- *  handler: ContainerLazyHookHandler|ContainerLazyPropertyHookHandler,
- *  type: 'action'|'filter',
- *  priority: int,
- *  accepted_args: int,
- *  tags: array<int, string>,
- *  registerIf: (\Closure(TObject...): bool)|null,
- *  registerIfParams: CallablePlan,
- *  executeIf: (\Closure(TObject...): bool)|null,
- *  executeIfParams: CallablePlan,
- *  once: bool,
- * }
  * @phpstan-import-type HookType from HookRegistration
- * @phpstan-type HandlerEntry array{key: HookKey, handler: ContainerLazyHookHandler|ContainerLazyPropertyHookHandler, type: 'action'|'filter', priority: int, accepted_args: int, tags: array<int, string>, registerIf: (\Closure(TObject...): bool)|null, registerIfParams: CallablePlan, executeIf: (\Closure(TObject...): bool)|null, executeIfParams: CallablePlan, once: bool}
- * @phpstan-type RemoveHandlerEntry array{handler: ContainerLazyHookHandler|ContainerLazyPropertyHookHandler, type: 'action'|'filter', priority: int}
+ * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-import-type HookTargetResolve from DeferredHookManager
+ * @phpstan-type ActivateEntry \Closure(DeferredHookEntryDTO): bool
+ * @template TKey of string
+
  */
 class WPHooksContainerRegistry
 {
     /**
-     * @var array<string, array<string, HandlerEntry>>
+     * @var array<TKey<ContainerRegistryHandlerEntry>, ContainerRegistryHandlerEntry>
      */
-    private array $handlers = [];
+    public private(set) array $handlers = [];
 
-    private bool $initialized = false;
+    public private(set) bool $initialized = false;
 
     /**
      * deferRegisterUntilHook entries whose trigger hook already fired before
      * initialize(). Processed after registerAll's handler loop so no handler
      * is registered twice.
      *
-     * @var list<array{string, string}> [hook, key] pairs.
+     * @var list<DeferredHookEntryDTO>
      */
-    private array $pendingDeferredActivation = [];
+    public private(set) array $pendingDeferredActivation = [];
 
     /**
      * @param ContainerInterface $container
@@ -90,25 +77,22 @@ class WPHooksContainerRegistry
             return;
         }
         $this->registerAll($this->hooksRegistration);
-        foreach ($this->handlers as $hook => $hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                try {
-                    $this->addSingleHook($hook, $data);
-                } catch (\Exception $e) {
-                    Logger::error(
-                        'WPHooksContainerRegistry',
-                        "Error registering {$data['type']} '{$hook}' for {$key}: {$e->getMessage()}"
-                    );
-                }
+        foreach ($this->handlers as $key => $data) {
+            try {
+                $data->register();
+            } catch (\Exception $e) {
+                Logger::error(
+                    'WPHooksContainerRegistry',
+                    "Error registering {$data->type} '{$data->hook}' for {$key}: {$e->getMessage()}"
+                );
             }
         }
 
         // Trigger hooks that had already fired before boot: activate the
         // entries now that the active pool is fully registered (deferring this
         // avoids double-registering handlers that were activated mid-registerAll).
-        $activate = fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k);
-        foreach ($this->pendingDeferredActivation as [$hook, $key]) {
-            $this->deferredHookManager->activateDeferredByKey($hook, $key, $activate);
+        foreach ($this->pendingDeferredActivation as $deferredHookEntry) {
+            $this->deferredHookManager->activateDeferredByKey($deferredHookEntry, $this->activateEntry);
         }
         $this->pendingDeferredActivation = [];
 
@@ -136,7 +120,7 @@ class WPHooksContainerRegistry
     {
         $this->deferredHookManager->activateDeferredByHook(
             $hook,
-            $this->activateEntry(...)
+            $this->activateEntry
         );
     }
 
@@ -157,7 +141,7 @@ class WPHooksContainerRegistry
     {
         $this->deferredHookManager->activateDeferredByClass(
             $class,
-            $this->activateEntry(...)
+            $this->activateEntry
         );
     }
 
@@ -218,7 +202,7 @@ class WPHooksContainerRegistry
     {
         $this->deferredHookManager->activateDeferredByCallable(
             $target,
-            $this->activateEntry(...)
+            $this->activateEntry
         );
     }
 
@@ -246,7 +230,7 @@ class WPHooksContainerRegistry
 
         return $this->deferredHookManager->activateDeferredByTags(
             $tags,
-            $this->activateEntry(...)
+            $this->activateEntry
         );
     }
 
@@ -263,7 +247,7 @@ class WPHooksContainerRegistry
     {
         return $this->deferredHookManager->activateDeferredByNamespace(
             $namespace,
-            $this->activateEntry(...)
+            $this->activateEntry
         );
     }
 
@@ -281,7 +265,7 @@ class WPHooksContainerRegistry
     {
         return $this->deferredHookManager->activateDeferredByHookPattern(
             $pattern,
-            $this->activateEntry(...)
+            $this->activateEntry
         );
     }
 
@@ -299,7 +283,7 @@ class WPHooksContainerRegistry
     {
         return $this->deferredHookManager->activateDeferredByTagPattern(
             $patterns,
-            $this->activateEntry(...)
+            $this->activateEntry
         );
     }
     #endregion
@@ -407,16 +391,13 @@ class WPHooksContainerRegistry
     {
         [$class, $method] = $this->resolverTarget->resolve($target);
 
-        foreach ($this->handlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (!$data['key']->isForCallable($class, $method)) {
-                    continue;
-                }
-                $this->removeSingleHook($hook, $data);
-                unset($hookHandlers[$key]);
+        foreach ($this->handlers as $key => $data) {
+            if (!$data->key->isForCallable($class, $method)) {
+                continue;
             }
+            $data->unregister();
+            unset($this->handlers[$data->toUniqueKey()]);
         }
-        unset($hookHandlers);
     }
 
     /**
@@ -426,11 +407,12 @@ class WPHooksContainerRegistry
      */
     public function unregisterByHook(string $hook): void
     {
-        foreach ($this->handlers[$hook] ?? [] as $data) {
-            $this->removeSingleHook($hook, $data);
+        foreach ($this->handlers as $key => $data) {
+            if ($data->hook === $hook) {
+                $data->unregister();
+                unset($this->handlers[$data->toUniqueKey()]);
+            }
         }
-
-        unset($this->handlers[$hook]);
     }
 
     /**
@@ -440,16 +422,13 @@ class WPHooksContainerRegistry
      */
     public function unregisterByClass(string $class): void
     {
-        foreach ($this->handlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (!$data['key']->isForClass($class)) {
-                    continue;
-                }
-                $this->removeSingleHook($hook, $data);
-                unset($hookHandlers[$key]);
+        foreach ($this->handlers as $key => $data) {
+            if (!$data->key->isForClass($class)) {
+                continue;
             }
+            $data->unregister();
+            unset($this->handlers[$data->toUniqueKey()]);
         }
-        unset($hookHandlers);
     }
 
     /**
@@ -463,19 +442,13 @@ class WPHooksContainerRegistry
      */
     public function unregisterByNamespace(string $namespace): void
     {
-        foreach ($this->handlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (!$data['key']->isWithinNamespace($namespace)) {
-                    continue;
-                }
-                $this->removeSingleHook($hook, $data);
-                unset($hookHandlers[$key]);
+        foreach ($this->handlers as $key => $data) {
+            if (!$data->key->isWithinNamespace($namespace)) {
+                continue;
             }
-            if (empty($hookHandlers)) {
-                unset($this->handlers[$hook]);
-            }
+            $data->unregister();
+            unset($this->handlers[$data->toUniqueKey()]);
         }
-        unset($hookHandlers);
     }
 
     /**
@@ -495,19 +468,13 @@ class WPHooksContainerRegistry
             return;
         }
 
-        foreach ($this->handlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (array_intersect($tags, $data['tags']) === []) {
-                    continue;
-                }
-                $this->removeSingleHook($hook, $data);
-                unset($hookHandlers[$key]);
+        foreach ($this->handlers as $key => $data) {
+            if (array_intersect($tags, $data->tags) === []) {
+                continue;
             }
-            if (empty($hookHandlers)) {
-                unset($this->handlers[$hook]);
-            }
+            $data->unregister();
+            unset($this->handlers[$data->toUniqueKey()]);
         }
-        unset($hookHandlers);
     }
 
     /**
@@ -524,16 +491,13 @@ class WPHooksContainerRegistry
     {
         HookPattern::assertValid($pattern);
 
-        foreach ($this->handlers as $hook => &$hookHandlers) {
-            if (!HookPattern::matches($hook, $pattern)) {
+        foreach ($this->handlers as $key => $data) {
+            if (!HookPattern::matches($data->hook, $pattern)) {
                 continue;
             }
-            foreach ($hookHandlers as $key => $data) {
-                $this->removeSingleHook($hook, $data);
-            }
-            unset($this->handlers[$hook]);
+            $data->unregister();
+            unset($this->handlers[$data->toUniqueKey()]);
         }
-        unset($hookHandlers);
     }
 
     /**
@@ -555,96 +519,56 @@ class WPHooksContainerRegistry
         }
         HookPattern::assertValidAll($patterns);
 
-        foreach ($this->handlers as $hook => &$hookHandlers) {
-            foreach ($hookHandlers as $key => $data) {
-                if (!HookPattern::matchesAny($data['tags'], $patterns)) {
-                    continue;
-                }
-                $this->removeSingleHook($hook, $data);
-                unset($hookHandlers[$key]);
+        foreach ($this->handlers as $key => $data) {
+            if (!HookPattern::matchesAny($data->tags, $patterns)) {
+                continue;
             }
-            if (empty($hookHandlers)) {
-                unset($this->handlers[$hook]);
-            }
+            $data->unregister();
+            unset($this->handlers[$data->toUniqueKey()]);
         }
-        unset($hookHandlers);
     }
     #endregion
-    /**
-     * Internal: call add_action or add_filter for a single handler entry.
-     *
-     * @param string $hook
-     * @param HandlerEntry $data
-     */
-    private function addSingleHook(string $hook, array $data): void
-    {
-        if ($data['type'] === 'action') {
-            add_action($hook, $data['handler'], $data['priority'], $data['accepted_args']);
-        } else {
-            add_filter($hook, $data['handler'], $data['priority'], $data['accepted_args']);
-        }
-    }
 
     /**
      * Callback provided to the DeferredHookManager: moves a deferred entry into
      * the active pool and registers it with WordPress.
-     *
-     * @param HandlerEntry $data
+     * @var ActivateEntry
      */
-    private function activateEntry(string $hook, array $data, string $key): bool
-    {
-        // Guard: skip if already activated
-        if (isset($this->handlers[$hook][$key])) {
-            return false;
-        }
+    private \Closure $activateEntry {
+        get => $this->activateEntry ??= function (DeferredHookEntryDTO $data): bool {
+            // Guard: skip if already activated
+            $uniqueKey = $data->toUniqueKey();
+            if (isset($this->handlers[$uniqueKey])) {
+                return false;
+            }
+            $this->handlers[$uniqueKey] = ContainerRegistryHandlerEntry::fromDeferredEntry($data);
 
-        $this->handlers[$hook][$key] = $data;
+            $this->handlers[$uniqueKey]->register();
 
-        $this->addSingleHook($hook, $data);
-
-        return true;
+            return true;
+        };
     }
 
     /**
-     * Internal: call remove_action or remove_filter for a single handler entry.
-     *
-     * @param RemoveHandlerEntry $data
-     */
-    private function removeSingleHook(string $hook, array $data): void
-    {
-        if ($data['type'] === 'action') {
-            remove_action($hook, $data['handler'], $data['priority']);
-        } else {
-            remove_filter($hook, $data['handler'], $data['priority']);
-        }
-    }
-
-    /**
-     * Internal: remove a once-registration from the active pool after its
+     * @Internal remove a once-registration from the active pool after its
      * first fire (consume-on-any-evaluation). Idempotent.
-     * @param 'action'|'filter' $hookType
      */
-    private function removeOnceEntry(string $hook, string $key, string $hookType): void
+    private function removeOnceEntry(ContainerRegistryHandlerEntry $entry): void
     {
-        if (!isset($this->handlers[$hook][$key])) {
+        $uniqueKey = $entry->toUniqueKey();
+        if (!isset($this->handlers[$uniqueKey])) {
             return;
         }
 
+        $entry = $this->handlers[$uniqueKey];
         // Skip the WordPress-side removal while the hook is being dispatched:
         // remove_action during dispatch corrupts WP_Hook's iteration
         // (resort_active_iterations skips the immediately-following priority).
         // The consumed flag already prevents re-firing, so the callback can
         // safely linger in $wp_filter until the request ends.
-        if ($hookType === 'action' && !doing_action($hook)) {
-            $this->removeSingleHook($hook, $this->handlers[$hook][$key]);
-        } else if ($hookType === 'filter' && !\doing_filter($hook)) {
-            $this->removeSingleHook($hook, $this->handlers[$hook][$key]);
-        }
-        unset($this->handlers[$hook][$key]);
+        !$entry->stillInCallbackStack() && $entry->unregister();
 
-        if (empty($this->handlers[$hook])) {
-            unset($this->handlers[$hook]);
-        }
+        unset($this->handlers[$uniqueKey]);
     }
 
     /**
@@ -742,40 +666,35 @@ class WPHooksContainerRegistry
                 );
                 continue;
             }
-
-            $key = HookKey::fromRegistration($registration);
-
-            $handler = $registration->target === 'method'
-                ? new ContainerLazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs, $registration->once)
-                : new ContainerLazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs, $registration->once);
+            $entry = new ContainerRegistryHandlerEntry(
+                hook: $hookName,
+                key: HookKey::fromRegistration($registration),
+                handler: $registration->target === 'method'
+                    ? new ContainerLazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs, $registration->once)
+                    : new ContainerLazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs, $registration->once),
+                type: $registration->type,
+                priority: $registration->priority,
+                acceptedArgs: $registration->acceptedArgs,
+                tags: $resolvedTags,
+                registerIf: $registration->registerIf,
+                registerIfParams: $registration->registerIfParams,
+                executeIf: $registration->executeIf,
+                executeIfParams: $registration->executeIfParams,
+                once: $registration->once,
+            );
 
             if ($registration->once) {
-                $handler->setRemoveCallback(
-                    fn() => $this->removeOnceEntry($hookName, $key->toString(), $key->type)
+                $entry->handler->setRemoveCallback(
+                    fn() => $this->removeOnceEntry($entry)
                 );
             }
-            /**
-             * @var SchedulerHookAttributeType
-             */
-            $entry = [
-                'key' => $key,
-                'handler' => $handler,
-                'type' => $registration->type,
-                'priority' => $registration->priority,
-                'accepted_args' => $registration->acceptedArgs,
-                'tags' => $resolvedTags,
-                'registerIf' => $registration->registerIf,
-                'registerIfParams' => $registration->registerIfParams,
-                'executeIf' => $registration->executeIf,
-                'executeIfParams' => $registration->executeIfParams,
-                'once' => $registration->once,
-            ];
 
             // deferRegisterUntilHook implies deferral: the entry is held in the
             // deferred pool until the trigger hook fires, regardless of how the
             // registration array was built (attribute, scanner cache, runtime).
             if ($registration->deferRegister || $registration->deferRegisterUntilHook !== null) {
-                $this->deferredHookManager->addDeferredEntry($hookName, $key->toString(), $entry);
+                $recordEntry = $entry->toDeferredEntryDTO();
+                $this->deferredHookManager->addDeferred($recordEntry);
 
                 if ($registration->deferRegisterUntilHook !== null) {
                     $triggerHook = $registration->deferRegisterUntilHook;
@@ -797,12 +716,11 @@ class WPHooksContainerRegistry
                     }
                     $this->scheduleDeferredActivation(
                         $triggerHook,
-                        $hookName,
-                        $key->toString()
+                        $recordEntry
                     );
                 }
             } else {
-                $this->handlers[$hookName][$key->toString()] = $entry;
+                $this->handlers[$entry->toUniqueKey()] = $entry;
             }
         }
     }
@@ -817,28 +735,19 @@ class WPHooksContainerRegistry
      * the listener removes itself.
      *
      * @param string $triggerHook WordPress hook that gates activation.
-     * @param string $hook        The deferred entry's own hook name.
-     * @param string $key         The deferred entry's key string.
      */
-    private function scheduleDeferredActivation(string $triggerHook, string $hook, string $key): void
+    private function scheduleDeferredActivation(string $triggerHook, DeferredHookEntryDTO $entry): void
     {
-        $activate = fn(string $h, array $d, string $k) => $this->activateEntry($h, $d, $k);
 
         if (did_action($triggerHook)) {
-            // The trigger already fired before boot — defer to initialize()'s
-            // pending queue so the entry activates exactly once, after the
-            // active handler loop has run.
-            $this->pendingDeferredActivation[] = [$hook, $key];
+            $this->pendingDeferredActivation[] = $entry;
             return;
         }
 
-        $listener = null;
-        $listener = function () use (&$listener, $triggerHook, $hook, $key, $activate): void {
-            $activated = $this->deferredHookManager->activateDeferredByKey($hook, $key, $activate);
+        $listener = function () use ($triggerHook, $entry): void {
+            $activated = $this->deferredHookManager->activateDeferredByKey($entry, $this->activateEntry);
 
-            if ($activated) {
-                remove_action($triggerHook, $listener, PHP_INT_MIN);
-            }
+            $activated && remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
         };
 
         add_action($triggerHook, $listener, PHP_INT_MIN, 0);
@@ -847,13 +756,13 @@ class WPHooksContainerRegistry
 /**
  * @internal not for external use beyond @see WPHooksContainerRegistry
  * 
- * @template TargetClass of object|class-string
- * @phpstan-type HookTargetResolve TargetClass|callable|string|array
+ * @template TargetClass
+ * @phpstan-type HookTargetResolve callable|string|array{class-string<TargetClass>&object<TargetClass>, callable-string<TargetClass>}
  * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-import-type CallableHookParams from HookProviderTrait
  * @phpstan-import-type HookType from HookRegistration
- * @phpstan-import-type HandlerEntry from WPHooksContainerRegistry
- * @phpstan-import-type SchedulerHookAttributeType from WPHooksContainerRegistry
+ * @phpstan-import-type DeferredHookEntry from DeferredHooksTrait
+ * @phpstan-import-type ActivateEntry from WPHooksContainerRegistry
  */
 class DeferredHookManager
 {
@@ -871,29 +780,18 @@ class DeferredHookManager
     ) {}
 
     /**
-     * Add a deferred hook entry to the registry.
-     * @param string $hookName Hook name.
-     * @param string $key Hook key.
-     * @param SchedulerHookAttributeType $entry Hook entry.
-     */
-    public function addDeferredEntry(string $hookName, string $key, array $entry): void
-    {
-        $this->addDeferred($hookName, $key, $entry);
-    }
-
-    /**
      * Activate all deferred handlers registered for a specific WordPress hook.
      *
-     * @param callable(string, array, string): bool $activateEntry Registry callback: moves the
+     * @param ActivateEntry $activateEntry Registry callback: moves the
      *                                                             entry to the active pool and
      *                                                             registers it; returns true when
      *                                                             newly activated, false when the
      *                                                             handler was already active.
      */
-    public function activateDeferredByHook(string $hook, callable $activateEntry): void
+    public function activateDeferredByHook(string $hook, \Closure $activateEntry): void
     {
         $this->activateMatchingDeferredEntries(
-            static fn(string $h): bool => $h === $hook,
+            static fn(DeferredHookEntryDTO $d): bool => $d->hook === $hook,
             $activateEntry,
         );
     }
@@ -902,15 +800,13 @@ class DeferredHookManager
      * Activate all deferred handlers belonging to a specific service class.
      *
      * @param class-string $class Fully qualified class name.
-     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
      */
-    public function activateDeferredByClass(string $class, callable $activateEntry): void
+    public function activateDeferredByClass(string $class, \Closure $activateEntry): void
     {
-        /** 
-         * @var HookKey $d['key']
-         */
+
         $this->activateMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => $d['key']->isForClass($class),
+            static fn(DeferredHookEntryDTO $d): bool => $d->key->isForClass($class),
             $activateEntry,
         );
     }
@@ -922,16 +818,14 @@ class DeferredHookManager
      * by a backslash, so 'App\Core' never matches 'App\CoreExtra\Foo'.
      *
      * @param string $namespace Fully qualified namespace prefix.
-     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
      * @return int Number of handlers activated.
      */
-    public function activateDeferredByNamespace(string $namespace, callable $activateEntry): int
+    public function activateDeferredByNamespace(string $namespace, \Closure $activateEntry): int
     {
-        /** 
-         * @var HookKey $d['key']
-         */
+
         return $this->activateMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => $d['key']->isWithinNamespace($namespace),
+            static fn(DeferredHookEntryDTO $d): bool => $d->key->isWithinNamespace($namespace),
             $activateEntry,
         );
     }
@@ -940,19 +834,16 @@ class DeferredHookManager
      * Activate deferred hook handlers matching the specified target callable or identifier.
      *
      * @param HookTargetResolve $target
-     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
      *
      * @throws \InvalidArgumentException If the target cannot be resolved to a valid class and member.
      */
-    public function activateDeferredByCallable(callable|string|array $target, callable $activateEntry): void
+    public function activateDeferredByCallable(callable|string|array $target, \Closure $activateEntry): void
     {
         [$class, $method] = $this->resolverTarget->resolve($target);
 
-        /** 
-         * @var HookKey $d['key']
-         */
         $this->activateMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => $d['key']->isForCallable($class, $method),
+            static fn(DeferredHookEntryDTO $d): bool => $d->key->isForCallable($class, $method),
             $activateEntry,
         );
     }
@@ -961,20 +852,17 @@ class DeferredHookManager
      * Activate all deferred handlers carrying at least one of the given tags.
      *
      * @param array<string> $tags Tag or list of tags to activate.
-     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
      * @return int Number of handlers activated.
      */
-    public function activateDeferredByTags(array $tags, callable $activateEntry): int
+    public function activateDeferredByTags(array $tags, \Closure $activateEntry): int
     {
         if ($tags === []) {
             return 0;
         }
 
-        /** 
-         * @var SchedulerHookAttributeType $d
-         */
         return $this->activateMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => array_intersect($tags, $d['tags']) !== [],
+            static fn(DeferredHookEntryDTO $d): bool => array_intersect($tags, $d->tags) !== [],
             $activateEntry,
         );
     }
@@ -987,15 +875,15 @@ class DeferredHookManager
      * handlers are silently skipped.
      *
      * @param string $pattern Wildcard hook-name pattern.
-     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
      * @return int Number of handlers activated.
      */
-    public function activateDeferredByHookPattern(string $pattern, callable $activateEntry): int
+    public function activateDeferredByHookPattern(string $pattern, \Closure $activateEntry): int
     {
         HookPattern::assertValid($pattern);
 
         return $this->activateMatchingDeferredEntries(
-            static fn(string $h): bool => HookPattern::matches($h, $pattern),
+            static fn(DeferredHookEntryDTO $d): bool => HookPattern::matches($d->hook, $pattern),
             $activateEntry,
         );
     }
@@ -1008,21 +896,18 @@ class DeferredHookManager
      * its tags matches any pattern (union of families).
      *
      * @param array<string> $patterns Tag wildcard patterns.
-     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
      * @return int Number of handlers activated.
      */
-    public function activateDeferredByTagPattern(array $patterns, callable $activateEntry): int
+    public function activateDeferredByTagPattern(array $patterns, \Closure $activateEntry): int
     {
         if ($patterns === []) {
             return 0;
         }
         HookPattern::assertValidAll($patterns);
 
-        /**
-         * @var SchedulerHookAttributeType $d
-         */
         return $this->activateMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => HookPattern::matchesAny($d['tags'], $patterns),
+            static fn(DeferredHookEntryDTO $d): bool => HookPattern::matchesAny($d->tags, $patterns),
             $activateEntry,
         );
     }
@@ -1034,26 +919,27 @@ class DeferredHookManager
      * hook listener calls this when the trigger fires. registerIf is
      * re-evaluated as with every activation.
      * @internal
-     * @param callable(string, array, string): bool $activateEntry Registry callback (see activateDeferredByHook).
+     * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
      * @return bool True when the entry was newly activated; false when the
      *              entry is unknown, already active, or a gate rejected it.
      */
-    public function activateDeferredByKey(string $hook, string $key, callable $activateEntry): bool
+    public function activateDeferredByKey(DeferredHookEntryDTO $deferredHookEntry, \Closure $activateEntry): bool
     {
-        if (!isset($this->deferredHandlers[$hook][$key])) {
+        $uniqueKey = $deferredHookEntry->toUniqueKey();
+        if (!isset($this->deferredHandlers[$uniqueKey])) {
             return false;
         }
 
-        $data = $this->deferredHandlers[$hook][$key];
+        $data = $this->deferredHandlers[$uniqueKey];
 
         // Registration gate: re-evaluated at activation time.
-        if (!$this->gateDeferredActivation($data, $hook, $key)) {
+        if (!$this->gateDeferredActivation($data)) {
             return false;
         }
 
-        $activated = $activateEntry($hook, $data, $key);
+        $activated = $activateEntry($data);
 
-        unset($this->deferredHandlers[$hook][$key]);
+        unset($this->deferredHandlers[$uniqueKey]);
 
         return $activated;
     }
@@ -1068,11 +954,8 @@ class DeferredHookManager
     {
         [$class, $method] = $this->resolverTarget->resolve($target);
 
-        /** 
-         * @var HookKey $d['key']
-         */
         $this->unregisterMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => $d['key']->isForCallable($class, $method),
+            static fn(DeferredHookEntryDTO $d): bool => $d->key->isForCallable($class, $method),
         );
     }
 
@@ -1083,7 +966,11 @@ class DeferredHookManager
      */
     public function unregisterDeferredByHook(string $hook): void
     {
-        unset($this->deferredHandlers[$hook]);
+        foreach ($this->deferredHandlers as $key => $data) {
+            if ($data->hook === $hook) {
+                unset($this->deferredHandlers[$key]);
+            }
+        }
     }
 
     /**
@@ -1093,11 +980,9 @@ class DeferredHookManager
      */
     public function unregisterDeferredByClass(string $class): void
     {
-        /** 
-         * @var HookKey $d['key']
-         */
+
         $this->unregisterMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => $d['key']->isForClass($class),
+            static fn(DeferredHookEntryDTO $d): bool => $d->key->isForClass($class),
         );
     }
 
@@ -1112,11 +997,9 @@ class DeferredHookManager
      */
     public function unregisterDeferredByNamespace(string $namespace): void
     {
-        /** 
-         * @var HookKey $d['key']
-         */
+
         $this->unregisterMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => $d['key']->isWithinNamespace($namespace),
+            static fn(DeferredHookEntryDTO $d): bool => $d->key->isWithinNamespace($namespace),
         );
     }
 
@@ -1134,7 +1017,7 @@ class DeferredHookManager
         }
 
         $this->unregisterMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => array_intersect($tags, $d['tags']) !== [],
+            static fn(DeferredHookEntryDTO $d): bool => array_intersect($tags, $d->tags) !== [],
         );
     }
 
@@ -1150,7 +1033,7 @@ class DeferredHookManager
         HookPattern::assertValid($pattern);
 
         $this->unregisterMatchingDeferredEntries(
-            static fn(string $h): bool => HookPattern::matches($h, $pattern),
+            static fn(DeferredHookEntryDTO $d): bool => HookPattern::matches($d->hook, $pattern),
         );
     }
 
@@ -1170,7 +1053,7 @@ class DeferredHookManager
         HookPattern::assertValidAll($patterns);
 
         $this->unregisterMatchingDeferredEntries(
-            static fn(string $h, array $d): bool => HookPattern::matchesAny($d['tags'], $patterns),
+            static fn(DeferredHookEntryDTO $d): bool => HookPattern::matchesAny($d->tags, $patterns),
         );
     }
 
@@ -1182,27 +1065,26 @@ class DeferredHookManager
      * here. On failure the entry stays in the deferred pool (a later activation
      * attempt may succeed once the gate flips to true except if 'once' is true).
      *
-     * @param HandlerEntry $data Handler entry.
-     * @param string $hook
+     * @param DeferredHookEntryDTO $data Handler entry.
      */
-    private function gateDeferredActivation(array $data, string $hook, string $key): bool
+    private function gateDeferredActivation(DeferredHookEntryDTO $data): bool
     {
-        if (($data['registerIf'] ?? null) === null) {
+        if (($data->registerIf ?? null) === null) {
             return true;
         }
 
         try {
             $allowed = $this->planProvider->evaluateRegistrationGate(
-                $data['registerIf'],
-                $data['registerIfParams'] ?? [],
+                $data->registerIf,
+                $data->registerIfParams ?? [],
                 $this->container,
-                $key,
-                $data['key']->class
+                $data->toUniqueKey(),
+                $data->key->class
             );
         } catch (\Throwable $e) {
             Logger::error(
                 'WPHooksContainerRegistry',
-                'Skipping deferred hook activation ' . $hook . ' — ' . $e->getMessage()
+                'Skipping deferred hook activation ' . $data->hook . ' — ' . $e->getMessage()
             );
             return false;
         }
@@ -1210,7 +1092,7 @@ class DeferredHookManager
         if (!$allowed) {
             Logger::warning(
                 'WPHooksContainerRegistry',
-                'Skipping deferred hook activation ' . $hook . ' — registerIf gate returned false.'
+                'Skipping deferred hook activation ' . $data->hook . ' — registerIf gate returned false.'
             );
             return false;
         }
@@ -1220,6 +1102,7 @@ class DeferredHookManager
 }
 /**
  * @internal not for use beyond \WPLokerBJM\Core\Container\Support\WPHooks\Registry\
+ * @template TClass
  * @phpstan-import-type HookTargetResolve from DeferredHookManager
  */
 class HookTargetResolver
@@ -1230,13 +1113,13 @@ class HookTargetResolver
      * WeakMap automatically drops entries when their key (the callable
      * object) is garbage-collected, avoiding memory leaks.
      *
-     * @var \WeakMap<object, array{class-string, string}>
+     * @var \WeakMap<object<TClass>, array{class-string<TClass>, callable-string<TClass>}>
      */
     private \WeakMap $callableTargetCache { get => $this->callableTargetCache ??= new \WeakMap(); }
 
     /**
      * @param HookTargetResolve $target
-     * @return array{class-string, string}
+     * @return array{class-string<TClass>, callable-string<TClass>}
      */
     public function resolve(object|callable|array|string $target): array
     {
@@ -1254,7 +1137,7 @@ class HookTargetResolver
 
     /**
      * @param HookTargetResolve $target
-     * @return array{class-string, string}
+     * @return array{class-string<TClass>, callable-string<TClass>}
      */
     private function doResolveCallableTarget(object|callable|array|string $target): array
     {
@@ -1307,9 +1190,8 @@ class HookTargetResolver
     }
 
     /**
-     * 
-     * @param object $target
-     * @return array{class-string, string}
+     * @param object<TClass> $target
+     * @return array{class-string<TClass>, callable-string<TClass>}
      */
     private function analyseObject(object $target): array
     {

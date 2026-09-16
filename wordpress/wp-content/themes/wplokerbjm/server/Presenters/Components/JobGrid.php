@@ -1,6 +1,7 @@
 <?php
 
 namespace WPLokerBJM\Presenters\Components;
+
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Services\GraphQL\GraphQLJobData;
@@ -19,11 +20,7 @@ use WPLokerBJM\Services\GraphQL\GraphQLJobData;
  */
 class JobGrid
 {
-
-    public function __construct(
-        private JobRepository $jobRepository
-    ) {
-    }
+    public function __construct(private JobRepository $jobRepository) {}
 
     /**
      * Get job grid data with caching.
@@ -58,7 +55,7 @@ class JobGrid
             };
         }
 
-
+        /** @var JobGridData $props */
         $props = [
             'jobs' => $jobs,
             'maxNumPages' => (int) $jobs_query->max_num_pages,

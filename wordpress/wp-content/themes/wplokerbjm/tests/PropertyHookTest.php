@@ -16,7 +16,7 @@ use WPLokerBJM\Tests\Support\Fixtures\PropertyMultiPriorityService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyNonClosureService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-
+use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
 
 /**
  * Test suite for property-closure hooks via #[Action]/#[Filter] attributes.
@@ -56,8 +56,8 @@ class PropertyHookTest extends WplokerbjmTestCase
     /**
      * Seed registrations via a bound closure (bypassing the container check),
      * then verify internal state.
-     *
-     * @param array<int, array{class: string, method: string, type: 'action'|'filter', hook: string, priority: int, accepted_args: int, deferRegister: bool}> $registrations
+     * @phpstan-import-type HookType from HookRegistration
+     * @param array<HookType> $registrations
      */
     private function seedRegistrations(array $registrations): void
     {
@@ -83,8 +83,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'filter',
                 'hook'          => 'property_filter',
                 'priority'      => 10,
-                'accepted_args' => 1,
-                'defer_register' => false,
+                'acceptedArgs' => 1,
+                'deferRegister' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -114,8 +114,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'action',
                 'hook'          => 'property_action',
                 'priority'      => 10,
-                'accepted_args' => 1,
-                'defer_register' => false,
+                'acceptedArgs' => 1,
+                'deferRegister' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -139,8 +139,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'filter',
                 'hook'          => 'property_filter',
                 'priority'      => 10,
-                'accepted_args' => 1,
-                'defer_register' => false,
+                'acceptedArgs' => 1,
+                'deferRegister' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -165,8 +165,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'filter',
                 'hook'          => 'multi_priority_filter',
                 'priority'      => 10,
-                'accepted_args' => 1,
-                'defer_register' => false,
+                'acceptedArgs' => 1,
+                'deferRegister' => false,
                 'target'        => 'property',
             ],
             [
@@ -175,8 +175,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'filter',
                 'hook'          => 'multi_priority_filter',
                 'priority'      => 20,
-                'accepted_args' => 1,
-                'defer_register' => false,
+                'acceptedArgs' => 1,
+                'deferRegister' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -211,8 +211,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'filter',
                 'hook'          => 'deferred_property_filter',
                 'priority'      => 10,
-                'accepted_args' => 1,
-                'defer_register' => true,
+                'acceptedArgs' => 1,
+                'deferRegister' => true,
                 'target'        => 'property',
             ],
         ]);
@@ -248,8 +248,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'filter',
                 'hook'          => 'non_closure_filter',
                 'priority'      => 10,
-                'accepted_args' => 1,
-                'defer_register' => false,
+                'acceptedArgs' => 1,
+                'deferRegister' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -275,8 +275,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'filter',
                 'hook'          => 'ghost_hook',
                 'priority'      => 10,
-                'accepted_args' => 1,
-                'defer_register' => false,
+                'acceptedArgs' => 1,
+                'deferRegister' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -301,8 +301,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'filter',
                 'hook'          => 'handler_type_check',
                 'priority'      => 10,
-                'accepted_args' => 1,
-                'defer_register' => false,
+                'acceptedArgs' => 1,
+                'deferRegister' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -343,8 +343,8 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'          => 'filter',
                 'hook'          => 'static_closure_filter',
                 'priority'      => 10,
-                'accepted_args' => 1,
-                'defer_register' => false,
+                'acceptedArgs' => 1,
+                'deferRegister' => false,
                 'target'        => 'property',
             ],
         ]);
@@ -374,12 +374,12 @@ class PropertyHookTest extends WplokerbjmTestCase
                 'type'              => 'filter',
                 'hook'              => 'property_execute_hook',
                 'priority'          => 10,
-                'accepted_args'     => 1,
-                'defer_register'    => false,
+                'acceptedArgs'     => 1,
+                'deferRegister'    => false,
                 'target'            => 'property',
-                'execute_if'        => $gate,
-                'execute_if_params' => $plan,
-                'hook_args'         => ['value'],
+                'executeIf'        => $gate,
+                'executeIfParams' => $plan,
+                'hookArgs'         => ['value'],
             ],
         ]);
 

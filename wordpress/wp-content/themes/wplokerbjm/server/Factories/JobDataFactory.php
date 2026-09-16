@@ -7,6 +7,7 @@ use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\Sanitizer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Repositories\{CustomFieldRepository, TaxonomyRepository};
 /**
  *  @phpstan-type JobData array{
  *     nama_perusahaan?: string,
@@ -37,8 +38,8 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 class JobDataFactory
 {
     public function __construct(
-        private \WPLokerBJM\Repositories\CustomFieldRepository $customFieldRepository,
-        private \WPLokerBJM\Repositories\TaxonomyRepository $taxonomyRepository
+        private CustomFieldRepository $customFieldRepository,
+        private TaxonomyRepository $taxonomyRepository
     ) {
     }
 

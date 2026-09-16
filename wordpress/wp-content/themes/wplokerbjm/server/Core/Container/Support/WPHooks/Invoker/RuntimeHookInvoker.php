@@ -1,10 +1,12 @@
 <?php
+
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{RuntimeWPHookProvider};
+use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
 
 /**
@@ -25,7 +27,7 @@ trait RuntimeInstanceInvokerTrait
      * @param object $instance The resolved owner instance.
      * @param mixed  ...$args  Hook arguments received at fire time.
      */
-    abstract protected function invokeOn(object $instance, mixed ...$args): mixed;
+    abstract private function invokeOn(object $instance, mixed ...$args): mixed;
 
     public function __invoke(mixed ...$args): mixed
     {
@@ -68,8 +70,7 @@ trait RuntimeInstanceInvokerTrait
 
             $result = $this->invokeOn($instance, ...$args);
 
-            SharedUtils::isDevelopment() && Logger::debug(static::class, 'Hook invoke ' . $this->label);
-
+            SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed ' . ++$this->numberExecutions . ' times');
             $this->consumeOnce();
             return $result;
         } catch (\Throwable $e) {
@@ -117,26 +118,29 @@ trait RuntimeInstanceInvokerTrait
  *
  * WordPress can match this by instance identity (spl_object_hash) for
  * remove_action()/remove_filter().
+ * @phpstan-import-type RuntimeHookMetadataData from RuntimeHookMetadata
  */
 final class RuntimeInstanceHookHandler
 {
     use RuntimeInstanceInvokerTrait;
 
-    public readonly string $label;
-
     /** @var \Closure|null Closure to invoke the method on the stored instance (for non-public methods) */
     private ?\Closure $invoker = null;
 
-    /**
-     * @param object $instance The object instance to invoke methods on.
-     * @param string $method   The method name.
-     * @param 'public'|'protected'|'private' $visibility
-     * @param 'action'|'filter' $type
-     * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
-     */
     /** @var \WeakReference<object> Weak reference to the owner instance — keeps it collectible (instance-lifetime scoping). */
     private readonly \WeakReference $instanceRef;
 
+    /**
+     * @template TClass
+     * @param object<TClass> $instance The object instance to invoke methods on.
+     * @param method-string<TClass> $method   The method name.
+     * @param RuntimeHookMetadataData['visibility'] $visibility
+     * @param RuntimeHookMetadataData['type'] $type
+     * @param RuntimeHookMetadataData['executeIf'] $executeIf Optional gate: invoked directly, must return bool.
+     * @param RuntimeHookMetadataData['executeIfParams'] $executeIfParams
+     * @param RuntimeHookMetadataData['hookArgNames'] $hookArgNames
+     * @param RuntimeHookMetadataData['once'] $once
+     */
     public function __construct(
         object $instance,
         private readonly string $method,
@@ -154,8 +158,8 @@ final class RuntimeInstanceHookHandler
         $this->instanceRef = \WeakReference::create($instance);
 
         $this->label = $instance instanceof AnonClassHookMetadata
-            ? $instance->getParentClass() . '::$' . $instance->parentProperty . '::' . $this->method
-            : $instance::class . '::' . $this->method;
+            ? $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->method
+            : $instance::class . '->' . $this->method;
 
         if ($this->visibility !== 'public') {
 
@@ -170,13 +174,12 @@ final class RuntimeInstanceHookHandler
     }
 
 
-    protected function invokeOn(object $instance, mixed ...$args): mixed
+    private function invokeOn(object $instance, mixed ...$args): mixed
     {
         return $this->visibility === 'public'
             ? $instance->{$this->method}(...$args)
             : ($this->invoker)($instance, $this->method, ...$args);
     }
-
 }
 
 /**
@@ -188,26 +191,30 @@ final class RuntimeInstanceHookHandler
  *
  * WordPress can match this by instance identity (spl_object_hash) for
  * remove_action()/remove_filter().
+ * @phpstan-import-type RuntimeHookMetadataData from RuntimeHookMetadata
  */
 final class RuntimeInstancePropertyHookHandler
 {
     use RuntimeInstanceInvokerTrait;
 
-    public readonly string $label;
-
     /** @var \Closure(object, string):mixed|null */
     private ?\Closure $reader = null;
 
-    /**
-     * @param object $instance   The object instance whose property holds the callable.
-     * @param string $property   The property name.
-     * @param 'public'|'protected'|'private' $visibility
-     * @param 'action'|'filter' $type
-     * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
-     */
     /** @var \WeakReference<object> Weak reference to the owner instance — keeps it collectible (instance-lifetime scoping). */
     private readonly \WeakReference $instanceRef;
 
+
+    /**
+     * @template TClass
+     * @param object<TClass> $instance   The object instance whose property holds the callable.
+     * @param property-string<TClass> $property   The property name.
+     * @param RuntimeHookMetadataData['executeIfParams'] $executeIfParams
+     * @param RuntimeHookMetadataData['visibility'] $visibility
+     * @param RuntimeHookMetadataData['type'] $type
+     * @param RuntimeHookMetadataData['executeIf'] $executeIf Optional gate: invoked directly, must return bool.
+     * @param RuntimeHookMetadataData['hookArgNames'] $hookArgNames
+     * @param RuntimeHookMetadataData['once'] $once
+     */
     public function __construct(
         object $instance,
         private readonly string $property,
@@ -225,8 +232,8 @@ final class RuntimeInstancePropertyHookHandler
         $this->instanceRef = \WeakReference::create($instance);
 
         $this->label = $instance instanceof AnonClassHookMetadata
-            ? $instance->getParentClass() . '::$' . $instance->parentProperty
-            : $instance::class . '::$' . $this->property;
+            ? $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->property
+            : $instance::class . '->' . $this->property;
 
         if ($this->visibility !== 'public') {
             // Bind inside the instance's class scope so
@@ -242,7 +249,7 @@ final class RuntimeInstancePropertyHookHandler
     /**
      * Invoke the property's callable with the given arguments.
      */
-    protected function invokeOn(object $instance, mixed ...$args): mixed
+    private function invokeOn(object $instance, mixed ...$args): mixed
     {
         $callable = $this->visibility === 'public'
             ? $instance->{$this->property}
@@ -256,7 +263,6 @@ final class RuntimeInstancePropertyHookHandler
 
         return $callable(...$args);
     }
-
 }
 
 /**
@@ -267,22 +273,20 @@ final class RuntimeInstancePropertyHookHandler
  * surrounding scope directly — no container resolution involved. An optional
  * condition closure is invoked directly before the callback and must return
  * bool.
+ * @phpstan-import-type RuntimeHookMetadataData from RuntimeHookMetadata
  */
 final class RuntimeCallableHookHandler
 {
     use HookInvokerTrait;
 
-    public readonly string $label;
-
     /**
-     * @param callable        $callback  Callable invoked when the hook fires.
-     * @param \Closure|null   $executeIf Optional gate: invoked directly, must return bool.
-     * @param 'action'|'filter' $type
-     * @param bool            $once      When true, the registration removes itself after its first
+     * @param callable $callback  Callable invoked when the hook fires.
+     * @param RuntimeHookMetadataData['executeIf']   $executeIf Optional gate: invoked directly, must return bool.
+     * @param RuntimeHookMetadataData['type'] $type
+     * @param RuntimeHookMetadataData['once'] $once      When true, the registration removes itself after its first
      *                                   fire where the executeIf gate is evaluated (consume-on-any-evaluation).
      */
     public function __construct(
-        // `callable` is not a valid property type — validated by the registry before construction.
         private readonly mixed $callback,
         private readonly ?\Closure $executeIf = null,
         private readonly string $type = 'action',
@@ -331,8 +335,7 @@ final class RuntimeCallableHookHandler
 
             $result = $callback(...$args);
 
-            SharedUtils::isDevelopment() && Logger::debug(static::class, 'Hook invoke ' . $this->label);
-
+            SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed ' . ++$this->numberExecutions . ' times');
             $this->consumeOnce();
 
             return $result;

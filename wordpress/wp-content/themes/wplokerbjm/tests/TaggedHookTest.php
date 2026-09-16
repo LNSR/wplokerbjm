@@ -391,10 +391,10 @@ class TaggedHookTest extends WplokerbjmTestCase
             'type' => 'action',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
-            'defer_register' => $deferRegister,
-            'execute_if' => $executeIf,
-            'execute_if_params' => [],
+            'acceptedArgs' => $acceptedArgs,
+            'deferRegister' => $deferRegister,
+            'executeIf' => $executeIf,
+            'executeIfParams' => [],
             'tags' => $tags,
         ];
     }

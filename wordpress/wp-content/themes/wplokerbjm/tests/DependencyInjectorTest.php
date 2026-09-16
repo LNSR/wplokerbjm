@@ -83,10 +83,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
         $injector->injectOn($this->typedChild());
         $injector->injectOn($this->typedChild());
-        $bind = \Closure::bind(static function(DependencyInjector $injector) {
-            return $injector->scopeAccessFactory->setters;
-        }, null, $injector);
-        $setters = $bind($injector);
+        $setters = $injector->cachedSetterClosure;
         $this->assertCount(1, $setters);
     }
 

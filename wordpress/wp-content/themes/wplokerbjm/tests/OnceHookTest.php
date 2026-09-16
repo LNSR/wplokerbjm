@@ -272,11 +272,11 @@ class OnceHookTest extends WplokerbjmTestCase
             'type' => 'action',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
+            'acceptedArgs' => $acceptedArgs,
             'once' => $once,
-            'defer_register' => $deferRegister,
-            'execute_if' => $executeIf,
-            'execute_if_params' => $executeIfParams,
+            'deferRegister' => $deferRegister,
+            'executeIf' => $executeIf,
+            'executeIfParams' => $executeIfParams,
         ];
     }
 
@@ -300,11 +300,11 @@ class OnceHookTest extends WplokerbjmTestCase
             'type' => 'filter',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
+            'acceptedArgs' => $acceptedArgs,
             'once' => $once,
-            'defer_register' => $deferRegister,
-            'execute_if' => $executeIf,
-            'execute_if_params' => $executeIfParams,
+            'deferRegister' => $deferRegister,
+            'executeIf' => $executeIf,
+            'executeIfParams' => $executeIfParams,
         ];
     }
 }

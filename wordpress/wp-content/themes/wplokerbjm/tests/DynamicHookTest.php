@@ -105,7 +105,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
     public function testUnresolvableClosureParamIsLoggedAndSkipped(): void
     {
-        $hook = static function (self $service): string {
+        $hook = static function (UnresolvableService $service): string {
             return 'never_registered';
         };
         $targetResolver = new HookTargetResolver();
@@ -231,11 +231,11 @@ class DynamicHookTest extends WplokerbjmTestCase
             'type' => 'action',
             'hook' => $hook,
             'priority' => $priority,
-            'accepted_args' => $acceptedArgs,
-            'defer_register' => $deferRegister,
-            'execute_if' => $executeIf,
-            'execute_if_params' => $executeIfParams,
-            'hook_params' => $hook instanceof Closure
+            'acceptedArgs' => $acceptedArgs,
+            'deferRegister' => $deferRegister,
+            'executeIf' => $executeIf,
+            'executeIfParams' => $executeIfParams,
+            'hookParams' => $hook instanceof Closure
                 ? $this->planProvider->buildCallablePlan($hook)
                 : [],
             'tags' => $tags,

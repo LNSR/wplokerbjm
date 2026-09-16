@@ -2,6 +2,8 @@
 
 namespace WPLokerBJM\Services\GraphQL\Hooks\Search;
 
+use Closure;
+use DI\Attribute\Injectable;
 use GraphQL\Type\Definition\FieldDefinition, GraphQL\Type\Definition\ResolveInfo;
 use WPGraphQL\AppContext;
 use WPLokerBJM\Controllers\GraphQL\Resolvers\JobsDataResolver;
@@ -11,6 +13,7 @@ use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
 use WPGraphQL\Utils\InstrumentSchema;
 use WPGraphQL\Utils\Tracing;
 use WPLokerBJM\Core\ContainerRegistryActions;
+use WPLokerBJM\Shared\Log\Logger;
 
 /*======================================================================
  | SEARCH
@@ -36,6 +39,14 @@ class SearchHooks
 {
 
     /**
+     * @param \wpdb|null $wpdb
+     */
+    public function __construct(private ?\wpdb $wpdb = null)
+    {
+        $this->wpdb ??= $GLOBALS['wpdb'];
+    }
+
+    /**
      * @param string        $search   The current search SQL fragment (may be empty).
      * @param \WP_Query     $wp_query The WP_Query object being executed.
      * @return string Modified search SQL fragment.
@@ -43,9 +54,8 @@ class SearchHooks
     #[Filter('posts_search', 10, 2, deferRegister: true, once: true)]
     public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
     {
-        global $wpdb;
         $q = (string) ($wp_query->query_vars['s'] ?? '');
-        return JobQuery::buildPostsSearchSql($wpdb, $q);
+        return JobQuery::buildPostsSearchSql($this->wpdb, $q);
     }
 
     /**
@@ -54,7 +64,7 @@ class SearchHooks
      */
     #[Action('graphql_before_resolve_field', 10, 8, once: true, deferRegisterUntilHook: 'init_graphql_request', executeIf: static function (ResolveInfo $info): bool {
         $result = $info->fieldName === GraphQLRegistration::TYPE_SEARCH_JOBS;
-        if (!$result) do_action(ContainerRegistryActions::UNREGISTER_DEFERRED_BY_CALLABLE, [SearchHooks::class, 'jobPostsSearchFilterImpl']);
+        if (!$result) do_action(ContainerRegistryActions::UNREGISTER_DEFERRED_BY_CALLABLE, [__CLASS__, 'jobPostsSearchFilterImpl']);
         return $result;
     })]
     public function beforeResolveField(
