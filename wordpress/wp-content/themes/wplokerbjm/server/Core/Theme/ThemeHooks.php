@@ -79,7 +79,7 @@ class ThemeProp
      * - Attempts to read attachment metadata for width/height; if absent, it falls back
      *   to the theme support defaults, then to a safe 128x128 fallback so browsers can
      *   compute aspect ratio reliably.
-     * @phpstan-template TLogo object{url:string|false,srcset:string|false,sizes:string|false,width:int,height:int}
+     * @phpstan-type TLogo object{url:string|false,srcset:string|false,sizes:string|false,width:int,height:int}
      * @return TLogo
      */
     private function getLogoData(): object
@@ -226,14 +226,10 @@ class ThemeProp
         /** @var ThemeData|false */
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
-            if ($loggedIn) {
-                $cached['wpRestNonce'] = wp_create_nonce('wp_rest');
-            } else {
-                // safety remove in case cached from logged-in
-                if (isset($cached['wpRestNonce'])) {
-                    unset($cached['wpRestNonce']);
-                }
-            }
+            $cached['wpRestNonce'] = $loggedIn
+                ? graphql_get_nonce()
+                : null;
+
             return $cached;
         }
 

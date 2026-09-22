@@ -73,7 +73,7 @@
     "intelephense.rename.namespaceMode": "all",
     "intelephense.codeLens.references.enable": true,
     "intelephense.codeLens.usages.enable": true,
-    "intelephense.files.maxSize": 1000000,
+    "intelephense.files.maxSize": 100000000,
     "intelephense.files.exclude": [
       "**/.git/**",
       "**/node_modules/**",

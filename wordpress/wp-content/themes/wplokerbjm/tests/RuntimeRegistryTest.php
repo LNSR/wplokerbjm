@@ -6,6 +6,7 @@ namespace WPLokerBJM\Tests;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Attributes\Filter;
+use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstanceHookHandler, RuntimeCallableHookHandler, RuntimeInstancePropertyHookHandler};
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
@@ -58,9 +59,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'runtime_action_test', acceptedArgs: 1)]
             public function doSomething(string $val): void
@@ -104,33 +104,37 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $actions = [];
         $filters = [];
 
-        $anon = new class ($actions, $filters) {
+        $anon = new class($actions, $filters) {
             public function __construct(
-            private array &$actions,
-            private array &$filters,
+                private array &$actions,
+                private array &$filters,
             ) {}
 
             #[Action(hook: 'multi_action_a', acceptedArgs: 1)]
             public function onActionA(string $v): void
             {
-                $this->actions[] = "A:$v"; }
+                $this->actions[] = "A:$v";
+            }
 
             #[Action(hook: 'multi_action_b', acceptedArgs: 1)]
             public function onActionB(string $v): void
             {
-                $this->actions[] = "B:$v"; }
+                $this->actions[] = "B:$v";
+            }
 
             #[Filter(hook: 'multi_filter_x', acceptedArgs: 1)]
             public function onFilterX(string $v): string
             {
                 $this->filters[] = "X:$v";
-                return $v . 'x'; }
+                return $v . 'x';
+            }
 
             #[Filter(hook: 'multi_filter_y', acceptedArgs: 1)]
             public function onFilterY(string $v): string
             {
                 $this->filters[] = "Y:$v";
-                return $v . 'y'; }
+                return $v . 'y';
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -154,9 +158,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_protected_action', acceptedArgs: 0)]
             protected function onProtectedAction(): void
@@ -194,14 +197,14 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_unreg_action', acceptedArgs: 1)]
             public function onAction(string $v): void
             {
-                $this->captured[] = $v; }
+                $this->captured[] = $v;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -224,14 +227,14 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $actions = [];
 
-        $anon = new class ($actions) {
-            public function __construct(private array &$actions)
-            {}
+        $anon = new class($actions) {
+            public function __construct(private array &$actions) {}
 
             #[Action(hook: 'rt_double_reg', acceptedArgs: 1)]
             public function onAction(string $v): void
             {
-                $this->actions[] = $v; }
+                $this->actions[] = $v;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -282,9 +285,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $anon = new class {
             #[Action(hook: 'rt_priority_action', priority: 99, acceptedArgs: 0)]
-            public function customPriority(): void
-            {
-            }
+            public function customPriority(): void {}
         };
 
         $this->registry->registerHooksOn($anon);
@@ -353,9 +354,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Filter(hook: 'rt_limited_args', acceptedArgs: 2)]
             public function onFilter(string $first, string $second): string
@@ -387,14 +387,14 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_isolated_action', acceptedArgs: 1)]
             public function onAction(string $v): void
             {
-                $this->captured[] = $v; }
+                $this->captured[] = $v;
+            }
         };
 
         $registryA->registerHooksOn($anon);
@@ -415,9 +415,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $owner = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $owner = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             public function boot(string $value): void
             {
@@ -439,9 +438,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $owner = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $owner = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             public function boot(string $value): void
             {
@@ -459,9 +457,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $feature = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $feature = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             public function warm(string $value): void
             {
@@ -469,9 +466,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
             }
         };
 
-        $cache = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $cache = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             public function warm(string $value): void
             {
@@ -505,18 +501,19 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $owner = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $owner = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_merge_attr', acceptedArgs: 1)]
             public function fromAttribute(string $v): void
             {
-                $this->captured[] = "attr:$v"; }
+                $this->captured[] = "attr:$v";
+            }
 
             public function fromManual(string $v): void
             {
-                $this->captured[] = "manual:$v"; }
+                $this->captured[] = "manual:$v";
+            }
         };
 
         // Manual registration FIRST, then attribute scan — order must not matter.
@@ -537,13 +534,13 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $owner = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $owner = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             public function boot(string $v): void
             {
-                $this->captured[] = $v; }
+                $this->captured[] = $v;
+            }
         };
 
         $callback = [$owner, 'boot'];
@@ -558,13 +555,13 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $owner = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $owner = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             public function boot(string $v): void
             {
-                $this->captured[] = $v; }
+                $this->captured[] = $v;
+            }
         };
 
         // Condition true → fires.
@@ -624,9 +621,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     public function testInvalidCallableThrowsAndLogs(): void
     {
         $owner = new class {
-            public function boot(): void
-            {
-            }
+            public function boot(): void {}
         };
 
         $this->expectException(\RuntimeException::class);
@@ -641,15 +636,16 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: static function (): string {
-                    return 'rt_closure_hook'; }, acceptedArgs: 1)]
+                return 'rt_closure_hook';
+            }, acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -666,17 +662,18 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
+        $anon = new class($captured) {
             private const HOOK_NAME = 'rt_scope_closure_hook';
 
-            public function __construct(private array &$captured)
-            {}
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: static function (): string {
-                    return self::HOOK_NAME; }, acceptedArgs: 1)]
+                return self::HOOK_NAME;
+            }, acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -691,10 +688,9 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $anon = new class {
             #[Action(hook: 'rt_closure_register_false', registerIf: static function (): bool {
-                    return false; })]
-            public function doSomething(): void
-            {
-            }
+                return false;
+            })]
+            public function doSomething(): void {}
         };
 
         $this->registry->registerHooksOn($anon);
@@ -706,15 +702,16 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_closure_register_true', registerIf: static function (): bool {
-                    return true; }, acceptedArgs: 1)]
+                return true;
+            }, acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -729,21 +726,24 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_closure_execute_gated', executeIf: static function (): bool {
-                    return false; }, acceptedArgs: 1)]
+                return false;
+            }, acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
 
             #[Action(hook: 'rt_closure_execute_open', executeIf: static function (): bool {
-                    return true; }, acceptedArgs: 1)]
+                return true;
+            }, acceptedArgs: 1)]
             public function doOther(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -762,7 +762,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $anon = new class {
             #[Filter(hook: 'rt_closure_execute_filter', executeIf: static function (): bool {
-                    return false; }, acceptedArgs: 2)]
+                return false;
+            }, acceptedArgs: 2)]
             public function transform(string $val, string $extra = ''): string
             {
                 return $val . $extra;
@@ -785,18 +786,19 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
             ->useAutowiring(true)
             ->addDefinitions([RuntimeProviderFlagService::class => \DI\autowire(RuntimeProviderFlagService::class)])
             ->build();
-        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new WPHooksRuntimeCache(),new RuntimeWPHookProvider($container));
+        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksRuntimeCache(), new RuntimeWPHookProvider($container));
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_provider_execute', executeIf: static function (RuntimeProviderFlagService $flag): bool {
-                    return $flag->isEnabled(); }, acceptedArgs: 1)]
+                return $flag->isEnabled();
+            }, acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $registry->registerHooksOn($anon);
@@ -814,18 +816,19 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
             ->build();
         $container->get(RuntimeProviderFlagService::class)->enabled = false;
 
-        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new WPHooksRuntimeCache(), new RuntimeWPHookProvider($container));
+        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksRuntimeCache(), new RuntimeWPHookProvider($container));
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_provider_execute_false', executeIf: static function (RuntimeProviderFlagService $flag): bool {
-                    return $flag->isEnabled(); }, acceptedArgs: 1)]
+                return $flag->isEnabled();
+            }, acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $registry->registerHooksOn($anon);
@@ -837,20 +840,18 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
     public function testProviderRegisterIfUsesDefaultParameters(): void
     {
-        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new WPHooksRuntimeCache(), new RuntimeWPHookProvider());
+        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksRuntimeCache(), new RuntimeWPHookProvider());
 
         $anon = new class {
             #[Action(hook: 'rt_provider_register_default_false', registerIf: static function (bool $flag = false): bool {
-                    return $flag; })]
-            public function doFalse(): void
-            {
-            }
+                return $flag;
+            })]
+            public function doFalse(): void {}
 
             #[Action(hook: 'rt_provider_register_default_true', registerIf: static function (bool $flag = true): bool {
-                    return $flag; })]
-            public function doTrue(): void
-            {
-            }
+                return $flag;
+            })]
+            public function doTrue(): void {}
         };
 
         $registry->registerHooksOn($anon);
@@ -867,14 +868,14 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_once_action', once: true, acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -895,15 +896,16 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_once_execute_false', once: true, executeIf: static function (): bool {
-                    return false; }, acceptedArgs: 1)]
+                return false;
+            }, acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -946,14 +948,14 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_deferred_hook', deferRegisterUntilHook: 'rt_trigger', acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -974,10 +976,9 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $anon = new class {
             #[Action(hook: 'rt_deferred_gated_hook', deferRegisterUntilHook: 'rt_trigger', registerIf: static function (): bool {
-                    return false; })]
-            public function doSomething(): void
-            {
-            }
+                return false;
+            })]
+            public function doSomething(): void {}
         };
 
         $this->registry->registerHooksOn($anon);
@@ -992,9 +993,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $anon = new class {
             #[Action(hook: 'rt_deferred_swept_hook', deferRegisterUntilHook: 'rt_trigger')]
-            public function doSomething(): void
-            {
-            }
+            public function doSomething(): void {}
         };
 
         $this->registry->registerHooksOn($anon);
@@ -1013,14 +1012,14 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class ($captured) {
-            public function __construct(private array &$captured)
-            {}
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
 
             #[Action(hook: 'rt_lifetime_action', acceptedArgs: 1)]
             public function doSomething(string $val): void
             {
-                $this->captured[] = $val; }
+                $this->captured[] = $val;
+            }
         };
 
         $this->registry->registerHooksOn($anon);
@@ -1041,9 +1040,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $anon = new class {
             #[Action(hook: 'rt_lifetime_deferred', deferRegisterUntilHook: 'rt_trigger', acceptedArgs: 1)]
-            public function doSomething(string $val): void
-            {
-            }
+            public function doSomething(string $val): void {}
         };
 
         $this->registry->registerHooksOn($anon);
@@ -1061,13 +1058,15 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     public function testPropertyHookExecuteIfResolvesHookArgsByName(): void
     {
         $container = (new ContainerBuilder())->useAutowiring(true)->build();
-        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new WPHooksRuntimeCache() ,new RuntimeWPHookProvider($container));
+        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksRuntimeCache(), new RuntimeWPHookProvider($container));
 
         $anon = new class {
             #[Filter(hook: 'rt_prop_execute', executeIf: static function (string $value): bool {
-                    return $value === 'go'; }, acceptedArgs: 1)]
+                return $value === 'go';
+            }, acceptedArgs: 1)]
             public $transform = static function (string $value): string {
-                    return strtoupper($value); };
+                return strtoupper($value);
+            };
         };
 
         $registry->registerHooksOn($anon);
@@ -1083,10 +1082,12 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     public function testPropertyHookInvokableObjectDefaultResolvesHookArgs(): void
     {
         $container = (new ContainerBuilder())->useAutowiring(true)->build();
-        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new WPHooksRuntimeCache() ,new RuntimeWPHookProvider($container));
+        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksRuntimeCache(), new RuntimeWPHookProvider($container));
 
         $anon = new class {
-            #[Filter(hook: 'rt_prop_invokable', executeIf: static function (string $value): bool { return $value === 'go'; }, acceptedArgs: 1)]
+            #[Filter(hook: 'rt_prop_invokable', executeIf: static function (string $value): bool {
+                return $value === 'go';
+            }, acceptedArgs: 1)]
             public $transform = [RuntimePropInvokable::class, 'transform'];
         };
 
@@ -1105,10 +1106,12 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     public function testPropertyHookGetterPatternResolvesHookArgs(): void
     {
         $container = (new ContainerBuilder())->useAutowiring(true)->build();
-        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new WPHooksRuntimeCache() ,new RuntimeWPHookProvider($container));
+        $registry = new WPHooksRuntimeRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksRuntimeCache(), new RuntimeWPHookProvider($container));
 
         $anon = new class {
-            #[Filter(hook: 'rt_prop_getter', executeIf: static function (string $value): bool { return $value === 'go'; }, acceptedArgs: 1)]
+            #[Filter(hook: 'rt_prop_getter', executeIf: static function (string $value): bool {
+                return $value === 'go';
+            }, acceptedArgs: 1)]
             public $transform = null {
                 get => $this->transform ??= new RuntimePropInvokable();
             }
@@ -1131,7 +1134,9 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $this->registry->registerAction(
             'rt_manual_once',
-            static function (string $val) use (&$captured): void { $captured[] = $val; },
+            static function (string $val) use (&$captured): void {
+                $captured[] = $val;
+            },
             once: true,
             owner: $owner,
         );
@@ -1155,7 +1160,9 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $this->registry->registerAction(
             'rt_manual_deferred',
-            static function (string $val) use (&$captured): void { $captured[] = $val; },
+            static function (string $val) use (&$captured): void {
+                $captured[] = $val;
+            },
             deferRegisterUntilHook: 'rt_trigger',
             owner: $owner,
         );
@@ -1177,7 +1184,9 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $this->registry->registerFilter(
             'rt_manual_once_filter',
-            static function (string $v): string { return strtoupper($v); },
+            static function (string $v): string {
+                return strtoupper($v);
+            },
             once: true,
             owner: $owner,
         );
@@ -1193,11 +1202,11 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
     public function testAnonSelfRegisteringGetterPatternInvokes(): void
     {
-        $host = new class ($this->registry) {
+        $host = new class($this->registry) {
             public function __construct(private WPHooksRuntimeRegistry $registry) {}
 
             public $optionActivePlugin {
-                get => $this->optionActivePlugin ??= new class ($this->registry) extends AnonClassHookMetadata {
+                get => $this->optionActivePlugin ??= new class($this->registry) extends AnonClassHookMetadata {
                     private const CONDITION = false;
                     public function __construct(private WPHooksRuntimeRegistry $registry)
                     {
@@ -1209,7 +1218,9 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
                         $this->registry->registerHooksOn($this);
                     }
 
-                    #[Filter(hook: 'option_active_plugins', priority: 0, once: true, executeIf: static function (): bool { return self::CONDITION; })]
+                    #[Filter(hook: 'option_active_plugins', priority: 0, once: true, executeIf: static function (): bool {
+                        return self::CONDITION;
+                    })]
                     public function devFilter(array $plugins): array
                     {
                         return $plugins;

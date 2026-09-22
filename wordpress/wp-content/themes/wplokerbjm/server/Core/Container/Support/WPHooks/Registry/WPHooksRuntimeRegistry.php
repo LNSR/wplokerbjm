@@ -18,6 +18,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
 use WPLokerBJM\Core\Container\Support\WPHooks\DeferredHookEntryDTO;
+use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeRegistryHandlerEntry;
@@ -90,6 +91,7 @@ class WPHooksRuntimeRegistry
 
     public function __construct(
         private HookRuntimeResolver $runtimeResolver = new HookRuntimeResolver(),
+        private EntriesIndexer $entriesIndexer,
         public ?WPHooksRuntimeCache $cache = null,
         private readonly ?RuntimeWPHookProvider $provider = null,
     ) {
@@ -322,6 +324,7 @@ class WPHooksRuntimeRegistry
     public function unregisterHooksOn(object $instance): void
     {
         $this->unregisterMatchingDeferredEntries(
+            $this->entriesIndexer->byClass[\spl_object_hash($instance)] ?? [],
             fn(DeferredHookEntryDTO $data): bool => $this->deferredEntryOwner($data) === $instance,
         );
 
@@ -454,7 +457,7 @@ class WPHooksRuntimeRegistry
 
         if (did_action($triggerHook)) {
             $this->activateMatchingDeferredEntries(
-                static fn(DeferredHookEntryDTO $d): bool => $d->hook === $hook && $d->key->toString() === $hookKey->toString(),
+                $this->entriesIndexer->byHook[$hook] ?? [],
                 $this->activateRuntimeEntry,
             );
             return;
@@ -462,7 +465,7 @@ class WPHooksRuntimeRegistry
 
         $listener = function () use ($triggerHook, $hook, $hookKey): void {
             $activated = $this->activateMatchingDeferredEntries(
-                static fn(DeferredHookEntryDTO $d): bool => $d->hook === $hook && $d->key->toString() === $hookKey->toString(),
+                $this->entriesIndexer->byHook[$hook] ?? [],
                 $this->activateRuntimeEntry,
             );
 
@@ -815,7 +818,7 @@ class WPHooksRuntimeRegistry
 
         if (did_action($triggerHook)) {
             $this->activateMatchingDeferredEntries(
-                static fn(DeferredHookEntryDTO $d): bool => $d->hook === $hook && $d->key->toString() === $hookKey->toString(),
+                $this->entriesIndexer->byHook[$hook] ?? [],
                 $this->activateRuntimeEntry,
             );
             return;
@@ -823,7 +826,7 @@ class WPHooksRuntimeRegistry
 
         $listener = function () use ($triggerHook, $hook, $hookKey): void {
             $activated = $this->activateMatchingDeferredEntries(
-                static fn(DeferredHookEntryDTO $d): bool => $d->hook === $hook && $d->key->toString() === $hookKey->toString(),
+                $this->entriesIndexer->byHook[$hook] ?? [],
                 $this->activateRuntimeEntry,
             );
 

@@ -10,6 +10,7 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionProperty;
 use TargetClass;
+use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
@@ -58,6 +59,7 @@ class WPHooksContainerRegistry
      * @param WPHookPlanProvider $planProvider Plan provider for condition/hook-name resolution.
      * @param DeferredHookManager $deferredHookManager Deferred hook manager.
      * @param HookTargetResolver $resolverTarget Resolves callable targets to class/method pairs.
+     * @param EntriesIndexer $entriesIndexer For fast lookup of handler indexes.
      */
     public function __construct(
         private readonly ContainerInterface $container,
@@ -65,6 +67,7 @@ class WPHooksContainerRegistry
         private WPHookPlanProvider $planProvider,
         private DeferredHookManager $deferredHookManager,
         private HookTargetResolver $resolverTarget,
+        private EntriesIndexer $entriesIndexer
     ) {}
 
     /**
@@ -80,6 +83,7 @@ class WPHooksContainerRegistry
         foreach ($this->handlers as $key => $data) {
             try {
                 $data->register();
+                $this->entriesIndexer->setIndexes($data);
             } catch (\Exception $e) {
                 Logger::error(
                     'WPHooksContainerRegistry',
@@ -389,15 +393,13 @@ class WPHooksContainerRegistry
      */
     public function unregisterByCallable(callable|string|array $target): void
     {
-        [$class, $method] = $this->resolverTarget->resolve($target);
-
-        foreach ($this->handlers as $key => $data) {
-            if (!$data->key->isForCallable($class, $method)) {
-                continue;
-            }
-            $data->unregister();
-            unset($this->handlers[$data->toUniqueKey()]);
+        $keyCallable = $this->entriesIndexer->getCallable($this->resolverTarget->resolve($target));
+        $entries = $this->entriesIndexer->byCallable[$keyCallable] ?? [];
+        foreach ($entries as $uniqueKey) {
+            $this->handlers[$uniqueKey]->unregister();
+            unset($this->handlers[$uniqueKey]);
         }
+        unset($this->entriesIndexer->byCallable[$keyCallable]);
     }
 
     /**
@@ -407,12 +409,12 @@ class WPHooksContainerRegistry
      */
     public function unregisterByHook(string $hook): void
     {
-        foreach ($this->handlers as $key => $data) {
-            if ($data->hook === $hook) {
-                $data->unregister();
-                unset($this->handlers[$data->toUniqueKey()]);
-            }
+        $entries = $this->entriesIndexer->byHook[$hook] ?? [];
+        foreach ($entries as $uniqueKey) {
+            $this->handlers[$uniqueKey]->unregister();
+            unset($this->handlers[$uniqueKey]);
         }
+        unset($this->entriesIndexer->byHook[$hook]);
     }
 
     /**
@@ -422,13 +424,12 @@ class WPHooksContainerRegistry
      */
     public function unregisterByClass(string $class): void
     {
-        foreach ($this->handlers as $key => $data) {
-            if (!$data->key->isForClass($class)) {
-                continue;
-            }
-            $data->unregister();
-            unset($this->handlers[$data->toUniqueKey()]);
+        $entries = $this->entriesIndexer->byClass[$class] ?? [];
+        foreach ($entries as $uniqueKey) {
+            $this->handlers[$uniqueKey]->unregister();
+            unset($this->handlers[$uniqueKey]);
         }
+        unset($this->entriesIndexer->byClass[$class]);
     }
 
     /**
@@ -442,13 +443,15 @@ class WPHooksContainerRegistry
      */
     public function unregisterByNamespace(string $namespace): void
     {
-        foreach ($this->handlers as $key => $data) {
-            if (!$data->key->isWithinNamespace($namespace)) {
+        $entries = $this->entriesIndexer->byNamespace[$namespace] ?? [];
+        foreach ($entries as $uniqueKey) {
+            if (!isset($this->handlers[$uniqueKey])) {
                 continue;
             }
-            $data->unregister();
-            unset($this->handlers[$data->toUniqueKey()]);
+            $this->handlers[$uniqueKey]->unregister();
+            unset($this->handlers[$uniqueKey]);
         }
+        unset($this->byNamespace[$namespace]);
     }
 
     /**
@@ -468,12 +471,20 @@ class WPHooksContainerRegistry
             return;
         }
 
-        foreach ($this->handlers as $key => $data) {
-            if (array_intersect($tags, $data->tags) === []) {
+        foreach ($tags as $tag) {
+            $entries = $this->entriesIndexer->byTag[$tag] ?? [];
+            if (empty($entries)) {
                 continue;
             }
-            $data->unregister();
-            unset($this->handlers[$data->toUniqueKey()]);
+
+            foreach ($entries as $key) {
+                if (!isset($this->handlers[$key])) {
+                    continue;
+                }
+                $this->handlers[$key]->unregister();
+                unset($this->handlers[$key]);
+            }
+            unset($this->entriesIndexer->byTag[$tag]);
         }
     }
 
@@ -490,13 +501,16 @@ class WPHooksContainerRegistry
     public function unregisterByHookPattern(string $pattern): void
     {
         HookPattern::assertValid($pattern);
-
-        foreach ($this->handlers as $key => $data) {
-            if (!HookPattern::matches($data->hook, $pattern)) {
-                continue;
+        $hooks = $this->entriesIndexer->byHook;
+        foreach ($hooks as $hook => $uniqueKeys) {
+            foreach ($uniqueKeys as $uniqueKey) {
+                if (!HookPattern::matches($hook, $pattern)) {
+                    continue;
+                }
+                $this->handlers[$uniqueKey]->unregister();
+                unset($this->handlers[$uniqueKey]);
             }
-            $data->unregister();
-            unset($this->handlers[$data->toUniqueKey()]);
+            unset($this->entriesIndexer->byHook[$hook]);
         }
     }
 
@@ -518,13 +532,17 @@ class WPHooksContainerRegistry
             return;
         }
         HookPattern::assertValidAll($patterns);
-
-        foreach ($this->handlers as $key => $data) {
-            if (!HookPattern::matchesAny($data->tags, $patterns)) {
-                continue;
+        $entries = $this->entriesIndexer->byTag;
+        foreach ($entries as $tag => $uniqueKeys) {
+            foreach ($uniqueKeys as $uniqueKey) {
+                $handler = $this->handlers[$uniqueKey] ?? null;
+                if ($handler && !HookPattern::matchesAny($handler->tags, $patterns)) {
+                    continue;
+                }
+                $this->handlers[$uniqueKey]->unregister();
+                unset($this->handlers[$uniqueKey]);
             }
-            $data->unregister();
-            unset($this->handlers[$data->toUniqueKey()]);
+            unset($this->entriesIndexer->byTag[$tag]);
         }
     }
     #endregion
@@ -541,9 +559,9 @@ class WPHooksContainerRegistry
             if (isset($this->handlers[$uniqueKey])) {
                 return false;
             }
-            $this->handlers[$uniqueKey] = ContainerRegistryHandlerEntry::fromDeferredEntry($data);
+            $entry = $this->handlers[$uniqueKey] = ContainerRegistryHandlerEntry::fromDeferredEntry($data);
 
-            $this->handlers[$uniqueKey]->register();
+            $entry->register();
 
             return true;
         };
@@ -772,11 +790,13 @@ class DeferredHookManager
      * @param WPHookPlanProvider  $planProvider Plan provider used for registerIf gates.
      * @param ContainerInterface $container    Container used by gate closures.
      * @param HookTargetResolver $resolverTarget 
+     * @param EntriesIndexer $entriesIndexer for fast lookup of matching entries
      */
     public function __construct(
         private WPHookPlanProvider $planProvider,
         private ContainerInterface $container,
         private HookTargetResolver $resolverTarget,
+        private EntriesIndexer $entriesIndexer
     ) {}
 
     /**
@@ -791,7 +811,7 @@ class DeferredHookManager
     public function activateDeferredByHook(string $hook, \Closure $activateEntry): void
     {
         $this->activateMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => $d->hook === $hook,
+            $this->entriesIndexer->byHook[$hook] ?? [],
             $activateEntry,
         );
     }
@@ -804,9 +824,8 @@ class DeferredHookManager
      */
     public function activateDeferredByClass(string $class, \Closure $activateEntry): void
     {
-
         $this->activateMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => $d->key->isForClass($class),
+            $this->entriesIndexer->byClass[$class] ?? [],
             $activateEntry,
         );
     }
@@ -823,9 +842,13 @@ class DeferredHookManager
      */
     public function activateDeferredByNamespace(string $namespace, \Closure $activateEntry): int
     {
-
+        $entries = $this->entriesIndexer->byNamespace[$namespace] ?? [];
+        $keys = [];
+        foreach ($entries as $key) {
+            $keys[] = $key;
+        }
         return $this->activateMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => $d->key->isWithinNamespace($namespace),
+            $keys,
             $activateEntry,
         );
     }
@@ -840,10 +863,10 @@ class DeferredHookManager
      */
     public function activateDeferredByCallable(callable|string|array $target, \Closure $activateEntry): void
     {
-        [$class, $method] = $this->resolverTarget->resolve($target);
+        $key = $this->entriesIndexer->getCallable($this->resolverTarget->resolve($target));
 
         $this->activateMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => $d->key->isForCallable($class, $method),
+            $this->entriesIndexer->byCallable[$key] ?? [],
             $activateEntry,
         );
     }
@@ -861,8 +884,23 @@ class DeferredHookManager
             return 0;
         }
 
+        $keys = [];
+
+        foreach ($tags as $tag) {
+            $entries = $this->entriesIndexer->byTag[$tag] ?? [];
+            foreach ($entries as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if (! isset($entry)) {
+                    continue;
+                }
+                if (\array_intersect($tags, $entry->tags) !== []) {
+                    $keys[] = $key;
+                }
+            }
+        }
+
         return $this->activateMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => array_intersect($tags, $d->tags) !== [],
+            $keys,
             $activateEntry,
         );
     }
@@ -881,9 +919,22 @@ class DeferredHookManager
     public function activateDeferredByHookPattern(string $pattern, \Closure $activateEntry): int
     {
         HookPattern::assertValid($pattern);
+        $hooks = $this->entriesIndexer->byHook;
+        $keys = [];
+        foreach ($hooks as $hook) {
+            foreach ($hook as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if ($entry === null) {
+                    continue;
+                }
+                if (HookPattern::matches($entry->hook, $pattern)) {
+                    $keys[] = $key;
+                }
+            }
+        }
 
         return $this->activateMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => HookPattern::matches($d->hook, $pattern),
+            $keys,
             $activateEntry,
         );
     }
@@ -905,9 +956,18 @@ class DeferredHookManager
             return 0;
         }
         HookPattern::assertValidAll($patterns);
+        $entries = $this->entriesIndexer->byTag;
+        $keys = [];
+        foreach ($entries as $key => $value) {
+            foreach ($value as $entry) {
+                if (HookPattern::matchesAny($this->deferredHandlers[$entry]->tags, $patterns)) {
+                    $keys[] = $entry;
+                }
+            }
+        }
 
         return $this->activateMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => HookPattern::matchesAny($d->tags, $patterns),
+            $keys,
             $activateEntry,
         );
     }
@@ -952,11 +1012,15 @@ class DeferredHookManager
      */
     public function unregisterDeferredByCallable(callable|string|array $target): void
     {
-        [$class, $method] = $this->resolverTarget->resolve($target);
-
-        $this->unregisterMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => $d->key->isForCallable($class, $method),
-        );
+        $keyCallable = $this->entriesIndexer->getCallable($this->resolverTarget->resolve($target));
+        $entries = $this->entriesIndexer->byCallable[$keyCallable] ?? [];
+        foreach ($entries as $key) {
+            if (!isset($this->deferredHandlers[$key])) {
+                continue;
+            }
+            unset($this->deferredHandlers[$key]);
+        }
+        unset($this->byCallable[$keyCallable]);
     }
 
     /**
@@ -966,11 +1030,14 @@ class DeferredHookManager
      */
     public function unregisterDeferredByHook(string $hook): void
     {
-        foreach ($this->deferredHandlers as $key => $data) {
-            if ($data->hook === $hook) {
-                unset($this->deferredHandlers[$key]);
+        $entries = $this->entriesIndexer->byHook[$hook] ?? [];
+        foreach ($entries as $key) {
+            if (!isset($this->deferredHandlers[$key])) {
+                continue;
             }
+            unset($this->deferredHandlers[$key]);
         }
+        unset($this->entriesIndexer->byHook[$hook]);
     }
 
     /**
@@ -980,10 +1047,14 @@ class DeferredHookManager
      */
     public function unregisterDeferredByClass(string $class): void
     {
-
-        $this->unregisterMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => $d->key->isForClass($class),
-        );
+        $entries = $this->entriesIndexer->byClass[$class] ?? [];
+        foreach ($entries as $key) {
+            if (!isset($this->deferredHandlers[$key])) {
+                continue;
+            }
+            unset($this->deferredHandlers[$key]);
+        }
+        unset($this->entriesIndexer->byClass[$class]);
     }
 
     /**
@@ -997,10 +1068,15 @@ class DeferredHookManager
      */
     public function unregisterDeferredByNamespace(string $namespace): void
     {
-
-        $this->unregisterMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => $d->key->isWithinNamespace($namespace),
-        );
+        $entries = $this->entriesIndexer->byNamespace[$namespace] ?? [];
+        foreach ($entries as $key) {
+            $handler = $this->deferredHandlers[$key] ?? null;
+            if ($handler && !$handler->key->isWithinNamespace($namespace)) {
+                continue;
+            }
+            unset($this->deferredHandlers[$key]);
+        }
+        unset($this->entriesIndexer->byNamespace[$namespace]);
     }
 
     /**
@@ -1015,10 +1091,20 @@ class DeferredHookManager
         if ($tags === []) {
             return;
         }
+        foreach ($tags as $tag) {
+            $entries = $this->entriesIndexer->byTag[$tag] ?? [];
+            if (empty($entries)) {
+                continue;
+            }
 
-        $this->unregisterMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => array_intersect($tags, $d->tags) !== [],
-        );
+            foreach ($entries as $key) {
+                if (!isset($this->deferredHandlers[$key])) {
+                    continue;
+                }
+                unset($this->deferredHandlers[$key]);
+            }
+            unset($this->entriesIndexer->byTag[$tag]);
+        }
     }
 
     /**
@@ -1031,10 +1117,16 @@ class DeferredHookManager
     public function unregisterDeferredByHookPattern(string $pattern): void
     {
         HookPattern::assertValid($pattern);
-
-        $this->unregisterMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => HookPattern::matches($d->hook, $pattern),
-        );
+        $hooks = $this->entriesIndexer->byHook ?? [];
+        foreach ($hooks as $hook) {
+            foreach ($hook as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if (!($entry instanceof DeferredHookEntryDTO)) continue;
+                if (HookPattern::matches($entry->hook, $pattern)) {
+                    unset($this->deferredHandlers[$key]);
+                }
+            }
+        }
     }
 
     /**
@@ -1051,10 +1143,16 @@ class DeferredHookManager
             return;
         }
         HookPattern::assertValidAll($patterns);
-
-        $this->unregisterMatchingDeferredEntries(
-            static fn(DeferredHookEntryDTO $d): bool => HookPattern::matchesAny($d->tags, $patterns),
-        );
+        $tags = $this->entriesIndexer->byTag ?? [];
+        foreach ($tags as $tag) {
+            foreach ($tag as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if (!($entry instanceof DeferredHookEntryDTO)) continue;
+                if (HookPattern::matchesAny($entry->tags, $patterns)) {
+                    unset($this->deferredHandlers[$key]);
+                }
+            }
+        }
     }
 
     /**

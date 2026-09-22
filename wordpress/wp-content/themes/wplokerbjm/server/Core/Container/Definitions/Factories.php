@@ -16,6 +16,7 @@ use WPLokerBJM\Core\Container\Support\InstanceDiscovery\PlanCache;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\PlanCompiler;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\ScopeAccessFactory;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\DependencyInjectorHookActions;
 use WPLokerBJM\Core\HooksRuntimeRegistryActions;
@@ -55,7 +56,16 @@ class Core implements DefinitionProviderInterface
         $scanner = new AutowireScanner($namespace);
         $autoWiredDefinitions = $scanner->scanForAutowirableClasses();
 
+        $indexerContainerRegistry = EntriesIndexer::class . 'ContainerRegistry';
+        $indexerRuntimeRegistry = EntriesIndexer::class . 'RuntimeRegistry';
+        $entriesIndexer = [
+            $indexerContainerRegistry => \DI\autowire(EntriesIndexer::class),
+            $indexerRuntimeRegistry => \DI\autowire(EntriesIndexer::class),
+        ];
+
+
         $core = [
+            ...$entriesIndexer,
             WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class),
             HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class))->lazy(),
@@ -65,14 +75,15 @@ class Core implements DefinitionProviderInterface
             ),
             WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class)->constructor(
                 \DI\get(HookRuntimeResolver::class),
-                \DI\get(WPHooksRuntimeCache::class),
+                \DI\get($indexerRuntimeRegistry),
+                \DI\create(WPHooksRuntimeCache::class),
                 \DI\get(RuntimeWPHookProvider::class),
             ),
-
             DeferredHookManager::class => \DI\autowire(DeferredHookManager::class)->constructor(
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(ContainerInterface::class),
                 \DI\get(HookTargetResolver::class),
+                \DI\get($indexerContainerRegistry),
             ),
             WPHooksContainerRegistry::class => \DI\autowire(WPHooksContainerRegistry::class)->constructor(
                 \DI\get(ContainerInterface::class),
@@ -80,6 +91,7 @@ class Core implements DefinitionProviderInterface
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(DeferredHookManager::class),
                 \DI\get(HookTargetResolver::class),
+                \DI\get($indexerContainerRegistry),
             ),
         ];
 

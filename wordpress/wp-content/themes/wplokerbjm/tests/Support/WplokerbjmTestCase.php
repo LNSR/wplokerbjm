@@ -7,6 +7,7 @@ namespace WPLokerBJM\Tests\Support;
 use PHPUnit\Framework\TestCase;
 use \DI\Container;
 use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookTargetResolver, WPHooksContainerRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 
@@ -223,13 +224,15 @@ abstract class WplokerbjmTestCase extends TestCase
         $container ??= $this->container();
         $planProvider = new WPHookPlanProvider();
         $resolver = new HookTargetResolver();
+        $entriesIndexer = new EntriesIndexer();
 
         return new WPHooksContainerRegistry(
             $container,
             $registrations,
             $planProvider,
-            new DeferredHookManager($planProvider, $container, $resolver),
+            new DeferredHookManager($planProvider, $container, $resolver, $entriesIndexer),
             $resolver,
+            $entriesIndexer
         );
     }
 }
