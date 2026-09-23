@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Models\Schema;
 use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Core\Container\Attributes\Filter;
-use WPLokerBJM\Shared\Utilities\PluginList;
+use WPLokerBJM\Core\Plugins\PluginList;
 
 /**
  * Custom Fields Schema

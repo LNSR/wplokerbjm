@@ -286,7 +286,7 @@ final class GraphQLRegistration
             'description' => 'Theme data object',
             'fields' => [
                 'logo' => ['type' => self::TYPE_LOGO],
-                'wpRestNonce' => ['type' => self::TYPE_STRING],
+                'wpGraphqlNonce' => ['type' => self::TYPE_STRING],
                 'siteIconTags' => ['type' => self::TYPE_STRING],
             ],
         ]);

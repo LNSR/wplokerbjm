@@ -4,20 +4,20 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Tests;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\HookTargetResolver;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
- * Covers the opt-in anonymous-hook contract: AnonClassHookMetadata
+ * Covers the opt-in anonymous-hook contract: ModuleClassHookMetadata
  * captures parent class + property at construction so HookTargetResolver can
  * resolve the hook target without walking the call stack.
  */
-class AnonClassHookMetadataTest extends WplokerbjmTestCase
+class ModuleClassHookMetadataTest extends WplokerbjmTestCase
 {
     public function testConstructorCapturesParentClassAndProperty(): void
     {
-        $hook = new class ('App\\ParentService', 'onFilter') extends AnonClassHookMetadata {
+        $hook = new class ('App\\ParentService', 'onFilter') extends ModuleClassHookMetadata {
             public function __invoke(): bool
             {
                 return false;
@@ -32,7 +32,7 @@ class AnonClassHookMetadataTest extends WplokerbjmTestCase
     {
         $parent = new \stdClass();
 
-        $hook = new class ($parent, 'onFilter') extends AnonClassHookMetadata {
+        $hook = new class ($parent, 'onFilter') extends ModuleClassHookMetadata {
             public function __invoke(): bool
             {
                 return false;
@@ -48,7 +48,7 @@ class AnonClassHookMetadataTest extends WplokerbjmTestCase
         $resolver = new HookTargetResolver();
         $parent = new \stdClass();
 
-        $hook = new class ($parent, 'onFilter') extends AnonClassHookMetadata {
+        $hook = new class ($parent, 'onFilter') extends ModuleClassHookMetadata {
             public function __invoke(): bool
             {
                 return false;
@@ -62,7 +62,7 @@ class AnonClassHookMetadataTest extends WplokerbjmTestCase
     {
         $resolver = new HookTargetResolver();
 
-        $hook = new class ('App\\ParentService', 'onFilter') extends AnonClassHookMetadata {
+        $hook = new class ('App\\ParentService', 'onFilter') extends ModuleClassHookMetadata {
             public function __invoke(): bool
             {
                 return false;
@@ -78,7 +78,7 @@ class AnonClassHookMetadataTest extends WplokerbjmTestCase
     {
         $resolver = new HookTargetResolver();
 
-        $hook = new class ('App\\ParentService', 'onFilter') extends AnonClassHookMetadata {
+        $hook = new class ('App\\ParentService', 'onFilter') extends ModuleClassHookMetadata {
             public function __invoke(): bool
             {
                 return false;

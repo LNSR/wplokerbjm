@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace WPLokerBJM\Configs\Credential;
 
 use RedisCredType;
@@ -20,11 +22,11 @@ class CredentialConfig
     public static function RedisCredential(?array $params = null): RedisCred
     {
         $params = [
-            'host' => (string) ($params['host'] ?? (defined('WP_REDIS_HOST') ? (string) WP_REDIS_HOST : null)),
-            'port' => (int) ($params['host'] ?? (defined('WP_REDIS_HOST') ? (int) WP_REDIS_HOST : null)),
-            'password' => (string) ($params['password'] ?? (defined('WP_REDIS_PASSWORD') ? (string) WP_REDIS_PASSWORD : null)),
-            'database' => (int) ($params['database'] ?? (defined('WP_REDIS_DATABASE') ? (int) WP_REDIS_DATABASE : null)),
-            'sock' => (string) ($params['sock'] ?? (defined('WP_REDIS_SOCK') ? (string) WP_REDIS_SOCK : null)),
+            'host' => $params['host'] ?? (defined('WP_REDIS_HOST') ? WP_REDIS_HOST : null),
+            'port' => $params['port'] ?? (defined('WP_REDIS_PORT') ? (int) WP_REDIS_PORT : null),
+            'password' => $params['password'] ?? (defined('WP_REDIS_PASSWORD') ? WP_REDIS_PASSWORD : null),
+            'database' => $params['database'] ?? (defined('WP_REDIS_DATABASE') ? (int) WP_REDIS_DATABASE : null),
+            'sock' => $params['sock'] ?? (defined('WP_REDIS_SOCK') ? WP_REDIS_SOCK : null),
         ];
         return RedisCred::fromArray($params);
     }
@@ -37,11 +39,11 @@ class CredentialConfig
     public static function R2CFCredential(?array $params = null): R2CFCred
     {
         $params = [
-            'key' => (string) ($params['key'] ?? (defined('ADVMO_CLOUDFLARE_R2_KEY') ? ADVMO_CLOUDFLARE_R2_KEY : null)),
-            'secret' => (string) ($params['secret'] ?? (defined('ADVMO_CLOUDFLARE_R2_SECRET') ? ADVMO_CLOUDFLARE_R2_SECRET : null)),
-            'bucket' => (string) ($params['bucket'] ?? (defined('ADVMO_CLOUDFLARE_R2_BUCKET') ? ADVMO_CLOUDFLARE_R2_BUCKET : null)),
-            'domain' => (string) ($params['domain'] ?? (defined('ADVMO_CLOUDFLARE_R2_DOMAIN') ? ADVMO_CLOUDFLARE_R2_DOMAIN : null)),
-            'endpoint' => (string) ($params['endpoint'] ?? (defined('ADVMO_CLOUDFLARE_R2_ENDPOINT') ? ADVMO_CLOUDFLARE_R2_ENDPOINT : null)),
+            'key' => $params['key'] ?? (defined('ADVMO_CLOUDFLARE_R2_KEY') ? ADVMO_CLOUDFLARE_R2_KEY : null),
+            'secret' => $params['secret'] ?? (defined('ADVMO_CLOUDFLARE_R2_SECRET') ? ADVMO_CLOUDFLARE_R2_SECRET : null),
+            'bucket' => $params['bucket'] ?? (defined('ADVMO_CLOUDFLARE_R2_BUCKET') ? ADVMO_CLOUDFLARE_R2_BUCKET : null),
+            'domain' => $params['domain'] ?? (defined('ADVMO_CLOUDFLARE_R2_DOMAIN') ? ADVMO_CLOUDFLARE_R2_DOMAIN : null),
+            'endpoint' => $params['endpoint'] ?? (defined('ADVMO_CLOUDFLARE_R2_ENDPOINT') ? ADVMO_CLOUDFLARE_R2_ENDPOINT : null),
         ];
 
         return R2CFCred::fromArray($params);
@@ -58,8 +60,8 @@ class CredentialConfig
     public static function CloudflareCredential(?array $params = null): CloudflareCred
     {
         $params = [
-            'token' => (string) ($params['token'] ?? (defined('WORDPRESS_API_TOKEN_DOMAIN') ? WORDPRESS_API_TOKEN_DOMAIN : null)),
-            'zone' => (string) ($params['zone'] ?? (defined('CLOUDFLARE_ZONE_ID') ? CLOUDFLARE_ZONE_ID : null)),
+            'token' => $params['token'] ?? (defined('WORDPRESS_API_TOKEN_DOMAIN') ? WORDPRESS_API_TOKEN_DOMAIN : null),
+            'zone' => $params['zone'] ?? (defined('CLOUDFLARE_ZONE_ID') ? CLOUDFLARE_ZONE_ID : null),
         ];
 
         return CloudflareCred::fromArray($params);

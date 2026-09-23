@@ -41,6 +41,7 @@
     "php.stubs": ["*"],
     "php.workspace.includePath": "wordpress/",
     "php.problems.scope": "opened",
+    "php.validate.run": "onType",
     "php.inlayHints.parameters.enabled": true,
     "php.suggest.basic": false, // Handled by Intelephense
     "php.files.exclude": {
@@ -121,6 +122,7 @@
     "python.analysis.typeEvaluation.strictDictionaryInference": true,
     "python.analysis.typeEvaluation.strictListInference": true,
     "python.analysis.typeEvaluation.strictSetInference": true,
+    "php.validate.enable": true,
   },
   "extensions": {
     "recommendations": [

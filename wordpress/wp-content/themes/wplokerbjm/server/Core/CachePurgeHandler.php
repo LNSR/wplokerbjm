@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Core;
 
 use WPLokerBJM\Adapter\RedisAdapter;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Shared\Log\Logger;
@@ -41,8 +41,8 @@ class CacheInvalidationHooks
     #[Action('trashed_post', 10, 1)]
     #[Action('delete_attachment', 10, 1)]
     #[Action('transition_post_status', 10, 3)]
-    private AnonClassHookMetadata $invalidatePostCache {
-        get => $this->invalidatePostCache ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
+    private ModuleClassHookMetadata $invalidatePostCache {
+        get => $this->invalidatePostCache ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
 
             /** @var array<int, bool> */
             private array $snapshotPostID = [];

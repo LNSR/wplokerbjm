@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests;
 use DI\ContainerBuilder;
 use DI\Container;
 use WPLokerBJM\Core\Container\Init;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry, Hook, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceRegistry, Hook, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyHookHandler;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;

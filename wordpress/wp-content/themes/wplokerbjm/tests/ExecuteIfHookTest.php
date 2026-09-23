@@ -9,7 +9,7 @@ use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
@@ -29,7 +29,7 @@ use WPLokerBJM\Tests\Support\Fixtures\RuntimeExecuteIfService;
  *  - A condition that throws is caught, logged, and falls back to the
  *    standard filter passthrough / action no-op contract.
  *  - A non-bool condition result is treated as a failure (logged + skip).
- *  - WPHooksRuntimeRegistry skips condition-gated hooks with a warning,
+ *  - WPHooksInstanceRegistry skips condition-gated hooks with a warning,
  *    since runtime-registered instances have no container access.
  */
 class ExecuteIfHookTest extends WplokerbjmTestCase
@@ -178,7 +178,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
 
     public function testRuntimeRegistryRegistersExecuteIfGatedHooksButGatesAtFireTime(): void
     {
-        $registry = $this->container->make(WPHooksRuntimeRegistry::class, [
+        $registry = $this->container->make(WPHooksInstanceRegistry::class, [
             'provider' => null
         ]);
         $registry->registerHooksOn(new RuntimeExecuteIfService());
@@ -285,8 +285,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $plan = (new WPHookPlanProvider())->buildCallablePlan($attr->executeIf);
 
         $this->assertTrue($plan['isStatic']);
-        $this->assertInstanceOf(\Closure::class, $plan['scopeClass']);
-        $this->assertSame(ExecuteIfHookTest::class, ($plan['scopeClass'])($this));
         $this->assertCount(1, $plan['params']);
         $this->assertSame('c', $plan['params'][0]['name']);
         $this->assertSame(ContainerInterface::class, $plan['params'][0]['type']);
@@ -307,7 +305,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $empty = (new WPHookPlanProvider())->buildCallablePlan(null);
         $this->assertSame([], $empty['params']);
         $this->assertTrue($empty['isStatic']);
-        $this->assertNull($empty['scopeClass']);
     }
 
     public function testExecuteIfPlanDrivenResolutionFiresAndSkipsHook(): void
@@ -354,7 +351,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 executeIf: static fn (): bool => true,
                 executeIfParams: [
                     'isStatic' => true,
-                    'scopeClass' => null,
                     'params' => [
                         ['name' => 'missing', 'type' => '\App\MissingService', 'hasDefault' => false, 'default' => null],
                     ],

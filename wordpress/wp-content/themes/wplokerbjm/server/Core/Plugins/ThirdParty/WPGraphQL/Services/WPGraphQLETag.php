@@ -2,6 +2,7 @@
 namespace WPLokerBJM\Core\Plugins\ThirdParty\WPGraphQL\Services;
 
 use GraphQL\Executor\ExecutionResult;
+use WPGraphQL\Router;
 use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
 use WPLokerBJM\Shared\Cache\{CacheKey, Cache};
 
@@ -27,9 +28,9 @@ class WPGraphQLETag
 
     /**
      * Intercept early in the request cycle to return a 304 if the incoming If-None-Match matches our cached ETag.
-     * Uses Router::get_raw_data() — the Router hasn't run yet at this point, so we parse the raw body ourselves.
+     * Uses @see Router::get_raw_data() — the Router hasn't run yet at this point, so we parse the raw body ourselves.
      */
-    public function checkEarly304(): void
+    public function checkEarly304AndExit(): void
     {
         $ifNoneMatch = trim(stripslashes($_SERVER['HTTP_IF_NONE_MATCH'] ?? ''));
         if ($ifNoneMatch === '') {

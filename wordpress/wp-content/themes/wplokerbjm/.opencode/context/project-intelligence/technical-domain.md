@@ -177,7 +177,7 @@ public function registerTypes(): void
 **Key points**:
 
 - Custom `#[Inject]` (`server/Core/Container/Attributes/AttributesDI.php`): targets property|method|parameter; params `name` (string|array|null) + `lazy` (bool); project-owned, invisible to PHP-DI's scanner
-- `AsChildClass` base (`Support/InstanceDiscovery/Abstract/AsChildClass.php`): readonly `parentClass` (string|object) + `identifier`; `getParentClass()` normalizes object parents; `AnonClassHookMetadata` extends it
+- `AsChildClass` base (`Support/InstanceDiscovery/Abstract/AsChildClass.php`): readonly `parentClass` (string|object) + `identifier`; `getParentClass()` normalizes object parents; `ModuleClassHookMetadata` extends it
 - `injectOn(AsChildClass $target)`: validates anonymous target, resolves plan from compiled cache, assigns via scope-bound setter (private/protected child properties writable)
 - Array-callable entries `[Class::class, 'member']` support methods AND class field properties (`kind: method|property`) — closures/anon classes stored in class properties are injectable
 - `lazy: true` (method callables only): injects a first-class callable closure; target property must be `\Closure`-typed
@@ -189,7 +189,7 @@ public function registerTypes(): void
 ```php
 $injector->injectOn($this); // anonymous child constructor
 
-#[Inject] private ?WPHooksRuntimeRegistry $runtimeRegistry; // typed entry via container
+#[Inject] private ?WPHooksInstanceRegistry $runtimeRegistry; // typed entry via container
 
 #[Inject([WPGraphQL::class, 'allowedOrigins'], lazy: true)]
 private \Closure $allowedOrigins; // lazy first-class callable

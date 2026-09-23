@@ -13,19 +13,19 @@ import type { WPLokerBJMThemedData } from "@/types";
 abstract class URQLBaseManager {
   private readonly clients = new Map<string, Client>();
 
-  #nonce: WPLokerBJMThemedData["wpRestNonce"];
+  #nonce: WPLokerBJMThemedData["wpGraphqlNonce"];
   #fetchFn?: typeof fetch;
 
   public setFetchFn(fetchFn: typeof fetch): void {
     this.#fetchFn = fetchFn;
   }
 
-  public setNonce(nonce: WPLokerBJMThemedData["wpRestNonce"]): void {
+  public setNonce(nonce: WPLokerBJMThemedData["wpGraphqlNonce"]): void {
     if (this.#nonce === nonce) return;
     this.#nonce = nonce;
   }
 
-  public get getNonce(): WPLokerBJMThemedData["wpRestNonce"] {
+  public get getNonce(): WPLokerBJMThemedData["wpGraphqlNonce"] {
     return this.#nonce;
   }
 

@@ -117,12 +117,12 @@ class SharedUtils
     }
 
     /**
-     * @return array{name: string, value: string}
+     * @return array{name: ?string, value: ?string}
      */
     public static function getWordpressAuthCookie(): array
     {
-        $authCookieName = '';
-        $authCookieValue = '';
+        $authCookieName = null;
+        $authCookieValue = null;
         if (!empty($_COOKIE)) {
             foreach ($_COOKIE as $name => $val) {
                 if (
@@ -136,8 +136,8 @@ class SharedUtils
             }
         }
         return [
-            'name' => (string) $authCookieName,
-            'value' => (string) $authCookieValue
+            'name' => $authCookieName,
+            'value' => $authCookieValue
         ];
     }
 

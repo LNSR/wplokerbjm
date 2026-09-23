@@ -7,7 +7,7 @@ use ReflectionClass;
 use ReflectionProperty;
 use ReflectionMethod;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksScanner, WPHooksRuntimeRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksScanner, WPHooksInstanceRegistry};
 
 /**
  * Shared method-scanning logic for hook attribute discovery.
@@ -17,7 +17,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\{WPHooksScanner, WPHooksRuntimeReg
  *
  * Used by:
  * - @see WPHooksScanner (compiled to HookRegistration arrays)
- * - @see WPHooksRuntimeRegistry (immediate add_action / add_filter)
+ * - @see WPHooksInstanceRegistry (immediate add_action / add_filter)
  */
 trait HookScannerTrait
 {

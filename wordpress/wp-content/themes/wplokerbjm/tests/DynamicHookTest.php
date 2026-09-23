@@ -9,7 +9,7 @@ use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\Fixtures\DynamicHookService;
 use WPLokerBJM\Tests\Support\Fixtures\RuntimeDynamicService;
@@ -170,7 +170,7 @@ class DynamicHookTest extends WplokerbjmTestCase
 
     public function testRuntimeRegistryRegistersClosureHooks(): void
     {
-        $runtimeRegistry = $this->container->make(WPHooksRuntimeRegistry::class, [
+        $runtimeRegistry = $this->container->make(WPHooksInstanceRegistry::class, [
             'provider' => null
         ]);
 

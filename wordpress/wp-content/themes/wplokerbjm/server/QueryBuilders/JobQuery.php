@@ -39,7 +39,7 @@ class JobQuery
 	 * 
 	 * @var BaseQuery
 	 */
-	const array getBaseArgs = [
+	public const array getBaseArgs = [
 		'post_type' => PostTypes::POST_TYPE_LOWONGAN,
 		'post_status' => 'publish',
 	];

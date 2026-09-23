@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HookProviderTrait};
-use WPLokerBJM\Shared\Utilities\DTO\AbstractDTO;
+use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, RuntimeCallableHookHandler, RuntimeInstanceHookHandler, RuntimeInstancePropertyHookHandler};
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksRuntimeRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryHandlerEntry, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 
 /**
  * Immutable structural shared structure keys.
@@ -27,7 +27,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry
  * }
  * @extends parent<HookKeyShape>
  */
-final readonly class HookKey extends AbstractDTO
+final readonly class HookKey extends AbstractDataObject
 {
     /**
      * @param HookKeyShape['class'] $class
@@ -122,7 +122,7 @@ final readonly class HookKey extends AbstractDTO
  * }
  * @extends parent<HookType>
  */
-final readonly class HookRegistration extends AbstractDTO
+final readonly class HookRegistration extends AbstractDataObject
 {
     /**
      * @param HookType['class'] $class
@@ -171,87 +171,6 @@ final readonly class HookRegistration extends AbstractDTO
         public bool $once = false,
     ) {}
 }
-/**
- * @phpstan-import-type HookType from HookRegistration
- * @phpstan-import-type CallablePlan from HookProviderTrait
- * @phpstan-type HandlerEntry array{
- *  hook: string,
- *  key: HookKey,
- *  handler: ContainerLazyHookHandler|ContainerLazyPropertyHookHandler,
- *  type: HookType['type'],
- *  priority: HookType['priority'],
- *  acceptedArgs: HookType['acceptedArgs'],
- *  tags: HookType['tags'],
- *  registerIf: HookType['registerIf'],
- *  registerIfParams: HookType['registerIfParams'],
- *  executeIf: HookType['executeIf'],
- *  executeIfParams: HookType['executeIfParams'],
- *  once: HookType['once']
- * }
- * @extends parent<HandlerEntry>
- */
-final readonly class ContainerRegistryHandlerEntry extends AbstractDTO
-{
-    use HandlerEntryTrait;
-
-    /**
-     * @param HandlerEntry['hook'] $hook
-     * @param HandlerEntry['key'] $key
-     * @param HandlerEntry['handler'] $handler
-     * @param HandlerEntry['type'] $type
-     * @param HandlerEntry['priority'] $priority
-     * @param HandlerEntry['acceptedArgs'] $acceptedArgs
-     * @param HandlerEntry['tags'] $tags
-     * @param HandlerEntry['registerIf'] $registerIf
-     * @param HandlerEntry['registerIfParams'] $registerIfParams
-     * @param HandlerEntry['executeIf'] $executeIf
-     * @param HandlerEntry['executeIfParams'] $executeIfParams
-     * @param HandlerEntry['once'] $once
-     */
-    public function __construct(
-        public string $hook,
-        public HookKey $key,
-        public ContainerLazyHookHandler|ContainerLazyPropertyHookHandler $handler,
-        public string $type,
-        public int $priority,
-        public int $acceptedArgs,
-        public array $tags,
-        public ?\Closure $registerIf,
-        public array $registerIfParams,
-        public ?\Closure $executeIf,
-        public array $executeIfParams,
-        public bool $once,
-    ) {}
-    public function __toString(): string
-    {
-        return $this->toUniqueKey();
-    }
-    public static function fromDeferredEntry(DeferredHookEntryDTO $deferredInstance): self
-    {
-        return new self(
-            hook: $deferredInstance->hook,
-            key: $deferredInstance->key,
-            handler: $deferredInstance->handler,
-            type: $deferredInstance->type,
-            priority: $deferredInstance->priority,
-            acceptedArgs: $deferredInstance->acceptedArgs,
-            tags: $deferredInstance->tags,
-            registerIf: $deferredInstance->registerIf,
-            registerIfParams: $deferredInstance->registerIfParams,
-            executeIf: $deferredInstance->executeIf,
-            executeIfParams: $deferredInstance->executeIfParams,
-            once: $deferredInstance->once,
-        );
-    }
-    public function toDeferredEntryDTO(): DeferredHookEntryDTO
-    {
-        return DeferredHookEntryDTO::fromContainerRegistryHandlerEntry($this);
-    }
-    public function toUniqueKey(): string
-    {
-        return $this->hook . ':' . $this->key->toString();
-    }
-}
 #endregion
 
 #region Runtime Registry Metadata DTOs
@@ -262,14 +181,14 @@ final readonly class ContainerRegistryHandlerEntry extends AbstractDTO
 /**
  * Immutable metadata for a single runtime-registered hook site.
  *
- * Produced by the WPHooksRuntimeRegistry scanner, cached per
+ * Produced by the WPHooksInstanceRegistry scanner, cached per
  * (parentClass, parentProperty) site in the file-backed WPHooksRuntimeCache,
  * and re-hydrated into live handlers on subsequent requests. Only scan-derived
  * metadata lives here — per-instance state (owner instance, WeakReference,
  * remove callbacks) is intentionally NOT part of the DTO.
  * @phpstan-import-type HookType from HookRegistration
  * @phpstan-import-type CallablePlan from HookProviderTrait
- * @phpstan-type RuntimeHookMetadataData array{
+ * @phpstan-type InstanceHookMetadataData array{
  *  hook: string,
  *  type: HookType['type'],
  *  priority: HookType['priority'],
@@ -286,26 +205,26 @@ final readonly class ContainerRegistryHandlerEntry extends AbstractDTO
  *  targetName: HookType['method'],
  *  visibility: HookType['visibility'],
  * }
- * @extends parent<RuntimeHookMetadataData>
+ * @extends parent<InstanceHookMetadataData>
  */
-readonly class RuntimeHookMetadata extends AbstractDTO
+readonly class InstanceHookMetadata extends AbstractDataObject
 {
     /**
-     * @param RuntimeHookMetadataData['hook'] $hook
-     * @param RuntimeHookMetadataData['type'] $type
-     * @param RuntimeHookMetadataData['priority'] $priority
-     * @param RuntimeHookMetadataData['acceptedArgs'] $acceptedArgs
-     * @param RuntimeHookMetadataData['once'] $once
-     * @param RuntimeHookMetadataData['executeIf'] $executeIf
-     * @param RuntimeHookMetadataData['executeIfParams'] $executeIfParams
-     * @param RuntimeHookMetadataData['registerIf'] $registerIf
-     * @param RuntimeHookMetadataData['registerIfParams'] $registerIfParams
-     * @param RuntimeHookMetadataData['deferRegisterUntilHook'] $deferRegisterUntilHook
-     * @param RuntimeHookMetadataData['deferRegisterUntilHookParams'] $deferRegisterUntilHookParams
-     * @param RuntimeHookMetadataData['hookArgNames'] $hookArgNames
-     * @param RuntimeHookMetadataData['target'] $target
-     * @param RuntimeHookMetadataData['targetName'] $targetName
-     * @param RuntimeHookMetadataData['visibility'] $visibility
+     * @param InstanceHookMetadataData['hook'] $hook
+     * @param InstanceHookMetadataData['type'] $type
+     * @param InstanceHookMetadataData['priority'] $priority
+     * @param InstanceHookMetadataData['acceptedArgs'] $acceptedArgs
+     * @param InstanceHookMetadataData['once'] $once
+     * @param InstanceHookMetadataData['executeIf'] $executeIf
+     * @param InstanceHookMetadataData['executeIfParams'] $executeIfParams
+     * @param InstanceHookMetadataData['registerIf'] $registerIf
+     * @param InstanceHookMetadataData['registerIfParams'] $registerIfParams
+     * @param InstanceHookMetadataData['deferRegisterUntilHook'] $deferRegisterUntilHook
+     * @param InstanceHookMetadataData['deferRegisterUntilHookParams'] $deferRegisterUntilHookParams
+     * @param InstanceHookMetadataData['hookArgNames'] $hookArgNames
+     * @param InstanceHookMetadataData['target'] $target
+     * @param InstanceHookMetadataData['targetName'] $targetName
+     * @param InstanceHookMetadataData['visibility'] $visibility
      */
     public function __construct(
         public string $hook,
@@ -323,42 +242,6 @@ readonly class RuntimeHookMetadata extends AbstractDTO
         public string $target = 'method',
         public string $targetName = '',
         public string $visibility = 'public',
-    ) {}
-}
-/**
- * @phpstan-import-type RuntimeHookMetadataData from RuntimeHookMetadata
- * @phpstan-import-type HookType from HookRegistration
- * @phpstan-type RuntimeHandlerEntry array{
- *     handler: RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler|RuntimeCallableHookHandler,
- *     hook: RuntimeHookMetadataData['hook'],
- *     priority: RuntimeHookMetadataData['priority'],
- *     type: RuntimeHookMetadataData['type'],
- *     acceptedArgs: RuntimeHookMetadataData['acceptedArgs'],
- *     owner: WeakReference<object>,
- *     callback?: callable
- * }
- * @extends parent<RuntimeHandlerEntry>
- */
-final readonly class RuntimeRegistryHandlerEntry extends AbstractDTO
-{
-    use HandlerEntryTrait;
-    /**
-     * @param RuntimeHandlerEntry['handler'] $handler
-     * @param RuntimeHandlerEntry['hook'] $hook
-     * @param RuntimeHandlerEntry['priority'] $priority
-     * @param RuntimeHandlerEntry['type'] $type
-     * @param RuntimeHandlerEntry['acceptedArgs'] $acceptedArgs
-     * @param RuntimeHandlerEntry['owner'] $owner
-     * @param RuntimeHandlerEntry['callback'] $callback if using manual registerAction() or registerFilter() it will hold the callback, otherwise it will be null.
-     */
-    public function __construct(
-        public RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler|RuntimeCallableHookHandler $handler,
-        public string $hook,
-        public int $priority,
-        public string $type,
-        public int $acceptedArgs,
-        public ?WeakReference $owner,
-        public mixed $callback = null,
     ) {}
 }
 #endregion
@@ -387,7 +270,7 @@ final readonly class RuntimeRegistryHandlerEntry extends AbstractDTO
  * }>>
  * @extends parent<DeferredHookEntry>
  */
-final readonly class DeferredHookEntryDTO extends AbstractDTO
+final readonly class DeferredHookEntryDTO extends AbstractDataObject
 {
     /**
      * @param DeferredHookEntry['hook'] $hook
@@ -402,7 +285,7 @@ final readonly class DeferredHookEntryDTO extends AbstractDTO
      * @param DeferredHookEntry['executeIf'] $executeIf
      * @param DeferredHookEntry['executeIfParams'] $executeIfParams
      * @param DeferredHookEntry['once'] $once
-     * @param DeferredHookEntry['instance'] $instance Exclusive for @see WPHooksRuntimeRegistry
+     * @param DeferredHookEntry['instance'] $instance Exclusive for @see WPHooksInstanceRegistry
      */
     public function __construct(
         public string $hook,

@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Shared\Utilities\DTO;
+namespace WPLokerBJM\Shared\Utilities\DataObject;
 
 /**
  * @template TShape
  * @suppress PHP0441
  */
-abstract readonly class AbstractDTO
+abstract readonly class AbstractDataObject
 {
     /**
      * @note All properties must be public, this only expose public variables
@@ -17,8 +17,8 @@ abstract readonly class AbstractDTO
     public function toArray(): array
     {
         /** @var \Closure(static): TShape $template */
-        static $template = static fn(object $object): array => get_object_vars($object);
-        return $template->bindTo(null, null)($this);
+        static $template = \Closure::bind(static fn(AbstractDataObject $object): array => get_object_vars($object), null, null);
+        return $template($this);
     }
 
     /**

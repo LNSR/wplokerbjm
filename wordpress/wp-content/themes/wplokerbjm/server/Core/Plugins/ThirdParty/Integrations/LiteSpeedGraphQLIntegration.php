@@ -2,8 +2,8 @@
 namespace WPLokerBJM\Core\Plugins\ThirdParty\Integrations;
 
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
-use WPLokerBJM\Shared\Utilities\PluginList;
 use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Plugins\PluginList;
 
 /**
  * LiteSpeed GraphQL Integration

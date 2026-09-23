@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksRuntimeCache;
-use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
@@ -47,9 +47,9 @@ class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
         }
     }
 
-    private function sampleMetadata(): RuntimeHookMetadata
+    private function sampleMetadata(): InstanceHookMetadata
     {
-        return new RuntimeHookMetadata(
+        return new InstanceHookMetadata(
             hook: 'my_hook',
             type: 'action',
             priority: 10,
@@ -143,7 +143,7 @@ class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
         $entries = $fresh->get('Service', 'prop');
         $this->assertIsArray($entries);
         $this->assertCount(1, $entries);
-        $this->assertInstanceOf(RuntimeHookMetadata::class, $entries[0]);
+        $this->assertInstanceOf(InstanceHookMetadata::class, $entries[0]);
         $this->assertSame('my_hook', $entries[0]->hook);
         $this->assertSame('action', $entries[0]->type);
         $this->assertSame('onMyHook', $entries[0]->targetName);
@@ -158,7 +158,7 @@ class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
         $cache->flush();
 
         $second = new WPHooksRuntimeCache($this->file);
-        $bufferMeta = new RuntimeHookMetadata(
+        $bufferMeta = new InstanceHookMetadata(
             hook: 'buffered_hook',
             type: 'filter',
             priority: 20,
@@ -199,7 +199,7 @@ class WPHooksRuntimeCacheTest extends WplokerbjmTestCase
         $entries = $fresh->get('Service', 'prop');
         $this->assertIsArray($entries);
         $this->assertCount(1, $entries);
-        $this->assertInstanceOf(RuntimeHookMetadata::class, $entries[0]);
+        $this->assertInstanceOf(InstanceHookMetadata::class, $entries[0]);
         $this->assertSame('my_hook', $entries[0]->hook);
         $this->assertSame('onMyHook', $entries[0]->targetName);
         $this->assertTrue(($entries[0]->executeIf)());

@@ -35,23 +35,18 @@ class WPHooksScanner
 
     /** @var array<int, HookRegistration>|null */
     private ?array $cachedHookRegistrations = null;
-    public private(set) string $cacheLocation {
-        set(string $value) {
-            $this->cacheLocation = is_dir($value) || str_ends_with($value, '/') || str_ends_with($value, '\\')
-                ? rtrim($value, '/\\') . '/WPHooksCache.php'
-                : $value;
-        }
-    }
 
     /**
      * @param string $namespace
      * @param string $cacheLocation directory where cache file will be stored
      * @param WPHookPlanProvider|null $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
-    public function __construct(private string $namespace = 'WPLokerBJM', $cacheLocation = '', private ?WPHookPlanProvider $hookPlanProvider = null)
+    public function __construct(private string $namespace = 'WPLokerBJM', private string $cacheLocation = '', private ?WPHookPlanProvider $hookPlanProvider = null)
     {
         $this->namespace = trim($namespace, '\\');
-        $this->cacheLocation = $cacheLocation;
+        $this->cacheLocation = is_dir($cacheLocation) || str_ends_with($cacheLocation, '/') || str_ends_with($cacheLocation, '\\')
+            ? rtrim($cacheLocation, '/\\') . '/WPHooksCache.php'
+            : $cacheLocation;
     }
 
     /**

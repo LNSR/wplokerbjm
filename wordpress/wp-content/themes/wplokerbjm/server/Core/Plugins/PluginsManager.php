@@ -3,10 +3,10 @@
 namespace WPLokerBJM\Core\Plugins;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\ContainerRegistryActions;
-use WPLokerBJM\Core\HooksRuntimeRegistryActions;
-use WPLokerBJM\Shared\Utilities\{PluginList, SharedUtils};
+use WPLokerBJM\Core\HooksInstanceRegistryActions;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Plugins\ThirdParty\{
     WPGraphQL\WPGraphQL,
     Integrations\LiteSpeedGraphQLIntegration,
@@ -16,6 +16,44 @@ use WPLokerBJM\Core\Plugins\ThirdParty\{
     WPRestJWTHooks,
 };
 use WPLokerBJM\Shared\Log\Logger;
+
+enum PluginList: string
+{
+    case LiteSpeed = 'litespeed-cache/litespeed-cache.php';
+    case Wordfence = 'wordfence/wordfence.php';
+    case MetaBox = 'meta-box/meta-box.php';
+    case MetaBoxLite = 'meta-box-lite/meta-box-lite.php';
+    case WpGraphql = 'wp-graphql/wp-graphql.php';
+    case RankMath = 'seo-by-rank-math/rank-math.php';
+    case QueryMonitor = 'query-monitor/query-monitor.php';
+    case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
+    case FastIndexingApi = 'fast-indexing-api/instant-indexing.php';
+    case wpCrontrol = 'wp-crontrol/wp-crontrol.php';
+    case updraftPlus = 'updraftplus/updraftplus.php';
+    case viewAdminAs = 'view-admin-as/view-admin-as.php';
+    case performanceLab = 'performance-lab/load.php';
+    public function isActive(): bool
+    {
+        static $activePlugins = null;
+        $activePlugins ??= \get_option('active_plugins') ?: [];
+        return \is_array($activePlugins) && \in_array($this->value, $activePlugins, true);
+    }
+
+    public function deactivePlugin(): void
+    {
+        if ($this->isActive()) {
+            deactivate_plugins($this->value, false);
+        }
+    }
+
+    public function activePlugin(): void
+    {
+        if (!$this->isActive()) {
+            activate_plugins($this->value, false);
+        }
+    }
+}
+
 
 /* ==========================================================================
    INTERFACE CONFIG
@@ -62,8 +100,8 @@ class PluginManagement
             do_action(ContainerRegistryActions::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
             return;
         }
-
-        do_action(HooksRuntimeRegistryActions::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
+        do_action(ContainerRegistryActions::ACTIVATE_DEFERRED_BY_CLASS, self::class);
+        do_action(HooksInstanceRegistryActions::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
     }
 
     /**
@@ -89,7 +127,7 @@ class PluginManagement
     /**
      * Remove the "Deactivate" action link for required plugins.
      */
-    #[Filter('plugin_action_links', 4, 2, once: true)]
+    #[Filter('plugin_action_links', 4, 2, deferRegister: true, once: true)]
     public function lockPluginActionLinks(array $actions, string $pluginFile): array
     {
         if (in_array($pluginFile, self::MUST_HAVE_PLUGINS) && isset($actions['deactivate'])) {
@@ -102,7 +140,7 @@ class PluginManagement
     }
 
     #region 3rd party choice hooks
-    #[Filter('option_active_plugins', once: true, registerIf: static function () {
+    #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function () {
         return !\is_admin() && (empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql'));
     })]
     public function disableWpGraphqlPlugin(array $plugins): array
@@ -116,6 +154,7 @@ class PluginManagement
     #[Filter(
         'option_active_plugins',
         once: true,
+        deferRegister: true,
         registerIf: static function (): bool {
             if (is_admin()) {
                 $action = $_REQUEST['action'] ?? '';
@@ -136,7 +175,7 @@ class PluginManagement
         return $plugins;
     }
 
-    #[Filter('option_active_plugins', once: true, registerIf: static function (): bool {
+    #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function (): bool {
         return !\is_admin();
     })]
     public function disablePluginOnNonAdminDashboard(array $plugins): array
@@ -159,8 +198,8 @@ class PluginManagement
      * activation hooks steps
      * @var __CLASS__::class
      */
-    public private(set) AnonClassHookMetadata $pluginEnvironmentCheck {
-        get => $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
+    public private(set) ModuleClassHookMetadata $pluginEnvironmentCheck {
+        get => $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
             private array $pluginsToDisable = [
                 PluginList::Wordfence->value,
                 PluginList::FastIndexingApi->value,

@@ -4,9 +4,9 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{RuntimeWPHookProvider};
-use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
 
 /**
@@ -113,12 +113,12 @@ trait RuntimeInstanceInvokerTrait
  *
  * Unlike ContainerLazyHookHandler (which resolves the service from the container at
  * hook-fire time), this handler is bound to an already-instantiated object.
- * Designed for use with WPHooksRuntimeRegistry for anonymous class hooks
+ * Designed for use with WPHooksInstanceRegistry for anonymous class hooks
  * that cannot be discovered by the file-based WPHooksScanner.
  *
  * WordPress can match this by instance identity (spl_object_hash) for
  * remove_action()/remove_filter().
- * @phpstan-import-type RuntimeHookMetadataData from RuntimeHookMetadata
+ * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
  */
 final class RuntimeInstanceHookHandler
 {
@@ -134,12 +134,12 @@ final class RuntimeInstanceHookHandler
      * @template TClass
      * @param object<TClass> $instance The object instance to invoke methods on.
      * @param method-string<TClass> $method   The method name.
-     * @param RuntimeHookMetadataData['visibility'] $visibility
-     * @param RuntimeHookMetadataData['type'] $type
-     * @param RuntimeHookMetadataData['executeIf'] $executeIf Optional gate: invoked directly, must return bool.
-     * @param RuntimeHookMetadataData['executeIfParams'] $executeIfParams
-     * @param RuntimeHookMetadataData['hookArgNames'] $hookArgNames
-     * @param RuntimeHookMetadataData['once'] $once
+     * @param InstanceHookMetadataData['visibility'] $visibility
+     * @param InstanceHookMetadataData['type'] $type
+     * @param InstanceHookMetadataData['executeIf'] $executeIf Optional gate: invoked directly, must return bool.
+     * @param InstanceHookMetadataData['executeIfParams'] $executeIfParams
+     * @param InstanceHookMetadataData['hookArgNames'] $hookArgNames
+     * @param InstanceHookMetadataData['once'] $once
      */
     public function __construct(
         object $instance,
@@ -157,7 +157,7 @@ final class RuntimeInstanceHookHandler
         // On death the hook nukes itself (instance-lifetime scoping).
         $this->instanceRef = \WeakReference::create($instance);
 
-        $this->label = $instance instanceof AnonClassHookMetadata
+        $this->label = $instance instanceof ModuleClassHookMetadata
             ? $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->method
             : $instance::class . '->' . $this->method;
 
@@ -186,12 +186,12 @@ final class RuntimeInstanceHookHandler
  * Runtime property hook handler — invocable object that holds a direct instance reference.
  *
  * Reads the property value (a Closure or invokable object) at hook-fire time
- * and invokes it. Designed for use with WPHooksRuntimeRegistry for anonymous
+ * and invokes it. Designed for use with WPHooksInstanceRegistry for anonymous
  * class property hooks that cannot be discovered by the file-based scanner.
  *
  * WordPress can match this by instance identity (spl_object_hash) for
  * remove_action()/remove_filter().
- * @phpstan-import-type RuntimeHookMetadataData from RuntimeHookMetadata
+ * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
  */
 final class RuntimeInstancePropertyHookHandler
 {
@@ -208,12 +208,12 @@ final class RuntimeInstancePropertyHookHandler
      * @template TClass
      * @param object<TClass> $instance   The object instance whose property holds the callable.
      * @param property-string<TClass> $property   The property name.
-     * @param RuntimeHookMetadataData['executeIfParams'] $executeIfParams
-     * @param RuntimeHookMetadataData['visibility'] $visibility
-     * @param RuntimeHookMetadataData['type'] $type
-     * @param RuntimeHookMetadataData['executeIf'] $executeIf Optional gate: invoked directly, must return bool.
-     * @param RuntimeHookMetadataData['hookArgNames'] $hookArgNames
-     * @param RuntimeHookMetadataData['once'] $once
+     * @param InstanceHookMetadataData['executeIfParams'] $executeIfParams
+     * @param InstanceHookMetadataData['visibility'] $visibility
+     * @param InstanceHookMetadataData['type'] $type
+     * @param InstanceHookMetadataData['executeIf'] $executeIf Optional gate: invoked directly, must return bool.
+     * @param InstanceHookMetadataData['hookArgNames'] $hookArgNames
+     * @param InstanceHookMetadataData['once'] $once
      */
     public function __construct(
         object $instance,
@@ -231,7 +231,7 @@ final class RuntimeInstancePropertyHookHandler
         // On death the hook nukes itself (instance-lifetime scoping).
         $this->instanceRef = \WeakReference::create($instance);
 
-        $this->label = $instance instanceof AnonClassHookMetadata
+        $this->label = $instance instanceof ModuleClassHookMetadata
             ? $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->property
             : $instance::class . '->' . $this->property;
 
@@ -268,12 +268,12 @@ final class RuntimeInstancePropertyHookHandler
 /**
  * Invocable wrapper for callables registered manually on the runtime registry.
  *
- * Used by WPHooksRuntimeRegistry::registerAction()/registerFilter() so the
+ * Used by WPHooksInstanceRegistry::registerAction()/registerFilter() so the
  * callback (closure, array-callable, invokable object) can capture the
  * surrounding scope directly — no container resolution involved. An optional
  * condition closure is invoked directly before the callback and must return
  * bool.
- * @phpstan-import-type RuntimeHookMetadataData from RuntimeHookMetadata
+ * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
  */
 final class RuntimeCallableHookHandler
 {
@@ -281,9 +281,9 @@ final class RuntimeCallableHookHandler
 
     /**
      * @param callable $callback  Callable invoked when the hook fires.
-     * @param RuntimeHookMetadataData['executeIf']   $executeIf Optional gate: invoked directly, must return bool.
-     * @param RuntimeHookMetadataData['type'] $type
-     * @param RuntimeHookMetadataData['once'] $once      When true, the registration removes itself after its first
+     * @param InstanceHookMetadataData['executeIf']   $executeIf Optional gate: invoked directly, must return bool.
+     * @param InstanceHookMetadataData['type'] $type
+     * @param InstanceHookMetadataData['once'] $once      When true, the registration removes itself after its first
      *                                   fire where the executeIf gate is evaluated (consume-on-any-evaluation).
      */
     public function __construct(

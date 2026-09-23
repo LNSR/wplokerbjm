@@ -11,11 +11,11 @@ use WPLokerBJM\Services\GraphQL\GraphQLJobData;
  * 
  * @phpstan-type JobGridData array{
  *     jobs: list<CardData>,
- *     maxNumPages: int,
+ *     maxNumPages?: positive-int,
  *     context: 'latest'|'search',
  *     filters: array{cari: string, lokasi: string, gender: string, pendidikan: string, sort: string},
- *     title: string,
- *     totalJobs: int
+ *     title?: string,
+ *     totalJobs?: non-negative-int
  * }
  */
 class JobGrid

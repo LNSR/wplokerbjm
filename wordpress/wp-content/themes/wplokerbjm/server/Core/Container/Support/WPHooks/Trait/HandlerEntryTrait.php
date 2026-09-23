@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\{RuntimeRegistryHandlerEntry, ContainerRegistryHandlerEntry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{RuntimeRegistryHandlerEntry, ContainerRegistryHandlerEntry};
 
 /**
  * @mixin ContainerRegistryHandlerEntry&RuntimeRegistryHandlerEntry

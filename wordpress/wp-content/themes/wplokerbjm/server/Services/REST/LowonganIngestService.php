@@ -29,6 +29,7 @@ class LowonganIngestService
     public function __construct(
         private readonly LowonganIngestImageHandler $imageHandler,
         private readonly LowonganIngestPayloadHandler $payloadHandler,
+        private readonly LowonganIngestTaxonomyResolver $taxonomyResolver
     ) {}
 
     /**
@@ -148,105 +149,102 @@ class LowonganIngestService
             ],
         ];
     }
+}
+
+class LowonganIngestTaxonomyResolver
+{
+    private $controlledTaxonomies = [
+        Taxonomies::KATEGORI_LOWONGAN,
+        Taxonomies::LOKASI_PEKERJAAN,
+        Taxonomies::JENIS_PEKERJAAN,
+        Taxonomies::GENDER,
+        Taxonomies::PENDIDIKAN,
+    ];
     /**
-     * @var __CLASS__::class
+     * @param array<string, mixed> $payload
+     * @param array<int, string> &$warnings
      */
-    public private(set) object $taxonomyResolver {
-        get => $this->taxonomyResolver ??= new class() {
-            private $controlledTaxonomies = [
-                Taxonomies::KATEGORI_LOWONGAN,
-                Taxonomies::LOKASI_PEKERJAAN,
-                Taxonomies::JENIS_PEKERJAAN,
-                Taxonomies::GENDER,
-                Taxonomies::PENDIDIKAN,
-            ];
+    public function assignTaxonomies(int $postId, array $payload, array &$warnings)
+    {
 
-            /**
-             * @param array<string, mixed> $payload
-             * @param array<int, string> &$warnings
-             */
-            public function assignTaxonomies(int $postId, array $payload, array &$warnings): void
-            {
-                if (isset($payload[Taxonomies::PERUSAHAAN]) && trim((string) $payload[Taxonomies::PERUSAHAAN]) !== '') {
-                    $warnings[] = 'perusahaan taxonomy is reserved for manual review and was not assigned.';
-                }
+        if (isset($payload[Taxonomies::PERUSAHAAN]) && trim((string) $payload[Taxonomies::PERUSAHAAN]) !== '') {
+            $warnings[] = 'perusahaan taxonomy is reserved for manual review and was not assigned.';
+        }
 
-                foreach ($this->controlledTaxonomies as $taxonomy) {
-                    if (!isset($payload[$taxonomy]) || trim((string) $payload[$taxonomy]) === '') {
-                        continue;
-                    }
+        foreach ($this->controlledTaxonomies as $taxonomy) {
+            if (!isset($payload[$taxonomy]) || trim((string) $payload[$taxonomy]) === '') {
+                continue;
+            }
 
-                    $termIds = $this->resolveTermIds((string) $taxonomy, (string) $payload[$taxonomy], $warnings);
-                    if ($termIds === []) {
-                        continue;
-                    }
+            $termIds = $this->resolveTermIds((string) $taxonomy, (string) $payload[$taxonomy], $warnings);
+            if ($termIds === []) {
+                continue;
+            }
 
-                    $result = wp_set_object_terms($postId, $termIds, $taxonomy, false);
-                    if (is_wp_error($result)) {
-                        Logger::error(LowonganIngestLogBuilder::LOG_CATEGORY, 'Taxonomy assignment failed.', array_merge(
-                            [
-                                'post_id' => $postId,
-                                'taxonomy' => $taxonomy,
-                                'term_ids' => $termIds,
-                            ],
-                            LowonganIngestLogBuilder::getWordPressErrorContext($result),
-                        ));
+            $result = wp_set_object_terms($postId, $termIds, $taxonomy, false);
+            if (is_wp_error($result)) {
+                Logger::error(LowonganIngestLogBuilder::LOG_CATEGORY, 'Taxonomy assignment failed.', array_merge(
+                    [
+                        'post_id' => $postId,
+                        'taxonomy' => $taxonomy,
+                        'term_ids' => $termIds,
+                    ],
+                    LowonganIngestLogBuilder::getWordPressErrorContext($result),
+                ));
+            }
+        }
+    }
+
+    /**
+     * @param array<int, string> &$warnings
+     * @return list<int>
+     */
+    private function resolveTermIds(string $taxonomy, string $value, array &$warnings): array
+    {
+        $availableTerms = TaxonomyQuery::allTaxonomiesTerms((string) $taxonomy, 'all');
+
+        $index = [];
+        foreach ($availableTerms as $term) {
+            $index[mb_strtolower((string) $term->name)] = (int) $term->term_id;
+            $index[mb_strtolower((string) $term->slug)] = (int) $term->term_id;
+        }
+
+        $parts = $this->splitTaxonomyValue((string) $taxonomy, $value);
+        $termIds = [];
+
+        foreach ($parts as $part) {
+            $key = mb_strtolower($part);
+            if (isset($index[$key])) {
+                $termIds[] = $index[$key];
+                continue;
+            }
+
+            $warnings[] = "Unknown " . (string) $taxonomy . " term skipped: " . (string) $part;
+        }
+
+        return array_values(array_unique($termIds));
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function splitTaxonomyValue(string $taxonomy, string $value): array
+    {
+        $parts = Sanitizer::splitAndClean(',', $value);
+
+        if ($taxonomy === Taxonomies::GENDER) {
+            $expanded = [];
+            foreach ($parts as $part) {
+                foreach (preg_split('/\s*\/\s*/', $part) ?: [] as $genderPart) {
+                    if (trim($genderPart) !== '') {
+                        $expanded[] = trim($genderPart);
                     }
                 }
             }
+            $parts = $expanded;
+        }
 
-            /**
-             * @param array<int, string> &$warnings
-             * @return list<int>
-             */
-            private function resolveTermIds(string $taxonomy, string $value, array &$warnings): array
-            {
-                $availableTerms = TaxonomyQuery::allTaxonomiesTerms((string) $taxonomy, 'all');
-
-                $index = [];
-                foreach ($availableTerms as $term) {
-                    $index[mb_strtolower((string) $term->name)] = (int) $term->term_id;
-                    $index[mb_strtolower((string) $term->slug)] = (int) $term->term_id;
-                }
-
-                $parts = $this->splitTaxonomyValue((string) $taxonomy, $value);
-                $termIds = [];
-
-                foreach ($parts as $part) {
-                    $key = mb_strtolower($part);
-                    if (isset($index[$key])) {
-                        $termIds[] = $index[$key];
-                        continue;
-                    }
-
-                    $warnings[] = "Unknown " . (string) $taxonomy . " term skipped: " . (string) $part;
-                }
-
-                return array_values(array_unique($termIds));
-            }
-
-            /**
-             * @return list<string>
-             */
-            private function splitTaxonomyValue(string $taxonomy, string $value): array
-            {
-                $parts = Sanitizer::splitAndClean(',', $value);
-
-                if ($taxonomy === Taxonomies::GENDER) {
-                    $expanded = [];
-                    foreach ($parts as $part) {
-                        foreach (preg_split('/\s*\/\s*/', $part) ?: [] as $genderPart) {
-                            if (trim($genderPart) !== '') {
-                                $expanded[] = trim($genderPart);
-                            }
-                        }
-                    }
-                    $parts = $expanded;
-                }
-
-                return array_values($parts);
-            }
-        };
+        return array_values($parts);
     }
 }
 

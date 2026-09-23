@@ -25,10 +25,3 @@ $testRl = (new \Nette\Loaders\RobotLoader)
 $testRl->register();
 
 Bootstrap::setRobotLoader($testRl);
-
-require_once __DIR__ . '/Support/ProxyContainer.php';
-require_once __DIR__ . '/Support/WplokerbjmTestCase.php';
-
-// Initialize Brain Monkey for function mocking
-require_once __DIR__ . '/../vendor/antecedent/patchwork/Patchwork.php';
-require_once __DIR__ . '/../vendor/brain/monkey/inc/api.php';

@@ -3,11 +3,12 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Abstract;
 
+use Override;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
- * Opt-in interface for anonymous classes that need to register hooks.
+ * Opt-in interface for anonymous classes and classes not found in container that need to register hooks.
  *
  * Extending this class captures the parent class and property name at
  * construction time so the hook registry can resolve the target without
@@ -17,7 +18,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * ```php
  * #[Filter('nocache_headers', 9, deferRegister: true)]
  * private $test = null {
- *     get => $this->test ??= new class ($this, __PROPERTY__) extends AnonClassHookMetadata {
+ *     get => $this->test ??= new class ($this, __PROPERTY__) extends ModuleClassHookMetadata {
  *         public function __invoke(): bool {
  *             return false;
  *         }
@@ -27,9 +28,10 @@ use WPLokerBJM\Shared\Log\Logger;
  *
  * `$parentClass` accepts either a class-string or the parent object itself —
  * {@see getParentClass()} normalizes an object parent via get_class().
- * @template T
+ * @template TClass
+ * @template T of class-string<TClass>|object<TClass>
  */
-abstract class AnonClassHookMetadata extends AsChildClass
+abstract class ModuleClassHookMetadata extends AsChildClass
 {
 
     /**
@@ -38,7 +40,8 @@ abstract class AnonClassHookMetadata extends AsChildClass
      * @param string              $parentProperty The property name holding this instance.
      */
     public function __construct(
-        public string|object $parentClass,
+        #[Override]
+        protected string|object $parentClass,
         public private(set) readonly string $parentProperty,
     ) {
         parent::__construct($parentClass, $parentProperty);

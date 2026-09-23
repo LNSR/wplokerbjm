@@ -5,12 +5,13 @@ namespace WPLokerBJM\Core\Plugins\ThirdParty;
 use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPlokerBJM\Core\Container\Attributes\Filter;
-use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
+use WPLokerBJM\Core\Plugins\PluginList;
+use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use RankMath\SEO_Analysis\SEO_Analyzer;
 use RankMath\OpenGraph\Image;
 
 /**
- * Rank Math Integration Service
+ * Rank Math
  * Extends RankMath plugin functionality
  * Handles Rank Math SEO plugin integrations including sitemap regeneration
  */
@@ -90,7 +91,7 @@ final class Rankmath implements PluginConfigInterface
 	 * Rewrite delete URL to use headless/frontend domain before Rank Math
 	 * Instant Indexing submits the delete notification.
 	 *
-	 * @see ../../../../../../wp-content/plugins/fast-indexing-api/includes/class-instant-indexing.php
+	 * @see ../../../../../../plugins/fast-indexing-api/includes/class-instant-indexing.php
 	 * @see \RM_GIAPI::delete_post
 	 *
 	 * @param string $url Original URL to delete (get_permalink()).
@@ -115,7 +116,7 @@ final class Rankmath implements PluginConfigInterface
 	 * Ensure Rank Math's SEO Analyzer uses the headless frontend domain for analysis.
 	 * Hooks into the analyzer after it sets the default URL and rewrites it.
 	 *
-	 * @see ../../../../../../wp-content/plugins/seo-by-rank-math/includes/modules/seo-analysis/class-seo-analyzer.php
+	 * @see ../../../../../../plugins/seo-by-rank-math/includes/modules/seo-analysis/class-seo-analyzer.php
 	 * @param SEO_Analyzer $analyzer.
 	 * @return void
 	 */

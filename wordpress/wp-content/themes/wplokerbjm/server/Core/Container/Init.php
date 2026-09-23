@@ -3,6 +3,7 @@
 namespace WPLokerBJM\Core\Container;
 
 use WPLokerBJM\Bootstrap;
+use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -32,7 +33,13 @@ class Init
 
     public function __destruct()
     {
-        !defined('WPLOKERBJM_TEST_ENV') && Logger::flush();
+        !defined('WPLOKERBJM_TEST_ENV') && $this->shutdown();
+    }
+
+    #[Action('shutdown', \PHP_INT_MAX)]
+    private function shutdown(): void
+    {
+        Logger::flush();
     }
 
     /**

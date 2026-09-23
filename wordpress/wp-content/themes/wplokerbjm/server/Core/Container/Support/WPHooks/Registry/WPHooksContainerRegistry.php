@@ -14,10 +14,10 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{ContainerRegistryHandlerEntry, DeferredHookEntryDTO, HookRegistration, HookKey, Provider\WPHookPlanProvider};
+use WPLokerBJM\Core\Container\Support\WPHooks\{DeferredHookEntryDTO, HookRegistration, HookKey, Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{AnonClassHookMetadata};
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{ModuleClassHookMetadata};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait};
 
@@ -38,7 +38,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait};
 class WPHooksContainerRegistry
 {
     /**
-     * @var array<TKey<ContainerRegistryHandlerEntry>, ContainerRegistryHandlerEntry>
+     * @var array<TKey, ContainerRegistryHandlerEntry>
      */
     public private(set) array $handlers = [];
 
@@ -67,7 +67,7 @@ class WPHooksContainerRegistry
         private WPHookPlanProvider $planProvider,
         private DeferredHookManager $deferredHookManager,
         private HookTargetResolver $resolverTarget,
-        private EntriesIndexer $entriesIndexer
+        private EntriesIndexer $entriesIndexer = new EntriesIndexer()
     ) {}
 
     /**
@@ -451,7 +451,7 @@ class WPHooksContainerRegistry
             $this->handlers[$uniqueKey]->unregister();
             unset($this->handlers[$uniqueKey]);
         }
-        unset($this->byNamespace[$namespace]);
+        unset($this->entriesIndexer->byNamespace[$namespace]);
     }
 
     /**
@@ -626,8 +626,8 @@ class WPHooksContainerRegistry
                 continue;
             }
 
-            // Registration gate: evaluated ONCE at registration time — a false
-            // result means the hook is never registered (deferred or not).
+            // Registration gate: evaluated ONCE at activiation time — a false
+            // result means the hook is never registered.
             // Entries carrying deferRegisterUntilHook skip this gate entirely:
             // they defer to the named trigger hook, where the gate is evaluated
             // at activation time (when request context exists).
@@ -796,7 +796,7 @@ class DeferredHookManager
         private WPHookPlanProvider $planProvider,
         private ContainerInterface $container,
         private HookTargetResolver $resolverTarget,
-        private EntriesIndexer $entriesIndexer
+        private EntriesIndexer $entriesIndexer = new EntriesIndexer()
     ) {}
 
     /**
@@ -1020,7 +1020,7 @@ class DeferredHookManager
             }
             unset($this->deferredHandlers[$key]);
         }
-        unset($this->byCallable[$keyCallable]);
+        unset($this->entriesIndexer->byCallable[$keyCallable]);
     }
 
     /**
@@ -1124,6 +1124,7 @@ class DeferredHookManager
                 if (!($entry instanceof DeferredHookEntryDTO)) continue;
                 if (HookPattern::matches($entry->hook, $pattern)) {
                     unset($this->deferredHandlers[$key]);
+                    unset($this->entriesIndexer->byHook[$key]);
                 }
             }
         }
@@ -1150,6 +1151,7 @@ class DeferredHookManager
                 if (!($entry instanceof DeferredHookEntryDTO)) continue;
                 if (HookPattern::matchesAny($entry->tags, $patterns)) {
                     unset($this->deferredHandlers[$key]);
+                    unset($this->entriesIndexer->byTag[$key]);
                 }
             }
         }
@@ -1261,7 +1263,7 @@ class HookTargetResolver
 
         // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
         $ref = new \ReflectionFunction($target);
-        $calledClass = $ref->getClosureCalledClass()?->getName();
+        $calledClass = $ref->getClosureThis() ?? null;
 
         if ($calledClass === null) {
             throw new \InvalidArgumentException('Callable target must be bound to an object instance.');
@@ -1271,7 +1273,7 @@ class HookTargetResolver
 
         // Standard Instance Method ($service->method(...))
         if (!str_contains($name, '{closure')) {
-            return [$calledClass, $name];
+            return [$calledClass::class, $name];
         }
 
         // PHP 8.4 Property Hook Closure ("{closure:FQCN::$propertyName::get():line}")
@@ -1280,11 +1282,11 @@ class HookTargetResolver
             $end = strpos($name, '::', $start);
 
             if ($start !== false && $end !== false) {
-                return [$calledClass, substr($name, $start, $end - $start)];
+                return [$calledClass::class, substr($name, $start, $end - $start)];
             }
         }
 
-        throw new \InvalidArgumentException("Unable to resolve hook target for class {$calledClass}.");
+        throw new \InvalidArgumentException('Unable to resolve hook target for class ' . $calledClass::class . '.');
     }
 
     /**
@@ -1295,9 +1297,9 @@ class HookTargetResolver
     {
         $className = $target::class;
 
-        // Anonymous class extending AnonClassHookMetadata —
+        // Anonymous class extending ModuleClassHookMetadata —
         // reads parent class & property directly, no backtrace needed.
-        if ($target instanceof AnonClassHookMetadata) {
+        if ($target instanceof ModuleClassHookMetadata) {
             return [$target->getParentClass(), $target->parentProperty];
         }
 
@@ -1321,7 +1323,7 @@ class HookTargetResolver
                     if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
                         Logger::warning(
                             "WPHooksContainerRegistry: ",
-                            "Anon class without extending AnonClassHookMetadata, it's recommended to use 'AnonClassHookMetadata'." . $refClass->getName() . "::" . $property->getName()
+                            "Anon class without extending ModuleClassHookMetadata, it's recommended to use 'ModuleClassHookMetadata'." . $refClass->getName() . "::" . $property->getName()
                         );
                         return [$refClass->getName(), $property->getName()];
                     }

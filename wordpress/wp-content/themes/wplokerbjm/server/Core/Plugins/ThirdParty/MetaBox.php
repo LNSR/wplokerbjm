@@ -2,8 +2,7 @@
 namespace WPLokerBJM\Core\Plugins\ThirdParty;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
-use WPLokerBJM\Shared\Utilities\PluginList;
-
+use WPLokerBJM\Core\Plugins\PluginList;
 /**
  * MetaBox Plugin Hooks
  */

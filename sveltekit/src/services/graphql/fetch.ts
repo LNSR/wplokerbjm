@@ -33,7 +33,7 @@ class SharedFetch {
         this.URQLManager = env;
     }
 
-    public setNonce(nonce: WPLokerBJMThemedData["wpRestNonce"]): void {
+    public setNonce(nonce: WPLokerBJMThemedData["wpGraphqlNonce"]): void {
         this.URQLManager.setNonce(nonce);
     }
 
@@ -44,7 +44,7 @@ class SharedFetch {
         this.URQLManager.setFetchFn(fetchFn);
     }
 
-    public get getNonce(): WPLokerBJMThemedData["wpRestNonce"] {
+    public get getNonce(): WPLokerBJMThemedData["wpGraphqlNonce"] {
         return this.URQLManager.getNonce;
     }
 
@@ -175,9 +175,9 @@ export class BrowserFetch extends SharedFetch {
         return typia.assertEquals<LoadMoreResponse>(result);
     }
 
-    public async getThemeNonceGraphQL(): Promise<WPLokerBJMThemedData["wpRestNonce"]> {
+    public async getThemeNonceGraphQL(): Promise<WPLokerBJMThemedData["wpGraphqlNonce"]> {
         const data = await this.URQLManager.runQuery({ query: GET_THEME_NONCE, variables: {}, httpMethodPref: false });
-        return typia.assertEquals<string | null>(data.themeData?.wpRestNonce);
+        return typia.assertEquals<string | null>(data.themeData?.wpGraphqlNonce);
     }
 
     public async syncBookmarkGraphQL(

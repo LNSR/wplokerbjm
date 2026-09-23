@@ -70,8 +70,7 @@ class DeferredHookTest extends WplokerbjmTestCase
      */
     private function deferredHandlersCount(): int
     {
-        $deferred = \Closure::bind(static fn(DeferredHookManager $manager) => $manager->deferredHandlers, null, DeferredHookManager::class);
-        return count($deferred($this->deferredHookManager));
+        return count($this->deferredHookManager->deferredHandlers);
     }
 
     public function testDeferredHooksNotRegisteredOnInitialize(): void

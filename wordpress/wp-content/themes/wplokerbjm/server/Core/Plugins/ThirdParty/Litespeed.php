@@ -6,7 +6,8 @@ use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
+use WPLokerBJM\Core\Plugins\PluginList;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -47,7 +48,7 @@ class Litespeed implements PluginConfigInterface
             wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
         Bootstrap::$robotLoader->rebuild();
-        WPLokerBJMContainer::getContainer(true);
+        WPLokerBJMContainer::getContainer(rebuild: true);
     }
 
     /**

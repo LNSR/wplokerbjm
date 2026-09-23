@@ -54,7 +54,6 @@ class Cloudflare
      *
      * Self-unregisters after firing: subsequent meta hooks within the
      * same request are redundant (the zone was already purged).
-     * @var __CLASS__::class
      */
     #[Action('added_post_meta', 10, 4)]
     #[Action('updated_post_meta', 10, 4)]
@@ -66,7 +65,6 @@ class Cloudflare
      *
      * Self-unregisters after firing: subsequent term hooks within the
      * same request are redundant (the zone was already purged).
-     * @var __CLASS__::class
      */
     #[Action('created_term', 10, 0)]
     #[Action('edit_term', 10, 0)]

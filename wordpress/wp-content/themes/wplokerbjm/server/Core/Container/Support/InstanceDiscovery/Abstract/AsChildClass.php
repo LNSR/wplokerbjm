@@ -12,8 +12,8 @@ use WPLokerBJM\Shared\Log\Logger;
  * Base metadata contract for anonymous child objects owned by a parent property.
  * @see DependencyInjector
  * * Intended usage: Passing external deps without needing host class carrying constructor boilerplate.
- *
- * @template T
+ * @template TClass
+ * @template T of class-string<TClass>|object<TClass>
  */
 abstract class AsChildClass
 {
@@ -23,7 +23,7 @@ abstract class AsChildClass
      * @param string $identifier The property or method or any magic string holding this instance.
      */
     public function __construct(
-        public string|object $parentClass,
+        protected string|object $parentClass,
         public private(set) readonly string $identifier,
     ) {
         if (defined('WPLOKERBJM_TEST_ENV')) return;

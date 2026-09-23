@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Attributes;
 
 use Attribute;
-use WPLokerBJM\Shared\Utilities\DTO\AbstractDTO;
+use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 
 /**
  * @template TClass
@@ -24,7 +24,7 @@ use WPLokerBJM\Shared\Utilities\DTO\AbstractDTO;
  * - #[Inject([Class::class, 'method'], lazy: true)] → inject a closure bound to the instance scope (FCC).
  */
 #[Attribute(Attribute::TARGET_PROPERTY | Attribute::TARGET_METHOD | Attribute::TARGET_PARAMETER)]
-final readonly class Inject extends AbstractDTO
+final readonly class Inject extends AbstractDataObject
 {
     /**
      * @param TInject['name'] $name
@@ -47,7 +47,7 @@ final readonly class Inject extends AbstractDTO
  * Marks a class as injectable
  */
 #[Attribute(Attribute::TARGET_CLASS)]
-final readonly class Injectable extends AbstractDTO
+final readonly class Injectable extends AbstractDataObject
 {
     /**
      * @param TInjectable['lazy'] $lazy Should the object be lazy-loaded.

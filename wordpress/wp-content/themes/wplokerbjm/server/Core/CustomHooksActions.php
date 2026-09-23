@@ -4,10 +4,10 @@ namespace WPLokerBJM\Core;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksRuntimeRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 
 /**
  * @suppress PHP7104
@@ -182,20 +182,20 @@ class ContainerRegistryActions
 /**
  * @suppress PHP7104
  */
-class HooksRuntimeRegistryActions
+class HooksInstanceRegistryActions
 {
     public const REGISTER_HOOKS = 'wplokerbjm_register_runtime_hook';
     public const UNREGISTER_HOOKS = 'wplokerbjm_unregister_runtime_hook';
 
-    public function __construct(private readonly WPHooksRuntimeRegistry $runtimeRegistry) {}
+    public function __construct(private readonly WPHooksInstanceRegistry $runtimeRegistry) {}
 
     #[Action(self::REGISTER_HOOKS, 10, 1)]
-    private function registerRuntimeHook(AnonClassHookMetadata $target): void
+    private function registerRuntimeHook(ModuleClassHookMetadata $target): void
     {
         $this->runtimeRegistry->registerHooksOn($target);
     }
     #[Action(self::UNREGISTER_HOOKS, 10, 1)]
-    private function unregisterRuntimeHook(AnonClassHookMetadata $target): void
+    private function unregisterRuntimeHook(ModuleClassHookMetadata $target): void
     {
         $this->runtimeRegistry->unregisterHooksOn($target);
     }

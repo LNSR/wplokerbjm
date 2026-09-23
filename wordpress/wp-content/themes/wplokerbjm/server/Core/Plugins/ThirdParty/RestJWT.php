@@ -3,7 +3,8 @@ namespace WPLokerBJM\Core\Plugins\ThirdParty;
 use \DI\Attribute\Injectable;
 use WPLokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
-use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
+use WPLokerBJM\Core\Plugins\PluginList;
+use WPLokerBJM\Shared\Utilities\{SharedUtils};
 /**
  * JWT Auth Hooks
  * @link https://github.com/Tmeister/wp-api-jwt-auth

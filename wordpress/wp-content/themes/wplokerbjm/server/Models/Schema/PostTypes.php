@@ -3,8 +3,7 @@ namespace WPLokerBJM\Models\Schema;
 
 use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Shared\Utilities\PluginList;
-
+use WPLokerBJM\Core\Plugins\PluginList;
 /**
  * Post Types Schema
  *

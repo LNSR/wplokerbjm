@@ -9,7 +9,7 @@ use WPLokerBJM\Core\Container\Definitions\Factory;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\Core;
 use WPLokerBJM\Core\Container\Definitions\DefinitionProviderInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksRuntimeRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     ContainerLazyHookHandler,
     ContainerLazyPropertyHookHandler,
@@ -84,9 +84,11 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
     public function testAutowireScannerCount()
     {
-        $scanner = new AutowireScanner(
-            'WPLokerBJM'
-        );
+        $namespace = 'WPLokerBJM';
+        $scanner = new AutowireScanner(excludedSubNamespaces: [
+            $namespace . '\\Core\\Container\\Support\\',
+            $namespace . '\\Tests\\',
+        ]);
 
         // First scan (cache miss)
         $start = microtime(true);

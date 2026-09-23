@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Indexers;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\ContainerRegistryHandlerEntry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryHandlerEntry;
 use WPLokerBJM\Core\Container\Support\WPHooks\DeferredHookEntryDTO;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 

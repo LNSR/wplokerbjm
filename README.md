@@ -147,7 +147,7 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   │       │   └── DependencyInjector.php
 │   │       └── WPHooks/             # WP hook scanning & invocation
 │   │           ├── Abstract/
-│   │           │   └── AnonClassHookMetadata.php
+│   │           │   └── ModuleClassHookMetadata.php
 │   │           ├── Constants/
 │   │           │   └── Tags.php
 │   │           ├── DTO.php
@@ -159,7 +159,7 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   │           │   └── WPHookPlanProvider.php
 │   │           ├── Registry/
 │   │           │   ├── WPHooksContainerRegistry.php
-│   │           │   └── WPHooksRuntimeRegistry.php
+│   │           │   └── WPHooksInstanceRegistry.php
 │   │           ├── Trait/
 │   │           │   ├── DeferredHooksTrait.php
 │   │           │   ├── HookInvokerTrait.php

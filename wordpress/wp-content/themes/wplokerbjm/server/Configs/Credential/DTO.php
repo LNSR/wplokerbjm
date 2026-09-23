@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Configs\Credential;
 
-use WPLokerBJM\Shared\Utilities\DTO\AbstractDTO;
+use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 
 /**
  * @phpstan-type RedisCredType array{
@@ -16,7 +16,7 @@ use WPLokerBJM\Shared\Utilities\DTO\AbstractDTO;
  * }
  * @extends parent<RedisCredType>
  */
-final readonly class RedisCred extends AbstractDTO
+final readonly class RedisCred extends AbstractDataObject
 {
     public function __construct(
         public ?string $host = null,
@@ -36,7 +36,7 @@ final readonly class RedisCred extends AbstractDTO
  * }
  * @extends parent<R2CFCredType>
  */
-final readonly class R2CFCred extends AbstractDTO
+final readonly class R2CFCred extends AbstractDataObject
 {
     public function __construct(
         public ?string $key = null,
@@ -54,7 +54,7 @@ final readonly class R2CFCred extends AbstractDTO
  * }
  * @extends parent<CloudflareCredType>
  */
-final readonly class CloudflareCred extends AbstractDTO
+final readonly class CloudflareCred extends AbstractDataObject
 {
     public function __construct(
         public ?string $token = null,

@@ -18,7 +18,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  * @phpstan-type ThemeData array{
  *  logo: LogoData, 
  *  siteIconTags: string,
- *  wpRestNonce?: string
+ *  wpGraphqlNonce?: string
  * }
  */
 class ThemeProp
@@ -209,7 +209,7 @@ class ThemeProp
      *
      * The array contains:
      * - logo: nested logo metadata
-     * - wpRestNonce (string, when logged in)
+     * - wpGraphqlNonce (string, when logged in)
      * - siteIconTags (string): newline‑separated <link> tags generated via the
      *   `site_icon_meta_tags` filter. Useful for rendering favicon markup in
      *   head elements when hydrating client code.
@@ -226,7 +226,7 @@ class ThemeProp
         /** @var ThemeData|false */
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
-            $cached['wpRestNonce'] = $loggedIn
+            $cached['wpGraphqlNonce'] = $loggedIn
                 ? graphql_get_nonce()
                 : null;
 
@@ -256,7 +256,7 @@ class ThemeProp
         $wpThemeData = [
             'logo' => $logo,
             'siteIconTags' => $siteIconTags,
-            'wpRestNonce' => $loggedIn ? graphql_get_nonce() : null
+            'wpGraphqlNonce' => $loggedIn ? graphql_get_nonce() : null
         ];
         Cache::set($cacheKey, $wpThemeData, 86400); // Cache for 1 day
 

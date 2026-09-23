@@ -15,7 +15,7 @@ use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
-use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
 
 /**
  * Phase 4 — Collect #[Action] / #[Filter] hook registrations.
@@ -98,13 +98,13 @@ function loadHookRegistrationsFromCache(string $themeRoot): ?array
     }
 
     foreach ($registrationRuntimeRegistry as $runtime) {
-        $hook = $runtime instanceof RuntimeHookMetadata ? $runtime->hook : ($runtime['hook'] ?? null);
+        $hook = $runtime instanceof InstanceHookMetadata ? $runtime->hook : ($runtime['hook'] ?? null);
         if (!is_string($hook)) {
             continue;
         }
-        if (($runtime instanceof RuntimeHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'action') {
+        if (($runtime instanceof InstanceHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'action') {
             $actions[] = $hook;
-        } elseif (($runtime instanceof RuntimeHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'filter') {
+        } elseif (($runtime instanceof InstanceHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'filter') {
             $filters[] = $hook;
         }
     }

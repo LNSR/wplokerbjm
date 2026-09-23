@@ -1,6 +1,8 @@
 <?php
+
 namespace WPLokerBJM\Controllers\GraphQL\Resolvers;
 
+use JobGridData;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Shared\Log\Logger;
@@ -12,6 +14,7 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
 use WPLokerBJM\Repositories\JobRepository;
 use WPLokerBJM\Presenters\Components\{JobCarousel, JobGrid};
 use WPLokerBJM\Core\Container\Attributes\Injectable;;
+
 use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
 
 /**
@@ -48,13 +51,7 @@ class JobsDataResolver
     public function resolveCarousel(): array
     {
         try {
-            $props = $this->jobCarouselPresenter->getProps(); // cached internally
-            $result = [
-                'jobs' => $props['jobs'] ?? [],
-                'totalJobs' => $props['totalJobs'] ?? 0,
-            ];
-
-            return $result;
+            return $this->jobCarouselPresenter->getProps(); // cached internally
         } catch (\Exception $e) {
             Logger::error('GraphQL', 'JobsDataResolver::resolveCarousel error: ' . $e->getMessage());
             return [
@@ -85,16 +82,16 @@ class JobsDataResolver
             }
 
             $cacheKey = CacheKey::LOAD_MORE_PREFIX . md5(serialize([$paged, $context, $filters]));
-            /** @var array{data: array{jobs: CardData[], filters: Filters, total: int, maxNumPages: int}, total: int, maxNumPages: int}|false $cached */
+
+            /** @var LoadMoreResponse|false $cached */
             $cached = Cache::get($cacheKey);
 
             if ($cached !== false) {
                 /** @var LoadMoreResponse $result */
-                $result = $cached['data'] + ['filters' => $filters] + [
-                    'total' => $cached['total'],
-                    'maxNumPages' => $cached['maxNumPages'],
+                return $result = [
+                    ...$cached,
+                    'filters' => $filters
                 ];
-                return $result;
             }
 
             $argsQuery = match ($context) {
@@ -110,21 +107,14 @@ class JobsDataResolver
             if ($paged > $query->max_num_pages && $query->max_num_pages > 0) {
                 throw new \Exception('Parameter "paged" exceeds max_num_pages.');
             }
-
-            $data = SharedUtils::filterEmptyValues([
+            /** @var LoadMoreResponse $data */
+            $data = [
                 'jobs' => $jobs,
                 'filters' => $filters,
                 'total' => $query->found_posts,
                 'maxNumPages' => $query->max_num_pages,
-            ]);
-
-            $cacheData = [
-                'data' => $data,
-                'total' => $query->found_posts,
-                'maxNumPages' => $query->max_num_pages,
             ];
-
-            Cache::set($cacheKey, $cacheData, 86400); // Cache for 1 day
+            Cache::set($cacheKey, SharedUtils::filterEmptyValues($data), 86400); // Cache for 1 day
 
             return $data;
         } catch (\Exception $e) {
@@ -167,7 +157,7 @@ class JobsDataResolver
             };
 
             $props = $this->jobGridPresenter->getProps($query_args, $title, $context, $total_jobs);
-
+            /** @var JobGridData $result */
             $result = [
                 'jobs' => $props['jobs'] ?? [],
                 'total' => $props['totalJobs'] ?? 0,
@@ -184,6 +174,7 @@ class JobsDataResolver
                 'jobs' => [],
                 'total' => 0,
                 'maxNumPages' => 0,
+                'filters' => $filters,
             ];
         }
     }
@@ -272,11 +263,11 @@ class JobsDataResolver
             $filters = $args['filters'] ?? [];
 
             $searchFilters = [
-                'cari' => (string) $filters['cari'] ?? '',
-                Taxonomies::LOKASI_PEKERJAAN => (array) $filters[Taxonomies::LOKASI_PEKERJAAN] ?? [],
-                Taxonomies::GENDER => (array) $filters[Taxonomies::GENDER] ?? [],
-                Taxonomies::PENDIDIKAN => (array) $filters[Taxonomies::PENDIDIKAN] ?? [],
-                'sort' => (string) $filters['sort']['value'] ?? 'desc',
+                'cari' => (string) ($filters['cari'] ?? ''),
+                Taxonomies::LOKASI_PEKERJAAN => (array) ($filters[Taxonomies::LOKASI_PEKERJAAN]) ?? [],
+                Taxonomies::GENDER => (array) ($filters[Taxonomies::GENDER]) ?? [],
+                Taxonomies::PENDIDIKAN => (array) ($filters[Taxonomies::PENDIDIKAN]) ?? [],
+                'sort' => (string) ($filters['sort']['value']) ?? 'desc',
             ];
 
             $cacheKey = CacheKey::DYNAMIC_SEARCH_PREFIX . md5(serialize([$searchFilters, $context]));

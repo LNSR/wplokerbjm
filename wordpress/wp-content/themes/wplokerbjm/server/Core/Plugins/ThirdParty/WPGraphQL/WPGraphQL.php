@@ -3,14 +3,14 @@
 namespace WPLokerBJM\Core\Plugins\ThirdParty\WPGraphQL;
 
 use GraphQL\Executor\ExecutionResult;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\AnonClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
-use WPLokerBJM\Shared\Utilities\{SharedUtils, PluginList};
+use WPLokerBJM\Core\Plugins\PluginList;
+use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use WP_User;
-use WPLokerBJM\Core\DependencyInjectorHookActions;
-use WPLokerBJM\Core\HooksRuntimeRegistryActions;
+use WPLokerBJM\Core\HooksInstanceRegistryActions;
 use WPLokerBJM\Core\Plugins\ThirdParty\Integrations\LiteSpeedGraphQLIntegration;
 use WPLokerBJM\Core\Plugins\ThirdParty\WPGraphQL\Services\WPGraphQLETag;
 
@@ -30,18 +30,18 @@ final class WPGraphQL implements PluginConfigInterface
     private function boot(): void
     {
         //register hooks on runtime registry
-        do_action(HooksRuntimeRegistryActions::REGISTER_HOOKS, $this->graphqlInit);
-        do_action(HooksRuntimeRegistryActions::REGISTER_HOOKS, $this->graphQlPluginSettings);
-        do_action(HooksRuntimeRegistryActions::REGISTER_HOOKS, $this->headersPolicy);
-        do_action(HooksRuntimeRegistryActions::REGISTER_HOOKS, $this->graphQlResponse);
+        do_action(HooksInstanceRegistryActions::REGISTER_HOOKS, $this->graphqlInit);
+        do_action(HooksInstanceRegistryActions::REGISTER_HOOKS, $this->graphQlPluginSettings);
+        do_action(HooksInstanceRegistryActions::REGISTER_HOOKS, $this->headersPolicy);
+        do_action(HooksInstanceRegistryActions::REGISTER_HOOKS, $this->graphQlResponse);
     }
 
     #region GraphQL Init
     /**
      * @var __CLASS__::class
      */
-    private AnonClassHookMetadata $graphqlInit {
-        get => $this->graphqlInit ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
+    private ModuleClassHookMetadata $graphqlInit {
+        get => $this->graphqlInit ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
             #[Inject]
             private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration;
             #[Inject]
@@ -55,7 +55,7 @@ final class WPGraphQL implements PluginConfigInterface
             {
                 $this->litespeedGraphQLIntegration->setCacheable();
                 $this->authenticateViaCookie();
-                $this->eTag->checkEarly304();
+                $this->eTag->checkEarly304AndExit();
             }
 
             /**
@@ -65,8 +65,9 @@ final class WPGraphQL implements PluginConfigInterface
             private function authenticateViaCookie(): void
             {
                 $cookie = SharedUtils::getWordpressAuthCookie();
-                if (empty($cookie))
+                if (empty($cookie)) {
                     return;
+                }
                 $this->injectJwtFromCookie();
 
                 // Validate the cookie value using WP helper
@@ -92,6 +93,37 @@ final class WPGraphQL implements PluginConfigInterface
             }
         };
     }
+    #endregion
+    
+    #region GraphQlPluginSettings
+    /**
+     * @var __CLASS__::class
+     */
+    private ModuleClassHookMetadata $graphQlPluginSettings {
+        get => $this->graphQlPluginSettings ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+            /**
+             * @see get_graphql_setting
+             * @see \WPGraphQL\Admin\Settings\Settings::register_settings() -> {
+             *  public_introspection_enabled,
+             *  debug_mode_enabled,
+             * }
+             * @see \WPGraphQL\SmartCache\Admin\Settings::init()
+             * @param 'public_introspection_enabled'|'debug_mode_enabled' $option_name
+             */
+
+            #[Filter('graphql_get_setting_section_field_value', 11, 3, executeIf: static function (string $option_name): bool {
+                return \in_array($option_name, ['public_introspection_enabled', 'debug_mode_enabled'], true);
+            })]
+            public function setSettings(?string $value, ?string $default_value, string $option_name): mixed
+            {
+                return match ($option_name) {
+                    'public_introspection_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
+                    'debug_mode_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
+                    default => $value,
+                };
+            }
+        };
+    }
 
     #endregion
 
@@ -99,8 +131,8 @@ final class WPGraphQL implements PluginConfigInterface
     /**
      * @var __CLASS__::class
      */
-    private AnonClassHookMetadata $headersPolicy {
-        get => $this->headersPolicy ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
+    private ModuleClassHookMetadata $headersPolicy {
+        get => $this->headersPolicy ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
             #[Inject]
             private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration;
             #[Inject]
@@ -244,40 +276,12 @@ final class WPGraphQL implements PluginConfigInterface
         };
     }
     #endregion
-    #region GraphQlPluginSettings
-    /**
-     * @var __CLASS__::class
-     */
-    private AnonClassHookMetadata $graphQlPluginSettings {
-        get => $this->graphQlPluginSettings ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
-            /**
-             * @see get_graphql_setting
-             * @see \WPGraphQL\Admin\Settings\Settings::register_settings() -> {
-             *  public_introspection_enabled,
-             *  debug_mode_enabled,
-             * }
-             * @see \WPGraphQL\SmartCache\Admin\Settings::init()
-             * @param 'public_introspection_enabled'|'debug_mode_enabled' $option_name
-             */
-
-            #[Filter('graphql_get_setting_section_field_value', 11, 3)]
-            public function setSettings(?string $value, ?string $default_value, string $option_name): mixed
-            {
-                return match ($option_name) {
-                    'public_introspection_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
-                    'debug_mode_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
-                    default => $value,
-                };
-            }
-        };
-    }
-    #endregion
     #region GraphQLResponse
     /**
      * @var __CLASS__::class
      */
-    private AnonClassHookMetadata $graphQlResponse {
-        get => $this->graphQlResponse ??= new class(__CLASS__, __PROPERTY__) extends AnonClassHookMetadata {
+    private ModuleClassHookMetadata $graphQlResponse {
+        get => $this->graphQlResponse ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
             #[Inject]
             private WPGraphQLETag $eTag;
             /**

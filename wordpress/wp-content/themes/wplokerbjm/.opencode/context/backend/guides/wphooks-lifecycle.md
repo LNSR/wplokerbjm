@@ -41,7 +41,7 @@ If a gate returns false, a filter receives its original first argument unchanged
 
 ## 5. Runtime and anonymous-object path
 
-Use `WPHooksRuntimeRegistry` when the object already exists or cannot be discovered from files. `registerHooksOn()` scans attributes once per object and registers supported hooks immediately.
+Use `WPHooksInstanceRegistry` when the object already exists or cannot be discovered from files. `registerHooksOn()` scans attributes once per object and registers supported hooks immediately.
 
 - With a `RuntimeWPHookProvider` injected, attribute closures (hook name, `registerIf`, `executeIf`) are resolved: parameters inject by name from hook args, then from the container, then defaults. Without one, closures are invoked with no arguments — only zero-parameter or defaulted closures work.
 - Attribute-argument closures must be static closures (PHP 8.1 constant-expression rule); private members resolve via `self::`, no instance binding is needed.
@@ -68,6 +68,6 @@ Use `unregisterByHook()`, `unregisterByClass()`, `unregisterByNamespace()`, `unr
 - `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — callable plans, gates, dynamic names, and tag resolution (container path).
 - `server/Core/Container/Support/WPHooks/Provider/RuntimeWPHookProvider.php` — same resolution on the runtime path.
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — active/deferred lifecycle and selectors.
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksRuntimeRegistry.php` — immediate object and manual registration.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — immediate object and manual registration.
 - `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — lazy execution and filter fallback behavior.
 - `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — runtime execution, once, and GC cleanup.
