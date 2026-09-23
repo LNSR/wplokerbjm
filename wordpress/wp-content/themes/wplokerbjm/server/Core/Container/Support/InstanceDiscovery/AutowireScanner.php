@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery;
 
 use ReflectionClass;
+use ScannerDefinition;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 use DI\Definition\AutowireDefinition;
 use WPLokerBJM\Bootstrap;
@@ -18,14 +19,15 @@ use WPLokerBJM\Bootstrap;
  *
  * Relies on WPLokerBJM\Bootstrap's RobotLoader for class discovery
  * instead of manual file scanning.
- *
+ * @template TClass of class-string
+ * @phpstan-type ScannerDefinition array{TClass, AutowireDefinition|null}
  * @see \WPLokerBJM\Core\Container\Definitions\Core
  * @see \WPLokerBJM\Bootstrap
  */
 class AutowireScanner
 {
 
-    /** @var array<class-string, AutowireDefinition>|null */
+    /** @var ScannerDefinition */
     private ?array $cachedDefinitions = null;
 
     public function __construct(private string $namespace = 'WPLokerBJM')
@@ -40,23 +42,17 @@ class AutowireScanner
      * for concrete, instantiable classes. Results are cached in-memory for
      * subsequent calls within the same request.
      *
-     * @return array<class-string, AutowireDefinition> Class → autowire definition
+     * @return ScannerDefinition Class → autowire definition
      */
     public function scanForAutowirableClasses(): array
     {
-        if ($this->cachedDefinitions !== null) {
-            return $this->cachedDefinitions;
-        }
-
-        $definitions = $this->performAutowirableScan();
-        $this->cachedDefinitions = $definitions;
-        return $definitions;
+        return $this->cachedDefinitions ??= $this->performAutowirableScan();
     }
 
     /**
      * Perform the actual autowirable class scanning logic.
      *
-     * @return array<class-string, AutowireDefinition>
+     * @return ScannerDefinition
      */
     private function performAutowirableScan(): array
     {
@@ -78,7 +74,7 @@ class AutowireScanner
     /** @var __CLASS__::class */
     public private(set) object $checkClass {
         get => $this->checkClass ??= new class($this->namespace) {
-            public function __construct(private string $namespace) {}
+            public function __construct(private string &$namespace) {}
             /**
              * Check if a class is suitable for autowiring and determine if it should be lazy loaded.
              *

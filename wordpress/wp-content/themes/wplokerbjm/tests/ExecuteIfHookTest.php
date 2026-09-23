@@ -285,8 +285,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $plan = (new WPHookPlanProvider())->buildCallablePlan($attr->executeIf);
 
         $this->assertTrue($plan['isStatic']);
-        $this->assertInstanceOf(\Closure::class, $plan['scopeClass']);
-        $this->assertSame(ExecuteIfHookTest::class, ($plan['scopeClass'])($this));
         $this->assertCount(1, $plan['params']);
         $this->assertSame('c', $plan['params'][0]['name']);
         $this->assertSame(ContainerInterface::class, $plan['params'][0]['type']);
@@ -307,7 +305,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $empty = (new WPHookPlanProvider())->buildCallablePlan(null);
         $this->assertSame([], $empty['params']);
         $this->assertTrue($empty['isStatic']);
-        $this->assertNull($empty['scopeClass']);
     }
 
     public function testExecuteIfPlanDrivenResolutionFiresAndSkipsHook(): void
@@ -354,7 +351,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 executeIf: static fn (): bool => true,
                 executeIfParams: [
                     'isStatic' => true,
-                    'scopeClass' => null,
                     'params' => [
                         ['name' => 'missing', 'type' => '\App\MissingService', 'hasDefault' => false, 'default' => null],
                     ],

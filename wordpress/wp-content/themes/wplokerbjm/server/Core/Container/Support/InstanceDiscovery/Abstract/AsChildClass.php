@@ -23,7 +23,7 @@ abstract class AsChildClass
      * @param string $identifier The property or method or any magic string holding this instance.
      */
     public function __construct(
-        public string|object $parentClass,
+        protected string|object $parentClass,
         public private(set) readonly string $identifier,
     ) {
         if (defined('WPLOKERBJM_TEST_ENV')) return;

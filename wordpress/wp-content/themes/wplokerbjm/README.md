@@ -321,11 +321,11 @@ class ThemeProp
             : CacheKey::THEME_DATA . '_anonymous';
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
-            if ($loggedIn) {$cached['wpRestNonce'] = wp_create_nonce('wp_rest');
+            if ($loggedIn) {$cached['wpGraphqlNonce'] = wp_create_nonce('wp_rest');
             } else {
                 // safety remove in case cached from logged-in
-                if (isset($cached['wpRestNonce'])) {
-                    unset($cached['wpRestNonce']);
+                if (isset($cached['wpGraphqlNonce'])) {
+                    unset($cached['wpGraphqlNonce']);
                 }
             }
             return $cached;
@@ -352,7 +352,7 @@ class ThemeProp
                 'logoHeight' => intval($logoData['height'] ?? 0),             ],             'siteIconTags' =>$siteIconTags,
         ];
 
-        if ($loggedIn) {$wpThemeData['wpRestNonce'] = wp_create_nonce('wp_rest');
+        if ($loggedIn) {$wpThemeData['wpGraphqlNonce'] = wp_create_nonce('wp_rest');
         }
 
         Cache::set($cacheKey,$wpThemeData, 86400); // Cache for 1 day

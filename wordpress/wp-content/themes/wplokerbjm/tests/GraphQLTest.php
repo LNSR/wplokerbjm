@@ -126,7 +126,7 @@ class GraphQLTest extends WplokerbjmTestCase
         $t = $this->findType('ThemeData');
         $this->assertSame('Logo', $t['fields']['logo']['type']);
         $this->assertSame('String', $t['fields']['siteIconTags']['type']);
-        $this->assertSame('String', $t['fields']['wpRestNonce']['type']);
+        $this->assertSame('String', $t['fields']['wpGraphqlNonce']['type']);
     }
 
     // ── Field args ───────────────────────────────────────────

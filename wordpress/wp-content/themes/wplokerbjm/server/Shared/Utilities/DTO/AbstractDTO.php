@@ -17,8 +17,8 @@ abstract readonly class AbstractDTO
     public function toArray(): array
     {
         /** @var \Closure(static): TShape $template */
-        static $template = static fn(object $object): array => get_object_vars($object);
-        return $template->bindTo(null, null)($this);
+        static $template = \Closure::bind(static fn(AbstractDTO $object): array => get_object_vars($object), null, null);
+        return $template($this);
     }
 
     /**

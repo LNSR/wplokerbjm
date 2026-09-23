@@ -23,7 +23,7 @@ use RuntimeException;
  * defaults).
  * @template TClass
  * @phpstan-type CallableHookParams array{name: string, type: string|class-string<TClass>|null, hasDefault: bool, default: mixed}
- * @phpstan-type CallablePlan array{isStatic: bool, scopeClass: \Closure(object<TClass>): class-string<TClass>|null, params: list<CallableHookParams>}
+ * @phpstan-type CallablePlan array{isStatic: bool, params: list<CallableHookParams>}
  */
 trait HookProviderTrait
 {
@@ -60,7 +60,7 @@ trait HookProviderTrait
          * Strictly used for test scope discovery
          * @var CallablePlan $empty
          */
-        $empty = ['isStatic' => true, 'scopeClass' => null, 'params' => []];
+        $empty = ['isStatic' => true, 'params' => []];
 
         if ($callable === null) {
             return $empty;
@@ -105,9 +105,6 @@ trait HookProviderTrait
 
             return [
                 'isStatic' => $reflect->isStatic(),
-                'scopeClass' => static function (object $instance): string {
-                    return \get_class($instance);
-                },
                 'params' => $params,
             ];
         } catch (ReflectionException) {

@@ -1026,11 +1026,10 @@ class WPHooksRuntimeCache
 
             public function loadCache(): void
             {
-                if ($this->file === null || !is_file($this->file)) {
+                if ($this->file === null || !is_readable($this->file)) {
                     return;
                 }
-                $loaded = require $this->file;
-                $this->loadedCache = $this->mapCache($loaded, 'fromArray');
+                $this->loadedCache = $this->mapCache(require $this->file, 'fromArray');
                 $this->alreadyLoaded = true;
             }
 

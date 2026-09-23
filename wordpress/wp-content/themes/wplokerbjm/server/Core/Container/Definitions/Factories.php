@@ -76,7 +76,7 @@ class Core implements DefinitionProviderInterface
             WPHooksRuntimeRegistry::class => \DI\autowire(WPHooksRuntimeRegistry::class)->constructor(
                 \DI\get(HookRuntimeResolver::class),
                 \DI\get($indexerRuntimeRegistry),
-                \DI\create(WPHooksRuntimeCache::class),
+                \DI\get(WPHooksRuntimeCache::class),
                 \DI\get(RuntimeWPHookProvider::class),
             ),
             DeferredHookManager::class => \DI\autowire(DeferredHookManager::class)->constructor(

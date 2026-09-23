@@ -38,7 +38,7 @@ abstract class AnonClassHookMetadata extends AsChildClass
      * @param string              $parentProperty The property name holding this instance.
      */
     public function __construct(
-        public string|object $parentClass,
+        protected string|object $parentClass,
         public private(set) readonly string $parentProperty,
     ) {
         parent::__construct($parentClass, $parentProperty);

@@ -14,10 +14,10 @@ class ThemePropsManager
   //   return this.#themeProps;
   // }
 
-  public get getNonce(): WPLokerBJMThemedData[ "wpRestNonce" ]
+  public get getNonce(): WPLokerBJMThemedData[ "wpGraphqlNonce" ]
   {
     if ( !this.#themeProps ) return undefined;
-    return this.#themeProps.wpRestNonce;
+    return this.#themeProps.wpGraphqlNonce;
   }
 
   public set setThemeData( data: WPLokerBJMThemedData )
@@ -25,10 +25,10 @@ class ThemePropsManager
     this.#themeProps = data;
   }
 
-  public set setNonce( nonce: WPLokerBJMThemedData[ "wpRestNonce" ] )
+  public set setNonce( nonce: WPLokerBJMThemedData[ "wpGraphqlNonce" ] )
   {
     if ( !this.#themeProps ) return;
-    this.#themeProps.wpRestNonce = nonce;
+    this.#themeProps.wpGraphqlNonce = nonce;
   }
 }
 

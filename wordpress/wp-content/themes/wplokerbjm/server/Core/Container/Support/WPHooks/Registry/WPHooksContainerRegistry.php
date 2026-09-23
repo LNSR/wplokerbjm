@@ -451,7 +451,7 @@ class WPHooksContainerRegistry
             $this->handlers[$uniqueKey]->unregister();
             unset($this->handlers[$uniqueKey]);
         }
-        unset($this->byNamespace[$namespace]);
+        unset($this->entriesIndexer->byNamespace[$namespace]);
     }
 
     /**
@@ -626,8 +626,8 @@ class WPHooksContainerRegistry
                 continue;
             }
 
-            // Registration gate: evaluated ONCE at registration time — a false
-            // result means the hook is never registered (deferred or not).
+            // Registration gate: evaluated ONCE at activiation time — a false
+            // result means the hook is never registered.
             // Entries carrying deferRegisterUntilHook skip this gate entirely:
             // they defer to the named trigger hook, where the gate is evaluated
             // at activation time (when request context exists).
@@ -1020,7 +1020,7 @@ class DeferredHookManager
             }
             unset($this->deferredHandlers[$key]);
         }
-        unset($this->byCallable[$keyCallable]);
+        unset($this->entriesIndexer->byCallable[$keyCallable]);
     }
 
     /**
@@ -1124,6 +1124,7 @@ class DeferredHookManager
                 if (!($entry instanceof DeferredHookEntryDTO)) continue;
                 if (HookPattern::matches($entry->hook, $pattern)) {
                     unset($this->deferredHandlers[$key]);
+                    unset($this->entriesIndexer->byHook[$key]);
                 }
             }
         }
@@ -1150,6 +1151,7 @@ class DeferredHookManager
                 if (!($entry instanceof DeferredHookEntryDTO)) continue;
                 if (HookPattern::matchesAny($entry->tags, $patterns)) {
                     unset($this->deferredHandlers[$key]);
+                    unset($this->entriesIndexer->byTag[$key]);
                 }
             }
         }
@@ -1261,7 +1263,7 @@ class HookTargetResolver
 
         // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
         $ref = new \ReflectionFunction($target);
-        $calledClass = $ref->getClosureCalledClass()?->getName();
+        $calledClass = $ref->getClosureThis() ?? null;
 
         if ($calledClass === null) {
             throw new \InvalidArgumentException('Callable target must be bound to an object instance.');
@@ -1271,7 +1273,7 @@ class HookTargetResolver
 
         // Standard Instance Method ($service->method(...))
         if (!str_contains($name, '{closure')) {
-            return [$calledClass, $name];
+            return [$calledClass::class, $name];
         }
 
         // PHP 8.4 Property Hook Closure ("{closure:FQCN::$propertyName::get():line}")
@@ -1280,11 +1282,11 @@ class HookTargetResolver
             $end = strpos($name, '::', $start);
 
             if ($start !== false && $end !== false) {
-                return [$calledClass, substr($name, $start, $end - $start)];
+                return [$calledClass::class, substr($name, $start, $end - $start)];
             }
         }
 
-        throw new \InvalidArgumentException("Unable to resolve hook target for class {$calledClass}.");
+        throw new \InvalidArgumentException('Unable to resolve hook target for class ' . $calledClass::class . '.');
     }
 
     /**

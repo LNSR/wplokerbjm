@@ -39,7 +39,8 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testInjectsExplicitContainerEntry(): void
     {
         $plugins = ['plugin-a/plugin-a.php'];
-        $container = $this->containerReturning(['active.plugins' => $plugins]);
+        $scopeAccessFactory = new ScopeAccessFactory();
+        $container = $this->containerReturning(['active.plugins' => $plugins, ScopeAccessFactory::class => $scopeAccessFactory]);
         $target = new class (self::class, 'plugins') extends AsChildClass {
             #[Inject('active.plugins')]
             private array $plugins;
@@ -59,13 +60,14 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $cacheFile = $this->newCacheFile();
         $firstService = new \stdClass();
+        $scopeAccessFactory = new ScopeAccessFactory();
         $firstTarget = $this->typedChild();
-        $this->injector($this->containerReturning([\stdClass::class => $firstService]), $cacheFile)
+        $this->injector($this->containerReturning([\stdClass::class => $firstService, ScopeAccessFactory::class => $scopeAccessFactory]), $cacheFile)
             ->injectOn($firstTarget);
 
         $secondService = new \stdClass();
         $secondTarget = $this->typedChild();
-        $this->injector($this->containerReturning([\stdClass::class => $secondService]), $cacheFile)
+        $this->injector($this->containerReturning([\stdClass::class => $secondService, ScopeAccessFactory::class => $scopeAccessFactory]), $cacheFile)
             ->injectOn($secondTarget);
 
         $cachedPlans = require $cacheFile;
@@ -77,8 +79,10 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testReusesBoundSetterForRepeatedInjection(): void
     {
         $cacheFile = $this->newCacheFile();
+        $scopeAccessFactory = new ScopeAccessFactory();
         $injector = $this->injector($this->containerReturning([
             \stdClass::class => new \stdClass(),
+            ScopeAccessFactory::class => $scopeAccessFactory,
         ]), $cacheFile);
 
         $injector->injectOn($this->typedChild());
@@ -148,7 +152,8 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testInjectsArrayCallableAsBoundClosure(): void
     {
         $provider = new CallableProvider();
-        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $scopeAccessFactory = new ScopeAccessFactory();
+        $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
         $target = new class (self::class, 'callable') extends AsChildClass {
             #[Inject([CallableProvider::class, 'secret'], lazy: true)]
             private \Closure $secret;
@@ -167,7 +172,8 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testInjectsArrayCallablePublicMethod(): void
     {
         $provider = new CallableProvider();
-        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $scopeAccessFactory = new ScopeAccessFactory();
+        $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
         $target = new class (self::class, 'callable-public') extends AsChildClass {
             #[Inject([CallableProvider::class, 'publicValue'], lazy: true)]
             private \Closure $publicValue;
@@ -212,7 +218,8 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testInjectsClosureFromPublicProperty(): void
     {
         $provider = new CallableProvider();
-        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $scopeAccessFactory = new ScopeAccessFactory();
+        $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
         $target = new class (self::class, 'prop-public') extends AsChildClass {
             #[Inject([CallableProvider::class, 'publicClosure'])]
             private \Closure $factory;
@@ -231,7 +238,8 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testInjectsClosureFromPrivateProperty(): void
     {
         $provider = new CallableProvider();
-        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $scopeAccessFactory = new ScopeAccessFactory();
+        $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
         $target = new class (self::class, 'prop-private') extends AsChildClass {
             #[Inject([CallableProvider::class, 'privateClosure'])]
             private \Closure $factory;
@@ -250,7 +258,8 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testInjectsAnonClassFromProperty(): void
     {
         $provider = new CallableProvider();
-        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $scopeAccessFactory = new ScopeAccessFactory();
+        $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
         $target = new class (self::class, 'prop-child') extends AsChildClass {
             #[Inject([CallableProvider::class, 'publicChild'])]
             private AsChildClass $child;
@@ -295,7 +304,8 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testInjectsArrayCallableReturnValue(): void
     {
         $provider = new CallableProvider();
-        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $scopeAccessFactory = new ScopeAccessFactory();
+        $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
         $target = new class (self::class, 'callable-value') extends AsChildClass {
             #[Inject([CallableProvider::class, 'secretValue'])]
             private int $secretValue;
@@ -314,7 +324,8 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testInjectsClosureReturnedByMethod(): void
     {
         $provider = new CallableProvider();
-        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $scopeAccessFactory = new ScopeAccessFactory();
+        $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
         $target = new class (self::class, 'callable-closure') extends AsChildClass {
             #[Inject([CallableProvider::class, 'closureFactory'])]
             private \Closure $factory;
@@ -333,7 +344,8 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testInjectsAnonClassReturnedByMethod(): void
     {
         $provider = new CallableProvider();
-        $container = $this->containerReturning([CallableProvider::class => $provider]);
+        $scopeAccessFactory = new ScopeAccessFactory();
+        $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
         $target = new class (self::class, 'callable-child') extends AsChildClass {
             #[Inject([CallableProvider::class, 'childInstance'])]
             private AsChildClass $child;
