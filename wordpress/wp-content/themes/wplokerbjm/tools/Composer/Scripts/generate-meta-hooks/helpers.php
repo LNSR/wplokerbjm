@@ -286,6 +286,11 @@ function renderMetadataSection(array $actions, array $filters, array $tags = [])
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
+        'WPHooksInstanceRegistry automatic unregister hooks' => [
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksInstanceRegistry::registerHooksOn()',
+            1,
+            ["argumentsSet('{$listHooksAction}')"],
+        ],
     ];
 
     if ($tags !== []) {

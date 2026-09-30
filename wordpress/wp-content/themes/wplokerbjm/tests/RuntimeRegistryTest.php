@@ -1241,6 +1241,25 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $result = apply_filters('option_active_plugins', ['a', 'b']);
         $this->assertSame(['a', 'b'], $result);
     }
+    public function testAutomaticUnregisterAtCertainHook(): void {
+        $host = new class(__CLASS__, __METHOD__, $this->registry) extends ModuleClassHookMetadata {
+            #[Action('rt_trigger_something', once: true, executeIf: static function (): bool {
+                return true;
+            })]
+            public function test(): void
+            {
+               
+            }
+        };
+
+        $this->registry->registerHooksOn($host, 'rt_automaticUnregister');
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_trigger_something'));
+
+        do_action('rt_automaticUnregister');
+
+        $this->assertNull($this->findRegisteredHook('action', 'rt_trigger_something'));
+    }
 }
 
 /**

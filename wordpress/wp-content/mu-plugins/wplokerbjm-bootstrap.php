@@ -15,11 +15,11 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 !defined('ABSPATH') && exit;
 
 /**
- * Bootstraps the wplokerbjm theme — sets up RobotLoader class autoloading
+ * @package MU-Plugin
+ * Plugin name: WPLokerBJM Infrastructure
+ * Description: Bootstraps the wplokerbjm theme — sets up RobotLoader class autoloading
  * and initializes the PHP-DI container early in the WordPress lifecycle.
- *
- * Runs as an MU plugin so hooks are registered before theme activation.
- *
+ * Author: MaulanaSR
  * @see ThemeProp
  */
 class Bootstrap

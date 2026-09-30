@@ -101,7 +101,7 @@ class PluginManagement
             return;
         }
         do_action(ContainerRegistryActions::ACTIVATE_DEFERRED_BY_CLASS, self::class);
-        do_action(HooksInstanceRegistryActions::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
+        do_action(HooksInstanceRegistryActions::REGISTER_HOOKS, $this->pluginEnvironmentCheck, 'plugins_loaded');
     }
 
     /**
@@ -145,9 +145,12 @@ class PluginManagement
     })]
     public function disableWpGraphqlPlugin(array $plugins): array
     {
-        unset($plugins[array_search(PluginList::WpGraphql->value, $plugins, true)]);
-        do_action(ContainerRegistryActions::UNREGISTER_BY_CLASS, WPGraphQL::class);
-        do_action(ContainerRegistryActions::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
+        $pluginKey = array_search(PluginList::WpGraphql->value, $plugins, true);
+        if ($pluginKey !== false) {
+            unset($plugins[$pluginKey]);
+            do_action(ContainerRegistryActions::UNREGISTER_BY_CLASS, WPGraphQL::class);
+            do_action(ContainerRegistryActions::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
+        }
         return $plugins;
     }
 
@@ -170,8 +173,10 @@ class PluginManagement
     )]
     public function disableQueryMonitorPlugin(array $plugins): array
     {
-        define('QM_DISABLED', true);
-        unset($plugins[array_search(PluginList::QueryMonitor->value, $plugins, true)]);
+        $pluginKey = array_search(PluginList::QueryMonitor->value, $plugins, true);
+        if ($pluginKey !== false) {
+            unset($plugins[$pluginKey]);
+        }
         return $plugins;
     }
 
@@ -185,7 +190,10 @@ class PluginManagement
             PluginList::viewAdminAs->value,
         ];
         foreach ($listPlugins as $plugin) {
-            unset($plugins[array_search($plugin, $plugins, true)]);
+            $pluginKey = array_search($plugin, $plugins, true);
+            if ($pluginKey !== false) {
+                unset($plugins[$pluginKey]);
+            }
         }
         return $plugins;
     }

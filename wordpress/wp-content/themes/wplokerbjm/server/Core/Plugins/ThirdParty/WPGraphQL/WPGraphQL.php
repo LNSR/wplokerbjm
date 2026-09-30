@@ -110,7 +110,6 @@ final class WPGraphQL implements PluginConfigInterface
              * @see \WPGraphQL\SmartCache\Admin\Settings::init()
              * @param 'public_introspection_enabled'|'debug_mode_enabled' $option_name
              */
-
             #[Filter('graphql_get_setting_section_field_value', 11, 3, executeIf: static function (string $option_name): bool {
                 return \in_array($option_name, ['public_introspection_enabled', 'debug_mode_enabled'], true);
             })]

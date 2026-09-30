@@ -115,8 +115,9 @@ class WPHooksInstanceRegistry
      * ```
      * @api
      * @param object|ModuleClassHookMetadata $instance An instantiated object with hook-annotated methods/properties.
+     * @param ?string $autoUnregisterAtHook automatic removal of whole hooks in object at certain hook lifecycle
      */
-    public function registerHooksOn(object $instance): void
+    public function registerHooksOn(object $instance, ?string $autoUnregisterAtHook = null): void
     {
         if (isset($this->scanned[$instance])) {
             return;
@@ -131,6 +132,7 @@ class WPHooksInstanceRegistry
             if ($cached !== null) {
                 $this->scanned[$instance] = true;
                 $this->weakRegistry[$instance] = $this->registerCachedEntries($cached, $instance);
+                \is_string($autoUnregisterAtHook) && $this->scheduleAutoUnregister($instance, $autoUnregisterAtHook);
                 return;
             }
         }
@@ -178,7 +180,7 @@ class WPHooksInstanceRegistry
 
 
                 if ($this->provider !== null) {
-                    $gatePassed = $this->provider->evaluateRuntimeRegisterIf($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf), $method->getName());
+                    $gatePassed = $this->provider->evaluateRuntimeRegisterIf($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf), $method->getName(), $instance);
                     if (!$gatePassed) {
                         Logger::warning('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $method->getName() . ' with hook ' . $hook . ' skipped');
                         return;
@@ -260,7 +262,7 @@ class WPHooksInstanceRegistry
                 }
 
                 if ($this->provider !== null) {
-                    $gatePassed = $this->provider->evaluateRuntimeRegisterIf($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf), $property->getName());
+                    $gatePassed = $this->provider->evaluateRuntimeRegisterIf($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf), $property->getName(), $instance);
                     if (!$gatePassed) {
                         Logger::warning('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $property->getName() . ' with hook ' . $hook . ' skipped');
                         return;
@@ -310,6 +312,7 @@ class WPHooksInstanceRegistry
         if ($instance instanceof ModuleClassHookMetadata && !$hasDeferred && $metadata !== []) {
             $this->cache?->set($instance->getParentClass(), $instance->parentProperty, $metadata);
         }
+        \is_string($autoUnregisterAtHook) && $this->scheduleAutoUnregister($instance, $autoUnregisterAtHook);
     }
     /**
      * Remove all hooks previously registered for the given instance.
@@ -337,6 +340,25 @@ class WPHooksInstanceRegistry
 
         unset($this->weakRegistry[$instance]);
         unset($this->scanned[$instance]);
+        unset($this->entriesIndexer->byClass[\spl_object_hash($instance)]);
+    }
+
+    private function scheduleAutoUnregister(object $instance, string $hook): void
+    {
+        if (\did_action($hook) >= 1) {
+            Logger::warning('WPHooksInstanceRegistry', 'Hook ' . $hook . ' has already been executed, cannot schedule unregister');
+            return;
+        }
+        $owner = \WeakReference::create($instance);
+
+        $listener = function () use ($owner, $hook): void {
+            if (($instance = $owner->get()) !== null) {
+                $this->unregisterHooksOn($instance);
+            }
+            \remove_action($hook, \Closure::getCurrent(), PHP_INT_MIN);
+        };
+
+        \add_action($hook, $listener, PHP_INT_MIN, 0);
     }
 
     /**
@@ -345,7 +367,7 @@ class WPHooksInstanceRegistry
      * (non-deferred) entries are cached, so no deferral handling here.
      *
      * @param list<InstanceHookMetadata> $entries Cached metadata entries.
-     * @param object $instance Owner instance to bind handlers to.
+     * @param object|ModuleClassHookMetadata $instance Owner instance to bind handlers to.
      *
      * @return array<int, array{
      *     handler: RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler,
@@ -361,7 +383,7 @@ class WPHooksInstanceRegistry
 
         foreach ($entries as $entry) {
             if ($this->provider !== null) {
-                $gatePassed = $this->provider->evaluateRuntimeRegisterIf($entry->registerIf, $this->provider->buildCallablePlan($entry->registerIf), $entry->targetName);
+                $gatePassed = $this->provider->evaluateRuntimeRegisterIf($entry->registerIf, $this->provider->buildCallablePlan($entry->registerIf), $entry->targetName, $instance);
                 if (!$gatePassed) {
                     Logger::warning('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $entry->targetName . ' with hook ' . $entry->hook . ' skipped');
                     continue;
@@ -412,7 +434,7 @@ class WPHooksInstanceRegistry
     }
 
     /**
-     * Register a deferRegisterUntilHook (registerUnderHook) entry on the
+     * Register a deferRegisterUntilHook entry on the
      * runtime path: the handler is held in the deferred pool until the
      * trigger hook fires, then activated automatically — no manual
      * activation API.
@@ -431,7 +453,7 @@ class WPHooksInstanceRegistry
         $triggerHook = $attr->deferRegisterUntilHook;
         if ($triggerHook instanceof \Closure) {
             $triggerHook = $this->provider !== null
-                ? $this->provider->resolveRuntimeHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook), $hookKey->target)
+                ? $this->provider->resolveRuntimeHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook), $hookKey->target, $instance)
                 : $this->runtimeResolver->resolveClosureHook($triggerHook, $instance, $hookKey->target);
             if ($triggerHook === null) {
                 return;

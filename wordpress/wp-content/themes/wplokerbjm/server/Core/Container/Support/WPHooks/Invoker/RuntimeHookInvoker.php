@@ -48,7 +48,7 @@ trait RuntimeInstanceInvokerTrait
 
             if ($this->executeIf !== null) {
                 $allowed = $this->hookPlanProvider !== null
-                    ? $this->hookPlanProvider->evaluateRuntimeExecuteIf($this->executeIf, $this->executeIfParams, $this->label, $instance::class, $this->buildHookArgs($args))
+                    ? $this->hookPlanProvider->evaluateRuntimeExecuteIf($this->executeIf, $this->executeIfParams, $this->label, $instance, $this->buildHookArgs($args))
                     : ($this->executeIf)();
                 if (!is_bool($allowed)) {
                     throw new \RuntimeException(

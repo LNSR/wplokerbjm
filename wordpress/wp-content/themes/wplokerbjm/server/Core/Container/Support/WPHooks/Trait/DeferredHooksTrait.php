@@ -48,9 +48,12 @@ trait DeferredHooksTrait
     }
 
     /**
-     * Sweep the deferred pool and activate every entry matching the predicate.
+     * Activate deferred entries identified by the supplied keys.
+     *
+     * Registration gates are re-evaluated immediately before activation.
+     *
      * @param list<TKey> $keys
-     * @param ActivateEntry $activateEntry Moves the entry to the active pool.
+     * @param ActivateEntry $activateEntry Moves an accepted entry to the active pool.
      * @return int Number of newly activated entries.
      */
     protected function activateMatchingDeferredEntries(array $keys, callable $activateEntry): int

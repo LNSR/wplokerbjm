@@ -189,10 +189,10 @@ class HooksInstanceRegistryActions
 
     public function __construct(private readonly WPHooksInstanceRegistry $runtimeRegistry) {}
 
-    #[Action(self::REGISTER_HOOKS, 10, 1)]
-    private function registerRuntimeHook(ModuleClassHookMetadata $target): void
+    #[Action(self::REGISTER_HOOKS, 10, 2)]
+    private function registerRuntimeHook(ModuleClassHookMetadata $target, ?string $autoUnregisterAtHook = null): void
     {
-        $this->runtimeRegistry->registerHooksOn($target);
+        $this->runtimeRegistry->registerHooksOn($target, $autoUnregisterAtHook);
     }
     #[Action(self::UNREGISTER_HOOKS, 10, 1)]
     private function unregisterRuntimeHook(ModuleClassHookMetadata $target): void

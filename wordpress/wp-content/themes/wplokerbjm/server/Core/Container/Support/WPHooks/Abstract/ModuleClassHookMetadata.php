@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Abstract;
 
 use Override;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
+use WPLokerBJM\Core\HooksInstanceRegistryActions;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -45,5 +46,11 @@ abstract class ModuleClassHookMetadata extends AsChildClass
         public private(set) readonly string $parentProperty,
     ) {
         parent::__construct($parentClass, $parentProperty);
+    }
+
+    public function __destruct()
+    {
+        if (\defined('WPLOKERBJM_TEST_ENV') && WPLOKERBJM_TEST_ENV) return;
+        \do_action(HooksInstanceRegistryActions::UNREGISTER_HOOKS, $this);
     }
 }

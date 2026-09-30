@@ -65,7 +65,7 @@ final class DependencyInjector
         $plan = $this->getOrCompilePlan($cacheKey, $target);
         if ($plan['properties'] === []) return $target;
         $setterKey = $cacheKey . "\0" . $target::class;
-        $setter = $this->cachedSetterClosure[$setterKey] ??= $this->scopeAccessFactory->createSetter($target::class);
+        $setter = $this->cachedSetterClosure[$setterKey] ??= ($this->scopeAccessFactory->createSetter)($target::class);
 
         $setter($this->container, $target, $plan['properties']);
 
@@ -576,42 +576,40 @@ class ScopeAccessFactory
     }
 
     /**
-     * Prevent needlessly creation of Closure
-     * @var TSetterClosure 
-     * @param CompiledPlan['properties'] $properties
-     */
-    private Closure $setterTemplateClosure {
-        get => $this->setterTemplateClosure ??= function (ContainerInterface $c, AsChildClass $target, array $properties): void {
-            foreach ($properties as $property => $entry) {
-                $target->{$property} = $entry instanceof InjectionEntryDTO
-                    /**
-                     *  Scope closure changed according @see ScopeAccessFactory::createSetter, cannot use 'self' 
-                     *  '$this' still points to ScopeAccessFactory instance, but lose privates access
-                     * */
-                    ? ($this->callableResolver)($c, $entry)
-                    : $c->get($entry);
-            }
-        };
-    }
-
-    /**
      * @param class-string $scopeClass
      * @throws RuntimeException
      * @see ScopeAccessFactory::$callableResolver for Closure's parameters shape
      * @return TSetterClosure
      */
-    public function createSetter(string $scopeClass): Closure
-    {
-        /** @var TSetterClosure $setter */
-        try {
-            $setter = Closure::bind(
-                $this->setterTemplateClosure,
-                $this,
-                $scopeClass,
-            );
-            return $setter;
-        } catch (\Throwable $e) {
-            throw new RuntimeException('Unable to bind the dependency injector to the child class scope.');
-        }
+    public private(set) \Closure $createSetter {
+        get => $this->createSetter ??= function (string $scopeClass): Closure {
+            /**
+             * Prevent needlessly creation of Closure
+             * @var TSetterClosure 
+             * @param CompiledPlan['properties'] $properties
+             */
+            static $setterTemplateClosure = function (ContainerInterface $c, AsChildClass $target, array $properties): void {
+                foreach ($properties as $property => $entry) {
+                    $target->{$property} = $entry instanceof InjectionEntryDTO
+                        /**
+                         *  Scope closure changed according $scopeClass, cannot use 'self' 
+                         *  '$this' still points to ScopeAccessFactory instance, but lose privates access
+                         * */
+                        ? ($this->callableResolver)($c, $entry)
+                        : $c->get($entry);
+                }
+            };
+
+            try {
+                $setter = Closure::bind(
+                    $setterTemplateClosure,
+                    $this,
+                    $scopeClass,
+                );
+                return $setter;
+            } catch (\Throwable $e) {
+                throw new RuntimeException('Unable to bind the dependency injector to the child class scope.');
+            }
+        };
     }
 }
