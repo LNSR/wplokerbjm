@@ -14,6 +14,7 @@ use WPGraphQL\Utils\InstrumentSchema;
 use WPGraphQL\Utils\Tracing;
 use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Transport\GraphQL\Registration\Job\JobRegistrationTypes;
 
 /*======================================================================
  | SEARCH
@@ -35,7 +36,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * on 'lowongan' post type.
  * @see JobsDataResolver::resolveSearchJobs
  */
-final class SearchHooks
+final class SearchJobHooks
 {
 
     /**
@@ -70,7 +71,7 @@ final class SearchHooks
         tag: ['graphql'],
         deferRegister: true,
         executeIf: static function (ResolveInfo $info): bool {
-            $result = $info->fieldName === GraphQLRegistration::TYPE_SEARCH_JOBS;
+            $result = $info->fieldName === JobRegistrationTypes::TYPE_SEARCH_JOBS;
             if (!$result) do_action(ContainerRegistryEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [__CLASS__, 'jobPostsSearchFilterImpl']);
             return $result;
         }

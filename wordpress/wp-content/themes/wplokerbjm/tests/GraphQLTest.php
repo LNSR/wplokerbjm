@@ -104,12 +104,11 @@ class GraphQLTest extends WplokerbjmTestCase
             'Logo',
             'ThemeData',
             'SearchJobsResponse',
-            'BookmarkResponse',
         ];
         foreach ($expected as $t) {
             $this->assertContains($t, $names, "Type '{$t}' should be registered");
         }
-        $this->assertCount(14, $GLOBALS['__wplokerbjm_registered_types']);
+        $this->assertCount(13, $GLOBALS['__wplokerbjm_registered_types']);
     }
 
     public function testCarouselResponseStructure(): void

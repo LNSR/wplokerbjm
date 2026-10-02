@@ -6,6 +6,7 @@ namespace WPLokerBJM\Tests;
 
 use DI\Container;
 use DI\ContainerBuilder;
+use Nette\Loaders\RobotLoader;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Tests\Support\Fixtures\{ChildNoRedeclareService, ChildRedeclareService, ParentHookService};
@@ -18,6 +19,8 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  */
 class InheritedHookTest extends WplokerbjmTestCase
 {
+    private RobotLoader $robotLoader;
+
     private Container $container;
 
     private WPHookPlanProvider $planProvider;
@@ -25,7 +28,8 @@ class InheritedHookTest extends WplokerbjmTestCase
     protected function setUp(): void
     {
         parent::setUp();
-
+        global $testRobotLoader;
+        $this->robotLoader = $testRobotLoader;
         $builder = new ContainerBuilder();
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
@@ -51,13 +55,18 @@ class InheritedHookTest extends WplokerbjmTestCase
     {
         return array_values(array_filter(
             $registrations,
-            static fn ($reg) => $reg->class === $class
+            static fn($reg) => $reg->class === $class
         ));
     }
 
     public function testChildWithoutRedeclarationHasNoRegistration(): void
     {
-        $scanner = new WPHooksScanner('WPLokerBJM\Tests\Support\Fixtures', '', $this->planProvider);
+        $scanner = new WPHooksScanner(
+            $this->robotLoader,
+            'WPLokerBJM\Tests\Support\Fixtures',
+            '',
+            $this->planProvider
+        );
         $registrations = $scanner->getHookRegistrations();
 
         // Parent declares the hook — exactly one registration.
@@ -77,7 +86,12 @@ class InheritedHookTest extends WplokerbjmTestCase
 
     public function testParentAndRedeclaringChildBothFire(): void
     {
-        $scanner = new WPHooksScanner('WPLokerBJM\Tests\Support\Fixtures', '', $this->planProvider);
+        $scanner = new WPHooksScanner(
+            $this->robotLoader,
+            'WPLokerBJM\Tests\Support\Fixtures',
+            '',
+            $this->planProvider
+        );
         $registrations = $scanner->getHookRegistrations();
 
         // Only the three inheritance fixtures exist in the container — the

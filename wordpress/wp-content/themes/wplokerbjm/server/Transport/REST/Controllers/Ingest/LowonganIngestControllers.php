@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Transport\REST\Controllers\Ingest;
 
+use WPLokerBJM\Core\Container\Attributes\Injectable;
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Repositories\TaxonomyRepository;
@@ -11,63 +12,9 @@ use WPLokerBJM\QueryBuilders\TaxonomyQuery;
 use WPLokerBJM\Services\REST\Ingest\LowonganIngestService;
 use WPLokerBJM\Shared\Log\Logger;
 
-trait IngestControllerTrait
+
+class LowonganIngestController extends RESTIngestController
 {
-
-    /**
-     * @param \WP_REST_Request|mixed $request
-     * @return int|null 401|403|null
-     */
-    public function getPermissionErrorStatus($request = null): ?int
-    {
-        if (!$this->hasBearerAuthorization($request)) {
-            return 401;
-        }
-
-        if (!is_user_logged_in()) {
-            return 401;
-        }
-
-        if (!current_user_can('edit_posts')) {
-            return 403;
-        }
-
-        return null;
-    }
-
-    /**
-     * @param \WP_REST_Request|mixed $request
-     * @return bool
-     */
-    private function hasBearerAuthorization($request): bool
-    {
-        $authorization = '';
-
-        if (is_object($request) && method_exists($request, 'get_header')) {
-            $authorization = (string) $request->get_header('authorization');
-        }
-
-        if ($authorization === '') {
-            $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
-        }
-
-        return $authorization
-        |> (static fn($auth) => trim((string) $auth))
-        |> (static fn($auth) => preg_match('/^Bearer\s+\S+$/i', $auth) === 1);
-    }
-
-    /**
-     * Permission callback for the REST route.
-     * @param \WP_REST_Request|null $request
-     * @return true|\WP_Error
-     */
-    abstract public function permissionsCheck($request = null);
-}
-
-class LowonganIngestController
-{
-    use IngestControllerTrait;
-
     public function __construct(
         private readonly LowonganIngestService $service,
     ) {}
@@ -123,10 +70,8 @@ class LowonganIngestController
     }
 }
 
-class LowonganIngestOptionsController
+class LowonganIngestOptionsController extends LowonganIngestController
 {
-
-    use IngestControllerTrait;
     public function __construct(
         private readonly LowonganIngestService $service,
     ) {}
@@ -158,4 +103,59 @@ class LowonganIngestOptionsController
     {
         return new \WP_REST_Response($this->service->getTaxonomyOptionsData(), 200);
     }
+}
+
+
+#[Injectable(skip: true)]
+abstract class RESTIngestController
+{
+
+    /**
+     * @param \WP_REST_Request|mixed $request
+     * @return int|null 401|403|null
+     */
+    public function getPermissionErrorStatus($request = null): ?int
+    {
+        if (!$this->hasBearerAuthorization($request)) {
+            return 401;
+        }
+
+        if (!is_user_logged_in()) {
+            return 401;
+        }
+
+        if (!current_user_can('edit_posts')) {
+            return 403;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param \WP_REST_Request|mixed $request
+     * @return bool
+     */
+    protected function hasBearerAuthorization($request): bool
+    {
+        $authorization = '';
+
+        if (is_object($request) && method_exists($request, 'get_header')) {
+            $authorization = (string) $request->get_header('authorization');
+        }
+
+        if ($authorization === '') {
+            $authorization = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+        }
+
+        return $authorization
+        |> (static fn($auth) => trim((string) $auth))
+        |> (static fn($auth) => preg_match('/^Bearer\s+\S+$/i', $auth) === 1);
+    }
+
+    /**
+     * Permission callback for the REST route.
+     * @param \WP_REST_Request|null $request
+     * @return true|\WP_Error
+     */
+    abstract protected function permissionsCheck($request = null);
 }

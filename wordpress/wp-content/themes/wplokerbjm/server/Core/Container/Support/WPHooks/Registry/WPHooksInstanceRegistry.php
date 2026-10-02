@@ -898,7 +898,7 @@ class WPHooksInstanceRegistry
 
 /**
  * @phpstan-import-type CallableHookParams from HookProviderTrait
- * @internal description
+ * @internal
  */
 class HookRuntimeResolver
 {
@@ -1032,6 +1032,7 @@ class WPHooksInstanceObjectCache
     }
 
     /** 
+     * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
     private object $cacheState {

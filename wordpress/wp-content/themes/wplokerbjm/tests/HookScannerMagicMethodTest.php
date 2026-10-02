@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Tests;
 
+use Nette\Loaders\RobotLoader;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -15,18 +16,37 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  */
 class HookScannerMagicMethodTest extends WplokerbjmTestCase
 {
+    private RobotLoader $robotLoader;
+
+    public function setUp(): void
+    {
+        global $testRobotLoader;
+        $this->robotLoader = $testRobotLoader;
+        parent::setUp();
+    }
+
     public function testMagicMethodAttributeThrows(): void
     {
         $this->expectException(\RuntimeException::class);
         $this->expectExceptionMessageIsOrContains('magic method');
 
-        $scanner = new WPHooksScanner('MagicHookRejected', '', new WPHookPlanProvider());
+        $scanner = new WPHooksScanner(
+            $this->robotLoader,
+            'MagicHookRejected',
+            '',
+            new WPHookPlanProvider()
+        );
         $scanner->getHookRegistrations();
     }
 
     public function testInvokeIsAllowed(): void
     {
-        $scanner = new WPHooksScanner('MagicHookAllowed', '', new WPHookPlanProvider());
+        $scanner = new WPHooksScanner(
+            $this->robotLoader,
+            'MagicHookAllowed',
+            '',
+            new WPHookPlanProvider()
+        );
         $registrations = $scanner->getHookRegistrations();
 
         self::assertCount(1, $registrations);

@@ -9,5 +9,5 @@ interface DefinitionProviderInterface
      *
      * @return array<string|class-string, mixed>
      */
-    public static function getDefinitions(): array;
+    public function getDefinitions(): array;
 }

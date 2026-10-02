@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Transport\GraphQL\Registration;
 
+use SearchFilters;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Transport\GraphQL\Resolvers\{TaxonomyResolver, JobsDataResolver, ThemeDataResolver};
 use WPLokerBJM\Transport\GraphQL\Resolvers\Auth\JWTDataResolver;
@@ -16,32 +17,33 @@ use WPLokerBJM\Transport\GraphQL\Registration\Theme\GraphQLThemeRegistrationType
 
 /**
  * @phpstan-import-type ThemeData from ThemeHooks
- * @phpstan-import-type TaxonomyJobTerms from TaxonomyResolver
- * @phpstan-import-type TaxonomyTerms from TaxonomyResolver
- * @phpstan-import-type Filters from JobsDataResolver
- * @phpstan-import-type LoadMoreResponse from JobsDataResolver
- * @phpstan-import-type SearchJobsResponse from JobsDataResolver
+ * 
+ * 
  * @phpstan-import-type JWTDataShape from JWTDataResolver
  * @phpstan-import-type CarouselData from HomepageComponents
  * @phpstan-import-type JobGridData from HomepageComponents
+ * @phpstan-import-type JobGridResponse from HomepageComponents
  * @phpstan-import-type CardData from GraphQLJobData
  * @phpstan-import-type JobDetailData from GraphQLJobData
+ * 
  * @phpstan-import-type JobPostingSchema from JobSchemaOrg
  * @phpstan-import-type ItemListSchema from JobSchemaOrg
- * @phpstan-type ArrayFilters array{cari?: string, lokasi_pekerjaan?: list<string>, gender?: list<string>, pendidikan?: list<string>, sort?: array{value?: string, label?: string}}
- * @phpstan-type AutoSuggestionsArgs array{query?: string}
- * @phpstan-type LoadMoreArgs array{paged?: int, context?: 'search'|'latest', filters?: ArrayFilters}
- * @phpstan-type JobGridArgs array{paged?: int, context?: 'search'|'latest', title?: string, total_jobs?: int, filters?: ArrayFilters}
+ * @phpstan-type RankMathHeadArgs array{url?: string}
+ * 
+ * @phpstan-type LoadMoreArgs array{paged?: int, context?: 'search'|'latest', filters?: SearchFilters}
+ * @phpstan-type JobGridArgs array{paged?: int, context?: 'search'|'latest', title?: string, total_jobs?: int, filters?: SearchFilters}
  * @phpstan-type JobDetailArgs array{slug?: string, id?: int, preview?: bool}
  * 
+ * 
+ * @phpstan-type AutoSuggestionsArgs array{query?: string}
  * @phpstan-type Context 'latest'|'search'
  * @phpstan-import-type SearchFilters from JobQuery
- * @phpstan-type LoadMoreResponse array{jobs: CardData[], filters: Filters, total: int, maxNumPages: int}
- * @phpstan-type SearchJobsResponse array{jobs: CardData[], filters: Filters, title: 'Hasil Pencarian', total: int, maxNumPages: int}
+ * @phpstan-type SearchJobsResponse array{jobs: CardData[], filters: SearchFilters, title: 'Hasil Pencarian', total: int, maxNumPages: int}
+ * @phpstan-type SearchJobsArgs array{context?: 'search'|'latest', filters?: SearchFilters}
+ * 
+ * @phpstan-type LoadMoreResponse array{jobs: CardData[], filters: SearchFilters, total: int, maxNumPages: int}
  * 
  * @phpstan-type JobSchemaArgs array{ids?: list<int>, slug?: string, type?: 'ItemList'|'JobPosting'}
- * @phpstan-type SearchJobsArgs array{context?: 'search'|'latest', filters?: ArrayFilters}
- * @phpstan-type RankMathHeadArgs array{url?: string}
  * @phpstan-type SyncBookmarkArgs array{ids?: list<int>}
  * @phpstan-type JobSchemaResponse array{schemas: list<JobPostingSchema>|list<ItemListSchema>}
  * 
@@ -56,7 +58,7 @@ use WPLokerBJM\Transport\GraphQL\Registration\Theme\GraphQLThemeRegistrationType
  *     autoSuggestions?: list<string>,
  *     carousel?: CarouselData,
  *     loadMore?: LoadMoreResponse,
- *     jobGrid?: JobGridData,
+ *     jobGrid?: JobGridResponse,
  *     jobDetail?: JobDetailData,
  *     jobSchema?: JobSchemaResponse,
  *     themeData?: ThemeData,
@@ -85,13 +87,13 @@ final class GraphQLRegistration
         private readonly JWTAuthRegistrationTypes $jwtAuthRegistrationTypes
     ) {}
 
-    public const TYPE_ROOT_QUERY = 'RootQuery';
-    public const TYPE_ROOT_MUTATION = 'RootMutation';
+    public const string TYPE_ROOT_QUERY = 'RootQuery';
+    public const string TYPE_ROOT_MUTATION = 'RootMutation';
 
-    public const TYPE_JSON = 'JSON';
-    public const TYPE_STRING = 'String';
-    public const TYPE_INT = 'Int';
-    public const TYPE_BOOLEAN = 'Boolean';
+    public const string TYPE_JSON = 'JSON';
+    public const string TYPE_STRING = 'String';
+    public const string TYPE_INT = 'Int';
+    public const string TYPE_BOOLEAN = 'Boolean';
 
     /**
      * Register all GraphQL types, fields, and mutations.

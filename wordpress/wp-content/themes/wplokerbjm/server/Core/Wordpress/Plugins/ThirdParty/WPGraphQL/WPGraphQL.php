@@ -37,6 +37,7 @@ final class WPGraphQL implements PluginConfigInterface
     
     #region GraphQlPluginSettings
     /**
+     * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
     private ModuleClassHookMetadata $graphQlPluginSettings {

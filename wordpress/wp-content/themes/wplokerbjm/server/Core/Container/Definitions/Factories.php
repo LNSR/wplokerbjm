@@ -6,32 +6,34 @@ use Psr\Container\ContainerInterface;
 use WPLokerBJM\Configs\Credential\{RedisCred, CloudflareCred, CredentialConfig};
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
+use WPLokerBJM\Core\Container\Attributes\Injectable;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\{DependencyInjector, PlanCache, PlanCompiler, ScopeAccessFactory};
 use WPLokerBJM\Services\WebHooks\CloudflareCachePurger;
 
 /**
  * Factory definitions — Manually define your arguments here.
  */
+#[Injectable(skip: true)]
 class Factory implements DefinitionProviderInterface
 {
-    public static function getDefinitions(): array
+    public function getDefinitions(): array
     {
 
         return [
-            ...self::getInstanceWithCredentials(),
-            ...self::dependencyService(),
+            ...$this->getInstanceWithCredentials(),
+            ...$this->dependencyService(),
         ];
     }
 
     //! For creds, defer via closure because if not CompiledContainer.php gonna expose your creds
-    private static function getInstanceWithCredentials(): array
+    private function getInstanceWithCredentials(): array
     {
         return [
             CloudflareCachePurger::class => \DI\autowire(CloudflareCachePurger::class)->constructor(static fn(): CloudflareCred => CredentialConfig::CloudflareCredential()),
             RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn(): RedisCred => CredentialConfig::RedisCredential()),
         ];
     }
-    private static function dependencyService(): array
+    private function dependencyService(): array
     {
         $dependencyInjector = [
             PlanCompiler::class => \DI\autowire(PlanCompiler::class),

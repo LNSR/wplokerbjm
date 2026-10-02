@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Tests;
 
+use Nette\Loaders\RobotLoader;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Definitions\Factory;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -15,7 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     ContainerLazyPropertyHookHandler,
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyAutowireScanner;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Services\WebHooks\CloudflareCachePurger;
 use WPLokerBJM\Adapter\RedisAdapter;
@@ -25,10 +26,17 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 class ContainerDefinitionsTest extends WplokerbjmTestCase
 {
     public static string $NAMESPACE = "WPLokerBJM";
+    private RobotLoader $testRobotLoader;
+    protected function setUp(): void
+    {
+        global $testRobotLoader;
+        $this->testRobotLoader = $testRobotLoader;
+        parent::setUp();
+    }
 
     public function testCoreDefinitions()
     {
-        $definitions = Core::getDefinitions();
+        $definitions = new Core($this->testRobotLoader)->getDefinitions();
 
         $this->assertIsArray($definitions);
         $count = count($definitions);
@@ -46,7 +54,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
     public function testFactoryDefinitions()
     {
-        $definitions = Factory::getDefinitions();
+        $definitions = new Factory()->getDefinitions();
 
         $this->assertIsArray($definitions);
         $count = count($definitions);
@@ -64,7 +72,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
     public function testCoreAndFactoryDefinitions()
     {
-        $definitions = array_merge(Core::getDefinitions(), Factory::getDefinitions());
+        $definitions = array_merge(new Core($this->testRobotLoader)->getDefinitions(), new Factory()->getDefinitions());
 
         $this->assertIsArray($definitions);
         $count = count($definitions);
@@ -82,10 +90,10 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $this->assertArrayHasKey(RedisAdapter::class, $definitions);
     }
 
-    public function testAutowireScannerCount()
+    public function testDependencyAutowireScannerCount()
     {
         $namespace = 'WPLokerBJM';
-        $scanner = new AutowireScanner(excludedSubNamespaces: [
+        $scanner = new DependencyAutowireScanner($this->testRobotLoader, excludedSubNamespaces: [
             $namespace . '\\Core\\Container\\Support\\',
             $namespace . '\\Tests\\',
         ]);
@@ -98,7 +106,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
         $this->assertIsArray($definitions);
         $count = count($definitions);
-        echo "\n\033[1;36m🔍 AutowireScanner\033[0m\n";
+        echo "\n\033[1;36m🔍 DependencyAutowireScanner\033[0m\n";
         echo "\033[1;32m✓ Found $count autowirable classes:\033[0m\n";
         echo "\033[1;33m⏱️  First scan time: " . number_format($timeFirst, 4) . " seconds\033[0m\n";
 
@@ -118,7 +126,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         echo "\n";
 
         $this->assertEquals($definitions, $definitions2);
-        $this->assertLessThan($timeFirst * 0.1, $timeSecond, 'Cached AutowireScanner scan should be significantly faster');
+        $this->assertLessThan($timeFirst * 0.1, $timeSecond, 'Cached DependencyAutowireScanner scan should be significantly faster');
     }
 
     public function testDefinitionProvidersImplementInterface()
@@ -146,6 +154,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     {
         // Create scanner like Core.php does
         $scanner = new WPHooksScanner(
+            $this->testRobotLoader,
             self::$NAMESPACE,
             '',
             new WPHookPlanProvider()
@@ -208,6 +217,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     {
         // Get real hook registrations from the scanner
         $scanner = new WPhooksScanner(
+            $this->testRobotLoader,
             self::$NAMESPACE,
             '',
             new WPHookPlanProvider()
@@ -324,6 +334,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     public function testHookRegistryUnregistration(): void
     {
         $scanner = new WPhooksScanner(
+            $this->testRobotLoader,
             self::$NAMESPACE,
             '',
             new WPHookPlanProvider()
@@ -409,7 +420,12 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
 
     public function testUnregisterByNamespace(): void
     {
-        $scanner = new WPhooksScanner(self::$NAMESPACE, '', new WPHookPlanProvider());
+        $scanner = new WPhooksScanner(
+            $this->testRobotLoader,
+            self::$NAMESPACE,
+            '',
+            new WPHookPlanProvider()
+        );
         $registrations = $scanner->getHookRegistrations();
 
         if (empty($registrations)) {
@@ -465,12 +481,17 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     public function testBootStatsSummary(): void
     {
         // ── Scan phase ─────────────────────────────────────────────────────
-        $scanner = new WPhooksScanner(self::$NAMESPACE, '', new WPHookPlanProvider());
+        $scanner = new WPhooksScanner(
+            $this->testRobotLoader,
+            self::$NAMESPACE,
+            '',
+            new WPHookPlanProvider()
+        );
         $registrations = $scanner->getHookRegistrations();
 
         $namespacePrefix = self::$NAMESPACE . '\\';
         $scannedClasses = 0;
-        foreach (Bootstrap::$robotLoader->getIndexedClasses() as $className => $file) {
+        foreach ($this->testRobotLoader->getIndexedClasses() as $className => $file) {
             if (str_starts_with($className, $namespacePrefix) && class_exists($className)) {
                 $scannedClasses++;
             }

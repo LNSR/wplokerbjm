@@ -5,7 +5,7 @@ namespace WPLokerBJM\Transport\GraphQL\Resolvers;
 
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\QueryBuilders\JobQuery;
-use WPLokerBJM\Services\GraphQL\Hooks\Search\SearchHooks;
+use WPLokerBJM\Services\GraphQL\Hooks\Search\SearchJobHooksoks;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
@@ -125,7 +125,7 @@ class JobsDataResolver
 
     /**
      * Resolve search jobs for GraphQL.
-     * @see SearchHooks::jobPostsSearchFilterImpl for hook query ['s']
+     * @see SearchJobHooksoks::jobPostsSearchFilterImpl for hook query ['s']
      * @param mixed $root The root Query object (unused)
      * @param SearchJobsArgs $args Search filters
      * @return SearchJobsResponse

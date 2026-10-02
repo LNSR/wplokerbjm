@@ -143,7 +143,7 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   │       ├── InstanceDiscovery/   # Autowiring & instance discovery
 │   │       │   ├── Abstract/
 │   │       │   │   └── AsChildClass.php
-│   │       │   ├── AutowireScanner.php
+│   │       │   ├── DependencyAutowireScanner.php
 │   │       │   └── DependencyInjector.php
 │   │       └── WPHooks/             # WP hook scanning & invocation
 │   │           ├── Abstract/

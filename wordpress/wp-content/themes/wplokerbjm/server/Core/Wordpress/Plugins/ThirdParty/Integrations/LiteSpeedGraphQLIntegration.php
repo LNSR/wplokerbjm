@@ -20,9 +20,17 @@ class LiteSpeedGraphQLIntegration implements PluginConfigInterface
     /**
      * Call litespeed_purge when graphql_purge is called
      */
-    #[Action('graphql_purge', deferRegister: true, tag: ['graphql'])]
-    public $purgeCache = static function ($keys): void {
+    #[Action('graphql_purge', deferRegister: true, tag: ['litespeed'])]
+    private \Closure $litespeedPurgeCache = static function ($keys): void {
         do_action('litespeed_purge', $keys);
+    };
+
+    /**
+     * Call wpgraphql_cache_purge_all when litespeed_purge_all is called
+     */
+    #[Action('litespeed_purge_all', deferRegister: true, tag: ['graphql'])]
+    private \Closure $purgeAllGraphqlCache = static function (): void {
+        do_action('wpgraphql_cache_purge_all');
     };
 
     /**

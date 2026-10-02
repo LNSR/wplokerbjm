@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Core\Wordpress\Plugins\ThirdParty;
 
+use Nette\Loaders\RobotLoader;
 use WPLokerBJM\Core\Wordpress\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
@@ -9,6 +10,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Bootstrap;
+use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -17,9 +19,17 @@ use WPLokerBJM\Shared\Log\Logger;
  */
 final class Litespeed implements PluginConfigInterface
 {
+    public function __construct(private WPLokerBJMContainer $lokerBJMcontainer, private RobotLoader $robotLoader) {}
+
     public static function isActive(): bool
     {
         return PluginList::LiteSpeed->isActive();
+    }
+
+    #[Action('plugins_loaded', once: true)]
+    public function boot(): void
+    {
+        \do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_TAGS, ['litespeed']);
     }
 
     /**
@@ -31,11 +41,9 @@ final class Litespeed implements PluginConfigInterface
     #[Action('litespeed_purged_all', once: true)]
     public function clearObjectCache(): void
     {
-
-        do_action('wpgraphql_cache_purge_all');
         Cache::flushGroup(CacheKey::OBJECT_CACHE_PREFIX);
         try {
-            $this->deleteRucursive(WPLokerBJMContainer::$CACHE_INFO->cacheDir);
+            $this->deleteRucursive($this->lokerBJMcontainer->cacheDir);
         } catch (\Exception $e) {
             Logger::error('Error deleting cache folder: ', $e->getMessage());
         }
@@ -47,8 +55,10 @@ final class Litespeed implements PluginConfigInterface
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
             wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
-        Bootstrap::$robotLoader->rebuild();
-        WPLokerBJMContainer::getContainer(rebuild: true);
+        $this->robotLoader->rebuild();
+        $this->lokerBJMcontainer
+            ->initContainerBuilder(forceRebuild: true)
+            ->buildContainer();
     }
 
     /**

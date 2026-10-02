@@ -2,17 +2,21 @@
 
 namespace WPLokerBJM\Transport\GraphQL\Registration\Job\Taxonomy;
 
+use TaxonomyJobTerms;
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 use WPLokerBJM\Transport\GraphQL\Resolvers\TaxonomyResolver;
-
+/**
+ * @phpstan-import-type TaxonomyJobTerms from GraphQLRegistration
+ * @phpstan-import-type TaxonomyTerms from GraphQLRegistration
+ */
 class JobTaxonomyRegistrationTypes
 {
     public function __construct(private readonly TaxonomyResolver $taxonomyResolver) {}
 
-    public const TYPE_TAXONOMY_TERMS_RESPONSE = 'TaxonomyTermsResponse';
-    public const TYPE_LOKASI_TERMS = 'lokasiTerms';
-    public const TYPE_GENDER_TERMS = 'genderTerms';
-    public const TYPE_PENDIDIKAN_TERMS = 'pendidikanTerms';
+    private const TYPE_TAXONOMY_TERMS_RESPONSE = 'TaxonomyTermsResponse';
+    private const TYPE_LOKASI_TERMS = 'lokasiTerms';
+    private const TYPE_GENDER_TERMS = 'genderTerms';
+    private const TYPE_PENDIDIKAN_TERMS = 'pendidikanTerms';
 
     public function __invoke(): void
     {
@@ -22,14 +26,17 @@ class JobTaxonomyRegistrationTypes
 
     public function registerObjectTypes(): void
     {
+        /** @var TaxonomyJobTerms $taxonomyJobFieldsType */
+        $taxonomyJobFieldsType = [
+            'lokasiTerms' => ['type' => GraphQLRegistration::TYPE_JSON],
+            'genderTerms' => ['type' => GraphQLRegistration::TYPE_JSON],
+            'pendidikanTerms' => ['type' => GraphQLRegistration::TYPE_JSON],
+        ];
+        
         // TaxonomyTermsResponse for grouped terms
         register_graphql_object_type(self::TYPE_TAXONOMY_TERMS_RESPONSE, [
             'description' => 'Response containing taxonomy terms',
-            'fields' => [
-                self::TYPE_LOKASI_TERMS => ['type' => GraphQLRegistration::TYPE_JSON],
-                self::TYPE_GENDER_TERMS => ['type' => GraphQLRegistration::TYPE_JSON],
-                self::TYPE_PENDIDIKAN_TERMS => ['type' => GraphQLRegistration::TYPE_JSON],
-            ],
+            'fields' => $taxonomyJobFieldsType,
         ]);
     }
 

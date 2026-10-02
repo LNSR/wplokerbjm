@@ -2,8 +2,10 @@
 
 namespace WPLokerBJM\Core\Container\Definitions;
 
+use Nette\Loaders\RobotLoader;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
+use WPLokerBJM\Core\Container\Attributes\Injectable;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyAutowireScanner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
@@ -25,12 +27,15 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
  *    via add_action/add_filter using the stored handler instances.
  *
  */
+#[Injectable(skip: true)]
 class Core implements DefinitionProviderInterface
 {
-    public static function getDefinitions(): array
+    public function __construct(private RobotLoader $robotLoader) {}
+    
+    public function getDefinitions(): array
     {
         $namespace = 'WPLokerBJM';
-        $scanner = new AutowireScanner(excludedSubNamespaces: [
+        $scanner = new DependencyAutowireScanner($this->robotLoader, excludedSubNamespaces: [
             $namespace . '\\Core\\Container\\Support\\',
             $namespace . '\\Tests\\',
         ]);
@@ -41,7 +46,12 @@ class Core implements DefinitionProviderInterface
             WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class),
             HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class))->lazy(),
-            WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, static fn() => get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class))->lazy(),
+            WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
+                \DI\get(RobotLoader::class),
+                $namespace,
+                static fn() => get_stylesheet_directory() . "/cache",
+                \DI\get(WPHookPlanProvider::class)
+            ),
             WPHooksInstanceObjectCache::class => \DI\autowire(WPHooksInstanceObjectCache::class)->constructor(
                 static fn(): string => get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
             ),
@@ -55,7 +65,7 @@ class Core implements DefinitionProviderInterface
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(ContainerInterface::class),
                 \DI\get(HookTargetResolver::class),
-               static fn() => new EntriesIndexer(),
+                static fn() => new EntriesIndexer(),
             ),
             WPHooksContainerRegistry::class => \DI\autowire(WPHooksContainerRegistry::class)->constructor(
                 \DI\get(ContainerInterface::class),
@@ -67,6 +77,6 @@ class Core implements DefinitionProviderInterface
             ),
         ];
 
-        return array_merge($autoWiredDefinitions, $core);
+        return \array_merge($autoWiredDefinitions, $core);
     }
 }

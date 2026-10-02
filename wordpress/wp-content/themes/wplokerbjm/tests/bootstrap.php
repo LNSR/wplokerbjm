@@ -1,7 +1,6 @@
 <?php
 
 declare(strict_types=1);
-use WPLokerBJM\Bootstrap;
 // Composer autoloader — needed for vendor deps (RobotLoader, PHP-DI, etc.)
 require_once __DIR__ . '/../vendor/autoload.php';
 
@@ -16,12 +15,11 @@ require_once __DIR__ . '/../../../mu-plugins/wplokerbjm-bootstrap.php';
 // Nette RobotLoader for all WPLokerBJM classes — replaces Composer classmaps.
 // Scans tests/, server/, and the mu-plugins Bootstrap file.
 // Always refreshes in test environment; uses /tmp to avoid permission issues.
-$testRl = (new \Nette\Loaders\RobotLoader)
+global $testRobotLoader;
+$testRobotLoader = (new \Nette\Loaders\RobotLoader)
     ->addDirectory(__DIR__)
     ->addDirectory(__DIR__ . '/../server')
     ->setCacheDirectory(__DIR__ . '/robotloader-cache/wplokerbjm-tests')
     ->setAutoRefresh(true)
     ->reportParseErrors(true);
-$testRl->register();
-
-Bootstrap::setRobotLoader($testRl);
+$testRobotLoader->register();

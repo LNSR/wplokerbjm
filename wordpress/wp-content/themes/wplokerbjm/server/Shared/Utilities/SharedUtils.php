@@ -39,7 +39,7 @@ class SharedUtils
         return false;
     }
 
-    public static function doActivityAtBackground(callable $activity): void
+    public static function doActivityAtEndRequest(callable $activity): void
     {
         try {
             if (defined('PHP_SAPI') && PHP_SAPI !== 'cli') {
@@ -50,7 +50,7 @@ class SharedUtils
                 }
             }
         } catch (\Exception $e) {
-            Logger::error('SharedUtils::doActivityAtBackground error: ', $e->getMessage());
+            Logger::error('SharedUtils::doActivityAtEndRequest error: ', $e->getMessage());
         } finally {
             $activity();
         }

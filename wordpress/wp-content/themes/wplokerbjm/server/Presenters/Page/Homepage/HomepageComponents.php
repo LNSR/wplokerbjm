@@ -13,22 +13,28 @@ use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 
 /**
  * @phpstan-import-type CardData from GraphQLJobData
- * @phpstan-import-type SearchFilters from GraphQLRegistration
+ * @phpstan-import-type SearchFilters from JobQuery
  * @phpstan-import-type SearchJobsArgs from GraphQLRegistration
  * @phpstan-import-type SearchJobsResponse from GraphQLRegistration
  * @phpstan-import-type LoadMoreArgs from GraphQLRegistration
  * @phpstan-import-type LoadMoreResponse from GraphQLRegistration
  * @phpstan-import-type JobGridArgs from GraphQLRegistration
  * @phpstan-import-type AutoSuggestionsArgs from GraphQLRegistration
- * @phpstan-type JobGridData array{
- *     jobs: list<CardData>,
- *     maxNumPages?: positive-int,
- *     context: 'latest'|'search',
- *     filters: array{cari: string, lokasi: string, gender: string, pendidikan: string, sort: string},
- *     title?: string,
- *     totalJobs?: non-negative-int
- * }
  * @phpstan-import-type CardData from GraphQLJobData
+ * @phpstan-type JobGridData array{
+ *     jobs: CardData[],
+ *     maxNumPages?: int,
+ *     context: 'latest'|'search',
+ *     filters: SearchFilters,
+ *     title?: string,
+ *     totalJobs?: int
+ * }
+ * @phpstan-type JobGridResponse array{
+ *     jobs: JobGridData['jobs'],
+ *     total: JobGridData['totalJobs'],
+ *     maxNumPages: JobGridData['maxNumPages'],
+ *     filters: JobGridData['filters']
+ * }
  * @phpstan-type CarouselData array{
  *    jobs: CardData[],
  *    totalJobs: int
@@ -45,7 +51,7 @@ class HomepageComponents
      * them for grid display. Supports search and latest contexts with filtering.
      *
      * @param JobGridArgs $args Query arguments
-     * @return JobGridData
+     * @return JobGridResponse
      */
     public function getJobGridProps(array $args): array
     {
@@ -56,7 +62,7 @@ class HomepageComponents
         $total_jobs = $args['total_jobs'] ?? 0;
 
         $cacheKey = CacheKey::JOB_GRID_PREFIX . md5(serialize([$filters, $paged, $context, $title, $total_jobs]));
-        /** @var JobGridData|false $cached */
+        /** @var JobGridResponse|false $cached */
         $cached = Cache::get($cacheKey);
         if ($cached !== false) {
             return $cached;
@@ -100,6 +106,7 @@ class HomepageComponents
             'title' => $title,
             'totalJobs' => $jobs_query->found_posts,
         ];
+        /** @var JobGridResponse $result */
         $result = [
             'jobs' => $props['jobs'] ?? [],
             'total' => $props['totalJobs'] ?? 0,

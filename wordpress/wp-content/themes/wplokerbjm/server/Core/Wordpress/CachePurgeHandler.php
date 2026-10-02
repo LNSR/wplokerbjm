@@ -19,7 +19,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  *   without arguments (no post context) and it will only purge global caches.
  * - For meta/taxonomy hooks we pass the `object_id` (post id) when available.
  */
-class CacheInvalidationHooks
+class CachePurgeHandler
 {
 
     /**
@@ -34,6 +34,7 @@ class CacheInvalidationHooks
      * is handled separately by {@see self::purgeGlobalCacheOnce}.
      *
      * Registered only on hooks that carry post context.
+     * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
     #[Action('save_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 2)]

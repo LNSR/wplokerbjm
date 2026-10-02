@@ -7,16 +7,12 @@ use WPLokerBJM\Core\Wordpress\Cron\WPCron;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Repositories\TaxonomyRepository;
 
-class TaxonomyManagement
+class TaxonomiesJanitor
 {
     public function __construct(
         private readonly TaxonomyRepository $taxonomyRepository
     ) {}
 
-    /**
-     * Delete unused terms from all taxonomies.
-     * A term is considered unused if it hasn't been associated with any posts for over 3 months.
-     */
     #[Action(WPCron::CLEANUP_TAXONOMY)]
     public function deleteUnusedTerms()
     {
