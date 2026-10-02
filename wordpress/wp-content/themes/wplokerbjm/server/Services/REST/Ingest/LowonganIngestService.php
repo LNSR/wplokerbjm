@@ -11,7 +11,7 @@ use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\Sanitizer;
-use WPLokerBJM\Core\Container\Attributes\Injectable;;
+use WPLokerBJM\Core\Container\Attributes\Injectable;
 
 /**
  * @phpstan-type IngestErrorResult array{status: 400|500, data: array{code: string, message: string, warnings: array}}

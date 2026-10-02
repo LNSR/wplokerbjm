@@ -6,7 +6,7 @@ namespace WPLokerBJM;
 
 use Nette\Loaders\RobotLoader;
 use WPLokerBJM\Core\Wordpress\Theme\ThemeProp;
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyAutowireScanner;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
@@ -25,22 +25,20 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
  */
 class Bootstrap
 {
-    public private(set) static ?RobotLoader $robotLoader = null;
+    public private(set) static ?string $themeRoot = null;
 
     /**
      * Entry point. Called once from this file after the class definition.
      */
-    public static function boot(): void
+    public static function boot(string $themeName): void
     {
-        $theme = 'wplokerbjm';
-        if (get_stylesheet() !== $theme) {
+        if (get_stylesheet() !== $themeName) {
             return;
         }
 
-        $themeRoot = WP_CONTENT_DIR . '/themes/' . $theme;
-        require_once $themeRoot . '/vendor/autoload.php';
+        self::$themeRoot = WP_CONTENT_DIR . '/themes/' . $themeName;
 
-        self::setupRobotLoader($themeRoot);
+        require self::$themeRoot . '/vendor/autoload.php';
         self::initContainer();
     }
 
@@ -53,35 +51,29 @@ class Bootstrap
      *
      * In production, uses the cached index for zero parsing overhead.
      */
-    private static function setupRobotLoader(string $themeRoot): void
+    private static function setupRobotLoader(RobotLoader $robotLoader = new RobotLoader()): RobotLoader
     {
-        $rl = new RobotLoader;
-        $rl->addDirectory($themeRoot . '/server/');
-        $rl->addDirectory(__FILE__);
-        $rl->setCacheDirectory($themeRoot . '/cache/robotloader/');
-        $rl->setAutoRefresh(defined('WP_ENV') && WP_ENV === 'development');
-        $rl->reportParseErrors(defined('WP_DEBUG') && WP_DEBUG);
-        $rl->register();
+        $robotLoader->addDirectory(Bootstrap::$themeRoot . '/server/');
+        $robotLoader->addDirectory(__FILE__);
+        $robotLoader->setCacheDirectory(Bootstrap::$themeRoot . '/cache/robotloader/');
+        $robotLoader->setAutoRefresh(defined('WP_ENV') && WP_ENV === 'development');
+        $robotLoader->reportParseErrors(defined('WP_DEBUG') && WP_DEBUG);
+        $robotLoader->register();
 
-        self::setRobotLoader($rl);
+        return $robotLoader;
     }
-
-    /**
-     * Inject a RobotLoader instance — used by tests to share the test
-     * autoloader with @see AutowireScanner and @see WPHooksScanner.
-     */
-    public static function setRobotLoader(RobotLoader $rl): void
-    {
-        self::$robotLoader = $rl;
-    }
-
     /**
      * Build the PHP-DI container and run theme initialization.
      */
     private static function initContainer(): void
     {
         try {
-            $init = WPLokerBJMContainer::getContainer()->get(Init::class);
+            $rl = self::setupRobotLoader();
+            $c = new WPLokerBJMContainer(robotLoader: $rl, cacheDir: \sprintf('%s/cache', self::$themeRoot, '/'))
+                ->initContainerBuilder()
+                ->buildContainer();
+            $c->set(RobotLoader::class, $rl);
+            $init = $c->get(Init::class);
             $init->initialize();
         } catch (\Exception $e) {
             error_log('wplokerbjm Bootstrap error: ' . $e->getMessage());
@@ -90,4 +82,4 @@ class Bootstrap
 }
 // *Only auto-boot in WordPress context. Tests and CLI tools define
 // *WPLOKERBJM_TEST_ENV to load the class without executing boot().
-!defined('WPLOKERBJM_TEST_ENV')  &&  Bootstrap::boot();
+!defined('WPLOKERBJM_TEST_ENV')  &&  Bootstrap::boot('wplokerbjm');

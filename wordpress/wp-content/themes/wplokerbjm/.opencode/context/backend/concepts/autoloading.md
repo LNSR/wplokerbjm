@@ -15,7 +15,7 @@ The project uses **Nette RobotLoader** to auto-discover PHP classes in `server/`
 - Composer handles `vendor/` (PSR-4: `WPLokerBJM\` → `server/`)
 - RobotLoader index cached to avoid disk I/O (cache file checked before scan)
 - Bootstrap loads both: Composer autoloader first, then RobotLoader
-- PHP-DI `AutowireScanner` further discovers `#[Injectable]` classes for the container
+- PHP-DI `DependencyAutowireScanner` further discovers `#[Injectable]` classes for the container
 - Script `composer dump-autoload --apcu -a -o` on install/update for optimized autoloads
 
 ## Bootstrap Autoload Setup
@@ -43,7 +43,7 @@ $loader->register();
 
 **Container Discovery**:
 - `server/Core/Container/Support/WPHooks/WPHooksScanner.php` — Discovers hook attributes
-- `server/Core/Container/Support/AutowireScanner.php` — Discovers autowirable classes
+- `server/Core/Container/Support/DependencyAutowireScanner.php` — Discovers autowirable classes
 
 ## Related
 - `concepts/architecture.md` — Bootstrap flow in context

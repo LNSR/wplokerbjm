@@ -11,6 +11,6 @@ require_once $themeRoot . '/vendor/autoload.php';
 $wpRoot = dirname($themeRoot, 3);
 (new \Nette\Loaders\RobotLoader)
     ->addDirectory($themeRoot . '/server')
-    ->setTempDirectory(__DIR__ . '/cache')
+    ->setCacheDirectory(__DIR__ . '/cache')
     ->setAutoRefresh(true)
     ->register();

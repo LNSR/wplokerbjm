@@ -6,6 +6,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks;
 
 use Brick\VarExporter\VarExporter;
 
+use Nette\Loaders\RobotLoader;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
@@ -41,8 +42,12 @@ class WPHooksScanner
      * @param string $cacheLocation directory where cache file will be stored
      * @param WPHookPlanProvider|null $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
-    public function __construct(private string $namespace = 'WPLokerBJM', private string $cacheLocation = '', private ?WPHookPlanProvider $hookPlanProvider = null)
-    {
+    public function __construct(
+        private RobotLoader $robotloader,
+        private string $namespace = 'WPLokerBJM',
+        private string $cacheLocation = '',
+        private ?WPHookPlanProvider $hookPlanProvider = null
+    ) {
         $this->namespace = trim($namespace, '\\');
         $this->cacheLocation = is_dir($cacheLocation) || str_ends_with($cacheLocation, '/') || str_ends_with($cacheLocation, '\\')
             ? rtrim($cacheLocation, '/\\') . '/WPhooksRegistryContainerCache.php'
@@ -96,7 +101,7 @@ class WPHooksScanner
 
         $hookPlanProvider = $this->hookPlanProvider;
         $isTest = defined('WPLOKERBJM_TEST_ENV');
-        $methodMap = $isTest ? Bootstrap::$robotLoader->getIndexedClasses() : CompiledContainer::METHOD_MAPPING;
+        $methodMap = $isTest ? $this->robotloader->getIndexedClasses() : CompiledContainer::METHOD_MAPPING;
         foreach ($methodMap as $className => $entryGet) {
             if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
                 continue;

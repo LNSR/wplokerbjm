@@ -4,111 +4,164 @@ namespace WPLokerBJM\Core\Container;
 
 use DI\ContainerBuilder;
 use DI\Container;
+use Nette\Loaders\RobotLoader;
+use WPLokerBJM\Bootstrap;
+use WPLokerBJM\Core\Container\Attributes\Injectable;
 use WPLokerBJM\Core\Container\Definitions\{Core, Factory};
 use WPLokerBJM\Shared\Log\Logger;
 
-
+/**
+ * WPLokerBJM Container
+ * 
+ * Builder for the PHP-DI container.
+ */
+#[Injectable(skip: true)]
 class WPLokerBJMContainer
 {
-    private static ?Container $container = null;
-    /** @var __CLASS__::class */
-    public static ?object $CACHE_INFO = null;
-
-    private static function initializeCachePaths(?string $cacheDir = null, ?string $cacheFile = null): void
+    public function __construct(private RobotLoader $robotLoader, public private(set) ?string $cacheDir = null)
     {
-        self::$CACHE_INFO ??= new class($cacheDir, $cacheFile) {
-            public function __construct(public private(set) ?string $cacheDir, public private(set) ?string $cacheFile)
-            {
-                $this->cacheDir ??= \sprintf("%s/cache", rtrim(get_stylesheet_directory(), '/'));
-                $this->cacheFile ??= \sprintf("%s/CompiledContainer.php", $this->cacheDir);
-            }
-        };
+        $this->cacheDir ??= \sprintf("%s/cache", rtrim(get_stylesheet_directory()));
+        $this->cacheFile ??= \sprintf("%s/CompiledContainer.php", $this->cacheDir);
+    }
+
+    private ?ContainerConfigurationState $containerConfigurationState {
+        get => $this->containerConfigurationState ??= new ContainerConfigurationState();
+    }
+    public private(set) ?string $cacheFile = null;
+
+    private ?WPLokerBJMContainerBuilderConfiguration $builderConfiguration {
+        get => $this->builderConfiguration ??= new WPLokerBJMContainerBuilderConfiguration(
+            $this,
+            $this->robotLoader,
+            $this->containerConfigurationState
+        );
     }
 
     /**
-     * Get the DI container instance.
-     * 
-     * Creates and configures a PHP-DI container with autowiring, caching, and custom definitions.
-     * Uses singleton pattern to ensure only one container instance exists.
-     * 
-     * @param bool|null $rebuild Whether to rebuild the container (skip cache). Default false.
-     * @return Container The configured DI container
-     * @throws \Exception If container creation fails
+     * @param bool $forceRebuild
      */
-    public static function getContainer(bool $rebuild = false): Container
+    public function initContainerBuilder(bool $forceRebuild = false): WPLokerBJMContainerBuilderConfiguration
     {
-        if (self::$container !== null && $rebuild === false) {
-            return self::$container;
-        }
-
-        self::initializeCachePaths();
-
         try {
-            $builder = new ContainerBuilder();
-
-            $builder->useAutowiring(true);
-            $builder->useAttributes(true);
-
-            self::setupCache($builder, (bool) $rebuild);
-
-            self::$container = $builder->build();
+            if ($this->containerConfigurationState->configured && !$forceRebuild) {
+                throw new \LogicException('Container already configured, use forceRebuild to force rebuild');
+            }
+            if ($forceRebuild) {
+                $this->containerConfigurationState = null;
+                @is_readable($this->cacheDir) && @unlink($this->cacheFile);
+            }
+            $this->containerConfigurationState->containerBuilder = new ContainerBuilder();
+            return $this->builderConfiguration;
         } catch (\Exception $e) {
             Logger::error('Container', 'Container::getContainer error: ' . $e->getMessage());
             Logger::flush();
             throw $e;
         }
-        return self::$container;
+    }
+}
+
+/**
+ * @internal
+ */
+#[Injectable(skip: true)]
+final class WPLokerBJMContainerBuilderConfiguration
+{
+
+    public function __construct(
+        private WPLokerBJMContainer $wpLokerContainer,
+        private RobotLoader $robotLoader,
+        private ContainerConfigurationState $containerConfigurationState
+    ) {}
+
+    public function setExtraDefinitionsSet(array $extraDefinitionsSet): static
+    {
+        $this->statusException();
+        $this->containerConfigurationState->extraDefinitionsSet = $extraDefinitionsSet;
+        return $this;
     }
 
-
-    /**
-     * Setup definitions
-     */
-    private static function setupDefinitions(ContainerBuilder $builder): void
+    public function buildContainer(): Container
     {
-        $builder->addDefinitions(
-            // Last position will overwrite previous definitions
-            \array_merge(
-                Core::getDefinitions(),
-                // factory definitions
-                Factory::getDefinitions(),
-            )
-        );
+        $builder = $this->containerConfigurationState->containerBuilder;
+        $builder->useAutowiring(false);
+        $builder->useAttributes(true);
+        $this->setupCache();
+        $c = $builder->build();
+        if (!$c->has(WPLokerBJMContainer::class)) {
+            $c->set(WPLokerBJMContainer::class, $this->wpLokerContainer);
+        }
+        $this->containerConfigurationState->configured = true;
+        return $c;
+    }
+
+    private function statusException(): void
+    {
+        if ($this->containerConfigurationState->configured) {
+            throw new \LogicException('Container already configured, use forceRebuild to force rebuild');
+        }
     }
 
     /**
      * Configures container compilation using strict guard clauses to minimize disk I/O.
-     * @param ContainerBuilder $builder
-     * @param bool $rebuild
      */
-    private static function setupCache(ContainerBuilder $builder, bool $rebuild): void
+    private function setupCache(): void
     {
-        $hasCache = file_exists(self::$CACHE_INFO->cacheFile);
+        $builder = $this->containerConfigurationState->containerBuilder;
+        $hasCache = \is_readable($this->wpLokerContainer->cacheFile);
 
-        if ($hasCache && !$rebuild) {
-            $builder->enableCompilation(self::$CACHE_INFO->cacheDir);
+        if ($hasCache) {
+            $builder->enableCompilation($this->wpLokerContainer->cacheDir);
             return;
         }
 
-        if (!is_dir(self::$CACHE_INFO->cacheDir) && !mkdir(self::$CACHE_INFO->cacheDir, 0755, true)) {
-            Logger::error('Container', "Failed to create cache directory: " . self::$CACHE_INFO->cacheDir);
-            Logger::flush();
+        if (!is_dir($this->wpLokerContainer->cacheDir) && !mkdir($this->wpLokerContainer->cacheDir, 0755, true)) {
+            Logger::error('Container', "Failed to create cache directory: " . $this->wpLokerContainer->cacheDir);
             return;
         }
 
-        if (!is_writable(self::$CACHE_INFO->cacheDir)) {
-            Logger::warning('Container', "Compilation directory not writable, skipping compilation: " . self::$CACHE_INFO->cacheDir);
+        if (!is_writable($this->wpLokerContainer->cacheDir)) {
+            Logger::warning('Container', "Compilation directory not writable, skipping compilation: " . $this->wpLokerContainer->cacheDir);
             Logger::flush();
             return;
         }
 
         try {
-            self::setupDefinitions($builder);
-
-            $builder->enableCompilation(self::$CACHE_INFO->cacheDir);
-            $builder->writeProxiesToFile(true, self::$CACHE_INFO->cacheFile . '/');
+            $this->persistDefinition($builder);
+            $builder->enableCompilation($this->wpLokerContainer->cacheDir);
+            $builder->writeProxiesToFile(true, $this->wpLokerContainer->cacheDir . '/');
         } catch (\Exception $e) {
             Logger::warning('Container', 'Failed to enable compilation: ' . $e->getMessage());
         }
     }
+    /**
+     * persist definitions
+     */
+    private function persistDefinition(ContainerBuilder $builder): void
+    {
+        $coreDefinition = new Core($this->robotLoader);
+        $factoryDefinitions = new Factory();
+
+        $builder->addDefinitions(
+            // default definitions
+            // Last position will overwrite previous definitions
+            \array_merge(
+                // core definitions
+                $coreDefinition->getDefinitions(),
+                // factory definitions
+                $factoryDefinitions->getDefinitions(),
+                $this->containerConfigurationState->extraDefinitionsSet
+            )
+        );
+    }
+}
+/**
+ * @internal
+ */
+#[Injectable(skip: true)]
+final class ContainerConfigurationState
+{
+    /** @var array<string,object> */
+    public array $extraDefinitionsSet = [];
+    public bool $configured = false;
+    public ?ContainerBuilder $containerBuilder = null;
 }

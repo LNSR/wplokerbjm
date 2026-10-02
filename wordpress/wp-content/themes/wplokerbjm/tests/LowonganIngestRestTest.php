@@ -17,6 +17,24 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
     {
         parent::setUp();
     }
+    private function getIngestRoute(): LowonganIngestRoute
+    {
+        return $this->container()->get(LowonganIngestRoute::class);
+    }
+    private function getIngestOptionsController(): LowonganIngestOptionsController
+    {
+        return $this->container()->get(LowonganIngestOptionsController::class);
+    }
+    private function getIngestController(): LowonganIngestController
+    {
+        return $this->container()->get(LowonganIngestController::class);
+    }
+    private function getIngestService(): LowonganIngestService
+    {
+        return $this->container()->get(LowonganIngestService::class);
+    }
+    
+    
     
     // ----------------------------------------------------------------
     //  Route registration
@@ -31,8 +49,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
             return true;
         });
 
-        $route = $this->container()->get(LowonganIngestRoute::class);
-        $route->registerRoutes();
+        $this->getIngestRoute()->registerRoutes();
 
         // registerRoutes() registers two routes: OPTIONS first, then POST.
         $post = $registeredRoutes[1] ?? null;
@@ -53,8 +70,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
             return true;
         });
 
-        $route = $this->container()->get(LowonganIngestRoute::class);
-        $route->registerRoutes();
+        $this->getIngestRoute()->registerRoutes();
 
         // registerRoutes() registers two routes: OPTIONS first, then POST.
         $options = $registeredRoutes[0] ?? null;
@@ -77,7 +93,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
         \Brain\Monkey\Functions\when('is_user_logged_in')->justReturn(true);
         \Brain\Monkey\Functions\when('current_user_can')->alias(fn($capability) => $capability === 'edit_posts');
 
-        $controller = $this->container()->get(LowonganIngestController::class);
+        $controller = $this->getIngestController();
 
         $this->assertSame(401, $controller->getPermissionErrorStatus($this->requestWithBearer('')));
         $this->assertNull($controller->getPermissionErrorStatus($this->requestWithBearer()));
@@ -88,7 +104,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
         \Brain\Monkey\Functions\when('is_user_logged_in')->justReturn(false);
         \Brain\Monkey\Functions\when('current_user_can')->justReturn(false);
 
-        $controller = $this->container()->get(LowonganIngestOptionsController::class);
+        $controller = $this->getIngestOptionsController();
 
         $this->assertSame(401, $controller->getPermissionErrorStatus($this->requestWithBearer()));
     }
@@ -98,7 +114,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
         \Brain\Monkey\Functions\when('is_user_logged_in')->justReturn(true);
         \Brain\Monkey\Functions\when('current_user_can')->justReturn(true);
 
-        $controller = $this->container()->get(LowonganIngestOptionsController::class);
+        $controller = $this->getIngestOptionsController();
 
         $this->assertSame(401, $controller->getPermissionErrorStatus($this->requestWithBearer('')));
     }
@@ -110,7 +126,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
             fn($capability) => $capability === 'edit_posts' ? false : true
         );
 
-        $controller = $this->container()->get(LowonganIngestOptionsController::class);
+        $controller = $this->getIngestOptionsController();
 
         $this->assertSame(403, $controller->getPermissionErrorStatus($this->requestWithBearer()));
     }
@@ -122,7 +138,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
             fn($capability) => $capability === 'edit_posts'
         );
 
-        $controller = $this->container()->get(LowonganIngestOptionsController::class);
+        $controller = $this->getIngestOptionsController();
 
         $this->assertNull($controller->getPermissionErrorStatus($this->requestWithBearer()));
     }
@@ -133,7 +149,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
 
     public function testMissingTitleReturnsBadRequest(): void
     {
-        $service = $this->container()->get(LowonganIngestService::class);
+        $service = $this->getIngestService();
 
         $result = $service->createDraftFromPayload([
             CustomFields::NAMA_PERUSAHAAN => 'PT. Gracia Guna Medika',
@@ -146,7 +162,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
 
     public function testPayloadWithoutMeaningfulDetailReturnsBadRequest(): void
     {
-        $service = $this->container()->get(LowonganIngestService::class);
+        $service = $this->getIngestService();
 
         $result = $service->createDraftFromPayload([
             'title' => 'Marketing Alat Kesehatan | PT. Gracia Guna Medika',
@@ -192,7 +208,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
         \Brain\Monkey\Functions\when('get_edit_post_link')->alias(fn($postId) => 'https://example.test/wp-admin/post.php?post=' . $postId . '&action=edit');
         \Brain\Monkey\Functions\when('get_permalink')->alias(fn($postId) => 'https://example.test/lowongan/marketing-alat-kesehatan/');
 
-        $service = $this->container()->get(LowonganIngestService::class);
+        $service = $this->getIngestService();
         $result = $service->createDraftFromPayload($this->validPayload(), $this->fixtureUpload());
 
         $this->assertSame(201, $result['status']);
@@ -236,7 +252,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
         $this->mockCommonWordPressFunctions();
         \Brain\Monkey\Functions\when('get_posts')->justReturn([555]);
 
-        $service = $this->container()->get(LowonganIngestService::class);
+        $service = $this->getIngestService();
         $result = $service->createDraftFromPayload($this->validPayload(), $this->fixtureUpload());
 
         $this->assertSame(409, $result['status']);
@@ -260,7 +276,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
         $payload = $this->validPayload();
         $payload[Taxonomies::JENIS_PEKERJAAN] = 'Super Shift';
 
-        $service = $this->container()->get(LowonganIngestService::class);
+        $service = $this->getIngestService();
         $result = $service->createDraftFromPayload($payload, $this->fixtureUpload());
 
         $this->assertSame(201, $result['status']);
@@ -297,7 +313,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
             ],
         ];
 
-        $service = $this->container()->get(LowonganIngestService::class);
+        $service = $this->getIngestService();
         $result = $service->createDraftFromPayload($payload, $this->fixtureUpload());
 
         $this->assertSame(201, $result['status']);
@@ -339,8 +355,8 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
             };
         });
 
-        $controller = $this->container()->get(LowonganIngestOptionsController::class);
-        $options = \Closure::bind(fn() => $controller->service->getTaxonomyOptionsData(), $controller, $controller)();
+        $controller = $this->getIngestOptionsController();
+        $options = \Closure::bind(fn() => $this->service->getTaxonomyOptionsData(), $controller, $controller)();
 
         $this->assertSame(['perusahaan'], $options['reserved_taxonomies']);
         $this->assertArrayNotHasKey(Taxonomies::PERUSAHAAN, $options['taxonomies']);
@@ -375,8 +391,8 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
         \Brain\Monkey\Functions\when('is_wp_error')->alias(fn($value) => false);
         \Brain\Monkey\Functions\when('get_terms')->justReturn([]);
 
-        $controller = $this->container()->get(LowonganIngestOptionsController::class);
-        $options = \Closure::bind(fn() => $controller->service->getTaxonomyOptionsData(), $controller, $controller)();
+        $controller = $this->getIngestOptionsController();
+        $options = \Closure::bind(fn() => $this->service->getTaxonomyOptionsData(), $controller, $controller)();
 
         $this->assertSame('lowongan_ingest_options.v1', $options['schema']);
         $this->assertArrayHasKey('taxonomies', $options);

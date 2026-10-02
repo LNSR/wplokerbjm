@@ -1032,6 +1032,7 @@ class WPHooksInstanceObjectCache
     }
 
     /** 
+     * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
     private object $cacheState {

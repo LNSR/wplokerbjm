@@ -33,7 +33,7 @@ The DI container automatically scans the `server/` directory recursively and reg
 
 ### Automatic Registration
 
-The `AutowireScanner` class automatically discovers and registers classes that are:
+The `DependencyAutowireScanner` class automatically discovers and registers classes that are:
 
 - ✅ **Concrete classes** with public constructors
 - ✅ **Regular service classes** (repositories, services, controllers, etc.)
@@ -49,7 +49,7 @@ The scanner intelligently skips classes that shouldn't be autowired:
 - ❌ **Static-only classes** - Don't need instances (utility classes, etc.)
 - ❌ **Traits** - Cannot be instantiated
 - ❌ **Classes with non-public constructors** - Cannot be autowired
-- ❌ **The AutowireScanner class itself** - To avoid circular dependencies
+- ❌ **The DependencyAutowireScanner class itself** - To avoid circular dependencies
 
 ### Manual Definitions
 
@@ -365,7 +365,7 @@ class ThemeProp
 
 ### How Hook Registration Works
 
-- **Two registration paths.** Container path: the `AutowireScanner` finds `#[Action]` / `#[Filter]` methods, and the `Init` service registers them as lazy `ContainerLazyHookHandler`s when the container initializes — the service is resolved from the DI container only when the hook actually fires. Runtime path: `WPHooksInstanceRegistry::registerHooksOn($object)` registers the hooks of an already-instantiated object immediately (attribute closures resolved via `RuntimeWPHookProvider`, static closures required).
+- **Two registration paths.** Container path: the `DependencyAutowireScanner` finds `#[Action]` / `#[Filter]` methods, and the `Init` service registers them as lazy `ContainerLazyHookHandler`s when the container initializes — the service is resolved from the DI container only when the hook actually fires. Runtime path: `WPHooksInstanceRegistry::registerHooksOn($object)` registers the hooks of an already-instantiated object immediately (attribute closures resolved via `RuntimeWPHookProvider`, static closures required).
 - **Gates.** `registerIf` runs once at registration time; `executeIf` runs on every fire — when it fails, filters pass the original value through unchanged and actions return `null`.
 - **Deferred pool.** `deferRegister` hooks skip registration until activated via `activateDeferredByHook()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()`; `deferRegisterUntilHook` auto-activates when its trigger hook fires.
 - **Lifecycle.** `once` hooks self-remove after the first evaluation; `unregisterByCallable()` / `ByHook()` / `ByClass()` / `ByNamespace()` / `ByTags()` plus wildcard `unregisterByHookPattern()` / `unregisterByTagPattern()` tear hooks down.

@@ -10,13 +10,13 @@ use WPLokerBJM\Core\Container\Attributes\Action;
 
 final class LowonganIngestRoute
 {
-    public const NAMESPACE = 'wplokerbjm/v1';
-    public const ROUTE = '/lowongan/ingest';
-    public const ROUTE_OPTIONS = self::ROUTE . '/options';
+    public const string NAMESPACE = 'wplokerbjm/v1';
+    public const string ROUTE = '/lowongan/ingest';
+    public const string ROUTE_OPTIONS = self::ROUTE . '/options';
 
     public function __construct(
-        private readonly LowonganIngestController $controller,
-        private readonly LowonganIngestOptionsController $optionsController
+        private readonly LowonganIngestController $controllerIngestIngest,
+        private readonly LowonganIngestOptionsController $optionsControllerIngestIngest
     ) {
     }
 
@@ -31,13 +31,13 @@ final class LowonganIngestRoute
 
         register_rest_route(self::NAMESPACE , self::ROUTE_OPTIONS, [
             'methods' => 'GET',
-            'callback' => $this->optionsController->options(...),
-            'permission_callback' => $this->optionsController->permissionsCheck(...),
+            'callback' => $this->optionsControllerIngestIngest->options(...),
+            'permission_callback' => $this->optionsControllerIngestIngest->permissionsCheck(...),
         ]);
         register_rest_route(self::NAMESPACE , self::ROUTE, [
             'methods' => 'POST',
-            'callback' => $this->controller->ingest(...),
-            'permission_callback' => $this->controller->permissionsCheck(...),
+            'callback' => $this->controllerIngestIngest->ingest(...),
+            'permission_callback' => $this->controllerIngestIngest->permissionsCheck(...),
         ]);
     }
 }

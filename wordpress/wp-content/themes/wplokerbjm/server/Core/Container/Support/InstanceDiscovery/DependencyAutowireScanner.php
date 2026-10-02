@@ -8,6 +8,7 @@ use ReflectionClass;
 use ScannerDefinition;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 use DI\Definition\AutowireDefinition;
+use Nette\Loaders\RobotLoader;
 use WPLokerBJM\Bootstrap;
 
 /**
@@ -17,25 +18,24 @@ use WPLokerBJM\Bootstrap;
  * and creates PHP-DI autowire definitions for suitable classes. Excludes
  * interfaces, abstracts, static-only classes, and attribute classes.
  *
- * Relies on WPLokerBJM\Bootstrap's RobotLoader for class discovery
- * instead of manual file scanning.
  * @template TClass of class-string
  * @phpstan-type ScannerDefinition array{TClass, AutowireDefinition|null}
  * @see \WPLokerBJM\Core\Container\Definitions\Core
  * @see \WPLokerBJM\Bootstrap
  */
-class AutowireScanner
+class DependencyAutowireScanner
 {
 
     /** @var ScannerDefinition */
     private ?array $cachedDefinitions = null;
+    private AutowireClassesChecker $checkClass;
 
     public function __construct(
-        private ?AutowireClassesChecker $checkClass = null,
+        private RobotLoader $robotLoader,
         array $excludedSubNamespaces = []
     ) {
-        $excludedSubNamespaces = array_map(fn(string $namespace): string => trim($namespace, '\\'), $excludedSubNamespaces);
-        $this->checkClass ??= new AutowireClassesChecker($excludedSubNamespaces);
+        $excludedSubNamespaces = array_map(static fn(string $namespace): string => trim($namespace, '\\'), $excludedSubNamespaces);
+        $this->checkClass = new AutowireClassesChecker($excludedSubNamespaces);
     }
 
     /**
@@ -61,7 +61,7 @@ class AutowireScanner
     {
         $definitions = [];
 
-        foreach (Bootstrap::$robotLoader->getIndexedClasses() as $className => $file) {
+        foreach ($this->robotLoader->getIndexedClasses() as $className => $file) {
             $checkList = $this->checkClass->isAutowirable($className);
 
             if (!$checkList->isAutowirable) {

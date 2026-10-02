@@ -163,7 +163,7 @@ public function registerTypes(): void
 
 ## Code Standards
 
-- DI container auto-discovers services via `AutowireScanner` (Reflection-based); services identified by `#[Action]`/`#[Filter]` attributes — no manual hook registration
+- DI container auto-discovers services via `DependencyAutowireScanner` (Reflection-based); services identified by `#[Action]`/`#[Filter]` attributes — no manual hook registration
 - Controllers return `\WP_REST_Response` or `\WP_Error`; never die/exit directly
 - Resolvers always wrap in try/catch, log errors via `Logger`, return empty/default on failure
 - Cache invalidation via `Cache::deleteMultiple()` / `Cache::deletePattern()` with wildcards
@@ -213,7 +213,7 @@ private \Closure $allowedOrigins; // lazy first-class callable
 
 **Cache**: `server/Shared/Cache/Cache.php`, `server/Shared/Cache/CacheKey.php`
 
-**DI**: `server/Core/Container/Support/InstanceDiscovery/AutowireScanner.php`, `server/Core/Container/Definitions/Factories.php`, `server/Core/Container/Attributes/AttributesDI.php`, `server/Core/Container/Support/InstanceDiscovery/DependencyInjector.php`, `server/Core/Container/Support/InstanceDiscovery/Abstract/AsChildClass.php`, `cache/DependencyInjectorCache.php`
+**DI**: `server/Core/Container/Support/InstanceDiscovery/DependencyAutowireScanner.php`, `server/Core/Container/Definitions/Factories.php`, `server/Core/Container/Attributes/AttributesDI.php`, `server/Core/Container/Support/InstanceDiscovery/DependencyInjector.php`, `server/Core/Container/Support/InstanceDiscovery/Abstract/AsChildClass.php`, `cache/DependencyInjectorCache.php`
 
 **Dev Workflows**: `tools/Composer/Scripts/autoloadwatcher.sh`, `tools/Composer/Scripts/test.sh`, `tools/Composer/Scripts/lint.sh`, `tests/InitLazyHookTest.php`, `tests/DeferredHookTest.php`, `tests/DynamicTagTest.php`
 

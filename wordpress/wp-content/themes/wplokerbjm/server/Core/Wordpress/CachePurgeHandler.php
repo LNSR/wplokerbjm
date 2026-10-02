@@ -34,6 +34,7 @@ class CacheInvalidationHooks
      * is handled separately by {@see self::purgeGlobalCacheOnce}.
      *
      * Registered only on hooks that carry post context.
+     * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
     #[Action('save_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 2)]

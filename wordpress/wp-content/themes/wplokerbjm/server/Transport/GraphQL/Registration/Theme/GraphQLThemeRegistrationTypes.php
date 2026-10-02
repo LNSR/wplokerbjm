@@ -1,9 +1,11 @@
 <?php
 
 namespace WPLokerBJM\Transport\GraphQL\Registration\Theme;
+
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 use WPLokerBJM\Transport\GraphQL\Resolvers\ThemeDataResolver;
 use WPLokerBJM\Core\Wordpress\Theme\ThemeHooks;
+
 /**
  * @phpstan-import-type ThemeData from ThemeHooks
  */
@@ -21,25 +23,29 @@ class GraphQLThemeRegistrationTypes
 
     private function registerObjectTypes(): void
     {
+        /** @var ThemeData['logo'] $fieldLogo */
+        $fieldLogo = [
+            'logoUrl' => ['type' => GraphQLRegistration::TYPE_STRING],
+            'logoSrcset' => ['type' => GraphQLRegistration::TYPE_STRING],
+            'logoSizes' => ['type' => GraphQLRegistration::TYPE_STRING],
+            'logoDecoding' => ['type' => GraphQLRegistration::TYPE_STRING],
+            'logoWidth' => ['type' => GraphQLRegistration::TYPE_INT],
+            'logoHeight' => ['type' => GraphQLRegistration::TYPE_INT],
+        ];
         register_graphql_object_type(self::TYPE_LOGO, [
             'description' => 'Logo image data',
-            'fields' => [
-                'logoUrl' => ['type' => GraphQLRegistration::TYPE_STRING],
-                'logoSrcset' => ['type' => GraphQLRegistration::TYPE_STRING],
-                'logoSizes' => ['type' => GraphQLRegistration::TYPE_STRING],
-                'logoDecoding' => ['type' => GraphQLRegistration::TYPE_STRING],
-                'logoWidth' => ['type' => GraphQLRegistration::TYPE_INT],
-                'logoHeight' => ['type' => GraphQLRegistration::TYPE_INT],
-            ],
+            'fields' => $fieldLogo,
         ]);
 
+        /** @var ThemeData $fieldThemeData */
+        $fieldThemeData = [
+            'logo' => ['type' => self::TYPE_LOGO],
+            'wpGraphqlNonce' => ['type' => GraphQLRegistration::TYPE_STRING],
+            'siteIconTags' => ['type' => GraphQLRegistration::TYPE_STRING],
+        ];
         register_graphql_object_type(self::TYPE_THEME_DATA, [
             'description' => 'Theme data object',
-            'fields' => [
-                'logo' => ['type' => self::TYPE_LOGO],
-                'wpGraphqlNonce' => ['type' => GraphQLRegistration::TYPE_STRING],
-                'siteIconTags' => ['type' => GraphQLRegistration::TYPE_STRING],
-            ],
+            'fields' => $fieldThemeData,
         ]);
     }
 

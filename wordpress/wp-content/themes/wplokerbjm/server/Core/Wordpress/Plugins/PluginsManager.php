@@ -203,6 +203,7 @@ class PluginManagement
     #region filter hooks sequence
     /**
      * activation hooks steps
+     * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
     public private(set) ModuleClassHookMetadata $pluginEnvironmentCheck {

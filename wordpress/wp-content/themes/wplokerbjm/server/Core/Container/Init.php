@@ -6,6 +6,7 @@ use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * Initializes core services in the wplokerbjm theme by registering WordPress hooks.
@@ -39,7 +40,7 @@ class Init
     #[Action('shutdown', \PHP_INT_MAX)]
     private function shutdown(): void
     {
-        Logger::flush();
+        SharedUtils::doActivityAtEndRequest(Logger::flush(...));
     }
 
     /**

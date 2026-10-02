@@ -56,11 +56,13 @@ final class ProxyContainer
         if (self::$container instanceof Container) {
             return self::$container;
         }
+        global $testRobotLoader;
 
         // Ensure runtime is booted before container initialization.
         self::boot();
-        self::$container = WPLokerBJMContainer::getContainer();
-        return self::$container;
+        return self::$container = new WPLokerBJMContainer($testRobotLoader)
+            ->initContainerBuilder()
+            ->buildContainer();
     }
 
     private static function themeRoot(): string

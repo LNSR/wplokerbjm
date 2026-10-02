@@ -23,7 +23,7 @@ ContainerLazyHookHandler            Service instantiated
 
 - `#[Action('hook_name', priority, args)]` replaces `add_action()`
 - `#[Filter('hook_name', priority, args)]` replaces `add_filter()`
-- Methods must be in **autowirable classes** (discovered by AutowireScanner)
+- Methods must be in **autowirable classes** (discovered by DependencyAutowireScanner)
 - Attribute params: `executeIf`, `registerIf`, `tag` (static list or callable), `deferRegisterUntilHook`, `once`, `deferRegister`
 - `deferRegister = true` skips registration by default (opt-in activation); `deferRegisterUntilHook` defers until a named trigger hook fires and implies defer
 - `once` removes the registration after its first evaluation

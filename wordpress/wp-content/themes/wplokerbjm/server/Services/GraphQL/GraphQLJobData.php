@@ -38,13 +38,19 @@ use WPLokerBJM\Services\Schema\SEO\JobSchemaOrg;
  *     status_pekerjaan?: int,
  * }
  * 
+ * @phpstan-type JobContacts array{
+ *     email_kontak?: string|null,
+ *     nomor_kontak?: string|null,
+ *     situs_kontak?: string|null,
+ * }
+ * 
  * @phpstan-type JobDetailData CardData|array{
  *     tentang_perusahaan?: string|null,
  *     deskripsi_pekerjaan?: string|null,
  *     persyaratan?: string|null,
  *     cara_melamar?: string|null,
  *     benefit?: string|null,
- *     contacts?: array{email_kontak?: string, nomor_kontak?: string, situs_kontak?: string},
+ *     contacts?: JobContacts,
  *     social_media?: string|null,
  *     dpNonce?: string,
  * }

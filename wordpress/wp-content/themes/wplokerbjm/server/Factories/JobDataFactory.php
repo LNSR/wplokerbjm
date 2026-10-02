@@ -10,7 +10,8 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Repositories\{CustomFieldRepository, TaxonomyRepository};
 /**
  *  @phpstan-type JobData array{
- *     nama_perusahaan?: string,
+ *     nama_perusahaan?: string, // from custom field
+ *     perusahaan?: string, //  from taxonomy
  *     tentang_perusahaan?: string|null,
  *     deskripsi_pekerjaan?: string|null,
  *     persyaratan?: string|null,
