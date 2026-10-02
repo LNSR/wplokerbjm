@@ -4,7 +4,7 @@
 
 ## 1. Discover and cache
 
-Call `WPHooksScanner::getHookRegistrations()` from the bootstrap path. It first checks the request-local cache, then an existing `WPHooksCache.php`; otherwise it scans RobotLoader-indexed classes. Only declared, non-static methods and properties are eligible. Successful scans are memoized and optionally exported as arrays plus closure snapshots.
+Call `WPHooksScanner::getHookRegistrations()` from the bootstrap path. It first checks the request-local cache, then an existing `WPhooksRegistryContainerCache.php`; otherwise it scans RobotLoader-indexed classes. Only declared, non-static methods and properties are eligible. Successful scans are memoized and optionally exported as arrays plus closure snapshots.
 
 ## 2. Build the registration plan
 

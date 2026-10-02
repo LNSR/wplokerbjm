@@ -11,7 +11,7 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 1. `WPHooksScanner` reads classes indexed by the RobotLoader.
 2. `HookScannerTrait` scans declared, non-static methods and properties for `#[Action]` / `#[Filter]`.
 3. Each attribute becomes a `HookRegistration`; callable metadata is converted into serializable resolution plans.
-4. The scanner can export registrations to `WPHooksCache.php` and reload them on later requests.
+4. The scanner can export registrations to `WPhooksRegistryContainerCache.php` and reload them on later requests.
 5. `WPHooksContainerRegistry` resolves the hook name, `registerIf` gate, and tags, then builds a lazy method/property handler.
 6. Active handlers call `add_action()` / `add_filter()` during `initialize()`; deferred handlers wait in `DeferredHookManager`.
 7. At fire time the handler resolves the service from the container, evaluates `executeIf`, and invokes the method or property callable.

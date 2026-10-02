@@ -12,7 +12,7 @@ use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
 use WPGraphQL\Utils\InstrumentSchema;
 use WPGraphQL\Utils\Tracing;
-use WPLokerBJM\Core\ContainerRegistryActions;
+use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
 use WPLokerBJM\Shared\Log\Logger;
 
 /*======================================================================
@@ -35,7 +35,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * on 'lowongan' post type.
  * @see JobsDataResolver::resolveSearchJobs
  */
-class SearchHooks
+final class SearchHooks
 {
 
     /**
@@ -62,11 +62,19 @@ class SearchHooks
      * @see InstrumentSchema::wrap_fields
      * @see Tracing::init
      */
-    #[Action('graphql_before_resolve_field', 10, 8, once: true, deferRegisterUntilHook: 'init_graphql_request', executeIf: static function (ResolveInfo $info): bool {
-        $result = $info->fieldName === GraphQLRegistration::TYPE_SEARCH_JOBS;
-        if (!$result) do_action(ContainerRegistryActions::UNREGISTER_DEFERRED_BY_CALLABLE, [__CLASS__, 'jobPostsSearchFilterImpl']);
-        return $result;
-    })]
+    #[Action(
+        'graphql_before_resolve_field',
+        10,
+        8,
+        once: true,
+        tag: ['graphql'],
+        deferRegister: true,
+        executeIf: static function (ResolveInfo $info): bool {
+            $result = $info->fieldName === GraphQLRegistration::TYPE_SEARCH_JOBS;
+            if (!$result) do_action(ContainerRegistryEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [__CLASS__, 'jobPostsSearchFilterImpl']);
+            return $result;
+        }
+    )]
     public function beforeResolveField(
         mixed $source,
         array $args,
@@ -77,6 +85,6 @@ class SearchHooks
         string $fieldKey,
         FieldDefinition $field,
     ): void {
-        do_action(ContainerRegistryActions::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'jobPostsSearchFilterImpl']);
+        do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'jobPostsSearchFilterImpl']);
     }
 }

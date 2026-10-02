@@ -5,7 +5,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Abstract;
 
 use Override;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
-use WPLokerBJM\Core\HooksInstanceRegistryActions;
+use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryEvent;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -51,6 +51,6 @@ abstract class ModuleClassHookMetadata extends AsChildClass
     public function __destruct()
     {
         if (\defined('WPLOKERBJM_TEST_ENV') && WPLOKERBJM_TEST_ENV) return;
-        \do_action(HooksInstanceRegistryActions::UNREGISTER_HOOKS, $this);
+        \do_action(InstanceRuntimeRegistryEvent::UNREGISTER_HOOKS, $this);
     }
 }

@@ -4,7 +4,7 @@ namespace WPLokerBJM\Core\Container\Definitions;
 
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, HookTargetResolver, WPHooksContainerRegistry, WPHooksRuntimeCache, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
@@ -42,13 +42,13 @@ class Core implements DefinitionProviderInterface
             HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class))->lazy(),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor($namespace, static fn() => get_stylesheet_directory() . "/cache", \DI\get(WPHookPlanProvider::class))->lazy(),
-            WPHooksRuntimeCache::class => \DI\autowire(WPHooksRuntimeCache::class)->constructor(
-                static fn(): string => get_stylesheet_directory() . '/cache/WPHooksRuntimeCache.php'
+            WPHooksInstanceObjectCache::class => \DI\autowire(WPHooksInstanceObjectCache::class)->constructor(
+                static fn(): string => get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
             ),
             WPHooksInstanceRegistry::class => \DI\autowire(WPHooksInstanceRegistry::class)->constructor(
                 \DI\get(HookRuntimeResolver::class),
                 static fn() => new EntriesIndexer(),
-                \DI\get(WPHooksRuntimeCache::class),
+                \DI\get(WPHooksInstanceObjectCache::class),
                 \DI\get(RuntimeWPHookProvider::class),
             ),
             DeferredHookManager::class => \DI\autowire(DeferredHookManager::class)->constructor(

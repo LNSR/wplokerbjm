@@ -45,7 +45,7 @@ class WPHooksScanner
     {
         $this->namespace = trim($namespace, '\\');
         $this->cacheLocation = is_dir($cacheLocation) || str_ends_with($cacheLocation, '/') || str_ends_with($cacheLocation, '\\')
-            ? rtrim($cacheLocation, '/\\') . '/WPHooksCache.php'
+            ? rtrim($cacheLocation, '/\\') . '/WPhooksRegistryContainerCache.php'
             : $cacheLocation;
     }
 

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract;
 
 use WPGraphQL;
-use WPLokerBJM\Core\DependencyInjectorHookActions;
+use WPLokerBJM\Core\Wordpress\DependencyInjectorEvent;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -27,7 +27,7 @@ abstract class AsChildClass
         public private(set) readonly string $identifier,
     ) {
         if (defined('WPLOKERBJM_TEST_ENV')) return;
-        do_action(DependencyInjectorHookActions::INJECT_ON, $this);
+        do_action(DependencyInjectorEvent::INJECT_ON, $this);
     }
 
     /**

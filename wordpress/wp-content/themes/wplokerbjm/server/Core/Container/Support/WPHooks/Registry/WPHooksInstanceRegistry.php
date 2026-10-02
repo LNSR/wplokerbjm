@@ -91,7 +91,7 @@ class WPHooksInstanceRegistry
     public function __construct(
         private HookRuntimeResolver $runtimeResolver = new HookRuntimeResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
-        public ?WPHooksRuntimeCache $cache = null,
+        public ?WPHooksInstanceObjectCache $cache = null,
         private readonly ?RuntimeWPHookProvider $provider = null,
     ) {
         $this->weakRegistry = new \WeakMap();
@@ -1004,7 +1004,7 @@ class HookRuntimeResolver
  * stable (parentClass, parentProperty) pair that uniquely identifies the
  * property-hook site. The reflected metadata (resolved hook names, plans,
  * hook-arg names) for that site is accumulated in an in-memory buffer during
- * the request and flushed atomically to WPHooksRuntimeCache.php, so repeated
+ * the request and flushed atomically to WPHooksInstanceObjectCache.php, so repeated
  * registerHooksOn() calls skip all reflection.
  *
  * Per-instance state (owner instance, WeakReference, remove callbacks) is
@@ -1015,7 +1015,7 @@ class HookRuntimeResolver
  * @phpstan-type TCache array<TClass, array<property-string<TClass>&property-hook-string<TClass>, list<InstanceHookMetadata>&list<InstanceHookMetadataData>>>
  * @internal
  */
-class WPHooksRuntimeCache
+class WPHooksInstanceObjectCache
 {
 
     /**

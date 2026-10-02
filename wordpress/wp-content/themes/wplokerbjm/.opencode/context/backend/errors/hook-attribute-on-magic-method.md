@@ -31,7 +31,7 @@ public function onInit(): void { /* ... */ }
 - **Declared-only**: inherited methods/properties are excluded — a subclass must re-declare the method with its own attribute and `parent::method()` call to opt in.
 - **Static members skipped**: hooks must be instance members (the container must instantiate the owning service).
 - **Property targets**: attributes on PHP 8.4 hooked properties get `target: 'property-hook'`; plain properties get `target: 'property'`.
-- **Cache path**: `WPHooksScanner::$cacheLocation` normalizes a directory path by appending `WPHooksCache.php`.
+- **Cache path**: `WPHooksScanner::$cacheLocation` normalizes a directory path by appending `WPhooksRegistryContainerCache.php`.
 
 ## 📂 Codebase References
 

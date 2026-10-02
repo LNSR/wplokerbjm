@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Models\Schema;
 use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Plugins\PluginList;
+use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 /**
  * Taxonomies Schema
  *
@@ -27,10 +27,7 @@ class Taxonomies
     public const GENDER = 'gender';
     public const PENDIDIKAN = 'pendidikan';
 
-    #[Action('init', registerIf: static function (): bool {
-            return PluginList::MetaBox->isActive();
-            })]
-    public function registerAll(): void
+    public function registerAllTaxonomies(): void
     {
         $this->registerPerusahaanTaxonomy();
         $this->registerKategoriTaxonomy();

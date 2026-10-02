@@ -3,7 +3,8 @@ namespace WPLokerBJM\Models\Schema;
 
 use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Plugins\PluginList;
+use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
+
 /**
  * Post Types Schema
  *
@@ -27,9 +28,6 @@ class PostTypes
      * 
      * @return void
      */
-    #[Action('init', registerIf: static function (): bool {
-            return PluginList::MetaBox->isActive();
-            })]
     public function registerLowonganPostType(): void
     {
         $labels = [

@@ -182,7 +182,7 @@ final readonly class HookRegistration extends AbstractDataObject
  * Immutable metadata for a single runtime-registered hook site.
  *
  * Produced by the WPHooksInstanceRegistry scanner, cached per
- * (parentClass, parentProperty) site in the file-backed WPHooksRuntimeCache,
+ * (parentClass, parentProperty) site in the file-backed WPHooksInstanceObjectCache,
  * and re-hydrated into live handlers on subsequent requests. Only scan-derived
  * metadata lives here — per-instance state (owner instance, WeakReference,
  * remove callbacks) is intentionally NOT part of the DTO.

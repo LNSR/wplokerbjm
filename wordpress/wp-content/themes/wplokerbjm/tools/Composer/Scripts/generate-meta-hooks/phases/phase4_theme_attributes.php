@@ -20,7 +20,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
 /**
  * Phase 4 — Collect #[Action] / #[Filter] hook registrations.
  *
- * Primary source: the WPHooksScanner cache file ({themeRoot}/cache/WPHooksCache.php).
+ * Primary source: the WPHooksScanner cache file ({themeRoot}/cache/WPhooksRegistryContainerCache.php).
  * It already contains class, method, hook, type and tags for every registered
  * hook — no parsing needed, and the results always match what the hook
  * registry actually uses at runtime.
@@ -51,8 +51,8 @@ function themeAttributeScan(string $themeRoot): array
  */
 function loadHookRegistrationsFromCache(string $themeRoot): ?array
 {
-    $cacheFileContainerRegistry = $themeRoot . '/cache/WPHooksCache.php';
-    $cacheFileRuntimeRegistry = $themeRoot . '/cache/WPHooksRuntimeCache.php';
+    $cacheFileContainerRegistry = $themeRoot . '/cache/WPhooksRegistryContainerCache.php';
+    $cacheFileRuntimeRegistry = $themeRoot . '/cache/WPHooksInstanceObjectCache.php';
 
     if (!is_file($cacheFileContainerRegistry)) {
         return null;

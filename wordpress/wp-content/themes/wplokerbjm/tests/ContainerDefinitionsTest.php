@@ -17,7 +17,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Init;
-use WPLokerBJM\Services\WebHooks\Cloudflare;
+use WPLokerBJM\Services\WebHooks\CloudflareCachePurger;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
@@ -58,7 +58,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         echo "\n";
 
         $this->assertIsArray($definitions, 'Factory should be array');
-        $this->assertArrayHasKey(Cloudflare::class, $definitions, 'Cloudflare should be in factory definitions');
+        $this->assertArrayHasKey(CloudflareCachePurger::class, $definitions, 'Cloudflare should be in factory definitions');
         $this->assertArrayHasKey(RedisAdapter::class, $definitions, 'RedisAdapter should be in factory definitions');
     }
 
@@ -78,7 +78,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $this->assertGreaterThanOrEqual(3, $count, 'Core + Factory should have at least 3 definitions');
         $this->assertArrayHasKey(Init::class, $definitions);
         $this->assertArrayHasKey(WPHooksContainerRegistry::class, $definitions);
-        $this->assertArrayHasKey(Cloudflare::class, $definitions);
+        $this->assertArrayHasKey(CloudflareCachePurger::class, $definitions);
         $this->assertArrayHasKey(RedisAdapter::class, $definitions);
     }
 

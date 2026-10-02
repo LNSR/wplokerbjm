@@ -2,44 +2,6 @@
 namespace WPLokerBJM\Shared\Utilities;
 
 use WPLokerBJM\Shared\Log\Logger;
-
-enum PluginList: string
-{
-    case LiteSpeed = 'litespeed-cache/litespeed-cache.php';
-    case Wordfence = 'wordfence/wordfence.php';
-    case MetaBox = 'meta-box/meta-box.php';
-    case MetaBoxLite = 'meta-box-lite/meta-box-lite.php';
-    case WpGraphql = 'wp-graphql/wp-graphql.php';
-    case RankMath = 'seo-by-rank-math/rank-math.php';
-    case QueryMonitor = 'query-monitor/query-monitor.php';
-    case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
-    case FastIndexingApi = 'fast-indexing-api/instant-indexing.php';
-    case wpCrontrol = 'wp-crontrol/wp-crontrol.php';
-    case updraftPlus = 'updraftplus/updraftplus.php';
-    case viewAdminAs = 'view-admin-as/view-admin-as.php';
-    case performanceLab = 'performance-lab/load.php';
-    public function isActive(): bool
-    {
-        static $activePlugins = null;
-        $activePlugins ??= \get_option('active_plugins') ?: [];
-        return \is_array($activePlugins) && \in_array($this->value, $activePlugins, true);
-    }
-
-    public function deactivePlugin(): void
-    {
-        if ($this->isActive()) {
-            deactivate_plugins($this->value, false);
-        }
-    }
-
-    public function activePlugin(): void
-    {
-        if (!$this->isActive()) {
-            activate_plugins($this->value, false);
-        }
-    }
-}
-
 class SharedUtils
 {
 

@@ -8,7 +8,7 @@ use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Factories\JobDataFactory;
-use WPLokerBJM\Services\Schema\JobSchemaOrg;
+use WPLokerBJM\Services\Schema\SEO\JobSchemaOrg;
 
 /**
  * @phpstan-type WordpressBaseData array{

@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Models\Schema;
 use WPLokerBJM\Core\Container\Attributes\Injectable;;
 use WPLokerBJM\Core\Container\Attributes\Filter;
-use WPLokerBJM\Core\Plugins\PluginList;
+use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 
 /**
  * Custom Fields Schema
@@ -80,10 +80,7 @@ class CustomFields
         self::STATUS_PEKERJAAN,
     ];
 
-    #[Filter('rwmb_meta_boxes', registerIf: static function (): bool {
-            return PluginList::MetaBox->isActive();
-            })]
-    public function lowongan_meta_boxes($meta_boxes)
+    public function lowonganCustomFields($meta_boxes)
     {
         $prefix = '';
 

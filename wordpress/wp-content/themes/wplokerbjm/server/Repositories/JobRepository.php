@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Repositories;
 
 use WPLokerBJM\Services\GraphQL\GraphQLJobData;
-use WPLokerBJM\Services\Schema\JobSchemaOrg;
+use WPLokerBJM\Services\Schema\SEO\JobSchemaOrg;
 
 /**
  * Job Repository

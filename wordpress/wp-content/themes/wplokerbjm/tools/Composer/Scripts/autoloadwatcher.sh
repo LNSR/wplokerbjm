@@ -39,7 +39,7 @@ while read -r file; do
 
     # Spawn debounced task chain
     (
-      sleep 3
+      sleep 5
 
       echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local Hot Reload Chain..." &
       docker restart "wordpress-${WP_ENV}" &

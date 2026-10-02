@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM;
 
 use Nette\Loaders\RobotLoader;
-use WPLokerBJM\Core\Theme\ThemeProp;
+use WPLokerBJM\Core\Wordpress\Theme\ThemeProp;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 use WPLokerBJM\Core\Container\Init;
@@ -20,6 +20,7 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
  * Description: Bootstraps the wplokerbjm theme — sets up RobotLoader class autoloading
  * and initializes the PHP-DI container early in the WordPress lifecycle.
  * Author: MaulanaSR
+ * RequiresPHP: 8.5
  * @see ThemeProp
  */
 class Bootstrap

@@ -7,6 +7,7 @@ use WPLokerBJM\Configs\Credential\{RedisCred, CloudflareCred, CredentialConfig};
 use WPLokerBJM\Services\WebHooks\Cloudflare;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\{DependencyInjector, PlanCache, PlanCompiler, ScopeAccessFactory};
+use WPLokerBJM\Services\WebHooks\CloudflareCachePurger;
 
 /**
  * Factory definitions — Manually define your arguments here.
@@ -26,7 +27,7 @@ class Factory implements DefinitionProviderInterface
     private static function getInstanceWithCredentials(): array
     {
         return [
-            Cloudflare::class => \DI\autowire(Cloudflare::class)->constructor(static fn(): CloudflareCred => CredentialConfig::CloudflareCredential()),
+            CloudflareCachePurger::class => \DI\autowire(CloudflareCachePurger::class)->constructor(static fn(): CloudflareCred => CredentialConfig::CloudflareCredential()),
             RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn(): RedisCred => CredentialConfig::RedisCredential()),
         ];
     }

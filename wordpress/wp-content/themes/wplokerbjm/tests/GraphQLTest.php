@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Tests;
 
-use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
+use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
-use WPLokerBJM\Controllers\GraphQL\Resolvers\{
+use WPLokerBJM\Transport\GraphQL\Resolvers\{
     Auth\JWTDataResolver,
     JobsDataResolver,
     TaxonomyResolver,

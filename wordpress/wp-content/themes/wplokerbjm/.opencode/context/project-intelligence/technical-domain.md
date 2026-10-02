@@ -70,7 +70,7 @@ Codebase uses **classmap autoloading** (not PSR-4). Every time you add/rename/mo
 - `tags`: `string` | `\BackedEnum` | `\Closure` — normalized to string (enum → value); invalid values logged + registration skipped
 - `executeIf`: fire-time gate (bool; false → hook skipped entirely, even deferred); `registerIf`: registration gate, re-evaluated at deferred activation
 - `defer: true` → inactive until `activateDeferredByHook/Class/Callable/Tags/Namespace`; unregistration via `unregisterByHook/Class/Callable/Tags/Namespace` (+ `unregisterDeferredBy*`) — class/namespace ops drop inactive plugins at `plugins_loaded`
-- Scan compiled to `WPHooksCache.php` (VarExporter); hot path uses precomputed plans — no reflection (fallback only for unexportable defaults)
+- Scan compiled to `WPhooksRegistryContainerCache.php` (VarExporter); hot path uses precomputed plans — no reflection (fallback only for unexportable defaults)
 - Static methods skipped — instance methods only (DI container); multi-priority + inherited attributes supported; runtime registry for programmatic hooks
 
 **Examples**:

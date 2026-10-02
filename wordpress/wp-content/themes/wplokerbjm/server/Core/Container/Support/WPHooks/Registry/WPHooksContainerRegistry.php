@@ -631,7 +631,7 @@ class WPHooksContainerRegistry
             // Entries carrying deferRegisterUntilHook skip this gate entirely:
             // they defer to the named trigger hook, where the gate is evaluated
             // at activation time (when request context exists).
-            if ($registration->deferRegisterUntilHook === null) {
+            if ($registration->deferRegisterUntilHook === null && $registration->deferRegister === false) {
                 try {
                     $allowed = $this->planProvider->evaluateRegistrationGate(
                         $registration->registerIf,

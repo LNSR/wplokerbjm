@@ -3,12 +3,12 @@
 declare(strict_types=1);
 
 namespace WPLokerBJM\Tests;
-use WPLokerBJM\Controllers\REST\{LowonganIngestController, LowonganIngestOptionsController};
+use WPLokerBJM\Services\REST\Ingest\LowonganIngestService;
+use WPLokerBJM\Transport\REST\Controllers\Ingest\{LowonganIngestController, LowonganIngestOptionsController};
 use WPLokerBJM\Models\Schema\CustomFields;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Models\Schema\Taxonomies;
-use WPLokerBJM\Services\REST\LowonganIngestService;
-use WPLokerBJM\Services\REST\Route\LowonganIngestRoute;
+use WPLokerBJM\Transport\REST\Route\LowonganIngestRoute;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 class LowonganIngestRestTest extends WplokerbjmTestCase
@@ -340,7 +340,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
         });
 
         $controller = $this->container()->get(LowonganIngestOptionsController::class);
-        $options = $controller->getOptionsData();
+        $options = \Closure::bind(fn() => $controller->service->getTaxonomyOptionsData(), $controller, $controller)();
 
         $this->assertSame(['perusahaan'], $options['reserved_taxonomies']);
         $this->assertArrayNotHasKey(Taxonomies::PERUSAHAAN, $options['taxonomies']);
@@ -376,7 +376,7 @@ class LowonganIngestRestTest extends WplokerbjmTestCase
         \Brain\Monkey\Functions\when('get_terms')->justReturn([]);
 
         $controller = $this->container()->get(LowonganIngestOptionsController::class);
-        $options = $controller->getOptionsData();
+        $options = \Closure::bind(fn() => $controller->service->getTaxonomyOptionsData(), $controller, $controller)();
 
         $this->assertSame('lowongan_ingest_options.v1', $options['schema']);
         $this->assertArrayHasKey('taxonomies', $options);
