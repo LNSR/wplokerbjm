@@ -23,7 +23,7 @@ class CachePurgeHandler
 {
 
     /**
-     * @param RedisAdapter    $redisAdapter  Used for direct Redis pattern-based cache deletion.
+     * @param RedisAdapter $redisAdapter  Used for direct Redis pattern-based cache deletion.
      */
     public function __construct(private RedisAdapter $redisAdapter) {}
     /**

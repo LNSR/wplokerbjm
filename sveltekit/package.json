@@ -31,7 +31,7 @@
     "viewerjs": "^1.15.2"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261004.1",
+    "@cloudflare/workers-types": "^5.20261005.1",
     "@eslint/compat": "^2.1.1",
     "@gql.tada/svelte-support": "^1.0.3",
     "@sveltejs/adapter-cloudflare": "^7.2.9",

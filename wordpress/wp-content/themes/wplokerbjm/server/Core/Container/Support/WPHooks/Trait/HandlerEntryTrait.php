@@ -31,7 +31,7 @@ trait HandlerEntryTrait
         return $this;
     }
 
-    public function stillInCallbackStack(): bool
+    public function stillDispatchingSameHook(): bool
     {
         return match ($this->type) {
             'action' => doing_action($this->hook),

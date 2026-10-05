@@ -111,7 +111,7 @@ trait RuntimeInstanceInvokerTrait
 /**
  * Runtime hook handler — invocable object that holds a direct instance reference.
  *
- * Unlike ContainerLazyHookHandler (which resolves the service from the container at
+ * Unlike ContainerLazyHookInvoker (which resolves the service from the container at
  * hook-fire time), this handler is bound to an already-instantiated object.
  * Designed for use with WPHooksInstanceRegistry for anonymous class hooks
  * that cannot be discovered by the file-based WPHooksScanner.
@@ -120,7 +120,7 @@ trait RuntimeInstanceInvokerTrait
  * remove_action()/remove_filter().
  * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
  */
-final class RuntimeInstanceHookHandler
+final class RuntimeInstanceHookInvoker
 {
     use RuntimeInstanceInvokerTrait;
 
@@ -143,6 +143,8 @@ final class RuntimeInstanceHookHandler
      */
     public function __construct(
         object $instance,
+        private readonly string $hookName,
+        private readonly int $priority,
         private readonly string $method,
         private readonly string $visibility = 'public',
         private readonly string $type = 'action',
@@ -158,15 +160,15 @@ final class RuntimeInstanceHookHandler
         $this->instanceRef = \WeakReference::create($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->method
-            : $instance::class . '->' . $this->method;
+            ? $this->hookName . '::' . (string) $this->priority . '::' . $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->method
+            : $this->hookName . '::' . (string) $this->priority . '::' . $instance::class . '->' . $this->method;
 
         if ($this->visibility !== 'public') {
 
             // Bind inside the instance's class scope so
             // $instance->privateMethod(...) works natively.
             $this->invoker = \Closure::bind(
-                self::$templateClosure ??= static fn(object $target, string $methodName, mixed ...$args): mixed => $target->{$methodName}(...$args),
+                static::$templateClosure ??= static fn(object $target, string $methodName, mixed ...$args): mixed => $target->{$methodName}(...$args),
                 null,
                 $instance::class,
             );
@@ -193,7 +195,7 @@ final class RuntimeInstanceHookHandler
  * remove_action()/remove_filter().
  * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
  */
-final class RuntimeInstancePropertyHookHandler
+final class RuntimeInstancePropertyHookInvoker
 {
     use RuntimeInstanceInvokerTrait;
 
@@ -217,6 +219,8 @@ final class RuntimeInstancePropertyHookHandler
      */
     public function __construct(
         object $instance,
+        private readonly string $hookName,
+        private readonly int $priority,
         private readonly string $property,
         private readonly string $visibility = 'public',
         private readonly string $type = 'action',
@@ -232,14 +236,14 @@ final class RuntimeInstancePropertyHookHandler
         $this->instanceRef = \WeakReference::create($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->property
-            : $instance::class . '->' . $this->property;
+            ? $this->hookName . '::' . (string) $this->priority . '::' . $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->property
+            : $this->hookName . '::' . (string) $this->priority . '::' . $instance::class . '->' . $this->property;
 
         if ($this->visibility !== 'public') {
             // Bind inside the instance's class scope so
             // $instance->privateProp works natively.
             $this->reader = \Closure::bind(
-                self::$templateClosure ??= static fn(object $target, string $propertyName): mixed => $target->{$propertyName},
+                static::$templateClosure ??= static fn(object $target, string $propertyName): mixed => $target->{$propertyName},
                 null,
                 $instance::class,
             );
@@ -275,7 +279,7 @@ final class RuntimeInstancePropertyHookHandler
  * bool.
  * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
  */
-final class RuntimeCallableHookHandler
+final class RuntimeCallableHookInvoker
 {
     use HookInvokerTrait;
 
@@ -288,17 +292,15 @@ final class RuntimeCallableHookHandler
      */
     public function __construct(
         private readonly mixed $callback,
+        private readonly string $hookName,
+        private readonly int $priority,
         private readonly ?\Closure $executeIf = null,
         private readonly string $type = 'action',
         private readonly bool $once = false,
     ) {
-        if (is_array($callback)) {
-            $this->label = get_debug_type($callback[0]) . '::' . $callback[1];
-        } elseif ($callback instanceof \Closure) {
-            $this->label = 'closure:' . spl_object_hash($callback);
-        } else {
-            $this->label = get_debug_type($callback);
-        }
+        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . (is_array($callback)
+            ? get_debug_type($callback[0]) . '::' . $callback[1] : ($callback instanceof \Closure ? 'closure:' . spl_object_hash($callback)
+                : get_debug_type($callback)));
     }
 
     public function __invoke(mixed ...$args): mixed
@@ -319,11 +321,11 @@ final class RuntimeCallableHookHandler
                     );
                 }
 
-                Logger::debug('RuntimeCallableHookHandler', 'executeIf for ' . $this->label . ': ' . ($allowed ? 'PASS' : 'FAIL'));
+                Logger::debug('RuntimeCallableHookInvoker', 'executeIf for ' . $this->label . ': ' . ($allowed ? 'PASS' : 'FAIL'));
 
                 if ($allowed === false) {
                     Logger::warning(
-                        'RuntimeCallableHookHandler',
+                        'RuntimeCallableHookInvoker',
                         'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                     );
                     $this->consumeOnce();
@@ -342,7 +344,7 @@ final class RuntimeCallableHookHandler
         } catch (\Throwable $e) {
             $this->consumeOnce();
             Logger::error(
-                'RuntimeCallableHookHandler',
+                'RuntimeCallableHookInvoker',
                 'Error invoking hook ' . $this->label . ': ' . $e->getMessage(),
             );
             // Filters must pass through the first argument; actions are fire-and-forget.

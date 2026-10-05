@@ -32,10 +32,10 @@ class DependencyAutowireScanner
 
     public function __construct(
         private RobotLoader $robotLoader,
-        array $excludedSubNamespaces = []
+        array $excludedSubNamespaces = [],
     ) {
-        $excludedSubNamespaces = array_map(static fn(string $namespace): string => trim($namespace, '\\'), $excludedSubNamespaces);
-        $this->checkClass = new AutowireClassesChecker($excludedSubNamespaces);
+        $formatExcludedNamespaces = array_map(static fn(string $namespace): string => trim($namespace, '\\'), $excludedSubNamespaces);
+        $this->checkClass = new AutowireClassesChecker($formatExcludedNamespaces);
     }
 
     /**
@@ -80,7 +80,7 @@ class DependencyAutowireScanner
  */
 class AutowireClassesChecker
 {
-    public function __construct(private array &$excludedSubNamespaces) {}
+    public function __construct(private readonly array $excludedSubNamespaces) {}
     /**
      * Check if a class is suitable for autowiring and determine if it should be lazy loaded.
      *
@@ -136,7 +136,7 @@ class AutowireClassesChecker
     {
         $options['isAutowirable'] ??= false;
         $options['isLazy'] ??= false;
-        return new readonly class(...$options) {
+        return new readonly class (...$options) {
             public function __construct(public bool $isAutowirable = false, public bool $isLazy = false) {}
         };
     }
@@ -216,11 +216,21 @@ class AutowireClassesChecker
         }
 
         foreach ($constructor->getParameters() as $param) {
-            if (!$param->isOptional() && $param->hasType()) {
-                $type = $param->getType();
-                if ($type instanceof \ReflectionNamedType && $type->isBuiltin()) {
-                    return true;
-                }
+            // PHP can supply the default.
+            if ($param->isOptional()) {
+                continue;
+            }
+
+            // Required untyped parameter cannot be autowired safely.
+            if (!$param->hasType()) {
+                return true;
+            }
+
+            $type = $param->getType();
+
+            // Required builtin cannot be resolved automatically.
+            if ($type instanceof \ReflectionNamedType && $type->isBuiltin()) {
+                return true;
             }
         }
 

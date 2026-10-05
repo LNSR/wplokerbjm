@@ -89,7 +89,7 @@ trait ContainerLazyHookInvokerTrait
  * remove_action()/remove_filter().
  * @phpstan-import-type HookType from HookRegistration
  */
-final class ContainerLazyHookHandler
+final class ContainerLazyHookInvoker
 {
     use ContainerLazyHookInvokerTrait;
 
@@ -111,6 +111,8 @@ final class ContainerLazyHookHandler
      */
     public function __construct(
         private readonly ContainerInterface $container,
+        private readonly string $hookName,
+        private readonly int $priority,
         private readonly string $class,
         private readonly string $method,
         private readonly string $visibility = 'public',
@@ -121,12 +123,12 @@ final class ContainerLazyHookHandler
         private readonly array $hookArgNames = [],
         private readonly bool $once = false,
     ) {
-        $this->label = $this->class . '->' . $this->method;
+        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . $this->class . '->' . $this->method;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
             $this->invoker = \Closure::bind(
-                self::$templateClosure ??= static fn(object $instance, string $methodName, mixed ...$args): mixed => $instance->{$methodName}(...$args),
+                static::$templateClosure ??= static fn(object $instance, string $methodName, mixed ...$args): mixed => $instance->{$methodName}(...$args),
                 null,
                 $this->class,
             );
@@ -157,7 +159,7 @@ final class ContainerLazyHookHandler
  * for remove_action()/remove_filter().
  * @phpstan-import-type HookType from HookRegistration
  */
-final class ContainerLazyPropertyHookHandler
+final class ContainerLazyPropertyHookInvoker
 {
     use ContainerLazyHookInvokerTrait;
 
@@ -181,6 +183,8 @@ final class ContainerLazyPropertyHookHandler
      */
     public function __construct(
         private readonly ContainerInterface $container,
+        private readonly string $hookName,
+        private readonly int $priority,
         private readonly string $class,
         private readonly string $property,
         private readonly string $visibility = 'public',
@@ -191,12 +195,12 @@ final class ContainerLazyPropertyHookHandler
         private readonly array $hookArgNames = [],
         private readonly bool $once = false,
     ) {
-        $this->label = $this->class . '->' . $this->property;
+        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . $this->class . '->' . $this->property;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
             $this->reader = \Closure::bind(
-                self::$templateClosure ??= static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
+                static::$templateClosure ??= static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
                 null,
                 $this->class,
             );

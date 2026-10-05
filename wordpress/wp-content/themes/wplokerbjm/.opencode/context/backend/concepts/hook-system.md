@@ -15,7 +15,7 @@ WPHooksScanner              WPHooksContainerRegistry
 discovers #[Action]   →    resolves service
   attributes              calls annotated method
      │                           │
-ContainerLazyHookHandler            Service instantiated
+ContainerLazyHookInvoker            Service instantiated
  stored in registry        at most once/request
 ```
 
@@ -53,7 +53,7 @@ public function search(string $sql, object $query): string { return $sql; }
 
 **Discovery & Registration**:
 - `server/Core/Container/Support/WPHooks/` — Scanner and Registry implementation
-- `server/Core/Container/Definitions/Factory.php` — ContainerLazyHookHandler definitions
+- `server/Core/Container/Definitions/Factory.php` — ContainerLazyHookInvoker definitions
 
 **Usage Examples**:
 - `server/Models/Schema/PostTypes.php` — `#[Action('init')]` for post type registration

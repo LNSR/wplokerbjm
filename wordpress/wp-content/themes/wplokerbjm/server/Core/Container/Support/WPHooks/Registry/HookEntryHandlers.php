@@ -8,7 +8,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HookProv
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, DeferredHookEntryDTO, InstanceHookMetadata, HookKey};
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, RuntimeCallableHookHandler, RuntimeInstanceHookHandler, RuntimeInstancePropertyHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 
 /**
  * @phpstan-import-type HookType from HookRegistration
@@ -16,7 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler,
  * @phpstan-type HandlerEntry array{
  *  hook: string,
  *  key: HookKey,
- *  handler: ContainerLazyHookHandler|ContainerLazyPropertyHookHandler,
+ *  handler: ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker,
  *  type: HookType['type'],
  *  priority: HookType['priority'],
  *  acceptedArgs: HookType['acceptedArgs'],
@@ -50,7 +50,7 @@ final readonly class ContainerRegistryHandlerEntry extends AbstractDataObject
     public function __construct(
         public string $hook,
         public HookKey $key,
-        public ContainerLazyHookHandler|ContainerLazyPropertyHookHandler $handler,
+        public ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $handler,
         public string $type,
         public int $priority,
         public int $acceptedArgs,
@@ -96,7 +96,7 @@ final readonly class ContainerRegistryHandlerEntry extends AbstractDataObject
  * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
  * @phpstan-import-type HookType from HookRegistration
  * @phpstan-type RuntimeHandlerEntry array{
- *     handler: RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler|RuntimeCallableHookHandler,
+ *     handler: RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker|RuntimeCallableHookInvoker,
  *     hook: InstanceHookMetadataData['hook'],
  *     priority: InstanceHookMetadataData['priority'],
  *     type: InstanceHookMetadataData['type'],
@@ -119,7 +119,7 @@ final readonly class RuntimeRegistryHandlerEntry extends AbstractDataObject
      * @param RuntimeHandlerEntry['callback'] $callback if using manual registerAction() or registerFilter() it will hold the callback, otherwise it will be null.
      */
     public function __construct(
-        public RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler|RuntimeCallableHookHandler $handler,
+        public RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker|RuntimeCallableHookInvoker $handler,
         public string $hook,
         public int $priority,
         public string $type,

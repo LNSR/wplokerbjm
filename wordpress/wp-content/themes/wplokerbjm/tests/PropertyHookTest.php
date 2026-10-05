@@ -6,7 +6,7 @@ namespace WPLokerBJM\Tests;
 
 use DI\ContainerBuilder;
 use DI\Container;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyPropertyHookHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyPropertyHookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookTargetResolver, WPHooksContainerRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyActionService;
@@ -22,7 +22,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
  * Test suite for property-closure hooks via #[Action]/#[Filter] attributes.
  *
  * Verifies that:
- *  - ContainerLazyPropertyHookHandler reads a public property and invokes the closure.
+ *  - ContainerLazyPropertyHookInvoker reads a public property and invokes the closure.
  *  - Filter closures return values correctly (apply_filters).
  *  - Action closures produce side effects (do_action).
  *  - Multiple #[Filter] on the same property (IS_REPEATABLE) work.
@@ -256,7 +256,7 @@ class PropertyHookTest extends WplokerbjmTestCase
 
         $this->registry->initialize();
 
-        // Should not throw — ContainerLazyPropertyHookHandler catches the error
+        // Should not throw — ContainerLazyPropertyHookInvoker catches the error
         $result = apply_filters('non_closure_filter', 'fallback_test');
 
         // Should return the first argument as fallback
@@ -289,7 +289,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         );
     }
 
-    public function testPropertyHookUsesContainerLazyPropertyHookHandlerInstance(): void
+    public function testPropertyHookUsesContainerLazyPropertyHookInvokerInstance(): void
     {
         $service = new PropertyFilterService();
         $this->container->set(PropertyFilterService::class, $service);
@@ -313,7 +313,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         $this->assertNotNull($hook, 'Handler should be registered');
 
         $handler = $hook['callable'];
-        $this->assertInstanceOf(ContainerLazyPropertyHookHandler::class, $handler, 'Property hooks should use ContainerLazyPropertyHookHandler');
+        $this->assertInstanceOf(ContainerLazyPropertyHookInvoker::class, $handler, 'Property hooks should use ContainerLazyPropertyHookInvoker');
         $this->assertStringContainsString(
             'appendSuffix',
             $handler->label,

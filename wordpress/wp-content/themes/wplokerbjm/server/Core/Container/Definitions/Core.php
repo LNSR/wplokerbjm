@@ -21,7 +21,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
  *
  * How it works:
  * 1. WPhooksScanner scans the server/ directory for #[Action] and #[Filter] attributes.
- * 2. WPHooksContainerRegistry receives the scanner results and pre-builds ContainerLazyHookHandler and ContainerLazyPropertyHookHandler instances
+ * 2. WPHooksContainerRegistry receives the scanner results and pre-builds ContainerLazyHookInvoker and ContainerLazyPropertyHookInvoker instances
  *    (named invocable objects that defer container resolution to hook-fire time).
  * 3. Init delegates to WPHooksContainerRegistry::initialize() which registers hooks with WordPress
  *    via add_action/add_filter using the stored handler instances.

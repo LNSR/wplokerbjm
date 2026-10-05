@@ -72,7 +72,6 @@ class Bootstrap
             $c = new WPLokerBJMContainer(robotLoader: $rl, cacheDir: \sprintf('%s/cache', self::$themeRoot, '/'))
                 ->initContainerBuilder()
                 ->buildContainer();
-            $c->set(RobotLoader::class, $rl);
             $init = $c->get(Init::class);
             $init->initialize();
         } catch (\Exception $e) {

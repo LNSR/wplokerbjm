@@ -31,9 +31,9 @@
 
 ## Invokers and utilities
 
-- `ContainerLazyHookHandler` / `ContainerLazyPropertyHookHandler` — resolve services at fire time; support `executeIf` and private/protected access (`Invoker/ContainerLazyHookInvoker.php`).
-- `RuntimeInstanceHookHandler` / `RuntimeInstancePropertyHookHandler` — retain an existing object and invoke its member; `WeakReference` owner with GC self-cleanup (`Invoker/RuntimeHookInvoker.php`).
-- `RuntimeCallableHookHandler` — wraps manual runtime callbacks and direct `executeIf` conditions (`Invoker/RuntimeHookInvoker.php`).
+- `ContainerLazyHookInvoker` / `ContainerLazyPropertyHookInvoker` — resolve services at fire time; support `executeIf` and private/protected access (`Invoker/ContainerLazyHookInvoker.php`).
+- `RuntimeInstanceHookInvoker` / `RuntimeInstancePropertyHookInvoker` — retain an existing object and invoke its member; `WeakReference` owner with GC self-cleanup (`Invoker/RuntimeHookInvoker.php`).
+- `RuntimeCallableHookInvoker` — wraps manual runtime callbacks and direct `executeIf` conditions (`Invoker/RuntimeHookInvoker.php`).
 - `HookInvokerTrait` — shared once/removal plumbing (`setRemoveCallback`, `consumed`/`removed` guards), `buildHookArgs` named args, `filterPassthrough` (`Trait/HookInvokerTrait.php`).
 - `RuntimeInstanceInvokerTrait` — runtime `__invoke` pipeline + `consumeLifetime()` GC nuke (`Invoker/RuntimeHookInvoker.php`).
 - `ContainerLazyHookInvokerTrait` — `executeHook()` pipeline; unresolvable gate on a once-hook is treated as pass (`Invoker/ContainerLazyHookInvoker.php`).

@@ -18,7 +18,7 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 
 ## Runtime flow
 
-`WPHooksInstanceRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. When a `RuntimeWPHookProvider` is injected, attribute closures (hook name, `registerIf`, `executeIf`) are resolved with optional container / named hook-argument injection; without one, closures must be zero-parameter. Manual `registerAction()` / `registerFilter()` use `RuntimeCallableHookHandler`, letting closures capture runtime state without container resolution.
+`WPHooksInstanceRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. When a `RuntimeWPHookProvider` is injected, attribute closures (hook name, `registerIf`, `executeIf`) are resolved with optional container / named hook-argument injection; without one, closures must be zero-parameter. Manual `registerAction()` / `registerFilter()` use `RuntimeCallableHookInvoker`, letting closures capture runtime state without container resolution.
 
 ## Deferred pool (shared)
 
@@ -62,5 +62,5 @@ The attribute declares intent; the registry owns lifecycle and the invoker owns 
 - `server/Core/Container/Support/WPHooks/Trait/DeferredHooksTrait.php` — shared deferred pool mechanics.
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — container registry, deferred manager, and target resolver.
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — immediate object/runtime registration path.
-- `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — ContainerLazyHookInvokerTrait, ContainerLazyHookHandler, ContainerLazyPropertyHookHandler.
-- `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — RuntimeInstanceInvokerTrait, RuntimeInstanceHookHandler, RuntimeInstancePropertyHookHandler, RuntimeCallableHookHandler.
+- `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — ContainerLazyHookInvokerTrait, ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker.
+- `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — RuntimeInstanceInvokerTrait, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker, RuntimeCallableHookInvoker.

@@ -71,66 +71,67 @@ class ThemeHooks
      * Adds additional site icon meta tags for custom sizes.
      */
     #[Filter('site_icon_meta_tags')]
-    public function addSiteIconMetaTags(array &$meta_tags): array
-    {
+    public private(set) \Closure $addSiteIconMetaTags {
+        get => $this->addSiteIconMetaTags ??= static function (array $meta_tags): array {
 
-        $additional_sizes = [48, 96, 144, 256, 384, 512];
+            static $additional_sizes = [48, 96, 144, 256, 384, 512];
 
-        foreach ($additional_sizes as $size) {
-            $url = get_site_icon_url($size);
-            $url && $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
-        }
-
-        /**
-         * Add type attributes to meta tags
-         * @param array $meta_tags
-         * @param string $type
-         * @return void
-         */
-        $addTypeAttribute = static function (array &$meta_tags, string $type): void {
-            foreach ($meta_tags as &$tag) {
-                // For link tags (icon and apple-touch-icon)
-                if (preg_match('/<link (?:rel="icon"|rel="apple-touch-icon")[^>]*href="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
-                    $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
-                }
-                // For meta msapplication-TileImage
-                if (preg_match('/<meta name="msapplication-TileImage"[^>]*content="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
-                    $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
-                }
+            foreach ($additional_sizes as $size) {
+                $url = get_site_icon_url($size);
+                $url && $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
             }
+
+            /**
+             * Add type attributes to meta tags
+             * @param array $meta_tags
+             * @param string $type
+             * @return void
+             */
+            static $addTypeAttribute = static function (array &$meta_tags, string $type): void {
+                foreach ($meta_tags as &$tag) {
+                    // For link tags (icon and apple-touch-icon)
+                    if (preg_match('/<link (?:rel="icon"|rel="apple-touch-icon")[^>]*href="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
+                        $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
+                    }
+                    // For meta msapplication-TileImage
+                    if (preg_match('/<meta name="msapplication-TileImage"[^>]*content="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
+                        $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
+                    }
+                }
+            };
+
+            /**
+             * Adds fallback site icon meta tags for custom sizes.
+             * WordPress may convert the original PNG to AVIF during upload(via Modern Image Formats plugin), so:
+             * 1. Walk post_parent to find the original upload attachment.
+             * 2. Use wp_get_original_image_url() to get the original PNG URL.
+             * @return string|null
+             */
+            static $addFallbackSiteIconMetaTags = static function (): string|null {
+                $cropped_id = get_option('site_icon');
+                if (!$cropped_id)
+                    return null;
+
+                $cropped_post = get_post($cropped_id);
+                $original_id = ($cropped_post && $cropped_post->post_parent) ? $cropped_post->post_parent : 0;
+                if (!$original_id)
+                    return null;
+
+                $png_url = wp_get_original_image_url($original_id);
+                if (!$png_url)
+                    return null;
+                return sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($png_url));
+            };
+
+            foreach (['png', 'ico', 'svg', 'webp', 'avif'] as $type) {
+                $addTypeAttribute($meta_tags, $type);
+            }
+
+            $fallbackTag = $addFallbackSiteIconMetaTags();
+            $fallbackTag && $meta_tags[] = $fallbackTag;
+
+            return $meta_tags;
         };
-
-        /**
-         * Adds fallback site icon meta tags for custom sizes.
-         * WordPress may convert the original PNG to AVIF during upload(via Modern Image Formats plugin), so:
-         * 1. Walk post_parent to find the original upload attachment.
-         * 2. Use wp_get_original_image_url() to get the original PNG URL.
-         * @return string|null
-         */
-        $addFallbackSiteIconMetaTags = static function (): string|null {
-            $cropped_id = get_option('site_icon');
-            if (!$cropped_id)
-                return null;
-
-            $cropped_post = get_post($cropped_id);
-            $original_id = ($cropped_post && $cropped_post->post_parent) ? $cropped_post->post_parent : 0;
-            if (!$original_id)
-                return null;
-
-            $png_url = wp_get_original_image_url($original_id);
-            if (!$png_url)
-                return null;
-            return sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($png_url));
-        };
-
-        foreach (['png', 'ico', 'svg', 'webp', 'avif'] as $type) {
-            $addTypeAttribute($meta_tags, $type);
-        }
-
-        $fallbackTag = $addFallbackSiteIconMetaTags();
-        $fallbackTag && $meta_tags[] = $fallbackTag;
-
-        return $meta_tags;
     }
 
     /**

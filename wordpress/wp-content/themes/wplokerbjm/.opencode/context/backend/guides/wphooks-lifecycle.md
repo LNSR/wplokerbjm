@@ -35,7 +35,7 @@ $registry->activateDeferredByTags(['cache', 'seo']);
 
 ## 4. Execute at hook fire
 
-`ContainerLazyHookHandler` resolves the service only when WordPress invokes it. It evaluates `executeIf` with the container and matching hook arguments, then invokes public methods directly or binds a closure for protected/private methods. `ContainerLazyPropertyHookHandler` reads the property at fire time and invokes the resulting closure/invokable object. The plan provider avoids reflection on the hot path when a cacheable plan exists.
+`ContainerLazyHookInvoker` resolves the service only when WordPress invokes it. It evaluates `executeIf` with the container and matching hook arguments, then invokes public methods directly or binds a closure for protected/private methods. `ContainerLazyPropertyHookInvoker` reads the property at fire time and invokes the resulting closure/invokable object. The plan provider avoids reflection on the hot path when a cacheable plan exists.
 
 If a gate returns false, a filter receives its original first argument unchanged. If invocation throws, the error is logged; filters still pass through the original value and actions return `null`.
 

@@ -4,11 +4,11 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
-    ContainerLazyHookHandler,
-    ContainerLazyPropertyHookHandler,
-    RuntimeInstanceHookHandler,
-    RuntimeInstancePropertyHookHandler,
-    RuntimeCallableHookHandler
+    ContainerLazyHookInvoker,
+    ContainerLazyPropertyHookInvoker,
+    RuntimeInstanceHookInvoker,
+    RuntimeInstancePropertyHookInvoker,
+    RuntimeCallableHookInvoker
 };
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -16,7 +16,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * Shared invoker mechanics used by BOTH the container-side lazy handlers and
  * the runtime instance handlers: the once/removal callback plumbing and the
  * named hook-args builder.
- * @mixin (ContainerLazyHookHandler|ContainerLazyPropertyHookHandler|RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler|RuntimeCallableHookHandler)
+ * @mixin (ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker|RuntimeCallableHookInvoker)
  * @internal consumed via the container's AbstractLazyHookHandlerTrait (in-file)
  * and the runtime's RuntimeInstanceInvokerTrait (in-file) — the gate evaluation
  * and instance resolution stay domain-specific in each invoker file.

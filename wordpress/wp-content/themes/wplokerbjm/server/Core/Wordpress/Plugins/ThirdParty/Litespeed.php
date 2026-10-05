@@ -19,7 +19,7 @@ use WPLokerBJM\Shared\Log\Logger;
  */
 final class Litespeed implements PluginConfigInterface
 {
-    public function __construct(private WPLokerBJMContainer $lokerBJMcontainer, private RobotLoader $robotLoader) {}
+    public function __construct(private WPLokerBJMContainer $lokerBJMcontainer) {}
 
     public static function isActive(): bool
     {
@@ -43,7 +43,7 @@ final class Litespeed implements PluginConfigInterface
     {
         Cache::flushGroup(CacheKey::OBJECT_CACHE_PREFIX);
         try {
-            $this->deleteRucursive($this->lokerBJMcontainer->cacheDir);
+            $this->deleteRucursive($this->lokerBJMcontainer->cacheLocation->cacheDir);
         } catch (\Exception $e) {
             Logger::error('Error deleting cache folder: ', $e->getMessage());
         }
@@ -55,7 +55,7 @@ final class Litespeed implements PluginConfigInterface
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
             wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
-        $this->robotLoader->rebuild();
+        $this->lokerBJMcontainer->robotLoader->rebuild();
         $this->lokerBJMcontainer
             ->initContainerBuilder(forceRebuild: true)
             ->buildContainer();

@@ -29,8 +29,8 @@ class Factory implements DefinitionProviderInterface
     private function getInstanceWithCredentials(): array
     {
         return [
-            CloudflareCachePurger::class => \DI\autowire(CloudflareCachePurger::class)->constructor(static fn(): CloudflareCred => CredentialConfig::CloudflareCredential()),
-            RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(static fn(): RedisCred => CredentialConfig::RedisCredential()),
+            CloudflareCachePurger::class => \DI\autowire(CloudflareCachePurger::class)->constructor(CredentialConfig::CloudflareCredential(...)),
+            RedisAdapter::class => \DI\autowire(RedisAdapter::class)->constructor(CredentialConfig::RedisCredential(...)),
         ];
     }
     private function dependencyService(): array

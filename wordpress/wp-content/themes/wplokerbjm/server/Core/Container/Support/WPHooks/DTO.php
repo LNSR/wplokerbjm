@@ -7,7 +7,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HookProviderTrait};
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WeakReference;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler, RuntimeCallableHookHandler, RuntimeInstanceHookHandler, RuntimeInstancePropertyHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryHandlerEntry, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 
 /**
@@ -252,7 +252,7 @@ readonly class InstanceHookMetadata extends AbstractDataObject
  ======================================================================*/
 /**
  * @phpstan-import-type HookType from HookRegistration
- * @phpstan-type AvailaibleHandlerType ContainerLazyHookHandler|ContainerLazyPropertyHookHandler|RuntimeCallableHookHandler|RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler
+ * @phpstan-type AvailaibleHandlerType ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker
  * @phpstan-type DeferredHookEntry array{
  *     hook: string,
  *     key: HookKey,
@@ -289,7 +289,7 @@ final readonly class DeferredHookEntryDTO extends AbstractDataObject
      */
     public function __construct(
         public string $hook,
-        public ContainerLazyHookHandler|ContainerLazyPropertyHookHandler|RuntimeCallableHookHandler|RuntimeInstanceHookHandler|RuntimeInstancePropertyHookHandler $handler,
+        public ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
         public string $type,
         public int $priority,
         public int $acceptedArgs,

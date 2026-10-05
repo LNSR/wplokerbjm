@@ -8,12 +8,28 @@ use PHPUnit\Framework\TestCase;
 use \DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookTargetResolver, WPHooksContainerRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 
 abstract class WplokerbjmTestCase extends TestCase
 {
     private static $mockCache = [];
+
+    /**
+     * When true, queued once-hook removals are flushed automatically at the
+     * end of each simulated dispatch. This mirrors production, where the
+     * removal queue is only swept on a later removal outside the hook's own
+     * dispatch. Set to false in a test to observe the queued state directly.
+     */
+    protected bool $flushQueuedRemovalsAfterDispatch = true;
+
+    /**
+     * Registries created during the current test, used to flush queued
+     * once-hook removals after a simulated dispatch completes.
+     *
+     * @var array<int,object>
+     */
+    private array $trackedRegistries = [];
 
     protected function setUp(): void
     {
@@ -81,6 +97,7 @@ abstract class WplokerbjmTestCase extends TestCase
     protected function setupWordPressHookMocks(): void
     {
         $GLOBALS['__wplokerbjm_registered_hooks'] = [];
+        $GLOBALS['__wplokerbjm_current_filter'] = [];
 
         \Brain\Monkey\Functions\when('add_action')->alias(function ($hook, $callable, $priority = 10, $acceptedArgs = 1) {
             $GLOBALS['__wplokerbjm_registered_hooks'][] = [
@@ -105,35 +122,55 @@ abstract class WplokerbjmTestCase extends TestCase
         });
 
         \Brain\Monkey\Functions\when('do_action')->alias(function ($hook, ...$args) {
-            $callbacks = array_filter(
-                $GLOBALS['__wplokerbjm_registered_hooks'],
-                fn($reg) => $reg['type'] === 'action' && $reg['hook'] === $hook
-            );
+            $GLOBALS['__wplokerbjm_current_filter'][] = $hook;
 
-            // Sort by priority ascending
-            usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
+            try {
+                $callbacks = array_filter(
+                    $GLOBALS['__wplokerbjm_registered_hooks'],
+                    fn($reg) => $reg['type'] === 'action' && $reg['hook'] === $hook
+                );
 
-            foreach ($callbacks as $reg) {
-                $limited = array_slice($args, 0, $reg['acceptedArgs']);
-                ($reg['callable'])(...$limited);
+                // Sort by priority ascending
+                usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
+
+                foreach ($callbacks as $reg) {
+                    $limited = array_slice($args, 0, $reg['acceptedArgs']);
+                    ($reg['callable'])(...$limited);
+                }
+            } finally {
+                array_pop($GLOBALS['__wplokerbjm_current_filter']);
+
+                if ($this->flushQueuedRemovalsAfterDispatch) {
+                    $this->flushQueuedRemovals();
+                }
             }
         });
 
         \Brain\Monkey\Functions\when('apply_filters')->alias(function ($hook, $value, ...$args) {
-            $callbacks = array_filter(
-                $GLOBALS['__wplokerbjm_registered_hooks'],
-                fn($reg) => $reg['type'] === 'filter' && $reg['hook'] === $hook
-            );
+            $GLOBALS['__wplokerbjm_current_filter'][] = $hook;
 
-            // Sort by priority ascending
-            usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
+            try {
+                $callbacks = array_filter(
+                    $GLOBALS['__wplokerbjm_registered_hooks'],
+                    fn($reg) => $reg['type'] === 'filter' && $reg['hook'] === $hook
+                );
 
-            foreach ($callbacks as $reg) {
-                $limited = array_slice([$value, ...$args], 0, $reg['acceptedArgs']);
-                $value = ($reg['callable'])(...$limited);
+                // Sort by priority ascending
+                usort($callbacks, fn($a, $b) => $a['priority'] <=> $b['priority']);
+
+                foreach ($callbacks as $reg) {
+                    $limited = array_slice([$value, ...$args], 0, $reg['acceptedArgs']);
+                    $value = ($reg['callable'])(...$limited);
+                }
+
+                return $value;
+            } finally {
+                array_pop($GLOBALS['__wplokerbjm_current_filter']);
+
+                if ($this->flushQueuedRemovalsAfterDispatch) {
+                    $this->flushQueuedRemovals();
+                }
             }
-
-            return $value;
         });
 
         $removeHook = function ($type, $hook, $callable, $priority = 10) {
@@ -154,6 +191,17 @@ abstract class WplokerbjmTestCase extends TestCase
 
         \Brain\Monkey\Functions\when('remove_action')->alias(fn($hook, $callable, $priority = 10) => $removeHook('action', $hook, $callable, $priority));
         \Brain\Monkey\Functions\when('remove_filter')->alias(fn($hook, $callable, $priority = 10) => $removeHook('filter', $hook, $callable, $priority));
+
+        // In WordPress both `doing_action` and `doing_filter` read the same
+        // `$wp_current_filter` stack, so mirror that here: the stack is pushed
+        // by the dispatch mocks above, letting `stillDispatchingSameHook()`
+        // behave faithfully during a hook's own dispatch.
+        \Brain\Monkey\Functions\when('doing_action')->alias(
+            static fn(string $hook): bool => in_array($hook, $GLOBALS['__wplokerbjm_current_filter'] ?? [], true)
+        );
+        \Brain\Monkey\Functions\when('doing_filter')->alias(
+            static fn(string $hook): bool => in_array($hook, $GLOBALS['__wplokerbjm_current_filter'] ?? [], true)
+        );
     }
 
     /**
@@ -182,6 +230,46 @@ abstract class WplokerbjmTestCase extends TestCase
             }
         }
         return null;
+    }
+
+    /**
+     * Track a registry so its queued once-hook removals can be flushed after
+     * a simulated dispatch completes.
+     */
+    protected function trackRegistry(WPHooksContainerRegistry|WPHooksInstanceRegistry $registry): void
+    {
+        if (!in_array($registry, $this->trackedRegistries, true)) {
+            $this->trackedRegistries[] = $registry;
+        }
+    }
+
+    /**
+     * Flush queued once-hook removals for the given registries (defaults to
+     * every registry tracked in the current test).
+     *
+     * Emulates production behaviour: a queued once-hook removal is only
+     * applied to WordPress once its hook is no longer dispatching. During
+     * dispatch the removal stays queued so `WP_Hook`'s iteration is not
+     * corrupted (see WordPress ticket #61263) - this is why same-hook once
+     * entries linger until a later removal sweeps them.
+     *
+     * @param array<int,WPHooksContainerRegistry&WPHooksInstanceRegistry>|null $registries
+     */
+    protected function flushQueuedRemovals(?array $registries = null): void
+    {
+        foreach ($registries ?? $this->trackedRegistries as $registry) {
+            $queued = $registry->queuedRemovalEntry ?? [];
+
+            foreach ($queued as $hook => $entries) {
+                if (\doing_action($hook) || \doing_filter($hook)) {
+                    continue;
+                }
+
+                foreach ($entries as $entry) {
+                    $entry->unregister();
+                }
+            }
+        }
     }
 
     protected function tearDown(): void
@@ -226,7 +314,7 @@ abstract class WplokerbjmTestCase extends TestCase
         $resolver = new HookTargetResolver();
         $entriesIndexer = new EntriesIndexer();
 
-        return new WPHooksContainerRegistry(
+        $registry = new WPHooksContainerRegistry(
             $container,
             $registrations,
             $planProvider,
@@ -234,5 +322,9 @@ abstract class WplokerbjmTestCase extends TestCase
             $resolver,
             $entriesIndexer
         );
+
+        $this->trackRegistry($registry);
+
+        return $registry;
     }
 }

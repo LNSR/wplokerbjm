@@ -18,22 +18,32 @@ use WPLokerBJM\Shared\Log\Logger;
 #[Injectable(skip: true)]
 class WPLokerBJMContainer
 {
-    public function __construct(private RobotLoader $robotLoader, public private(set) ?string $cacheDir = null)
+    public function __construct(public readonly RobotLoader $robotLoader, ?string $cacheDir = null)
     {
-        $this->cacheDir ??= \sprintf("%s/cache", rtrim(get_stylesheet_directory()));
-        $this->cacheFile ??= \sprintf("%s/CompiledContainer.php", $this->cacheDir);
+        $this->cacheLocation = new readonly class ($cacheDir ??= \sprintf("%s/cache", rtrim(\get_stylesheet_directory()))) {
+            public string $cacheFile;
+
+            public function __construct(public string $cacheDir)
+            {
+                $this->cacheFile = \sprintf("%s/CompiledContainer.php", $this->cacheDir);
+            }
+        };
     }
+
+    /**
+     * @phpstan-ignore-next-line
+     * @var __CLASS__::class
+     */
+    public private(set) ?object $cacheLocation = null;
 
     private ?ContainerConfigurationState $containerConfigurationState {
         get => $this->containerConfigurationState ??= new ContainerConfigurationState();
     }
-    public private(set) ?string $cacheFile = null;
 
     private ?WPLokerBJMContainerBuilderConfiguration $builderConfiguration {
         get => $this->builderConfiguration ??= new WPLokerBJMContainerBuilderConfiguration(
-            $this,
-            $this->robotLoader,
-            $this->containerConfigurationState
+        $this,
+        $this->containerConfigurationState,
         );
     }
 
@@ -46,10 +56,7 @@ class WPLokerBJMContainer
             if ($this->containerConfigurationState->configured && !$forceRebuild) {
                 throw new \LogicException('Container already configured, use forceRebuild to force rebuild');
             }
-            if ($forceRebuild) {
-                $this->containerConfigurationState = null;
-                @is_readable($this->cacheDir) && @unlink($this->cacheFile);
-            }
+            $forceRebuild && $this->reset();
             $this->containerConfigurationState->containerBuilder = new ContainerBuilder();
             return $this->builderConfiguration;
         } catch (\Exception $e) {
@@ -57,6 +64,13 @@ class WPLokerBJMContainer
             Logger::flush();
             throw $e;
         }
+    }
+
+    private function reset(): void
+    {
+        $this->containerConfigurationState = null;
+        $this->builderConfiguration = null;
+        @is_readable($this->cacheLocation->cacheDir) && @unlink($this->cacheLocation->cacheFile);
     }
 }
 
@@ -66,17 +80,17 @@ class WPLokerBJMContainer
 #[Injectable(skip: true)]
 final class WPLokerBJMContainerBuilderConfiguration
 {
-
+    /** @var array<string,object> */
+    private array $extraDefinitionsSet = [];
     public function __construct(
         private WPLokerBJMContainer $wpLokerContainer,
-        private RobotLoader $robotLoader,
-        private ContainerConfigurationState $containerConfigurationState
+        private ContainerConfigurationState $containerConfigurationState,
     ) {}
 
     public function setExtraDefinitionsSet(array $extraDefinitionsSet): static
     {
         $this->statusException();
-        $this->containerConfigurationState->extraDefinitionsSet = $extraDefinitionsSet;
+        $this->extraDefinitionsSet = $extraDefinitionsSet;
         return $this;
     }
 
@@ -87,8 +101,12 @@ final class WPLokerBJMContainerBuilderConfiguration
         $builder->useAttributes(true);
         $this->setupCache();
         $c = $builder->build();
-        if (!$c->has(WPLokerBJMContainer::class)) {
-            $c->set(WPLokerBJMContainer::class, $this->wpLokerContainer);
+        $postRegisteration = [
+            WPLokerBJMContainer::class => $this->wpLokerContainer,
+            RobotLoader::class => $this->wpLokerContainer->robotLoader,
+        ];
+        foreach ($postRegisteration as $class => $instance) {
+            $c->has($class) && $c->set($class, $instance);
         }
         $this->containerConfigurationState->configured = true;
         return $c;
@@ -107,28 +125,28 @@ final class WPLokerBJMContainerBuilderConfiguration
     private function setupCache(): void
     {
         $builder = $this->containerConfigurationState->containerBuilder;
-        $hasCache = \is_readable($this->wpLokerContainer->cacheFile);
+        $hasCache = \is_readable($this->wpLokerContainer->cacheLocation->cacheFile);
 
         if ($hasCache) {
-            $builder->enableCompilation($this->wpLokerContainer->cacheDir);
+            $builder->enableCompilation($this->wpLokerContainer->cacheLocation->cacheDir);
             return;
         }
 
-        if (!is_dir($this->wpLokerContainer->cacheDir) && !mkdir($this->wpLokerContainer->cacheDir, 0755, true)) {
-            Logger::error('Container', "Failed to create cache directory: " . $this->wpLokerContainer->cacheDir);
+        if (!is_dir($this->wpLokerContainer->cacheLocation->cacheDir) && !mkdir($this->wpLokerContainer->cacheLocation->cacheDir, 0755, true)) {
+            Logger::error('Container', "Failed to create cache directory: " . $this->wpLokerContainer->cacheLocation->cacheDir);
             return;
         }
 
-        if (!is_writable($this->wpLokerContainer->cacheDir)) {
-            Logger::warning('Container', "Compilation directory not writable, skipping compilation: " . $this->wpLokerContainer->cacheDir);
+        if (!is_writable($this->wpLokerContainer->cacheLocation->cacheDir)) {
+            Logger::warning('Container', "Compilation directory not writable, skipping compilation: " . $this->wpLokerContainer->cacheLocation->cacheDir);
             Logger::flush();
             return;
         }
 
         try {
             $this->persistDefinition($builder);
-            $builder->enableCompilation($this->wpLokerContainer->cacheDir);
-            $builder->writeProxiesToFile(true, $this->wpLokerContainer->cacheDir . '/');
+            $builder->enableCompilation($this->wpLokerContainer->cacheLocation->cacheDir);
+            $builder->writeProxiesToFile(true, $this->wpLokerContainer->cacheLocation->cacheDir . '/');
         } catch (\Exception $e) {
             Logger::warning('Container', 'Failed to enable compilation: ' . $e->getMessage());
         }
@@ -138,7 +156,7 @@ final class WPLokerBJMContainerBuilderConfiguration
      */
     private function persistDefinition(ContainerBuilder $builder): void
     {
-        $coreDefinition = new Core($this->robotLoader);
+        $coreDefinition = new Core($this->wpLokerContainer->robotLoader);
         $factoryDefinitions = new Factory();
 
         $builder->addDefinitions(
@@ -149,8 +167,8 @@ final class WPLokerBJMContainerBuilderConfiguration
                 $coreDefinition->getDefinitions(),
                 // factory definitions
                 $factoryDefinitions->getDefinitions(),
-                $this->containerConfigurationState->extraDefinitionsSet
-            )
+                $this->extraDefinitionsSet,
+            ),
         );
     }
 }
@@ -160,8 +178,6 @@ final class WPLokerBJMContainerBuilderConfiguration
 #[Injectable(skip: true)]
 final class ContainerConfigurationState
 {
-    /** @var array<string,object> */
-    public array $extraDefinitionsSet = [];
     public bool $configured = false;
     public ?ContainerBuilder $containerBuilder = null;
 }

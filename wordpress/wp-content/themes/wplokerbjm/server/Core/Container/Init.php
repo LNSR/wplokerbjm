@@ -12,7 +12,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  * Initializes core services in the wplokerbjm theme by registering WordPress hooks.
  *
  * Delegates to WPHooksContainerRegistry which stores hooks as identifiable
- * ContainerLazyHookHandler instances, enabling unregistration by class/method.
+ * ContainerLazyHookInvoker instances, enabling unregistration by class/method.
  *
  * Each hook defers container resolution to the moment WordPress fires it.
  * The underlying service is NOT instantiated during `initialize()` —

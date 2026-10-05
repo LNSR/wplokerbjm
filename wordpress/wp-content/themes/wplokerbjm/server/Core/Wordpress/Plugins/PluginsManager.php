@@ -66,7 +66,7 @@ interface PluginConfigInterface
 /* ==========================================================================
    PLUGIN MANAGEMENT
    ========================================================================== */
-class PluginManagement
+class PluginManager
 {
     public const MUST_HAVE_PLUGINS = [
         PluginList::LiteSpeed->value,
@@ -100,7 +100,7 @@ class PluginManagement
             return;
         }
         do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
-        do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
+        do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $this->pluginEnvironmentCheck, 'plugins_loaded');
     }
 
     /**
@@ -140,8 +140,8 @@ class PluginManagement
 
     #region 3rd party choice hooks
     #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function () {
-        return !\is_admin() && (empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql'));
-    })]
+            return !\is_admin() && (empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql'));
+            })]
     public function disableWpGraphqlPlugin(array $plugins): array
     {
         $pluginKey = array_search(PluginList::WpGraphql->value, $plugins, true);
@@ -158,17 +158,17 @@ class PluginManagement
         once: true,
         deferRegister: true,
         registerIf: static function (): bool {
-            if (is_admin()) {
-                $action = $_REQUEST['action'] ?? '';
-                if (in_array($action, ['upgrade-plugin', 'update-plugin', 'activate', 'deactivate', 'activate-plugin'], true)) {
+                    if (is_admin()) {
+                    $action = $_REQUEST['action'] ?? '';
+                        if (in_array($action, ['upgrade-plugin', 'update-plugin', 'activate', 'deactivate', 'activate-plugin'], true)) {
+                        return true;
+                        }
+                    }
+                $cookie = SharedUtils::getWordpressAuthCookie();
+                    if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookie['name']))
                     return true;
+                return false;
                 }
-            }
-            $cookie = SharedUtils::getWordpressAuthCookie();
-            if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookie['name']))
-                return true;
-            return false;
-        }
     )]
     public function disableQueryMonitorPlugin(array $plugins): array
     {
@@ -180,8 +180,8 @@ class PluginManagement
     }
 
     #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function (): bool {
-        return !\is_admin();
-    })]
+            return !\is_admin();
+            })]
     public function disablePluginOnNonAdminDashboard(array $plugins): array
     {
         $listPlugins = [
@@ -207,93 +207,95 @@ class PluginManagement
      * @var __CLASS__::class
      */
     public private(set) ModuleClassHookMetadata $pluginEnvironmentCheck {
-        get => $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
-            private array $pluginsToDisable = [
+        get {
+            return $this->pluginEnvironmentCheck ??= new class (__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+                private array $pluginsToDisable = [
                 PluginList::Wordfence->value,
                 PluginList::FastIndexingApi->value,
-            ];
+                ];
 
-            #[Filter('option_active_plugins', 0, once: true)]
-            public ?\Closure $pluginsOption {
-                get => $this->pluginsOption ??= SharedUtils::isDevelopment() ? $this->disablePluginsForDevImpl(...) : $this->disablePluginsforSimulatedProdImpl(...);
-            }
+                #[Filter('option_active_plugins', 0, once: true)]
+                public ?\Closure $pluginsOption {
+                    get => $this->pluginsOption ??= SharedUtils::isDevelopment() ? $this->disablePluginsForDevImpl(...) : $this->disablePluginsforSimulatedProdImpl(...);
+                }
 
-            /**
-             * Force active plugins for production
-             */
-            #[Filter(
+                /**
+                 * Force active plugins for production
+                 */
+                #[Filter(
                 'option_active_plugins',
                 1,
                 once: true,
                 registerIf: static function (): bool {
-                    return !SharedUtils::isDevelopment();
-                }
-            )]
-            public function forceActivePlugin(array $plugins): array
-            {
-                foreach (PluginManagement::MUST_HAVE_PLUGINS as $plugin) {
-                    if (!in_array($plugin, $plugins)) {
-                        array_push($plugins, $plugin);
+                        return !SharedUtils::isDevelopment();
                     }
-                }
-                return $plugins;
-            }
-
-            /**
-             * Temporarily disable specific plugins if in development environment.
-             */
-            private function disablePluginsForDevImpl(array $plugins): array
-            {
-                // $extra = [];
-                $pluginsToDisable = $this->listPluginsToDisable();
-                return $this->filteredPlugins($plugins, $pluginsToDisable);
-            }
-
-
-            /**
-             * Temporarily disable specific plugins if simulating production environment on local machine.
-             */
-            private function disablePluginsforSimulatedProdImpl(array $plugins): array
-            {
-                // $extra = [];
-                $pluginsToDisable = $this->listPluginsToDisable();
-
-                return $this->filteredPlugins($plugins, $pluginsToDisable);
-            }
-
-
-            /**
-             * Returns the list of plugins to disable, optionally merged with extra plugins.
-             *
-             * @param array|null $extra Optional array of additional plugin prefixes to disable.
-             * @return array Array of plugin prefixes to disable.
-             */
-            private function listPluginsToDisable(?array $extra = []): array
-            {
-                return array_merge($this->pluginsToDisable, $extra);
-            }
-            /**
-             * Filters the list of active plugins by removing specified plugins.
-             *
-             * @param array $plugins          Array of active plugin file paths.
-             * @param array $pluginsToDisable Array of plugin prefixes to disable.
-             * @return array Filtered array of active plugins.
-             */
-            private function filteredPlugins(array $plugins, array $pluginsToDisable): array
-            {
-                $cb = static function (string $plugin) use ($pluginsToDisable): bool {
-                    foreach ($pluginsToDisable as $disable) {
-                        if (str_starts_with($plugin, $disable)) {
-                            return false;
+                )]
+                public function forceActivePlugin(array $plugins): array
+                {
+                    foreach (PluginManager::MUST_HAVE_PLUGINS as $plugin) {
+                        if (!in_array($plugin, $plugins)) {
+                            array_push($plugins, $plugin);
                         }
                     }
-                    return true;
-                };
-                $filtered = array_filter($plugins, $cb);
+                    return $plugins;
+                }
 
-                return array_values($filtered);
-            }
-        };
+                /**
+                 * Temporarily disable specific plugins if in development environment.
+                 */
+                private function disablePluginsForDevImpl(array $plugins): array
+                {
+                    // $extra = [];
+                    $pluginsToDisable = $this->listPluginsToDisable();
+                    return $this->filteredPlugins($plugins, $pluginsToDisable);
+                }
+
+
+                /**
+                 * Temporarily disable specific plugins if simulating production environment on local machine.
+                 */
+                private function disablePluginsforSimulatedProdImpl(array $plugins): array
+                {
+                    // $extra = [];
+                    $pluginsToDisable = $this->listPluginsToDisable();
+
+                    return $this->filteredPlugins($plugins, $pluginsToDisable);
+                }
+
+
+                /**
+                 * Returns the list of plugins to disable, optionally merged with extra plugins.
+                 *
+                 * @param array|null $extra Optional array of additional plugin prefixes to disable.
+                 * @return array Array of plugin prefixes to disable.
+                 */
+                private function listPluginsToDisable(?array $extra = []): array
+                {
+                    return array_merge($this->pluginsToDisable, $extra);
+                }
+                /**
+                 * Filters the list of active plugins by removing specified plugins.
+                 *
+                 * @param array $plugins          Array of active plugin file paths.
+                 * @param array $pluginsToDisable Array of plugin prefixes to disable.
+                 * @return array Filtered array of active plugins.
+                 */
+                private function filteredPlugins(array $plugins, array $pluginsToDisable): array
+                {
+                    $cb = static function (string $plugin) use ($pluginsToDisable): bool {
+                        foreach ($pluginsToDisable as $disable) {
+                            if (str_starts_with($plugin, $disable)) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    };
+                    $filtered = array_filter($plugins, $cb);
+
+                    return array_values($filtered);
+                }
+            };
+        }
     }
     #endregion
 

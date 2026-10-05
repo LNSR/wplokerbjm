@@ -8,7 +8,7 @@ use DI\ContainerBuilder;
 use DI\Container;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyHookHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyHookInvoker;
 use WPLokerBJM\Tests\Support\Fixtures\FilterService;
 use WPLokerBJM\Tests\Support\Fixtures\LazyHookService;
 use WPLokerBJM\Tests\Support\Fixtures\MethodDeferredService;
@@ -19,7 +19,7 @@ use WPLokerBJM\Tests\Support\Fixtures\ThrowingActionService;
 use WPLokerBJM\Tests\Support\Fixtures\ThrowingFilterService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
-class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
+class ContainerLazyHookInvokerTest extends WplokerbjmTestCase
 {
     private Container $container;
     private WPHooksContainerRegistry $registry;
@@ -211,7 +211,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
         $this->assertNull($this->findRegisteredHook('filter', 'ghost_hook'));
     }
 
-    public function testMethodHookUsesContainerLazyHookHandlerInstance(): void
+    public function testMethodHookUsesContainerLazyHookInvokerInstance(): void
     {
         $service = new LazyHookService();
         $this->container->set(LazyHookService::class, $service);
@@ -234,7 +234,7 @@ class ContainerLazyHookHandlerTest extends WplokerbjmTestCase
         $this->assertNotNull($hook);
 
         $handler = $hook['callable'];
-        $this->assertInstanceOf(ContainerLazyHookHandler::class, $handler);
+        $this->assertInstanceOf(ContainerLazyHookInvoker::class, $handler);
         $this->assertStringContainsString('onAction', $handler->label);
     }
 

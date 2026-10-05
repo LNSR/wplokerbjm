@@ -15,17 +15,17 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{DeferredHookEntryDTO, HookRegistration, HookKey, Provider\WPHookPlanProvider};
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookHandler, ContainerLazyPropertyHookHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{ModuleClassHookMetadata};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait};
-
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
  *
- * Stores all hook registrations as identifiable ContainerLazyHookHandler instances,
+ * Stores all hook registrations as identifiable ContainerLazyHookInvoker instances,
  * enabling unregistration by hook name, class, or specific class::method.
  * Service resolution is deferred to hook-fire time (lazy loading).
  * @phpstan-import-type HookType from HookRegistration
@@ -33,16 +33,18 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait};
  * @phpstan-import-type HookTargetResolve from DeferredHookManager
  * @phpstan-type ActivateEntry \Closure(DeferredHookEntryDTO): bool
  * @template TKey of string
-
+ * @template THookName of string
  */
 class WPHooksContainerRegistry
 {
     /**
      * @var array<TKey, ContainerRegistryHandlerEntry>
      */
-    public private(set) array $handlers = [];
+    private array $handlers = [];
 
     public private(set) bool $initialized = false;
+    /** @var array<THookName, list<ContainerRegistryHandlerEntry>> */
+    public private(set) array $queuedRemovalEntry = [];
 
     /**
      * deferRegisterUntilHook entries whose trigger hook already fired before
@@ -87,7 +89,7 @@ class WPHooksContainerRegistry
             } catch (\Exception $e) {
                 Logger::error(
                     'WPHooksContainerRegistry',
-                    "Error registering {$data->type} '{$data->hook}' for {$key}: {$e->getMessage()}"
+                    "Error registering {$data->type} '{$data->hook}' with 'priority' " . (string) $data->priority . " and 'acceptedArgs' " . (string) $data->acceptedArgs . " for {$key}: {$e->getMessage()}"
                 );
             }
         }
@@ -108,7 +110,7 @@ class WPHooksContainerRegistry
     /**
      * Activate all deferred handlers registered for a specific WordPress hook.
      *
-     * Moves matching ContainerLazyHookHandler instances from $this->deferredHandlers
+     * Moves matching ContainerLazyHookInvoker instances from $this->deferredHandlers
      * into $this->handlers and registers them with WordPress via add_action/add_filter.
      * Handlers that have already been activated are silently skipped.
      *
@@ -131,7 +133,7 @@ class WPHooksContainerRegistry
     /**
      * Activate all deferred handlers belonging to a specific service class.
      *
-     * Scans all deferred hooks and activates any ContainerLazyHookHandler whose owning
+     * Scans all deferred hooks and activates any ContainerLazyHookInvoker whose owning
      * class matches the given FQCN. Already-active handlers are silently skipped.
      *
      * **Example:**
@@ -573,25 +575,52 @@ class WPHooksContainerRegistry
      */
     private function removeOnceEntry(ContainerRegistryHandlerEntry $entry): void
     {
+        #region next new `once` with new hook name iteration
+        /**
+         *  Temporary implementation
+         * ? In Invokers its `finallly` perhaps?
+         */
+        if ($this->queuedRemovalEntry !== []) {
+            foreach ($this->queuedRemovalEntry as $hookName => $entries) {
+                if (\doing_filter($hookName)) {
+                    continue;
+                }
+
+                foreach ($entries as $entry) {
+                    $entry->unregister();
+                }
+
+                unset($this->queuedRemovalEntry[$hookName]);
+            }
+        }
+        #endregion
+
         $uniqueKey = $entry->toUniqueKey();
         if (!isset($this->handlers[$uniqueKey])) {
             return;
         }
 
         $entry = $this->handlers[$uniqueKey];
-        // Skip the WordPress-side removal while the hook is being dispatched:
-        // remove_action during dispatch corrupts WP_Hook's iteration
-        // (resort_active_iterations skips the immediately-following priority).
-        // The consumed flag already prevents re-firing, so the callback can
-        // safely linger in $wp_filter until the request ends.
-        !$entry->stillInCallbackStack() && $entry->unregister();
-
+        /**
+         * Skip unregister hook while still in the same hook stack
+         * 
+         * Skip the WordPress-side removal while the hook is being dispatched:
+         * remove_action during dispatch corrupts WP_Hook's iteration
+         * (resort_active_iterations skips the immediately-following priority).
+         * The consumed flag already prevents re-firing, so the callback can
+         * safely linger in $wp_filter until the request ends.
+         * @link https://core.trac.wordpress.org/ticket/61263
+         */
+        // !$entry->stillDispatchingSameHook() && $entry->unregister();
+        if ($entry->stillDispatchingSameHook()) {
+            $this->queuedRemovalEntry[$entry->hook][] = $entry;
+        }
         unset($this->handlers[$uniqueKey]);
     }
 
     /**
      * Register hook registrations from the scanner.
-     * Pre-builds ContainerLazyHookHandler instances and validates container existence.
+     * Pre-builds ContainerLazyHookInvoker instances and validates container existence.
      *
      * @param list<HookRegistration> $registrations
      */
@@ -643,14 +672,14 @@ class WPHooksContainerRegistry
                 } catch (\Throwable $e) {
                     Logger::error(
                         'WPHooksContainerRegistry',
-                        'Skipping hook for ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . ' — ' . $e->getMessage()
+                        'Skipping hook for ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
                     );
                     continue;
                 }
                 if (!$allowed) {
                     Logger::warning(
                         'WPHooksContainerRegistry',
-                        'Skipping hook ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . ' — registerIf gate returned false.'
+                        'Skipping hook ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — registerIf gate returned false.'
                     );
                     continue;
                 }
@@ -679,8 +708,7 @@ class WPHooksContainerRegistry
             } catch (\Throwable $e) {
                 Logger::error(
                     'WPHooksContainerRegistry',
-                    'Skipping hook for ' . $registration->class . '::' . $registration->method
-                        . ' on ' . $hookName . ' — ' . $e->getMessage()
+                    'Skipping hook for ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
                 );
                 continue;
             }
@@ -688,8 +716,34 @@ class WPHooksContainerRegistry
                 hook: $hookName,
                 key: HookKey::fromRegistration($registration),
                 handler: $registration->target === 'method'
-                    ? new ContainerLazyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs, $registration->once)
-                    : new ContainerLazyPropertyHookHandler($this->container, $registration->class, $registration->method, $registration->visibility, $registration->type, $registration->executeIf, $registration->executeIfParams, $this->planProvider, $registration->hookArgs, $registration->once),
+                    ? new ContainerLazyHookInvoker(
+                        $this->container,
+                        $hookName,
+                        $registration->priority,
+                        $registration->class,
+                        $registration->method,
+                        $registration->visibility,
+                        $registration->type,
+                        $registration->executeIf,
+                        $registration->executeIfParams,
+                        $this->planProvider,
+                        $registration->hookArgs,
+                        $registration->once
+                    )
+                    : new ContainerLazyPropertyHookInvoker(
+                        $this->container,
+                        $hookName,
+                        $registration->priority,
+                        $registration->class,
+                        $registration->method,
+                        $registration->visibility,
+                        $registration->type,
+                        $registration->executeIf,
+                        $registration->executeIfParams,
+                        $this->planProvider,
+                        $registration->hookArgs,
+                        $registration->once
+                    ),
                 type: $registration->type,
                 priority: $registration->priority,
                 acceptedArgs: $registration->acceptedArgs,
@@ -702,9 +756,7 @@ class WPHooksContainerRegistry
             );
 
             if ($registration->once) {
-                $entry->handler->setRemoveCallback(
-                    fn() => $this->removeOnceEntry($entry)
-                );
+                $entry->handler->setRemoveCallback(fn() => $this->removeOnceEntry($entry));
             }
 
             // deferRegisterUntilHook implies deferral: the entry is held in the
@@ -727,7 +779,7 @@ class WPHooksContainerRegistry
                         } catch (\RuntimeException $e) {
                             Logger::error(
                                 'WPHooksContainerRegistry',
-                                'Skipping hook for ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . ' — ' . $e->getMessage()
+                                'Skipping hook for ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
                             );
                             continue;
                         }
@@ -782,6 +834,7 @@ class WPHooksContainerRegistry
  * @phpstan-import-type DeferredHookEntry from DeferredHooksTrait
  * @phpstan-import-type ActivateEntry from WPHooksContainerRegistry
  */
+
 class DeferredHookManager
 {
     use DeferredHooksTrait;
@@ -1184,7 +1237,7 @@ class DeferredHookManager
         } catch (\Throwable $e) {
             Logger::error(
                 'WPHooksContainerRegistry',
-                'Skipping deferred hook activation ' . $data->hook . ' — ' . $e->getMessage()
+                'Skipping deferred hook activation ' . $data->hook . '::' . (string) $data->priority . ' — error ' . $e->getMessage()
             );
             return false;
         }
@@ -1192,7 +1245,7 @@ class DeferredHookManager
         if (!$allowed) {
             Logger::warning(
                 'WPHooksContainerRegistry',
-                'Skipping deferred hook activation ' . $data->hook . ' — registerIf gate returned false.'
+                'Skipping deferred hook activation ' . $data->hook . '::' . (string) $data->priority . ' — registerIf gate returned false.'
             );
             return false;
         }
