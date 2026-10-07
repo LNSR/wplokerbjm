@@ -5,7 +5,6 @@ namespace WPLokerBJM\Core\Container;
 use DI\ContainerBuilder;
 use DI\Container;
 use Nette\Loaders\RobotLoader;
-use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 use WPLokerBJM\Core\Container\Definitions\{Core, Factory};
 use WPLokerBJM\Shared\Log\Logger;
@@ -14,36 +13,56 @@ use WPLokerBJM\Shared\Log\Logger;
  * WPLokerBJM Container
  * 
  * Builder for the PHP-DI container.
+ * 
+ * @note class_alias used for virtual typed classes without polluting global runtime namespace
  */
 #[Injectable(skip: true)]
 class WPLokerBJMContainer
 {
-    public function __construct(public readonly RobotLoader $robotLoader, ?string $cacheDir = null)
+
+    /**
+     * @phpstan-ignore-next-line
+     * @var __WPLokerBJMContainerCacheLocation
+     */
+    public private(set) object $cacheLocation;
+
+    public function __construct(private readonly RobotLoader $robotLoader, ?string $cacheDir = null)
     {
-        $this->cacheLocation = new readonly class ($cacheDir ??= \sprintf("%s/cache", rtrim(\get_stylesheet_directory()))) {
+        $this->cacheLocation = new readonly class($cacheDir ??= \sprintf("%s/cache", rtrim(\get_stylesheet_directory()))) {
             public string $cacheFile;
 
             public function __construct(public string $cacheDir)
             {
                 $this->cacheFile = \sprintf("%s/CompiledContainer.php", $this->cacheDir);
+                return;
+                \class_alias(__CLASS__, __WPLokerBJMContainerCacheLocation::class);
             }
         };
     }
 
     /**
      * @phpstan-ignore-next-line
-     * @var __CLASS__::class
+     * @var ?__WPLokerBJMContainerConfigurationState
      */
-    public private(set) ?object $cacheLocation = null;
-
-    private ?ContainerConfigurationState $containerConfigurationState {
-        get => $this->containerConfigurationState ??= new ContainerConfigurationState();
+    private ?object $containerConfigurationState {
+        get => $this->containerConfigurationState ??= new class() {
+            /** @var array<class-string,object> */
+            public array $extraRuntimeDefinitionsSet = [];
+            public bool $configured = false;
+            public ?ContainerBuilder $containerBuilder = null;
+            public function __construct()
+            {
+                return;
+                \class_alias(__CLASS__, __WPLokerBJMContainerConfigurationState::class);
+            }
+        };
     }
 
     private ?WPLokerBJMContainerBuilderConfiguration $builderConfiguration {
         get => $this->builderConfiguration ??= new WPLokerBJMContainerBuilderConfiguration(
-        $this,
-        $this->containerConfigurationState,
+            $this,
+            $this->robotLoader,
+            $this->containerConfigurationState,
         );
     }
 
@@ -57,7 +76,6 @@ class WPLokerBJMContainer
                 throw new \LogicException('Container already configured, use forceRebuild to force rebuild');
             }
             $forceRebuild && $this->reset();
-            $this->containerConfigurationState->containerBuilder = new ContainerBuilder();
             return $this->builderConfiguration;
         } catch (\Exception $e) {
             Logger::error('Container', 'Container::getContainer error: ' . $e->getMessage());
@@ -80,17 +98,24 @@ class WPLokerBJMContainer
 #[Injectable(skip: true)]
 final class WPLokerBJMContainerBuilderConfiguration
 {
-    /** @var array<string,object> */
-    private array $extraDefinitionsSet = [];
+    /**
+     * @param __WPLokerBJMContainerConfigurationState $containerConfigurationState
+     */
     public function __construct(
         private WPLokerBJMContainer $wpLokerContainer,
-        private ContainerConfigurationState $containerConfigurationState,
-    ) {}
+        private RobotLoader $robotLoader,
+        private object $containerConfigurationState,
+    ) {
+        $this->containerConfigurationState->containerBuilder = new ContainerBuilder();
+    }
 
-    public function setExtraDefinitionsSet(array $extraDefinitionsSet): static
+    /**
+     * @param array<class-string, object> $extraDefinitionsSet
+     */
+    public function setExtraRuntimeDefinitionsSet(array $extraDefinitionsSet): static
     {
         $this->statusException();
-        $this->extraDefinitionsSet = $extraDefinitionsSet;
+        $this->containerConfigurationState->extraRuntimeDefinitionsSet = $extraDefinitionsSet;
         return $this;
     }
 
@@ -100,13 +125,14 @@ final class WPLokerBJMContainerBuilderConfiguration
         $builder->useAutowiring(false);
         $builder->useAttributes(true);
         $this->setupCache();
+        /** @var Container $c */
         $c = $builder->build();
         $postRegisteration = [
             WPLokerBJMContainer::class => $this->wpLokerContainer,
-            RobotLoader::class => $this->wpLokerContainer->robotLoader,
+            ...$this->containerConfigurationState->extraRuntimeDefinitionsSet,
         ];
         foreach ($postRegisteration as $class => $instance) {
-            $c->has($class) && $c->set($class, $instance);
+            $c->set($class, $instance);
         }
         $this->containerConfigurationState->configured = true;
         return $c;
@@ -156,7 +182,7 @@ final class WPLokerBJMContainerBuilderConfiguration
      */
     private function persistDefinition(ContainerBuilder $builder): void
     {
-        $coreDefinition = new Core($this->wpLokerContainer->robotLoader);
+        $coreDefinition = new Core($this->robotLoader);
         $factoryDefinitions = new Factory();
 
         $builder->addDefinitions(
@@ -167,17 +193,7 @@ final class WPLokerBJMContainerBuilderConfiguration
                 $coreDefinition->getDefinitions(),
                 // factory definitions
                 $factoryDefinitions->getDefinitions(),
-                $this->extraDefinitionsSet,
             ),
         );
     }
-}
-/**
- * @internal
- */
-#[Injectable(skip: true)]
-final class ContainerConfigurationState
-{
-    public bool $configured = false;
-    public ?ContainerBuilder $containerBuilder = null;
 }

@@ -10,6 +10,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, Hoo
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
+use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 
 /**
  * Core container definitions for the wplokerbjm theme.
@@ -47,7 +48,7 @@ class Core implements DefinitionProviderInterface
             HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class))->lazy(),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
-                \DI\get(RobotLoader::class),
+                static fn() => \CompiledContainer::METHOD_MAPPING,
                 $namespace,
                 static fn() => get_stylesheet_directory() . "/cache",
                 \DI\get(WPHookPlanProvider::class)

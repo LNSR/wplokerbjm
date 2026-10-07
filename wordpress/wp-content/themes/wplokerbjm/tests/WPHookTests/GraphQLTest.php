@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;

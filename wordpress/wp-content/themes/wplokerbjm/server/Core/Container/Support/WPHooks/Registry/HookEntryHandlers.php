@@ -124,7 +124,7 @@ final readonly class RuntimeRegistryHandlerEntry extends AbstractDataObject
         public int $priority,
         public string $type,
         public int $acceptedArgs,
-        public ?WeakReference $owner,
+        public WeakReference $owner,
         public mixed $callback = null,
     ) {}
 }

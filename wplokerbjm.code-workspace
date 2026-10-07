@@ -58,7 +58,7 @@
       "**/wordpress/wp-includes/**": true,
     },
     "[php]": {
-      "editor.defaultFormatter": "DEVSENSE.phptools-vscode",
+      "editor.defaultFormatter": "bmewburn.vscode-intelephense-client",
     },
 
     // INTELEPHENSE INDEXER CONFIG

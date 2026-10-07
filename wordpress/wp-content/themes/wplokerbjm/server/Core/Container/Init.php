@@ -2,7 +2,6 @@
 
 namespace WPLokerBJM\Core\Container;
 
-use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Shared\Log\Logger;

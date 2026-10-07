@@ -84,7 +84,7 @@ class TaxonomyRepository
 			}
 
 			$options[$taxonomy] = array_values(array_map(
-				static fn($term): array => [
+				static fn(\WP_Term|\stdClass $term): array => [
 					'id' => (int) $term->term_id,
 					'name' => html_entity_decode((string) $term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
 					'slug' => (string) $term->slug,

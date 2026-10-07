@@ -17,16 +17,13 @@ use RankMath\OpenGraph\Image;
  */
 final class Rankmath implements PluginConfigInterface
 {
-	private static ?bool $isActiveCache = null;
-	private static ?array $sitemapUrlsCache = null;
 
 	/**
 	 * Check if Rank Math plugin is active (with caching)
 	 */
 	public static function isActive(): bool
 	{
-		self::$isActiveCache ??= PluginList::RankMath->isActive();
-		return self::$isActiveCache;
+		return PluginList::RankMath->isActive();
 	}
 	/**
 	 * Checks if the given URL is valid (not empty).
@@ -91,7 +88,7 @@ final class Rankmath implements PluginConfigInterface
 	 * Rewrite delete URL to use headless/frontend domain before Rank Math
 	 * Instant Indexing submits the delete notification.
 	 *
-	 * @see ../../../../../../plugins/fast-indexing-api/includes/class-instant-indexing.php
+	 * @see ../../../../../../../plugins/fast-indexing-api/includes/class-instant-indexing.php
 	 * @see \RM_GIAPI::delete_post
 	 *
 	 * @param string $url Original URL to delete (get_permalink()).
@@ -116,7 +113,7 @@ final class Rankmath implements PluginConfigInterface
 	 * Ensure Rank Math's SEO Analyzer uses the headless frontend domain for analysis.
 	 * Hooks into the analyzer after it sets the default URL and rewrites it.
 	 *
-	 * @see ../../../../../../plugins/seo-by-rank-math/includes/modules/seo-analysis/class-seo-analyzer.php
+	 * @see ../../../../../../../plugins/seo-by-rank-math/includes/modules/seo-analysis/class-seo-analyzer.php
 	 * @param SEO_Analyzer $analyzer.
 	 * @return void
 	 */

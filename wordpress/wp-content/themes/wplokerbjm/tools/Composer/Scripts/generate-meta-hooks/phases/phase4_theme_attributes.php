@@ -57,7 +57,7 @@ function loadHookRegistrationsFromCache(string $themeRoot): ?array
     if (!is_file($cacheFileContainerRegistry)) {
         return null;
     }
-    require_once $themeRoot . '/server/Core/Container/Support/WPHooks/DTO.php';
+    require $themeRoot . '/server/Core/Container/Support/WPHooks/DTO.php';
     $registrationContainerRegistry = require $cacheFileContainerRegistry;
     $registrationRuntimeRegistry = require $cacheFileRuntimeRegistry;
 

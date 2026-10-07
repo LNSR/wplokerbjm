@@ -7,6 +7,7 @@ namespace WPLokerBJM\Tests\Support;
 use \DI\Container;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use Dotenv\Dotenv;
+use Nette\Loaders\RobotLoader;
 
 /**
  * ProxyContainer
@@ -62,6 +63,11 @@ final class ProxyContainer
         self::boot();
         return self::$container = new WPLokerBJMContainer($testRobotLoader)
             ->initContainerBuilder()
+            ->setExtraRuntimeDefinitionsSet(
+                [
+                    RobotLoader::class => $testRobotLoader,
+                ]
+            )
             ->buildContainer();
     }
 

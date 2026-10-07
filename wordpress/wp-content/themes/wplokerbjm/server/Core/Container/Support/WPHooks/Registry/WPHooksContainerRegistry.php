@@ -577,7 +577,7 @@ class WPHooksContainerRegistry
     {
         #region next new `once` with new hook name iteration
         /**
-         *  Temporary implementation
+         *  Temporary solution till bug fixed upstream         
          * ? In Invokers its `finallly` perhaps?
          */
         if ($this->queuedRemovalEntry !== []) {
@@ -632,7 +632,7 @@ class WPHooksContainerRegistry
             if (!$this->container->has($registration->class)) {
                 Logger::warning(
                     'WPHooksContainerRegistry',
-                    'Skipping hook ' . $registration->hook
+                    'Skipping hook ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
                         . ' — class not in container: ' . $registration->class
                 );
                 continue;
@@ -649,7 +649,7 @@ class WPHooksContainerRegistry
                 Logger::error(
                     'WPHooksContainerRegistry',
                     'Skipping hook for ' . $registration->class . '::' . $registration->method
-                        . ' on ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook)
+                        . ' on ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
                         . ' — ' . $e->getMessage()
                 );
                 continue;
@@ -672,14 +672,14 @@ class WPHooksContainerRegistry
                 } catch (\Throwable $e) {
                     Logger::error(
                         'WPHooksContainerRegistry',
-                        'Skipping hook for ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
+                        'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
                     );
                     continue;
                 }
                 if (!$allowed) {
                     Logger::warning(
                         'WPHooksContainerRegistry',
-                        'Skipping hook ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — registerIf gate returned false.'
+                        'Skipping hook ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — registerIf gate returned false.'
                     );
                     continue;
                 }
@@ -708,7 +708,7 @@ class WPHooksContainerRegistry
             } catch (\Throwable $e) {
                 Logger::error(
                     'WPHooksContainerRegistry',
-                    'Skipping hook for ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
+                    'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
                 );
                 continue;
             }
@@ -764,7 +764,7 @@ class WPHooksContainerRegistry
             // registration array was built (attribute, scanner cache, runtime).
             if ($registration->deferRegister || $registration->deferRegisterUntilHook !== null) {
                 $recordEntry = $entry->toDeferredEntryDTO();
-                $this->deferredHookManager->addDeferred($recordEntry);
+                $this->deferredHookManager->addDeferredEntry($recordEntry);
 
                 if ($registration->deferRegisterUntilHook !== null) {
                     $triggerHook = $registration->deferRegisterUntilHook;
@@ -779,7 +779,7 @@ class WPHooksContainerRegistry
                         } catch (\RuntimeException $e) {
                             Logger::error(
                                 'WPHooksContainerRegistry',
-                                'Skipping hook for ' . $registration->class . '::' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
+                                'Skipping hook for ' . $entry->handler->label . ' — error ' . $e->getMessage()
                             );
                             continue;
                         }
@@ -851,6 +851,11 @@ class DeferredHookManager
         private HookTargetResolver $resolverTarget,
         private EntriesIndexer $entriesIndexer = new EntriesIndexer()
     ) {}
+
+    public function addDeferredEntry(DeferredHookEntryDTO $entry): void
+    {
+        $this->addDeferred($entry);
+    }
 
     /**
      * Activate all deferred handlers registered for a specific WordPress hook.
@@ -1237,7 +1242,7 @@ class DeferredHookManager
         } catch (\Throwable $e) {
             Logger::error(
                 'WPHooksContainerRegistry',
-                'Skipping deferred hook activation ' . $data->hook . '::' . (string) $data->priority . ' — error ' . $e->getMessage()
+                'Skipping deferred hook activation: ' . $data->handler->label .  ' — error ' . $e->getMessage()
             );
             return false;
         }
@@ -1245,7 +1250,7 @@ class DeferredHookManager
         if (!$allowed) {
             Logger::warning(
                 'WPHooksContainerRegistry',
-                'Skipping deferred hook activation ' . $data->hook . '::' . (string) $data->priority . ' — registerIf gate returned false.'
+                'Skipping deferred hook activation: ' . $data->handler->label .  ' — registerIf gate returned false.'
             );
             return false;
         }

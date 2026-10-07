@@ -1,7 +1,9 @@
 <?php
+
 namespace WPLokerBJM\Shared\Utilities;
 
 use WPLokerBJM\Shared\Log\Logger;
+
 class SharedUtils
 {
 
@@ -13,9 +15,9 @@ class SharedUtils
 
         // Check exact localhost addresses
         static $exactLocalhost = [
-        '127.0.0.1',
-        '::1',
-        'localhost',
+            '127.0.0.1',
+            '::1',
+            'localhost',
         ];
 
         if (in_array($remoteAddr, $exactLocalhost)) {
@@ -43,11 +45,11 @@ class SharedUtils
     {
         try {
             if (defined('PHP_SAPI') && PHP_SAPI !== 'cli') {
-                if (function_exists('litespeed_finish_request')) {
-                    litespeed_finish_request();
-                } elseif (function_exists('fastcgi_finish_request')) {
-                    fastcgi_finish_request();
-                }
+                match (true) {
+                    function_exists('litespeed_finish_request') => litespeed_finish_request(),
+                    function_exists('fastcgi_finish_request') => fastcgi_finish_request(),
+                    default => null,
+                };
             }
         } catch (\Exception $e) {
             Logger::error('SharedUtils::doActivityAtEndRequest error: ', $e->getMessage());

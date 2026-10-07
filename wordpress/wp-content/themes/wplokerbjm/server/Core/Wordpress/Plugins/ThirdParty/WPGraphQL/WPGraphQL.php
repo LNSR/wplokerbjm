@@ -41,28 +41,28 @@ final class WPGraphQL implements PluginConfigInterface
      * @var __CLASS__::class
      */
     private ModuleClassHookMetadata $graphQlPluginSettings {
-        get => $this->graphQlPluginSettings ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
-            /**
-             * @see get_graphql_setting
-             * @see \WPGraphQL\Admin\Settings\Settings::register_settings() -> {
-             *  public_introspection_enabled,
-             *  debug_mode_enabled,
-             * }
-             * @see \WPGraphQL\SmartCache\Admin\Settings::init()
-             * @param 'public_introspection_enabled'|'debug_mode_enabled' $option_name
-             */
-            #[Filter('graphql_get_setting_section_field_value', \PHP_INT_MAX, 3, executeIf: static function (string $option_name): bool {
-                return \in_array($option_name, ['public_introspection_enabled', 'debug_mode_enabled'], true);
-            })]
-            public function setSettings(?string $value, ?string $default_value, string $option_name): mixed
-            {
-                return match ($option_name) {
-                    'public_introspection_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
-                    'debug_mode_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
-                    default => $value,
-                };
-            }
-        };
+        get {
+            return $this->graphQlPluginSettings ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+                /**
+                 * @see get_graphql_setting
+                 * @see \WPGraphQL\Admin\Settings\Settings::register_settings() -> {
+                 *  public_introspection_enabled,
+                 *  debug_mode_enabled,
+                 * }
+                 * @see \WPGraphQL\SmartCache\Admin\Settings::init()
+                 * @param 'public_introspection_enabled'|'debug_mode_enabled' $option_name
+                 */
+                #[Filter('graphql_get_setting_section_field_value', \PHP_INT_MAX, 3)]
+                public function setSettings(?string $value, ?string $default_value, string $option_name): mixed
+                {
+                    return match ($option_name) {
+                        'public_introspection_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
+                        'debug_mode_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
+                        default => $value,
+                    };
+                }
+            };
+        }
     }
 
     #endregion

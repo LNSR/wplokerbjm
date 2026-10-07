@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use DI\Container;
 use DI\ContainerBuilder;
@@ -62,7 +62,7 @@ class InheritedHookTest extends WplokerbjmTestCase
     public function testChildWithoutRedeclarationHasNoRegistration(): void
     {
         $scanner = new WPHooksScanner(
-            $this->robotLoader,
+            $this->robotLoader->getIndexedClasses(),
             'WPLokerBJM\Tests\Support\Fixtures',
             '',
             $this->planProvider
@@ -87,7 +87,7 @@ class InheritedHookTest extends WplokerbjmTestCase
     public function testParentAndRedeclaringChildBothFire(): void
     {
         $scanner = new WPHooksScanner(
-            $this->robotLoader,
+            $this->robotLoader->getIndexedClasses(),
             'WPLokerBJM\Tests\Support\Fixtures',
             '',
             $this->planProvider

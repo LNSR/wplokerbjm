@@ -132,8 +132,13 @@ trait HookProviderTrait
      *
      * @throws \RuntimeException when the closure result is not a string
      */
-    public function resolveHookName(string|\Closure $hook, ?ContainerInterface $container = null, array $hookParams = [], string $label = '', ?object $instanceTarget = null): string
-    {
+    public function resolveHookName(
+        string|\Closure $hook,
+        ?ContainerInterface $container = null,
+        array $hookParams = [],
+        string $label = '',
+        ?object $instanceTarget = null
+    ): string {
         if (is_string($hook)) {
             return $hook;
         }
@@ -461,8 +466,11 @@ trait HookProviderTrait
      *
      * @throws RuntimeException when a parameter cannot be resolved
      */
-    private function resolveCallableFallback(\Closure $callable, ?ContainerInterface $container = null, string $label = ''): array
-    {
+    private function resolveCallableFallback(
+        \Closure $callable,
+        ?ContainerInterface $container = null,
+        string $label = ''
+    ): array {
         $reflect = new ReflectionFunction($callable);
         $values = [];
 
@@ -510,8 +518,14 @@ trait HookProviderTrait
      *
      * @throws RuntimeException when a parameter cannot be resolved
      */
-    private function resolveCallableParameters(\Closure $callable, array $plan, ?ContainerInterface $container = null, string $label = '', array $hookArgs = [], ?object $instanceTarget = null): array
-    {
+    private function resolveCallableParameters(
+        \Closure $callable,
+        array $plan,
+        ?ContainerInterface $container = null,
+        string $label = '',
+        array $hookArgs = [],
+        ?object $instanceTarget = null
+    ): array {
         $params = $plan['params'] ?? [];
 
         if ($params !== []) {

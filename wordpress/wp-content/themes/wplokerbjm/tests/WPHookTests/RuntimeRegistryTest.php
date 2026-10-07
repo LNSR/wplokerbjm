@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Attributes\Filter;
@@ -27,32 +27,6 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         ]);
 
         $this->trackRegistry($this->registry);
-
-        // Extend hook mocks with remove_action / remove_filter support
-        // so unregister actually strips entries from the registered-hooks array.
-        $hooks = &$GLOBALS['__wplokerbjm_registered_hooks'];
-
-        \Brain\Monkey\Functions\when('remove_action')->alias(
-            function (string $hook, $callable, int $priority = 10) use (&$hooks) {
-                $hooks = array_values(array_filter(
-                    $hooks,
-                    fn(array $h): bool =>
-                    !($h['type'] === 'action' && $h['hook'] === $hook
-                        && $h['callable'] === $callable && $h['priority'] === $priority),
-                ));
-            },
-        );
-
-        \Brain\Monkey\Functions\when('remove_filter')->alias(
-            function (string $hook, $callable, int $priority = 10) use (&$hooks) {
-                $hooks = array_values(array_filter(
-                    $hooks,
-                    fn(array $h): bool =>
-                    !($h['type'] === 'filter' && $h['hook'] === $hook
-                        && $h['callable'] === $callable && $h['priority'] === $priority),
-                ));
-            },
-        );
     }
 
     // ── Basic registration ────────────────────────────────────────────

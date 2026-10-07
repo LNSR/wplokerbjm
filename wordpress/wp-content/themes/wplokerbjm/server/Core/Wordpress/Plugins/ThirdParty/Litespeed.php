@@ -9,7 +9,6 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -19,7 +18,7 @@ use WPLokerBJM\Shared\Log\Logger;
  */
 final class Litespeed implements PluginConfigInterface
 {
-    public function __construct(private WPLokerBJMContainer $lokerBJMcontainer) {}
+    public function __construct(private WPLokerBJMContainer $lokerBJMcontainer, private RobotLoader $robotLoader) {}
 
     public static function isActive(): bool
     {
@@ -55,7 +54,7 @@ final class Litespeed implements PluginConfigInterface
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
             wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
-        $this->lokerBJMcontainer->robotLoader->rebuild();
+        $this->robotLoader->rebuild();
         $this->lokerBJMcontainer
             ->initContainerBuilder(forceRebuild: true)
             ->buildContainer();

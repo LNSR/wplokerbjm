@@ -9,7 +9,6 @@ use ScannerDefinition;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 use DI\Definition\AutowireDefinition;
 use Nette\Loaders\RobotLoader;
-use WPLokerBJM\Bootstrap;
 
 /**
  * Scans directories for autowirable PHP classes.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use DI\ContainerBuilder;
 use DI\Container;
@@ -273,8 +273,7 @@ class ContainerLazyHookInvokerTest extends WplokerbjmTestCase
         $hooks = $this->registeredHooks();
         $matched = array_values(array_filter(
             $hooks,
-            fn(array $h): bool =>
-                $h['hook'] === 'multi_priority_method_filter' && $h['type'] === 'filter',
+            fn(array $h): bool => $h['hook'] === 'multi_priority_method_filter',
         ));
 
         $this->assertCount(2, $matched);

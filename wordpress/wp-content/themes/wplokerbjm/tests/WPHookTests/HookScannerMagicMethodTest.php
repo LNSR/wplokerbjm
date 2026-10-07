@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use Nette\Loaders\RobotLoader;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
@@ -31,7 +31,7 @@ class HookScannerMagicMethodTest extends WplokerbjmTestCase
         $this->expectExceptionMessageIsOrContains('magic method');
 
         $scanner = new WPHooksScanner(
-            $this->robotLoader,
+            $this->robotLoader->getIndexedClasses(),
             'MagicHookRejected',
             '',
             new WPHookPlanProvider()
@@ -42,7 +42,7 @@ class HookScannerMagicMethodTest extends WplokerbjmTestCase
     public function testInvokeIsAllowed(): void
     {
         $scanner = new WPHooksScanner(
-            $this->robotLoader,
+            $this->robotLoader->getIndexedClasses(),
             'MagicHookAllowed',
             '',
             new WPHookPlanProvider()

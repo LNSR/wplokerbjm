@@ -43,81 +43,83 @@ class CachePurgeHandler
     #[Action('delete_attachment', 10, 1)]
     #[Action('transition_post_status', 10, 3)]
     private ModuleClassHookMetadata $invalidatePostCache {
-        get => $this->invalidatePostCache ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+        get {
+            return $this->invalidatePostCache ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
 
-            /** @var array<int, bool> */
-            public private(set) array $snapshotPostID = [];
+                /** @var array<int, bool> */
+                public private(set) array $snapshotPostID = [];
 
-            public function __invoke(...$args): void
-            {
-                $post_id = $this->extractPostId($args);
+                public function __invoke(...$args): void
+                {
+                    $post_id = $this->extractPostId($args);
 
-                if ($post_id === null || isset($this->snapshotPostID[$post_id]) && $this->snapshotPostID[$post_id] === true) {
-                    return;
+                    if ($post_id === null || isset($this->snapshotPostID[$post_id]) && $this->snapshotPostID[$post_id] === true) {
+                        return;
+                    }
+
+                    $this->snapshotPostID[(int) $post_id] = true;
+
+                    $this->invalidateJobDataCache((int) $post_id);
                 }
 
-                $this->snapshotPostID[(int) $post_id] = true;
+                /**
+                 * Extract a post ID from variadic hook arguments, validating post type.
+                 *
+                 * @param array $args Hook arguments
+                 * @return int|null The resolved lowongan post ID, or null if not applicable
+                 */
+                private function extractPostId(array $args): ?int
+                {
+                    $post_id = null;
 
-                $this->invalidateJobDataCache((int) $post_id);
-            }
+                    foreach ($args as $arg) {
+                        if ($arg instanceof \WP_Post) {
+                            if ($arg->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
+                                return null;
+                            }
+                            $post_id = $arg->ID;
+                            continue;
+                        }
 
-            /**
-             * Extract a post ID from variadic hook arguments, validating post type.
-             *
-             * @param array $args Hook arguments
-             * @return int|null The resolved lowongan post ID, or null if not applicable
-             */
-            private function extractPostId(array $args): ?int
-            {
-                $post_id = null;
+                        if (is_int($arg)) {
+                            $post_id = $arg;
+                            continue;
+                        }
 
-                foreach ($args as $arg) {
-                    if ($arg instanceof \WP_Post) {
-                        if ($arg->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
+                        if (is_string($arg) && ctype_digit($arg)) {
+                            $post_id = (int) $arg;
+                            continue;
+                        }
+                    }
+
+                    if ($post_id !== null) {
+                        $resolved = get_post($post_id);
+                        if ($resolved === null || $resolved->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
                             return null;
                         }
-                        $post_id = $arg->ID;
-                        continue;
                     }
 
-                    if (is_int($arg)) {
-                        $post_id = $arg;
-                        continue;
-                    }
-
-                    if (is_string($arg) && ctype_digit($arg)) {
-                        $post_id = (int) $arg;
-                        continue;
-                    }
+                    return $post_id;
                 }
 
-                if ($post_id !== null) {
-                    $resolved = get_post($post_id);
-                    if ($resolved === null || $resolved->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
-                        return null;
-                    }
+                /**
+                 * Invalidate job data caches for a specific lowongan post.
+                 *
+                 * @param int $post_id The post ID.
+                 * @return bool True if any cache entry was deleted.
+                 */
+                private function invalidateJobDataCache(int $post_id): bool
+                {
+                    $deleteResults = Cache::deleteMultiple([
+                        CacheKey::JOB_DATA_PREFIX . $post_id,
+                        CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id,
+                        CacheKey::JOB_SCHEMA_PREFIX . $post_id,
+                    ]);
+
+                    return !empty(array_filter($deleteResults));
                 }
-
-                return $post_id;
-            }
-
-            /**
-             * Invalidate job data caches for a specific lowongan post.
-             *
-             * @param int $post_id The post ID.
-             * @return bool True if any cache entry was deleted.
-             */
-            private function invalidateJobDataCache(int $post_id): bool
-            {
-                $deleteResults = Cache::deleteMultiple([
-                    CacheKey::JOB_DATA_PREFIX . $post_id,
-                    CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id,
-                    CacheKey::JOB_SCHEMA_PREFIX . $post_id,
-                ]);
-
-                return !empty(array_filter($deleteResults));
-            }
-        };
+            };
+        }
     }
 
     /**
@@ -139,13 +141,13 @@ class CachePurgeHandler
     #[Action('transition_post_status', 10, 3)]
     private \Closure $purgeGlobalCacheOnce {
         get {
-            static $propertyName = __PROPERTY__;
-            return $this->purgeGlobalCacheOnce ??= function () use ($propertyName) {
+            static $__propertyName = __PROPERTY__;
+            return $this->purgeGlobalCacheOnce ??= function () use ($__propertyName) {
                 static $alreadyRun = false;
                 if ($alreadyRun)
                     return;
                 $alreadyRun = true;
-                do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [$this, $propertyName]);
+                do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
                 try {
                     Cache::deleteMultiple([
                         CacheKey::CAROUSEL_JOBS,

@@ -63,7 +63,8 @@ final class DependencyInjector
         $this->assertTarget($target);
         $cacheKey = $target->constructCurrentClassIdentity();
         $plan = $this->getOrCompilePlan($cacheKey, $target);
-        if ($plan['properties'] === []) return $target;
+        if ($plan['properties'] === [])
+            return $target;
         $setterKey = $cacheKey . "\0" . $target::class;
         $setter = $this->cachedSetterClosure[$setterKey] ??= ($this->scopeAccessFactory->createSetter)($target::class);
 
@@ -118,7 +119,8 @@ class PlanCompiler
         $properties = [];
         foreach ($reflection->getProperties() as $property) {
             $attributes = $property->getAttributes(Inject::class);
-            if ($attributes === []) continue;
+            if ($attributes === [])
+                continue;
 
             $this->validateProperty($property, $reflection);
             $properties[$property->getName()] = $this->resolveDependencyEntry($property, $attributes[0]->newInstance());
@@ -421,7 +423,8 @@ class PlanCache
     ) {}
     public function __destruct()
     {
-        if ($this->compiledPlans === []) return;
+        if ($this->compiledPlans === [])
+            return;
         $this->flushPlansToCache();
     }
 
@@ -538,41 +541,42 @@ class ScopeAccessFactory
      * and protected members stay accessible.
      * 
      * @var TScopeAccessCallableResolver
-     * @return CallableResult
      */
-    public private(set) Closure $callableResolver {
-        get => $this->callableResolver ??= function (ContainerInterface $c, InjectionEntryDTO $entry): mixed {
-            /** @var Closure(InjectionEntryDTO): TFactoryClosure */
-            static $templateFactory = static function (InjectionEntryDTO $entry): Closure {
-                static $property;
-                static $method;
-                static $methodLazy;
+    private Closure $callableResolver {
+        get {
+            return $this->callableResolver ??= function (ContainerInterface $c, InjectionEntryDTO $entry): mixed {
+                /** @var Closure(InjectionEntryDTO): TFactoryClosure */
+                static $templateFactory = static function (InjectionEntryDTO $entry): Closure {
+                    static $property;
+                    static $method;
+                    static $methodLazy;
 
-                try {
-                    /** @var TFactoryClosure $factory */
-                    $factory = Closure::bind(
-                        match ($entry->kind) {
-                            'property' => $property ??= static fn(object $instance, InjectionEntryDTO $entry): mixed => $instance->{$entry->member},
-                            'method' => $entry->lazy
-                                ? $methodLazy ??= static fn(object $instance, InjectionEntryDTO $entry): Closure => $instance->{$entry->member}(...)
-                                : $method ??= static fn(object $instance, InjectionEntryDTO $entry): mixed => $instance->{$entry->member}(),
-                        },
-                        null,
-                        $entry->class,
-                    );
+                    try {
+                        /** @var TFactoryClosure $factory */
+                        $factory = Closure::bind(
+                            match ($entry->kind) {
+                                'property' => $property ??= static fn(object $instance, InjectionEntryDTO $entry): mixed => $instance->{$entry->member},
+                                'method' => $entry->lazy
+                                    ? $methodLazy ??= static fn(object $instance, InjectionEntryDTO $entry): Closure => $instance->{$entry->member}(...)
+                                    : $method ??= static fn(object $instance, InjectionEntryDTO $entry): mixed => $instance->{$entry->member}(),
+                            },
+                            null,
+                            $entry->class,
+                        );
 
-                    return $factory;
-                } catch (\Throwable $e) {
-                    throw new RuntimeException('Unable to bind callable factory for ' . $entry->class . '::' . $entry->member . '.');
-                }
+                        return $factory;
+                    } catch (\Throwable $e) {
+                        throw new RuntimeException('Unable to bind callable factory for ' . $entry->class . '::' . $entry->member . '.');
+                    }
+                };
+
+                $instance = $c->get($entry->class);
+                $factoryKey = $entry->class . '->' . $entry->member . '#' . $entry->kind . ($entry->lazy ? '#lazy' : '#value');
+                $factory = $this->closureFactories[$factoryKey] ??= $templateFactory($entry);
+
+                return $factory($instance, $entry);
             };
-
-            $instance = $c->get($entry->class);
-            $factoryKey = $entry->class . '->' . $entry->member . '#' . $entry->kind . ($entry->lazy ? '#lazy' : '#value');
-            $factory = $this->closureFactories[$factoryKey] ??= $templateFactory($entry);
-
-            return $factory($instance, $entry);
-        };
+        }
     }
 
     /**
@@ -581,35 +585,34 @@ class ScopeAccessFactory
      * @see ScopeAccessFactory::$callableResolver for Closure's parameters shape
      * @return TSetterClosure
      */
-    public private(set) \Closure $createSetter {
-        get => $this->createSetter ??= function (string $scopeClass): Closure {
-            /**
-             * Prevent needlessly creation of Closure
-             * @var TSetterClosure 
-             * @param CompiledPlan['properties'] $properties
-             */
-            static $setterTemplateClosure = function (ContainerInterface $c, AsChildClass $target, array $properties): void {
-                foreach ($properties as $property => $entry) {
-                    $target->{$property} = $entry instanceof InjectionEntryDTO
-                        /**
-                         *  Scope closure changed according $scopeClass, cannot use 'self' 
-                         *  '$this' still points to ScopeAccessFactory instance, but lose privates access
-                         * */
-                        ? ($this->callableResolver)($c, $entry)
-                        : $c->get($entry);
+    public private(set) Closure $createSetter {
+        get {
+            return $this->createSetter ??= function (string $scopeClass): Closure {
+                static $resolver = $this->callableResolver;
+                /**
+                 * Prevent needlessly creation of Closure
+                 * @var TSetterClosure 
+                 * @param CompiledPlan['properties'] $properties
+                 */
+                static $setterTemplateClosure = static function (ContainerInterface $c, AsChildClass $target, array $properties) use ($resolver): void {
+                    foreach ($properties as $property => $entry) {
+                        $target->{$property} = $entry instanceof InjectionEntryDTO
+                            ? $resolver($c, $entry)
+                            : $c->get($entry);
+                    }
+                };
+
+                try {
+                    $setter = Closure::bind(
+                        $setterTemplateClosure,
+                        null,
+                        $scopeClass,
+                    );
+                    return $setter;
+                } catch (\Throwable $e) {
+                    throw new RuntimeException('Unable to bind the dependency injector to the child class scope.');
                 }
             };
-
-            try {
-                $setter = Closure::bind(
-                    $setterTemplateClosure,
-                    $this,
-                    $scopeClass,
-                );
-                return $setter;
-            } catch (\Throwable $e) {
-                throw new RuntimeException('Unable to bind the dependency injector to the child class scope.');
-            }
-        };
+        }
     }
 }

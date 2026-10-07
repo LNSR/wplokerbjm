@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use Closure;
 use DI\Container;
@@ -31,20 +31,9 @@ class DeferRegisterUntilHookTest extends WplokerbjmTestCase
 
     private WPHookPlanProvider $planProvider;
 
-    /** @var array<string, int> Mutable did_action state, read by the did_action mock. */
-    private array $didActionStates = [];
-
     protected function setUp(): void
     {
         parent::setUp();
-
-        $this->didActionStates = [];
-
-        // The base test case does not mock did_action — alias it to a
-        // mutable map so tests can simulate already-fired trigger hooks.
-        \Brain\Monkey\Functions\when('did_action')->alias(function (string $hook): int {
-            return $this->didActionStates[$hook] ?? 0;
-        });
 
         $builder = new ContainerBuilder();
         $builder->useAutowiring(true);
@@ -200,7 +189,8 @@ class DeferRegisterUntilHookTest extends WplokerbjmTestCase
     public function testTriggerAlreadyFiredActivatesImmediately(): void
     {
         // Simulate the trigger hook having fired before the registry booted.
-        $this->didActionStates['graphql_init'] = 1;
+        // Real did_action() reads the $wp_actions global.
+        $GLOBALS['wp_actions']['graphql_init'] = 1;
 
         $registry = $this->createRegistry([
             $this->action(

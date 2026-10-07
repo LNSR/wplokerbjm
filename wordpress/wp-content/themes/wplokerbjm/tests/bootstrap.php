@@ -10,7 +10,6 @@ require_once __DIR__ . '/../vendor/autoload.php';
 // (set in mu-plugins/wplokerbjm-bootstrap.php) to prevent boot().
 define('ABSPATH', true);
 define('WPLOKERBJM_TEST_ENV', true);
-require_once __DIR__ . '/../../../mu-plugins/wplokerbjm-bootstrap.php';
 
 // Nette RobotLoader for all WPLokerBJM classes — replaces Composer classmaps.
 // Scans tests/, server/, and the mu-plugins Bootstrap file.
@@ -23,3 +22,10 @@ $testRobotLoader = (new \Nette\Loaders\RobotLoader)
     ->setAutoRefresh(true)
     ->reportParseErrors(true);
 $testRobotLoader->register();
+
+// Real WordPress hook engine (add_action / add_filter / do_action /
+// apply_filters / remove_action / ... / WP_Hook). Loaded once per process;
+// the test harness resets the hook globals before each test.
+if (!function_exists('add_action')) {
+    require_once dirname(__DIR__, 4) . '/wp-includes/plugin.php';
+}

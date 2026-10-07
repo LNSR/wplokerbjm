@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
@@ -594,7 +594,9 @@ class DeferredHookTest extends WplokerbjmTestCase
     }
 
     /**
-     * Find all registered hooks matching type and hook name.
+     * Find all registered hooks matching hook name. The $type argument is kept
+     * for call-site compatibility; WordPress stores actions and filters in the
+     * same hook table and does not track the distinction.
      *
      * @return array<int, array<string, mixed>>
      */
@@ -602,7 +604,7 @@ class DeferredHookTest extends WplokerbjmTestCase
     {
         return array_values(array_filter(
             $this->registeredHooks(),
-            fn(array $reg): bool => $reg['type'] === $type && $reg['hook'] === $hook,
+            fn(array $reg): bool => $reg['hook'] === $hook,
         ));
     }
 }

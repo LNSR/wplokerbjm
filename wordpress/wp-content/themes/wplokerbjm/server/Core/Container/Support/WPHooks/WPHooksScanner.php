@@ -14,7 +14,6 @@ use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Shared\Log\Logger;
 use \CompiledContainer;
 
@@ -38,12 +37,13 @@ class WPHooksScanner
     private ?array $cachedHookRegistrations = null;
 
     /**
-     * @param string $namespace
+     * @param array $compiledContainerMap list of classes in compiled container
+     * @param string $namespace namespace to scan
      * @param string $cacheLocation directory where cache file will be stored
      * @param WPHookPlanProvider|null $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
     public function __construct(
-        private RobotLoader $robotloader,
+        private array $compiledContainerMap,
         private string $namespace = 'WPLokerBJM',
         private string $cacheLocation = '',
         private ?WPHookPlanProvider $hookPlanProvider = null
@@ -99,15 +99,13 @@ class WPHooksScanner
 
         $namespacePrefix = $this->namespace . '\\';
 
-        $isTest = defined('WPLOKERBJM_TEST_ENV');
-        $methodMap = $isTest ? $this->robotloader->getIndexedClasses() : CompiledContainer::METHOD_MAPPING;
-        foreach ($methodMap as $className => $entryGet) {
+        foreach ($this->compiledContainerMap as $className => $entryGet) {
             if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
                 continue;
             }
             try {
                 $reflection = new ReflectionClass($className);
-                $methodCb = function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations): void {
+                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations): void {
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $method->getName(),
@@ -131,10 +129,9 @@ class WPHooksScanner
                         deferRegisterUntilHookParams: $this->hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                         once: $attr->once,
                     );
-                };
-                $this->scanMethodHooks($reflection, $methodCb);
+                });
 
-                $propertyCb = function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations): void {
+                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations): void {
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $property->getName(),
@@ -158,10 +155,14 @@ class WPHooksScanner
                         deferRegisterUntilHookParams: $this->hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                         once: $attr->once,
                     );
-                };
-                $this->scanPropertyHooks($reflection, $propertyCb);
+                });
             } catch (\RuntimeException $e) {
-                Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());
+                Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ', [
+                    'message' => $e->getMessage(),
+                    'line' => $e->getLine(),
+                    'file' => $e->getFile(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
                 Logger::flush();
                 throw $e;
             }

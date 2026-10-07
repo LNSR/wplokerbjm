@@ -140,8 +140,8 @@ class PluginManager
 
     #region 3rd party choice hooks
     #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function () {
-            return !\is_admin() && (empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql'));
-            })]
+        return !\is_admin() && (empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql'));
+    })]
     public function disableWpGraphqlPlugin(array $plugins): array
     {
         $pluginKey = array_search(PluginList::WpGraphql->value, $plugins, true);
@@ -158,17 +158,17 @@ class PluginManager
         once: true,
         deferRegister: true,
         registerIf: static function (): bool {
-                    if (is_admin()) {
-                    $action = $_REQUEST['action'] ?? '';
-                        if (in_array($action, ['upgrade-plugin', 'update-plugin', 'activate', 'deactivate', 'activate-plugin'], true)) {
-                        return true;
-                        }
-                    }
-                $cookie = SharedUtils::getWordpressAuthCookie();
-                    if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookie['name']))
+            if (is_admin()) {
+                $action = $_REQUEST['action'] ?? '';
+                if (in_array($action, ['upgrade-plugin', 'update-plugin', 'activate', 'deactivate', 'activate-plugin'], true)) {
                     return true;
-                return false;
                 }
+            }
+            $cookie = SharedUtils::getWordpressAuthCookie();
+            if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookie['name']))
+                return true;
+            return false;
+        }
     )]
     public function disableQueryMonitorPlugin(array $plugins): array
     {
@@ -180,8 +180,8 @@ class PluginManager
     }
 
     #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function (): bool {
-            return !\is_admin();
-            })]
+        return !\is_admin();
+    })]
     public function disablePluginOnNonAdminDashboard(array $plugins): array
     {
         $listPlugins = [
@@ -206,12 +206,12 @@ class PluginManager
      * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
-    public private(set) ModuleClassHookMetadata $pluginEnvironmentCheck {
+    private ModuleClassHookMetadata $pluginEnvironmentCheck {
         get {
-            return $this->pluginEnvironmentCheck ??= new class (__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+            return $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
                 private array $pluginsToDisable = [
-                PluginList::Wordfence->value,
-                PluginList::FastIndexingApi->value,
+                    PluginList::Wordfence->value,
+                    PluginList::FastIndexingApi->value,
                 ];
 
                 #[Filter('option_active_plugins', 0, once: true)]
@@ -223,10 +223,10 @@ class PluginManager
                  * Force active plugins for production
                  */
                 #[Filter(
-                'option_active_plugins',
-                1,
-                once: true,
-                registerIf: static function (): bool {
+                    'option_active_plugins',
+                    1,
+                    once: true,
+                    registerIf: static function (): bool {
                         return !SharedUtils::isDevelopment();
                     }
                 )]

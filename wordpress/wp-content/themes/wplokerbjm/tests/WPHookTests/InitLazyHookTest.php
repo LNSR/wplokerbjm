@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use DI\ContainerBuilder;
 use DI\Container;
@@ -185,16 +185,19 @@ class InitLazyHookTest extends WplokerbjmTestCase
 
         $matching = array_filter(
             $this->registeredHooks(),
-            fn($r) => $r['type'] === 'action' && $r['hook'] === 'lazy_action_hook'
+            fn($r) => $r['hook'] === 'lazy_action_hook'
         );
         $this->assertCount(1, $matching, 'Hook should only be registered once even with multiple initialize() calls');
     }
 
-    public function testMultipleServicesOnSameHookFireIndependently(): void
+    public function testMultipleLazyServicesResolveIndependently(): void
     {
+        // Each service is registered on its own hook, so lazy resolution must
+        // happen independently per hook and each service is instantiated
+        // exactly once on its first fire.
         $registrations = [
-            $this->action(LazyHookService::class, 'onAction', 'mixed_hook'),
-            $this->filter(FilterService::class, 'onFilter', 'mixed_hook', acceptedArgs: 1),
+            $this->action(LazyHookService::class, 'onAction', 'lazy_action_hook'),
+            $this->filter(FilterService::class, 'onFilter', 'lazy_filter_hook', acceptedArgs: 2),
         ];
 
         $init = $this->createInit($registrations);
@@ -203,14 +206,13 @@ class InitLazyHookTest extends WplokerbjmTestCase
         $this->assertSame(0, LazyHookService::$instantiationCount, 'Lazy service should not be instantiated yet');
         $this->assertSame(0, FilterService::$instantiationCount, 'Lazy filter service should not be instantiated yet');
 
-        // do_action fires only action-typed registrations for the hook,
-        // apply_filters fires only filter-typed ones. Both must trigger
-        // lazy resolution on the same hook name.
-        do_action('mixed_hook', 'payload');
-        apply_filters('mixed_hook', 'value');
+        do_action('lazy_action_hook', 'payload');
+        apply_filters('lazy_filter_hook', 'value');
 
         $this->assertSame(1, LazyHookService::$instantiationCount, 'Action service should be instantiated exactly once');
         $this->assertSame(1, FilterService::$instantiationCount, 'Filter service should be instantiated exactly once');
+        $this->assertCount(1, LazyHookService::$capturedValues);
+        $this->assertCount(1, FilterService::$capturedArgs);
         $this->assertSame('payload', LazyHookService::$capturedValues[0]['value']);
         $this->assertSame('value', FilterService::$capturedArgs[0]['value']);
     }

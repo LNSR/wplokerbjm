@@ -1,8 +1,7 @@
 <?php
-
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use Closure;
 use DI\Container;

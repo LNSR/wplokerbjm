@@ -24,7 +24,7 @@ abstract class BaseHookAttribute
      * 
      * @param (\Closure(TParams...): bool)|null $registerIf decide whether to register the hook
      * 
-     * @param array<int, string|\BackedEnum|\Closure(TParams...): array> $tag
+     * @param (\Closure(TParams...): array)|array $tag
      * 
      * @param string|(\Closure(TParams...): string)|null $deferRegisterUntilHook
      * !defer registration until the named 'action' trigger hook fires (implies defer); a Closure is resolved through the container and must return the trigger hook name
@@ -52,7 +52,6 @@ abstract class BaseHookAttribute
 class Action extends BaseHookAttribute {}
 /**
  * Attribute for WordPress actions.
- * @template TParams of object
  */
 #[Attribute(Attribute::TARGET_METHOD | Attribute::TARGET_PROPERTY | Attribute::IS_REPEATABLE)]
 class Filter extends BaseHookAttribute {}

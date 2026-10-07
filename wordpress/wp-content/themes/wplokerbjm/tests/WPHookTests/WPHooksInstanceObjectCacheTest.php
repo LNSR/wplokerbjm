@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceObjectCache;
 use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;

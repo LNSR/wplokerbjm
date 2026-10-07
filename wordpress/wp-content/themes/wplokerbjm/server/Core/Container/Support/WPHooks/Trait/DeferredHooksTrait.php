@@ -40,8 +40,9 @@ trait DeferredHooksTrait
 
     /**
      * Store a deferred hook entry under its unique key.
+     * @internal
      */
-    public function addDeferred(DeferredHookEntryDTO $entry): void
+    private function addDeferred(DeferredHookEntryDTO $entry): void
     {
         $this->deferredHandlers[$entry->toUniqueKey()] = $entry;
         $this->entriesIndexer->setIndexes($entry);
@@ -56,7 +57,7 @@ trait DeferredHooksTrait
      * @param ActivateEntry $activateEntry Moves an accepted entry to the active pool.
      * @return int Number of newly activated entries.
      */
-    protected function activateMatchingDeferredEntries(array $keys, callable $activateEntry): int
+    private function activateMatchingDeferredEntries(array $keys, callable $activateEntry): int
     {
         $activated = 0;
         if ($keys === []) return $activated;
@@ -78,7 +79,7 @@ trait DeferredHooksTrait
      * @param list<TKey> $keys
      * @param callable(DeferredHookEntryDTO): bool $matches Predicate over ($hook, $entry, $key).
      */
-    protected function unregisterMatchingDeferredEntries(array $keys, callable $matches): void
+    private function unregisterMatchingDeferredEntries(array $keys, callable $matches): void
     {
         if ($keys === []) return;
         foreach ($keys as $key) {

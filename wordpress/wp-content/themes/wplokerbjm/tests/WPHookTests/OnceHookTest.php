@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests;
+namespace WPLokerBJM\Tests\WPHookTests;
 
 use Closure;
 use DI\Container;
@@ -75,10 +75,8 @@ class OnceHookTest extends WplokerbjmTestCase
         // the WordPress-side removal — otherwise WP_Hook::resort_active_iterations
         // repositions the iteration pointer and the immediately-following
         // priority never fires (consecutive once-hooks on the same hook).
-        \Brain\Monkey\Functions\when('doing_action')->alias(
-            static fn (string $hook): bool => $hook === 'once_consecutive'
-        );
-
+        // The real engine drives doing_action() from $wp_current_filter, so no
+        // mock is needed here.
         $registrations = [
             $this->action(OnceActionService::class, 'onOnceAction', 'once_consecutive', priority: 1, once: true),
             $this->action(OnceActionService::class, 'onOnceAction', 'once_consecutive', priority: 2, once: true),
@@ -101,9 +99,9 @@ class OnceHookTest extends WplokerbjmTestCase
         $this->assertSame(1, OnceActionService::$instantiationCount);
         $this->assertSame(['first', 'first'], OnceActionService::$capturedValues);
 
-        // WordPress-side removal was skipped during dispatch (the guard) —
-        // the callbacks linger, but are inert (consumed → passthrough).
-        $this->assertCount(2, array_filter(
+        // WordPress-side removal was deferred while dispatching (the guard),
+        // then applied by the queued-removal flush once the dispatch ended.
+        $this->assertCount(0, array_filter(
             $this->registeredHooks(),
             static fn (array $r): bool => $r['hook'] === 'once_consecutive'
         ));
