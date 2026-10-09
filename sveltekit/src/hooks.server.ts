@@ -31,8 +31,10 @@ class HttpUtils {
   ): Promise<string> {
     const baseHash = event.locals.postTime?.trim() || response;
     const authToken = event.locals.authToken || null;
-    const nonce = event.locals.themeData.wpRestNonce;
-    const hash = await HttpUtils.calculateHash(`${baseHash}:${authToken}:${nonce}`);
+    const nonce = event.locals.themeData.wpGraphqlNonce;
+    const hash = await HttpUtils.calculateHash(
+      `${baseHash}:${authToken}:${nonce}`,
+    );
     return `W/"${hash}"`;
   }
 
@@ -234,9 +236,9 @@ const handleGraphQLETag: Handle = async ({ event, resolve }) => {
 const handleThemeContext: Handle = async ({ event, resolve }) => {
   APIServiceServer.setFetchFn(event.fetch); //! set fetchFn function for server
   let cache: WPLokerBJMThemedData | undefined = getThemeCache();
-  
+
   if (cache) {
-    cache.wpRestNonce = APIServiceServer.getNonce;
+    cache.wpGraphqlNonce = APIServiceServer.getNonce;
     event.locals.themeData = { ...cache };
     return resolve(event);
   }
@@ -244,9 +246,12 @@ const handleThemeContext: Handle = async ({ event, resolve }) => {
   try {
     const result: WPLokerBJMThemedData =
       await APIServiceServer.getThemeDataGraphQL();
-    cache = { ...result, wpRestNonce: undefined };
+    cache = { ...result, wpGraphqlNonce: undefined };
     setThemeCache(cache);
-    event.locals.themeData = { ...cache, wpRestNonce: APIServiceServer.getNonce };
+    event.locals.themeData = {
+      ...cache,
+      wpGraphqlNonce: result.wpGraphqlNonce,
+    };
   } catch (e) {
     console.warn("hooks.handleThemeContext: failed to fetch theme data", e);
   }
@@ -302,7 +307,9 @@ const handleCacheAndTransform: Handle = async ({ event, resolve }) => {
   const publicCache =
     "public, max-age=60, s-maxage=2592000, stale-while-revalidate=86400";
   const privateCache = "private, no-cache, must-revalidate";
-  const devModeCache = "no-cache, must-revalidate";
+  const devModeCache = !!event.locals.themeData.wpGraphqlNonce
+    ? privateCache
+    : "public, no-cache, must-revalidate";
   const cachePolicy = dev
     ? devModeCache
     : authenticated

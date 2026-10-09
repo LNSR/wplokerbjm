@@ -81,8 +81,8 @@ class Logger
      * Attempts a single batch write; if it fails, falls back to writing
      * each entry individually. The buffer is cleared regardless of outcome.
      * Safe against re-entry (nested calls during flush are no-ops).
-     * @see \WPLokerBJM\Core\ShutdownHooks use this to setup logger
-     * ! Strictly used only during Wordpress shutdown hook
+     * @see \WPLokerBJM\Core\Container\Init also serve as flusher
+     * ! Strictly used only during __destruct sequence
      */
     public static function flush(): void
     {

@@ -13,7 +13,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * @phpstan-type BaseQuery array{post_type: string, post_status: string}
  * @phpstan-type SearchFilters array{
  *   cari?: string,
- *   sort?: string|array{value?: 'asc'|'desc'},
+ *   sort?: array{value?: 'ASC'|'DESC', label?: 'Terbaru'|'Terlama'},
  *   lokasi_pekerjaan?: string|list<string>,
  *   gender?: string|list<string>,
  *   pendidikan?: string|list<string>
@@ -39,7 +39,7 @@ class JobQuery
 	 * 
 	 * @var BaseQuery
 	 */
-	const array getBaseArgs = [
+	public const array getBaseArgs = [
 		'post_type' => PostTypes::POST_TYPE_LOWONGAN,
 		'post_status' => 'publish',
 	];

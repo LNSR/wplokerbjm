@@ -1,39 +1,8 @@
 <?php
+
 namespace WPLokerBJM\Shared\Utilities;
 
 use WPLokerBJM\Shared\Log\Logger;
-
-enum PluginList: string
-{
-    case LiteSpeed = 'litespeed-cache/litespeed-cache.php';
-    case Wordfence = 'wordfence/wordfence.php';
-    case MetaBox = 'meta-box/meta-box.php';
-    case MetaBoxLite = 'meta-box-lite/meta-box-lite.php';
-    case WpGraphql = 'wp-graphql/wp-graphql.php';
-    case RankMath = 'seo-by-rank-math/rank-math.php';
-    case QueryMonitor = 'query-monitor/query-monitor.php';
-    case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
-    public function isActive(): bool
-    {
-        static $activePlugins = null;
-        $activePlugins ??= get_option('active_plugins') ?: [];
-        return is_array($activePlugins) && in_array($this->value, $activePlugins, true);
-    }
-
-    public function deactivePlugin(): void
-    {
-        if ($this->isActive()) {
-            deactivate_plugins($this->value, false);
-        }
-    }
-
-    public function activePlugin(): void
-    {
-        if (!$this->isActive()) {
-            activate_plugins($this->value, false);
-        }
-    }
-}
 
 class SharedUtils
 {
@@ -46,9 +15,9 @@ class SharedUtils
 
         // Check exact localhost addresses
         static $exactLocalhost = [
-        '127.0.0.1',
-        '::1',
-        'localhost',
+            '127.0.0.1',
+            '::1',
+            'localhost',
         ];
 
         if (in_array($remoteAddr, $exactLocalhost)) {
@@ -72,18 +41,18 @@ class SharedUtils
         return false;
     }
 
-    public static function doActivityAtBackground(callable $activity): void
+    public static function doActivityAtEndRequest(callable $activity): void
     {
         try {
             if (defined('PHP_SAPI') && PHP_SAPI !== 'cli') {
-                if (function_exists('litespeed_finish_request')) {
-                    litespeed_finish_request();
-                } elseif (function_exists('fastcgi_finish_request')) {
-                    fastcgi_finish_request();
-                }
+                match (true) {
+                    function_exists('litespeed_finish_request') => litespeed_finish_request(),
+                    function_exists('fastcgi_finish_request') => fastcgi_finish_request(),
+                    default => null,
+                };
             }
         } catch (\Exception $e) {
-            Logger::error('SharedUtils::doActivityAtBackground error: ', $e->getMessage());
+            Logger::error('SharedUtils::doActivityAtEndRequest error: ', $e->getMessage());
         } finally {
             $activity();
         }
@@ -112,12 +81,12 @@ class SharedUtils
     }
 
     /**
-     * @return array{name: string, value: string}
+     * @return array{name: ?string, value: ?string}
      */
     public static function getWordpressAuthCookie(): array
     {
-        $authCookieName = '';
-        $authCookieValue = '';
+        $authCookieName = null;
+        $authCookieValue = null;
         if (!empty($_COOKIE)) {
             foreach ($_COOKIE as $name => $val) {
                 if (
@@ -131,8 +100,8 @@ class SharedUtils
             }
         }
         return [
-            'name' => (string) $authCookieName,
-            'value' => (string) $authCookieValue
+            'name' => $authCookieName,
+            'value' => $authCookieValue
         ];
     }
 

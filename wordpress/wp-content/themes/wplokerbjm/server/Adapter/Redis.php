@@ -1,7 +1,10 @@
 <?php
+
 declare(strict_types=1);
+
 namespace WPLokerBJM\Adapter;
 
+use WPLokerBJM\Configs\Credential\RedisCred;
 use WPLokerBJM\Shared\Cache\CacheKey;
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -13,19 +16,11 @@ use WPLokerBJM\Shared\Log\Logger;
  *
  * Credentials are injected via the constructor using PHP-DI.
  * @see \WPLokerBJM\Core\Container\Definitions\Factory
- * @phpstan-import-type RedisCred from \WPLokerBJM\Configs\Credential\CredentialConfig
  */
 class RedisAdapter
 {
     private ?\Redis $connection = null;
-
-    /**
-     * Summary of __construct
-     * @param RedisCred $credentials
-     */
-    public function __construct(private array $credentials)
-    {
-    }
+    public function __construct(private RedisCred $credentials) {}
 
     /**
      * Delete cache keys matching multiple patterns.
@@ -57,29 +52,19 @@ class RedisAdapter
                 return false;
             }
 
-            $host = $this->credentials['host'];
-            $port = $this->credentials['port'];
-            $password = $this->credentials['password'];
-            $database = $this->credentials['database'];
-            $sock = $this->credentials['sock'];
+            $credential = $this->credentials;
 
             $redis = new \Redis();
-
-            if ($sock && file_exists($sock)) {
-                $connected = $redis->connect($sock);
-            } else {
-                $connected = $redis->connect($host, $port);
-            }
-
+            $connected = $credential->sock && file_exists($credential->sock) ? $redis->connect($credential->sock) : $redis->connect($credential->host, (int) $credential->port);
             if (!$connected) {
                 return false;
             }
 
-            if ($password && !$redis->auth($password)) {
+            if ($credential->password && !$redis->auth($credential->password)) {
                 return false;
             }
 
-            if ($database !== null && !$redis->select($database)) {
+            if ($credential->database !== null && !$redis->select((int) $credential->database)) {
                 return false;
             }
 

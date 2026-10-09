@@ -2,14 +2,16 @@
 
 namespace WPLokerBJM\Core\Container;
 
-use WPLokerBJM\Bootstrap;
+use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * Initializes core services in the wplokerbjm theme by registering WordPress hooks.
  *
  * Delegates to WPHooksContainerRegistry which stores hooks as identifiable
- * ContainerLazyHookHandler instances, enabling unregistration by class/method.
+ * ContainerLazyHookInvoker instances, enabling unregistration by class/method.
  *
  * Each hook defers container resolution to the moment WordPress fires it.
  * The underlying service is NOT instantiated during `initialize()` —
@@ -28,6 +30,17 @@ class Init
     public function __construct(
         private readonly WPHooksContainerRegistry $registry,
     ) {}
+
+    public function __destruct()
+    {
+        !defined('WPLOKERBJM_TEST_ENV') && $this->shutdown();
+    }
+
+    #[Action('shutdown', \PHP_INT_MAX)]
+    private function shutdown(): void
+    {
+        SharedUtils::doActivityAtEndRequest(Logger::flush(...));
+    }
 
     /**
      * Register all WordPress hooks from attributes via the registry.

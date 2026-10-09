@@ -1,7 +1,9 @@
 <?php
+
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
 use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{WPHookPlanProvider};
@@ -13,15 +15,18 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
 trait ContainerLazyHookInvokerTrait
 {
     use HookInvokerTrait;
-
-    public readonly string $label;
+    /**
+     * Invoke the actual hook callback on the (alive) owner instance.
+     *
+     * @param object $instance The resolved owner instance.
+     * @param mixed  ...$args  Hook arguments received at fire time.
+     */
+    abstract private function invokeOn(object $instance, mixed ...$args): mixed;
 
     /**
      * Common __invoke execution pipeline wrapping gate checks, invocation, and error handling.
-     * 
-     * @param \Closure(object $instance, mixed ...$args): mixed $executor
      */
-    private function executeHook(\Closure $executor, array $args): mixed
+    private function executeHook(array $args): mixed
     {
         $hookArgs = $this->buildHookArgs($args);
 
@@ -63,12 +68,11 @@ trait ContainerLazyHookInvokerTrait
             }
 
             $instance = $this->container->get($this->class);
-            $result = $executor($instance, ...$args);
+            $result = $this->invokeOn($instance, ...$args);
 
-            SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}");
+            SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed ' . ++$this->numberExecutions . ' times');
             $this->consumeOnce();
             return $result;
-
         } catch (\Throwable $e) {
             $this->consumeOnce();
             Logger::error(static::class, "Error invoking hook {$this->label}: " . $e->getMessage());
@@ -83,8 +87,9 @@ trait ContainerLazyHookInvokerTrait
  * Unlike closures, this is a named class that appears in debugging tools
  * WordPress can match it by instance identity (spl_object_hash) for
  * remove_action()/remove_filter().
+ * @phpstan-import-type HookType from HookRegistration
  */
-final class ContainerLazyHookHandler
+final class ContainerLazyHookInvoker
 {
     use ContainerLazyHookInvokerTrait;
 
@@ -93,8 +98,21 @@ final class ContainerLazyHookHandler
 
     /** Plan provider used for condition gates and hook-name resolution. */
     private readonly WPHookPlanProvider $planProvider;
+    /**
+     * @template TClass
+     * @param class-string<TClass> $class
+     * @param method-string<TClass> $method
+     * @param HookType['visibility'] $visibility
+     * @param HookType['type'] $type
+     * @param HookType['executeIf'] $executeIf
+     * @param HookType['executeIfParams'] $executeIfParams
+     * @param HookType['hookArgs'] $hookArgNames
+     * @param HookType['once'] $once
+     */
     public function __construct(
         private readonly ContainerInterface $container,
+        private readonly string $hookName,
+        private readonly int $priority,
         private readonly string $class,
         private readonly string $method,
         private readonly string $visibility = 'public',
@@ -105,26 +123,28 @@ final class ContainerLazyHookHandler
         private readonly array $hookArgNames = [],
         private readonly bool $once = false,
     ) {
-        $this->label = $this->class . '::' . $this->method;
+        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . $this->class . '->' . $this->method;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
             $this->invoker = \Closure::bind(
-                self::$templateClosure ??= static fn(object $instance, string $methodName, mixed ...$args): mixed => $instance->{$methodName}(...$args),
+                static::$templateClosure ??= static fn(object $instance, string $methodName, mixed ...$args): mixed => $instance->{$methodName}(...$args),
                 null,
                 $this->class,
             );
         }
-
     }
 
     public function __invoke(mixed ...$args): mixed
     {
-        return $this->executeHook(function (object $instance, mixed ...$args) {
-            return $this->visibility === 'public'
-                ? $instance->{$this->method}(...$args)
-                : ($this->invoker)($instance, $this->method, ...$args);
-        }, $args);
+        return $this->executeHook($args);
+    }
+
+    private function invokeOn(object $instance, mixed ...$args): mixed
+    {
+        return $this->visibility === 'public'
+            ? $instance->{$this->method}(...$args)
+            : ($this->invoker)($instance, $this->method, ...$args);
     }
 }
 
@@ -137,8 +157,9 @@ final class ContainerLazyHookHandler
  * Unlike raw closures, this is a named class that appears in debugging
  * tools and WordPress can match it by instance identity (spl_object_hash)
  * for remove_action()/remove_filter().
+ * @phpstan-import-type HookType from HookRegistration
  */
-final class ContainerLazyPropertyHookHandler
+final class ContainerLazyPropertyHookInvoker
 {
     use ContainerLazyHookInvokerTrait;
 
@@ -148,8 +169,22 @@ final class ContainerLazyPropertyHookHandler
     /** Plan provider used for condition gates and hook-name resolution. */
     private readonly WPHookPlanProvider $planProvider;
 
+    /**
+     * @template TClass
+     * @param ContainerInterface $container
+     * @param class-string<TClass> $class
+     * @param property-string<TClass> $property
+     * @param HookType['visibility'] $visibility
+     * @param HookType['type'] $type
+     * @param HookType['executeIf'] $executeIf
+     * @param HookType['executeIfParams'] $executeIfParams
+     * @param HookType['hookArgs'] $hookArgNames
+     * @param HookType['once'] $once
+     */
     public function __construct(
         private readonly ContainerInterface $container,
+        private readonly string $hookName,
+        private readonly int $priority,
         private readonly string $class,
         private readonly string $property,
         private readonly string $visibility = 'public',
@@ -160,12 +195,12 @@ final class ContainerLazyPropertyHookHandler
         private readonly array $hookArgNames = [],
         private readonly bool $once = false,
     ) {
-        $this->label = $this->class . '::$' . $this->property;
+        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . $this->class . '->' . $this->property;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
             $this->reader = \Closure::bind(
-                self::$templateClosure ??= static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
+                static::$templateClosure ??= static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
                 null,
                 $this->class,
             );
@@ -174,18 +209,21 @@ final class ContainerLazyPropertyHookHandler
 
     public function __invoke(mixed ...$args): mixed
     {
-        return $this->executeHook(function (object $instance, mixed ...$args) {
-            $callable = $this->visibility === 'public'
-                ? $instance->{$this->property}
-                : ($this->reader)($instance, $this->property);
+        return $this->executeHook($args);
+    }
 
-            $isInvokable = $callable instanceof \Closure || (is_object($callable) && method_exists($callable, '__invoke'));
+    private function invokeOn(object $instance, mixed ...$args): mixed
+    {
+        $callable = $this->visibility === 'public'
+            ? $instance->{$this->property}
+            : ($this->reader)($instance, $this->property);
 
-            if (!$isInvokable || !is_callable($callable)) {
-                throw new \RuntimeException("Property {$this->label} is not a valid callable or invokable object.");
-            }
+        $isInvokable = $callable instanceof \Closure || (is_object($callable) && method_exists($callable, '__invoke'));
 
-            return $callable(...$args);
-        }, $args);
+        if (!$isInvokable || !is_callable($callable)) {
+            throw new \RuntimeException("Property {$this->label} is not a valid callable or invokable object.");
+        }
+
+        return $callable(...$args);
     }
 }

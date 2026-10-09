@@ -267,7 +267,7 @@ class BookmarkBroadcastChannel extends BaseBroadcastChannel
     {
       //! this reload every tab
       case "reload":
-        this.#reloadPage();
+        void this.#reloadPage();
         break;
       case "sync":
         void refreshStoreOnMessage();

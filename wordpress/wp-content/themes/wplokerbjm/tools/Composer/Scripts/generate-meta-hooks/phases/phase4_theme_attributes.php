@@ -15,12 +15,12 @@ use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
-use WPLokerBJM\Core\Container\Support\WPHooks\RuntimeHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
 
 /**
  * Phase 4 — Collect #[Action] / #[Filter] hook registrations.
  *
- * Primary source: the WPHooksScanner cache file ({themeRoot}/cache/WPHooksCache.php).
+ * Primary source: the WPHooksScanner cache file ({themeRoot}/cache/WPhooksRegistryContainerCache.php).
  * It already contains class, method, hook, type and tags for every registered
  * hook — no parsing needed, and the results always match what the hook
  * registry actually uses at runtime.
@@ -51,13 +51,13 @@ function themeAttributeScan(string $themeRoot): array
  */
 function loadHookRegistrationsFromCache(string $themeRoot): ?array
 {
-    $cacheFileContainerRegistry = $themeRoot . '/cache/WPHooksCache.php';
-    $cacheFileRuntimeRegistry = $themeRoot . '/cache/WPHooksRuntimeCache.php';
+    $cacheFileContainerRegistry = $themeRoot . '/cache/WPhooksRegistryContainerCache.php';
+    $cacheFileRuntimeRegistry = $themeRoot . '/cache/WPHooksInstanceObjectCache.php';
 
     if (!is_file($cacheFileContainerRegistry)) {
         return null;
     }
-    require_once $themeRoot . '/server/Core/Container/Support/WPHooks/DTO.php';
+    require $themeRoot . '/server/Core/Container/Support/WPHooks/DTO.php';
     $registrationContainerRegistry = require $cacheFileContainerRegistry;
     $registrationRuntimeRegistry = require $cacheFileRuntimeRegistry;
 
@@ -98,13 +98,13 @@ function loadHookRegistrationsFromCache(string $themeRoot): ?array
     }
 
     foreach ($registrationRuntimeRegistry as $runtime) {
-        $hook = $runtime instanceof RuntimeHookMetadata ? $runtime->hook : ($runtime['hook'] ?? null);
+        $hook = $runtime instanceof InstanceHookMetadata ? $runtime->hook : ($runtime['hook'] ?? null);
         if (!is_string($hook)) {
             continue;
         }
-        if (($runtime instanceof RuntimeHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'action') {
+        if (($runtime instanceof InstanceHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'action') {
             $actions[] = $hook;
-        } elseif (($runtime instanceof RuntimeHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'filter') {
+        } elseif (($runtime instanceof InstanceHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'filter') {
             $filters[] = $hook;
         }
     }

@@ -23,7 +23,7 @@
 | `unregisterByHook/Class/Namespace/Callable/Tags()` | Remove active entries only; use the `unregisterDeferredBy*` family for deferred entries. |
 | `unregisterByHookPattern($pattern)` / `unregisterByTagPattern($patterns)` | Wildcard removal of active entries. |
 | `unregisterDeferredByHookPattern($pattern)` / `unregisterDeferredByTagPattern($patterns)` | Wildcard removal of deferred entries only. |
-| `WPHooksRuntimeRegistry::registerHooksOn()` | Scan one existing object once; attribute closures resolve when a provider is injected. |
+| `WPHooksInstanceRegistry::registerHooksOn()` | Scan one existing object once; attribute closures resolve when a provider is injected. |
 | `registerAction()` / `registerFilter()` | Manual runtime path for captured closures and callbacks; params: `executeIf`, `once`, `deferRegisterUntilHook`, `owner`. Identical (hook, callback, priority) registrations are deduplicated. |
 | `unregisterHooksOn()` | Remove every runtime handler owned by one object (incl. its deferred entries). |
 
@@ -31,15 +31,15 @@
 
 ## Invokers and utilities
 
-- `ContainerLazyHookHandler` / `ContainerLazyPropertyHookHandler` — resolve services at fire time; support `executeIf` and private/protected access (`Invoker/ContainerLazyHookInvoker.php`).
-- `RuntimeInstanceHookHandler` / `RuntimeInstancePropertyHookHandler` — retain an existing object and invoke its member; `WeakReference` owner with GC self-cleanup (`Invoker/RuntimeHookInvoker.php`).
-- `RuntimeCallableHookHandler` — wraps manual runtime callbacks and direct `executeIf` conditions (`Invoker/RuntimeHookInvoker.php`).
+- `ContainerLazyHookInvoker` / `ContainerLazyPropertyHookInvoker` — resolve services at fire time; support `executeIf` and private/protected access (`Invoker/ContainerLazyHookInvoker.php`).
+- `RuntimeInstanceHookInvoker` / `RuntimeInstancePropertyHookInvoker` — retain an existing object and invoke its member; `WeakReference` owner with GC self-cleanup (`Invoker/RuntimeHookInvoker.php`).
+- `RuntimeCallableHookInvoker` — wraps manual runtime callbacks and direct `executeIf` conditions (`Invoker/RuntimeHookInvoker.php`).
 - `HookInvokerTrait` — shared once/removal plumbing (`setRemoveCallback`, `consumed`/`removed` guards), `buildHookArgs` named args, `filterPassthrough` (`Trait/HookInvokerTrait.php`).
 - `RuntimeInstanceInvokerTrait` — runtime `__invoke` pipeline + `consumeLifetime()` GC nuke (`Invoker/RuntimeHookInvoker.php`).
 - `ContainerLazyHookInvokerTrait` — `executeHook()` pipeline; unresolvable gate on a once-hook is treated as pass (`Invoker/ContainerLazyHookInvoker.php`).
 - `DeferredHooksTrait` — shared deferred pool: `addDeferred`, `activateMatchingDeferredEntries`, `unregisterMatchingDeferredEntries`, abstract `gateDeferredActivation` (`Trait/DeferredHooksTrait.php`).
 - `HookProviderTrait` — shared plan core for both providers: `buildCallablePlan`, `resolveHookName`, `evaluateExecuteIf`, `evaluateRegistrationGate`, `resolveTagCallable`, `callableParamNames` (`Trait/HookProviderTrait.php`).
-- `HookRuntimeResolver` — runtime owner inference (`resolveOwner`), closure hook names (`resolveClosureHook`), method param names (`resolveHookArgNames`) — in `Registry/WPHooksRuntimeRegistry.php`.
+- `HookRuntimeResolver` — runtime owner inference (`resolveOwner`), closure hook names (`resolveClosureHook`), method param names (`resolveHookArgNames`) — in `Registry/WPHooksInstanceRegistry.php`.
 - `HookPattern` — wildcard validation/matching: exactly one trailing asterisk, literal prefix ≥ 2 chars, else `InvalidArgumentException`; `matches` / `matchesAny` (`Utilities/HookPattern.php`).
 - `HookTagUtilities::normalizeTags()` / `normalizeTagValue()` — accept strings or string-backed enums and deduplicate tags.
 - `HookTags::GRAPHQL_NOCACHE_HEADERS` — current shared tag constant.
@@ -48,7 +48,7 @@
 ## 📂 Codebase References
 
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — container registry, deferred manager, and target resolver.
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksRuntimeRegistry.php` — runtime registry + `HookRuntimeResolver`.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — runtime registry + `HookRuntimeResolver`.
 - `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — runtime handlers + `RuntimeInstanceInvokerTrait`.
 - `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — lazy handlers + `ContainerLazyHookInvokerTrait`.
 - `server/Core/Container/Support/WPHooks/Provider/RuntimeWPHookProvider.php` — runtime closure resolution.

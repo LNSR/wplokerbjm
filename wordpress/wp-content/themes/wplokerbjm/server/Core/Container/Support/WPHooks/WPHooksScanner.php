@@ -6,6 +6,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks;
 
 use Brick\VarExporter\VarExporter;
 
+use Nette\Loaders\RobotLoader;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
@@ -13,8 +14,8 @@ use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Bootstrap;
 use WPLokerBJM\Shared\Log\Logger;
+use \CompiledContainer;
 
 /**
  * Scans directories for WordPress hook attribute registrations.
@@ -34,23 +35,23 @@ class WPHooksScanner
 
     /** @var array<int, HookRegistration>|null */
     private ?array $cachedHookRegistrations = null;
-    public private(set) string $cacheLocation {
-        set(string $value) {
-            $this->cacheLocation = is_dir($value) || str_ends_with($value, '/') || str_ends_with($value, '\\')
-                ? rtrim($value, '/\\') . '/WPHooksCache.php'
-                : $value;
-        }
-    }
 
     /**
-     * @param string $namespace
+     * @param array $compiledContainerMap list of classes in compiled container
+     * @param string $namespace namespace to scan
      * @param string $cacheLocation directory where cache file will be stored
      * @param WPHookPlanProvider|null $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
-    public function __construct(private string $namespace = 'WPLokerBJM', $cacheLocation = '', private ?WPHookPlanProvider $hookPlanProvider = null)
-    {
+    public function __construct(
+        private array $compiledContainerMap,
+        private string $namespace = 'WPLokerBJM',
+        private string $cacheLocation = '',
+        private ?WPHookPlanProvider $hookPlanProvider = null
+    ) {
         $this->namespace = trim($namespace, '\\');
-        $this->cacheLocation = $cacheLocation;
+        $this->cacheLocation = is_dir($cacheLocation) || str_ends_with($cacheLocation, '/') || str_ends_with($cacheLocation, '\\')
+            ? rtrim($cacheLocation, '/\\') . '/WPhooksRegistryContainerCache.php'
+            : $cacheLocation;
     }
 
     /**
@@ -68,7 +69,7 @@ class WPHooksScanner
         }
 
         if (!empty($this->cacheLocation) && is_file($this->cacheLocation)) {
-            $loaded = require_once $this->cacheLocation;
+            $loaded = require $this->cacheLocation;
             if (is_array($loaded)) {
                 return $this->cachedHookRegistrations = array_map(
                     static fn(HookRegistration|array $reg): HookRegistration => $reg instanceof HookRegistration ? $reg : HookRegistration::fromArray($reg),
@@ -98,14 +99,13 @@ class WPHooksScanner
 
         $namespacePrefix = $this->namespace . '\\';
 
-        $hookPlanProvider = $this->hookPlanProvider;
-        foreach (Bootstrap::$robotLoader->getIndexedClasses() as $className => $file) {
+        foreach ($this->compiledContainerMap as $className => $entryGet) {
             if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
                 continue;
             }
             try {
                 $reflection = new ReflectionClass($className);
-                $methodCb = static function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, $hookPlanProvider): void {
+                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations): void {
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $method->getName(),
@@ -117,22 +117,21 @@ class WPHooksScanner
                         target: 'method',
                         visibility: $visibility,
                         executeIf: $attr->executeIf,
-                        executeIfParams: $hookPlanProvider->buildCallablePlan($attr->executeIf),
+                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf),
                         registerIf: $attr->registerIf,
-                        registerIfParams: $hookPlanProvider->buildCallablePlan($attr->registerIf),
-                        hookParams: $hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        hookArgs: array_map(static fn($p) => $p->getName(), $method->getParameters()),
+                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
+                        hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
+                        hookArgs: array_map(static fn(\ReflectionParameter $p) => $p->getName(), $method->getParameters()),
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
-                        tagCallableParams: $hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
+                        tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                         deferRegisterUntilHook: $attr->deferRegisterUntilHook,
-                        deferRegisterUntilHookParams: $hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
+                        deferRegisterUntilHookParams: $this->hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                         once: $attr->once,
                     );
-                };
-                $this->scanMethodHooks($reflection, $methodCb);
+                });
 
-                $propertyCb = static function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations, $hookPlanProvider): void {
+                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations): void {
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $property->getName(),
@@ -144,22 +143,27 @@ class WPHooksScanner
                         target: $target,
                         visibility: $visibility,
                         executeIf: $attr->executeIf,
-                        executeIfParams: $hookPlanProvider->buildCallablePlan($attr->executeIf),
+                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf),
                         registerIf: $attr->registerIf,
-                        registerIfParams: $hookPlanProvider->buildCallablePlan($attr->registerIf),
-                        hookParams: $hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        hookArgs: $hookPlanProvider->extractPropertyCallableParamNames($property),
+                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
+                        hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
+                        hookArgs: $this->hookPlanProvider->extractPropertyCallableParamNames($property),
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
-                        tagCallableParams: $hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
+                        tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                         deferRegisterUntilHook: $attr->deferRegisterUntilHook,
-                        deferRegisterUntilHookParams: $hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
+                        deferRegisterUntilHookParams: $this->hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                         once: $attr->once,
                     );
-                };
-                $this->scanPropertyHooks($reflection, $propertyCb);
+                });
             } catch (\RuntimeException $e) {
-                Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ' . $e->getMessage());
+                Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ', [
+                    'message' => $e->getMessage(),
+                    'line' => $e->getLine(),
+                    'file' => $e->getFile(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+                Logger::flush();
                 throw $e;
             }
         }

@@ -27,7 +27,7 @@
 | `Core\Container\` | `server/Core/Container/` | DI container, Init, bootstrap |
 | `Core\Container\Attributes\` | `server/Core/Container/Attributes/` | #[Action], #[Filter] attributes |
 | `Core\Container\Definitions\` | `server/Core/Container/Definitions/` | Core + Factory definitions |
-| `Core\Container\Support\WPHooks\` | `server/Core/Container/Support/WPHooks/` | Scanner, Registry, ContainerLazyHookHandler |
+| `Core\Container\Support\WPHooks\` | `server/Core/Container/Support/WPHooks/` | Scanner, Registry, ContainerLazyHookInvoker |
 | `Core\Abilities\` | `server/Core/Abilities/` | User capability management |
 | `Core\Cron\` | `server/Core/Cron/` | WP-Cron jobs |
 | `Core\Cron\Posts\` | `server/Core/Cron/Posts/` | Post lifecycle cron |

@@ -8,7 +8,7 @@ export interface WPLokerBJMThemedData
     logoWidth?: number;
     logoHeight?: number;
   };
-  wpRestNonce?: string | null;
+  wpGraphqlNonce?: string | null;
   siteIconTags?: string;
 }
 
