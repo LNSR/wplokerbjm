@@ -12,7 +12,7 @@ export const GET_THEME_DATA = graphql(`
         logoWidth
         logoHeight
         }
-      wpRestNonce
+      wpGraphqlNonce
     }
   }
 `);

@@ -1,0 +1,266 @@
+<?php
+
+namespace WPLokerBJM\Core\Wordpress\Theme;
+
+use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+
+/**
+ * Leverage Wordpress theme feature for easier assets (logo,favicon,etc) management and integrate to frontend
+ * @phpstan-type LogoData array{
+ *  logoDecoding: 'async'|'auto'|'none',
+ *  logoHeight: int,
+ *  logoSizes: string,
+ *  logoSrcset: string,
+ *  logoUrl: string, 
+ *  logoWidth: int
+ * }
+ * @phpstan-type ThemeData array{
+ *  logo: LogoData, 
+ *  siteIconTags: string,
+ *  wpGraphqlNonce?: string
+ * }
+ */
+class ThemeHooks
+{
+    public const THEME_DATA_HOOK = 'wplokerbjm_graphql_theme_data';
+
+    /**
+     * Register theme supports and image sizes.
+     *
+     * Adds common theme supports used across the theme:
+     * - title-tag: let WP handle document title
+     * - html5: modern markup for forms, galleries, captions, scripts and styles
+     * - post-thumbnails: enable featured images
+     * - custom-logo: configurable logo with sensible defaults
+     *
+     * Also registers a small set of logo image sizes used for responsive headers.
+     *
+     * Side effects:
+     * - Calls add_theme_support() and add_image_size() during theme bootstrap.
+     *
+     * @return void
+     */
+    #[Action('after_setup_theme', once: true)]
+    public function addThemeSupport(): void
+    {
+
+        add_theme_support('title-tag');         // Add title tag support for dynamic titles
+        add_theme_support('align-wide');        // Enable wide alignment for blocks
+        add_theme_support('responsive-embeds'); // Responsive embeds
+        // HTML5 markup for forms, galleries, captions, and scripts/styles
+        add_theme_support('html5', [
+            'gallery',
+            'caption',
+            'script',
+        ]);
+        add_theme_support('post-thumbnails');          // featured images
+
+        // Register custom logo support with sensible defaults.
+        // Admin can set the logo in Appearance -> Customize -> Site Identity.
+        add_theme_support('custom-logo', [
+            'width' => 222,
+            'height' => 64,
+            'flex-height' => true,
+            'flex-width' => true,
+            'header-text' => ['site-title', 'site-description'],
+        ]);
+    }
+
+    /**
+     * Adds additional site icon meta tags for custom sizes.
+     */
+    #[Filter('site_icon_meta_tags')]
+    public private(set) \Closure $addSiteIconMetaTags {
+        get => $this->addSiteIconMetaTags ??= static function (array $meta_tags): array {
+
+            static $additional_sizes = [48, 96, 144, 256, 384, 512];
+
+            foreach ($additional_sizes as $size) {
+                $url = get_site_icon_url($size);
+                $url && $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
+            }
+
+            /**
+             * Add type attributes to meta tags
+             * @param array $meta_tags
+             * @param string $type
+             * @return void
+             */
+            static $addTypeAttribute = static function (array &$meta_tags, string $type): void {
+                foreach ($meta_tags as &$tag) {
+                    // For link tags (icon and apple-touch-icon)
+                    if (preg_match('/<link (?:rel="icon"|rel="apple-touch-icon")[^>]*href="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
+                        $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
+                    }
+                    // For meta msapplication-TileImage
+                    if (preg_match('/<meta name="msapplication-TileImage"[^>]*content="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
+                        $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
+                    }
+                }
+            };
+
+            /**
+             * Adds fallback site icon meta tags for custom sizes.
+             * WordPress may convert the original PNG to AVIF during upload(via Modern Image Formats plugin), so:
+             * 1. Walk post_parent to find the original upload attachment.
+             * 2. Use wp_get_original_image_url() to get the original PNG URL.
+             * @return string|null
+             */
+            static $addFallbackSiteIconMetaTags = static function (): string|null {
+                $cropped_id = get_option('site_icon');
+                if (!$cropped_id)
+                    return null;
+
+                $cropped_post = get_post($cropped_id);
+                $original_id = ($cropped_post && $cropped_post->post_parent) ? $cropped_post->post_parent : 0;
+                if (!$original_id)
+                    return null;
+
+                $png_url = wp_get_original_image_url($original_id);
+                if (!$png_url)
+                    return null;
+                return sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($png_url));
+            };
+
+            foreach (['png', 'ico', 'svg', 'webp', 'avif'] as $type) {
+                $addTypeAttribute($meta_tags, $type);
+            }
+
+            $fallbackTag = $addFallbackSiteIconMetaTags();
+            $fallbackTag && $meta_tags[] = $fallbackTag;
+
+            return $meta_tags;
+        };
+    }
+
+    /**
+     * Provide additional site icon image sizes for generation.
+     *
+     * This filter adds a set of common icon sizes to be generated when a site icon is set.
+     * It complements the default sizes provided by WordPress.
+     *
+     * @return int[] Array of additional icon sizes in pixels.
+     */
+    #[Filter('site_icon_image_sizes')]
+    public function siteIconImageSizes(): array
+    {
+        return [32, 48, 96, 144, 192, 256, 384, 512];
+    }
+
+    /**
+     * Provide theme runtime data for frontend side.
+     *
+     * The array contains:
+     * - logo: nested logo metadata
+     * - wpGraphqlNonce (string, when logged in)
+     * - siteIconTags (string): newline‑separated <link> tags generated via the
+     *   `site_icon_meta_tags` filter. Useful for rendering favicon markup in
+     *   head elements when hydrating client code.
+     * @return ThemeData
+     */
+    #[Filter(ThemeHooks::THEME_DATA_HOOK, once: true)]
+    public function themeData(): array
+    {
+        $loggedIn = is_user_logged_in();
+        // For logged-in users store per-user caches to avoid leaking any per-user secrets (nonces)
+        $cacheKey = $loggedIn
+            ? CacheKey::THEME_DATA . '_user_' . (int) get_current_user_id()
+            : CacheKey::THEME_DATA . '_anonymous';
+        /** @var ThemeData|false */
+        $cached = Cache::get($cacheKey);
+        if ($cached !== false) {
+            $cached['wpGraphqlNonce'] = $loggedIn
+                ? \graphql_get_nonce()
+                : null;
+
+            return $cached;
+        }
+
+
+        $logoData = $this->getLogoData();
+        if (empty($logoData->sizes)) {
+            $logoData->sizes = '(max-width: 640px) 48px, (max-width: 1024px) 64px, 128px';
+        }
+
+        // compute optional site icon <link> tags using the same filter used in addSiteIconMetaTags()
+        $siteIconTags = '';
+        $tags = apply_filters('site_icon_meta_tags', []);
+        if (!empty($tags) && is_array($tags)) {
+            $siteIconTags = implode("\n", $tags);
+        }
+        $logo = [
+            'logoUrl' => $logoData->url ?? '',
+            'logoSrcset' => $logoData->srcset ?? '',
+            'logoSizes' => $logoData->sizes ?? '',
+            'logoDecoding' => 'async',
+            'logoWidth' => intval($logoData->width ?? 0),
+            'logoHeight' => intval($logoData->height ?? 0),
+        ];
+        $wpThemeData = [
+            'logo' => $logo,
+            'siteIconTags' => $siteIconTags,
+            'wpGraphqlNonce' => $loggedIn ? \graphql_get_nonce() : null
+        ];
+        Cache::set($cacheKey, $wpThemeData, 86400); // Cache for 1 day
+
+        return $wpThemeData;
+    }
+
+    /**
+     * Get current theme logo information.
+     *
+     * Returns a compact associative array with the URL, responsive srcset and sizes,
+     * and intrinsic image dimensions where available. This helper centralizes logic
+     * for retrieving logo metadata so templates and scripts can consume a single shape.
+     *
+     * Behavior notes:
+     * - If no custom logo is set returns empty url/srcset/sizes and fallback dimensions.
+     * - Attempts to read attachment metadata for width/height; if absent, it falls back
+     *   to the theme support defaults, then to a safe 128x128 fallback so browsers can
+     *   compute aspect ratio reliably.
+     * @phpstan-type TLogo object{url:string|false,srcset:string|false,sizes:string|false,width:int,height:int}
+     * @return TLogo
+     */
+    private function getLogoData(): object
+    {
+        $custom_logo_id = get_theme_mod('custom_logo');
+        if (!$custom_logo_id) {
+            return (object) ['url' => false, 'srcset' => false, 'sizes' => false, 'width' => 0, 'height' => 0];
+        }
+
+        $url = wp_get_attachment_image_url($custom_logo_id, 'full') ?: '';
+        $srcset = wp_get_attachment_image_srcset($custom_logo_id, 'full') ?: '';
+        $sizes = wp_get_attachment_image_sizes($custom_logo_id, 'full') ?: '';
+
+        // Try to get intrinsic image dimensions from the attachment metadata
+        $width = 0;
+        $height = 0;
+        $image_src = wp_get_attachment_image_src($custom_logo_id, 'full');
+        if ($image_src && is_array($image_src)) {
+            // wp_get_attachment_image_src returns [src, width, height]
+            $width = isset($image_src[1]) ? intval($image_src[1]) : 0;
+            $height = isset($image_src[2]) ? intval($image_src[2]) : 0;
+        }
+
+        // Fallback to theme support defaults if WP didn't provide dims (e.g., SVGs)
+        if (!$width || !$height) {
+            $support = get_theme_support('custom-logo');
+            if (is_array($support) && isset($support[0]) && is_array($support[0])) {
+                $supportOpts = $support[0];
+                if (isset($supportOpts['width']) && isset($supportOpts['height'])) {
+                    $width = intval($supportOpts['width']);
+                    $height = intval($supportOpts['height']);
+                }
+            }
+        }
+
+        return (object) [
+            'url' => $url,
+            'srcset' => $srcset,
+            'sizes' => $sizes,
+            'width' => $width,
+            'height' => $height,
+        ];
+    }
+}

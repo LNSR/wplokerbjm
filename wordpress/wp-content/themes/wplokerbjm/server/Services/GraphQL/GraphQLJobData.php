@@ -8,7 +8,7 @@ use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Factories\JobDataFactory;
-use WPLokerBJM\Services\Schema\JobSchemaOrg;
+use WPLokerBJM\Services\Schema\SEO\JobSchemaBuilder;
 
 /**
  * @phpstan-type WordpressBaseData array{
@@ -32,34 +32,39 @@ use WPLokerBJM\Services\Schema\JobSchemaOrg;
  *     deadline?: string|null,
  * }
  * 
- * @phpstan-type CardData WordpressBaseData&array{
+ * @phpstan-type CardData WordpressBaseData|array{
  *     nama_perusahaan?: string,
  *     ringkasanPekerjaan: RingkasanPekerjaan,
  *     status_pekerjaan?: int,
  * }
  * 
- * @phpstan-type JobDetailData CardData&array{
+ * @phpstan-type JobContacts array{
+ *     email_kontak?: string|null,
+ *     nomor_kontak?: string|null,
+ *     situs_kontak?: string|null,
+ * }
+ * 
+ * @phpstan-type JobDetailData CardData|array{
  *     tentang_perusahaan?: string|null,
  *     deskripsi_pekerjaan?: string|null,
  *     persyaratan?: string|null,
  *     cara_melamar?: string|null,
  *     benefit?: string|null,
- *     contacts?: array{email_kontak?: string, nomor_kontak?: string, situs_kontak?: string},
+ *     contacts?: JobContacts,
  *     social_media?: string|null,
  *     dpNonce?: string,
  * }
  * @phpstan-import-type JobData from JobDataFactory
- * @phpstan-import-type JobPostingSchema from JobSchemaOrg
- * @phpstan-import-type ItemListSchema from JobSchemaOrg
+ * @phpstan-import-type JobPostingSchema from JobSchemaBuilder
+ * @phpstan-import-type ItemListSchema from JobSchemaBuilder
  */
 class GraphQLJobData
 {
-    
+
     public function __construct(
         private JobDataFactory $jobDataFactory,
-        private JobSchemaOrg $jobSchema,
-    ) {
-    }
+        private JobSchemaBuilder $jobSchema,
+    ) {}
 
     /**
      * Get card data for a Homepage Jobcard listing
@@ -77,9 +82,9 @@ class GraphQLJobData
             return $cached;
         }
 
+        /** @var CardData $data */
         try {
             $jobdata = $this->jobDataFactory->createJobData($post_id);
-
             $data = [
                 'id' => $post_id,
                 'slug' => get_post_field('post_name', $post_id),
@@ -92,7 +97,6 @@ class GraphQLJobData
                 'permalink' => esc_url(get_permalink($post_id)),
                 'post_time' => get_post_time('c', false, $post_id),
             ];
-
             $data = SharedUtils::filterEmptyValues($data);
             Cache::set($cacheKey, $data, 86400); // Cache for 1 day
             return $data;
@@ -137,10 +141,9 @@ class GraphQLJobData
                 }
             }
         }
-
+        /** @var JobDetailData $data */
         try {
             $jobdata = $this->jobDataFactory->createJobData($post_id);
-
             $data = [
                 'id' => $post_id,
                 'slug' => get_post_field('post_name', $post_id),

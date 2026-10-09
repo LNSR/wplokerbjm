@@ -16,7 +16,7 @@ class HookTagUtilities
      */
     public static function normalizeTags(string|array $tags): array
     {
-        $normalized = array_map(static fn($tag) => self::normalizeTagValue($tag), (array) $tags);
+        $normalized = array_map(self::normalizeTagValue(...), (array) $tags);
 
         return array_values(array_unique($normalized));
     }
