@@ -6,7 +6,7 @@
 **Last Updated**: 2026-07-27
 
 ## Use Case
-You need to register a WordPress action or filter hook. The class must be autowirable (discoverable by `AutowireScanner`). The container wires dependencies automatically.
+You need to register a WordPress action or filter hook. The class must be autowirable (discoverable by `DependencyAutowireScanner`). The container wires dependencies automatically.
 
 ## Code
 

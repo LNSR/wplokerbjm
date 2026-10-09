@@ -7,6 +7,7 @@ namespace WPLokerBJM\Tests\Support;
 use \DI\Container;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use Dotenv\Dotenv;
+use Nette\Loaders\RobotLoader;
 
 /**
  * ProxyContainer
@@ -33,7 +34,6 @@ final class ProxyContainer
         }
 
         self::$booted = true;
-
         self::loadEnvFiles();
         self::defineCoreConstants();
 
@@ -57,12 +57,18 @@ final class ProxyContainer
         if (self::$container instanceof Container) {
             return self::$container;
         }
+        global $testRobotLoader;
 
         // Ensure runtime is booted before container initialization.
         self::boot();
-
-        self::$container = WPLokerBJMContainer::getContainer();
-        return self::$container;
+        return self::$container = new WPLokerBJMContainer($testRobotLoader)
+            ->initContainerBuilder()
+            ->setExtraRuntimeDefinitionsSet(
+                [
+                    RobotLoader::class => $testRobotLoader,
+                ]
+            )
+            ->buildContainer();
     }
 
     private static function themeRoot(): string

@@ -209,7 +209,7 @@
 
   (() => {
     themePropsStore.setThemeData = themeData;
-    APIServiceShared.setNonce(themeData.wpRestNonce);
+    APIServiceShared.setNonce(themeData.wpGraphqlNonce);
   })();
 
   onMount(() => {

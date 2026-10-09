@@ -11,14 +11,14 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 1. `WPHooksScanner` reads classes indexed by the RobotLoader.
 2. `HookScannerTrait` scans declared, non-static methods and properties for `#[Action]` / `#[Filter]`.
 3. Each attribute becomes a `HookRegistration`; callable metadata is converted into serializable resolution plans.
-4. The scanner can export registrations to `WPHooksCache.php` and reload them on later requests.
+4. The scanner can export registrations to `WPhooksRegistryContainerCache.php` and reload them on later requests.
 5. `WPHooksContainerRegistry` resolves the hook name, `registerIf` gate, and tags, then builds a lazy method/property handler.
 6. Active handlers call `add_action()` / `add_filter()` during `initialize()`; deferred handlers wait in `DeferredHookManager`.
 7. At fire time the handler resolves the service from the container, evaluates `executeIf`, and invokes the method or property callable.
 
 ## Runtime flow
 
-`WPHooksRuntimeRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. When a `RuntimeWPHookProvider` is injected, attribute closures (hook name, `registerIf`, `executeIf`) are resolved with optional container / named hook-argument injection; without one, closures must be zero-parameter. Manual `registerAction()` / `registerFilter()` use `RuntimeCallableHookHandler`, letting closures capture runtime state without container resolution.
+`WPHooksInstanceRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. When a `RuntimeWPHookProvider` is injected, attribute closures (hook name, `registerIf`, `executeIf`) are resolved with optional container / named hook-argument injection; without one, closures must be zero-parameter. Manual `registerAction()` / `registerFilter()` use `RuntimeCallableHookInvoker`, letting closures capture runtime state without container resolution.
 
 ## Deferred pool (shared)
 
@@ -28,7 +28,7 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 - `activateMatchingDeferredEntries()` sweeps the pool, re-evaluates the registration gate via the abstract `gateDeferredActivation()`, and hands matches to an activate callback.
 - `unregisterMatchingDeferredEntries()` removes entries without touching active handlers.
 
-`DeferredHookManager` (container path) exposes the micromanage selectors; `WPHooksRuntimeRegistry` consumes the same mechanics behind an automatic-only surface (`deferRegisterUntilHook` only).
+`DeferredHookManager` (container path) exposes the micromanage selectors; `WPHooksInstanceRegistry` consumes the same mechanics behind an automatic-only surface (`deferRegisterUntilHook` only).
 
 ## The important boundary
 
@@ -61,6 +61,6 @@ The attribute declares intent; the registry owns lifecycle and the invoker owns 
 - `server/Core/Container/Support/WPHooks/Trait/HookScannerTrait.php` — shared declared-member scanner.
 - `server/Core/Container/Support/WPHooks/Trait/DeferredHooksTrait.php` — shared deferred pool mechanics.
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — container registry, deferred manager, and target resolver.
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksRuntimeRegistry.php` — immediate object/runtime registration path.
-- `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — ContainerLazyHookInvokerTrait, ContainerLazyHookHandler, ContainerLazyPropertyHookHandler.
-- `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — RuntimeInstanceInvokerTrait, RuntimeInstanceHookHandler, RuntimeInstancePropertyHookHandler, RuntimeCallableHookHandler.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — immediate object/runtime registration path.
+- `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — ContainerLazyHookInvokerTrait, ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker.
+- `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — RuntimeInstanceInvokerTrait, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker, RuntimeCallableHookInvoker.

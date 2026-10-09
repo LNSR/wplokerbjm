@@ -26,11 +26,11 @@ for p in "${watch_paths[@]}"; do
 done
 
 pending_pid=""
-
+debounce_time=5
 # Process substitution keeps the while loop in the main subshell, preserving $pending_pid across iterations
 while read -r file; do
   if [[ -n "$file" && "$file" =~ \.(php|json)$ ]]; then
-    echo "[$(date +'%H:%M:%S')] Change detected in $file, setting 3s debounce timer..."
+    echo "[$(date +'%H:%M:%S')] Change detected in $file, setting ${debounce_time}s debounce timer..."
 
     # Cancel any previous pending hot reload task
     if [[ -n "$pending_pid" ]]; then
@@ -39,7 +39,7 @@ while read -r file; do
 
     # Spawn debounced task chain
     (
-      sleep 3
+      sleep "$debounce_time"
 
       echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local Hot Reload Chain..." &
       docker restart "wordpress-${WP_ENV}" &

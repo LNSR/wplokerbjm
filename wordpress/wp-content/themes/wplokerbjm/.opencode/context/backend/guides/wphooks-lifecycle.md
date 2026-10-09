@@ -4,7 +4,7 @@
 
 ## 1. Discover and cache
 
-Call `WPHooksScanner::getHookRegistrations()` from the bootstrap path. It first checks the request-local cache, then an existing `WPHooksCache.php`; otherwise it scans RobotLoader-indexed classes. Only declared, non-static methods and properties are eligible. Successful scans are memoized and optionally exported as arrays plus closure snapshots.
+Call `WPHooksScanner::getHookRegistrations()` from the bootstrap path. It first checks the request-local cache, then an existing `WPhooksRegistryContainerCache.php`; otherwise it scans RobotLoader-indexed classes. Only declared, non-static methods and properties are eligible. Successful scans are memoized and optionally exported as arrays plus closure snapshots.
 
 ## 2. Build the registration plan
 
@@ -35,13 +35,13 @@ $registry->activateDeferredByTags(['cache', 'seo']);
 
 ## 4. Execute at hook fire
 
-`ContainerLazyHookHandler` resolves the service only when WordPress invokes it. It evaluates `executeIf` with the container and matching hook arguments, then invokes public methods directly or binds a closure for protected/private methods. `ContainerLazyPropertyHookHandler` reads the property at fire time and invokes the resulting closure/invokable object. The plan provider avoids reflection on the hot path when a cacheable plan exists.
+`ContainerLazyHookInvoker` resolves the service only when WordPress invokes it. It evaluates `executeIf` with the container and matching hook arguments, then invokes public methods directly or binds a closure for protected/private methods. `ContainerLazyPropertyHookInvoker` reads the property at fire time and invokes the resulting closure/invokable object. The plan provider avoids reflection on the hot path when a cacheable plan exists.
 
 If a gate returns false, a filter receives its original first argument unchanged. If invocation throws, the error is logged; filters still pass through the original value and actions return `null`.
 
 ## 5. Runtime and anonymous-object path
 
-Use `WPHooksRuntimeRegistry` when the object already exists or cannot be discovered from files. `registerHooksOn()` scans attributes once per object and registers supported hooks immediately.
+Use `WPHooksInstanceRegistry` when the object already exists or cannot be discovered from files. `registerHooksOn()` scans attributes once per object and registers supported hooks immediately.
 
 - With a `RuntimeWPHookProvider` injected, attribute closures (hook name, `registerIf`, `executeIf`) are resolved: parameters inject by name from hook args, then from the container, then defaults. Without one, closures are invoked with no arguments — only zero-parameter or defaulted closures work.
 - Attribute-argument closures must be static closures (PHP 8.1 constant-expression rule); private members resolve via `self::`, no instance binding is needed.
@@ -68,6 +68,6 @@ Use `unregisterByHook()`, `unregisterByClass()`, `unregisterByNamespace()`, `unr
 - `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — callable plans, gates, dynamic names, and tag resolution (container path).
 - `server/Core/Container/Support/WPHooks/Provider/RuntimeWPHookProvider.php` — same resolution on the runtime path.
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — active/deferred lifecycle and selectors.
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksRuntimeRegistry.php` — immediate object and manual registration.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — immediate object and manual registration.
 - `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — lazy execution and filter fallback behavior.
 - `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — runtime execution, once, and GC cleanup.

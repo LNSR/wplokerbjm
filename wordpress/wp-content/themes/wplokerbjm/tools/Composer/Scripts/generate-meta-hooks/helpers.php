@@ -12,7 +12,7 @@ use Psl\Shell;
 use Psl\Shell\Exception\FailedExecutionException;
 use Psl\Str;
 use Psl\Vec;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksRuntimeRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 
 // ── Helpers ────────────────────────────────────────────────────────────────
 
@@ -267,12 +267,12 @@ function renderMetadataSection(array $actions, array $filters, array $tags = [])
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
         ],
         'List Filter to register for runtime instance' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::registerFilter()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksInstanceRegistry::registerFilter()',
             0,
             ["argumentsSet('{$listHooksFilter}')"],
         ],
         'List Action hooks to register for runtime instance' => [
-            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksRuntimeRegistry::registerAction()',
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksInstanceRegistry::registerAction()',
             0,
             ["argumentsSet('{$listHooksAction}')"],
         ],
@@ -285,6 +285,11 @@ function renderMetadataSection(array $actions, array $filters, array $tags = [])
             '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksContainerRegistry::unregisterDeferredByHook()',
             0,
             ["argumentsSet('{$listHooksAction}')", "argumentsSet('{$listHooksFilter}')"],
+        ],
+        'WPHooksInstanceRegistry automatic unregister hooks' => [
+            '\\WPLokerBJM\\Core\\Container\\Support\\WPHooks\\Registry\\WPHooksInstanceRegistry::registerHooksOn()',
+            1,
+            ["argumentsSet('{$listHooksAction}')"],
         ],
     ];
 
