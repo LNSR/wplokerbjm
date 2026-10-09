@@ -1,93 +1,115 @@
 <?php
+
 declare(strict_types=1);
+
 namespace WPLokerBJM;
 
+use InvalidArgumentException;
+use LogicException;
 use Nette\Loaders\RobotLoader;
-use WPLokerBJM\Core\Theme\ThemeProp;
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\AutowireScanner;
-use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
+use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Wordpress\Theme\ThemeHooks;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
+use WPLokerBJM\Shared\Log\Logger;
 
 // Exit if accessed directly for security
 !defined('ABSPATH') && exit;
 
 /**
- * Bootstraps the wplokerbjm theme — sets up RobotLoader class autoloading
+ * @package MU-Plugin
+ * Plugin name: WPLokerBJM Infrastructure
+ * Description: Bootstraps the wplokerbjm theme — sets up RobotLoader class autoloading
  * and initializes the PHP-DI container early in the WordPress lifecycle.
- *
- * Runs as an MU plugin so hooks are registered before theme activation.
- *
- * @see ThemeProp
+ * Author: MaulanaSR
+ * RequiresPHP: 8.5
+ * @see ThemeHooks
  */
-class Bootstrap
+class WPLokerBJMBootstrap
 {
-    public private(set) static ?RobotLoader $robotLoader = null;
+    public protected(set) static bool $alreadyLoaded = false;
+    public protected(set) string $themeRoot;
+    public protected(set) string $nameMUpluginFile = __FILE__;
+    protected ContainerInterface $container;
+    public protected(set) RobotLoader $robotloader;
 
-    /**
-     * Entry point. Called once from this file after the class definition.
-     */
-    public static function boot(): void
+    public function __construct(string $themeName)
     {
-        $theme = 'wplokerbjm';
-        if (get_stylesheet() !== $theme) {
-            return;
+        if (self::$alreadyLoaded) throw new LogicException(sprintf('%s already initialized', self::class));
+        if (\get_stylesheet() !== $themeName) throw new LogicException(sprintf('Theme name %s does not match %s', \get_stylesheet(), $themeName));
+        self::$alreadyLoaded = true;
+
+        $this->themeInfo = $themeName;
+        require_once $this->themeInfo->themeRoot . '/vendor/autoload.php';
+        $this->robotloader = new RobotLoader()
+            ->addDirectory($this->themeInfo->themeRoot . '/server/')
+            ->setCacheDirectory($this->themeInfo->themeRoot . '/cache/robotloader/')
+            ->setAutoRefresh(defined('WP_ENV') && WP_ENV === 'development')
+            ->reportParseErrors(defined('WP_DEBUG') && WP_DEBUG)
+            ->register();
+
+        $this->init();
+    }
+
+    /** @var ?__WPLokerBJMThemeInfo */
+    public private(set) object|string|null $themeInfo {
+        set {
+            $this->themeInfo = new class(
+                \is_string($value)
+                    ? $value
+                    : throw new InvalidArgumentException(
+                        'Theme name must be a string.'
+                    )
+            ) {
+                public readonly string $themeRoot;
+
+                public function __construct(public readonly string $themeName)
+                {
+                    $this->themeRoot = WP_CONTENT_DIR . '/themes/' . $themeName;
+                    return;
+                    /**
+                     * Double dead code alias, self::class seem more reliable for intelephense LSP, but cause PHP(PHP0413) warning
+                     * __CLASS__ ones help silence the warning
+                     * !Important for full autocomplete IDE by tricking LSP to use virtual class, no need for interface or abstract class
+                     * !Make sure to use object type and attach @var/@param phpdoc for autocomplete if used without accessing this class
+                     */
+                    \class_alias(self::class, __WPLokerBJMThemeInfo::class);
+                    \class_alias(__CLASS__, __WPLokerBJMThemeInfo::class);
+                }
+
+                /**
+                 * Check whether theme match with this bootstrap
+                 */
+                public function checkThemeMatch(string $themeName): bool
+                {
+                    if ($this->themeName !== $themeName) {
+                        \error_log(sprintf('Theme name %s does not match %s; current wordpress set theme is %s', $this->themeName, $themeName, \get_stylesheet()));
+                    }
+                    return $this->themeName === $themeName;
+                }
+            };
         }
-
-        $themeRoot = WP_CONTENT_DIR . '/themes/' . $theme;
-        require_once $themeRoot . '/vendor/autoload.php';
-
-        self::setupRobotLoader($themeRoot);
-        self::initContainer();
     }
 
-    /**
-     * Configure and register Nette RobotLoader for WPLokerBJM classes.
-     *
-     * Replaces the previous Composer classmap approach. The RobotLoader
-     * scans the theme's server/ directory and this MU plugin's directory
-     * for PHP classes, building a cached index.
-     *
-     * In production, uses the cached index for zero parsing overhead.
-     */
-    private static function setupRobotLoader(string $themeRoot): void
-    {
-        $rl = new RobotLoader;
-        $rl->addDirectory($themeRoot . '/server/');
-        $rl->addDirectory(__FILE__);
-        $rl->setTempDirectory($themeRoot . '/cache/robotloader/');
-        $rl->setAutoRefresh(defined('WP_ENV') && WP_ENV === 'development');
-        $rl->reportParseErrors(defined('WP_DEBUG') && WP_DEBUG);
-        $rl->register();
-
-        self::$robotLoader = $rl;
-    }
-
-    /**
-     * Inject a RobotLoader instance — used by tests to share the test
-     * autoloader with @see AutowireScanner and @see WPHooksScanner.
-     */
-    public static function setRobotLoader(RobotLoader $rl): void
-    {
-        self::$robotLoader = $rl;
-    }
-
-    /**
-     * Build the PHP-DI container and run theme initialization.
-     */
-    private static function initContainer(): void
+    protected function init(): void
     {
         try {
-            $init = WPLokerBJMContainer::getContainer()->get(Init::class);
-            $init->initialize();
-        } catch (\Exception $e) {
-            error_log('wplokerbjm Bootstrap error: ' . $e->getMessage());
+            $this->container = new WPLokerBJMContainer(
+                robotLoader: $this->robotloader,
+                cacheDir: \sprintf('%s/cache', $this->themeInfo->themeRoot)
+            )
+                ->initContainerBuilder()
+                ->setExtraRuntimeDefinitionsSet([
+                    RobotLoader::class => $this->robotloader,
+                    WPLokerBJMBootstrap::class => $this
+                ])
+                ->buildContainer();
+            $this->container
+                ->get(Init::class)
+                ->initialize();
+        } catch (\Throwable $e) {
+            error_log('MU-Plugin bootstrap fail' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
         }
     }
 }
-
-// *Only auto-boot in WordPress context. Tests and CLI tools define
-// *WPLOKERBJM_SKIP_BOOT to load the class without executing boot().
-if (!defined('WPLOKERBJM_SKIP_BOOT')) {
-    Bootstrap::boot();
-}
+new WPLokerBJMBootstrap(themeName: 'wplokerbjm');

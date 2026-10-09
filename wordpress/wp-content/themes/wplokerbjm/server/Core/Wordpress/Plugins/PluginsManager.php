@@ -1,0 +1,321 @@
+<?php
+
+namespace WPLokerBJM\Core\Wordpress\Plugins;
+
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Wordpress\{ContainerRegistryHookEvent, InstanceRuntimeRegistryHookEvent};
+use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\{
+    WPGraphQL\WPGraphQL,
+    Integrations\LiteSpeedGraphQLIntegration,
+    Litespeed,
+    MetaBox,
+    Rankmath,
+    WPRestJWTHooks,
+};
+use WPLokerBJM\Core\Wordpress\Utilities\WPCookieUtils;
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\WPLokerBJMBootstrap;
+
+enum PluginList: string
+{
+    case LiteSpeed = 'litespeed-cache/litespeed-cache.php';
+    case AdvancedMediaOffloader = 'advanced-media-offloader/advanced-media-offloader.php';
+    case Wordfence = 'wordfence/wordfence.php';
+    case MetaBox = 'meta-box/meta-box.php';
+    case MetaBoxLite = 'meta-box-lite/meta-box-lite.php';
+    case AI = 'ai/ai.php';
+    case WpGraphql = 'wp-graphql/wp-graphql.php';
+    case WpGraphqlSmartCache = 'wpgraphql-smart-cache/wp-graphql-smart-cache.php';
+    case RankMath = 'seo-by-rank-math/rank-math.php';
+    case QueryMonitor = 'query-monitor/query-monitor.php';
+    case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
+    case FastIndexingApi = 'fast-indexing-api/instant-indexing.php';
+    case wpCrontrol = 'wp-crontrol/wp-crontrol.php';
+    case updraftPlus = 'updraftplus/updraftplus.php';
+    case viewAdminAs = 'view-admin-as/view-admin-as.php';
+    case performanceLab = 'performance-lab/load.php';
+    public function isActive(): bool
+    {
+        static $activePlugins = null;
+        $activePlugins ??= \function_exists('get_option') ? \get_option('active_plugins') : [];
+        return \is_array($activePlugins) && \in_array($this->value, $activePlugins, true);
+    }
+
+    public function deactivePlugin(): void
+    {
+        if ($this->isActive()) {
+            deactivate_plugins($this->value, false);
+        }
+    }
+
+    public function activePlugin(): void
+    {
+        if (!$this->isActive()) {
+            activate_plugins($this->value, false);
+        }
+    }
+}
+
+
+/* ==========================================================================
+   INTERFACE CONFIG
+   ========================================================================== */
+
+interface PluginConfigInterface
+{
+    public static function isActive(): bool;
+}
+
+/* ==========================================================================
+   PLUGIN MANAGEMENT
+   ========================================================================== */
+class PluginManager
+{
+    public const MUST_HAVE_PLUGINS = [
+        PluginList::LiteSpeed->value,
+        PluginList::WpGraphql->value,
+        PluginList::RankMath->value,
+        PluginList::MetaBoxLite->value,
+        PluginList::MetaBox->value,
+    ];
+
+    /**
+     * List of integration classes that implement PluginConfigInterface.
+     * 
+     * @var array<class-string<PluginConfigInterface>>
+     */
+    public const THIRD_PARTY_INTEGRATIONS = [
+        Litespeed::class,
+        LiteSpeedGraphQLIntegration::class,
+        MetaBox::class,
+        Rankmath::class,
+        WPRestJWTHooks::class,
+        WPGraphQL::class,
+    ];
+
+    #[Action('mu_plugin_loaded', executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
+        if ($pluginPath !== $bootstrap->nameMUpluginFile) return false;
+        do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [__CLASS__, 'boot']);
+        return true;
+    })]
+    private function boot(string $pluginPath): void
+    {
+        $activeCount = $this->unregisterInactivePluginHooks();
+        if ($activeCount === 0) {
+            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            return;
+        }
+        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
+        do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $this->pluginEnvironmentCheck, 'plugins_loaded');
+    }
+
+    /**
+     * Purge all registered and deferred hooks for third-party integrations 
+     * whose underlying WordPress plugins are inactive.
+     * @return int number of active plugins
+     */
+    private function unregisterInactivePluginHooks(): int
+    {
+        $activeCount = 0;
+        foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
+            $isActive = $integrationClass::isActive();
+            if ($isActive) {
+                $activeCount++;
+                continue;
+            }
+            Logger::warning("Plugin status", $integrationClass . ' is inactive');
+            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, $integrationClass);
+            do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CLASS, $integrationClass);
+        }
+        return $activeCount;
+    }
+    /**
+     * Remove the "Deactivate" action link for required plugins.
+     */
+    #[Filter('plugin_action_links', 4, 2, deferRegister: true, once: true)]
+    public function lockPluginActionLinks(array $actions, string $pluginFile): array
+    {
+        if (in_array($pluginFile, self::MUST_HAVE_PLUGINS) && isset($actions['deactivate'])) {
+            unset($actions['deactivate']);
+
+            $actions['required'] = '<span style="color: red; font-weight: bold;">Must Have Dependency</span>';
+        }
+
+        return $actions;
+    }
+
+    #region 3rd party choice hooks
+    #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function () {
+        return (!\is_admin() && (empty($_SERVER['REQUEST_URI'])));
+    })]
+    public function disableWpGraphqlPlugin(array $plugins): array
+    {
+        $wpGraphQlPlugins = [
+            PluginList::WpGraphql->value,
+            PluginList::WpGraphqlSmartCache->value,
+        ];
+        $alreadyUnregistred = false;
+        foreach ($wpGraphQlPlugins as $plugin) {
+            $pluginKey = array_search($plugin, $plugins, true);
+            if ($pluginKey !== false) {
+                unset($plugins[$pluginKey]);
+                if ($alreadyUnregistred) continue;
+                do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, WPGraphQL::class);
+                do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
+                $alreadyUnregistred = true;
+            }
+        }
+        return $plugins;
+    }
+
+    #[Filter(
+        'option_active_plugins',
+        once: true,
+        deferRegister: true,
+        registerIf: static function (WPCookieUtils $cookieUtils): bool {
+            if (is_admin()) {
+                $action = $_REQUEST['action'] ?? '';
+                if (in_array($action, ['upgrade-plugin', 'update-plugin', 'activate', 'deactivate', 'activate-plugin'], true)) {
+                    return true;
+                }
+            }
+            if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookieUtils->WordpressAuthCookieInfo->name))
+                return true;
+            return false;
+        }
+    )]
+    public function disableQueryMonitorPlugin(array $plugins): array
+    {
+        $pluginKey = array_search(PluginList::QueryMonitor->value, $plugins, true);
+        if ($pluginKey !== false) {
+            unset($plugins[$pluginKey]);
+        }
+        return $plugins;
+    }
+
+    #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function (): bool {
+        return !\is_admin();
+    })]
+    public function disablePluginOnNonAdminDashboard(array $plugins): array
+    {
+        $listPlugins = [
+            PluginList::wpCrontrol->value,
+            PluginList::viewAdminAs->value,
+        ];
+        foreach ($listPlugins as $plugin) {
+            $pluginKey = array_search($plugin, $plugins, true);
+            if ($pluginKey !== false) {
+                unset($plugins[$pluginKey]);
+            }
+        }
+        return $plugins;
+    }
+
+    #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function (): bool {
+        if (\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) return false;
+        return true;
+    })]
+    public function disableUpdraftOnFrontEnd(array $plugins): array
+    {
+        $pluginKey = array_search(PluginList::updraftPlus->value, $plugins, true);
+        if ($pluginKey !== false) {
+            unset($plugins[$pluginKey]);
+        }
+        return $plugins;
+    }
+
+    #endregion
+
+
+    #region filter hooks sequence
+    /**
+     * activation hooks steps
+     * @phpstan-ignore-next-line
+     * @var __CLASS__::class
+     */
+    private ?ModuleClassHookMetadata $pluginEnvironmentCheck {
+        get {
+            return $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+                /**
+                 * Temporarily disable specific plugins if in development environment.
+                 */
+                #[Filter('option_active_plugins', 0, once: true, registerIf: static function (): bool {
+                    return SharedUtils::isDevelopment();
+                })]
+                public function disablePluginsForDevImpl(array $plugins): array
+                {
+                    $pluginsToDisable = [
+                        PluginList::FastIndexingApi->value,
+                        PluginList::Wordfence->value
+                    ];
+                    return $this->filteredPlugins($plugins, $pluginsToDisable);
+                }
+
+
+                /**
+                 * Temporarily disable specific plugins if simulating production environment on local machine.
+                 */
+                #[Filter('option_active_plugins', 0, once: true, registerIf: static function (): bool {
+                    return SharedUtils::isLocalhost();
+                })]
+                public function disablePluginsforSimulatedProdImpl(array $plugins): array
+                {
+                    $pluginsToDisable = [
+                        PluginList::Wordfence->value
+                    ];
+                    return $this->filteredPlugins($plugins, $pluginsToDisable);
+                }
+
+                /**
+                 * Force active plugins for production
+                 */
+                #[Filter(
+                    'option_active_plugins',
+                    1,
+                    once: true,
+                    registerIf: static function (): bool {
+                        return !SharedUtils::isDevelopment();
+                    }
+                )]
+                public function forceActivePlugin(array $plugins): array
+                {
+                    foreach (PluginManager::MUST_HAVE_PLUGINS as $plugin) {
+                        if (!in_array($plugin, $plugins)) {
+                            array_push($plugins, $plugin);
+                        }
+                    }
+                    return $plugins;
+                }
+
+
+                /**
+
+                 * Filters the list of active plugins by removing specified plugins.
+                 *
+                 * @param array $plugins          Array of active plugin file paths.
+                 * @param array $pluginsToDisable Array of plugin prefixes to disable.
+                 * @return array Filtered array of active plugins.
+                 */
+                private function filteredPlugins(array $plugins, array $pluginsToDisable): array
+                {
+                    $cb = static function (string $plugin) use ($pluginsToDisable): bool {
+                        foreach ($pluginsToDisable as $disable) {
+                            if (str_starts_with($plugin, $disable)) {
+                                return false;
+                            }
+                        }
+                        return true;
+                    };
+                    $filtered = array_filter($plugins, $cb);
+
+                    return array_values($filtered);
+                }
+            };
+        }
+    }
+    #endregion
+
+}

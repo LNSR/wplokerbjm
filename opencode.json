@@ -1,80 +1,73 @@
 {
   "$schema": "https://opencode.ai/config.json",
   "mcp": {
-    "render": {
-      "type": "remote",
-      "url": "https://mcp.render.com/mcp",
-      "headers": {
-        "Authorization": "Bearer {env:RENDER_MCP_API_KEY}"
-      }
-    },
-    "redis": {
-      "type": "local",
-      "command": [
-        "docker",
-        "run",
-        "-i",
-        "--rm",
-        "--network",
-        "host",
-        "--env-file",
-        ".env",
-        "mcp/redis"
-      ],
-      "enabled": true
-    },
-    "mysql": {
-      "type": "local",
-      "command": [
-        "docker",
-        "run",
-        "-i",
-        "--rm",
-        "--network",
-        "host",
-        "--env-file",
-        ".env",
-        "docker.io/acuvity/mcp-server-benborla-mysql:latest"
-      ],
-      "enabled": true
-    },
-    "google-maps": {
-      "type": "local",
-      "command": ["bunx", "-y", "google-maps-mcp-server"],
-      "enabled": true,
-      "environment": {
-        "GOOGLE_MAPS_API_KEY": "{env:GOOGLE_MAPS_API_KEY}",
-        "GOOGLE_MAPS_RATE_LIMIT_ENABLED": "true",
-        "GOOGLE_MAPS_RATE_LIMIT_WINDOW_MS": "120000",
-        "GOOGLE_MAPS_RATE_LIMIT_MAX_REQUESTS": "200"
-      }
-    },
-    "wplokerbjm-mcp-prod": {
-      "type": "remote",
-      "url": "{env:WP_MCP_WPLOKERBJM_PROD}",
-      "headers": {
-        "X-Royal-MCP-API-Key": "{env:X_ROYAL_MCP_API_KEY}"
-      }
-    },
-    "wplokerbjm-mcp-local": {
-      "type": "remote",
-      "url": "{env:WP_MCP_WPLOKERBJM_DEV}",
-      "headers": {
-        "X-Royal-MCP-API-Key": "{env:X_ROYAL_MCP_API_KEY}"
-      }
-    },
-    "cloudflare-api": {
-      "type": "remote",
-      "url": "https://mcp.cloudflare.com/mcp",
-      "headers": {
-        "Authorization": "Bearer {env:CLOUDFLARE_MCP_API_KEY}"
+    "servers": {
+      "render": {
+        "type": "remote",
+        "url": "https://mcp.render.com/mcp",
+        "oauth": false,
+        "headers": {
+          "Authorization": "Bearer {env:RENDER_MCP_API_KEY}"
+        }
+      },
+      "redis": {
+        "type": "local",
+        "command": [
+          "docker",
+          "run",
+          "-i",
+          "--rm",
+          "--network",
+          "host",
+          "--env-file",
+          ".env",
+          "mcp/redis"
+        ]
+      },
+      "mysql": {
+        "type": "local",
+        "command": [
+          "docker",
+          "run",
+          "-i",
+          "--rm",
+          "--network",
+          "host",
+          "--env-file",
+          ".env",
+          "docker.io/acuvity/mcp-server-benborla-mysql:latest"
+        ]
+      },
+      "google-maps": {
+        "type": "local",
+        "command": ["bunx", "-y", "google-maps-mcp-server"],
+        "environment": {
+          "GOOGLE_MAPS_API_KEY": "{env:GOOGLE_MAPS_API_KEY}",
+          "GOOGLE_MAPS_RATE_LIMIT_ENABLED": "true",
+          "GOOGLE_MAPS_RATE_LIMIT_WINDOW_MS": "120000",
+          "GOOGLE_MAPS_RATE_LIMIT_MAX_REQUESTS": "200"
+        }
+      },
+      "wplokerbjm-mcp-prod": {
+        "type": "remote",
+        "url": "{env:WP_MCP_WPLOKERBJM_PROD}",
+      },
+      "wplokerbjm-mcp-local": {
+        "type": "remote",
+        "url": "{env:WP_MCP_WPLOKERBJM_DEV}",
+      },
+      "cloudflare-api": {
+        "type": "remote",
+        "url": "https://mcp.cloudflare.com/mcp",
+        "oauth": false,
+        "headers": {
+          "Authorization": "Bearer {env:CLOUDFLARE_MCP_API_KEY}"
+        }
       }
     }
   },
-  "permission": {
-    "read": {
-      ".env": "deny",
-      ".env.*": "deny",
-    }
-  }
+  "permissions": [
+    { "action": "read", "resource": "*.env", "effect": "deny" },
+    { "action": "read", "resource": "*.env.*", "effect": "deny" }
+  ]
 }

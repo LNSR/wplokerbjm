@@ -1,6 +1,7 @@
 //TODO: Migrate to Temporal from Old Date API
 import { type DeadlineStatus, type JobSummary, type StatusPekerjaanNumber, type StatusPekerjaanString } from "@/types";
 import { createSubscriber } from "svelte/reactivity";
+import { browser } from "$app/environment";
 import timeWorker from '@/workers/clock/time.worker?worker';
 import type { Component } from 'svelte';
 import
@@ -27,13 +28,13 @@ interface SummaryRow
 /**
  * A self-correcting time interval that updates a date object every minute, aligned to the minute boundary
  */
-const timeInterval = function()
+const timeInterval = (() =>
 {
-    let date = new Date();
+    let date: Date = new Date();
     let worker: Worker | null = null;
     const subscribeToTime = createSubscriber((update) =>
     {
-        if (typeof window === 'undefined') return;
+        if (!browser) return;
         worker ??= new timeWorker();
 
         const updateTime = () =>
@@ -65,7 +66,7 @@ const timeInterval = function()
             return date;
         }
     };
-}();
+})();
 
 export function showSummaryJob(jobdata?: JobSummary | null): SummaryRow[]
 {
@@ -73,7 +74,7 @@ export function showSummaryJob(jobdata?: JobSummary | null): SummaryRow[]
     const rows: SummaryRow[] = []
     const data: JobSummary = (jobdata ?? {})
 
-    const arrayOrString = (value: unknown): string =>
+    function arrayOrString(value: unknown): string
     {
         return typia.is<string>(value)
             ? value

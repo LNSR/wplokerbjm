@@ -19,8 +19,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
  * (warn + skip).
  *
  * Attribute-argument closures are static and already scoped to the declaring
- * class (PHP 8.1 RFC 'Closures in constant expressions'), so private members
- * resolve via self:: and no instance binding is needed.
+ * class resolve via self:: and no instance binding is needed.
  * @phpstan-import-type CallableHookParams from HookProviderTrait
  */
 class RuntimeWPHookProvider
@@ -38,12 +37,13 @@ class RuntimeWPHookProvider
      * @param string|\Closure $hook       Static hook name or closure resolving to one.
      * @param CallableHookParams $hookParams Callable plan params.
      * @param string          $label      Descriptive label for error messages.
+     * @param object|null|string   $instanceTarget  Class whose scope the closure was declared in.
      *
      * @return string The resolved hook name.
      */
-    public function resolveRuntimeHookName(string|\Closure $hook, array $hookParams, string $label): string
+    public function resolveRuntimeHookName(string|\Closure $hook, array $hookParams, string $label, object|null|string $instanceTarget = null): string
     {
-        return $this->resolveHookName($hook, $this->container, $hookParams, $label);
+        return $this->resolveHookName($hook, $this->container, $hookParams, $label, $instanceTarget);
     }
 
     /**
@@ -52,9 +52,9 @@ class RuntimeWPHookProvider
      * @param \Closure|null $registerIf   Gate closure (null = no gate).
      * @param CallableHookParams $params Callable plan params.
      * @param string        $label        Descriptive label for error messages.
-     * @param string|null   $targetClass  Class whose scope the closure was declared in.
+     * @param string|object|null   $targetClass  Class whose scope the closure was declared in.
      */
-    public function evaluateRuntimeRegisterIf(?\Closure $registerIf, array $params, string $label, ?string $targetClass = null): bool
+    public function evaluateRuntimeRegisterIf(?\Closure $registerIf, array $params, string $label, object|null|string $targetClass = null): bool
     {
         return $this->evaluateRegistrationGate($registerIf, $params, $this->container, $label, $targetClass);
     }
@@ -66,11 +66,11 @@ class RuntimeWPHookProvider
      * @param \Closure|null $executeIf    Gate closure (null = no gate).
      * @param CallableHookParams $params Callable plan params.
      * @param string        $label        Descriptive label for error messages.
-     * @param string|null   $targetClass  Class whose scope the closure was declared in.
+     * @param object|null|string   $targetClass  Class whose scope the closure was declared in.
      * @param array<string, mixed> $hookArgs Named hook arguments (hook parameter name → value).
      */
-    public function evaluateRuntimeExecuteIf(?\Closure $executeIf, array $params, string $label, ?string $targetClass = null, array $hookArgs = []): bool
+    public function evaluateRuntimeExecuteIf(?\Closure $executeIf, array $params, string $label, object|null|string $targetClass = null, array $hookArgs = [], ?string $variadicHookArg = null): bool
     {
-        return $this->evaluateExecuteIf($executeIf, $params, $this->container, $label, $targetClass, $hookArgs);
+        return $this->evaluateExecuteIf($executeIf, $params, $this->container, $label, $targetClass, $hookArgs, $variadicHookArg);
     }
 }

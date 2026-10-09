@@ -42,7 +42,7 @@ class MyController { #[Action('init')] public function onInit() {} }
 
 1. Verify class is in `server/` under `WPLokerBJM\` namespace
 2. Check filename matches class name (PSR-4)
-3. If using `deferRegister`, activate explicitly via `DeferredHookManager::activateMatchingDeferredEntries()`
+3. If using `deferRegister`, activate explicitly via `ContainerRegistryDeferredHookManager::activateMatchingDeferredEntries()`
 4. Delete `cache/CompiledContainer.php` + reload
 
 **Prevention**: Always use `WPLokerBJM\` root namespace.

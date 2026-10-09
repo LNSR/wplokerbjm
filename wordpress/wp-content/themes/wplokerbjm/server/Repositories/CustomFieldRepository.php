@@ -1,11 +1,12 @@
 <?php
 
 namespace WPLokerBJM\Repositories;
+
 use WPLokerBJM\Models\Schema\CustomFields;
 
 class CustomFieldRepository
 {
-    public $metaBoxesCustomFields = [
+    public const array METABOX_CUSTOM_FIELDS = [
         CustomFields::NAMA_PERUSAHAAN,
         CustomFields::TENTANG_PERUSAHAAN,
         CustomFields::DESKRIPSI_PEKERJAAN,
@@ -42,7 +43,7 @@ class CustomFieldRepository
     public function getMetaBoxCustomFields(int $post_id): array
     {
         $field = [];
-        foreach ($this->metaBoxesCustomFields as $fieldId) {
+        foreach (self::METABOX_CUSTOM_FIELDS as $fieldId) {
             $field[$fieldId] = rwmb_meta($fieldId, [], $post_id);
         }
         return $field;

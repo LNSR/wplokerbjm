@@ -15,7 +15,7 @@ WPHooksScanner              WPHooksContainerRegistry
 discovers #[Action]   →    resolves service
   attributes              calls annotated method
      │                           │
-ContainerLazyHookHandler            Service instantiated
+ContainerLazyHookInvoker            Service instantiated
  stored in registry        at most once/request
 ```
 
@@ -23,7 +23,7 @@ ContainerLazyHookHandler            Service instantiated
 
 - `#[Action('hook_name', priority, args)]` replaces `add_action()`
 - `#[Filter('hook_name', priority, args)]` replaces `add_filter()`
-- Methods must be in **autowirable classes** (discovered by AutowireScanner)
+- Methods must be in **autowirable classes** (discovered by DependencyAutowireScanner)
 - Attribute params: `executeIf`, `registerIf`, `tag` (static list or callable), `deferRegisterUntilHook`, `once`, `deferRegister`
 - `deferRegister = true` skips registration by default (opt-in activation); `deferRegisterUntilHook` defers until a named trigger hook fires and implies defer
 - `once` removes the registration after its first evaluation
@@ -53,7 +53,7 @@ public function search(string $sql, object $query): string { return $sql; }
 
 **Discovery & Registration**:
 - `server/Core/Container/Support/WPHooks/` — Scanner and Registry implementation
-- `server/Core/Container/Definitions/Factory.php` — ContainerLazyHookHandler definitions
+- `server/Core/Container/Definitions/Factory.php` — ContainerLazyHookInvoker definitions
 
 **Usage Examples**:
 - `server/Models/Schema/PostTypes.php` — `#[Action('init')]` for post type registration
