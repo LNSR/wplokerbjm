@@ -37,7 +37,7 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 
         new WPLokerBJMContainer(robotLoader: $robotLoader, cacheDir: \sprintf('%s/cache', $themeRoot))
             ->initContainerBuilder()
-            ->setExtraRuntimeDefinitionsSet([RobotLoader::class, $robotLoader])
+            ->setExtraRuntimeDefinitionsSet([RobotLoader::class => $robotLoader])
             ->buildContainer()
             ->get(Init::class)
             ->initialize();

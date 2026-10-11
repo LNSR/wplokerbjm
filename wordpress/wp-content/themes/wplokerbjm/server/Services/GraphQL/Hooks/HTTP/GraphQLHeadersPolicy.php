@@ -3,6 +3,7 @@
 namespace WPLokerBJM\Services\GraphQL\Hooks\HTTP;
 
 use GraphQL\Executor\ExecutionResult;
+use WPGraphQL\SmartCache\Document\MaxAge;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
@@ -33,7 +34,7 @@ final class GraphQLHeadersPolicy
      */
     #[Filter(
         'graphql_response_headers_to_send',
-        9,
+        11,
         deferRegister: true,
         tag: ['graphql'],
         registerIf: static function (): bool {
@@ -44,7 +45,8 @@ final class GraphQLHeadersPolicy
     {
         /**
          * remove WPGraphQL author hooks and inbuit core nocache Headers
-         * @see \WPGraphQL\SmartCache\Cache\Results::init
+         * @see Results::init
+         * @see MaxAge::init
          */
         \remove_all_filters('graphql_response_headers_to_send');
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
@@ -74,7 +76,7 @@ final class GraphQLHeadersPolicy
 
         $headers['Access-Control-Expose-Headers'] = 'X-WP-Nonce, ETag';
 
-        $headers = $this->litespeedGraphqlIntegration->addLitespeedTagHeader($headers);
+        $headers = $this->litespeedGraphqlIntegration->liteSpeedCommands?->addLitespeedTagHeader($headers) ?? $headers;
 
         unset($headers['Expires']);
 
@@ -94,7 +96,7 @@ final class GraphQLHeadersPolicy
     }
     #[Filter(
         'graphql_send_nocache_headers',
-        9,
+        11,
         deferRegister: true,
         registerIf: static function (): bool {
             return \is_user_logged_in() && !\is_admin();

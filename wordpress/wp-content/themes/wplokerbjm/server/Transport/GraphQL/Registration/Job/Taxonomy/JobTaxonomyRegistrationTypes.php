@@ -4,7 +4,7 @@ namespace WPLokerBJM\Transport\GraphQL\Registration\Job\Taxonomy;
 
 use TaxonomyJobTerms;
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
-use WPLokerBJM\Transport\GraphQL\Resolvers\TaxonomyResolver;
+use WPLokerBJM\Transport\GraphQL\Resolvers\Job\TaxonomyResolver;
 /**
  * @phpstan-import-type TaxonomyJobTerms from GraphQLRegistration
  * @phpstan-import-type TaxonomyTerms from GraphQLRegistration

@@ -229,7 +229,7 @@ class WPHooksInstanceRegistry
             $ref,
             function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records, &$metadata, &$hasDeferred, &$hookKey): void {
                 $hook = $this->provider !== null && $attr->hook instanceof \Closure
-                    ? $this->provider->resolveRuntimeHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $property->getName())
+                    ? $this->provider->resolveRuntimeHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $property->getName(), $instance)
                     : $this->runtimeResolver->resolveClosureHook($attr->hook, $instance, $property->getName());
                 if ($hook === null) {
                     return;
@@ -314,7 +314,7 @@ class WPHooksInstanceRegistry
         $this->scanned[$instance] = true;
         $this->weakRegistry[$instance] = array_merge($this->weakRegistry[$instance] ?? [], $records);
 
-        if ($instance instanceof ModuleClassHookMetadata && !$hasDeferred && $metadata !== []) {
+        if ($instance instanceof ModuleClassHookMetadata && $metadata !== []) {
             $this->cache?->set($instance->getParentClass(), $instance->parentProperty, $metadata);
         }
         \is_string($autoUnregisterAtHook) && $this->scheduleAutoUnregister($instance, $autoUnregisterAtHook);
@@ -501,7 +501,7 @@ class WPHooksInstanceRegistry
 
         \add_action($triggerHook, $listener, PHP_INT_MIN, 0);
 
-        Logger::debug('WPHooksInstanceRegistry', 'Deferred ' . $handler->label . ' until trigger ' . $triggerHook);
+        Logger::debug(__CLASS__, 'Deferred ' . $handler->label . ' until trigger hook ' . $triggerHook);
     }
 
     /**
@@ -834,26 +834,26 @@ class WPHooksInstanceRegistry
         $triggerHook = $deferRegisterUntilHook;
         if ($triggerHook instanceof \Closure) {
             $triggerHook = $this->provider !== null
-                ? $this->provider->resolveRuntimeHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook), 'manual')
+                ? $this->provider->resolveRuntimeHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook), 'manual', $instance)
                 : $this->runtimeResolver->resolveClosureHook($triggerHook, $instance, 'manual');
             if ($triggerHook === null) {
                 return;
             }
         }
         $dtoEntry = new DeferredHookEntryDTO(
-                hook: $hook,
-                key: $hookKey,
-                handler: $handler,
-                type: $hookKey->type,
-                priority: $hookKey->priority,
-                acceptedArgs: $hookKey->acceptedArgs,
-                tags: [],
-                registerIf: null,
-                registerIfParams: [],
-                executeIf: $executeIf,
-                executeIfParams: $this->provider !== null ? $this->provider->buildCallablePlan($executeIf) : [],
-                once: $once,
-                instance: \WeakReference::create($instance),
+            hook: $hook,
+            key: $hookKey,
+            handler: $handler,
+            type: $hookKey->type,
+            priority: $hookKey->priority,
+            acceptedArgs: $hookKey->acceptedArgs,
+            tags: [],
+            registerIf: null,
+            registerIfParams: [],
+            executeIf: $executeIf,
+            executeIfParams: $this->provider !== null ? $this->provider->buildCallablePlan($executeIf) : [],
+            once: $once,
+            instance: \WeakReference::create($instance),
         );
         $this->addDeferred($dtoEntry);
 
@@ -964,7 +964,8 @@ class WPHooksInstanceObjectCache
                 /** @var TCache */
                 public array $loadedCache = [];
 
-                public function __construct(private readonly ?string $file) {
+                public function __construct(private readonly ?string $file)
+                {
                     return;
                     \class_alias(__CLASS__, __WPHooksInstanceObjectCacheState::class);
                 }
@@ -1084,7 +1085,7 @@ class WPHooksInstanceObjectCache
         );
 
         $content = "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Auto-generated WP Hooks Runtime Cache\n * Generated at: " . date('Y-m-d H:i:s') . "\n */\n\n" . $exported;
-
+        $content = \str_replace('__CLASS__', 'self::class', $content);
         $tmp = $this->file . '.' . bin2hex(random_bytes(4)) . '.tmp';
         if (file_put_contents($tmp, $content, LOCK_EX) !== false) {
             rename($tmp, $this->file);

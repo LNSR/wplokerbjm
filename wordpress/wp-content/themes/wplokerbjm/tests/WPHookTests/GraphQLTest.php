@@ -8,8 +8,8 @@ use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Transport\GraphQL\Resolvers\{
     Auth\JWTDataResolver,
-    JobsDataResolver,
-    TaxonomyResolver,
+    Job\JobsDataResolver,
+    Job\TaxonomyResolver,
     ThemeDataResolver,
 };
 

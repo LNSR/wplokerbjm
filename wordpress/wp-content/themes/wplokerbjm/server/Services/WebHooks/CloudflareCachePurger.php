@@ -14,7 +14,7 @@ use WPLokerBJM\Core\Container\Definitions\Factory;
  * Cloudflare cache purging via the purge_everything API.
  *
  * Any content change (post, meta, term) invalidates the entire zone.
- * Since the app is served through QUIC.cloud, Cloudflare just refetches
+ * Since the Wordpress backend is served through QUIC.cloud, Cloudflare just refetches
  * warm content on next request — full purges are cheap.
  *
  * Meta and term hooks self-unregister after the first fire within a
@@ -37,37 +37,18 @@ class CloudflareCachePurger
 
     /**
      * Purge the entire Cloudflare zone cache.
-     *
-     * Registered on post-lifecycle hooks. NEVER self-unregisters — every
-     * post in a batch operation must have its CDN cache purged individually.
      * @return bool
      */
-    #[Action('save_post', 10, 2)]
-    #[Action('deleted_post', 10, 1)]
-    public function purgeAllCache()
-    {
-        return $this->sendPurgeRequest(['purge_everything' => true]);
-    }
-
-    /**
-     * Purge the entire zone on the first meta change of the request.
-     *
-     * Self-unregisters after firing: subsequent meta hooks within the
-     * same request are redundant (the zone was already purged).
-     */
-    #[Action('added_post_meta', 10, 4)]
-    #[Action('updated_post_meta', 10, 4)]
-    #[Action('deleted_post_meta', 10, 4)]
-    private \Closure|false $purgeOnMetaChange { get => $this->purgeOnMetaChange ??= $this->createHandler(__PROPERTY__); }
+    #[Action('wp_after_insert_post', 10, 4)]
+    #[Action('before_delete_post', 10, 1)]
+    public \Closure|false $purgeOnPostChange { get => $this->purgeOnPostChange ??= $this->createHandler(__PROPERTY__); }
 
     /**
      * Purge the entire zone on the first term change of the request.
-     *
-     * Self-unregisters after firing: subsequent term hooks within the
-     * same request are redundant (the zone was already purged).
      */
     #[Action('created_term', 10, 0)]
     #[Action('edit_term', 10, 0)]
+    #[Action('set_object_terms', 10, 0)]
     #[Action('delete_term', 10, 0)]
     private \Closure|false $purgeOnTermChange { get => $this->purgeOnTermChange ??= $this->createHandler(__PROPERTY__); }
 
@@ -88,6 +69,11 @@ class CloudflareCachePurger
             do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [$this, $propertyName]);
             return $this->purgeAllCache();
         };
+    }
+
+    private function purgeAllCache(): bool
+    {
+        return $this->sendPurgeRequest(['purge_everything' => true]);
     }
 
     /**

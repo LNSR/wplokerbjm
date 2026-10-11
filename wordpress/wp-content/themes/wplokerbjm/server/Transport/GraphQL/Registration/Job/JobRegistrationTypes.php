@@ -12,7 +12,7 @@ use WPLokerBJM\Models\Schema\{CustomFields, Taxonomies};
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 use WPLokerBJM\Transport\GraphQL\Registration\Job\SEO\JobSchemaRegistrationTypes;
 use WPLokerBJM\Transport\GraphQL\Registration\Job\Taxonomy\JobTaxonomyRegistrationTypes;
-use WPLokerBJM\Transport\GraphQL\Resolvers\JobsDataResolver;
+use WPLokerBJM\Transport\GraphQL\Resolvers\Job\JobsDataResolver;
 use WPLokerBJM\Presenters\Page\Homepage\HomepageComponents;
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Services\GraphQL\GraphQLJobData;

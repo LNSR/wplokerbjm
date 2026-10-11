@@ -70,7 +70,7 @@ class Logger
             'environment' => self::getEnvironment(),
             'level' => $level,
             'category' => $category,
-            'message' => $message,
+            'message' => \var_export($message, true),
             'context' => $context,
         ];
     }

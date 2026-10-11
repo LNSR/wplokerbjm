@@ -10,7 +10,8 @@ use WPLokerBJM\Services\GraphQL\GraphQLJobData;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Wordpress\Theme\ThemeHooks;
 use WPLokerBJM\Presenters\Page\Homepage\HomepageComponents;
-use WPLokerBJM\Services\Schema\SEO\JobSchemaOrg;
+use WPLokerBJM\Services\Auth\JWT\JWTService;
+use WPLokerBJM\Services\Schema\SEO\JobSchemaBuilder;
 use WPLokerBJM\Transport\GraphQL\Registration\Auth\JWTAuthRegistrationTypes;
 use WPLokerBJM\Transport\GraphQL\Registration\Job\JobRegistrationTypes;
 use WPLokerBJM\Transport\GraphQL\Registration\Theme\GraphQLThemeRegistrationTypes;
@@ -19,15 +20,15 @@ use WPLokerBJM\Transport\GraphQL\Registration\Theme\GraphQLThemeRegistrationType
  * @phpstan-import-type ThemeData from ThemeHooks
  * 
  * 
- * @phpstan-import-type JWTDataShape from JWTDataResolver
+ * @phpstan-import-type JWTDataShape from JWTService
  * @phpstan-import-type CarouselData from HomepageComponents
  * @phpstan-import-type JobGridData from HomepageComponents
  * @phpstan-import-type JobGridResponse from HomepageComponents
  * @phpstan-import-type CardData from GraphQLJobData
  * @phpstan-import-type JobDetailData from GraphQLJobData
  * 
- * @phpstan-import-type JobPostingSchema from JobSchemaOrg
- * @phpstan-import-type ItemListSchema from JobSchemaOrg
+ * @phpstan-import-type JobPostingSchema from JobSchemaBuilder
+ * @phpstan-import-type ItemListSchema from JobSchemaBuilder
  * @phpstan-type RankMathHeadArgs array{url?: string}
  * 
  * @phpstan-type LoadMoreArgs array{paged?: int, context?: 'search'|'latest', filters?: SearchFilters}

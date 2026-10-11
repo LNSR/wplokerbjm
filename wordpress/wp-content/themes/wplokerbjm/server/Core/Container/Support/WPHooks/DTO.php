@@ -96,6 +96,7 @@ final readonly class HookKey extends AbstractDataObject
  * @template TObject
  * @template TClass
  * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-import-type CallableHookParams from HookProviderTrait
  * *Master Hook Type*
  * @phpstan-type HookType array{
  *  class: class-string<TClass>,
@@ -112,7 +113,7 @@ final readonly class HookKey extends AbstractDataObject
  *  registerIf: null|(\Closure(TObject...): bool),
  *  registerIfParams: CallablePlan,
  *  hookParams: CallablePlan,
- *  hookArgs: array,
+ *  hookArgs: list<CallableHookParams>,
  *  tags: array,
  *  tagCallable: null|\Closure(TObject...): array,
  *  tagCallableParams: CallablePlan,

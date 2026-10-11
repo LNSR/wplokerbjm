@@ -19,10 +19,13 @@ use WPLokerBJM\Shared\Log\Logger;
 enum PluginList: string
 {
     case LiteSpeed = 'litespeed-cache/litespeed-cache.php';
+    case AdvancedMediaOffloader = 'advanced-media-offloader/advanced-media-offloader.php';
     case Wordfence = 'wordfence/wordfence.php';
     case MetaBox = 'meta-box/meta-box.php';
     case MetaBoxLite = 'meta-box-lite/meta-box-lite.php';
+    case AI = 'ai/ai.php';
     case WpGraphql = 'wp-graphql/wp-graphql.php';
+    case WpGraphqlSmartCache = 'wpgraphql-smart-cache/wp-graphql-smart-cache.php';
     case RankMath = 'seo-by-rank-math/rank-math.php';
     case QueryMonitor = 'query-monitor/query-monitor.php';
     case JwtAuthenticationForWpRestApi = 'jwt-authentication-for-wp-rest-api/jwt-auth.php';
@@ -144,11 +147,20 @@ class PluginManager
     })]
     public function disableWpGraphqlPlugin(array $plugins): array
     {
-        $pluginKey = array_search(PluginList::WpGraphql->value, $plugins, true);
-        if ($pluginKey !== false) {
-            unset($plugins[$pluginKey]);
-            do_action(ContainerRegistryEvent::UNREGISTER_BY_CLASS, WPGraphQL::class);
-            do_action(ContainerRegistryEvent::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
+        $wpGraphQlPlugins = [
+            PluginList::WpGraphql->value,
+            PluginList::WpGraphqlSmartCache->value,
+        ];
+        $alreadyUnregistred = false;
+        foreach ($wpGraphQlPlugins as $plugin) {    
+            $pluginKey = array_search($plugin, $plugins, true);
+            if ($pluginKey !== false) {
+                unset($plugins[$pluginKey]);
+                if ($alreadyUnregistred) continue;
+                do_action(ContainerRegistryEvent::UNREGISTER_BY_CLASS, WPGraphQL::class);
+                do_action(ContainerRegistryEvent::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
+                $alreadyUnregistred = true;
+            }
         }
         return $plugins;
     }
@@ -215,7 +227,7 @@ class PluginManager
                 ];
 
                 #[Filter('option_active_plugins', 0, once: true)]
-                public ?\Closure $pluginsOption {
+                public \Closure $pluginsOption {
                     get => $this->pluginsOption ??= SharedUtils::isDevelopment() ? $this->disablePluginsForDevImpl(...) : $this->disablePluginsforSimulatedProdImpl(...);
                 }
 

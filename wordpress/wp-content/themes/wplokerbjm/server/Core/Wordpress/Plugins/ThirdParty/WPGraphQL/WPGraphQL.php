@@ -12,8 +12,6 @@ use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use WP_User;
 use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
 use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryEvent;
-use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations\LiteSpeedGraphQLIntegration;
-use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\WPGraphQL\Services\WPGraphQLETag;
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 
 /**

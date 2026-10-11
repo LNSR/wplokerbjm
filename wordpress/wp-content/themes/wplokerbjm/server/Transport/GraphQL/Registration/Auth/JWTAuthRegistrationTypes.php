@@ -2,12 +2,12 @@
 
 namespace WPLokerBJM\Transport\GraphQL\Registration\Auth;
 
-use JWTDataShape;
+use WPLokerBJM\Services\Auth\JWT\JWTService;
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 use WPLokerBJM\Transport\GraphQL\Resolvers\Auth\JWTDataResolver;
 
 /**
- * @phpstan-import-type JWTDataShape from JWTDataResolver
+ * @phpstan-import-type JWTDataShape from JWTService
  */
 class JWTAuthRegistrationTypes
 {

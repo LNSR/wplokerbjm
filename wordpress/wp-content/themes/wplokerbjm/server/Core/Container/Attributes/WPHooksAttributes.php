@@ -9,6 +9,7 @@ use Attribute;
 /**
  * Base class for all WordPress hook attributes.
  * @template TParams
+ * Any Closure in attribute support param that can be resolved from Container, unless provider is `null` for InstanceRegistry side
  */
 abstract class BaseHookAttribute
 {
@@ -20,7 +21,7 @@ abstract class BaseHookAttribute
      * @param int $acceptedArgs
      * @param bool $deferRegister defer activation (forced true when $deferRegisterUntilHook is set)
      * 
-     * @param (\Closure(TParams...): bool)|null $executeIf decide whether to execute callback, potentially instantiating the object
+     * @param (\Closure(TParams...): bool)|null $executeIf decide whether to execute callback. In addition resolving params from container, Closure can receive same params from hook execution callback by matching name
      * 
      * @param (\Closure(TParams...): bool)|null $registerIf decide whether to register the hook
      * 

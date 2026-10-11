@@ -67,7 +67,9 @@ trait DeferredHooksTrait
             if (!$this->gateDeferredActivation($entry)) {
                 continue;
             }
-            $activateEntry($entry);
+            if (!$activateEntry($entry)) {
+                continue;
+            }
             $activated++;
             unset($this->deferredHandlers[$key]);
         }

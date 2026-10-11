@@ -38,7 +38,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  *     numberOfItems: int
  * }
  */
-class JobSchemaOrg
+class JobSchemaBuilder
 {
     public function __construct(
         private JobDataFactory $jobDataFactory

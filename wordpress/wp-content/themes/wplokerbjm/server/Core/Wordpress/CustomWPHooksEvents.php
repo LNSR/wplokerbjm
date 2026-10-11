@@ -65,28 +65,28 @@ class ContainerRegistryEvent
         $this->containerRegistry->activateDeferredByCallable($target);
     }
 
-    #[Filter(self::ACTIVATE_DEFERRED_BY_TAGS, 10, 1)]
-    private function activateDeferredByTags(array $tags): int
+    #[Action(self::ACTIVATE_DEFERRED_BY_TAGS, 10, 1)]
+    private function activateDeferredByTags(array $tags): void
     {
-        return $this->containerRegistry->activateDeferredByTags($tags);
+        $this->containerRegistry->activateDeferredByTags($tags);
     }
 
-    #[Filter(self::ACTIVATE_DEFERRED_BY_NAMESPACE, 10, 1)]
-    private function activateDeferredByNamespace(string $namespace): int
+    #[Action(self::ACTIVATE_DEFERRED_BY_NAMESPACE, 10, 1)]
+    private function activateDeferredByNamespace(string $namespace): void
     {
-        return $this->containerRegistry->activateDeferredByNamespace($namespace);
+        $this->containerRegistry->activateDeferredByNamespace($namespace);
     }
 
-    #[Filter(self::ACTIVATE_DEFERRED_BY_HOOK_PATTERN, 10, 1)]
-    private function activateDeferredByHookPattern(string $pattern): int
+    #[Action(self::ACTIVATE_DEFERRED_BY_HOOK_PATTERN, 10, 1)]
+    private function activateDeferredByHookPattern(string $pattern): void
     {
-        return $this->containerRegistry->activateDeferredByHookPattern($pattern);
+        $this->containerRegistry->activateDeferredByHookPattern($pattern);
     }
 
-    #[Filter(self::ACTIVATE_DEFERRED_BY_TAG_PATTERN, 10, 1)]
-    private function activateDeferredByTagPattern(array $patterns): int
+    #[Action(self::ACTIVATE_DEFERRED_BY_TAG_PATTERN, 10, 1)]
+    private function activateDeferredByTagPattern(array $patterns): void
     {
-        return $this->containerRegistry->activateDeferredByTagPattern($patterns);
+        $this->containerRegistry->activateDeferredByTagPattern($patterns);
     }
     #endregion
 

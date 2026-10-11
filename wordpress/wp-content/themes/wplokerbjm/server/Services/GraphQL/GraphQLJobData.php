@@ -8,7 +8,7 @@ use WPLokerBJM\Models\Schema\{Taxonomies, CustomFields};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Factories\JobDataFactory;
-use WPLokerBJM\Services\Schema\SEO\JobSchemaOrg;
+use WPLokerBJM\Services\Schema\SEO\JobSchemaBuilder;
 
 /**
  * @phpstan-type WordpressBaseData array{
@@ -55,15 +55,15 @@ use WPLokerBJM\Services\Schema\SEO\JobSchemaOrg;
  *     dpNonce?: string,
  * }
  * @phpstan-import-type JobData from JobDataFactory
- * @phpstan-import-type JobPostingSchema from JobSchemaOrg
- * @phpstan-import-type ItemListSchema from JobSchemaOrg
+ * @phpstan-import-type JobPostingSchema from JobSchemaBuilder
+ * @phpstan-import-type ItemListSchema from JobSchemaBuilder
  */
 class GraphQLJobData
 {
 
     public function __construct(
         private JobDataFactory $jobDataFactory,
-        private JobSchemaOrg $jobSchema,
+        private JobSchemaBuilder $jobSchema,
     ) {}
 
     /**

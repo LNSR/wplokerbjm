@@ -4,6 +4,7 @@ namespace WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations;
 
 use WPLokerBJM\Core\Wordpress\Plugins\PluginConfigInterface;
 use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Container\Attributes\Injectable;
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 
 /**
@@ -11,6 +12,10 @@ use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
  */
 class LiteSpeedGraphQLIntegration implements PluginConfigInterface
 {
+    public function __construct(LitespeedIntegrationCommands $litespeedIntegrationCommands)
+    {
+        $this->liteSpeedCommands = self::isActive() ? $litespeedIntegrationCommands : null;
+    }
 
     public static function isActive(): bool
     {
@@ -33,6 +38,12 @@ class LiteSpeedGraphQLIntegration implements PluginConfigInterface
         do_action('wpgraphql_cache_purge_all');
     };
 
+    public private(set) ?LitespeedIntegrationCommands $liteSpeedCommands;
+}
+
+class LitespeedIntegrationCommands
+{
+
     /**
      * Set GraphQL Queries returned via HTTP GET|OPTIONS requests to be cacheable
      */
@@ -40,6 +51,7 @@ class LiteSpeedGraphQLIntegration implements PluginConfigInterface
     {
         if ($_SERVER['REQUEST_METHOD'] !== 'GET' && $_SERVER['REQUEST_METHOD'] !== 'OPTIONS')
             return;
+
         do_action('litespeed_control_force_cacheable');
         if (is_user_logged_in()) {
             do_action('litespeed_control_set_ttl', 3600);

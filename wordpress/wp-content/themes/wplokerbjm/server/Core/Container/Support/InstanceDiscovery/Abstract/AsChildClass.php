@@ -67,8 +67,8 @@ abstract class AsChildClass
     public function configure(\Closure $configuration): static
     {
         try {
-            $bound = \Closure::bind($configuration, $this, static::class);
-            $bound();
+            $configuration = $configuration->bindTo($this, static::class);
+            $configuration();
             return $this;
         } catch (\Throwable $th) {
             Logger::Error(static::class . $this->identifier . ': ', 'Failed to configure ' . $th->getMessage());

@@ -45,7 +45,8 @@ trait ContainerLazyHookInvokerTrait
                     $this->container,
                     $this->label,
                     $this->class,
-                    $hookArgs
+                    $hookArgs,
+                    $this->variadicHookArgName()
                 );
             } catch (\Throwable $e) {
                 if (!$this->once) {

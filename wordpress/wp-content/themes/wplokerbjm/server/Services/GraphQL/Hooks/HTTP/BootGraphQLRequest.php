@@ -17,7 +17,7 @@ final class BootGraphQLRequest
     #[Action('init_graphql_request', once: true, tag: ['graphql'], deferRegister: true)]
     public function handleInitRequest(): void
     {
-        $this->litespeedGraphQLIntegration->setCacheable();
+        $this->litespeedGraphQLIntegration->liteSpeedCommands?->setCacheable();
         $this->authenticateViaCookie();
         $this->eTag->checkEarly304AndExit();
     }

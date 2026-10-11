@@ -1,6 +1,6 @@
 <?php
 
-namespace WPLokerBJM\Transport\GraphQL\Resolvers;
+namespace WPLokerBJM\Transport\GraphQL\Resolvers\Job;
 
 
 use WPLokerBJM\Models\Schema\PostTypes;
@@ -11,7 +11,7 @@ use WPLokerBJM\Models\Schema\Taxonomies;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Services\GraphQL\GraphQLJobData;
-use WPLokerBJM\Services\Schema\SEO\JobSchemaOrg;
+use WPLokerBJM\Services\Schema\SEO\JobSchemaBuilder;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 use WPLokerBJM\Presenters\Header\HeadersComponents;
 use WPLokerBJM\Presenters\Page\JobDetail\JobDetailComponents;

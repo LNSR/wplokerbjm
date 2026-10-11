@@ -37,86 +37,49 @@ class CachePurgeHandler
      * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
-    #[Action('save_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 2)]
-    #[Action('delete_post_' . PostTypes::POST_TYPE_LOWONGAN, 10, 1)]
-    #[Action('trashed_post', 10, 1)]
-    #[Action('delete_attachment', 10, 1)]
-    #[Action('transition_post_status', 10, 3)]
-    private ModuleClassHookMetadata $invalidatePostCache {
+    #[Action('init', 10, 0, once: true)]
+    public private(set) ModuleClassHookMetadata $invalidatePostCache {
         get {
             return $this->invalidatePostCache ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
-
                 /** @var array<int, bool> */
                 public private(set) array $snapshotPostID = [];
 
-                public function __invoke(...$args): void
+                public function __invoke(): void
                 {
-                    $post_id = $this->extractPostId($args);
+                    do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $this);
+                }
 
-                    if ($post_id === null || isset($this->snapshotPostID[$post_id]) && $this->snapshotPostID[$post_id] === true) {
+                #[Action('wp_after_insert_post', 10, 4)]
+                public function onAfterInsertPost(int $postId, \WP_Post $post, bool $update, ?\WP_Post $postBefore): void
+                {
+                    $this->invalidatePostOnce($post);
+                }
+
+                #[Action('before_delete_post', 10, 2)]
+                public function onBeforeDeletePost(int $postId, \WP_Post $post): void
+                {
+                    $this->invalidatePostOnce($post);
+                }
+
+                private function invalidatePostOnce(\WP_Post $post): void
+                {
+                    if ($post->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
                         return;
                     }
 
-                    $this->snapshotPostID[(int) $post_id] = true;
+                    $postId = (int) $post->ID;
 
-                    $this->invalidateJobDataCache((int) $post_id);
-                }
-
-                /**
-                 * Extract a post ID from variadic hook arguments, validating post type.
-                 *
-                 * @param array $args Hook arguments
-                 * @return int|null The resolved lowongan post ID, or null if not applicable
-                 */
-                private function extractPostId(array $args): ?int
-                {
-                    $post_id = null;
-
-                    foreach ($args as $arg) {
-                        if ($arg instanceof \WP_Post) {
-                            if ($arg->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
-                                return null;
-                            }
-                            $post_id = $arg->ID;
-                            continue;
-                        }
-
-                        if (is_int($arg)) {
-                            $post_id = $arg;
-                            continue;
-                        }
-
-                        if (is_string($arg) && ctype_digit($arg)) {
-                            $post_id = (int) $arg;
-                            continue;
-                        }
+                    if (isset($this->snapshotPostID[$postId])) {
+                        return;
                     }
 
-                    if ($post_id !== null) {
-                        $resolved = get_post($post_id);
-                        if ($resolved === null || $resolved->post_type !== PostTypes::POST_TYPE_LOWONGAN) {
-                            return null;
-                        }
-                    }
+                    $this->snapshotPostID[$postId] = true;
 
-                    return $post_id;
-                }
-
-                /**
-                 * Invalidate job data caches for a specific lowongan post.
-                 *
-                 * @param int $post_id The post ID.
-                 * @return bool True if any cache entry was deleted.
-                 */
-                private function invalidateJobDataCache(int $post_id): bool
-                {
-                    $deleteResults = Cache::deleteMultiple([
-                        CacheKey::JOB_DATA_PREFIX . $post_id,
-                        CacheKey::GRAPHQL_JOB_CARD_PREFIX . $post_id,
-                        CacheKey::JOB_SCHEMA_PREFIX . $post_id,
+                    Cache::deleteMultiple([
+                        CacheKey::JOB_DATA_PREFIX . $postId,
+                        CacheKey::GRAPHQL_JOB_CARD_PREFIX . $postId,
+                        CacheKey::JOB_SCHEMA_PREFIX . $postId,
                     ]);
-
-                    return !empty(array_filter($deleteResults));
                 }
             };
         }
@@ -144,8 +107,9 @@ class CachePurgeHandler
             static $__propertyName = __PROPERTY__;
             return $this->purgeGlobalCacheOnce ??= function () use ($__propertyName) {
                 static $alreadyRun = false;
-                if ($alreadyRun)
+                if ($alreadyRun) {
                     return;
+                }
                 $alreadyRun = true;
                 do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
                 try {
@@ -174,7 +138,7 @@ class CachePurgeHandler
                         CacheKey::THEME_DATA . '*',
                     ]);
                 } catch (\Exception $e) {
-                    Logger::error('Hooks', 'CacheInvalidationHooks::purgeGlobalCacheOnce error: ' . $e->getMessage());
+                    Logger::error(static::class, '::' . $__propertyName . ' Error: ' . $e->getMessage());
                 }
             };
         }

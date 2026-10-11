@@ -12,19 +12,29 @@ use ReflectionMethod;
 use ReflectionNamedType;
 use RuntimeException;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Shared DI parameter-plan resolution core for hook providers.
  *
  * Both the container provider (WPHookPlanProvider) and the runtime provider
  * resolve closure parameters through this trait: plans are pre-computed at
- * scan time (via {@see buildCallablePlan()}), exported to the hooks cache
+ * scan time (via {@see self::buildCallablePlan()}), exported to the hooks cache
  * file, and resolved from the container at hook-fire time — so the hot path
  * never needs reflection unless a plan is missing (stale cache / unexportable
  * defaults).
  * @template TClass
- * @phpstan-type CallableHookParams array{name: string, type: string|class-string<TClass>|null, hasDefault: bool, default: mixed}
- * @phpstan-type CallablePlan array{isStatic: bool, params: list<CallableHookParams>}
+ * @phpstan-type CallableHookParams array{
+ *      name: string, 
+ *      type: string|class-string<TClass>|null, 
+ *      hasDefault: bool, 
+ *      default: mixed,
+ *      isVariadic: bool
+ * }
+ * @phpstan-type CallablePlan array{
+ *      isStatic: bool, 
+ *      params: list<CallableHookParams>
+ * }
  */
 trait HookProviderTrait
 {
@@ -38,8 +48,6 @@ trait HookProviderTrait
      * @var \WeakMap<\Closure, array<class-string<TClass>, \Closure>>
      */
     private \WeakMap $boundClosureCache { get => $this->boundClosureCache ??= new \WeakMap(); }
-
-    public function __construct() {}
 
     /**
      * Build the resolution plan for a callable closure.
@@ -68,60 +76,152 @@ trait HookProviderTrait
         }
 
         try {
-            $reflect = new ReflectionFunction($callable);
-            /**
-             * @var list<CallableHookParams> $params
-             */
-            $params = [];
-
-            foreach ($reflect->getParameters() as $param) {
-                $type = $param->getType();
-                $paramType = null;
-                if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
-                    $reflectClass = $reflect->getClosureScopeClass();
-                    if ($reflectClass->isAnonymous() && $reflectClass->getParentClass()->getName() === ModuleClassHookMetadata::class) {
-                        $anonClassName = \rtrim($reflectClass->getName(), '$');
-                        $position = \strpos($anonClassName, '$');
-                        $paramType = \substr($anonClassName, 0, $position);
-                    } else if ($reflectClass->isAnonymous()) {
-                        throw new RuntimeException(
-                            'Bare Anonymous class cannot be used as a parameter type hint \'self\' for hook.'
-                        );
-                    } else {
-                        $paramType = $reflectClass->getName();
-                    }
-                } else {
-                    $paramType = $type instanceof ReflectionNamedType && !$type->isBuiltin() ? $type->getName() : null;
-                }
-
-                $hasDefault = $param->isDefaultValueAvailable();
-                $default = $hasDefault ? $param->getDefaultValue() : null;
-
-                /** @var CallableHookParams $planParam */
-                $planParam = [
-                    'name' => $param->getName(),
-                    'type' => $paramType,
-                    'hasDefault' => $hasDefault,
-                    'default' => $default,
-                ];
-
-
-                // Non-exportable defaults (objects/resources) -> set to null.
-                if ($hasDefault && (is_object($default) || is_resource($default))) {
-                    $planParam['hasDefault'] = false;
-                    $planParam['default'] = null;
-                }
-
-                $params[] = $planParam;
-            }
-
-            return [
-                'isStatic' => $reflect->isStatic(),
-                'params' => $params,
-            ];
+            return $this->buildCallablePlanFromReflector(new ReflectionFunction($callable));
         } catch (ReflectionException) {
             return $empty;
         }
+    }
+
+    /**
+     * Build the resolution plan for ANY reflected callable (closure or method).
+     *
+     * This is the single source of truth for parameter metadata used both by
+     * gate closures (executeIf / registerIf / hook-name / tag callables, via
+     * {@see buildCallablePlan()}) and by hook HANDLERS themselves — the
+     * scanner exports a handler's own plan as `hookArgs`, so parameter names
+     * AND the variadic flag derive from the same shape, with no parallel
+     * `hookArgsVariadic` fields.
+     *
+     * @param \ReflectionFunctionAbstract $reflect
+     * @return CallablePlan
+     */
+    public function buildCallablePlanFromReflector(\ReflectionFunctionAbstract $reflect): array
+    {
+        /**
+         * @var list<CallableHookParams> $params
+         */
+        $params = [];
+
+        foreach ($reflect->getParameters() as $param) {
+            $type = $param->getType();
+            $paramType = null;
+            if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
+                $reflectClass = $reflect->getClosureScopeClass();
+                if ($reflectClass->getParentClass()->getName() === ModuleClassHookMetadata::class) {
+                    if ($reflectClass->isAnonymous()) {
+                        $anonClassName = \rtrim($reflectClass->getName(), '$');
+                        $position = \strpos($anonClassName, '$');
+                        $paramType = \substr($anonClassName, 0, $position);
+                    } else {
+                        $paramType = $reflectClass->getName();
+                    }
+                } else if ($reflectClass->isAnonymous()) {
+                    throw new RuntimeException(
+                        'Bare Anonymous class cannot be used as a parameter type hint \'self\' for hook.'
+                    );
+                } else {
+                    $paramType = $reflectClass->getName();
+                }
+            } else {
+                $paramType = $type instanceof ReflectionNamedType && !$type->isBuiltin() ? $type->getName() : null;
+            }
+
+            $hasDefault = $param->isDefaultValueAvailable();
+            $default = $hasDefault ? $param->getDefaultValue() : null;
+
+            /** @var CallableHookParams $planParam */
+            $planParam = [
+                'name' => $param->getName(),
+                'type' => $paramType,
+                'hasDefault' => $hasDefault,
+                'default' => $default,
+                'isVariadic' => $param->isVariadic(),
+            ];
+
+            // Non-exportable defaults (objects/resources) -> set to null.
+            if ($hasDefault && (is_object($default) || is_resource($default))) {
+                $planParam['hasDefault'] = false;
+                $planParam['default'] = null;
+            }
+
+            $params[] = $planParam;
+        }
+
+        return [
+            'isStatic' => $reflect->isStatic(),
+            'params' => $params,
+        ];
+    }
+
+    /**
+     * Build the resolution plan for any callable VALUE (closure, invokable
+     * object, array callable, 'Class::method' string) — used for property
+     * hooks whose callable lives in a property default value or live instance.
+     *
+     * @param mixed $callable The callable value to introspect.
+     * @return CallablePlan
+     */
+    public function callablePlan(mixed $callable): array
+    {
+        if (!is_callable($callable)) {
+            return ['isStatic' => true, 'params' => []];
+        }
+
+        try {
+            $reflect = match (true) {
+                $callable instanceof \Closure => new \ReflectionFunction($callable),
+                is_object($callable) => new \ReflectionMethod($callable, '__invoke'),
+                is_array($callable) => new \ReflectionMethod($callable[0], $callable[1]),
+                is_string($callable) && str_contains($callable, '::') => new \ReflectionMethod(...array_slice(explode('::', $callable), 0, 2)),
+                is_string($callable) => new \ReflectionFunction($callable),
+                default => null,
+            };
+
+            if ($reflect === null) {
+                return ['isStatic' => true, 'params' => []];
+            }
+
+            return $this->buildCallablePlanFromReflector($reflect);
+        } catch (\ReflectionException) {
+            return ['isStatic' => true, 'params' => []];
+        }
+    }
+
+    /**
+     * Build the resolution plan for a property's callable value or default value.
+     *
+     * Mirrors {@see extractPropertyCallableParamNames()} but returns the full
+     * plan (names + variadic flags) instead of names only.
+     *
+     * @param \ReflectionProperty $property from attributes
+     * @param object|null $instance Optional runtime instance to execute getters/hooks.
+     *
+     * @return CallablePlan
+     */
+    public function extractPropertyCallablePlan(\ReflectionProperty $property, ?object $instance = null): array
+    {
+        $propertyName = $property->getName();
+
+        if ($instance !== null) {
+            // For hooked properties, reading the property executes the `get` hook.
+            // For non-hooked properties, ensure it's initialized before reading to avoid Error.
+            /** @suppress PHP0406 */
+            $isHooked = $property->hasHook(\PropertyHookType::Get);
+            $isInitialized = $property->isInitialized($instance);
+
+            if ($isHooked || $isInitialized) {
+                $value = $instance->{$propertyName} ?? null;
+                if (is_callable($value)) {
+                    return $this->callablePlan($value);
+                }
+            }
+        }
+
+        if ($property->hasDefaultValue()) {
+            return $this->callablePlan($property->getDefaultValue());
+        }
+
+        return ['isStatic' => true, 'params' => []];
     }
 
     /**
@@ -179,6 +279,7 @@ trait HookProviderTrait
         string $label = '',
         object|null|string $targetClass = null,
         array $hookArgs = [],
+        ?string $variadicHookArg = null,
     ): bool {
         if ($executeIf === null) {
             return true;
@@ -205,7 +306,7 @@ trait HookProviderTrait
             }
         }
 
-        $values = $this->resolveCallableParameters($executeIf, $executeIfParams, $container, $label, $hookArgs, $targetInstance);
+        $values = $this->resolveCallableParameters($executeIf, $executeIfParams, $container, $label, $hookArgs, $targetInstance, $variadicHookArg);
         $allowed = $executeIf(...$values);
 
         if (!is_bool($allowed)) {
@@ -313,93 +414,23 @@ trait HookProviderTrait
         return $allowed;
     }
 
-
-    /**
-     * Extract the parameter names of any callable shape, used to build named
-     * hook args for executeIf resolution (property hooks, dynamic callables).
-     *
-     * Supports closures, invokable objects, array callables and string
-     * callables ('Class::method' or plain function names). Anything not
-     * callable yields an empty result.
-     *
-     * @param mixed $callable The callable value to introspect.
-     *
-     * @return array<int, string> Parameter names in declaration order.
-     */
-    public function callableParamNames(mixed $callable): array
-    {
-        if (!is_callable($callable)) {
-            return [];
-        }
-
-        try {
-            $reflect = match (true) {
-                $callable instanceof \Closure =>
-                new \ReflectionFunction($callable),
-
-                is_object($callable) =>
-                new \ReflectionMethod($callable, '__invoke'),
-
-                is_array($callable) =>
-                new \ReflectionMethod($callable[0], $callable[1]),
-
-                is_string($callable) && str_contains($callable, '::') =>
-                new \ReflectionFunction($callable),
-
-                is_string($callable) =>
-                new \ReflectionFunction($callable),
-
-                default => null,
-            };
-
-            if ($reflect === null) {
-                return [];
-            }
-
-            return array_map(
-                static fn(\ReflectionParameter $param): string => $param->getName(),
-                $reflect->getParameters(),
-            );
-        } catch (\ReflectionException) {
-            return [];
-        }
-    }
     /**
      * Extract parameter names from a property's callable value or default value.
      *
      * Handles standard properties (default values), initialized property hooks,
      * and live object instances.
      *
-     * @param \ReflectionProperty $property
+     * @param \ReflectionProperty $property from Attribute #Action/#Filter
      * @param object|null $instance Optional runtime instance to execute getters/hooks.
      *
      * @return array<int, string>
      */
     public function extractPropertyCallableParamNames(\ReflectionProperty $property, ?object $instance = null): array
     {
-
-        $propertyName = $property->getName();
-
-        if ($instance !== null) {
-            // For hooked properties, reading the property executes the `get` hook.
-            // For non-hooked properties, ensure it's initialized before reading to avoid Error.
-            /** @suppress PHP0406 */
-            $isHooked = $property->hasHook(\PropertyHookType::Get);
-            $isInitialized = $property->isInitialized($instance);
-
-            if ($isHooked || $isInitialized) {
-                $value = $instance->{$propertyName} ?? null;
-                if (is_callable($value)) {
-                    return $this->callableParamNames($value);
-                }
-            }
-        }
-
-        if ($property->hasDefaultValue()) {
-            return $this->callableParamNames($property->getDefaultValue());
-        }
-
-        return [];
+        return array_map(
+            static fn(array $param): string => $param['name'],
+            $this->extractPropertyCallablePlan($property, $instance)['params'],
+        );
     }
 
 
@@ -513,6 +544,7 @@ trait HookProviderTrait
      * pre-computed plan when available and reflection as a fallback.
      *
      * @param CallablePlan $plan
+     * @param list<CallableHookParams> $hookArgs
      *
      * @return array<int, mixed>
      *
@@ -524,13 +556,31 @@ trait HookProviderTrait
         ?ContainerInterface $container = null,
         string $label = '',
         array $hookArgs = [],
-        ?object $instanceTarget = null
+        ?object $instanceTarget = null,
+        ?string $variadicHookArg = null
     ): array {
         $params = $plan['params'] ?? [];
 
         if ($params !== []) {
             $values = [];
             foreach ($params as $param) {
+                // A variadic closure parameter mirrors the HANDLER's variadic
+                // bucket (the name must match $variadicHookArg): splat the
+                // whole remainder, letting the caller dissect it manually.
+                // An unmatched variadic parameter captures nothing — it never
+                // falls back to the container.
+                if (($param['isVariadic'] ?? false)) {
+                    if (
+                        $variadicHookArg !== null
+                        && $param['name'] === $variadicHookArg
+                        && isset($hookArgs[$param['name']])
+                        && is_array($hookArgs[$param['name']])
+                    ) {
+                        array_push($values, ...$hookArgs[$param['name']]);
+                    }
+                    continue;
+                }
+
                 // Exact parameter-name match wins — hook arguments are injected
                 // by name (e.g. `string $search` receives the handler's $search
                 // argument), removing any scalar-ambiguity.
@@ -540,9 +590,7 @@ trait HookProviderTrait
                 }
 
                 if (
-                    is_string($param['type'])
-                    && str_contains($param['type'], ModuleClassHookMetadata::class)
-                    && $instanceTarget instanceof ModuleClassHookMetadata
+                    is_string($param['type']) && $instanceTarget instanceof ModuleClassHookMetadata
                 ) {
                     $values[] = $instanceTarget;
                     continue;

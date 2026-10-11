@@ -121,7 +121,7 @@ class WPHooksScanner
                         registerIf: $attr->registerIf,
                         registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
                         hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        hookArgs: array_map(static fn(\ReflectionParameter $p) => $p->getName(), $method->getParameters()),
+                        hookArgs: $this->hookPlanProvider->buildCallablePlanFromReflector($method)['params'],
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
@@ -147,7 +147,7 @@ class WPHooksScanner
                         registerIf: $attr->registerIf,
                         registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
                         hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        hookArgs: $this->hookPlanProvider->extractPropertyCallableParamNames($property),
+                        hookArgs: ($this->hookPlanProvider->extractPropertyCallablePlan($property))['params'],
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
@@ -222,6 +222,7 @@ class WPHooksScanner
         );
 
         $phpContent = "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Auto-generated WP Hooks Cache\n * Generated at: " . date('Y-m-d H:i:s') . "\n */\n\n" . $exportedArray;
+        $phpContent = \str_replace('__CLASS__', 'self::class', $phpContent);
         $result = file_put_contents($targetFile, $phpContent, LOCK_EX);
         return $result !== false;
     }

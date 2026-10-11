@@ -36,7 +36,7 @@ class Init
         !defined('WPLOKERBJM_TEST_ENV') && $this->shutdown();
     }
 
-    #[Action('shutdown', \PHP_INT_MAX)]
+    #[Action('shutdown', \PHP_INT_MAX, once: true)]
     private function shutdown(): void
     {
         SharedUtils::doActivityAtEndRequest(Logger::flush(...));

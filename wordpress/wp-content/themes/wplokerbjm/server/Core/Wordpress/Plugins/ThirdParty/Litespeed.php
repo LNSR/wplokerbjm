@@ -47,12 +47,12 @@ final class Litespeed implements PluginConfigInterface
             Logger::error('Error deleting cache folder: ', $e->getMessage());
         }
 
-        if (function_exists('apcu_clear_cache')) {
-            apcu_clear_cache();
+        if (\apcu_enabled()) {
+            \apcu_clear_cache();
         }
 
         if (function_exists('wp_opcache_invalidate') && function_exists('wp_opcache_invalidate_directory')) {
-            wp_opcache_invalidate_directory(get_stylesheet_directory());
+            \wp_opcache_invalidate_directory(get_stylesheet_directory());
         }
         $this->robotLoader->rebuild();
         $this->lokerBJMcontainer
@@ -86,11 +86,11 @@ final class Litespeed implements PluginConfigInterface
             $path = $file->getRealPath();
             if (str_contains($path, 'robotloader')) continue;
 
-            Logger::debug('Deleting item: ', $path);
+            Logger::info('Deleting item: ', $path);
 
-            $file->isDir() && !$file->isLink() ? rmdir($path) : unlink($path);
+            $file->isDir() && !$file->isLink() ? @rmdir($path) : @unlink($path);
         }
 
-        return rmdir($dir);
+        return @rmdir($dir);
     }
 }

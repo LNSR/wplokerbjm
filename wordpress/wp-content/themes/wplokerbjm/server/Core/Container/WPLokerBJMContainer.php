@@ -20,15 +20,17 @@ use WPLokerBJM\Shared\Log\Logger;
 class WPLokerBJMContainer
 {
 
+    public function __construct(private readonly RobotLoader $robotLoader, ?string $cacheDir = null)
+    {
+        $this->cacheLocation = $cacheDir ??= \sprintf("%s/cache", rtrim(\get_stylesheet_directory()));
+    }
+
     /**
      * @phpstan-ignore-next-line
      * @var __WPLokerBJMContainerCacheLocation
      */
-    public private(set) object $cacheLocation;
-
-    public function __construct(private readonly RobotLoader $robotLoader, ?string $cacheDir = null)
-    {
-        $this->cacheLocation = new readonly class($cacheDir ??= \sprintf("%s/cache", rtrim(\get_stylesheet_directory()))) {
+    public private(set) object|string $cacheLocation {
+        set => $this->cacheLocation = new readonly class($value) {
             public string $cacheFile;
 
             public function __construct(public string $cacheDir)

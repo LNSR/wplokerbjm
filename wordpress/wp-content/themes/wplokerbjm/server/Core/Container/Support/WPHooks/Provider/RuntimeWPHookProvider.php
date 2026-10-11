@@ -70,8 +70,8 @@ class RuntimeWPHookProvider
      * @param object|null|string   $targetClass  Class whose scope the closure was declared in.
      * @param array<string, mixed> $hookArgs Named hook arguments (hook parameter name → value).
      */
-    public function evaluateRuntimeExecuteIf(?\Closure $executeIf, array $params, string $label, object|null|string $targetClass = null, array $hookArgs = []): bool
+    public function evaluateRuntimeExecuteIf(?\Closure $executeIf, array $params, string $label, object|null|string $targetClass = null, array $hookArgs = [], ?string $variadicHookArg = null): bool
     {
-        return $this->evaluateExecuteIf($executeIf, $params, $this->container, $label, $targetClass, $hookArgs);
+        return $this->evaluateExecuteIf($executeIf, $params, $this->container, $label, $targetClass, $hookArgs, $variadicHookArg);
     }
 }

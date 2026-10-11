@@ -1,6 +1,6 @@
 <?php
 
-namespace WPLokerBJM\Transport\GraphQL\Resolvers;
+namespace WPLokerBJM\Transport\GraphQL\Resolvers\Job;
 
 use WPLokerBJM\Repositories\TaxonomyRepository;
 use WPLokerBJM\Models\Schema\Taxonomies;
