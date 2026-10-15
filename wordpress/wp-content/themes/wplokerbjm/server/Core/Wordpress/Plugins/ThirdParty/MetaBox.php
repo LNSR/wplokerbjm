@@ -24,8 +24,11 @@ final class MetaBox implements PluginConfigInterface
     #[Action('plugins_loaded')]
     public function boot(): void
     {
-        do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $this->registerCustomModels);
-        do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $this->metaboxBugsPatch);
+        $modules = [$this->registerCustomModels, $this->metaboxBugsPatch];
+        
+        foreach($modules as $module) {
+            do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $module);
+        }
     }
 
     private ModuleClassHookMetadata $metaboxBugsPatch {

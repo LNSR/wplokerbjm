@@ -137,8 +137,14 @@ class CachePurgeHandler
                         CacheKey::GRAPHQL_ETAG_PREFIX . '*',
                         CacheKey::THEME_DATA . '*',
                     ]);
-                } catch (\Exception $e) {
-                    Logger::error(static::class, '::' . $__propertyName . ' Error: ' . $e->getMessage());
+                } catch (\Throwable $e) {
+                    Logger::error(static::class, '::' . $__propertyName . ' Error: ', [
+                        'message' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'code' => $e->getCode(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ]);
                 }
             };
         }

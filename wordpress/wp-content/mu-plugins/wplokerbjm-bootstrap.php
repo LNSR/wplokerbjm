@@ -8,6 +8,7 @@ use Nette\Loaders\RobotLoader;
 use WPLokerBJM\Core\Wordpress\Theme\ThemeHooks;
 use WPLokerBJM\Core\Container\Init;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
+use WPLokerBJM\Shared\Log\Logger;
 
 // Exit if accessed directly for security
 !defined('ABSPATH') && exit;
@@ -24,6 +25,7 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 (static function () {
     $themeName = 'wplokerbjm';
     if (get_stylesheet() !== $themeName) return;
+
     $themeRoot = WP_CONTENT_DIR . '/themes/' . $themeName;
     require_once $themeRoot . '/vendor/autoload.php';
 
@@ -42,13 +44,6 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
             ->get(Init::class)
             ->initialize();
     } catch (\Throwable $e) {
-        error_log(
-            sprintf(
-                'wplokerbjm Bootstrap error: %s in %s:%d',
-                $e->getMessage(),
-                $e->getFile(),
-                $e->getLine()
-            )
-        );
+        error_log('MU-Plugin bootstrap fail' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
     }
 })();

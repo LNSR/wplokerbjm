@@ -238,18 +238,27 @@ class WPHooksInstanceObjectCacheTest extends WplokerbjmTestCase
             $cache->flush();
             $this->assertFileExists($file);
         } finally {
+            // Drop the cache object first: its destructor flushes the unsaved
+            // buffer and would otherwise rebuild the tree we are about to
+            // delete.
+            unset($cache);
+
             if (is_dir($cacheDir)) {
-                $files = new \RecursiveIteratorIterator(
+                       $iterator = new \RecursiveIteratorIterator(
                     new \RecursiveDirectoryIterator($cacheDir, \RecursiveDirectoryIterator::SKIP_DOTS),
                     \RecursiveIteratorIterator::CHILD_FIRST,
                 );
 
-                foreach ($files as $fileInfo) {
-                    $todo = $fileInfo->isDir() ? 'rmdir' : 'unlink';
-                    $todo($fileInfo->getRealPath());
+                $paths = [];
+                foreach ($iterator as $fileInfo) {
+                    $paths[] = $fileInfo->getPathname();
                 }
 
-                rmdir($cacheDir);
+                foreach ($paths as $path) {
+                    is_dir($path) ? @rmdir($path) : @unlink($path);
+                }
+
+                @rmdir($cacheDir);
             }
         }
     }

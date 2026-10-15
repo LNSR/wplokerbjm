@@ -199,15 +199,11 @@ abstract class WplokerbjmTestCase extends TestCase
     {
         foreach ($registries ?? $this->trackedRegistries as $registry) {
             $queued = $registry->queuedRemovalEntry ?? [];
+            if ($queued === []) continue;
 
-            foreach ($queued as $hook => $entries) {
-                if (\doing_action($hook) || \doing_filter($hook)) {
-                    continue;
-                }
-
-                foreach ($entries as $entry) {
-                    $entry->unregister();
-                }
+            foreach ($queued as $idx => $entry) {
+                if ($entry->isCurrentlyExecuting()) continue;
+                $entry->unregister();
             }
         }
     }

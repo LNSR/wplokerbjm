@@ -107,7 +107,9 @@ trait HookProviderTrait
             $paramType = null;
             if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
                 $reflectClass = $reflect->getClosureScopeClass();
-                if ($reflectClass->getParentClass()->getName() === ModuleClassHookMetadata::class) {
+                $parentClass = $reflectClass?->getParentClass();
+                $isModuleClass = $parentClass ? $parentClass->getName() === ModuleClassHookMetadata::class : false;
+                if ($isModuleClass) {
                     if ($reflectClass->isAnonymous()) {
                         $anonClassName = \rtrim($reflectClass->getName(), '$');
                         $position = \strpos($anonClassName, '$');

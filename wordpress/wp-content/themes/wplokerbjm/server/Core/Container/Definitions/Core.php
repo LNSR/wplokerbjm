@@ -11,6 +11,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHo
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\{DependencyInjector, PlanCache, PlanCompiler, ScopeAccessFactory};
 
 /**
  * Core container definitions for the wplokerbjm theme.
@@ -32,7 +33,7 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 class Core implements DefinitionProviderInterface
 {
     public function __construct(private RobotLoader $robotLoader) {}
-    
+
     public function getDefinitions(): array
     {
         $namespace = 'WPLokerBJM';
@@ -78,6 +79,24 @@ class Core implements DefinitionProviderInterface
             ),
         ];
 
-        return \array_merge($autoWiredDefinitions, $core);
+        return \array_merge($autoWiredDefinitions, $core, $this->dependencyService());
+    }
+
+    private function dependencyService(): array
+    {
+        $dependencyInjector = [
+            PlanCompiler::class => \DI\autowire(PlanCompiler::class),
+            ScopeAccessFactory::class => \DI\autowire(ScopeAccessFactory::class),
+            PlanCache::class => \DI\autowire(PlanCache::class)->constructor(
+                static fn(): string => get_stylesheet_directory() . '/cache/DependencyInjectorCache.php'
+            ),
+            DependencyInjector::class => \DI\autowire(DependencyInjector::class)->constructor(
+                \DI\get(ContainerInterface::class),
+                \DI\get(ScopeAccessFactory::class),
+                \DI\get(PlanCache::class),
+                \DI\get(PlanCompiler::class),
+            ),
+        ];
+        return $dependencyInjector;
     }
 }

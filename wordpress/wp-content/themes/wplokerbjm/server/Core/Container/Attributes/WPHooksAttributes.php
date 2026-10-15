@@ -27,9 +27,9 @@ abstract class BaseHookAttribute
      * 
      * @param (\Closure(TParams...): array)|array $tag
      * 
-     * @param string|(\Closure(TParams...): string)|null $deferRegisterUntilHook
      * !defer registration until the named 'action' trigger hook fires (implies defer); a Closure is resolved through the container and must return the trigger hook name
-     * @param bool $once consume-on-any-evaluation: the registration removes itself after executeIf is evaluated or callback proceeded
+     * @param string|(\Closure(TParams...): string)|null $deferRegisterUntilHook
+     * @param bool $once consume-on-any-evaluation: the registration removes itself when dispatched invoker evaluation triggered, or proceeded to callback(executeIf null).
      */
     public function __construct(
         public readonly string|\Closure $hook,

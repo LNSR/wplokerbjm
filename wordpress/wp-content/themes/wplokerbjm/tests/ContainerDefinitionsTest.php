@@ -357,8 +357,16 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $totalBefore = count($this->registeredHooks());
         Terminal::out("  \033[0;33m•\033[0m $totalBefore hooks registered initially\n");
 
+        // Deferred entries only reach $wp_filter after their trigger hook
+        // fires, and the unregister APIs never touch the deferred pool — pick
+        // an ACTIVE registration so the removal actually happens.
+        $target = array_find(
+            $registrations,
+            static fn($registration): bool => !$registration->deferRegister && $registration->deferRegisterUntilHook === null,
+        ) ?? $registrations[0];
+
         // Test unregisterByHook
-        $targetHook = $registrations[0]->hook;
+        $targetHook = $target->hook;
         $registry->unregisterByHook($targetHook);
 
         $remainingForHook = array_filter($this->registeredHooks(), fn($r) => $r['hook'] === $targetHook);
@@ -369,12 +377,12 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         Terminal::out("  \033[0;32m✓\033[0m unregisterByHook('$targetHook') removed $removed hook(s)\n");
 
         // Test unregisterByClass (fresh setup)
-        $GLOBALS['__wplokerbjm_registered_hooks'] = [];
+        $GLOBALS['wp_filter'] = [];
         $registry2 = $this->createRegistry($registrations, $container);
         $registry2->initialize();
 
         $totalBeforeClass = count($this->registeredHooks());
-        $targetClass = $registrations[0]->class;
+        $targetClass = $target->class;
         $registry2->unregisterByClass($targetClass);
 
         $this->assertLessThan($totalBeforeClass, count($this->registeredHooks()), 'Total hook count should decrease after unregisterByClass');
@@ -408,9 +416,6 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         ));
 
         $this->assertGreaterThan(0, $expectedRemoved, 'Fixture hooks should exist to unregister');
-
-        $GLOBALS['__wplokerbjm_registered_hooks'] = [];
-
         $registry = $this->createRegistry($registrations, $container);
         $registry->initialize();
         $before = count($this->registeredHooks());

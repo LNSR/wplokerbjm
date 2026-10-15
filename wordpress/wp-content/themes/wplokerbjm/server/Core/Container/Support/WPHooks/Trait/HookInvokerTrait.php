@@ -1,6 +1,7 @@
 <?php
 
 declare(strict_types=1);
+
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
@@ -10,6 +11,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     RuntimeInstancePropertyHookInvoker,
     RuntimeCallableHookInvoker
 };
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -26,12 +28,17 @@ trait HookInvokerTrait
     /** @var string pathway to callback for observability purpose */
     public readonly string $label;
     /** @var 'action'|'filter' */
-    private readonly string $type;
-    private readonly bool $once;
-    
-    public int $numberExecutions = 0;
-    
-    /** @var \Closure|null Callback that nukes this registration once consumed (once-hook) or the owner dies (lifetime scoping). */
+    public readonly string $type;
+    public readonly bool $once;
+    public private(set) int $numberExecutions = 0;
+    /** Current hook callback execution */
+    public private(set) bool $dispatching = false;
+
+    /** 
+     * @var (\Closure(static): void)|null Callback that nukes this registration once consumed (once-hook) or the owner dies (lifetime scoping). 
+     * @see WPHooksContainerRegistry::$removeOnceEntry
+     * @see WPHooksInstanceRegistry::$removeRuntimeHook
+     */
     private ?\Closure $removeCallback = null;
 
     /** Whether the once-hook has been consumed (first fire reached gate evaluation). */
@@ -47,7 +54,7 @@ trait HookInvokerTrait
      * can nuke its own registration when consumed (once) or when the owner
      * instance dies (runtime lifetime scoping).
      *
-     * @param \Closure|null $callback Registry-side removal callback.
+     * @param \Closure(static): void $callback Registry-side removal callback.
      */
     public function setRemoveCallback(?\Closure $callback): void
     {
@@ -67,9 +74,14 @@ trait HookInvokerTrait
         $this->removed = true;
 
         try {
-            ($this->removeCallback)();
+            ($this->removeCallback)($this);
         } catch (\Throwable $e) {
-            Logger::error(static::class, 'Error removing once-hook ' . $this->label . ': ' . $e->getMessage());
+            Logger::error(static::class, 'Error removing once-hook ' . $this->label . ': ', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
         }
     }
 

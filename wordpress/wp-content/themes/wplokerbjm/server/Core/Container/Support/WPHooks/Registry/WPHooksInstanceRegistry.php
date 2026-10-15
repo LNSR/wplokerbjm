@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
 
+use ArrayObject;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionProperty;
 use Brick\VarExporter\VarExporter;
-use RuntimeHandlerEntry;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstancePropertyHookInvoker, RuntimeInstanceHookInvoker, RuntimeCallableHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
@@ -17,7 +17,6 @@ use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
-use WPLokerBJM\Core\Container\Support\WPHooks\DeferredHookEntryDTO;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
@@ -67,6 +66,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
  * @phpstan-import-type CallableHookParams from HookProviderTrait
  * @phpstan-import-type CallablePlan from HookProviderTrait
  * @template THookName of string
+ * @template TLabel of string
  */
 class WPHooksInstanceRegistry
 {
@@ -88,14 +88,14 @@ class WPHooksInstanceRegistry
      * @var \WeakMap<object, bool>
      */
     private \WeakMap $scanned;
-    /** @var array<THookName, list<RuntimeRegistryHandlerEntry>> */
+    /** @var list<RuntimeRegistryHandlerEntry> */
     public private(set) array $queuedRemovalEntry = [];
 
     public function __construct(
         private HookRuntimeResolver $runtimeResolver = new HookRuntimeResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
         public ?WPHooksInstanceObjectCache $cache = null,
-        private readonly ?RuntimeWPHookProvider $provider = null,
+        private ?RuntimeWPHookProvider $provider = null,
     ) {
         $this->weakRegistry = new \WeakMap();
         $this->scanned = new \WeakMap();
@@ -143,7 +143,7 @@ class WPHooksInstanceRegistry
         $ref = new ReflectionClass($instance);
         $this->scanMethodHooks(
             $ref,
-            function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records, &$metadata, &$hasDeferred, &$hookKey): void {
+            function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records, &$metadata, &$hasDeferred): void {
                 $hook = $this->provider !== null && $attr->hook instanceof \Closure
                     ? $this->provider->resolveRuntimeHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $method->getName())
                     : $this->runtimeResolver->resolveClosureHook($attr->hook, $instance, $method->getName());
@@ -151,7 +151,7 @@ class WPHooksInstanceRegistry
                     return;
                 }
                 $hookKey = new HookKey(
-                    class: spl_object_hash($instance),
+                    class: \spl_object_hash($instance),
                     method: $method->getName(),
                     target: 'method',
                     type: $attr instanceof Action ? 'action' : 'filter',
@@ -198,6 +198,7 @@ class WPHooksInstanceRegistry
                     method: $method->getName(),
                     visibility: $visibility,
                     type: $type,
+                    acceptedArgs: $attr->acceptedArgs,
                     executeIf: $attr->executeIf,
                     hookPlanProvider: $this->provider,
                     executeIfParams: $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
@@ -207,6 +208,7 @@ class WPHooksInstanceRegistry
 
                 $record = new RuntimeRegistryHandlerEntry(
                     handler: $handler,
+                    hookKey: $hookKey,
                     hook: $hook,
                     priority: $attr->priority,
                     type: $type,
@@ -214,7 +216,7 @@ class WPHooksInstanceRegistry
                     owner: \WeakReference::create($instance),
                     callback: null,
                 );
-                $handler->setRemoveCallback(fn() => $this->removeRuntimeHook($record));
+                $handler->setRemoveCallback(($this->removeRuntimeHook)($record));
 
                 if ($attr->deferRegisterUntilHook !== null) {
                     $hasDeferred = true;
@@ -236,7 +238,7 @@ class WPHooksInstanceRegistry
                 }
 
                 $hookKey = new HookKey(
-                    class: spl_object_hash($instance),
+                    class: \spl_object_hash($instance),
                     method: $target,
                     target: $property->getName(),
                     type: $attr instanceof Action ? 'action' : 'filter',
@@ -283,6 +285,7 @@ class WPHooksInstanceRegistry
                     property: $property->getName(),
                     visibility: $visibility,
                     type: $type,
+                    acceptedArgs: $attr->acceptedArgs,
                     executeIf: $attr->executeIf,
                     hookPlanProvider: $this->provider,
                     executeIfParams: $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
@@ -291,6 +294,7 @@ class WPHooksInstanceRegistry
                 );
                 $record = new RuntimeRegistryHandlerEntry(
                     handler: $handler,
+                    hookKey: $hookKey,
                     hook: $hook,
                     priority: $attr->priority,
                     type: $type,
@@ -298,7 +302,7 @@ class WPHooksInstanceRegistry
                     owner: \WeakReference::create($instance),
                     callback: null,
                 );
-                $handler->setRemoveCallback(fn() => $this->removeRuntimeHook($record));
+                $handler->setRemoveCallback(($this->removeRuntimeHook)($record));
 
                 if ($attr->deferRegisterUntilHook !== null) {
                     $hasDeferred = true;
@@ -332,15 +336,21 @@ class WPHooksInstanceRegistry
     {
         $this->unregisterMatchingDeferredEntries(
             $this->entriesIndexer->byClass[\spl_object_hash($instance)] ?? [],
-            static fn(DeferredHookEntryDTO $data): bool => $data->instance?->get() === $instance,
+            static fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
         );
 
         if (!isset($this->weakRegistry[$instance])) {
+            unset($this->entriesIndexer->byClass[\spl_object_hash($instance)]);
             return;
         }
 
         foreach ($this->weakRegistry[$instance] as $record) {
             $record->unregister();
+        }
+
+        foreach ($this->queuedRemovalEntry as $idx => $entry) {
+            $entry->owner?->get() === $instance && $entry->unregister();
+            unset($this->queuedRemovalEntry[$idx]);
         }
 
         unset($this->weakRegistry[$instance]);
@@ -401,6 +411,7 @@ class WPHooksInstanceRegistry
                     method: $entry->targetName,
                     visibility: $entry->visibility,
                     type: $entry->type,
+                    acceptedArgs: $entry->acceptedArgs,
                     executeIf: $entry->executeIf,
                     hookPlanProvider: $this->provider,
                     executeIfParams: $entry->executeIfParams,
@@ -414,6 +425,7 @@ class WPHooksInstanceRegistry
                     property: $entry->targetName,
                     visibility: $entry->visibility,
                     type: $entry->type,
+                    acceptedArgs: $entry->acceptedArgs,
                     executeIf: $entry->executeIf,
                     hookPlanProvider: $this->provider,
                     executeIfParams: $entry->executeIfParams,
@@ -423,13 +435,21 @@ class WPHooksInstanceRegistry
             };
             $record = new RuntimeRegistryHandlerEntry(
                 handler: $handler,
+                hookKey: new HookKey(
+                    class: \spl_object_hash($instance),
+                    method: $entry->targetName,
+                    target: $entry->target,
+                    priority: $entry->priority,
+                    type: $entry->type,
+                    acceptedArgs: $entry->acceptedArgs,
+                ),
                 hook: $entry->hook,
                 priority: $entry->priority,
                 type: $entry->type,
                 acceptedArgs: $entry->acceptedArgs,
                 owner: \WeakReference::create($instance),
             );
-            $handler->setRemoveCallback(fn() => $this->removeRuntimeHook($record));
+            $handler->setRemoveCallback(($this->removeRuntimeHook)($record));
 
             $records[] = $record->register();
         }
@@ -464,7 +484,7 @@ class WPHooksInstanceRegistry
             }
         }
 
-        $this->addDeferred(new DeferredHookEntryDTO(
+        $deferredEntry = new DeferredHookEntryHandler(
             hook: $hook,
             key: $hookKey,
             handler: $handler,
@@ -478,19 +498,22 @@ class WPHooksInstanceRegistry
             executeIfParams: $this->provider !== null ? $this->provider->buildCallablePlan($attr->executeIf) : [],
             once: $attr->once,
             instance: \WeakReference::create($instance),
-        ));
+        );
+        $this->addDeferred($deferredEntry);
+
+        $deferredKey = $deferredEntry->toUniqueKey();
 
         if (did_action($triggerHook)) {
             $this->activateMatchingDeferredEntries(
-                $this->entriesIndexer->byHook[$hook] ?? [],
+                [$deferredKey],
                 $this->activateRuntimeEntry,
             );
             return;
         }
 
-        $listener = function () use ($triggerHook, $hook): void {
+        $listener = function () use ($triggerHook, $deferredKey): void {
             $activated = $this->activateMatchingDeferredEntries(
-                $this->entriesIndexer->byHook[$hook] ?? [],
+                [$deferredKey],
                 $this->activateRuntimeEntry,
             );
 
@@ -507,11 +530,11 @@ class WPHooksInstanceRegistry
     /**
      * Activate a deferred runtime entry: register the handler with WordPress
      * and record it under the owner instance.
-     * @var \Closure(string, DeferredHookEntryDTO, string): bool
+     * @var \Closure(string, DeferredHookEntryHandler, string): bool
      * @return bool True when the entry was activated.
      */
     private \Closure $activateRuntimeEntry {
-        get => $this->activateRuntimeEntry ??= function (DeferredHookEntryDTO $data): bool {
+        get => $this->activateRuntimeEntry ??= function (DeferredHookEntryHandler $data): bool {
             $owner = $data->instance?->get();
             if ($owner === null) {
                 return false;
@@ -519,6 +542,7 @@ class WPHooksInstanceRegistry
 
             $record = new RuntimeRegistryHandlerEntry(
                 handler: $data->handler,
+                hookKey: $data->key,
                 hook: $data->hook,
                 priority: $data->priority,
                 type: $data->type,
@@ -542,53 +566,68 @@ class WPHooksInstanceRegistry
      * instance-lifetime cleanup). The owner is passed as a WeakReference so
      * the callback never keeps the instance alive — only the record drop
      * touches it, and only when it still exists.
-     *
-     * @param RuntimeRegistryHandlerEntry $entry Registry entry holding the handler and metadata.
+     * @internal
      */
-    private function removeRuntimeHook(RuntimeRegistryHandlerEntry $entry): void
+    private \Closure $removeRuntimeHook {
+        get {
+            return $this->removeRuntimeHook ??= function (RuntimeRegistryHandlerEntry $entry): \Closure {
+                /** @var array<TLabel, RuntimeRegistryHandlerEntry> */
+                static $entries = new \ArrayObject();
+                static $cb;
+                $entries[\spl_object_id($entry->handler)] = $entry;
+                return $cb ??= function (
+                    RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker
+                ) use ($entries): void {
+                    $entry = $entries[\spl_object_id($invoker)] ?? null;
+
+                    /**
+                     * Skip unregister hook while still in the same callback stack
+                     * 
+                     * Skip the WordPress-side removal while the hook is being dispatched:
+                     * remove_action during dispatch corrupts WP_Hook's iteration
+                     * (resort_active_iterations skips the immediately-following priority).
+                     * The consumed flag already prevents re-firing, so the callback can
+                     * safely linger in $wp_filter until the next invoker order.
+                     * @link https://core.trac.wordpress.org/ticket/61263
+                     * @link https://core.trac.wordpress.org/ticket/64653
+                     */
+                    switch ($entry->stillDispatchingSameHook()) {
+                        case true:
+                            $this->queuedRemovalEntry[] = $entry;
+                            static $schedulerDispatched = false;
+                            static $cb;
+                            !$schedulerDispatched && \add_action('all', $cb ??= function () use (&$schedulerDispatched) {
+                                $schedulerDispatched = true;
+                                foreach ($this->queuedRemovalEntry as $idx => $entry) {
+                                    if ($entry->isCurrentlyExecuting()) continue;
+                                    $entry->unregister();
+                                    SharedUtils::isDevelopment() && Logger::info(__METHOD__, 'Unregistering queued ONCE entry: ' . $entry->handler->label);
+                                    unset($this->queuedRemovalEntry[$idx]);
+                                }
+                                if ($this->queuedRemovalEntry !== []) return;
+                                \remove_action('all', \Closure::getCurrent(), \PHP_INT_MIN);
+                                $schedulerDispatched = false;
+                            }, \PHP_INT_MIN);
+                            break;
+                        default:
+                            $entry->unregister();
+                            break;
+                    }
+                    $this->cleanUpInstance($entry);
+                    unset($entries[\spl_object_id($invoker)]);
+                };
+            };
+        }
+    }
+
+    private function cleanUpInstance(RuntimeRegistryHandlerEntry $entry): void
     {
-        #region next new `once` with new hook name iteration
-        /**
-         *  Temporary solution till bug fixed upstream
-         * ? In Invokers its `finallly` perhaps?
-         */
-        if ($this->queuedRemovalEntry !== []) {
-            foreach ($this->queuedRemovalEntry as $hookName => $entries) {
-                if (\doing_filter($hookName)) {
-                    continue;
-                }
-
-                foreach ($entries as $entry) {
-                    $entry->unregister();
-                }
-
-                unset($this->queuedRemovalEntry[$hookName]);
-            }
-        }
-        #endregion
-
-        /**
-         * Skip unregister hook while still in the same hook stack
-         * 
-         * Skip the WordPress-side removal while the hook is being dispatched:
-         * remove_action during dispatch corrupts WP_Hook's iteration
-         * (resort_active_iterations skips the immediately-following priority).
-         * The consumed flag already prevents re-firing, so the callback can
-         * safely linger in $wp_filter until the request ends.
-         * @link https://core.trac.wordpress.org/ticket/61263
-         */
-        // !$entry->stillDispatchingSameHook() && $entry->unregister();
-        if ($entry->stillDispatchingSameHook()) {
-            $this->queuedRemovalEntry[$entry->hook][] = $entry;
-        }
-
-        $owner = $entry->owner->get();
-        if ($owner !== null && isset($this->weakRegistry[$owner])) {
-            $this->weakRegistry[$owner] = array_values(array_filter(
-                $this->weakRegistry[$owner],
-                static fn(RuntimeRegistryHandlerEntry $record): bool => $record !== $entry,
-            ));
-        }
+        $owner = $entry->owner?->get();
+        if ($owner === null || !isset($this->weakRegistry[$owner])) return;
+        $this->weakRegistry[$owner] = array_values(array_filter(
+            $this->weakRegistry[$owner],
+            static fn(RuntimeRegistryHandlerEntry $record): bool => $record !== $entry,
+        ));
     }
 
     /**
@@ -597,7 +636,7 @@ class WPHooksInstanceRegistry
      * the gate, so the entry is allowed (mirrors the container path's defer
      * semantics).
      */
-    private function gateDeferredActivation(DeferredHookEntryDTO $data): bool
+    private function gateDeferredActivation(DeferredHookEntryHandler $data): bool
     {
         $registerIf = $data->registerIf ?? null;
         if ($registerIf === null || $this->provider === null) {
@@ -774,7 +813,7 @@ class WPHooksInstanceRegistry
         }
         $hookKey = new HookKey(
             class: \spl_object_hash($owner),
-            method: '#manual-registration',
+            method: '#manual-registration:' . $this->manualRegistrationIdentity($callback),
             target: '#manual',
             type: $type,
             priority: $priority,
@@ -787,10 +826,12 @@ class WPHooksInstanceRegistry
             priority: $priority,
             executeIf: $executeIf,
             type: $type,
+            acceptedArgs: $acceptedArgs,
             once: $once,
         );
         $record = new RuntimeRegistryHandlerEntry(
             handler: $handler,
+            hookKey: $hookKey,
             hook: $hook,
             priority: $priority,
             type: $type,
@@ -800,7 +841,7 @@ class WPHooksInstanceRegistry
         );
 
         if ($once) {
-            $handler->setRemoveCallback(fn() => $this->removeRuntimeHook($record));
+            $handler->setRemoveCallback(($this->removeRuntimeHook)($record));
         }
 
         if ($deferRegisterUntilHook !== null) {
@@ -810,6 +851,27 @@ class WPHooksInstanceRegistry
 
         $existing[] = $record->register();
         $this->weakRegistry[$owner] = $existing;
+    }
+
+    /**
+     * Stable per-callback identity used to disambiguate manual registrations.
+     *
+     * Manual registrations share the same hook/type/priority/acceptedArgs and
+     * carry no class/method pair, so their HookKey needs a callback-derived
+     * fingerprint to stay unique inside the deferred pool.
+     *
+     * @param callable|array $callback Registered callback.
+     */
+    private function manualRegistrationIdentity(callable $callback): string
+    {
+        return match (true) {
+            is_array($callback) => (is_object($callback[0])
+                ? $callback[0]::class . '#' . \spl_object_hash($callback[0])
+                : (string) $callback[0]) . '::' . $callback[1],
+            is_string($callback) => $callback,
+            is_object($callback) => $callback::class . '#' . \spl_object_hash($callback),
+            default => 'callable',
+        };
     }
 
     /**
@@ -840,7 +902,7 @@ class WPHooksInstanceRegistry
                 return;
             }
         }
-        $dtoEntry = new DeferredHookEntryDTO(
+        $dtoEntry = new DeferredHookEntryHandler(
             hook: $hook,
             key: $hookKey,
             handler: $handler,
@@ -857,17 +919,19 @@ class WPHooksInstanceRegistry
         );
         $this->addDeferred($dtoEntry);
 
+        $deferredKey = $dtoEntry->toUniqueKey();
+
         if (did_action($triggerHook)) {
             $this->activateMatchingDeferredEntries(
-                $this->entriesIndexer->byHook[$hook] ?? [],
+                [$deferredKey],
                 $this->activateRuntimeEntry,
             );
             return;
         }
 
-        $listener = function () use ($triggerHook, $hook): void {
+        $listener = function () use ($triggerHook, $deferredKey): void {
             $activated = $this->activateMatchingDeferredEntries(
-                $this->entriesIndexer->byHook[$hook] ?? [],
+                [$deferredKey],
                 $this->activateRuntimeEntry,
             );
 

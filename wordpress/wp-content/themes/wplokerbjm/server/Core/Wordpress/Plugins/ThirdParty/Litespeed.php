@@ -63,7 +63,7 @@ final class Litespeed implements PluginConfigInterface
     /**
      * Override LiteSpeed's mobile detection to use TinyWP Mobile Detect's enhanced wp_is_mobile().
      */
-    #[Filter('litespeed_is_mobile')]
+    #[Filter('litespeed_is_mobile', once: true)]
     public function isMobile(): bool
     {
         return wp_is_mobile();

@@ -10,6 +10,15 @@ use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryHandlerEntry, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 
+trait HandlerEntryUniqueKey
+{
+    public function toUniqueKey(): string
+    {
+        return $this->hook . ':' . $this->key->toString();
+    }
+}
+
+
 /**
  * Immutable structural shared structure keys.
  *
@@ -62,21 +71,6 @@ final readonly class HookKey extends AbstractDataObject
     {
         return $this->class . '::' . $this->method . '::' . $this->target
             . '::' . $this->type . '::' . $this->priority . '::' . $this->acceptedArgs;
-    }
-
-    public function __toString(): string
-    {
-        return $this->toString();
-    }
-
-    public function isForClass(string $class): bool
-    {
-        return $this->class === $class;
-    }
-
-    public function isForCallable(string $class, string $method): bool
-    {
-        return $this->class === $class && $this->method === $method;
     }
 
     public function isWithinNamespace(string $namespace): bool
@@ -244,85 +238,5 @@ readonly class InstanceHookMetadata extends AbstractDataObject
         public string $targetName = '',
         public string $visibility = 'public',
     ) {}
-}
-#endregion
-
-#region Deferred Hook metadata DTOs
-/*======================================================================
- | Deferred Hook metadata DTOs
- ======================================================================*/
-/**
- * @phpstan-import-type HookType from HookRegistration
- * @phpstan-type AvailaibleHandlerType ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker
- * @phpstan-type DeferredHookEntry array{
- *     hook: string,
- *     key: HookKey,
- *     handler: AvailaibleHandlerType,
- *     type: HookType['type'],
- *     priority: HookType['priority'],
- *     acceptedArgs: HookType['acceptedArgs'],
- *     tags: HookType['tags'],
- *     registerIf: HookType['registerIf'],
- *     registerIfParams: HookType['registerIfParams'],
- *     executeIf: HookType['executeIf'],
- *     executeIfParams: HookType['executeIfParams'],
- *     once: HookType['once'],
- *     instance: WeakReference<object>
- * }>>
- * @extends parent<DeferredHookEntry>
- */
-final readonly class DeferredHookEntryDTO extends AbstractDataObject
-{
-    /**
-     * @param DeferredHookEntry['hook'] $hook
-     * @param DeferredHookEntry['key'] $key Exclusive for @see WPHooksContainerRegistry
-     * @param DeferredHookEntry['handler'] $handler
-     * @param DeferredHookEntry['type'] $type
-     * @param DeferredHookEntry['priority'] $priority
-     * @param DeferredHookEntry['acceptedArgs'] $acceptedArgs
-     * @param DeferredHookEntry['tags'] $tags
-     * @param DeferredHookEntry['registerIf'] $registerIf
-     * @param DeferredHookEntry['registerIfParams'] $registerIfParams
-     * @param DeferredHookEntry['executeIf'] $executeIf
-     * @param DeferredHookEntry['executeIfParams'] $executeIfParams
-     * @param DeferredHookEntry['once'] $once
-     * @param DeferredHookEntry['instance'] $instance Exclusive for @see WPHooksInstanceRegistry
-     */
-    public function __construct(
-        public string $hook,
-        public ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
-        public string $type,
-        public int $priority,
-        public int $acceptedArgs,
-        public array $tags,
-        public ?\Closure $registerIf,
-        public array $registerIfParams,
-        public ?\Closure $executeIf,
-        public array $executeIfParams,
-        public bool $once,
-        public HookKey $key,
-        public ?WeakReference $instance = null
-    ) {}
-    public static function fromContainerRegistryHandlerEntry(ContainerRegistryHandlerEntry $entry): self
-    {
-        return new self(
-            hook: $entry->hook,
-            key: $entry->key,
-            handler: $entry->handler,
-            type: $entry->type,
-            priority: $entry->priority,
-            acceptedArgs: $entry->acceptedArgs,
-            tags: $entry->tags,
-            registerIf: $entry->registerIf,
-            registerIfParams: $entry->registerIfParams,
-            executeIf: $entry->executeIf,
-            executeIfParams: $entry->executeIfParams,
-            once: $entry->once,
-        );
-    }
-    public function toUniqueKey(): string
-    {
-        return $this->hook . ':' . $this->key->toString();
-    }
 }
 #endregion
