@@ -34,8 +34,8 @@
 - `ContainerLazyHookInvoker` / `ContainerLazyPropertyHookInvoker` — resolve services at fire time; support `executeIf` and private/protected access (`Invoker/ContainerLazyHookInvoker.php`).
 - `RuntimeInstanceHookInvoker` / `RuntimeInstancePropertyHookInvoker` — retain an existing object and invoke its member; `WeakReference` owner with GC self-cleanup (`Invoker/RuntimeHookInvoker.php`).
 - `RuntimeCallableHookInvoker` — wraps manual runtime callbacks and direct `executeIf` conditions (`Invoker/RuntimeHookInvoker.php`).
-- `HookInvokerTrait` — shared once/removal plumbing (`setRemoveCallback`, `consumed`/`removed` guards), `buildHookArgs` named args, `filterPassthrough` (`Trait/HookInvokerTrait.php`).
-- `RuntimeInstanceInvokerTrait` — runtime `__invoke` pipeline + `consumeLifetime()` GC nuke (`Invoker/RuntimeHookInvoker.php`).
+- `HookInvokerTrait` — shared once/removal plumbing (`setCleanupCallback`, `consumed`/`removed` guards), `buildHookArgs` named args, `filterPassthrough` (`Trait/HookInvokerTrait.php`).
+- `RuntimeInstanceInvokerTrait` — runtime `__invoke` pipeline + `consumeLifetimeAndClean()` GC nuke (`Invoker/RuntimeHookInvoker.php`).
 - `ContainerLazyHookInvokerTrait` — `executeHook()` pipeline; unresolvable gate on a once-hook is treated as pass (`Invoker/ContainerLazyHookInvoker.php`).
 - `DeferredHooksTrait` — shared deferred pool: `addDeferred`, `activateMatchingDeferredEntries`, `unregisterMatchingDeferredEntries`, abstract `gateDeferredActivation` (`Trait/DeferredHooksTrait.php`).
 - `HookProviderTrait` — shared plan core for both providers: `buildCallablePlan`, `resolveHookName`, `evaluateExecuteIf`, `evaluateRegistrationGate`, `resolveTagCallable`, `callableParamNames` (`Trait/HookProviderTrait.php`).

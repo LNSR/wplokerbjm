@@ -4,8 +4,9 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyHookInvoker;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyPropertyHookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{RuntimeRegistryHandlerEntry, ContainerRegistryHandlerEntry};
-
 /**
  * @mixin ContainerRegistryHandlerEntry&RuntimeRegistryHandlerEntry
  */
@@ -38,5 +39,10 @@ trait HandlerEntryTrait
             'filter' => doing_filter($this->hook),
             default => false,
         };
+    }
+
+    public function isCurrentlyExecuting(): bool
+    {
+        return $this->handler->dispatching;
     }
 }

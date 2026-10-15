@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookEntryHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
-use WPLokerBJM\Core\Container\Support\WPHooks\DeferredHookEntryDTO;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 
 
@@ -26,7 +26,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker,
  * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-import-type ActivateEntry from WPHooksContainerRegistry
  * @template TKey
- * @phpstan-type IndexedHandler array<TKey, DeferredHookEntryDTO>
+ * @phpstan-type IndexedHandler array<TKey, DeferredHookEntryHandler>
  * @internal
  */
 trait DeferredHooksTrait
@@ -42,7 +42,7 @@ trait DeferredHooksTrait
      * Store a deferred hook entry under its unique key.
      * @internal
      */
-    private function addDeferred(DeferredHookEntryDTO $entry): void
+    private function addDeferred(DeferredHookEntryHandler $entry): void
     {
         $this->deferredHandlers[$entry->toUniqueKey()] = $entry;
         $this->entriesIndexer->setIndexes($entry);
@@ -71,6 +71,7 @@ trait DeferredHooksTrait
                 continue;
             }
             $activated++;
+            $this->entriesIndexer->removeIndexes($entry);
             unset($this->deferredHandlers[$key]);
         }
         return $activated;
@@ -79,7 +80,7 @@ trait DeferredHooksTrait
     /**
      * Sweep the deferred pool and remove every entry matching the predicate.
      * @param list<TKey> $keys
-     * @param callable(DeferredHookEntryDTO): bool $matches Predicate over ($hook, $entry, $key).
+     * @param callable(DeferredHookEntryHandler): bool $matches Predicate over ($hook, $entry, $key).
      */
     private function unregisterMatchingDeferredEntries(array $keys, callable $matches): void
     {
@@ -90,6 +91,7 @@ trait DeferredHooksTrait
             if (!$matches($entry)) {
                 continue;
             }
+            $this->entriesIndexer->removeIndexes($entry);
             unset($this->deferredHandlers[$key]);
         }
     }
@@ -97,5 +99,5 @@ trait DeferredHooksTrait
     /**
      * Re-evaluate the registration gate for a deferred entry at activation time.
      */
-    abstract protected function gateDeferredActivation(DeferredHookEntryDTO $data): bool;
+    abstract protected function gateDeferredActivation(DeferredHookEntryHandler $data): bool;
 }

@@ -68,18 +68,26 @@ class CachePurgeHandler
                     }
 
                     $postId = (int) $post->ID;
-
                     if (isset($this->snapshotPostID[$postId])) {
                         return;
                     }
 
-                    $this->snapshotPostID[$postId] = true;
-
-                    Cache::deleteMultiple([
-                        CacheKey::JOB_DATA_PREFIX . $postId,
-                        CacheKey::GRAPHQL_JOB_CARD_PREFIX . $postId,
-                        CacheKey::JOB_SCHEMA_PREFIX . $postId,
-                    ]);
+                    try {
+                        $this->snapshotPostID[$postId] = true;
+                        Cache::deleteMultiple([
+                            CacheKey::JOB_DATA_PREFIX . $postId,
+                            CacheKey::GRAPHQL_JOB_CARD_PREFIX . $postId,
+                            CacheKey::JOB_SCHEMA_PREFIX . $postId,
+                        ]);
+                    } catch (\Throwable $e) {
+                        Logger::error($this->constructCurrentClassIdentity(), 'Error:', [
+                            'message' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                            'code' => $e->getCode(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                        ]);
+                    }
                 }
             };
         }
@@ -137,8 +145,14 @@ class CachePurgeHandler
                         CacheKey::GRAPHQL_ETAG_PREFIX . '*',
                         CacheKey::THEME_DATA . '*',
                     ]);
-                } catch (\Exception $e) {
-                    Logger::error(static::class, '::' . $__propertyName . ' Error: ' . $e->getMessage());
+                } catch (\Throwable $e) {
+                    Logger::error(static::class, '::' . $__propertyName . ' Error: ', [
+                        'message' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'code' => $e->getCode(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ]);
                 }
             };
         }

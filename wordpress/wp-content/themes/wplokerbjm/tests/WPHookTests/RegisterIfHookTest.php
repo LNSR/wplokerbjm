@@ -184,7 +184,7 @@ class RegisterIfHookTest extends WplokerbjmTestCase
         // Null gate → empty plan.
         $nullPlan = $this->planProvider->buildCallablePlan(null);
         self::assertSame([], $nullPlan['params']);
-        self::assertNull($nullPlan['scopeClass']);
+        self::assertTrue($nullPlan['isStatic']);
     }
 
     /**

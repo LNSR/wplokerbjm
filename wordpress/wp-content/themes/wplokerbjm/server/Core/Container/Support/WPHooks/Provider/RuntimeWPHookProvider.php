@@ -19,8 +19,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
  * (warn + skip).
  *
  * Attribute-argument closures are static and already scoped to the declaring
- * class (PHP 8.1 RFC 'Closures in constant expressions'), so private members
- * resolve via self:: and no instance binding is needed.
+ * class resolve via self:: and no instance binding is needed.
  * @phpstan-import-type CallableHookParams from HookProviderTrait
  */
 class RuntimeWPHookProvider

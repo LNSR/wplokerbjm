@@ -27,7 +27,6 @@ use \CompiledContainer;
  *
  * @see Action
  * @see Filter
- * @see \WPLokerBJM\Bootstrap
  */
 class WPHooksScanner
 {

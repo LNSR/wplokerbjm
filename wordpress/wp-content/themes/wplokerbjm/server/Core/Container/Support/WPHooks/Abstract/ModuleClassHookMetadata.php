@@ -5,11 +5,14 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Abstract;
 
 use Override;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryEvent;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
- * Opt-in interface for anonymous classes and classes not found in container that need to register hooks.
+ * interface for anonymous classes and classes not found in container that need to register hooks.
+ * * @see WPHooksInstanceRegistry Primarily used for identity to register hooks found inside class
+ * * @see WPHooksContainerRegistry by implementing __invoke as invocable object
  *
  * Extending this class captures the parent class and property name at
  * construction time so the hook registry can resolve the target without

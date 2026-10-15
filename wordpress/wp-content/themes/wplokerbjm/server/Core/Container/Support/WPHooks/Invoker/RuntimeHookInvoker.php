@@ -31,19 +31,24 @@ trait RuntimeInstanceInvokerTrait
 
     public function __invoke(mixed ...$args): mixed
     {
+
         try {
+            $this->dispatching = true;
+
             $instance = $this->instanceRef->get();
             if ($instance === null) {
                 // Owner instance is gone — nuke the hook (instance-lifetime scoping).
-                $this->consumeLifetime();
+                $this->consumeLifetimeAndClean();
                 return $this->filterPassthrough($args);
             }
 
             if ($this->once) {
                 if ($this->consumed) {
+                    $this->consumeOnceAndClean();
                     return $this->filterPassthrough($args);
                 }
                 $this->consumed = true;
+                $this->consumeOnceAndClean();
             }
 
             if ($this->executeIf !== null) {
@@ -63,7 +68,6 @@ trait RuntimeInstanceInvokerTrait
                         static::class,
                         'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                     );
-                    $this->consumeOnce();
                     return $this->filterPassthrough($args);
                 }
             }
@@ -71,15 +75,23 @@ trait RuntimeInstanceInvokerTrait
             $result = $this->invokeOn($instance, ...$args);
 
             SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed ' . ++$this->numberExecutions . ' times');
-            $this->consumeOnce();
+
             return $result;
         } catch (\Throwable $e) {
-            $this->consumeOnce();
             Logger::error(
                 static::class,
-                'Error invoking hook ' . $this->label . ': ' . $e->getMessage(),
+                'Error invoking hook ' . $this->label . ': ',
+                [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ],
             );
             return $this->filterPassthrough($args);
+        } finally {
+            $this->consumeOnceAndClean();
+            $this->dispatching = false;
         }
     }
 
@@ -88,7 +100,7 @@ trait RuntimeInstanceInvokerTrait
      * (instance-lifetime scoping). Idempotent — shares the $removed guard with
      * the once flow.
      */
-    private function consumeLifetime(): void
+    private function consumeLifetimeAndClean(): void
     {
         if ($this->removed || $this->removeCallback === null) {
             return;
@@ -97,11 +109,17 @@ trait RuntimeInstanceInvokerTrait
         $this->removed = true;
 
         try {
-            ($this->removeCallback)();
+            ($this->removeCallback)($this);
         } catch (\Throwable $e) {
             Logger::error(
                 static::class,
-                'Error removing lifetime hook ' . $this->label . ': ' . $e->getMessage(),
+                'Error removing lifetime hook ' . $this->label . ': ',
+                [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ],
             );
         }
     }
@@ -143,16 +161,17 @@ final class RuntimeInstanceHookInvoker
      */
     public function __construct(
         object $instance,
-        private readonly string $hookName,
-        private readonly int $priority,
-        private readonly string $method,
-        private readonly string $visibility = 'public',
-        private readonly string $type = 'action',
+        public readonly string $hookName,
+        public readonly int $priority,
+        public readonly string $method,
+        public readonly string $visibility = 'public',
+        public readonly string $type = 'action',
+        public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
         private readonly ?RuntimeWPHookProvider $hookPlanProvider = null,
         private readonly array $executeIfParams = [],
         private readonly array $hookArgNames = [],
-        private readonly bool $once = false,
+        public readonly bool $once = false,
     ) {
         // Keep the owner collectible: only a weak reference is retained, so
         // the instance can be garbage-collected while the hook is registered.
@@ -160,8 +179,8 @@ final class RuntimeInstanceHookInvoker
         $this->instanceRef = \WeakReference::create($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->hookName . '::' . (string) $this->priority . '::' . $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->method
-            : $this->hookName . '::' . (string) $this->priority . '::' . $instance::class . '->' . $this->method;
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->method
+            : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '->' . $this->method;
 
         if ($this->visibility !== 'public') {
 
@@ -219,16 +238,17 @@ final class RuntimeInstancePropertyHookInvoker
      */
     public function __construct(
         object $instance,
-        private readonly string $hookName,
-        private readonly int $priority,
-        private readonly string $property,
-        private readonly string $visibility = 'public',
-        private readonly string $type = 'action',
+        public readonly string $hookName,
+        public readonly int $priority,
+        public readonly string $property,
+        public readonly string $visibility = 'public',
+        public readonly string $type = 'action',
+        public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
         private readonly ?RuntimeWPHookProvider $hookPlanProvider = null,
         private readonly array $executeIfParams = [],
         private readonly array $hookArgNames = [],
-        private readonly bool $once = false,
+        public readonly bool $once = false,
     ) {
         // Keep the owner collectible: only a weak reference is retained, so
         // the instance can be garbage-collected while the hook is registered.
@@ -236,8 +256,8 @@ final class RuntimeInstancePropertyHookInvoker
         $this->instanceRef = \WeakReference::create($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->hookName . '::' . (string) $this->priority . '::' . $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->property
-            : $this->hookName . '::' . (string) $this->priority . '::' . $instance::class . '->' . $this->property;
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->property
+            : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '->' . $this->property;
 
         if ($this->visibility !== 'public') {
             // Bind inside the instance's class scope so
@@ -292,13 +312,14 @@ final class RuntimeCallableHookInvoker
      */
     public function __construct(
         private readonly mixed $callback,
-        private readonly string $hookName,
-        private readonly int $priority,
+        public readonly string $hookName,
+        public readonly int $priority,
+        public readonly string $type = 'action',
+        public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
-        private readonly string $type = 'action',
-        private readonly bool $once = false,
+        public readonly bool $once = false,
     ) {
-        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . (is_array($callback)
+        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . (is_array($callback)
             ? get_debug_type($callback[0]) . '::' . $callback[1] : ($callback instanceof \Closure ? 'closure:' . spl_object_hash($callback)
                 : get_debug_type($callback)));
     }
@@ -306,11 +327,15 @@ final class RuntimeCallableHookInvoker
     public function __invoke(mixed ...$args): mixed
     {
         try {
+            $this->dispatching = true;
+
             if ($this->once) {
                 if ($this->consumed) {
+                    $this->consumeOnceAndClean();
                     return $this->filterPassthrough($args);
                 }
                 $this->consumed = true;
+                $this->consumeOnceAndClean();
             }
 
             if ($this->executeIf !== null) {
@@ -328,7 +353,6 @@ final class RuntimeCallableHookInvoker
                         'RuntimeCallableHookInvoker',
                         'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                     );
-                    $this->consumeOnce();
                     return $this->filterPassthrough($args);
                 }
             }
@@ -338,17 +362,23 @@ final class RuntimeCallableHookInvoker
             $result = $callback(...$args);
 
             SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed ' . ++$this->numberExecutions . ' times');
-            $this->consumeOnce();
-
             return $result;
         } catch (\Throwable $e) {
-            $this->consumeOnce();
             Logger::error(
                 'RuntimeCallableHookInvoker',
-                'Error invoking hook ' . $this->label . ': ' . $e->getMessage(),
+                'Error invoking hook ' . $this->label . ': ',
+                [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ],
             );
             // Filters must pass through the first argument; actions are fire-and-forget.
             return $this->filterPassthrough($args);
+        } finally {
+            $this->consumeOnceAndClean();
+            $this->dispatching = false;
         }
     }
 }

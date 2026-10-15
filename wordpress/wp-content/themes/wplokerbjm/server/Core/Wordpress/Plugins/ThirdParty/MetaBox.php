@@ -24,8 +24,11 @@ final class MetaBox implements PluginConfigInterface
     #[Action('plugins_loaded')]
     public function boot(): void
     {
-        do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $this->registerCustomModels);
-        do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $this->metaboxBugsPatch);
+        $modules = [$this->registerCustomModels, $this->metaboxBugsPatch];
+        
+        foreach($modules as $idx => $module) {
+            do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $module);
+        }
     }
 
     private ModuleClassHookMetadata $metaboxBugsPatch {
@@ -50,17 +53,17 @@ final class MetaBox implements PluginConfigInterface
             #[Inject]
             private PostTypes $postTypes;
 
-            #[Filter('rwmb_meta_boxes')]
+            #[Filter('rwmb_meta_boxes', 100, once: true)]
             public function registerCustomFields($meta_boxes): void
             {
                 $this->customFields->lowonganCustomFields($meta_boxes);
             }
-            #[Action('init')]
+            #[Action('init', once: true)]
             public function registerPostTypes(): void
             {
                 $this->postTypes->registerLowonganPostType();
             }
-            #[Action('init')]
+            #[Action('init', once: true)]
             public function registerTaxonomies(): void
             {
                 $this->taxonomies->registerAllTaxonomies();

@@ -16,15 +16,16 @@ use PHPUnit\Framework\TestCase;
  *
  * Covered:
  *  - the engine loads and dispatches against WP_Hook
- *  - core ticket #61263: a mid-dispatch remove_action() can make WP_Hook skip
+ *  - core ticket #64653: a mid-dispatch remove_action() can make WP_Hook skip
  *    the priority that immediately follows the removed one — but ONLY while an
  *    earlier (lower) priority survives; the `$current < $min` guard added to
  *    resort_active_iterations() already rescues the isolated-minimum case
  *  - the production strategy (defer the removal until the hook is no longer
  *    dispatching) keeps every consecutive priority firing
  * @link https://core.trac.wordpress.org/ticket/61263
+ * @link https://core.trac.wordpress.org/ticket/64653
  */
-final class TestTracTicket61263 extends TestCase
+final class TestTracTicket64653 extends TestCase
 {
     protected function setUp(): void
     {

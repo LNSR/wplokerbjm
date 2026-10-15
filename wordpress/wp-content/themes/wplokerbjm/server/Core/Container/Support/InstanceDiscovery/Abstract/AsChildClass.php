@@ -42,6 +42,14 @@ abstract class AsChildClass
     /**
      * For Recursive Anon Classes
      * @param property-hook-string<T> $currentClassPropertryIdentifier magic constant
+     * @example
+     * ```php
+     * $instance = new class(parent: __CLASS__, identifier: __PROPERTY__) extends AsChildClass {
+     *  private AsChildClass $depthClass1 {
+     *      get => $this->depthClass1 ??= new class(...$this->createIdentityClass(__PROPERTY__)) extends AsChildClass {};
+     *  }
+     * }
+     * ```
      * @return array
      */
     protected function createIdentityClass(string $currentClassPropertryIdentifier): array

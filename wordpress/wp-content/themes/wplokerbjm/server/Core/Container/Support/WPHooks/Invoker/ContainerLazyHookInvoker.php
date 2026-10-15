@@ -28,16 +28,20 @@ trait ContainerLazyHookInvokerTrait
      */
     private function executeHook(array $args): mixed
     {
-        $hookArgs = $this->buildHookArgs($args);
-
-        if ($this->once) {
-            if ($this->consumed) {
-                return $this->filterPassthrough($args);
-            }
-            $this->consumed = true;
-        }
 
         try {
+            $this->dispatching = true;
+            $hookArgs = $this->buildHookArgs($args);
+
+            if ($this->once) {
+                if ($this->consumed) {
+                    $this->consumeOnceAndClean();
+                    return $this->filterPassthrough($args);
+                }
+                $this->consumed = true;
+                $this->consumeOnceAndClean();
+            }
+
             try {
                 $gatePassed = $this->planProvider->evaluateExecuteIf(
                     $this->executeIf,
@@ -64,7 +68,6 @@ trait ContainerLazyHookInvokerTrait
                     static::class,
                     'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                 );
-                $this->consumeOnce();
                 return $this->filterPassthrough($args);
             }
 
@@ -72,12 +75,18 @@ trait ContainerLazyHookInvokerTrait
             $result = $this->invokeOn($instance, ...$args);
 
             SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed ' . ++$this->numberExecutions . ' times');
-            $this->consumeOnce();
             return $result;
         } catch (\Throwable $e) {
-            $this->consumeOnce();
-            Logger::error(static::class, "Error invoking hook {$this->label}: " . $e->getMessage());
+            Logger::error(static::class, "Error invoking hook {$this->label}: ", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             return $this->filterPassthrough($args);
+        } finally {
+            $this->consumeOnceAndClean();
+            $this->dispatching = false;
         }
     }
 }
@@ -112,19 +121,20 @@ final class ContainerLazyHookInvoker
      */
     public function __construct(
         private readonly ContainerInterface $container,
-        private readonly string $hookName,
-        private readonly int $priority,
-        private readonly string $class,
-        private readonly string $method,
-        private readonly string $visibility = 'public',
-        private readonly string $type = 'action',
+        public readonly string $hookName,
+        public readonly int $priority,
+        public readonly string $class,
+        public readonly string $method,
+        public readonly string $visibility = 'public',
+        public readonly string $type = 'action',
+        public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
         private readonly array $executeIfParams = [],
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
         private readonly array $hookArgNames = [],
-        private readonly bool $once = false,
+        public readonly bool $once = false,
     ) {
-        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . $this->class . '->' . $this->method;
+        $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->method;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
@@ -184,19 +194,20 @@ final class ContainerLazyPropertyHookInvoker
      */
     public function __construct(
         private readonly ContainerInterface $container,
-        private readonly string $hookName,
-        private readonly int $priority,
-        private readonly string $class,
-        private readonly string $property,
-        private readonly string $visibility = 'public',
-        private readonly string $type = 'action',
+        public readonly string $hookName,
+        public readonly int $priority,
+        public readonly string $class,
+        public readonly string $property,
+        public readonly string $visibility = 'public',
+        public readonly string $type = 'action',
+        public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
         private readonly array $executeIfParams = [],
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
         private readonly array $hookArgNames = [],
-        private readonly bool $once = false,
+        public readonly bool $once = false,
     ) {
-        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . $this->class . '->' . $this->property;
+        $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->property;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
