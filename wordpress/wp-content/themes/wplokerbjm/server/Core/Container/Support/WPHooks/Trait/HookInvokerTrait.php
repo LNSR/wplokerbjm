@@ -19,9 +19,6 @@ use WPLokerBJM\Shared\Log\Logger;
  * the runtime instance handlers: the once/removal callback plumbing and the
  * named hook-args builder.
  * @mixin (ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker|RuntimeCallableHookInvoker)
- * @internal consumed via the container's AbstractLazyHookHandlerTrait (in-file)
- * and the runtime's RuntimeInstanceInvokerTrait (in-file) — the gate evaluation
- * and instance resolution stay domain-specific in each invoker file.
  */
 trait HookInvokerTrait
 {

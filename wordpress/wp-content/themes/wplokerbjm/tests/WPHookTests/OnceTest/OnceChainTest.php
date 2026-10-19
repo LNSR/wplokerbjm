@@ -1,11 +1,11 @@
 <?php
+
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests\WPHookTests;
+namespace WPLokerBJM\Tests\WPHookTests\OnceTest;
 
 use DI\Container;
 use DI\ContainerBuilder;
-use WPLokerBJM\Tests\Support\Fixtures\OnceChainService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
@@ -33,17 +33,16 @@ final class OnceChainTest extends WplokerbjmTestCase
     protected function setUp(): void
     {
         parent::setUp();
-
+        /** @suppresswarnings PHP0410 */
+        $this->onceChainService = null;
         $builder = new ContainerBuilder();
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
         $builder->addDefinitions([
-            OnceChainService::class => \DI\autowire(),
+            $this->onceChainService::class => $this->onceChainService,
         ]);
 
         $this->container = $builder->build();
-
-        OnceChainService::reset();
     }
 
     public function testEveryOnceActionOnSameHookFiresAndIsRemoved(): void
@@ -56,12 +55,12 @@ final class OnceChainTest extends WplokerbjmTestCase
         \do_action(self::HOOK);
 
         // No priority may be skipped: all ten once-handlers fired exactly once.
-        $this->assertSame(range(0, 9), OnceChainService::$fired);
+        $this->assertSame(range(0, 9), $this->onceChainService->fired);
         $this->assertNull($this->findRegisteredHook('action', self::HOOK));
 
         // A second dispatch must not re-fire any consumed once-handler.
         \do_action(self::HOOK);
-        $this->assertSame(range(0, 9), OnceChainService::$fired);
+        $this->assertSame(range(0, 9), $this->onceChainService->fired);
     }
 
     public function testQueuedRemovalsLingerUntilExplicitFlush(): void
@@ -75,12 +74,10 @@ final class OnceChainTest extends WplokerbjmTestCase
 
         \do_action(self::HOOK);
 
-        $this->assertSame(range(0, 9), OnceChainService::$fired);
+        $this->assertSame(range(0, 9), $this->onceChainService->fired);
 
         $this->assertNotNull($this->findRegisteredHook('action', self::HOOK));
         $this->flushQueuedRemovals([$registry]);
-        // $this->assertCount(10, $registry->queuedRemovalEntry[self::HOOK] ?? []);
-
 
         $this->assertNull($this->findRegisteredHook('action', self::HOOK));
     }
@@ -94,7 +91,7 @@ final class OnceChainTest extends WplokerbjmTestCase
 
         for ($priority = 0; $priority <= 9; $priority++) {
             $registrations[] = [
-                'class' => OnceChainService::class,
+                'class' => $this->onceChainService::class,
                 'method' => 'p' . $priority,
                 'type' => 'action',
                 'hook' => self::HOOK,
@@ -108,5 +105,65 @@ final class OnceChainTest extends WplokerbjmTestCase
         }
 
         return $registrations;
+    }
+
+
+    private $onceChainService {
+        get {
+            return $this->onceChainService ??= new class {
+                /** @var list<int> */
+                public array $fired = [];
+
+                public function p0(): void
+                {
+                    $this->fired[] = 0;
+                }
+
+                public function p1(): void
+                {
+                    $this->fired[] = 1;
+                }
+
+                public function p2(): void
+                {
+                    $this->fired[] = 2;
+                }
+
+                public function p3(): void
+                {
+                    $this->fired[] = 3;
+                }
+
+                public function p4(): void
+                {
+                    $this->fired[] = 4;
+                }
+
+                public function p5(): void
+                {
+                    $this->fired[] = 5;
+                }
+
+                public function p6(): void
+                {
+                    $this->fired[] = 6;
+                }
+
+                public function p7(): void
+                {
+                    $this->fired[] = 7;
+                }
+
+                public function p8(): void
+                {
+                    $this->fired[] = 8;
+                }
+
+                public function p9(): void
+                {
+                    $this->fired[] = 9;
+                }
+            };
+        }
     }
 }

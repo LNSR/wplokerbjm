@@ -12,6 +12,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\{DependencyInjector, PlanCache, PlanCompiler, ScopeAccessFactory};
+use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 
 /**
  * Core container definitions for the wplokerbjm theme.
@@ -45,9 +46,10 @@ class Core implements DefinitionProviderInterface
 
 
         $core = [
+            QueuedHooksCleaner::class => \DI\autowire(QueuedHooksCleaner::class),
             WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class),
             HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
-            RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class))->lazy(),
+            RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
                 static fn() => \CompiledContainer::METHOD_MAPPING,
                 $namespace,
@@ -58,6 +60,7 @@ class Core implements DefinitionProviderInterface
                 static fn(): string => get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
             ),
             WPHooksInstanceRegistry::class => \DI\autowire(WPHooksInstanceRegistry::class)->constructor(
+                \DI\get(QueuedHooksCleaner::class),
                 \DI\get(HookRuntimeResolver::class),
                 static fn() => new EntriesIndexer(),
                 \DI\get(WPHooksInstanceObjectCache::class),
@@ -75,6 +78,7 @@ class Core implements DefinitionProviderInterface
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(DeferredHookManager::class),
                 \DI\get(HookTargetResolver::class),
+                \DI\get(QueuedHooksCleaner::class),
                 static fn() => new EntriesIndexer(),
             ),
         ];

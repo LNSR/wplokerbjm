@@ -93,8 +93,12 @@ class PluginManager
         WPGraphQL::class,
     ];
 
-    #[Action('muplugins_loaded', 0, once: true)]
-    private function boot(): void
+    #[Action('mu_plugin_loaded', acceptedArgs: 1, executeIf: static function (string $pluginPath): bool {
+        if ($pluginPath !== WPMU_PLUGIN_DIR . '/wplokerbjm-bootstrap.php') return false;
+        do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [__CLASS__, 'boot']);
+        return true;
+    })]
+    private function boot(string $pluginPath): void
     {
         $activeCount = $this->unregisterInactivePluginHooks();
         if ($activeCount === 0) {
@@ -143,7 +147,7 @@ class PluginManager
 
     #region 3rd party choice hooks
     #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function () {
-        return !\is_admin() && (empty($_SERVER['REQUEST_URI']) || !str_contains($_SERVER['REQUEST_URI'], \get_option('graphql_endpoint') ?: '/graphql'));
+        return (!\is_admin() && (empty($_SERVER['REQUEST_URI'])));
     })]
     public function disableWpGraphqlPlugin(array $plugins): array
     {
@@ -152,7 +156,7 @@ class PluginManager
             PluginList::WpGraphqlSmartCache->value,
         ];
         $alreadyUnregistred = false;
-        foreach ($wpGraphQlPlugins as $plugin) {    
+        foreach ($wpGraphQlPlugins as $plugin) {
             $pluginKey = array_search($plugin, $plugins, true);
             if ($pluginKey !== false) {
                 unset($plugins[$pluginKey]);

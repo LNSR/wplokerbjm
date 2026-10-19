@@ -11,6 +11,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
 
 /**
  * Common lifecycle & gate evaluation logic for lazy container hook handlers.
+ * @mixin ContainerLazyHookInvokerTrait&ContainerLazyHookInvoker Trait
  */
 trait ContainerLazyHookInvokerTrait
 {
@@ -35,7 +36,6 @@ trait ContainerLazyHookInvokerTrait
 
             if ($this->once) {
                 if ($this->consumed) {
-                    $this->consumeOnceAndClean();
                     return $this->filterPassthrough($args);
                 }
                 $this->consumed = true;

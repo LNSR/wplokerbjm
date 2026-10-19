@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 use \DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
+use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 
@@ -23,6 +24,7 @@ abstract class WplokerbjmTestCase extends TestCase
      * then flush it explicitly with {@see flushQueuedRemovals()}.
      */
     protected bool $flushQueuedRemovalsAfterDispatch = true;
+    protected QueuedHooksCleaner $queuedHooksCleaner;
 
     /**
      * Registries created during the current test, used to flush queued
@@ -197,14 +199,13 @@ abstract class WplokerbjmTestCase extends TestCase
      */
     protected function flushQueuedRemovals(?array $registries = null): void
     {
-        foreach ($registries ?? $this->trackedRegistries as $registry) {
-            $queued = $registry->queuedRemovalEntry ?? [];
-            if ($queued === []) continue;
+        $queued = $this->queuedHooksCleaner->queuedRemovalEntry ?? [];
+        if ($queued === []) return;
 
-            foreach ($queued as $idx => $entry) {
-                if ($entry->isCurrentlyExecuting()) continue;
-                $entry->unregister();
-            }
+        foreach ($queued as $idx => $entry) {
+            if ($entry->isCurrentlyExecuting()) continue;
+            $entry->unregister();
+            unset($this->queuedHooksCleaner->queuedRemovalEntry[$idx]);
         }
     }
 
@@ -256,6 +257,7 @@ abstract class WplokerbjmTestCase extends TestCase
             $planProvider,
             new DeferredHookManager($planProvider, $container, $resolver, $entriesIndexer),
             $resolver,
+            $this->queuedHooksCleaner = new QueuedHooksCleaner(),
             $entriesIndexer
         );
 

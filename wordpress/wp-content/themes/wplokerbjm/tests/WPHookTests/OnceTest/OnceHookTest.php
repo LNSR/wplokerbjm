@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests\WPHookTests;
+namespace WPLokerBJM\Tests\WPHookTests\OnceTest;
 
 use Closure;
 use DI\Container;

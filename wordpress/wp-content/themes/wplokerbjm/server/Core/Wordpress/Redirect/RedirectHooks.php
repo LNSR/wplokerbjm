@@ -1,10 +1,13 @@
 <?php
+
 namespace WPLokerBJM\Core\Redirect;
 
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Shared\Log\Logger;
-use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Injectable};
+use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
+
 /*======================================================================
  | REDIRECTS
  ======================================================================*/
@@ -15,6 +18,35 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
  */
 class RedirectHooks
 {
+
+    #region Boot
+
+    #[Action(hook: 'init', once: true, deferRegisterUntilHook: 'init', registerIf: static function (): bool {
+        return self::shouldRegister();
+    })]
+    public function __invoke(): void
+    {
+        \do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CLASS, __CLASS__);
+    }
+
+    private static function shouldRegister(): bool
+    {
+
+        if (
+            \is_graphql_http_request() ||
+            (defined('REST_REQUEST') && REST_REQUEST) ||
+            (defined('DOING_AJAX') && DOING_AJAX) ||
+            SharedUtils::isWPCLI() ||
+            isset($_GET['_wfsf']) // WordFence query
+        ) {
+            return false;
+        }
+
+        return true;
+    }
+    #endregion
+
+
     /**
      * Return 410 Gone for old job posts that have been trashed due to age.
      * * For deleted job posts (404 on single lowongan), return 410 Gone.
@@ -22,14 +54,10 @@ class RedirectHooks
      */
     #[Action(
         'template_redirect',
-        2,
-        deferRegisterUntilHook: 'init',
+        deferRegister: true,
         once: true,
-        registerIf: static function (): bool {
-            return self::shouldRegister();
-        },
-        executeIf: static function (): bool {
-            return !self::shouldSkipRedirect() && !self::isDraftPreviewRequest() && is_404() && is_singular(PostTypes::POST_TYPE_LOWONGAN);
+        executeIf: static function (self $self): bool {
+            return !$self->shouldSkipRedirect() && !$self->isDraftPreviewRequest() && is_404() && is_singular(PostTypes::POST_TYPE_LOWONGAN);
         },
     )]
     public function oldPost410Redirect(): void
@@ -50,14 +78,10 @@ class RedirectHooks
      */
     #[Action(
         'template_redirect',
-        3,
-        deferRegisterUntilHook: 'init',
+        deferRegister: true,
         once: true,
-        registerIf: static function (): bool {
-            return self::shouldRegister();
-        },
-        executeIf: static function (): bool {
-            return !self::shouldSkipRedirect();
+        executeIf: static function (self $self): bool {
+            return !$self->shouldSkipRedirect();
         },
     )]
     public function headlessFrontendAdminSideRedirect(): void
@@ -69,7 +93,7 @@ class RedirectHooks
             $path = '/pasang-iklan-loker';
         } elseif (is_page('kebijakan-privasi')) {
             $path = '/kebijakan-privasi';
-        } elseif (self::isDraftPreviewRequest()) {
+        } elseif ($this->isDraftPreviewRequest()) {
             // Draft/pending lowongan: normalize to ID-based URL so the
             // frontend preview route can resolve it without the redundant
             // ?post_type=lowongan&p= query string.
@@ -84,7 +108,7 @@ class RedirectHooks
         }
 
         $query = '';
-        if (!self::isDraftPreviewRequest()) {
+        if (!$this->isDraftPreviewRequest()) {
             $query = isset($_SERVER['QUERY_STRING']) && $_SERVER['QUERY_STRING'] !== '' ? ('?' . $_SERVER['QUERY_STRING']) : '';
         }
         $location = rtrim($baseUrl, '/') . $path . $query;
@@ -95,7 +119,7 @@ class RedirectHooks
     /**
      * Skip redirect logic for ACME challenge requests and AutoSSL probe user agents.
      */
-    private static function shouldBypassAutoSsl(): bool
+    private function shouldBypassAutoSsl(): bool
     {
         $requestUri = $_SERVER['REQUEST_URI'] ?? '';
         if ($requestUri !== '' && str_starts_with($requestUri, '/.well-known/acme-challenge/')) {
@@ -114,12 +138,12 @@ class RedirectHooks
      * Common early-return guard for all template_redirect hooks.
      *
      * Consolidates checks that apply universally: SSL bypass probes,
-     * backend-only contexts (REST, AJAX, CLI, cron, preview), and
+     * backend-only contexts (REST, AJAX, CLI, cron, admin preview), and
      * special query-parameter bypass flags.
      */
-    private static function shouldSkipRedirect(): bool
+    private function shouldSkipRedirect(): bool
     {
-        if (self::shouldBypassAutoSsl()) {
+        if ($this->shouldBypassAutoSsl()) {
             return true;
         }
 
@@ -130,29 +154,13 @@ class RedirectHooks
         return false;
     }
 
-    private static function shouldRegister(): bool
-    {
-
-        if (
-            (defined('GRAPHQL_REQUEST') && GRAPHQL_REQUEST) ||
-            (defined('REST_REQUEST') && REST_REQUEST) ||
-            (defined('DOING_AJAX') && DOING_AJAX) ||
-            SharedUtils::isWPCLI() ||
-            isset($_GET['_wfsf']) // WordFence query
-        ) {
-            return false;
-        }
-
-        return true;
-    }
-
     /**
      * Detect draft-preview intent: a request to view a non-published lowongan
      * by ID (e.g. `?post_type=lowongan&p=15941` from the editor's save-draft
      * flow). These must NOT be treated as 404/410 — they are preview requests
      * that the headless redirect forwards to the frontend preview route.
      */
-    private static function isDraftPreviewRequest(): bool
+    private function isDraftPreviewRequest(): bool
     {
         if (empty($_GET['p'])) {
             return false;

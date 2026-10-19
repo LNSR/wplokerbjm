@@ -27,16 +27,16 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
     protected function setUp(): void
     {
         parent::setUp();
-
+        /** @suppressWarnings PHP0410 */
+        $this->variadicHookService = null;
         $builder = new ContainerBuilder();
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
         $builder->addDefinitions([
-            VariadicHookService::class => \DI\autowire(),
+            __VariadicHookService::class => $this->variadicHookService,
         ]);
         $this->container = $builder->build();
         $this->planProvider = new WPHookPlanProvider();
-        VariadicHookService::reset();
     }
 
     public function testPureVariadicHandlerForwardsEveryArgumentToVariadicExecuteIf(): void
@@ -46,7 +46,7 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
         };
 
         $registrations = [[
-            'class' => VariadicHookService::class,
+            'class' => __VariadicHookService::class,
             'method' => 'collectAll',
             'type' => 'action',
             'hook' => 'variadic_all',
@@ -65,18 +65,18 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
 
         \do_action('variadic_all', 'alpha', 'beta', 'gamma', 'delta');
 
-        $this->assertCount(1, VariadicHookService::$captured);
-        $this->assertSame(['alpha', 'beta', 'gamma', 'delta'], VariadicHookService::$captured[0]);
+        $this->assertCount(1, $this->variadicHookService->captured);
+        $this->assertSame(['alpha', 'beta', 'gamma', 'delta'], $this->variadicHookService->captured[0]);
     }
 
     public function testNamedHeadPlusVariadicTailSplitsSourceFromRemainder(): void
     {
-        $executeIf = static function (VariadicHookService $service, mixed ...$args): bool {
-            return $service instanceof VariadicHookService && \count($args) === 4 && $args[0] === 'beta';
+        $executeIf = static function (__VariadicHookService $service, mixed ...$args): bool {
+            return $service instanceof __VariadicHookService && \count($args) === 4 && $args[0] === 'beta';
         };
 
         $registrations = [[
-            'class' => VariadicHookService::class,
+            'class' => __VariadicHookService::class,
             'method' => 'collectTail',
             'type' => 'action',
             'hook' => 'variadic_tail',
@@ -96,9 +96,9 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
 
         \do_action('variadic_tail', 'source1', 'beta', 'gamma', 'delta', 'eps');
 
-        $this->assertCount(1, VariadicHookService::$captured);
-        $this->assertSame('source1', VariadicHookService::$captured[0][0]);
-        $this->assertSame(['beta', 'gamma', 'delta', 'eps'], VariadicHookService::$captured[0][1]);
+        $this->assertCount(1, $this->variadicHookService->captured);
+        $this->assertSame('source1', $this->variadicHookService->captured[0][0]);
+        $this->assertSame(['beta', 'gamma', 'delta', 'eps'], $this->variadicHookService->captured[0][1]);
     }
 
     public function testNamedDescriptorHandlerStillInjectsNamedHookArgIntoExecuteIf(): void
@@ -108,7 +108,7 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
         };
 
         $registrations = [[
-            'class' => VariadicHookService::class,
+            'class' => __VariadicHookService::class,
             'method' => 'collectNamed',
             'type' => 'action',
             'hook' => 'named_descriptor',
@@ -128,7 +128,7 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
         \do_action('named_descriptor', 'go');
         \do_action('named_descriptor', 'stop');
 
-        $this->assertSame(['go'], VariadicHookService::$captured);
+        $this->assertSame(['go'], $this->variadicHookService->captured);
     }
 
     public function testLegacyStringHookArgsStillResolveNamedHookArg(): void
@@ -138,7 +138,7 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
         };
 
         $registrations = [[
-            'class' => VariadicHookService::class,
+            'class' => __VariadicHookService::class,
             'method' => 'collectNamed',
             'type' => 'action',
             'hook' => 'legacy_names',
@@ -156,6 +156,36 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
         \do_action('legacy_names', 'go');
         \do_action('legacy_names', 'stop');
 
-        $this->assertSame(['go'], VariadicHookService::$captured);
+        $this->assertSame(['go'], $this->variadicHookService->captured);
+    }
+
+    private ?__VariadicHookService $variadicHookService {
+        get {
+            return $this->variadicHookService ??= new class() {
+                public function __construct()
+                {
+                    !\class_exists(__VariadicHookService::class) && \class_alias(__CLASS__, __VariadicHookService::class);
+                }
+                
+                public array $captured = [];
+                /** Pure variadic handler — receives the whole argument list as one bucket. */
+                public function collectAll(...$args): void
+                {
+                    $this->captured[] = $args;
+                }
+
+                /** Named head + variadic tail handler. */
+                public function collectTail(mixed $source, ...$args): void
+                {
+                    $this->captured[] = [$source, $args];
+                }
+
+                /** Fully named handler (regression shape). */
+                public function collectNamed(string $value): void
+                {
+                    $this->captured[] = $value;
+                }
+            };
+        }
     }
 }

@@ -59,11 +59,8 @@ abstract class AsChildClass
             $currentClassPropertryIdentifier
         ];
     }
-    
-    public function constructCurrentClassIdentity(): string
-    {
-        return sprintf("%s->%s", $this->getParentClass(), $this->identifier);
-    }
+
+    public string $constructCurrentClassIdentity { get => $this->constructCurrentClassIdentity ??= \sprintf("%s->%s", $this->getParentClass(), $this->identifier); }
 
     /**
      * ! Must be an instance Closure

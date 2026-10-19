@@ -8,7 +8,6 @@ use DI\Container;
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
-use WPLokerBJM\Tests\Support\Fixtures\DeferredIsolationService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
@@ -29,6 +28,8 @@ final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
     protected function setUp(): void
     {
         parent::setUp();
+        /** @suppresswarnings PHP0410 */
+        $this->deferredIsolationService = null;
         $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, ['provider' => null]);
         $this->trackRegistry($this->registry);
 
@@ -36,17 +37,16 @@ final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
         $builder->addDefinitions([
-            DeferredIsolationService::class => \DI\autowire(),
+            $this->deferredIsolationService::class => $this->deferredIsolationService,
         ]);
         $this->serviceContainer = $builder->build();
-        DeferredIsolationService::reset();
     }
 
     public function testEachAttributeDeferredEntryActivatesOnlyOnItsOwnTrigger(): void
     {
         $log = [];
 
-        $instance = new class ($log) {
+        $instance = new class($log) {
             public function __construct(private array &$log) {}
 
             #[Action(hook: 'shared_destination', deferRegisterUntilHook: 'trigger_a')]
@@ -127,7 +127,7 @@ final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
     {
         $registrations = [
             [
-                'class' => DeferredIsolationService::class,
+                'class' => $this->deferredIsolationService::class,
                 'method' => 'handlerA',
                 'type' => 'action',
                 'hook' => 'shared_destination',
@@ -136,7 +136,7 @@ final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
                 'deferRegisterUntilHook' => 'trigger_a',
             ],
             [
-                'class' => DeferredIsolationService::class,
+                'class' => $this->deferredIsolationService::class,
                 'method' => 'handlerB',
                 'type' => 'action',
                 'hook' => 'shared_destination',
@@ -155,10 +155,30 @@ final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
         $this->assertNotNull($this->findRegisteredHook('action', 'shared_destination'));
 
         do_action('shared_destination');
-        $this->assertSame(['B'], DeferredIsolationService::$log, 'handlerA must stay deferred until trigger_a fires');
+        $this->assertSame(['B'], $this->deferredIsolationService->log, 'handlerA must stay deferred until trigger_a fires');
 
         do_action('trigger_a');
         do_action('shared_destination');
-        $this->assertSame(['B', 'B', 'A'], DeferredIsolationService::$log);
+        $this->assertSame(['B', 'B', 'A'], $this->deferredIsolationService->log);
+    }
+
+    private $deferredIsolationService {
+        get {
+            return $this->deferredIsolationService ??= new class() {
+                public array $log = [];
+
+                #[Action(hook: 'shared_destination', deferRegisterUntilHook: 'trigger_a')]
+                public function handlerA(): void
+                {
+                    $this->log[] = 'A';
+                }
+
+                #[Action(hook: 'shared_destination', deferRegisterUntilHook: 'trigger_b')]
+                public function handlerB(): void
+                {
+                    $this->log[] = 'B';
+                }
+            };
+        }
     }
 }

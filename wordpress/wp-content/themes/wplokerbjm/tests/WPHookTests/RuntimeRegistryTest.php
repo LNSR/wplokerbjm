@@ -9,6 +9,7 @@ use WPLokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstanceHookInvoker, RuntimeCallableHookInvoker, RuntimeInstancePropertyHookInvoker};
 use DI\ContainerBuilder;
+use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{HookRuntimeResolver, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
@@ -24,6 +25,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, [
             'provider' => null,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner ??= new QueuedHooksCleaner(),
         ]);
 
         $this->trackRegistry($this->registry);
@@ -762,7 +764,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
             ->useAutowiring(true)
             ->addDefinitions([RuntimeProviderFlagService::class => \DI\autowire(RuntimeProviderFlagService::class)])
             ->build();
-        $registry = new WPHooksInstanceRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(),new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
         $captured = [];
 
         $anon = new class($captured) {
@@ -792,7 +794,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
             ->build();
         $container->get(RuntimeProviderFlagService::class)->enabled = false;
 
-        $registry = new WPHooksInstanceRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(),new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
         $captured = [];
 
         $anon = new class($captured) {
@@ -816,7 +818,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
     public function testProviderRegisterIfUsesDefaultParameters(): void
     {
-        $registry = new WPHooksInstanceRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider());
+        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(),new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider());
 
         $anon = new class {
             #[Action(hook: 'rt_provider_register_default_false', registerIf: static function (bool $flag = false): bool {
@@ -1034,7 +1036,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     public function testPropertyHookExecuteIfResolvesHookArgsByName(): void
     {
         $container = (new ContainerBuilder())->useAutowiring(true)->build();
-        $registry = new WPHooksInstanceRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(),new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
 
         $anon = new class {
             #[Filter(hook: 'rt_prop_execute', executeIf: static function (string $value): bool {
@@ -1058,7 +1060,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     public function testPropertyHookInvokableObjectDefaultResolvesHookArgs(): void
     {
         $container = (new ContainerBuilder())->useAutowiring(true)->build();
-        $registry = new WPHooksInstanceRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(), new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
 
         $anon = new class {
             #[Filter(hook: 'rt_prop_invokable', executeIf: static function (string $value): bool {
@@ -1082,7 +1084,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     public function testPropertyHookGetterPatternResolvesHookArgs(): void
     {
         $container = (new ContainerBuilder())->useAutowiring(true)->build();
-        $registry = new WPHooksInstanceRegistry(new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(), new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
 
         $anon = new class {
             #[Filter(hook: 'rt_prop_getter', executeIf: static function (string $value): bool {
@@ -1217,15 +1219,13 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $result = apply_filters('option_active_plugins', ['a', 'b']);
         $this->assertSame(['a', 'b'], $result);
     }
-    public function testAutomaticUnregisterAtCertainHook(): void {
+    public function testAutomaticUnregisterAtCertainHook(): void
+    {
         $host = new class(__CLASS__, __METHOD__, $this->registry) extends ModuleClassHookMetadata {
             #[Action('rt_trigger_something', once: true, executeIf: static function (): bool {
                 return true;
             })]
-            public function test(): void
-            {
-               
-            }
+            public function test(): void {}
         };
 
         $this->registry->registerHooksOn($host, 'rt_automaticUnregister');

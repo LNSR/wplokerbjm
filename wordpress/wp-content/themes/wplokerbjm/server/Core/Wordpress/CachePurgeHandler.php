@@ -80,7 +80,7 @@ class CachePurgeHandler
                             CacheKey::JOB_SCHEMA_PREFIX . $postId,
                         ]);
                     } catch (\Throwable $e) {
-                        Logger::error($this->constructCurrentClassIdentity(), 'Error:', [
+                        Logger::error($this->constructCurrentClassIdentity, 'Error:', [
                             'message' => $e->getMessage(),
                             'trace' => $e->getTraceAsString(),
                             'code' => $e->getCode(),

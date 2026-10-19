@@ -29,22 +29,21 @@ abstract class BaseHookAttribute
      * 2. params resolved from provider its container
      * 
      * 
-     * 
-     * @param (\Closure(TParams...): bool)|null $registerIf decide whether to register the hook, if deferRegister is true then registerIf evaluated after activation
-     * 
      * @param (\Closure(TParams...): array)|array $tag can be used to activate defer/unregister registered hooks by tag
      * * Closure returned array must be flat array
      * 
      * 
      * 
+     * @param (\Closure(TParams...): bool)|null $registerIf decide whether to register the hook, if deferRegister is true then registerIf evaluated after activation
      * @param string|(\Closure(TParams...): string)|null $deferRegisterUntilHook defer registration until the named 'action' trigger hook fires (implies defer); a Closure is resolved through the container and must return the trigger hook name
      * * it's scheduled under PHP_INT_MIN priority
+     * ! Failed registerIf will stay deferred until gate Closure flip, except if using InstanceRegistry there's no micro-management apis
      * 
      * 
      * 
-     * @param bool $once consume-on-any-evaluation: the registration removes itself when dispatched invoker evaluation triggered, or proceeded to callback(executeIf null).
+     * @param bool $once the registration removes itself when invoker dispatched.
      * * The handler/invoker will become logically inert after $once used.
-     * * The phsyical hook removal happen at temporary 'all' hook to avoid:
+     * * The phsyical hook removal may happen at temporary 'all' hook to avoid:
      * @link https://core.trac.wordpress.org/ticket/61263
      * @link https://core.trac.wordpress.org/ticket/64653
      */

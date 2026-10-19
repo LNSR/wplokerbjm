@@ -21,7 +21,7 @@ final class MetaBox implements PluginConfigInterface
         return PluginList::MetaBox->isActive();
     }
 
-    #[Action('plugins_loaded')]
+    #[Action('plugins_loaded', once: true)]
     public function boot(): void
     {
         $modules = [$this->registerCustomModels, $this->metaboxBugsPatch];
@@ -53,7 +53,7 @@ final class MetaBox implements PluginConfigInterface
             #[Inject]
             private PostTypes $postTypes;
 
-            #[Filter('rwmb_meta_boxes', 100, once: true)]
+            #[Filter('rwmb_meta_boxes')]
             public function registerCustomFields($meta_boxes): void
             {
                 $this->customFields->lowonganCustomFields($meta_boxes);

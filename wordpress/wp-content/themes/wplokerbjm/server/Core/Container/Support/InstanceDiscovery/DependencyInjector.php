@@ -61,7 +61,7 @@ final class DependencyInjector
     public function injectOn(AsChildClass $target): AsChildClass
     {
         $this->assertTarget($target);
-        $cacheKey = $target->constructCurrentClassIdentity();
+        $cacheKey = $target->constructCurrentClassIdentity;
         $plan = $this->getOrCompilePlan($cacheKey, $target);
         if ($plan['properties'] === [])
             return $target;
@@ -531,9 +531,6 @@ class PlanCache
 class ScopeAccessFactory
 {
 
-    /** @var array<string, TFactoryClosure> */
-    public private(set) array $closureFactories = [];
-
     /** 
      * Resolve an array callable [class, member] into either the member's
      * value (property kind), the method's return value (lazy: false), or a
@@ -545,6 +542,9 @@ class ScopeAccessFactory
     private Closure $callableResolver {
         get {
             return $this->callableResolver ??= function (ContainerInterface $c, InjectionEntryDTO $entry): mixed {
+                /** @var array<string, TFactoryClosure> $closureFactoriesCache */
+                static $closureFactoriesCache = [];
+                
                 /** @var Closure(InjectionEntryDTO): TFactoryClosure */
                 static $templateFactory = static function (InjectionEntryDTO $entry): Closure {
                     static $property;
@@ -572,7 +572,7 @@ class ScopeAccessFactory
 
                 $instance = $c->get($entry->class);
                 $factoryKey = $entry->class . '->' . $entry->member . '#' . $entry->kind . ($entry->lazy ? '#lazy' : '#value');
-                $factory = $this->closureFactories[$factoryKey] ??= $templateFactory($entry);
+                $factory = $closureFactoriesCache[$factoryKey] ??= $templateFactory($entry);
 
                 return $factory($instance, $entry);
             };

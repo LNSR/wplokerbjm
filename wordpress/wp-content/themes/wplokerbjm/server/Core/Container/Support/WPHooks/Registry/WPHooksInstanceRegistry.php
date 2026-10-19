@@ -4,13 +4,13 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
 
-use ArrayObject;
 use ReflectionClass;
 use ReflectionFunction;
 use ReflectionProperty;
 use Brick\VarExporter\VarExporter;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstancePropertyHookInvoker, RuntimeInstanceHookInvoker, RuntimeCallableHookInvoker};
+use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 use WPLokerBJM\Shared\Log\Logger;
@@ -87,14 +87,14 @@ class WPHooksInstanceRegistry
      * @var \WeakMap<object, bool>
      */
     private \WeakMap $scanned;
-    /** @var list<RuntimeRegistryHandlerEntry> */
-    public private(set) array $queuedRemovalEntry = [];
 
     public function __construct(
+        private QueuedHooksCleaner $queuedHooksCleaner = new QueuedHooksCleaner(),
         private HookRuntimeResolver $runtimeResolver = new HookRuntimeResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
         public ?WPHooksInstanceObjectCache $cache = null,
         private ?RuntimeWPHookProvider $provider = null,
+
     ) {
         $this->weakRegistry = new \WeakMap();
         $this->scanned = new \WeakMap();
@@ -215,7 +215,8 @@ class WPHooksInstanceRegistry
                     owner: \WeakReference::create($instance),
                     callback: null,
                 );
-                $handler->setCleanupCallback(($this->removeRuntimeHook)($record));
+                $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
+                $handler->setCleanupCallback($this->removeRuntimeHook);
 
                 if ($attr->deferRegisterUntilHook !== null) {
                     $hasDeferred = true;
@@ -301,7 +302,8 @@ class WPHooksInstanceRegistry
                     owner: \WeakReference::create($instance),
                     callback: null,
                 );
-                $handler->setCleanupCallback(($this->removeRuntimeHook)($record));
+                $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
+                $handler->setCleanupCallback($this->removeRuntimeHook);
 
                 if ($attr->deferRegisterUntilHook !== null) {
                     $hasDeferred = true;
@@ -344,12 +346,11 @@ class WPHooksInstanceRegistry
         }
 
         foreach ($this->weakRegistry[$instance] as $record) {
-            $record->unregister();
+            $this->queuedHooksCleaner->immediatelyScheduleRemove($record);
         }
 
-        foreach ($this->queuedRemovalEntry as $idx => $entry) {
-            $entry->owner?->get() === $instance && $entry->unregister();
-            unset($this->queuedRemovalEntry[$idx]);
+        foreach ($this->queuedHooksCleaner->queuedRemovalEntry as $entry) {
+            $entry->owner?->get() === $instance && $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
         }
 
         unset($this->weakRegistry[$instance]);
@@ -448,7 +449,8 @@ class WPHooksInstanceRegistry
                 acceptedArgs: $entry->acceptedArgs,
                 owner: \WeakReference::create($instance),
             );
-            $handler->setCleanupCallback(($this->removeRuntimeHook)($record));
+            $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
+            $handler->setCleanupCallback($this->removeRuntimeHook);
 
             $records[] = $record->register();
         }
@@ -511,14 +513,13 @@ class WPHooksInstanceRegistry
         }
 
         $listener = function () use ($triggerHook, $deferredKey): void {
-            $activated = $this->activateMatchingDeferredEntries(
+            $this->activateMatchingDeferredEntries(
                 [$deferredKey],
                 $this->activateRuntimeEntry,
             );
 
-            if ($activated > 0) {
-                \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-            }
+            \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+            unset($this->deferredHandlers[$deferredKey]);
         };
 
         \add_action($triggerHook, $listener, PHP_INT_MIN, 0);
@@ -570,76 +571,25 @@ class WPHooksInstanceRegistry
      */
     private \Closure $removeRuntimeHook {
         get {
-            return $this->removeRuntimeHook ??= function (RuntimeRegistryHandlerEntry $entry): \Closure {
-                /** @var \ArrayObject<int, RuntimeRegistryHandlerEntry> $entries */
-                static $entries = new \ArrayObject();
-                static $cb;
-                $entries[\spl_object_id($entry->handler)] = $entry;
-                return $cb ??= function (
-                    RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker
-                ) use ($entries): void {
-                    $entry = $entries[\spl_object_id($invoker)] ?? null;
-                    if ($entry === null) return;
+            return $this->removeRuntimeHook ??= function (
+                RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker
+            ): void {
+                $entry = $this->queuedHooksCleaner->getEntry($invoker);
+                if ($entry === null) return;
 
-                    /**
-                     * Skip unregister hook while still in the same callback stack
-                     * 
-                     * Skip the WordPress-side removal while the hook is being dispatched:
-                     * self removal during dispatch corrupts WP_Hook's iteration
-                     * (resort_active_iterations skips the immediately-following priority).
-                     * The consumed flag already prevents re-firing, so the callback can
-                     * safely linger in $wp_filter until the next invoker order or beginning hook(all).
-                     * @link https://core.trac.wordpress.org/ticket/61263
-                     * @link https://core.trac.wordpress.org/ticket/64653
-                     */
-                    switch ($entry->stillDispatchingSameHook()) {
-                        case true:
-                            $this->queuedRemovalEntry[] = $entry;
-
-                            static $baggage = new class() {
-                                public bool $schedulerDispatched = false;
-                                public ?\Closure $scheduleCleanup = null;
-                                public int $priority;
-                                public function __construct()
-                                {
-                                    $this->priority = \mt_rand(-1000, 0);
-                                }
-                            };
-                            !$baggage->schedulerDispatched && \add_action('all', $baggage->scheduleCleanup ??= function (mixed ...$args) use ($baggage): void {
-                                $invoker = null;
-                                if (
-                                    array_key_exists(0, $args) && (
-                                        $args[0] instanceof RuntimeCallableHookInvoker
-                                        || $args[0] instanceof RuntimeInstanceHookInvoker
-                                        || $args[0] instanceof RuntimeInstancePropertyHookInvoker
-                                    )
-                                ) {
-                                    $invoker = $args[0];
-                                }
-
-                                $baggage->schedulerDispatched = true;
-                                foreach ($this->queuedRemovalEntry as $idx => $entry) {
-                                    if ($invoker !== null && $entry->handler === $invoker) {
-                                        continue;
-                                    }
-                                    $entry->unregister();
-                                    SharedUtils::isDevelopment() && Logger::info(__METHOD__, 'Unregistering queued ONCE entry: ' . $entry->handler->label);
-                                    unset($this->queuedRemovalEntry[$idx]);
-                                }
-                                if ($this->queuedRemovalEntry !== []) return;
-                                \remove_action('all', $baggage->scheduleCleanup, $baggage->priority);
-                                $baggage->schedulerDispatched = false;
-                            }, $baggage->priority);
-
-                            ($baggage->scheduleCleanup)($invoker);
-                            break;
-                        default:
-                            $entry->unregister();
-                            break;
-                    }
-                    $this->cleanUpInstance($entry);
-                    unset($entries[\spl_object_id($invoker)]);
-                };
+                /**
+                 * Skip unregister hook while still in the same callback stack
+                 * 
+                 * Skip the WordPress-side removal while the hook is being dispatched:
+                 * self removal during dispatch corrupts WP_Hook's iteration
+                 * (resort_active_iterations skips the immediately-following priority).
+                 * The consumed flag already prevents re-firing, so the callback can
+                 * safely linger in $wp_filter until the next invoker order or beginning hook(all).
+                 * @link https://core.trac.wordpress.org/ticket/61263
+                 * @link https://core.trac.wordpress.org/ticket/64653
+                 */
+                $this->queuedHooksCleaner->cleanUpCallback($invoker);
+                $this->cleanUpInstance($entry);
             };
         }
     }
@@ -863,8 +813,8 @@ class WPHooksInstanceRegistry
             owner: \WeakReference::create($owner),
             callback: $callback,
         );
-
-        $handler->setCleanupCallback(($this->removeRuntimeHook)($record));
+        $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
+        $handler->setCleanupCallback($this->removeRuntimeHook);
 
         if ($deferRegisterUntilHook !== null) {
             $this->deferManualUntilHook($hook, $hookKey, $deferRegisterUntilHook, $handler, $owner, $executeIf, $once);
@@ -952,14 +902,13 @@ class WPHooksInstanceRegistry
         }
 
         $listener = function () use ($triggerHook, $deferredKey): void {
-            $activated = $this->activateMatchingDeferredEntries(
+            $this->activateMatchingDeferredEntries(
                 [$deferredKey],
                 $this->activateRuntimeEntry,
             );
 
-            if ($activated > 0) {
-                \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-            }
+            \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+            unset($this->deferredHandlers[$deferredKey]);
         };
 
         \add_action($triggerHook, $listener, PHP_INT_MIN, 0);

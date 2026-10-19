@@ -16,6 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
  * Cross-domain members (once-removal plumbing, named hook-args builder,
  * filter passthrough) come from the shared {@see HookInvokerTrait}; the
  * actual invocation step is domain-specific via {@see invokeOn()}.
+ * @mixin RuntimeInstanceHookInvoker&RuntimeInstancePropertyHookInvoker&RuntimeCallableHookInvoker
  */
 trait RuntimeInstanceInvokerTrait
 {
@@ -44,7 +45,6 @@ trait RuntimeInstanceInvokerTrait
 
             if ($this->once) {
                 if ($this->consumed) {
-                    $this->consumeOnceAndClean();
                     return $this->filterPassthrough($args);
                 }
                 $this->consumed = true;
@@ -331,7 +331,6 @@ final class RuntimeCallableHookInvoker
 
             if ($this->once) {
                 if ($this->consumed) {
-                    $this->consumeOnceAndClean();
                     return $this->filterPassthrough($args);
                 }
                 $this->consumed = true;
