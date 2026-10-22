@@ -16,7 +16,7 @@ if ! command -v inotifywait >/dev/null 2>&1; then
   exit 1
 fi
 
-# Verify watched paths exist (allow files too)
+# Verify watched paths exist
 for p in "${watch_paths[@]}"; do
   if [ -d "$p" ] || [ -f "$p" ]; then
     continue
@@ -27,35 +27,35 @@ done
 
 pending_pid=""
 debounce_time=5
-# Process substitution keeps the while loop in the main subshell, preserving $pending_pid across iterations
+
 while read -r file; do
   if [[ -n "$file" && "$file" =~ \.(php|json)$ ]]; then
-    echo "[$(date +'%H:%M:%S')] Change detected in $file, setting ${debounce_time}s debounce timer..."
+    echo "[$(date +'%H:%M:%S')] Change in $file -> Setting ${debounce_time}s debounce timer..."
 
-    # Cancel any previous pending hot reload task
     if [[ -n "$pending_pid" ]]; then
-      kill -9 "$pending_pid" 2>/dev/null || true
+      kill -15 "$pending_pid" 2>/dev/null || true
     fi
 
-    # Spawn debounced task chain
     (
       sleep "$debounce_time"
+      echo "[$(date +'%H:%M:%S')] 🚀 Executing WordPress Local Hot Reload Chain..."
 
-      echo "[$(date +'%H:%M:%S')] 🚀 Triggering WordPress Local Hot Reload Chain..." &
+      # Run Docker restart in background
       docker restart "wordpress-${WP_ENV}" &
 
-      echo "[$(date +'%H:%M:%S')] Flushing Redis..." &
-      docker exec -i wordpress_redis redis-cli -a "${REDIS_PWD}" FLUSHALL > /dev/null 2>&1
+      # Run Redis flush and Cache clearing concurrently in the background
+      (
+        docker exec -i wordpress_redis redis-cli -a "${REDIS_PWD}" FLUSHALL > /dev/null 2>&1 &
+        if [[ -d cache ]]; then
+          rm -rf cache/* &
+        fi
+        wait
+      ) &
 
-      if [[ -d cache ]]; then
-        echo "[$(date +'%H:%M:%S')] Clearing cache directory."
-        rm -rf cache/*
-      else
-        echo "[$(date +'%H:%M:%S')] Cache directory not found."
-      fi
-
+      wait
       echo "[$(date +'%H:%M:%S')] 🚀 WordPress Local Hot Reload Chain Completed."
     ) &
+    
     pending_pid=$!
   fi
 done < <(inotifywait -m -r -e modify,create,delete --format '%w%f' "${watch_paths[@]}" \

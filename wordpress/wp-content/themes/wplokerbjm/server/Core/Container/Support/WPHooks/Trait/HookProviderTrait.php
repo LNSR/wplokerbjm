@@ -172,9 +172,9 @@ trait HookProviderTrait
         try {
             $reflect = match (true) {
                 $callable instanceof \Closure => new \ReflectionFunction($callable),
-                is_object($callable) => new \ReflectionMethod($callable, '__invoke'),
-                is_array($callable) => new \ReflectionMethod($callable[0], $callable[1]),
-                is_string($callable) && str_contains($callable, '::') => new \ReflectionMethod(...array_slice(explode('::', $callable), 0, 2)),
+                is_object($callable) => \ReflectionMethod::createFromMethodName($callable::class . '::__invoke'),
+                is_array($callable) => \ReflectionMethod::createFromMethodName($callable[0] . '::' . $callable[1]),
+                is_string($callable) && str_contains($callable, '::') => \ReflectionMethod::createFromMethodName(...array_slice(explode('::', $callable), 0, 2)),
                 is_string($callable) => new \ReflectionFunction($callable),
                 default => null,
             };
@@ -202,20 +202,12 @@ trait HookProviderTrait
      */
     public function extractPropertyCallablePlan(\ReflectionProperty $property, ?object $instance = null): array
     {
-        $propertyName = $property->getName();
-
-        if ($instance !== null) {
+        /** @suppress PHP0406 */
+        if ($instance !== null && $property->hasHook(\PropertyHookType::Get)) {
             // For hooked properties, reading the property executes the `get` hook.
-            // For non-hooked properties, ensure it's initialized before reading to avoid Error.
-            /** @suppress PHP0406 */
-            $isHooked = $property->hasHook(\PropertyHookType::Get);
-            $isInitialized = $property->isInitialized($instance);
-
-            if ($isHooked || $isInitialized) {
-                $value = $instance->{$propertyName} ?? null;
-                if (is_callable($value)) {
-                    return $this->callablePlan($value);
-                }
+            $value = $property->getValue($instance);
+            if (is_callable($value)) {
+                return $this->callablePlan($value);
             }
         }
 

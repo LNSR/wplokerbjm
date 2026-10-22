@@ -3,12 +3,15 @@
 namespace WPLokerBJM\Core\Wordpress\Plugins\ThirdParty;
 
 use WPLokerBJM\Core\Container\Attributes\Injectable;;
+
 use WPLokerBJM\Core\Wordpress\Plugins\PluginConfigInterface;
 use WPlokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use RankMath\SEO_Analysis\SEO_Analyzer;
 use RankMath\OpenGraph\Image;
+use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
 
 /**
  * Rank Math
@@ -25,6 +28,13 @@ final class Rankmath implements PluginConfigInterface
 	{
 		return PluginList::RankMath->isActive();
 	}
+
+	#[Action('rank_math/loaded', once: true)]
+	private function boot(): void
+	{
+		\do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
+	}
+
 	/**
 	 * Checks if the given URL is valid (not empty).
 	 * @param string $url The URL to check.
@@ -32,9 +42,7 @@ final class Rankmath implements PluginConfigInterface
 	 */
 	private static function checkUrl(string $url): bool
 	{
-		if (empty($url)) {
-			return false;
-		}
+		if (empty($url)) return false;
 		return true;
 	}
 
@@ -45,12 +53,15 @@ final class Rankmath implements PluginConfigInterface
 	 * @param array|string $input Either an array (image_array filter) or string (og_image_type filter)
 	 * @return array|string Modified input with correct og:image:type
 	 */
-	#[Filter('rank_math/opengraph/facebook/image_array', executeIf: static function (array|string $input): bool {
-				if (is_array($input) && isset($input['url']) && strpos($input['url'], '.avif') !== false) {
+	#[Filter(
+		'rank_math/opengraph/facebook/image_array',
+		deferRegister: true,
+		executeIf: static function (array|string $input): bool {
+			if (is_array($input) && isset($input['url']) && strpos($input['url'], '.avif') !== false) {
 				return true;
-				}
-			return false;
 			}
+			return false;
+		}
 	)]
 	public function FixImageTypeOG(array|string $input): array|string
 	{
@@ -69,10 +80,12 @@ final class Rankmath implements PluginConfigInterface
 	 * @param string $provider Provider identifier (e.g., 'google'|'bing').
 	 * @return string Rewritten URL using headless domain.
 	 */
-	#[Filter('rank_math/indexing_api/publish_url',
+	#[Filter(
+		'rank_math/indexing_api/publish_url',
+		deferRegister: true,
 		executeIf: static function (string $url): bool {
-				return self::checkUrl($url);
-				}
+			return self::checkUrl($url);
+		}
 	)]
 	public function RewritePublishUrl(string $url, array|\WP_Post|null $post, string $provider)
 	{
@@ -95,10 +108,12 @@ final class Rankmath implements PluginConfigInterface
 	 * @param array|\WP_Post|null $post $post WP_Post or post ID passed by Rank Math.
 	 * @return string Rewritten URL using headless domain.
 	 */
-	#[Filter('rank_math/indexing_api/delete_url',
+	#[Filter(
+		'rank_math/indexing_api/delete_url',
+		deferRegister: true,
 		executeIf: static function (string $url): bool {
-				return self::checkUrl($url);
-				}
+			return self::checkUrl($url);
+		}
 	)]
 	public function RewriteDeleteUrl(string $url, array|\WP_Post|null $post)
 	{
@@ -117,18 +132,20 @@ final class Rankmath implements PluginConfigInterface
 	 * @param SEO_Analyzer $analyzer.
 	 * @return void
 	 */
-	#[Filter('seo_analysis/after_set_url',
+	#[Filter(
+		'seo_analysis/after_set_url',
+		deferRegister: true,
 		executeIf: static function (SEO_Analyzer $analyzer): bool {
-					if (empty($analyzer) || !property_exists($analyzer, 'analyse_url')) {
-					return false;
-					}
+			if (empty($analyzer) || !property_exists($analyzer, 'analyse_url')) {
+				return false;
+			}
 
-				$original = $analyzer->analyse_url;
-					if (empty($original)) {
-					return false;
-					}
-				return true;
-				}
+			$original = $analyzer->analyse_url;
+			if (empty($original)) {
+				return false;
+			}
+			return true;
+		}
 	)]
 	public function rewriteSeoAnalyzerInstanceUrl(SEO_Analyzer $analyzer): void
 	{

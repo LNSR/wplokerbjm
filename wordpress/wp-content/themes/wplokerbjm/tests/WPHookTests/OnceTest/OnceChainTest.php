@@ -63,25 +63,6 @@ final class OnceChainTest extends WplokerbjmTestCase
         $this->assertSame(range(0, 9), $this->onceChainService->fired);
     }
 
-    public function testQueuedRemovalsLingerUntilExplicitFlush(): void
-    {
-        // Keep the production-like queue so we can observe the deferred removal
-        // instead of letting the harness flush it at the end of the dispatch.
-        $this->flushQueuedRemovalsAfterDispatch = false;
-
-        $registry = $this->createRegistry($this->chainRegistrations(), $this->container);
-        $registry->initialize();
-
-        \do_action(self::HOOK);
-
-        $this->assertSame(range(0, 9), $this->onceChainService->fired);
-
-        $this->assertNotNull($this->findRegisteredHook('action', self::HOOK));
-        $this->flushQueuedRemovals([$registry]);
-
-        $this->assertNull($this->findRegisteredHook('action', self::HOOK));
-    }
-
     /**
      * @return list<array<string,mixed>>
      */

@@ -9,7 +9,7 @@ use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\Fixtures\DynamicHookService;
 use WPLokerBJM\Tests\Support\Fixtures\RuntimeDynamicService;
@@ -55,7 +55,6 @@ class DynamicHookTest extends WplokerbjmTestCase
         $hook = static function (ContainerInterface $c): string {
             return 'dynamic_action';
         };
-        $targetResolver = new HookTargetResolver();
 
         $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
@@ -72,7 +71,6 @@ class DynamicHookTest extends WplokerbjmTestCase
 
     public function testStringHookIsUnchanged(): void
     {
-        $targetResolver = new HookTargetResolver();
 
         $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', 'plain_string_action'),
@@ -89,7 +87,6 @@ class DynamicHookTest extends WplokerbjmTestCase
     public function testNonStringClosureResultIsLoggedAndSkipped(): void
     {
         $hook = static fn (): int => 42;
-        $targetResolver = new HookTargetResolver();
 
         $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
@@ -108,7 +105,6 @@ class DynamicHookTest extends WplokerbjmTestCase
         $hook = static function (UnresolvableService $service): string {
             return 'never_registered';
         };
-        $targetResolver = new HookTargetResolver();
 
         $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
@@ -127,7 +123,6 @@ class DynamicHookTest extends WplokerbjmTestCase
         $executeIf = static function (ExecuteIfActionService $service): bool {
             return $service !== null;
         };
-        $targetResolver = new HookTargetResolver();
 
         $registry = $this->createRegistry([
             $this->action(
@@ -150,7 +145,6 @@ class DynamicHookTest extends WplokerbjmTestCase
     {
         $hook = static fn (): string => 'dynamic_deferred';
 
-        $targetResolver = new HookTargetResolver();
         $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook, deferRegister: true),
         ], $this->container);

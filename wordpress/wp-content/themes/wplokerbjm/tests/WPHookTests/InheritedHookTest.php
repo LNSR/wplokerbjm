@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests\WPHookTests;
 use DI\Container;
 use DI\ContainerBuilder;
 use Nette\Loaders\RobotLoader;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Tests\Support\Fixtures\{ChildNoRedeclareService, ChildRedeclareService, ParentHookService};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -62,6 +62,7 @@ class InheritedHookTest extends WplokerbjmTestCase
     public function testChildWithoutRedeclarationHasNoRegistration(): void
     {
         $scanner = new WPHooksScanner(
+            $this->container(),
             $this->robotLoader->getIndexedClasses(),
             'WPLokerBJM\Tests\Support\Fixtures',
             '',
@@ -87,6 +88,7 @@ class InheritedHookTest extends WplokerbjmTestCase
     public function testParentAndRedeclaringChildBothFire(): void
     {
         $scanner = new WPHooksScanner(
+            $this->container(),
             $this->robotLoader->getIndexedClasses(),
             'WPLokerBJM\Tests\Support\Fixtures',
             '',

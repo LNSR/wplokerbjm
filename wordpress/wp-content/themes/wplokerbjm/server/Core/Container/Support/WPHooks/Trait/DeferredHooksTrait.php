@@ -20,7 +20,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker,
  * RuntimeHookProvider on the runtime path).
  *
  * The micromanage API (activateDeferredByHook/ByClass/ByTags/...,
- * unregisterDeferredBy*) stays on the container-side DeferredHookManager; the
+ * unregisterDeferredBy*) stays on the container-side ContainerRegistryDeferredHookManager; the
  * runtime registry consumes the same mechanics behind an automatic-only
  * surface.
  * @phpstan-import-type CallableHookParams from HookProviderTrait

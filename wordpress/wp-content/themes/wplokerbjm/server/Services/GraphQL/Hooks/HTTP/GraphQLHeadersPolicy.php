@@ -41,7 +41,7 @@ final class GraphQLHeadersPolicy
             return !\is_admin();
         },
     )]
-    public function ModifyHeaderGraphQL(array $headers): array
+    protected function ModifyHeaderGraphQL(array $headers): array
     {
         /**
          * remove WPGraphQL author hooks and inbuit core nocache Headers
@@ -51,9 +51,7 @@ final class GraphQLHeadersPolicy
         \remove_all_filters('graphql_response_headers_to_send');
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
 
-        if (in_array($origin, $this->allowedOrigins(), true)) {
-            $headers['Access-Control-Allow-Origin'] = $origin;
-        }
+        if (in_array($origin, $this->allowedOrigins(), true)) $headers['Access-Control-Allow-Origin'] = $origin;
 
         // Headers relevant to both preflight and actual responses.
         $headers['Access-Control-Allow-Credentials'] = 'true';
@@ -68,9 +66,7 @@ final class GraphQLHeadersPolicy
         $headers['Vary'] = $this->removeDuplicateValues($headers['Vary']);
 
         //! Preflight ends here.
-        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') {
-            return $headers;
-        }
+        if (($_SERVER['REQUEST_METHOD'] ?? '') === 'OPTIONS') return $headers;
 
         $headers = $this->eTag->setHeader($headers);
 
@@ -80,29 +76,29 @@ final class GraphQLHeadersPolicy
 
         unset($headers['Expires']);
 
-        if (empty($headers['Last-Modified'])) {
-            unset($headers['Last-Modified']);
-        }
+        if (empty($headers['Last-Modified'])) unset($headers['Last-Modified']);
 
         $headers = $this->applyCachePolicy($headers);
+        if (!is_user_logged_in()) return $headers;
 
-        if (is_user_logged_in()) {
-            $headers['Logged-In'] = 'true';
-            $headers['X-WP-Nonce'] = \graphql_get_nonce();
-            do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'disableGraphQLNocacheHeader']);
-            do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'applyCachePolicy']);
-        }
+        $headers['Logged-In'] = 'true';
+        $headers['X-WP-Nonce'] = \graphql_get_nonce();
+        do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'disableGraphQLNocacheHeader']);
+        do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'applyCachePolicy']);
+
         return $headers;
     }
+
     #[Filter(
         'graphql_send_nocache_headers',
         11,
+        once: true,
         deferRegister: true,
         registerIf: static function (): bool {
             return \is_user_logged_in() && !\is_admin();
         }
     )]
-    public function disableGraphQLNocacheHeader(): bool
+    protected function disableGraphQLNocacheHeader(): bool
     {
         \remove_all_filters('graphql_send_nocache_headers');
         return false;
@@ -116,7 +112,7 @@ final class GraphQLHeadersPolicy
             return \is_user_logged_in() && !\is_admin();
         }
     )]
-    public function applyCachePolicy(array $headers): array
+    protected function applyCachePolicy(array $headers): array
     {
         $loggedIn = is_user_logged_in();
         $isDev = SharedUtils::isDevelopment();

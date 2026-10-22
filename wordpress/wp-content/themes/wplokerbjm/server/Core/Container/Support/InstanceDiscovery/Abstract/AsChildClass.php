@@ -60,7 +60,7 @@ abstract class AsChildClass
         ];
     }
 
-    public string $constructCurrentClassIdentity { get => $this->constructCurrentClassIdentity ??= \sprintf("%s->%s", $this->getParentClass(), $this->identifier); }
+    public private(set) string $constructCurrentClassIdentity { get => $this->constructCurrentClassIdentity ??= \sprintf("%s->%s", $this->getParentClass(), $this->identifier); }
 
     /**
      * ! Must be an instance Closure

@@ -41,7 +41,7 @@ class CloudflareCachePurger
      */
     #[Action('wp_after_insert_post', 10, 4)]
     #[Action('before_delete_post', 10, 1)]
-    public \Closure|false $purgeOnPostChange { get => $this->purgeOnPostChange ??= $this->createHandler(__PROPERTY__); }
+    public \Closure $purgeOnPostChange { get => $this->purgeOnPostChange ??= $this->createHandler(__PROPERTY__); }
 
     /**
      * Purge the entire zone on the first term change of the request.
@@ -50,17 +50,17 @@ class CloudflareCachePurger
     #[Action('edit_term', 10, 0)]
     #[Action('set_object_terms', 10, 0)]
     #[Action('delete_term', 10, 0)]
-    private \Closure|false $purgeOnTermChange { get => $this->purgeOnTermChange ??= $this->createHandler(__PROPERTY__); }
+    private \Closure $purgeOnTermChange { get => $this->purgeOnTermChange ??= $this->createHandler(__PROPERTY__); }
 
     /** 
      * @param string $propertyName string magic
-     * @return \Closure|false
+     * @return \Closure
      */
-    private function createHandler(string $propertyName): \Closure|false
+    private function createHandler(string $propertyName): \Closure
     {
         if (empty($this->credential->token) || empty($this->credential->zone)) {
             do_action(ContainerRegistryEvent::UNREGISTER_BY_CLASS, self::class);
-            return false;
+            return static fn() => false;
         }
         return function () use ($propertyName): bool {
             static $alreadyRun = false;

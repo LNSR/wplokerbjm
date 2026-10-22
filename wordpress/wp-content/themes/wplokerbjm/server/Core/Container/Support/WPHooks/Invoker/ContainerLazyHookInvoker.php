@@ -56,15 +56,21 @@ trait ContainerLazyHookInvokerTrait
                 if (!$this->once) {
                     throw $e;
                 }
-                Logger::warning(
+                Logger::info(
                     static::class,
-                    'executeIf gate unresolvable for once-hook ' . $this->label . ' — treated as pass.'
+                    'executeIf gate unresolvable for once-hook ' . $this->label . ' — treated as pass.',
+                    [
+                        'message' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ]
                 );
                 $gatePassed = true;
             }
 
             if (!$gatePassed) {
-                Logger::warning(
+                Logger::info(
                     static::class,
                     'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                 );
@@ -74,7 +80,7 @@ trait ContainerLazyHookInvokerTrait
             $instance = $this->container->get($this->class);
             $result = $this->invokeOn($instance, ...$args);
 
-            SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed ' . ++$this->numberExecutions . ' times');
+            SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
             return $result;
         } catch (\Throwable $e) {
             Logger::error(static::class, "Error invoking hook {$this->label}: ", [

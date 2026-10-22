@@ -18,7 +18,7 @@
     },
   ],
   "settings": {
-    "php.version": "8.5",
+    "php.version": "8.6",
     "php.format.rules.addCommaAfterLastArrayElement": true,
     "editor.codeLens": true,
 
@@ -51,7 +51,7 @@
     },
     "php.problems.exclude": {
       "**/generate-meta-hooks/captures/": true,
-      "**/vendor/": true,
+      "**/vendor/**": true,
       "**/node_modules/**": true,
       "**/wplokerbjm-post-automation/**": true,
       "**/wordpress/wp-admin/**": true,
@@ -72,6 +72,8 @@
     "intelephense.completion.insertUseDeclaration": true,
     "intelephense.completion.fullyQualifyGlobalConstantsAndFunctions": true,
     "intelephense.rename.namespaceMode": "all",
+    "intelephense.codeLens.overrides.enable": true,
+    "intelephense.environment.phpVersion": "8.6.0",
     "intelephense.codeLens.references.enable": true,
     "intelephense.codeLens.usages.enable": true,
     "intelephense.files.maxSize": 100000000,

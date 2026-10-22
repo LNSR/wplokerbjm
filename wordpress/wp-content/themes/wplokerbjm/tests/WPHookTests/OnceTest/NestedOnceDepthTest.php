@@ -51,6 +51,7 @@ final class NestedOnceDepthTest extends WplokerbjmTestCase
                     $this->outerRuns++;
                     $this->log[] = 'outer';
                     \do_action('nested_mid', $assertCallback);
+                    \do_action('nested_outer', $assertCallback);
                 }
 
                 public function mid(array $assertCallback): void
@@ -93,6 +94,7 @@ final class NestedOnceDepthTest extends WplokerbjmTestCase
             $this->never(...),
         ];
         \do_action('nested_outer', $assertCallback);
+        $this->assertNull($this->findRegisteredHook('action', 'nested_inner'));
 
         // Each once-handler ran exactly once — the deepest re-entry of
         // `nested_outer` (from inner()) did NOT re-run the outer handler.
@@ -100,9 +102,6 @@ final class NestedOnceDepthTest extends WplokerbjmTestCase
         $this->assertSame(1, $this->nestedOnceService->midRuns);
         $this->assertSame(1, $this->nestedOnceService->innerRuns);
         $this->assertSame(['outer', 'mid', 'inner'], $this->nestedOnceService->log);
-
-        $this->assertSame(['outer', 'mid', 'inner'], $this->nestedOnceService->log);
-        $this->assertSame(1, $this->nestedOnceService->outerRuns);
     }
 
     /**

@@ -30,8 +30,7 @@ final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
         parent::setUp();
         /** @suppresswarnings PHP0410 */
         $this->deferredIsolationService = null;
-        $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, ['provider' => null]);
-        $this->trackRegistry($this->registry);
+        $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, ['provider' => null, 'queuedHooksCleaner' => $this->queuedHooksCleaner]);
 
         $builder = new ContainerBuilder();
         $builder->useAutowiring(true);

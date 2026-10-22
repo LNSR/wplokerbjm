@@ -17,7 +17,7 @@
 
 | API | Purpose / constraint |
 |---|---|
-| `WPHooksContainerRegistry::initialize()` | Idempotently resolves and registers active entries; deferred entries stay in `DeferredHookManager`. |
+| `WPHooksContainerRegistry::initialize()` | Idempotently resolves and registers active entries; deferred entries stay in `ContainerRegistryDeferredHookManager`. |
 | `activateDeferredByHook/Class/Namespace/Callable/Tags()` | Move matching deferred entries into WordPress; activation re-checks `registerIf`. |
 | `activateDeferredByHookPattern($pattern)` / `activateDeferredByTagPattern($patterns)` | Wildcard activation; pattern rules from `HookPattern`. |
 | `unregisterByHook/Class/Namespace/Callable/Tags()` | Remove active entries only; use the `unregisterDeferredBy*` family for deferred entries. |
@@ -27,7 +27,7 @@
 | `registerAction()` / `registerFilter()` | Manual runtime path for captured closures and callbacks; params: `executeIf`, `once`, `deferRegisterUntilHook`, `owner`. Identical (hook, callback, priority) registrations are deduplicated. |
 | `unregisterHooksOn()` | Remove every runtime handler owned by one object (incl. its deferred entries). |
 
-`DeferredHookManager` and `HookTargetResolver` are implemented in `Registry/WPHooksContainerRegistry.php`. The resolver accepts array callables, `Class::method` strings, bound first-class callables, invokable objects, property-hook closures, and the anonymous-property metadata object.
+`ContainerRegistryDeferredHookManager` and `HookTargetResolver` are implemented in `Registry/WPHooksContainerRegistry.php`. The resolver accepts array callables, `Class::method` strings, bound first-class callables, invokable objects, property-hook closures, and the anonymous-property metadata object.
 
 ## Invokers and utilities
 

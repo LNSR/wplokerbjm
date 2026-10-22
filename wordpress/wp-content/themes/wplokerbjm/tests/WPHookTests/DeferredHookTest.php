@@ -6,7 +6,7 @@ namespace WPLokerBJM\Tests\WPHookTests;
 
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, DeferredHookManager, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, ContainerRegistryDeferredHookManager, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
@@ -34,7 +34,7 @@ class DeferredHookTest extends WplokerbjmTestCase
 {
     private ContainerInterface $container;
     private WPHooksContainerRegistry $registry;
-    private DeferredHookManager $deferredHookManager;
+    private ContainerRegistryDeferredHookManager $ContainerRegistryDeferredHookManager;
     private EntriesIndexer $entriesIndexer;
     private WPHookPlanProvider $planProvider;
     private HookTargetResolver $targetResolver;
@@ -52,8 +52,8 @@ class DeferredHookTest extends WplokerbjmTestCase
         $this->targetResolver = new HookTargetResolver();
         $this->entriesIndexer = new EntriesIndexer();
         $this->queuedHooksCleaner = new QueuedHooksCleaner();
-        $this->deferredHookManager = new DeferredHookManager($this->planProvider, $this->container, $this->targetResolver, $this->entriesIndexer);
-        $this->registry = new WPHooksContainerRegistry($this->container, [], $this->planProvider, $this->deferredHookManager, $this->targetResolver, $this->queuedHooksCleaner, $this->entriesIndexer);
+        $this->ContainerRegistryDeferredHookManager = new ContainerRegistryDeferredHookManager($this->planProvider, $this->container, $this->targetResolver, $this->entriesIndexer);
+        $this->registry = new WPHooksContainerRegistry($this->container, [], $this->planProvider, $this->ContainerRegistryDeferredHookManager, $this->targetResolver, $this->queuedHooksCleaner, $this->entriesIndexer);
     }
 
     /**
@@ -73,7 +73,7 @@ class DeferredHookTest extends WplokerbjmTestCase
      */
     private function deferredHandlersCount(): int
     {
-        return count($this->deferredHookManager->deferredHandlers);
+        return count($this->ContainerRegistryDeferredHookManager->deferredHandlers);
     }
 
     public function testDeferredHooksNotRegisteredOnInitialize(): void

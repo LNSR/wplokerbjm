@@ -25,10 +25,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, [
             'provider' => null,
-            'queuedHooksCleaner' => $this->queuedHooksCleaner ??= new QueuedHooksCleaner(),
+            'queuedHooksCleaner' => $this->queuedHooksCleaner,
         ]);
-
-        $this->trackRegistry($this->registry);
     }
 
     // ── Basic registration ────────────────────────────────────────────
@@ -760,11 +758,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
     public function testProviderResolvesExecuteIfContainerDependencies(): void
     {
-        $container = (new ContainerBuilder())
-            ->useAutowiring(true)
-            ->addDefinitions([RuntimeProviderFlagService::class => \DI\autowire(RuntimeProviderFlagService::class)])
-            ->build();
-        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(),new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $this->container()->set(RuntimeProviderFlagService::class, new RuntimeProviderFlagService());
+        $registry = $this->container()->get(WPHooksInstanceRegistry::class);
         $captured = [];
 
         $anon = new class($captured) {
@@ -788,13 +783,9 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
     public function testProviderExecuteIfGateFalseSkipsFire(): void
     {
-        $container = (new ContainerBuilder())
-            ->useAutowiring(true)
-            ->addDefinitions([RuntimeProviderFlagService::class => \DI\autowire(RuntimeProviderFlagService::class)])
-            ->build();
-        $container->get(RuntimeProviderFlagService::class)->enabled = false;
-
-        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(),new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $this->container()->set(RuntimeProviderFlagService::class, new RuntimeProviderFlagService());
+        $this->container()->get(RuntimeProviderFlagService::class)->enabled = false;
+        $registry = $this->container()->get(WPHooksInstanceRegistry::class);
         $captured = [];
 
         $anon = new class($captured) {
@@ -818,7 +809,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
     public function testProviderRegisterIfUsesDefaultParameters(): void
     {
-        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(),new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider());
+        $registry = $this->container()->get(WPHooksInstanceRegistry::class);
 
         $anon = new class {
             #[Action(hook: 'rt_provider_register_default_false', registerIf: static function (bool $flag = false): bool {
@@ -1035,8 +1026,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
     public function testPropertyHookExecuteIfResolvesHookArgsByName(): void
     {
-        $container = (new ContainerBuilder())->useAutowiring(true)->build();
-        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(),new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $registry = $this->container()->get(WPHooksInstanceRegistry::class);
 
         $anon = new class {
             #[Filter(hook: 'rt_prop_execute', executeIf: static function (string $value): bool {
@@ -1059,8 +1049,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
     public function testPropertyHookInvokableObjectDefaultResolvesHookArgs(): void
     {
-        $container = (new ContainerBuilder())->useAutowiring(true)->build();
-        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(), new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $registry = $this->container()->get(WPHooksInstanceRegistry::class);
 
         $anon = new class {
             #[Filter(hook: 'rt_prop_invokable', executeIf: static function (string $value): bool {
@@ -1083,8 +1072,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
     public function testPropertyHookGetterPatternResolvesHookArgs(): void
     {
-        $container = (new ContainerBuilder())->useAutowiring(true)->build();
-        $registry = new WPHooksInstanceRegistry(new QueuedHooksCleaner(), new HookRuntimeResolver(), new EntriesIndexer(), new WPHooksInstanceObjectCache(), new RuntimeWPHookProvider($container));
+        $registry = $this->container()->get(WPHooksInstanceRegistry::class);
 
         $anon = new class {
             #[Filter(hook: 'rt_prop_getter', executeIf: static function (string $value): bool {
@@ -1235,6 +1223,91 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         do_action('rt_automaticUnregister');
 
         $this->assertNull($this->findRegisteredHook('action', 'rt_trigger_something'));
+    }
+
+    /**
+     * Regression guard for deferred registrations on the runtime cache-hit path.
+     *
+     * `registerHooksOn()` caches the reflected metadata of a
+     * ModuleClassHookMetadata site — including entries carrying
+     * `deferRegisterUntilHook`. A later instance of the SAME site hits that
+     * cache, so `registerCachedEntries()` must re-hydrate the deferral (rebuild
+     * the deferred pool entry and its trigger listener) instead of registering
+     * the handler eagerly.
+     *
+     * Before the fix the second instance registered immediately, so the handler
+     * fired before its trigger hook ever ran.
+     */
+    public function testCacheHitRehydratesDeferredRegistrationInsteadOfRegisteringEagerly(): void
+    {
+        /** @var \ArrayObject<int, string> $log */
+        $log = new \ArrayObject();
+        $cache = new WPHooksInstanceObjectCache();
+
+        // Two instances of the SAME anonymous class (same factory expression)
+        // share one cache site:
+        //   (CachedDeferredHost, hooks).
+        $factory = static fn(\ArrayObject $log): ModuleClassHookMetadata => new class($log) extends ModuleClassHookMetadata {
+            public function __construct(private \ArrayObject $log)
+            {
+                parent::__construct('CachedDeferredHost', 'hooks');
+            }
+
+            #[Action(
+                hook: 'cached_deferred_destination',
+                deferRegisterUntilHook: 'cached_deferred_trigger',
+                once: true,
+            )]
+            public function onDestination(): void
+            {
+                $this->log[] = 'fired';
+            }
+        };
+
+        $registry = $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner,
+        ]);
+
+        // Both instances must stay alive: the registry binds handlers through
+        // WeakReferences, and activation is skipped once the owner is gone.
+        $first = $factory($log);
+
+        // First instance populates the cache (reflection scan path).
+        $registry->registerHooksOn($first);
+
+        self::assertNull(
+            $this->findRegisteredHook('action', 'cached_deferred_destination'),
+            'The deferred handler of the scanned instance must not be registered before its trigger fires.',
+        );
+        self::assertNotNull(
+            $cache->get('CachedDeferredHost', 'hooks'),
+            'The scanned metadata must be cached so the second instance takes the cache-hit path.',
+        );
+
+        // Second instance hits the cache.
+        $second = $factory($log);
+        $registry->registerHooksOn($second);
+
+        self::assertNull(
+            $this->findRegisteredHook('action', 'cached_deferred_destination'),
+            'A cache hit must re-hydrate the deferral instead of registering the handler eagerly.',
+        );
+
+        \do_action('cached_deferred_trigger');
+
+        self::assertNotNull(
+            $this->findRegisteredHook('action', 'cached_deferred_destination'),
+            'Both deferred handlers must activate once the trigger hook fires.',
+        );
+
+        \do_action('cached_deferred_destination');
+
+        self::assertCount(2, $log->getArrayCopy(), 'Both instances must fire exactly once.');
+        self::assertNull(
+            $this->findRegisteredHook('action', 'cached_deferred_destination'),
+            'The once handlers must be cleaned up after firing.',
+        );
     }
 }
 

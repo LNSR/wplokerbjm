@@ -11,7 +11,7 @@ use WPLokerBJM\Tests\Support\Terminal;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\Core;
 use WPLokerBJM\Core\Container\Definitions\DefinitionProviderInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     ContainerLazyHookInvoker,
     ContainerLazyPropertyHookInvoker,
@@ -37,6 +37,7 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     private function createScanner(): WPHooksScanner
     {
         return new WPHooksScanner(
+            $this->container(),
             $this->testRobotLoader->getIndexedClasses(),
             self::$NAMESPACE,
             '',

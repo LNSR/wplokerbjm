@@ -81,31 +81,6 @@ class SharedUtils
     }
 
     /**
-     * @return array{name: ?string, value: ?string}
-     */
-    public static function getWordpressAuthCookie(): array
-    {
-        $authCookieName = null;
-        $authCookieValue = null;
-        if (!empty($_COOKIE)) {
-            foreach ($_COOKIE as $name => $val) {
-                if (
-                    str_starts_with($name, 'wordpress_sec_') ||
-                    str_starts_with($name, 'wordpress_logged_in_')
-                ) {
-                    $authCookieName = $name;
-                    $authCookieValue = \stripslashes_deep($val);
-                    break;
-                }
-            }
-        }
-        return [
-            'name' => $authCookieName,
-            'value' => $authCookieValue
-        ];
-    }
-
-    /**
      * Recursively filter out empty values from an array.
      *! make arrays returned values more compact by removing empty entries 
      *

@@ -16,6 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Log\Logger;
 use \CompiledContainer;
+use Psr\Container\ContainerInterface;
 
 /**
  * Scans directories for WordPress hook attribute registrations.
@@ -32,7 +33,7 @@ class WPHooksScanner
 {
     use HookScannerTrait;
 
-    /** @var array<int, HookRegistration>|null */
+    /** @var list<HookRegistration>|null */
     private ?array $cachedHookRegistrations = null;
 
     /**
@@ -42,6 +43,7 @@ class WPHooksScanner
      * @param WPHookPlanProvider|null $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
     public function __construct(
+        private ContainerInterface $container,
         private array $compiledContainerMap,
         private string $namespace = 'WPLokerBJM',
         private string $cacheLocation = '',
@@ -59,9 +61,9 @@ class WPHooksScanner
      * Scans instance methods and properties for hook attributes across all PHP files
      * in the base directory. Results are cached in-memory for the request.
      *
-     * @return HookRegistration[]|array
+     * @return list<HookRegistration>
      */
-    public function getHookRegistrations(): array|HookRegistration
+    public function getHookRegistrations(): array
     {
         if ($this->cachedHookRegistrations !== null) {
             return $this->cachedHookRegistrations;
@@ -110,6 +112,7 @@ class WPHooksScanner
                         method: $method->getName(),
                         type: $type,
                         hook: $attr->hook,
+                        hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                         priority: $attr->priority,
                         acceptedArgs: $attr->acceptedArgs,
                         deferRegister: $attr->deferRegister,
@@ -117,10 +120,9 @@ class WPHooksScanner
                         visibility: $visibility,
                         executeIf: $attr->executeIf,
                         executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf),
+                        hookArgs: $attr->executeIf ? $this->hookPlanProvider->buildCallablePlanFromReflector($method)['params'] : [],
                         registerIf: $attr->registerIf,
                         registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
-                        hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        hookArgs: $this->hookPlanProvider->buildCallablePlanFromReflector($method)['params'],
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
@@ -136,6 +138,7 @@ class WPHooksScanner
                         method: $property->getName(),
                         type: $type,
                         hook: $attr->hook,
+                        hookParams: $attr->hook instanceof \Closure ? $this->hookPlanProvider->buildCallablePlan($attr->hook) : [],
                         priority: $attr->priority,
                         acceptedArgs: $attr->acceptedArgs,
                         deferRegister: $attr->deferRegister,
@@ -143,10 +146,9 @@ class WPHooksScanner
                         visibility: $visibility,
                         executeIf: $attr->executeIf,
                         executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf),
+                        hookArgs: $attr->executeIf ? $this->hookPlanProvider->extractPropertyCallablePlan($property)['params'] : [],
                         registerIf: $attr->registerIf,
                         registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
-                        hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
-                        hookArgs: ($this->hookPlanProvider->extractPropertyCallablePlan($property))['params'],
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),

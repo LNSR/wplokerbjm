@@ -1,16 +1,22 @@
 <?php
+
 namespace WPLokerBJM\Services\GraphQL\Hooks\HTTP;
+
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations\LiteSpeedGraphQLIntegration;
+use WPLokerBJM\Core\Wordpress\Utilities\WPCookieUtils;
 use WPLokerBJM\Services\GraphQL\ETag\WPGraphQLETag;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
+
 final class BootGraphQLRequest
 {
 
-    public function __construct(private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration, private WPGraphQLETag $eTag)
-    {
-    }
-    
+    public function __construct(
+        private LiteSpeedGraphQLIntegration $litespeedGraphQLIntegration,
+        private WPGraphQLETag $eTag,
+        private WPCookieUtils $cookieUtils
+    ) {}
+
     /**
      * Unified init request handler: checks ETag cache before performing auth.
      */
@@ -28,20 +34,17 @@ final class BootGraphQLRequest
      */
     private function authenticateViaCookie(): void
     {
-        $cookie = SharedUtils::getWordpressAuthCookie();
-        if (empty($cookie)) {
-            return;
-        }
+        $cookie = $this->cookieUtils->WordpressAuthCookieInfo;
+        if (empty($cookie->name)) return;
         $this->injectJwtFromCookie();
 
         // Validate the cookie value using WP helper
         // choose scheme based on cookie type: secure login cookies use the secure_auth scheme
-        $scheme = str_starts_with($cookie['name'], 'wordpress_sec_') ? 'secure_auth' : 'logged_in';
-        $user_id = wp_validate_auth_cookie($cookie['value'], $scheme);
-        if ($user_id !== false) {
-            wp_set_current_user((int) $user_id);
-            wp_get_current_user();
-        }
+        $scheme = str_starts_with($cookie->name, 'wordpress_sec_') ? 'secure_auth' : 'logged_in';
+        $user_id = wp_validate_auth_cookie($cookie->value, $scheme);
+        if ($user_id === false) return;
+        wp_set_current_user((int) $user_id);
+        wp_get_current_user();
     }
     /**
      * Inject the JWT from the HttpOnly cookie as a Bearer token so the JWT

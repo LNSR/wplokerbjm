@@ -14,6 +14,7 @@ use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\{
     Rankmath,
     WPRestJWTHooks,
 };
+use WPLokerBJM\Core\Wordpress\Utilities\WPCookieUtils;
 use WPLokerBJM\Shared\Log\Logger;
 
 enum PluginList: string
@@ -37,7 +38,7 @@ enum PluginList: string
     public function isActive(): bool
     {
         static $activePlugins = null;
-        $activePlugins ??= \get_option('active_plugins') ?: [];
+        $activePlugins ??= \function_exists('get_option') ? \get_option('active_plugins') : [];
         return \is_array($activePlugins) && \in_array($this->value, $activePlugins, true);
     }
 
@@ -93,12 +94,8 @@ class PluginManager
         WPGraphQL::class,
     ];
 
-    #[Action('mu_plugin_loaded', acceptedArgs: 1, executeIf: static function (string $pluginPath): bool {
-        if ($pluginPath !== WPMU_PLUGIN_DIR . '/wplokerbjm-bootstrap.php') return false;
-        do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [__CLASS__, 'boot']);
-        return true;
-    })]
-    private function boot(string $pluginPath): void
+    #[Action('muplugins_loaded', once: true)]
+    private function boot(): void
     {
         $activeCount = $this->unregisterInactivePluginHooks();
         if ($activeCount === 0) {
@@ -173,15 +170,14 @@ class PluginManager
         'option_active_plugins',
         once: true,
         deferRegister: true,
-        registerIf: static function (): bool {
+        registerIf: static function (WPCookieUtils $cookieUtils): bool {
             if (is_admin()) {
                 $action = $_REQUEST['action'] ?? '';
                 if (in_array($action, ['upgrade-plugin', 'update-plugin', 'activate', 'deactivate', 'activate-plugin'], true)) {
                     return true;
                 }
             }
-            $cookie = SharedUtils::getWordpressAuthCookie();
-            if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookie['name']))
+            if ((!\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) && empty($cookieUtils->WordpressAuthCookieInfo->name))
                 return true;
             return false;
         }
@@ -213,6 +209,19 @@ class PluginManager
         return $plugins;
     }
 
+    #[Filter('option_active_plugins', once: true, deferRegister: true, registerIf: static function (): bool {
+        if (\is_admin() || \wp_doing_cron() || \wp_doing_ajax() || SharedUtils::isWPCLI()) return false;
+        return true;
+    })]
+    public function disableUpdraftOnFrontEnd(array $plugins): array
+    {
+        $pluginKey = array_search(PluginList::updraftPlus->value, $plugins, true);
+        if ($pluginKey !== false) {
+            unset($plugins[$pluginKey]);
+        }
+        return $plugins;
+    }
+
     #endregion
 
 
@@ -222,17 +231,37 @@ class PluginManager
      * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
-    private ModuleClassHookMetadata $pluginEnvironmentCheck {
+    private ?ModuleClassHookMetadata $pluginEnvironmentCheck {
         get {
             return $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
-                private array $pluginsToDisable = [
-                    PluginList::Wordfence->value,
-                    PluginList::FastIndexingApi->value,
-                ];
+                /**
+                 * Temporarily disable specific plugins if in development environment.
+                 */
+                #[Filter('option_active_plugins', 0, once: true, registerIf: static function (): bool {
+                    return SharedUtils::isDevelopment();
+                })]
+                public function disablePluginsForDevImpl(array $plugins): array
+                {
+                    $pluginsToDisable = [
+                        PluginList::FastIndexingApi->value,
+                        PluginList::Wordfence->value
+                    ];
+                    return $this->filteredPlugins($plugins, $pluginsToDisable);
+                }
 
-                #[Filter('option_active_plugins', 0, once: true)]
-                public \Closure $pluginsOption {
-                    get => $this->pluginsOption ??= SharedUtils::isDevelopment() ? $this->disablePluginsForDevImpl(...) : $this->disablePluginsforSimulatedProdImpl(...);
+
+                /**
+                 * Temporarily disable specific plugins if simulating production environment on local machine.
+                 */
+                #[Filter('option_active_plugins', 0, once: true, registerIf: static function (): bool {
+                    return SharedUtils::isLocalhost();
+                })]
+                public function disablePluginsforSimulatedProdImpl(array $plugins): array
+                {
+                    $pluginsToDisable = [
+                        PluginList::Wordfence->value
+                    ];
+                    return $this->filteredPlugins($plugins, $pluginsToDisable);
                 }
 
                 /**
@@ -256,40 +285,9 @@ class PluginManager
                     return $plugins;
                 }
 
-                /**
-                 * Temporarily disable specific plugins if in development environment.
-                 */
-                private function disablePluginsForDevImpl(array $plugins): array
-                {
-                    // $extra = [];
-                    $pluginsToDisable = $this->listPluginsToDisable();
-                    return $this->filteredPlugins($plugins, $pluginsToDisable);
-                }
-
 
                 /**
-                 * Temporarily disable specific plugins if simulating production environment on local machine.
-                 */
-                private function disablePluginsforSimulatedProdImpl(array $plugins): array
-                {
-                    // $extra = [];
-                    $pluginsToDisable = $this->listPluginsToDisable();
 
-                    return $this->filteredPlugins($plugins, $pluginsToDisable);
-                }
-
-
-                /**
-                 * Returns the list of plugins to disable, optionally merged with extra plugins.
-                 *
-                 * @param array|null $extra Optional array of additional plugin prefixes to disable.
-                 * @return array Array of plugin prefixes to disable.
-                 */
-                private function listPluginsToDisable(?array $extra = []): array
-                {
-                    return array_merge($this->pluginsToDisable, $extra);
-                }
-                /**
                  * Filters the list of active plugins by removing specified plugins.
                  *
                  * @param array $plugins          Array of active plugin file paths.

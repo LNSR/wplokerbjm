@@ -13,7 +13,7 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 3. Each attribute becomes a `HookRegistration`; callable metadata is converted into serializable resolution plans.
 4. The scanner can export registrations to `WPhooksRegistryContainerCache.php` and reload them on later requests.
 5. `WPHooksContainerRegistry` resolves the hook name, `registerIf` gate, and tags, then builds a lazy method/property handler.
-6. Active handlers call `add_action()` / `add_filter()` during `initialize()`; deferred handlers wait in `DeferredHookManager`.
+6. Active handlers call `add_action()` / `add_filter()` during `initialize()`; deferred handlers wait in `ContainerRegistryDeferredHookManager`.
 7. At fire time the handler resolves the service from the container, evaluates `executeIf`, and invokes the method or property callable.
 
 ## Runtime flow
@@ -28,7 +28,7 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 - `activateMatchingDeferredEntries()` sweeps the pool, re-evaluates the registration gate via the abstract `gateDeferredActivation()`, and hands matches to an activate callback.
 - `unregisterMatchingDeferredEntries()` removes entries without touching active handlers.
 
-`DeferredHookManager` (container path) exposes the micromanage selectors; `WPHooksInstanceRegistry` consumes the same mechanics behind an automatic-only surface (`deferRegisterUntilHook` only).
+`ContainerRegistryDeferredHookManager` (container path) exposes the micromanage selectors; `WPHooksInstanceRegistry` consumes the same mechanics behind an automatic-only surface (`deferRegisterUntilHook` only).
 
 ## The important boundary
 

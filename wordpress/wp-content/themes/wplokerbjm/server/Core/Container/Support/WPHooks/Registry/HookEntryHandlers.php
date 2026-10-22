@@ -65,7 +65,7 @@ final readonly class ContainerRegistryHandlerEntry extends AbstractDataObject
     ) {}
     public static function fromDeferredEntry(DeferredHookEntryHandler $deferredInstance): self
     {
-        return new self(
+        return new static(
             hook: $deferredInstance->hook,
             key: $deferredInstance->key,
             handler: $deferredInstance->handler,
@@ -182,7 +182,7 @@ final readonly class DeferredHookEntryHandler extends AbstractDataObject
     ) {}
     public static function fromContainerRegistryHandlerEntry(ContainerRegistryHandlerEntry $entry): self
     {
-        return new self(
+        return new static(
             hook: $entry->hook,
             key: $entry->key,
             handler: $entry->handler,

@@ -2,11 +2,12 @@
 
 namespace WPLokerBJM\Core\Container\Definitions;
 
+use DI\Container;
 use Nette\Loaders\RobotLoader;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyAutowireScanner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{DeferredHookManager, HookRuntimeResolver, HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, HookRuntimeResolver, HookTargetResolver, InstanceRegistryDeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
@@ -51,6 +52,7 @@ class Core implements DefinitionProviderInterface
             HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
+                \DI\get(ContainerInterface::class),
                 static fn() => \CompiledContainer::METHOD_MAPPING,
                 $namespace,
                 static fn() => get_stylesheet_directory() . "/cache",
@@ -59,14 +61,19 @@ class Core implements DefinitionProviderInterface
             WPHooksInstanceObjectCache::class => \DI\autowire(WPHooksInstanceObjectCache::class)->constructor(
                 static fn(): string => get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
             ),
-            WPHooksInstanceRegistry::class => \DI\autowire(WPHooksInstanceRegistry::class)->constructor(
-                \DI\get(QueuedHooksCleaner::class),
+            InstanceRegistryDeferredHookManager::class => \DI\autowire(InstanceRegistryDeferredHookManager::class)->constructor(
+                \DI\get(RuntimeWPHookProvider::class),
                 \DI\get(HookRuntimeResolver::class),
                 static fn() => new EntriesIndexer(),
+            ),
+            WPHooksInstanceRegistry::class => \DI\autowire(WPHooksInstanceRegistry::class)->constructor(
+                \DI\get(InstanceRegistryDeferredHookManager::class),
+                \DI\get(QueuedHooksCleaner::class),
+                \DI\get(HookRuntimeResolver::class),
                 \DI\get(WPHooksInstanceObjectCache::class),
                 \DI\get(RuntimeWPHookProvider::class),
             ),
-            DeferredHookManager::class => \DI\autowire(DeferredHookManager::class)->constructor(
+            ContainerRegistryDeferredHookManager::class => \DI\autowire(ContainerRegistryDeferredHookManager::class)->constructor(
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(ContainerInterface::class),
                 \DI\get(HookTargetResolver::class),
@@ -76,7 +83,7 @@ class Core implements DefinitionProviderInterface
                 \DI\get(ContainerInterface::class),
                 static fn(WPHooksScanner $scanner): array => $scanner->getHookRegistrations(),
                 \DI\get(WPHookPlanProvider::class),
-                \DI\get(DeferredHookManager::class),
+                \DI\get(ContainerRegistryDeferredHookManager::class),
                 \DI\get(HookTargetResolver::class),
                 \DI\get(QueuedHooksCleaner::class),
                 static fn() => new EntriesIndexer(),

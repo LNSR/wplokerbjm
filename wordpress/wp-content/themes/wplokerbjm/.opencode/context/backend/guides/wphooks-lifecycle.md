@@ -15,7 +15,7 @@ Call `WPHooksScanner::getHookRegistrations()` from the bootstrap path. It first 
 - evaluates `registerIf` once, before the hook enters either pool — skipped when `deferRegisterUntilHook` is set, so the gate is re-evaluated at activation time instead;
 - resolves static or callable tags and normalizes them to unique strings;
 - creates a lazy method or property handler;
-- stores the entry in the active pool or `DeferredHookManager` when `deferRegister` or `deferRegisterUntilHook` is set.
+- stores the entry in the active pool or `ContainerRegistryDeferredHookManager` when `deferRegister` or `deferRegisterUntilHook` is set.
 
 Errors in hook-name resolution, gates, or tags are logged and the individual registration is skipped.
 

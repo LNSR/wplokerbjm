@@ -24,7 +24,7 @@ class RedirectHooks
     #[Action(hook: 'init', once: true, deferRegisterUntilHook: 'init', registerIf: static function (): bool {
         return self::shouldRegister();
     })]
-    public function __invoke(): void
+    private function boot(): void
     {
         \do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CLASS, __CLASS__);
     }
@@ -55,7 +55,6 @@ class RedirectHooks
     #[Action(
         'template_redirect',
         deferRegister: true,
-        once: true,
         executeIf: static function (self $self): bool {
             return !$self->shouldSkipRedirect() && !$self->isDraftPreviewRequest() && is_404() && is_singular(PostTypes::POST_TYPE_LOWONGAN);
         },
@@ -136,10 +135,6 @@ class RedirectHooks
 
     /**
      * Common early-return guard for all template_redirect hooks.
-     *
-     * Consolidates checks that apply universally: SSL bypass probes,
-     * backend-only contexts (REST, AJAX, CLI, cron, admin preview), and
-     * special query-parameter bypass flags.
      */
     private function shouldSkipRedirect(): bool
     {

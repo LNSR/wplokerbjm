@@ -6,8 +6,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
 
 /**
  * @suppress PHP7104

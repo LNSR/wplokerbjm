@@ -15,20 +15,28 @@ use WPLokerBJM\Shared\Log\Logger;
  * Builder for the PHP-DI container.
  * 
  * @note class_alias used for virtual typed classes without polluting global runtime namespace
+ * * double dead code alias, self::class seem more reliable for intelephense LSP, but cause PHP(PHP0413) warning
+ * * __CLASS__ ones help silence the warning
  */
 #[Injectable(skip: true)]
 class WPLokerBJMContainer
 {
 
+    public function __construct(private readonly RobotLoader $robotLoader, ?string $cacheDir = null)
+    {
+        $this->cacheLocation = $cacheDir ?? \sprintf("%s/cache", rtrim(\get_stylesheet_directory()));
+    }
+
     /**
      * @phpstan-ignore-next-line
      * @var __WPLokerBJMContainerCacheLocation
      */
-    public private(set) object $cacheLocation;
-
-    public function __construct(private readonly RobotLoader $robotLoader, ?string $cacheDir = null)
-    {
-        $this->cacheLocation = new readonly class($cacheDir ?? \sprintf("%s/cache", rtrim(\get_stylesheet_directory()))) {
+    public private(set) object|string $cacheLocation {
+        set => $this->cacheLocation = new readonly class(
+            \is_string($value)
+                ? $value
+                : throw new \InvalidArgumentException('cacheDir must be a string')
+        ) {
             public string $cacheFile;
 
             public function __construct(public string $cacheDir)
@@ -36,6 +44,7 @@ class WPLokerBJMContainer
                 $this->cacheFile = \sprintf("%s/CompiledContainer.php", $this->cacheDir);
                 return;
                 \class_alias(__CLASS__, __WPLokerBJMContainerCacheLocation::class);
+                \class_alias(self::class, __WPLokerBJMContainerCacheLocation::class);
             }
         };
     }
@@ -54,6 +63,7 @@ class WPLokerBJMContainer
             {
                 return;
                 \class_alias(__CLASS__, __WPLokerBJMContainerConfigurationState::class);
+                \class_alias(self::class, __WPLokerBJMContainerConfigurationState::class);
             }
         };
     }

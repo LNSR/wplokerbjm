@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests\WPHookTests;
 use Closure;
 use DI\Container;
 use DI\ContainerBuilder;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookManager;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryDeferredHookManager;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\HookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
@@ -27,22 +27,11 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  */
 class DeferRegisterUntilHookTest extends WplokerbjmTestCase
 {
-    private Container $container;
-
-    private WPHookPlanProvider $planProvider;
 
     protected function setUp(): void
     {
         parent::setUp();
-
-        $builder = new ContainerBuilder();
-        $builder->useAutowiring(true);
-        $builder->useAttributes(false);
-        $builder->addDefinitions([
-            ExecuteIfActionService::class => \DI\autowire(),
-        ]);
-        $this->container = $builder->build();
-        $this->planProvider = $this->container->get(WPHookPlanProvider::class);
+        $this->container()->set(ExecuteIfActionService::class, new ExecuteIfActionService());
 
         ExecuteIfActionService::reset();
     }
@@ -57,7 +46,7 @@ class DeferRegisterUntilHookTest extends WplokerbjmTestCase
                 registerIf: static fn (): bool => false,
                 deferRegisterUntilHook: 'graphql_init'
             ),
-        ], $this->container);
+        ]);
         $registry->initialize();
 
         // registerIf returned false at boot — but unlike a plain registerIf
@@ -77,7 +66,7 @@ class DeferRegisterUntilHookTest extends WplokerbjmTestCase
                 registerIf: static fn (): bool => true,
                 deferRegisterUntilHook: 'graphql_init'
             ),
-        ], $this->container);
+        ]);
         $registry->initialize();
 
         // Deferred — the hook is not registered yet.
@@ -105,7 +94,7 @@ class DeferRegisterUntilHookTest extends WplokerbjmTestCase
                 },
                 deferRegisterUntilHook: 'graphql_init'
             ),
-        ], $this->container);
+        ]);
         $registry->initialize();
 
         // First trigger fire: gate false → stays deferred, listener re-arms.
@@ -142,7 +131,7 @@ class DeferRegisterUntilHookTest extends WplokerbjmTestCase
                 hookArgs: ['value'],
                 deferRegisterUntilHook: 'graphql_init'
             ),
-        ], $this->container);
+        ]);
         $registry->initialize();
 
         // The executeIf param is request-scoped: no container type and no
@@ -171,7 +160,7 @@ class DeferRegisterUntilHookTest extends WplokerbjmTestCase
                     ],
                 ],
             ),
-        ], $this->container);
+        ]);
         $registry->initialize();
 
         // The trigger closure resolves to 'graphql_init' via the container —
@@ -200,7 +189,7 @@ class DeferRegisterUntilHookTest extends WplokerbjmTestCase
                 registerIf: static fn (): bool => true,
                 deferRegisterUntilHook: 'graphql_init'
             ),
-        ], $this->container);
+        ]);
         $registry->initialize();
 
         // did_action('graphql_init') is true → immediate activation, no
