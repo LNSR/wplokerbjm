@@ -1,17 +1,20 @@
 <?php
+
 declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Abstract;
 
 use Override;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
+use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
 use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryEvent;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * interface for anonymous classes and classes not found in container that need to register hooks.
- * * @see WPHooksInstanceRegistry Primarily used for identity to register hooks found inside class
+ * * @see WPHooksInstanceRegistry Primarily used for identity to register hooks found inside runtime instance class
  * * @see WPHooksContainerRegistry by implementing __invoke as invocable object
  *
  * Extending this class captures the parent class and property name at
@@ -51,9 +54,28 @@ abstract class ModuleClassHookMetadata extends AsChildClass
         parent::__construct($parentClass, $parentProperty);
     }
 
+    /**
+     *! NOTE: If you relying on this: Be careful, even module class itself can retain its own strong reference like
+     * @example:
+     * ```php
+     * <?php
+     * class ReferenceTest extends ModuleClassHookMetadata 
+     * {
+     *      private \Closure $property {
+     *           get { $this->property ??= fn() => ... };
+     *      }
+     * }
+     * ```
+     * this instance closure has `$this` reference from its own class
+     * it will take ZEND Engine for a while to collect cycle.
+     */
     public function __destruct()
     {
         if (\defined('WPLOKERBJM_TEST_ENV') && WPLOKERBJM_TEST_ENV) return;
         \do_action(InstanceRuntimeRegistryEvent::UNREGISTER_HOOKS, $this);
+
+        if (!\method_exists($this, '__invoke')) return;
+        \do_action(ContainerRegistryEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
+        \do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
     }
 }

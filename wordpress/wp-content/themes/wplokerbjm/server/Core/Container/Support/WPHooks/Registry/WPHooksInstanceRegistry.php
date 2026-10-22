@@ -189,9 +189,9 @@ class WPHooksInstanceRegistry
                     Logger::warning('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $method->getName() . ' with hook ' . $hook . ' and ' . 'priority ' . (string) $attr->priority . ' skipped');
                     return;
                 }
-
+                $weakRef = \WeakReference::create($instance);
                 $handler = new RuntimeInstanceHookInvoker(
-                    instance: $instance,
+                    instanceRef: $weakRef,
                     hookName: $hook,
                     priority: $attr->priority,
                     method: $method->getName(),
@@ -212,7 +212,7 @@ class WPHooksInstanceRegistry
                     priority: $attr->priority,
                     type: $type,
                     acceptedArgs: $attr->acceptedArgs,
-                    owner: \WeakReference::create($instance),
+                    owner: $weakRef,
                     callback: null,
                 );
                 $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
@@ -276,10 +276,10 @@ class WPHooksInstanceRegistry
                     Logger::warning('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $property->getName() . ' with hook ' . $hook . ' and ' . 'priority' . (string) $attr->priority . ' skipped');
                     return;
                 }
-
+                $weakRef = \WeakReference::create($instance);
 
                 $handler = new RuntimeInstancePropertyHookInvoker(
-                    instance: $instance,
+                    instanceRef: $weakRef,
                     hookName: $hook,
                     priority: $attr->priority,
                     property: $property->getName(),
@@ -299,7 +299,7 @@ class WPHooksInstanceRegistry
                     priority: $attr->priority,
                     type: $type,
                     acceptedArgs: $attr->acceptedArgs,
-                    owner: \WeakReference::create($instance),
+                    owner: $weakRef,
                     callback: null,
                 );
                 $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
@@ -310,8 +310,6 @@ class WPHooksInstanceRegistry
                     $this->deferUntilTriggerHook($hook, $hookKey, $attr, $handler, $instance);
                     return;
                 }
-                SharedUtils::isDevelopment() && Logger::debug('WPHooksInstanceRegistry', 'Registered ' . $handler->label);
-
                 $records[] = $record->register();
             }
         );
@@ -347,10 +345,6 @@ class WPHooksInstanceRegistry
 
         foreach ($this->weakRegistry[$instance] as $record) {
             $this->queuedHooksCleaner->immediatelyScheduleRemove($record);
-        }
-
-        foreach ($this->queuedHooksCleaner->queuedRemovalEntry as $entry) {
-            $entry->owner?->get() === $instance && $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
         }
 
         unset($this->weakRegistry[$instance]);
@@ -402,10 +396,10 @@ class WPHooksInstanceRegistry
                 Logger::warning('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $entry->targetName . ' with hook ' . $entry->hook . ' and ' . 'priority ' . (string) $entry->priority . ' skipped');
                 continue;
             }
-
+            $weakRef = \WeakReference::create($instance);
             $handler = match ($entry->target) {
                 'method' => new RuntimeInstanceHookInvoker(
-                    instance: $instance,
+                    instanceRef: $weakRef,
                     hookName: $entry->hook,
                     priority: $entry->priority,
                     method: $entry->targetName,
@@ -419,7 +413,7 @@ class WPHooksInstanceRegistry
                     once: $entry->once,
                 ),
                 'property', 'property-hook' => new RuntimeInstancePropertyHookInvoker(
-                    instance: $instance,
+                    instanceRef: $weakRef,
                     hookName: $entry->hook,
                     priority: $entry->priority,
                     property: $entry->targetName,
@@ -447,7 +441,7 @@ class WPHooksInstanceRegistry
                 priority: $entry->priority,
                 type: $entry->type,
                 acceptedArgs: $entry->acceptedArgs,
-                owner: \WeakReference::create($instance),
+                owner: $weakRef,
             );
             $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
             $handler->setCleanupCallback($this->removeRuntimeHook);
@@ -598,10 +592,10 @@ class WPHooksInstanceRegistry
     {
         $owner = $entry->owner?->get();
         if ($owner === null || !isset($this->weakRegistry[$owner])) return;
-        $this->weakRegistry[$owner] = array_values(array_filter(
+        $this->weakRegistry[$owner] = array_filter(
             $this->weakRegistry[$owner],
             static fn(RuntimeRegistryHandlerEntry $record): bool => $record !== $entry,
-        ));
+        );
     }
 
     /**

@@ -25,10 +25,8 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, [
             'provider' => null,
-            'queuedHooksCleaner' => $this->queuedHooksCleaner ??= new QueuedHooksCleaner(),
+            'queuedHooksCleaner' => $this->queuedHooksCleaner,
         ]);
-
-        $this->trackRegistry($this->registry);
     }
 
     // ── Basic registration ────────────────────────────────────────────

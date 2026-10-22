@@ -2,7 +2,6 @@
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Janitor;
 
-use InvokersID;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     ContainerLazyHookInvoker,
     ContainerLazyPropertyHookInvoker,
@@ -22,9 +21,9 @@ class QueuedHooksCleaner
     public private(set) bool $schedulerCleanerDispatched = false;
 
     /** @var list<ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
-    public array $queuedRemovalEntry = [];
+    private array $queuedRemovalEntry = [];
 
-    /** @var \WeakMap<Invokers, ContainerRegistryHandlerEntry&RuntimeRegistryHandlerEntry> */
+    /** @var \WeakMap<Invokers, ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
     private \WeakMap $entries;
     private int $priority;
 
@@ -93,44 +92,39 @@ class QueuedHooksCleaner
     }
 
     private \Closure $scheduleCleanup {
-        get => $this->scheduleCleanup ??= function (mixed ...$args): void {
-            $this->schedulerCleanerDispatched = true;
-            $invoker = null;
-            if (
-                array_key_exists(0, $args) && (
-                    //Container Invokers
-                    $args[0] instanceof ContainerLazyHookInvoker
-                    || $args[0] instanceof ContainerLazyPropertyHookInvoker
-                    //RuntimeInstance Invokers
-                    || $args[0] instanceof RuntimeCallableHookInvoker
-                    || $args[0] instanceof RuntimeInstanceHookInvoker
-                    || $args[0] instanceof RuntimeInstancePropertyHookInvoker
-                )
-            ) {
-                $invoker = $args[0];
-            }
-
-            $numberCleaned = 0;
-            foreach ($this->queuedRemovalEntry as $idx => $entry) {
-                /**
-                 * * 'all' hook is in different active inner call stack it's ok to remove previous handler(invoker) immediately
-                 */
-                if ($invoker !== null && $entry->handler === $invoker) {
-                    continue;
+        get {
+            return $this->scheduleCleanup ??= function (mixed ...$args): void {
+                $this->schedulerCleanerDispatched = true;
+                $invoker = null;
+                if (
+                    array_key_exists(0, $args) && (
+                        //Container Invokers
+                        $args[0] instanceof ContainerLazyHookInvoker
+                        || $args[0] instanceof ContainerLazyPropertyHookInvoker
+                        //RuntimeInstance Invokers
+                        || $args[0] instanceof RuntimeCallableHookInvoker
+                        || $args[0] instanceof RuntimeInstanceHookInvoker
+                        || $args[0] instanceof RuntimeInstancePropertyHookInvoker
+                    )
+                ) {
+                    $invoker = $args[0];
                 }
-                $entry->unregister();
-                SharedUtils::isDevelopment() && Logger::info(__FUNCTION__, 'Unregistering queued entry: ', [
-                    'invokerLabel' => $invoker?->label ?? 'No label, this mean run from ALL hook',
-                    'currentHookNameRunInAllContext' => \current_filter(),
-                    'unregisteredEntry' => $entry->handler->label
-                ]);
-                unset($this->queuedRemovalEntry[$idx]);
-                $numberCleaned++;
-            }
-            $numberCleaned > 0 && SharedUtils::isDevelopment() && Logger::info(__FUNCTION__, 'Cleaned ' . $numberCleaned . ' queued entries.');
-            if ($this->queuedRemovalEntry !== []) return;
-            \remove_action('all', \Closure::getCurrent(), $this->priority);
-            $this->schedulerCleanerDispatched = false;
-        };
+
+                foreach ($this->queuedRemovalEntry as $idx => $entry) {
+                    /**
+                     * * 'all' hook is in different active inner call stack it's ok to remove previous handler(invoker) immediately
+                     */
+                    if ($invoker !== null && $entry->handler === $invoker) {
+                        continue;
+                    }
+                    $entry->unregister();
+                    unset($this->queuedRemovalEntry[$idx]);
+                }
+                if ($this->queuedRemovalEntry !== []) return;
+                \remove_action('all', \Closure::getCurrent(), $this->priority);
+                $this->schedulerCleanerDispatched = false;
+                // \gc_collect_cycles(); // make sure self-reference purged
+            };
+        }
     }
 }

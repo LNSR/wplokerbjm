@@ -6,9 +6,8 @@ namespace WPLokerBJM\Shared\Utilities\DataObject;
 
 /**
  * @template TShape
- * @suppress PHP0441
  */
-abstract readonly class AbstractDataObject
+trait TraitDataObject
 {
     /**
      * @note All properties must be public, this only expose public variables
@@ -17,7 +16,7 @@ abstract readonly class AbstractDataObject
     public function toArray(): array
     {
         /** @var \Closure(static): TShape $template */
-        static $template = \Closure::bind(static fn(AbstractDataObject $object): array => get_object_vars($object), null, null);
+        static $template = \Closure::bind(get_object_vars(...), null, null);
         return $template($this);
     }
 
@@ -38,4 +37,14 @@ abstract readonly class AbstractDataObject
     {
         return new static(...$properties);
     }
+}
+
+/**
+ * @suppress PHP0441
+ * @template TShape
+ */
+abstract readonly class AbstractDataObject
+{
+    /** @use TraitDataObject<TShape> */
+    use TraitDataObject;
 }

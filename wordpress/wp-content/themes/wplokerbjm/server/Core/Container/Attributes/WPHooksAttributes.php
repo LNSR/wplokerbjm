@@ -41,8 +41,8 @@ abstract class BaseHookAttribute
      * 
      * 
      * 
-     * @param bool $once the registration removes itself when invoker dispatched.
-     * * The handler/invoker will become logically inert after $once used.
+     * @param bool $once the registration removes itself when invoker/proxy dispatched.
+     * * The handler/invoker/proxy will become logically inert after $once used.
      * * The phsyical hook removal may happen at temporary 'all' hook to avoid:
      * @link https://core.trac.wordpress.org/ticket/61263
      * @link https://core.trac.wordpress.org/ticket/64653

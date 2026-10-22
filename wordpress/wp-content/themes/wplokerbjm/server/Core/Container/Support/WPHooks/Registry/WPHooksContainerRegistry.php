@@ -860,7 +860,7 @@ class DeferredHookManager
     public function __construct(
         private WPHookPlanProvider $planProvider,
         private ContainerInterface $container,
-        private HookTargetResolver $resolverTarget,
+        private HookTargetResolver $resolverTarget = new HookTargetResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer()
     ) {}
 

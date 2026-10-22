@@ -35,6 +35,7 @@ final class GraphQLHeadersPolicy
     #[Filter(
         'graphql_response_headers_to_send',
         11,
+        once: true,
         deferRegister: true,
         tag: ['graphql'],
         registerIf: static function (): bool {

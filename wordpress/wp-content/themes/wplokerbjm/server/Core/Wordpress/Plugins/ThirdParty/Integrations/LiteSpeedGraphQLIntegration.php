@@ -12,6 +12,8 @@ use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
  */
 class LiteSpeedGraphQLIntegration implements PluginConfigInterface
 {
+    public private(set) ?LitespeedIntegrationCommands $liteSpeedCommands;
+
     public function __construct(LitespeedIntegrationCommands $litespeedIntegrationCommands)
     {
         $this->liteSpeedCommands = self::isActive() ? $litespeedIntegrationCommands : null;
@@ -37,8 +39,6 @@ class LiteSpeedGraphQLIntegration implements PluginConfigInterface
     private \Closure $purgeAllGraphqlCache = static function (): void {
         do_action('wpgraphql_cache_purge_all');
     };
-
-    public private(set) ?LitespeedIntegrationCommands $liteSpeedCommands;
 }
 
 class LitespeedIntegrationCommands

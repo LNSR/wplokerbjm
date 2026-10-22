@@ -21,12 +21,12 @@ final class MetaBox implements PluginConfigInterface
         return PluginList::MetaBox->isActive();
     }
 
-    #[Action('plugins_loaded', once: true)]
+    #[Action('plugin_loaded', once: true, deferRegisterUntilHook: 'plugin_loaded')]
     public function boot(): void
     {
         $modules = [$this->registerCustomModels, $this->metaboxBugsPatch];
-        
-        foreach($modules as $idx => $module) {
+
+        foreach ($modules as $module) {
             do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $module);
         }
     }
@@ -36,7 +36,9 @@ final class MetaBox implements PluginConfigInterface
             /**
              * Fix blank WYSIWYG/TinyMCE editor on fresh post-editor load edit by viewing WYSIWYG/TinyMCE editor html code first
              */
-            #[Filter('wp_default_editor', 8, registerIf: static function(): bool { return is_admin(); })]
+            #[Filter('wp_default_editor', 8, registerIf: static function (): bool {
+                return is_admin();
+            })]
             public function switch_tinymce_default_view(): string
             {
                 return 'html';

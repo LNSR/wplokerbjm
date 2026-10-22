@@ -38,7 +38,7 @@ class CachePurgeHandler
      * @var __CLASS__::class
      */
     #[Action('init', 10, 0, once: true)]
-    public private(set) ModuleClassHookMetadata $invalidatePostCache {
+    public private(set) ?ModuleClassHookMetadata $invalidatePostCache {
         get {
             return $this->invalidatePostCache ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
                 /** @var array<int, bool> */

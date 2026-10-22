@@ -24,7 +24,7 @@ abstract class WplokerbjmTestCase extends TestCase
      * then flush it explicitly with {@see flushQueuedRemovals()}.
      */
     protected bool $flushQueuedRemovalsAfterDispatch = true;
-    protected QueuedHooksCleaner $queuedHooksCleaner;
+    protected QueuedHooksCleaner $queuedHooksCleaner { get => $this->queuedHooksCleaner ??= new QueuedHooksCleaner(); }
 
     /**
      * Registries created during the current test, used to flush queued
@@ -46,7 +46,7 @@ abstract class WplokerbjmTestCase extends TestCase
 
         // Initialize Brain Monkey
         \Brain\Monkey\setup();
-        
+
 
         // Mock essential WordPress functions
         \Brain\Monkey\Functions\when('get_stylesheet_directory')->justReturn(dirname(__DIR__, 2));
@@ -120,7 +120,7 @@ abstract class WplokerbjmTestCase extends TestCase
     protected function registeredHooks(): array
     {
         if ($this->flushQueuedRemovalsAfterDispatch) {
-            $this->flushQueuedRemovals();
+            ($this->flushQueuedRemovals)();
         }
 
         $hooks = [];
@@ -158,7 +158,7 @@ abstract class WplokerbjmTestCase extends TestCase
     protected function findRegisteredHook(string $type, string $hook): ?array
     {
         if ($this->flushQueuedRemovalsAfterDispatch) {
-            $this->flushQueuedRemovals();
+            ($this->flushQueuedRemovals)();
         }
 
         foreach ($GLOBALS['wp_filter'][$hook]->callbacks ?? [] as $priority => $callbacks) {
@@ -175,37 +175,18 @@ abstract class WplokerbjmTestCase extends TestCase
         return null;
     }
 
-    /**
-     * Track a registry so its queued once-hook removals can be flushed.
-     */
-    protected function trackRegistry(WPHooksContainerRegistry|WPHooksInstanceRegistry $registry): void
-    {
-        if (!in_array($registry, $this->trackedRegistries, true)) {
-            $this->trackedRegistries[] = $registry;
-        }
-    }
+    private \Closure $flushQueuedRemovals {
+        get {
+            return $this->flushQueuedRemovals ??= \Closure::bind(function () {
+                $queued = $this->queuedRemovalEntry ?? [];
+                if ($queued === []) return;
 
-    /**
-     * Flush queued once-hook removals for the given registries (defaults to
-     * every registry tracked in the current test).
-     *
-     * Emulates production behaviour: a queued once-hook removal is only
-     * applied to WordPress once its hook is no longer dispatching. During
-     * dispatch the removal stays queued so `WP_Hook`'s iteration is not
-     * corrupted (see WordPress ticket #61263) - this is why same-hook once
-     * entries linger until a later removal sweeps them.
-     *
-     * @param array<int,WPHooksContainerRegistry&WPHooksInstanceRegistry>|null $registries
-     */
-    protected function flushQueuedRemovals(?array $registries = null): void
-    {
-        $queued = $this->queuedHooksCleaner->queuedRemovalEntry ?? [];
-        if ($queued === []) return;
-
-        foreach ($queued as $idx => $entry) {
-            if ($entry->isCurrentlyExecuting()) continue;
-            $entry->unregister();
-            unset($this->queuedHooksCleaner->queuedRemovalEntry[$idx]);
+                foreach ($queued as $idx => $entry) {
+                    if ($entry->isCurrentlyExecuting()) continue;
+                    $entry->unregister();
+                    unset($this->queuedRemovalEntry[$idx]);
+                }
+            }, $this->queuedHooksCleaner, $this->queuedHooksCleaner);
         }
     }
 
@@ -260,9 +241,6 @@ abstract class WplokerbjmTestCase extends TestCase
             $this->queuedHooksCleaner = new QueuedHooksCleaner(),
             $entriesIndexer
         );
-
-        $this->trackRegistry($registry);
-
         return $registry;
     }
 }

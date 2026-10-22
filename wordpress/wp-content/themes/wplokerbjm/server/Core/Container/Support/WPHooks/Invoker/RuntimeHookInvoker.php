@@ -145,12 +145,8 @@ final class RuntimeInstanceHookInvoker
     /** @var \Closure|null Closure to invoke the method on the stored instance (for non-public methods) */
     private ?\Closure $invoker = null;
 
-    /** @var \WeakReference<object> Weak reference to the owner instance — keeps it collectible (instance-lifetime scoping). */
-    private readonly \WeakReference $instanceRef;
-
     /**
      * @template TClass
-     * @param object<TClass> $instance The object instance to invoke methods on.
      * @param method-string<TClass> $method   The method name.
      * @param InstanceHookMetadataData['visibility'] $visibility
      * @param InstanceHookMetadataData['type'] $type
@@ -160,7 +156,7 @@ final class RuntimeInstanceHookInvoker
      * @param InstanceHookMetadataData['once'] $once
      */
     public function __construct(
-        object $instance,
+        private readonly \WeakReference $instanceRef,
         public readonly string $hookName,
         public readonly int $priority,
         public readonly string $method,
@@ -173,14 +169,12 @@ final class RuntimeInstanceHookInvoker
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
     ) {
-        // Keep the owner collectible: only a weak reference is retained, so
-        // the instance can be garbage-collected while the hook is registered.
-        // On death the hook nukes itself (instance-lifetime scoping).
-        $this->instanceRef = \WeakReference::create($instance);
+        $instance = $this->instanceRef->get();
+        $objectId = \spl_object_id($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->method
-            : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '->' . $this->method;
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
+            : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->method;
 
         if ($this->visibility !== 'public') {
 
@@ -221,13 +215,9 @@ final class RuntimeInstancePropertyHookInvoker
     /** @var \Closure(object, string):mixed|null */
     private ?\Closure $reader = null;
 
-    /** @var \WeakReference<object> Weak reference to the owner instance — keeps it collectible (instance-lifetime scoping). */
-    private readonly \WeakReference $instanceRef;
-
 
     /**
      * @template TClass
-     * @param object<TClass> $instance   The object instance whose property holds the callable.
      * @param property-string<TClass> $property   The property name.
      * @param InstanceHookMetadataData['executeIfParams'] $executeIfParams
      * @param InstanceHookMetadataData['visibility'] $visibility
@@ -237,7 +227,7 @@ final class RuntimeInstancePropertyHookInvoker
      * @param InstanceHookMetadataData['once'] $once
      */
     public function __construct(
-        object $instance,
+        private readonly \WeakReference $instanceRef,
         public readonly string $hookName,
         public readonly int $priority,
         public readonly string $property,
@@ -250,14 +240,12 @@ final class RuntimeInstancePropertyHookInvoker
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
     ) {
-        // Keep the owner collectible: only a weak reference is retained, so
-        // the instance can be garbage-collected while the hook is registered.
-        // On death the hook nukes itself (instance-lifetime scoping).
-        $this->instanceRef = \WeakReference::create($instance);
+        $instance = $this->instanceRef->get() ?? null;
+        $objectId = \spl_object_id($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '->' . $instance->parentProperty . '->' . $this->property
-            : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '->' . $this->property;
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
+            : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->property;
 
         if ($this->visibility !== 'public') {
             // Bind inside the instance's class scope so

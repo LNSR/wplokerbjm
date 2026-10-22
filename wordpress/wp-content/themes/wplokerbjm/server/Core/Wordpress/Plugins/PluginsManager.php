@@ -222,7 +222,7 @@ class PluginManager
      * @phpstan-ignore-next-line
      * @var __CLASS__::class
      */
-    private ModuleClassHookMetadata $pluginEnvironmentCheck {
+    private ?ModuleClassHookMetadata $pluginEnvironmentCheck {
         get {
             return $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
                 private array $pluginsToDisable = [
