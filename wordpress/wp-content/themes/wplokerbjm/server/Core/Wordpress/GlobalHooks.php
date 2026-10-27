@@ -6,6 +6,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\WPLokerBJMBootstrap;
 
 /*======================================================================
  | Temporary Global Hooks Classes Purgatory
@@ -67,14 +68,18 @@ class HTTPHooks
 {
     //** forwarded IP from the SvelteKit frontend
     #[Action(
-        'muplugins_loaded',
+        'mu_plugin_loaded',
         PHP_INT_MIN,
-        once: true,
         registerIf: static function (): bool {
             return !SharedUtils::isDevelopment() && !SharedUtils::isWPCLI();
+        },
+        executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
+            if ($pluginPath !== $bootstrap->nameMUpluginFile) return false;
+            \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [__CLASS__, 'setRemoteAddr']);
+            return true;
         }
     )]
-    public function setRemoteAddr(): void
+    public function setRemoteAddr($pluginPath): void
     {
         if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) {
             $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_CF_CONNECTING_IP'];

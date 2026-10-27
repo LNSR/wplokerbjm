@@ -3,6 +3,7 @@ namespace WPLokerBJM\Services\GraphQL\ETag;
 
 use GraphQL\Executor\ExecutionResult;
 use WPGraphQL\Router;
+use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\WPRestJWTHooks;
 use WPLokerBJM\Shared\Cache\{CacheKey, Cache};
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
 
@@ -146,7 +147,7 @@ class WPGraphQLETag
             if (
                 str_starts_with($name, 'wordpress_logged_in_') ||
                 str_starts_with($name, 'wordpress_sec_') ||
-                $name === 'jwt-token'
+                $name === WPRestJWTHooks::JWT_COOKIE_NAME
             ) {
                 $authCookies[$name] = $value;
             }

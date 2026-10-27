@@ -46,7 +46,7 @@ class CachePurgeHandler
 
                 public function __invoke(): void
                 {
-                    do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $this);
+                    do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $this);
                 }
 
                 #[Action('wp_after_insert_post', 10, 4)]
@@ -119,7 +119,7 @@ class CachePurgeHandler
                     return;
                 }
                 $alreadyRun = true;
-                do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
+                do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
                 try {
                     Cache::deleteMultiple([
                         CacheKey::CAROUSEL_JOBS,

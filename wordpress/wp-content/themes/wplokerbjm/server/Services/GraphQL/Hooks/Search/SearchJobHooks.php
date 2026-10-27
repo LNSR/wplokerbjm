@@ -12,7 +12,7 @@ use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Services\GraphQL\GraphQLRegistration;
 use WPGraphQL\Utils\InstrumentSchema;
 use WPGraphQL\Utils\Tracing;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
+use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Transport\GraphQL\Registration\Job\JobRegistrationTypes;
 
@@ -67,7 +67,7 @@ final class SearchJobHooks
         AppContext $context,
         ResolveInfo $info,
     ) {
-        \do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CLASS, __CLASS__);
+        \do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, __CLASS__);
     }
 
     /**

@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Services\Auth\JWT;
 
+use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\WPRestJWTHooks;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
@@ -113,7 +114,7 @@ class JWTService
             return '.' . $trimmed; // add root prefix for cookie
         };
 
-        setcookie('jwt-token', $token, [
+        setcookie(WPRestJWTHooks::JWT_COOKIE_NAME, $token, [
             'domain' => $domain(),
             'expires' => time() + (7 * 60 * 60 * 24), // 7 day
             'path' => '/',
@@ -121,5 +122,19 @@ class JWTService
             'httponly' => SharedUtils::isDevelopment() ? \is_ssl() : true,
             'samesite' => 'Lax',
         ]);
+    }
+
+    /**
+     * Inject the JWT from the HttpOnly cookie as a Bearer token so the JWT
+     * authentication plugin can authenticate the request transparently.
+     */
+    public function injectJwtFromCookie(): void
+    {
+        if (empty($_COOKIE[WPRestJWTHooks::JWT_COOKIE_NAME])) return;
+        if (!empty($_SERVER['HTTP_AUTHORIZATION'])) return;
+
+        $bearer = 'Bearer ' . $_COOKIE[WPRestJWTHooks::JWT_COOKIE_NAME];
+        $_SERVER['HTTP_AUTHORIZATION'] = $bearer;
+        $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] = $bearer;
     }
 }

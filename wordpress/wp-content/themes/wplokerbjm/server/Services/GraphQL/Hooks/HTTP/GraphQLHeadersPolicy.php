@@ -9,8 +9,8 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use WP_User;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
-use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryEvent;
+use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
+use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryHookEvent;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations\LiteSpeedGraphQLIntegration;
 use WPLokerBJM\Services\GraphQL\ETag\WPGraphQLETag;
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
@@ -83,8 +83,8 @@ final class GraphQLHeadersPolicy
 
         $headers['Logged-In'] = 'true';
         $headers['X-WP-Nonce'] = \graphql_get_nonce();
-        do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'disableGraphQLNocacheHeader']);
-        do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'applyCachePolicy']);
+        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'disableGraphQLNocacheHeader']);
+        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'applyCachePolicy']);
 
         return $headers;
     }

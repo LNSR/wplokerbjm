@@ -2,9 +2,9 @@
 
 namespace WPLokerBJM\Core\Wordpress\Plugins;
 
-use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Wordpress\{ContainerRegistryEvent, InstanceRuntimeRegistryEvent};
+use WPLokerBJM\Core\Wordpress\{ContainerRegistryHookEvent, InstanceRuntimeRegistryHookEvent};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\{
     WPGraphQL\WPGraphQL,
@@ -16,6 +16,7 @@ use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\{
 };
 use WPLokerBJM\Core\Wordpress\Utilities\WPCookieUtils;
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\WPLokerBJMBootstrap;
 
 enum PluginList: string
 {
@@ -94,17 +95,21 @@ class PluginManager
         WPGraphQL::class,
     ];
 
-    #[Action('muplugins_loaded', once: true)]
-    private function boot(): void
+    #[Action('mu_plugin_loaded', executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
+        if ($pluginPath !== $bootstrap->nameMUpluginFile) return false;
+        do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [__CLASS__, 'boot']);
+        return true;
+    })]
+    private function boot(string $pluginPath): void
     {
         $activeCount = $this->unregisterInactivePluginHooks();
         if ($activeCount === 0) {
-            do_action(ContainerRegistryEvent::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
-            do_action(ContainerRegistryEvent::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
             return;
         }
-        do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
-        do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $this->pluginEnvironmentCheck, 'plugins_loaded');
+        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
+        do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $this->pluginEnvironmentCheck, 'plugins_loaded');
     }
 
     /**
@@ -122,8 +127,8 @@ class PluginManager
                 continue;
             }
             Logger::warning("Plugin status", $integrationClass . ' is inactive');
-            do_action(ContainerRegistryEvent::UNREGISTER_BY_CLASS, $integrationClass);
-            do_action(ContainerRegistryEvent::UNREGISTER_DEFERRED_BY_CLASS, $integrationClass);
+            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, $integrationClass);
+            do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CLASS, $integrationClass);
         }
         return $activeCount;
     }
@@ -158,8 +163,8 @@ class PluginManager
             if ($pluginKey !== false) {
                 unset($plugins[$pluginKey]);
                 if ($alreadyUnregistred) continue;
-                do_action(ContainerRegistryEvent::UNREGISTER_BY_CLASS, WPGraphQL::class);
-                do_action(ContainerRegistryEvent::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
+                do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, WPGraphQL::class);
+                do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
                 $alreadyUnregistred = true;
             }
         }

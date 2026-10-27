@@ -11,7 +11,7 @@ use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use RankMath\SEO_Analysis\SEO_Analyzer;
 use RankMath\OpenGraph\Image;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
+use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
 
 /**
  * Rank Math
@@ -32,7 +32,7 @@ final class Rankmath implements PluginConfigInterface
 	#[Action('rank_math/loaded', once: true)]
 	private function boot(): void
 	{
-		\do_action(ContainerRegistryEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
+		\do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
 	}
 
 	/**

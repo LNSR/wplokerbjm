@@ -11,6 +11,7 @@ use ReflectionFunction;
 use ReflectionMethod;
 use ReflectionNamedType;
 use RuntimeException;
+use WPLokerBJM\Core\Container\Attributes\Inject;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -101,11 +102,14 @@ trait HookProviderTrait
          * @var list<CallableHookParams> $params
          */
         $params = [];
-
         foreach ($reflect->getParameters() as $param) {
             $type = $param->getType();
-            $paramType = null;
-            if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
+
+            $attribute = $param->getAttributes(Inject::class)[0] ?? null;
+            $injectInstance = $attribute?->newInstance();
+
+            $paramType = $injectInstance?->name ?? null;
+            if ($type instanceof ReflectionNamedType && $type->getName() === 'self' && $paramType === null) {
                 $reflectClass = $reflect->getClosureScopeClass();
                 $parentClass = $reflectClass?->getParentClass();
                 $isModuleClass = $parentClass ? $parentClass->getName() === ModuleClassHookMetadata::class : false;
@@ -125,7 +129,7 @@ trait HookProviderTrait
                     $paramType = $reflectClass->getName();
                 }
             } else {
-                $paramType = $type instanceof ReflectionNamedType && !$type->isBuiltin() ? $type->getName() : null;
+                $paramType = $type instanceof ReflectionNamedType && !$type->isBuiltin() ? $type->getName() : $paramType;
             }
 
             $hasDefault = $param->isDefaultValueAvailable();

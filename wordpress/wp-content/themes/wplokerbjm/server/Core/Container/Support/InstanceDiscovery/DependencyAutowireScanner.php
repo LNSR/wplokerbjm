@@ -20,7 +20,7 @@ use Nette\Loaders\RobotLoader;
  * @template TClass of class-string
  * @phpstan-type ScannerDefinition array{TClass, AutowireDefinition|null}
  * @see \WPLokerBJM\Core\Container\Definitions\Core
- * @see \WPLokerBJM\Bootstrap
+ * @see WPLokerBJM\WPLokerBJMBootstrap
  */
 class DependencyAutowireScanner
 {

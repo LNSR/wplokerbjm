@@ -5,7 +5,7 @@ namespace WPLokerBJM\Services\WebHooks;
 use WPLokerBJM\Configs\Credential\CloudflareCred;
 use WPLokerBJM\Configs\Credential\CredentialConfig;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
+use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Definitions\Factory;
@@ -59,14 +59,14 @@ class CloudflareCachePurger
     private function createHandler(string $propertyName): \Closure
     {
         if (empty($this->credential->token) || empty($this->credential->zone)) {
-            do_action(ContainerRegistryEvent::UNREGISTER_BY_CLASS, self::class);
+            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, self::class);
             return static fn() => false;
         }
         return function () use ($propertyName): bool {
             static $alreadyRun = false;
             if ($alreadyRun) return true;
             $alreadyRun = true;
-            do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [$this, $propertyName]);
+            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, $propertyName]);
             return $this->purgeAllCache();
         };
     }

@@ -21,7 +21,7 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
  * - #[Inject]                                                  → resolve from the property's declared type.
  * - #[Inject('entry.name')]                                    → resolve a named container entry.
  * - #[Inject([Class::class, 'method/property'])]               → call the method/property/property and inject its return value.
- * - #[Inject([Class::class, 'method/property'], lazy: true)]   → inject a method/propertybound to the instance scope:
+ * - #[Inject([Class::class, 'method/property'], lazy: true)]   → inject a method/property bound to the instance scope:
  * * the declared type runtime contract specified must be closure, TIP: lazy is good if wanted to get live value property
  * @example
  * ```php

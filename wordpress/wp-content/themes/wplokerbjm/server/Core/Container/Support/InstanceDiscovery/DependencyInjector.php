@@ -35,7 +35,7 @@ use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
  * the already-compiled entries and reuses a closure bound to the child class scope to write private and protected members.
  * @template TClass of AsChildClass
  * @phpstan-type ClassTarget TClass
- * @phpstan-type CompiledPlan array{properties: array<string, string|InjectionEntryDTO>}
+ * @phpstan-type CompiledPlan array{properties: array<string, InjectionEntryDTO>}
  * @phpstan-type TSetterClosure Closure(ContainerInterface, ClassTarget, CompiledPlan['properties']): void
  */
 final class DependencyInjector
@@ -153,7 +153,7 @@ class PlanCompiler
         }
     }
 
-    private function resolveDependencyEntry(ReflectionProperty $property, Inject $attribute): string|InjectionEntryDTO
+    private function resolveDependencyEntry(ReflectionProperty $property, Inject $attribute): InjectionEntryDTO
     {
 
         if (!is_bool($attribute->lazy)) {
@@ -176,7 +176,7 @@ class PlanCompiler
                     );
                 }
 
-                return $attribute->name;
+                return new InjectionEntryDTO($attribute->name);
             }
 
             if ($this->isCallableEntry($attribute->name)) {
@@ -195,7 +195,7 @@ class PlanCompiler
             );
         }
 
-        return $type->getName();
+        return new InjectionEntryDTO($type->getName());
     }
     /**
      * @param string|array $entry
@@ -231,30 +231,34 @@ class PlanCompiler
 
         if ($kind === 'property') {
             if ($attribute->lazy) {
-                throw new InvalidArgumentException(
-                    'The #[Inject] lazy flag is only valid with method callables: ' . $property->getName() . '.',
-                );
+                $this->validateLazyTarget($property);
+                return new InjectionEntryDTO($class, $member, $kind, $attribute->lazy);
             }
 
             $this->validatePropertyTargetType($property, $class, $member);
 
-            return new InjectionEntryDTO($class, $member, $kind, false);
+            return new InjectionEntryDTO($class, $member, $kind, $attribute->lazy);
         }
 
         $reflectionMethod = new ReflectionMethod($class, $member);
 
         if ($attribute->lazy) {
-            $type = $property->getType();
-            if (!$type instanceof ReflectionNamedType || $type->getName() !== \Closure::class) {
-                throw new InvalidArgumentException(
-                    'Lazy callable injection requires a \\Closure-typed property: ' . $property->getName() . '.',
-                );
-            }
+            $this->validateLazyTarget($property);
         } else {
             $this->validateValueReturnType($property, $reflectionMethod);
         }
 
         return new InjectionEntryDTO($class, $member, $kind, $attribute->lazy);
+    }
+
+    private function validateLazyTarget(ReflectionProperty $refProperty)
+    {
+        $type = $refProperty->getType();
+        if (!$type instanceof ReflectionNamedType || $type->getName() !== \Closure::class) {
+            throw new InvalidArgumentException(
+                'Lazy callable injection requires a \\Closure-typed property: ' . $refProperty->getName() . '.',
+            );
+        }
     }
 
     /**
@@ -544,10 +548,11 @@ class ScopeAccessFactory
             return $this->callableResolver ??= function (ContainerInterface $c, InjectionEntryDTO $entry): mixed {
                 /** @var array<string, TFactoryClosure> $closureFactoriesCache */
                 static $closureFactoriesCache = [];
-                
+
                 /** @var Closure(InjectionEntryDTO): TFactoryClosure */
                 static $templateFactory = static function (InjectionEntryDTO $entry): Closure {
                     static $property;
+                    static $propertyLazy;
                     static $method;
                     static $methodLazy;
 
@@ -555,10 +560,13 @@ class ScopeAccessFactory
                         /** @var TFactoryClosure $factory */
                         $factory = Closure::bind(
                             match ($entry->kind) {
-                                'property' => $property ??= static fn(object $instance, InjectionEntryDTO $entry): mixed => $instance->{$entry->member},
+                                'property' => $entry->lazy
+                                    ? $propertyLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => Closure::bind(static fn(): mixed => $c->get($entry->class)->{$entry->member}, null, $entry->class)
+                                    : $property ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): mixed => $c->get($entry->class)->{$entry->member},
                                 'method' => $entry->lazy
-                                    ? $methodLazy ??= static fn(object $instance, InjectionEntryDTO $entry): Closure => $instance->{$entry->member}(...)
-                                    : $method ??= static fn(object $instance, InjectionEntryDTO $entry): mixed => $instance->{$entry->member}(),
+                                //** no FCC, FCC implicitly bind $this. Break lazy */
+                                    ? $methodLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => Closure::bind(static fn(...$args): mixed => $c->get($entry->class)->{$entry->member}(...$args), null, $entry->class)
+                                    : $method ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): mixed => $c->get($entry->class)->{$entry->member}(),
                             },
                             null,
                             $entry->class,
@@ -570,11 +578,10 @@ class ScopeAccessFactory
                     }
                 };
 
-                $instance = $c->get($entry->class);
                 $factoryKey = $entry->class . '->' . $entry->member . '#' . $entry->kind . ($entry->lazy ? '#lazy' : '#value');
                 $factory = $closureFactoriesCache[$factoryKey] ??= $templateFactory($entry);
 
-                return $factory($instance, $entry);
+                return $factory($c, $entry);
             };
         }
     }
@@ -596,9 +603,9 @@ class ScopeAccessFactory
                  */
                 static $setterTemplateClosure = static function (ContainerInterface $c, AsChildClass $target, array $properties) use ($resolver): void {
                     foreach ($properties as $property => $entry) {
-                        $target->{$property} = $entry instanceof InjectionEntryDTO
+                        $target->{$property} = $entry->kind !== null
                             ? $resolver($c, $entry)
-                            : $c->get($entry);
+                            : $c->get($entry->class);
                     }
                 };
 

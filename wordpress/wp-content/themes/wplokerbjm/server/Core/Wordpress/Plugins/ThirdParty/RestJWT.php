@@ -11,6 +11,9 @@ use WPLokerBJM\Shared\Utilities\{SharedUtils};
  */
 final class WPRestJWTHooks implements PluginConfigInterface
 {
+
+    public const string JWT_COOKIE_NAME = 'jwt-token';
+    
     public static function isActive(): bool
     {
         return PluginList::JwtAuthenticationForWpRestApi->isActive();

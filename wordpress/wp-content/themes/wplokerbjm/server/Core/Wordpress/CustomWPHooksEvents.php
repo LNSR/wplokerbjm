@@ -11,7 +11,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry
 /**
  * @suppress PHP7104
  */
-class ContainerRegistryEvent
+class ContainerRegistryHookEvent
 {
     #region deferred handlers activation hooks
     public const ACTIVATE_DEFERRED_BY_HOOK = 'wplokerbjm_container_activate_deferred_by_hook';
@@ -47,43 +47,43 @@ class ContainerRegistryEvent
 
     #region deferred handlers activation methods
     #[Action(self::ACTIVATE_DEFERRED_BY_HOOK, 10, 1)]
-    private function activateDeferredByHook(string $hook): void
+    protected function activateDeferredByHook(string $hook): void
     {
         $this->containerRegistry->activateDeferredByHook($hook);
     }
 
     #[Action(self::ACTIVATE_DEFERRED_BY_CLASS, 10, 1)]
-    private function activateDeferredByClass(string $class): void
+    protected function activateDeferredByClass(string $class): void
     {
         $this->containerRegistry->activateDeferredByClass($class);
     }
 
     #[Action(self::ACTIVATE_DEFERRED_BY_CALLABLE, 10, 1)]
-    private function activateDeferredByCallable(callable|string|array $target): void
+    protected function activateDeferredByCallable(callable|string|array $target): void
     {
         $this->containerRegistry->activateDeferredByCallable($target);
     }
 
     #[Action(self::ACTIVATE_DEFERRED_BY_TAGS, 10, 1)]
-    private function activateDeferredByTags(array $tags): void
+    protected function activateDeferredByTags(array $tags): void
     {
         $this->containerRegistry->activateDeferredByTags($tags);
     }
 
     #[Action(self::ACTIVATE_DEFERRED_BY_NAMESPACE, 10, 1)]
-    private function activateDeferredByNamespace(string $namespace): void
+    protected function activateDeferredByNamespace(string $namespace): void
     {
         $this->containerRegistry->activateDeferredByNamespace($namespace);
     }
 
     #[Action(self::ACTIVATE_DEFERRED_BY_HOOK_PATTERN, 10, 1)]
-    private function activateDeferredByHookPattern(string $pattern): void
+    protected function activateDeferredByHookPattern(string $pattern): void
     {
         $this->containerRegistry->activateDeferredByHookPattern($pattern);
     }
 
     #[Action(self::ACTIVATE_DEFERRED_BY_TAG_PATTERN, 10, 1)]
-    private function activateDeferredByTagPattern(array $patterns): void
+    protected function activateDeferredByTagPattern(array $patterns): void
     {
         $this->containerRegistry->activateDeferredByTagPattern($patterns);
     }
@@ -91,43 +91,43 @@ class ContainerRegistryEvent
 
     #region deferred handlers unregistration methods
     #[Action(self::UNREGISTER_DEFERRED_BY_CALLABLE, 10, 1)]
-    private function unregisterDeferredByCallable(callable|string|array $target): void
+    protected function unregisterDeferredByCallable(callable|string|array $target): void
     {
         $this->containerRegistry->unregisterDeferredByCallable($target);
     }
 
     #[Action(self::UNREGISTER_DEFERRED_BY_HOOK, 10, 1)]
-    private function unregisterDeferredByHook(string $hook): void
+    protected function unregisterDeferredByHook(string $hook): void
     {
         $this->containerRegistry->unregisterDeferredByHook($hook);
     }
 
     #[Action(self::UNREGISTER_DEFERRED_BY_CLASS, 10, 1)]
-    private function unregisterDeferredByClass(string $class): void
+    protected function unregisterDeferredByClass(string $class): void
     {
         $this->containerRegistry->unregisterDeferredByClass($class);
     }
 
     #[Action(self::UNREGISTER_DEFERRED_BY_NAMESPACE, 10, 1)]
-    private function unregisterDeferredByNamespace(string $namespace): void
+    protected function unregisterDeferredByNamespace(string $namespace): void
     {
         $this->containerRegistry->unregisterDeferredByNamespace($namespace);
     }
 
     #[Action(self::UNREGISTER_DEFERRED_BY_TAGS, 10, 1)]
-    private function unregisterDeferredByTags(array $tags): void
+    protected function unregisterDeferredByTags(array $tags): void
     {
         $this->containerRegistry->unregisterDeferredByTags($tags);
     }
 
     #[Action(self::UNREGISTER_DEFERRED_BY_HOOK_PATTERN, 10, 1)]
-    private function unregisterDeferredByHookPattern(string $pattern): void
+    protected function unregisterDeferredByHookPattern(string $pattern): void
     {
         $this->containerRegistry->unregisterDeferredByHookPattern($pattern);
     }
 
     #[Action(self::UNREGISTER_DEFERRED_BY_TAG_PATTERN, 10, 1)]
-    private function unregisterDeferredByTagPattern(array $patterns): void
+    protected function unregisterDeferredByTagPattern(array $patterns): void
     {
         $this->containerRegistry->unregisterDeferredByTagPattern($patterns);
     }
@@ -135,43 +135,43 @@ class ContainerRegistryEvent
 
     #region active handlers unregistration methods
     #[Action(self::UNREGISTER_BY_CALLABLE, 10, 1)]
-    private function unregisterByCallable(callable|string|array $target): void
+    protected function unregisterByCallable(callable|string|array $target): void
     {
         $this->containerRegistry->unregisterByCallable($target);
     }
 
     #[Action(self::UNREGISTER_BY_HOOK, 10, 1)]
-    private function unregisterByHook(string $hook): void
+    protected function unregisterByHook(string $hook): void
     {
         $this->containerRegistry->unregisterByHook($hook);
     }
 
     #[Action(self::UNREGISTER_BY_CLASS, 10, 1)]
-    private function unregisterByClass(string $class): void
+    protected function unregisterByClass(string $class): void
     {
         $this->containerRegistry->unregisterByClass($class);
     }
 
     #[Action(self::UNREGISTER_BY_NAMESPACE, 10, 1)]
-    private function unregisterByNamespace(string $namespace): void
+    protected function unregisterByNamespace(string $namespace): void
     {
         $this->containerRegistry->unregisterByNamespace($namespace);
     }
 
     #[Action(self::UNREGISTER_BY_TAGS, 10, 1)]
-    private function unregisterByTags(array $tags): void
+    protected function unregisterByTags(array $tags): void
     {
         $this->containerRegistry->unregisterByTags($tags);
     }
 
     #[Action(self::UNREGISTER_BY_HOOK_PATTERN, 10, 1)]
-    private function unregisterByHookPattern(string $pattern): void
+    protected function unregisterByHookPattern(string $pattern): void
     {
         $this->containerRegistry->unregisterByHookPattern($pattern);
     }
 
     #[Action(self::UNREGISTER_BY_TAG_PATTERN, 10, 1)]
-    private function unregisterByTagPattern(array $patterns): void
+    protected function unregisterByTagPattern(array $patterns): void
     {
         $this->containerRegistry->unregisterByTagPattern($patterns);
     }
@@ -181,7 +181,7 @@ class ContainerRegistryEvent
 /**
  * @suppress PHP7104
  */
-class InstanceRuntimeRegistryEvent
+class InstanceRuntimeRegistryHookEvent
 {
     public const REGISTER_HOOKS = 'wplokerbjm_register_runtime_hook';
     public const UNREGISTER_HOOKS = 'wplokerbjm_unregister_runtime_hook';
@@ -189,12 +189,12 @@ class InstanceRuntimeRegistryEvent
     public function __construct(private readonly WPHooksInstanceRegistry $runtimeRegistry) {}
 
     #[Action(self::REGISTER_HOOKS, 10, 2)]
-    private function registerRuntimeHook(ModuleClassHookMetadata $target, ?string $autoUnregisterAtHook = null): void
+    protected function registerRuntimeHook(ModuleClassHookMetadata $target, ?string $autoUnregisterAtHook = null): void
     {
         $this->runtimeRegistry->registerHooksOn($target, $autoUnregisterAtHook);
     }
     #[Action(self::UNREGISTER_HOOKS, 10, 1)]
-    private function unregisterRuntimeHook(ModuleClassHookMetadata $target): void
+    protected function unregisterRuntimeHook(ModuleClassHookMetadata $target): void
     {
         $this->runtimeRegistry->unregisterHooksOn($target);
     }
@@ -209,7 +209,7 @@ class DependencyInjectorEvent
     public function __construct(private readonly DependencyInjector $injector) {}
 
     #[Action(self::INJECT_ON, 10, 1)]
-    private function injectOn(AsChildClass $target): void
+    protected function injectOn(AsChildClass $target): void
     {
         $this->injector->injectOn($target);
     }

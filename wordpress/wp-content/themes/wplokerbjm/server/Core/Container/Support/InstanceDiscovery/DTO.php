@@ -27,8 +27,8 @@ final readonly class InjectionEntryDTO extends AbstractDataObject
      */
     public function __construct(
         public string $class,
-        public string $member,
-        public string $kind,
-        public bool $lazy,
+        public ?string $member = null,
+        public ?string $kind = null,
+        public ?bool $lazy = null,
     ) {}
 }

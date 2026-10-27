@@ -4,7 +4,7 @@ namespace WPLokerBJM\Core\Wordpress\Plugins\ThirdParty;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryEvent;
+use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryHookEvent;
 use WPLokerBJM\Core\Wordpress\Plugins\PluginConfigInterface;
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Models\Schema\CustomFields;
@@ -27,7 +27,7 @@ final class MetaBox implements PluginConfigInterface
         $modules = [$this->registerCustomModels, $this->metaboxBugsPatch];
 
         foreach ($modules as $module) {
-            do_action(InstanceRuntimeRegistryEvent::REGISTER_HOOKS, $module);
+            do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $module);
         }
     }
 
@@ -56,9 +56,9 @@ final class MetaBox implements PluginConfigInterface
             private PostTypes $postTypes;
 
             #[Filter('rwmb_meta_boxes')]
-            public function registerCustomFields($meta_boxes): void
+            public function registerCustomFields(array $meta_boxes): array
             {
-                $this->customFields->lowonganCustomFields($meta_boxes);
+                return $this->customFields->lowonganCustomFields($meta_boxes);
             }
             #[Action('init', once: true)]
             public function registerPostTypes(): void

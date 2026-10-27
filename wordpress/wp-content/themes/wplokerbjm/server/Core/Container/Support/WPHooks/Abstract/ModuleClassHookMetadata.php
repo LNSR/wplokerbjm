@@ -8,8 +8,8 @@ use Override;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
-use WPLokerBJM\Core\Wordpress\ContainerRegistryEvent;
-use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryEvent;
+use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
+use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryHookEvent;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 
@@ -74,10 +74,10 @@ abstract class ModuleClassHookMetadata extends AsChildClass
     public function __destruct()
     {
         if (\defined('WPLOKERBJM_TEST_ENV') && WPLOKERBJM_TEST_ENV) return;
-        \do_action(InstanceRuntimeRegistryEvent::UNREGISTER_HOOKS, $this);
+        \do_action(InstanceRuntimeRegistryHookEvent::UNREGISTER_HOOKS, $this);
 
         if (!\method_exists($this, '__invoke')) return;
-        \do_action(ContainerRegistryEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
-        \do_action(ContainerRegistryEvent::UNREGISTER_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
+        \do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
+        \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
     }
 }

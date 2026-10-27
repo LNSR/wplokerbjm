@@ -91,14 +91,6 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $this->assertCount(1, $setters);
     }
 
-    // public function testRejectsNamedAsChildClassTarget(): void
-    // {
-    //     $this->expectException(\InvalidArgumentException::class);
-    //     $this->expectExceptionMessageIsOrContains('only accepts anonymous classes');
-
-    //     $this->injector($this->containerReturning([]))->injectOn(new NamedDependencyChild('Parent', 'child'));
-    // }
-
     public function testRejectsStaticPropertyInjection(): void
     {
         $target = new class (self::class, 'static') extends AsChildClass {
@@ -273,19 +265,6 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $this->injector($container)->injectOn($target);
 
         $this->assertSame('hello', $target->child()->greet());
-    }
-
-    public function testRejectsLazyOnPropertyCallable(): void
-    {
-        $target = new class (self::class, 'bad-lazy-prop') extends AsChildClass {
-            #[Inject([CallableProvider::class, 'publicClosure'], lazy: true)]
-            private \Closure $factory;
-        };
-
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessageIsOrContains('lazy flag is only valid with method callables');
-
-        $this->injector($this->containerReturning([]))->injectOn($target);
     }
 
     public function testRejectsPropertyTargetTypeMismatch(): void
