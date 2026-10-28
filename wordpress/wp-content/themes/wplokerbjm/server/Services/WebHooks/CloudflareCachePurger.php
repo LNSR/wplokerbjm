@@ -54,7 +54,7 @@ class CloudflareCachePurger
 
     /** 
      * @param string $propertyName string magic
-     * @return \Closure
+     * @return \Closure: bool
      */
     private function createHandler(string $propertyName): \Closure
     {

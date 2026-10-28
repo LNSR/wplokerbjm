@@ -91,7 +91,7 @@ class WPLokerBJMBootstrap
         }
     }
 
-    private function init(): void
+    protected function init(): void
     {
         try {
             $this->container = new WPLokerBJMContainer(

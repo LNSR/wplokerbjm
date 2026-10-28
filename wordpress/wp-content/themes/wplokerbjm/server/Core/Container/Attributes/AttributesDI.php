@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Attributes;
 
 use Attribute;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 
 /**
@@ -30,6 +32,9 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
  *  private \Closure $resolve
  * }
  * ```
+ * @note TARGET::METHOD unused currently and has no implementation (implementation is set to TARGET_PROPERTY only) for @see DependencyInjector
+ * While TARGET_PARAMETER currently used for WPHooks side @see HookProviderTrait::buildCallablePlanFromReflector
+ *
  */
 #[Attribute(Attribute::TARGET_PROPERTY | Attribute::TARGET_METHOD | Attribute::TARGET_PARAMETER)]
 final readonly class Inject extends AbstractDataObject

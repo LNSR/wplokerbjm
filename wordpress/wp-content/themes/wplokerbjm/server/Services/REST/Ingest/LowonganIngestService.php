@@ -28,7 +28,8 @@ final class LowonganIngestService
     public function __construct(
         private readonly LowonganIngestImageHandler $imageHandler,
         private readonly LowonganIngestPayloadHandler $payloadHandler,
-        private readonly LowonganIngestTaxonomyResolver $taxonomyResolver
+        private readonly LowonganIngestTaxonomyResolver $taxonomyResolver,
+        private readonly LowonganIngestLogBuilder $ingestLogBuilder
     ) {}
 
     /**
@@ -42,7 +43,7 @@ final class LowonganIngestService
     {
         $warnings = [];
         $title = sanitize_text_field((string) ($payload['title'] ?? ''));
-        $logContext = LowonganIngestLogBuilder::buildLogContext($payload, $featuredImage, $title);
+        $logContext = $this->ingestLogBuilder->buildLogContext($payload, $featuredImage, $title);
 
         Logger::debug(LowonganIngestLogBuilder::LOG_CATEGORY, 'Starting lowongan draft ingest.', $logContext);
 
@@ -84,7 +85,7 @@ final class LowonganIngestService
         ]);
 
         if (is_wp_error($postId) || (int) $postId <= 0) {
-            Logger::error(LowonganIngestLogBuilder::LOG_CATEGORY, 'WordPress failed to create the lowongan draft.', array_merge($logContext, LowonganIngestLogBuilder::getWordPressErrorContext($postId)));
+            Logger::error(LowonganIngestLogBuilder::LOG_CATEGORY, 'WordPress failed to create the lowongan draft.', array_merge($logContext, $this->ingestLogBuilder->getWordPressErrorContext($postId)));
             return $this->errorResult(500, 'post_create_failed', 'Unable to create lowongan draft.', $warnings);
         }
 
@@ -160,7 +161,7 @@ final class LowonganIngestService
 
 class LowonganIngestTaxonomyResolver
 {
-    public function __construct(private TaxonomyRepository $taxonomyRepository) {}
+    public function __construct(private TaxonomyRepository $taxonomyRepository, private LowonganIngestLogBuilder $ingestLogBuilder) {}
 
     private const SCHEMA = 'lowongan_ingest_options.v1';
 
@@ -209,7 +210,7 @@ class LowonganIngestTaxonomyResolver
                         'taxonomy' => $taxonomy,
                         'term_ids' => $termIds,
                     ],
-                    LowonganIngestLogBuilder::getWordPressErrorContext($result),
+                    $this->ingestLogBuilder->getWordPressErrorContext($result),
                 ));
             }
         }
@@ -304,6 +305,8 @@ class LowonganIngestImageHandler
 {
     public const HASH_META_KEY = '_wplokerbjm_ingest_hash';
 
+    public function __construct(private LowonganIngestLogBuilder $ingestLogBuilder) {}
+
     /**
      * @param array{tmp_name?: string, name?: string, error?: int}|null $featuredImage
      * @return array{code: string, message: string}|null Validation error, or null if valid
@@ -345,7 +348,7 @@ class LowonganIngestImageHandler
         $posts = JobQuery::findPostIdForIngest(self::HASH_META_KEY, $hash);
         if (is_wp_error($posts) || empty($posts)) {
             if (is_wp_error($posts)) {
-                Logger::error(LowonganIngestLogBuilder::LOG_CATEGORY, 'Duplicate flyer lookup failed.', LowonganIngestLogBuilder::getWordPressErrorContext($posts));
+                Logger::error(LowonganIngestLogBuilder::LOG_CATEGORY, 'Duplicate flyer lookup failed.', $this->ingestLogBuilder->getWordPressErrorContext($posts));
             }
             return null;
         }
@@ -373,7 +376,7 @@ class LowonganIngestImageHandler
         if (is_wp_error($attachmentId) || (int) $attachmentId <= 0) {
             Logger::error(LowonganIngestLogBuilder::LOG_CATEGORY, 'Featured image upload failed.', array_merge(
                 $logContext,
-                LowonganIngestLogBuilder::getWordPressErrorContext($attachmentId),
+                $this->ingestLogBuilder->getWordPressErrorContext($attachmentId),
             ));
             return null;
         }
@@ -604,7 +607,7 @@ class LowonganIngestLogBuilder
      * @param array{name?: string, type?: string, size?: int, error?: int}|null $featuredImage
      * @return array{title: string, source: string, payload_fields: list<string>, image_name: string, image_type: string, image_size: int|null, image_upload_error: int|null}
      */
-    public static function buildLogContext(array $payload, ?array $featuredImage, string $title): array
+    public function buildLogContext(array $payload, ?array $featuredImage, string $title): array
     {
         return [
             'title' => $title,
@@ -621,7 +624,7 @@ class LowonganIngestLogBuilder
      * @param ?\WP_Error $value
      * @return array{wp_error_code?: string, wp_error_message?: string}
      */
-    public static function getWordPressErrorContext(?\WP_Error $value): array
+    public function getWordPressErrorContext(?\WP_Error $value): array
     {
         if (!is_object($value)) {
             return [];
