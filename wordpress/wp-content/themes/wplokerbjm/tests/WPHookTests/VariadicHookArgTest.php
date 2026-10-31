@@ -6,6 +6,7 @@ namespace WPLokerBJM\Tests\WPHookTests;
 
 use DI\Container;
 use DI\ContainerBuilder;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\VariadicHookService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -15,8 +16,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  *
  * `hookArgs` is the handler's own CallableHookParams plan; a trailing
  * isVariadic parameter makes the runtime forward the whole argument
- * remainder truthfully under that name — mirrors
- * server/Core/Container/Test.php and SearchJobHooks.php usage.
+ * remainder truthfully under that name
  */
 final class VariadicHookArgTest extends WplokerbjmTestCase
 {

@@ -20,7 +20,7 @@
   },
   "scripts": {
     "watch:autoload": [
-      "php ./tools/Composer/Scripts/generate-meta-hooks.php & ./tools/Composer/Scripts/autoloadwatcher.sh"
+      "php ./tools/Composer/Scripts/generate-meta-hooks.php && ./tools/Composer/Scripts/autoloadwatcher.sh"
     ],
     "post-update-cmd": [
       "composer dump-autoload --apcu -a -o"

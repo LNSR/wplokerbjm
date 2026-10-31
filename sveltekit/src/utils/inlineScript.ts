@@ -5,7 +5,7 @@ import {
     localStorageThemeActions,
 } from "@/utils/theme";
 
-void function inlineThemeScript()
+void function inlineThemeScript(): void
 {
     try
     {
