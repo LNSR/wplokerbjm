@@ -16,9 +16,11 @@ class CacheTest extends WplokerbjmTestCase
     {
         parent::setUp();
 
-        // Define LSOC_PREFIX for testing (mimics LiteSpeed's behavior)
+        // Simulate LSCWP v7.x LSOC_PREFIX (sha256 site identity), normally
+        // defined by WP_Object_Cache::__construct() in
+        // litespeed-cache/src/object-cache-wp.cls.php.
         if (!defined('LSOC_PREFIX')) {
-            define('LSOC_PREFIX', 'cf8e0');
+            define('LSOC_PREFIX', hash('sha256', 'wplokerbjm-test-identity'));
         }
 
         // Create an instance of RedisAdapter for testing
@@ -175,7 +177,7 @@ class CacheTest extends WplokerbjmTestCase
 
     public function testDeletePattern()
     {
-        // Test pattern-based deletion using Redis::deletePattern
+        // Test registry-based deletion against LSCWP v7.x opaque keys
         if (!extension_loaded('redis')) {
             $this->fail('Redis extension is not loaded. Install with: pecl install redis && echo "extension=redis.so" >> php.ini');
         }
@@ -189,49 +191,59 @@ class CacheTest extends WplokerbjmTestCase
             $this->fail('Redis connection failed - cannot test deletePattern');
         }
 
-        // Determine the salt (LSOC_PREFIX or fallback)
-        $wp_content_dir = '/var/www/html/wp-content'; // Hardcoded for test environment
-        $lscwp_dir = (defined('WP_PLUGIN_DIR') ? WP_PLUGIN_DIR : $wp_content_dir . '/plugins') . '/litespeed-cache/';
-        $cls_file = $lscwp_dir . 'src/object-cache-wp.cls.php';
-        $expectedSalt = defined('LSOC_PREFIX') && is_string(LSOC_PREFIX) && !empty(LSOC_PREFIX) ? LSOC_PREFIX : substr(md5($cls_file), -5);
+        $prefix = 'phpunit_test_pattern_';
+        $registryKey = RedisAdapter::registryKeyFor($prefix);
+        $suffix = time();
 
         Terminal::out("\033[0;36mPattern Configuration:\033[0m\n");
-        Terminal::out("  \033[0;33m•\033[0m Expected Salt: \033[0;32m{$expectedSalt}\033[0m\n");
+        Terminal::out("  \033[0;33m•\033[0m Salt (LSOC_PREFIX): \033[0;32m" . LSOC_PREFIX . "\033[0m\n");
         Terminal::out("  \033[0;33m•\033[0m Cache Prefix: \033[0;32m" . CacheKey::OBJECT_CACHE_PREFIX . "\033[0m\n");
+        Terminal::out("  \033[0;33m•\033[0m Registry Key: \033[0;32m{$registryKey}\033[0m\n");
 
-        // Create test keys directly in Redis with the correct format
-        $testPattern = 'phpunit_test_pattern_' . time() . '_*';
-        $testKeys = [
-            $expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.phpunit_test_pattern_' . time() . '_1',
-            $expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.phpunit_test_pattern_' . time() . '_2',
-            $expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.phpunit_test_pattern_' . time() . '_3',
-        ];
-
-        Terminal::out("\n\033[0;36mSetting up test keys:\033[0m\n");
-        foreach ($testKeys as $key) {
-            $redis->set($key, 'test_value', 300); // 5 minute expiry
-            Terminal::out("  \033[0;32m✓\033[0m Set key: {$key}\n");
+        // Simulate LSCWP v7.x storage: only the final hashed keys exist in Redis
+        $finalKeys = [];
+        for ($n = 1; $n <= 3; $n++) {
+            $finalKey = $this->adapter->buildObjectCacheKey($prefix . $suffix . '_' . $n);
+            $finalKeys[] = $finalKey;
+            $this->assertNotFalse($redis->set($finalKey, 'test_value', 300), 'Failed to set test key');
+            Terminal::out("  \033[0;32m✓\033[0m Set key: {$finalKey}\n");
         }
 
-        // Verify keys exist
-        $existingKeys = $redis->keys($expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.' . $testPattern);
+        // Record keys the same way Cache::set() does at runtime
+        foreach ($finalKeys as $finalKey) {
+            $this->adapter->registerKey($prefix, $finalKey);
+        }
+
+        // Verify registry holds exactly the test keys
+        $members = $redis->sMembers($registryKey);
         Terminal::out("\n\033[0;36mKeys before deletion:\033[0m\n");
-        Terminal::out("  \033[0;33m•\033[0m Found " . count($existingKeys) . " keys matching pattern\n");
-        $this->assertCount(3, $existingKeys, 'Test keys were not set correctly');
+        Terminal::out("  \033[0;33m•\033[0m Found " . count($members) . " registered keys\n");
+        $this->assertCount(3, $members, 'Registry did not record test keys');
 
         // Call deletePattern
-        $patternToDelete = 'phpunit_test_pattern_' . time() . '_*';
-        $deletedCount = $this->adapter->deletePattern([$patternToDelete]);
+        $deletedCount = $this->adapter->deletePattern([$prefix . '*']);
 
         Terminal::out("\n\033[0;36mDelete Pattern Result:\033[0m\n");
         Terminal::out("  \033[0;33m•\033[0m Deleted count: \033[0;32m{$deletedCount}\033[0m\n");
-        $this->assertEquals(3, $deletedCount, 'deletePattern did not delete the expected number of keys');
+        $this->assertSame(3, $deletedCount, 'deletePattern did not delete the expected number of keys');
 
-        // Verify keys are gone
-        $remainingKeys = $redis->keys($expectedSalt . CacheKey::OBJECT_CACHE_PREFIX . '.' . $testPattern);
-        Terminal::out("  \033[0;33m•\033[0m Remaining keys: \033[0;32m" . count($remainingKeys) . "\033[0m\n");
-        $this->assertCount(0, $remainingKeys, 'Keys were not deleted by deletePattern');
+        // Verify final keys are gone and the registry was cleared
+        $this->assertSame([], $redis->sMembers($registryKey), 'Registry SET was not cleared after purge');
+        $this->assertSame(0, $redis->exists($finalKeys), 'Final keys still present after purge');
 
         Terminal::out("\n\033[0;32m✅ Delete Pattern Test Passed\033[0m\n");
+    }
+
+    public function testBuildObjectCacheKeyReplicatesLiteSpeedV7()
+    {
+        // Locks the _key() format of litespeed-cache/src/object-cache-wp.cls.php
+        // so future LSCWP changes surface as a failing test.
+        $key = 'job_grid_unit_' . time();
+
+        $group = CacheKey::OBJECT_CACHE_PREFIX;
+        $expected = LSOC_PREFIX . ':'
+            . hash('sha256', '0:' . strlen($group) . ':' . $group . ':' . $key);
+
+        $this->assertSame($expected, $this->adapter->buildObjectCacheKey($key));
     }
 }

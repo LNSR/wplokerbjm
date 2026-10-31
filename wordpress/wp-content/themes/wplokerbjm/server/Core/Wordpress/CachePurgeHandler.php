@@ -130,21 +130,10 @@ class CachePurgeHandler
                         CacheKey::TAXONOMY_DEPTH_PENDIDIKAN,
                     ]);
 
-                    $this->redisAdapter->deletePattern([
-                        CacheKey::JOB_GRID_PREFIX . '*',
-                        CacheKey::SEARCH_SQL_PREFIX . '*',
-                        CacheKey::LOAD_MORE_PREFIX . '*',
-                        CacheKey::AUTO_SUGGESTION_PREFIX . '*',
-                        CacheKey::POST_TAXONOMIES_PREFIX . '*',
-                        CacheKey::GRAPHQL_JOB_DETAIL_PREFIX . '*',
-                        CacheKey::GRAPHQL_JOB_CARD_PREFIX . '*',
-                        CacheKey::DYNAMIC_SEARCH_PREFIX . '*',
-                        CacheKey::SYNC_BOOKMARK_PREFIX . '*',
-                        CacheKey::GRAPHQL_JOB_SCHEMA_BATCH_PREFIX . '*',
-                        CacheKey::RANKMATH_HEAD_PREFIX . '*',
-                        CacheKey::GRAPHQL_ETAG_PREFIX . '*',
-                        CacheKey::THEME_DATA . '*',
-                    ]);
+                    $this->redisAdapter->deletePattern(array_map(
+                        static fn (string $prefix): string => $prefix . '*',
+                        CacheKey::PATTERN_PURGE_PREFIXES,
+                    ));
                 } catch (\Throwable $e) {
                     Logger::error(static::class, '::' . $__propertyName . ' Error: ', [
                         'message' => $e->getMessage(),

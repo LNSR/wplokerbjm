@@ -31,6 +31,9 @@ class Cache
                 return false;
             }
             $result = wp_cache_set($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            if ($result) {
+                CacheRegistry::record($key);
+            }
             Logger::info('Cache', "Cache set result for key '{$key}': " . ($result ? 'success' : 'failure'));
             return $result;
         } catch (\Exception $e) {
@@ -101,6 +104,11 @@ class Cache
                 return $results;
             }
             $results = wp_cache_set_multiple($data, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            foreach ($results as $key => $result) {
+                if ($result) {
+                    CacheRegistry::record((string) $key);
+                }
+            }
             return $results;
         } catch (\Exception $e) {
             Logger::error('Cache', 'Cache::setMultiple error: ' . $e->getMessage());
@@ -150,6 +158,9 @@ class Cache
                 return false;
             }
             $result = wp_cache_add($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            if ($result) {
+                CacheRegistry::record($key);
+            }
             Logger::info('Cache', "Cache add result for key '{$key}': " . ($result ? 'success' : 'failure'));
             return $result;
         } catch (\Exception $e) {
@@ -270,6 +281,9 @@ class Cache
             }
             Logger::info('Cache', "Replacing cache key: '{$key}' with group: '" . CacheKey::OBJECT_CACHE_PREFIX . "' and expiration: {$expiration}");
             $result = wp_cache_replace($key, $value, CacheKey::OBJECT_CACHE_PREFIX, $expiration);
+            if ($result) {
+                CacheRegistry::record($key);
+            }
             Logger::info('Cache', "Cache replace result for key '{$key}': " . ($result ? 'success' : 'failure'));
             return $result;
         } catch (\Exception $e) {
@@ -346,49 +360,4 @@ class Cache
     }
 
 
-}
-
-/**
- * Cache key definitions
- *
- * Centralized definition of all cache keys and prefixes used in the application.
- * Helps avoid typos and ensures consistency across the codebase.
- */
-class CacheKey
-{
-    // General cache prefixes and keys
-    const OBJECT_CACHE_PREFIX = 'wplokerbjm_obj_';
-    const THEME_DATA = 'theme_data';
-
-    // Job-related
-    const JOB_DATA_PREFIX = 'job_data_';
-    const JOB_SCHEMA_PREFIX = 'job_schema_';
-    const JOB_LAST_MODIFIED = 'job_last_modified';
-
-    // GraphQL API
-    const GRAPHQL_JOB_CARD_PREFIX = 'graphql_job_card_';
-    const GRAPHQL_JOB_DETAIL_PREFIX = 'graphql_job_detail_';
-    const GRAPHQL_JOB_SCHEMA_BATCH_PREFIX = 'graphql_job_schema_batch_';
-    const AUTO_SUGGESTION_PREFIX = 'auto_suggestion_';
-    const LOAD_MORE_PREFIX = 'load_more_';
-    const DYNAMIC_SEARCH_PREFIX = 'dynamic_search_';
-    const SYNC_BOOKMARK_PREFIX = 'sync_bookmark_';
-    const RANKMATH_HEAD_PREFIX = 'rankmath_head_';
-
-    // Presenters
-    const CAROUSEL_JOBS = 'carousel_jobs';
-    const JOB_GRID_PREFIX = 'job_grid_';
-
-    // Taxonomy
-    const POST_TAXONOMIES_PREFIX = 'post_taxonomies_';
-    const TAXONOMY_DEPTH_HANDLE = 'taxonomy_depth_handle';
-    const TAXONOMY_DEPTH_LOKASI = 'taxonomy_depth_lokasi';
-    const TAXONOMY_DEPTH_GENDER = 'taxonomy_depth_gender';
-    const TAXONOMY_DEPTH_PENDIDIKAN = 'taxonomy_depth_pendidikan';
-
-    // Query Builders
-    const SEARCH_SQL_PREFIX = 'search_sql_';
-
-    // ETag
-    const GRAPHQL_ETAG_PREFIX = 'graphql_etag_';
 }

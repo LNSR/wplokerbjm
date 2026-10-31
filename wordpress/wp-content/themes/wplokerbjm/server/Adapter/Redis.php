@@ -7,6 +7,7 @@ namespace WPLokerBJM\Adapter;
 use WPLokerBJM\Configs\Credential\RedisCred;
 use WPLokerBJM\Shared\Cache\CacheKey;
 use WPLokerBJM\Shared\Log\Logger;
+use WP_Object_Cache;
 
 /**
  * Redis connection adapter for advanced operations.
@@ -14,20 +15,31 @@ use WPLokerBJM\Shared\Log\Logger;
  * Provides direct Redis access for pattern-based key deletion and other
  * advanced operations not supported by the WordPress object cache API.
  *
+ * Since LiteSpeed Cache v7.x stores object-cache keys as opaque hashes
+ * ({LSOC_PREFIX}:{sha256(...)}), glob patterns can no longer address keys
+ * directly. Key addresses are instead recorded at write time in per-prefix
+ * registry SETs (see registerKey() / CacheRegistry) and deletePattern()
+ * purges from those registries.
+ *
  * Credentials are injected via the constructor using PHP-DI.
  * @see \WPLokerBJM\Core\Container\Definitions\Factory
  */
 class RedisAdapter
 {
+    /** Prefix for registry SET keys tracking exact Redis keys per logical prefix. */
+    private const REGISTRY_KEY_PREFIX = 'wplokerbjm:registry:';
+
     private ?\Redis $connection = null;
     public function __construct(private RedisCred $credentials) {}
 
     /**
      * Delete cache keys matching multiple patterns.
      *
-     * Builds the full key pattern using the LiteSpeed salt and the
-     * application's object-cache prefix, then performs an asynchronous
-     * unlink on all matched keys.
+     * For each pattern the matching prefix registry SET is read (SMEMBERS),
+     * every recorded key is asynchronously unlinked, and the registry SET
+     * itself is dropped. Patterns are accepted in glob form (e.g.
+     * ['job_grid_*', 'search_sql_*']); the trailing glob is stripped to
+     * resolve the registry key.
      *
      * @param string[] $patterns Array of glob patterns (e.g. ['job_grid_*', 'search_sql_*']).
      * @return int|false Number of keys deleted, or false on error.
@@ -35,6 +47,62 @@ class RedisAdapter
     public function deletePattern(array $patterns): int|false
     {
         return $this->executeDeletePattern($patterns);
+    }
+
+    /**
+     * Compute the exact Redis key LSCWP v7.x stores for a logical cache key.
+     *
+     * Mirrors @see WP_Object_Cache::_key() in
+     * litespeed-cache/src/object-cache-wp.cls.php:
+     * LSOC_PREFIX . ':' . hash('sha256',
+     *     strlen($prefix).':'.$prefix . strlen($group).':'.$group . ':'.$key)
+     *
+     * @param string $key Logical cache key written via Cache::set().
+     */
+    public function buildObjectCacheKey(string $key): string
+    {
+        $group = CacheKey::OBJECT_CACHE_PREFIX;
+        $blogPrefix = '';
+
+        // Multisite: LSCWP prefixes with 'blogId:' for non-global groups.
+        if (function_exists('is_multisite') && is_multisite()) {
+            $blogPrefix = (string) get_current_blog_id() . ':';
+        }
+
+        return $this->getSalt()
+            . ':'
+            . hash('sha256', strlen($blogPrefix) . ':' . $blogPrefix . strlen($group) . ':' . $group . ':' . $key);
+    }
+
+    /**
+     * Registry SET key holding the exact Redis keys for a logical prefix.
+     */
+    public static function registryKeyFor(string $prefix): string
+    {
+        return self::REGISTRY_KEY_PREFIX . rtrim($prefix, '*');
+    }
+
+    /**
+     * Record an exact Redis key under a prefix's purge registry.
+     *
+     * Idempotent (Redis SET semantics). Never throws — registry bookkeeping
+     * must not break cache writes.
+     *
+     * @return bool True when recorded (or Redis unreachable → false).
+     */
+    public function registerKey(string $prefix, string $redisKey): bool
+    {
+        try {
+            $redis = $this->resolveConnection();
+            if (!$redis) {
+                return false;
+            }
+
+            return $redis->sAdd(self::registryKeyFor($prefix), $redisKey) !== false;
+        } catch (\Exception $e) {
+            Logger::warning('Redis', 'Failed to register cache key: ' . $e->getMessage());
+            return false;
+        }
     }
 
     /**
@@ -76,7 +144,7 @@ class RedisAdapter
     }
 
     /**
-     * Execute pattern-based deletion against Redis.
+     * Execute registry-based deletion against Redis.
      */
     private function executeDeletePattern(array $patterns): int|false
     {
@@ -87,54 +155,50 @@ class RedisAdapter
                 return false;
             }
 
-            // Collect all matching keys across patterns
-            $allKeys = [];
+            $deleted = 0;
 
             foreach ($patterns as $pattern) {
-                $fullPattern = $this->getSalt() . CacheKey::OBJECT_CACHE_PREFIX . '.' . $pattern;
-                $iterator = null;
+                $registryKey = self::registryKeyFor($pattern);
+                $members = $redis->sMembers($registryKey);
 
-                while (($keys = $redis->scan($iterator, $fullPattern, 100)) !== false) {
-                    if (!empty($keys)) {
-                        $allKeys = array_merge($allKeys, $keys);
-                    }
-                    if ($iterator === 0 || $iterator === '0') {
-                        break;
-                    }
+                if (!empty($members)) {
+                    // Asynchronous unlink is faster than del for bulk operations
+                    $deleted += (int) $redis->unlink($members);
                 }
-            }
-            if (empty($allKeys)) {
-                return 0;
+
+                // Drop the registry regardless: members are only valid for this purge.
+                $redis->del($registryKey);
             }
 
-            // Asynchronous unlink is faster than del for bulk operations
-            return $redis->unlink($allKeys);
+            return $deleted;
         } catch (\Exception $e) {
+            Logger::error('Redis', 'Failed to delete cache patterns: ' . $e->getMessage());
             return false;
         }
     }
 
     /**
      * Get Redis cache salt used by LiteSpeed Cache's object cache drop-in.
-     * @return string
+     *
+     * LSCWP v7.x defines LSOC_PREFIX at runtime as
+     * hash('sha256', WP_CACHE_KEY_SALT . "\0" . DB_NAME . "\0" . $table_prefix),
+     * which is honored when available. The fallback mirrors that algorithm
+     * for non-WP contexts.
      */
     private function getSalt(): string
     {
-        $wp_content_dir = defined('WP_CONTENT_DIR')
-            ? WP_CONTENT_DIR
-            : dirname(get_stylesheet_directory()) . '/..';
-
-        $lscwp_dir = (defined('WP_PLUGIN_DIR')
-            ? WP_PLUGIN_DIR
-            : $wp_content_dir . '/plugins') . '/litespeed-cache/';
-
-        $cls_file = $lscwp_dir . 'src/object-cache-wp.cls.php';
-
         if (defined('LSOC_PREFIX') && is_string(LSOC_PREFIX) && !empty(LSOC_PREFIX)) {
-            $salt = LSOC_PREFIX;
-        } else {
-            $salt = substr(md5($cls_file), -5);
+            return LSOC_PREFIX;
         }
-        return $salt;
+
+        global $table_prefix;
+
+        $identity = (defined('WP_CACHE_KEY_SALT') && is_string(WP_CACHE_KEY_SALT) ? WP_CACHE_KEY_SALT : '')
+            . "\0"
+            . (defined('DB_NAME') ? DB_NAME : (defined('ABSPATH') ? ABSPATH : ''))
+            . "\0"
+            . (string) ($table_prefix ?? '');
+
+        return hash('sha256', $identity);
     }
 }
