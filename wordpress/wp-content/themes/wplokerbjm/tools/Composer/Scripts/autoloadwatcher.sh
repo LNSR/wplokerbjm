@@ -26,25 +26,10 @@ for p in "${watch_paths[@]}"; do
   fi
 done
 
-debounce_time=5
+debounce_time=3
 lock_file="/tmp/wplokerbjm_reload.lock"
 
-# Acquire an exclusive, non-blocking lock.
-exec 9>"$lock_file"
-
-if ! flock -n 9; then
-  echo "[$(date +'%H:%M:%S')] ⚠️ Reload already in progress. Skipping overlapping trigger."
-  exit 0
-fi
-
 current_timer_pid=""
-
-# ---------------------------------------------------------
-# ZOMBIE PREVENTION: Automatically reap completed children
-# ---------------------------------------------------------
-TRAPCHLD() {
-  while wait 2>/dev/null; do :; done
-}
 
 # Cleanup handler to ensure pending timers are killed on exit
 cleanup_timer() {
@@ -66,18 +51,29 @@ while read -r file; do
     # Reset/Cancel any pending debounce timer
     cleanup_timer
 
-    # Spawn new debounce block in background
+    # 1. If an old debounce subshell is already waiting, kill it immediately
+    if [[ -n "$current_timer_pid" ]] && kill -TERM "$current_timer_pid" 2>/dev/null; then
+      kill "$current_timer_pid" 2>/dev/null
+    fi
+
+    # 2. Spawn the new debounce block in the background and track its PID
     (
       sleep "$debounce_time"
 
-      echo "[$(date +'%H:%M:%S')] 🚀 Executing WordPress Local Hot Reload Chain..."
-
-      # Run Docker restart
-      if ! docker restart "wordpress-${WP_ENV}" >/dev/null 2>&1; then
-        echo "[$(date +'%H:%M:%S')] ❌ Warning: Docker restart encountered an issue."
+      exec {lock_fd}<>"$lock_file"
+      if ! flock -n "$lock_fd"; then
+        # If a reload is actively running, silent exit or handle clean queue
+        exit 0
       fi
 
-      # Run Redis flush and Cache clearing concurrently
+      trap 'rm -f "$lock_file"' EXIT
+
+      echo "[$(date +'%H:%M:%S')] 🚀 Executing WordPress Local Hot Reload Chain..."
+
+      if ! docker restart "wordpress-${WP_ENV}" >/dev/null 2>&1; then
+        echo "❌ Warning: Docker restart encountered an issue."
+      fi
+
       (
         docker exec -i wordpress_redis redis-cli -a "${REDIS_PWD}" FLUSHALL >/dev/null 2>&1 &
         if [[ -d cache ]]; then
@@ -86,7 +82,7 @@ while read -r file; do
         wait
       )
 
-      echo "[$(date +'%H:%M:%S')] 🚀 WordPress Local Hot Reload Chain Completed."
+      echo "🚀 WordPress Local Hot Reload Chain Completed."
     ) &
 
     current_timer_pid=$!

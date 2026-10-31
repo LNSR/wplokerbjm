@@ -35,7 +35,7 @@ class RedirectHooks
         if (
             \is_graphql_http_request() ||
             (defined('REST_REQUEST') && REST_REQUEST) ||
-            (defined('DOING_AJAX') && DOING_AJAX) ||
+            \wp_doing_ajax() ||
             SharedUtils::isWPCLI() ||
             isset($_GET['_wfsf']) // WordFence query
         ) {

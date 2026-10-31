@@ -82,10 +82,9 @@ class WPLokerBJMBootstrap
                  */
                 public function checkThemeMatch(string $themeName): bool
                 {
-                    if ($this->themeName !== $themeName) {
-                        \error_log(sprintf('Theme name %s does not match %s; current wordpress set theme is %s', $this->themeName, $themeName, \get_stylesheet()));
-                    }
-                    return $this->themeName === $themeName;
+                    if ($this->themeName === $themeName) return true;
+                    \error_log(sprintf('Theme name %s does not match %s; current wordpress set theme is %s', $this->themeName, $themeName, \get_stylesheet()));
+                    return false;
                 }
             };
         }

@@ -115,9 +115,7 @@ class CachePurgeHandler
             static $__propertyName = __PROPERTY__;
             return $this->purgeGlobalCacheOnce ??= function () use ($__propertyName) {
                 static $alreadyRun = false;
-                if ($alreadyRun) {
-                    return;
-                }
+                if ($alreadyRun) return;
                 $alreadyRun = true;
                 do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
                 try {
@@ -131,7 +129,7 @@ class CachePurgeHandler
                     ]);
 
                     $this->redisAdapter->deletePattern(array_map(
-                        static fn (string $prefix): string => $prefix . '*',
+                        static fn(string $prefix): string => $prefix . '*',
                         CacheKey::PATTERN_PURGE_PREFIXES,
                     ));
                 } catch (\Throwable $e) {
