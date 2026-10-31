@@ -114,13 +114,7 @@ trait HookProviderTrait
                 $parentClass = $reflectClass?->getParentClass();
                 $isModuleClass = $parentClass ? $parentClass->getName() === ModuleClassHookMetadata::class : false;
                 if ($isModuleClass) {
-                    if ($reflectClass->isAnonymous()) {
-                        $anonClassName = \rtrim($reflectClass->getName(), '$');
-                        $position = \strpos($anonClassName, '$');
-                        $paramType = \substr($anonClassName, 0, $position);
-                    } else {
-                        $paramType = $reflectClass->getName();
-                    }
+                    $reflectClass->isAnonymous() ? $paramType = 'self' : $paramType = $reflectClass->getName();
                 } else if ($reflectClass->isAnonymous()) {
                     throw new RuntimeException(
                         'Bare Anonymous class cannot be used as a parameter type hint \'self\' for hook.'
@@ -543,6 +537,7 @@ trait HookProviderTrait
      *
      * @param CallablePlan $plan
      * @param list<CallableHookParams> $hookArgs
+     * @param object|ModuleClassHookMetadata $instanceTarget supplied live instance from instanceRegistry
      *
      * @return array<int, mixed>
      *
@@ -559,47 +554,51 @@ trait HookProviderTrait
     ): array {
         $params = $plan['params'] ?? [];
 
-        if ($params !== []) {
-            $values = [];
-            foreach ($params as $param) {
-                // A variadic closure parameter mirrors the HANDLER's variadic
-                // bucket (the name must match $variadicHookArg): splat the
-                // whole remainder, letting the caller dissect it manually.
-                // An unmatched variadic parameter captures nothing — it never
-                // falls back to the container.
-                if (($param['isVariadic'] ?? false)) {
-                    if (
-                        $variadicHookArg !== null
-                        && $param['name'] === $variadicHookArg
-                        && isset($hookArgs[$param['name']])
-                        && is_array($hookArgs[$param['name']])
-                    ) {
-                        array_push($values, ...$hookArgs[$param['name']]);
-                    }
-                    continue;
-                }
+        if ($params === []) return $this->resolveCallableFallback($callable, $container, $label);
 
-                // Exact parameter-name match wins — hook arguments are injected
-                // by name (e.g. `string $search` receives the handler's $search
-                // argument), removing any scalar-ambiguity.
-                if (array_key_exists($param['name'], $hookArgs)) {
-                    $values[] = $hookArgs[$param['name']];
-                    continue;
-                }
-
+        $values = [];
+        foreach ($params as $param) {
+            // A variadic closure parameter mirrors the HANDLER's variadic
+            // bucket (the name must match $variadicHookArg): splat the
+            // whole remainder, letting the caller dissect it manually.
+            // An unmatched variadic parameter captures nothing — it never
+            // falls back to the container.
+            if (($param['isVariadic'] ?? false)) {
                 if (
-                    is_string($param['type']) && $instanceTarget instanceof ModuleClassHookMetadata
+                    $variadicHookArg !== null
+                    && $param['name'] === $variadicHookArg
+                    && isset($hookArgs[$param['name']])
+                    && is_array($hookArgs[$param['name']])
                 ) {
-                    $values[] = $instanceTarget;
-                    continue;
+                    array_push($values, ...$hookArgs[$param['name']]);
                 }
-
-                $values[] = $this->resolveCallableParam($param, $container, $label);
+                continue;
             }
 
-            return $values;
+            // Exact parameter-name match wins — hook arguments are injected
+            // by name (e.g. `string $search` receives the handler's $search
+            // argument), removing any scalar-ambiguity.
+            if (array_key_exists($param['name'], $hookArgs)) {
+                $values[] = $hookArgs[$param['name']];
+                continue;
+            }
+
+            /**
+             * for `self` type in closure attribute
+             * for non extending Module but it's resolvable by container, continue to @see self::resolveCallableParam()
+             */
+            if (
+                ($param['type'] ?? null) === 'self'
+                && $instanceTarget instanceof ModuleClassHookMetadata
+                && ($container === null || !$container->has($instanceTarget::class))
+            ) {
+                $values[] = $instanceTarget;
+                continue;
+            }
+
+            $values[] = $this->resolveCallableParam($param, $container, $label);
         }
 
-        return $this->resolveCallableFallback($callable, $container, $label);
+        return $values;
     }
 }

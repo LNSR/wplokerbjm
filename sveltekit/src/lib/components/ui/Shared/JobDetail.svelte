@@ -417,23 +417,24 @@
     ];
 
     contactFields.forEach((field) => {
-      if (field.value) {
-        const values = field.value
-          .split(",")
-          .map((v) => v.trim())
-          .filter((v) => v);
-        values.forEach((value) => {
-          if (value) {
-            contacts.push({
-              type: field.type,
-              icon: field.icon,
-              label: field.label,
-              value,
-              href: field.href,
-            });
-          }
-        });
-      }
+      if (!field.value) return;
+
+      const values = field.value
+        .split(",")
+        .map((v) => v.trim())
+        .filter((v) => v);
+
+      values.forEach((value) => {
+        if (value) {
+          contacts.push({
+            type: field.type,
+            icon: field.icon,
+            label: field.label,
+            value,
+            href: field.href,
+          });
+        }
+      });
     });
 
     return contacts;
@@ -647,7 +648,9 @@
         </span>
       </h2>
       <address class="not-italic">
-        <ul class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-x-6 gap-y-3 mt-4">
+        <ul
+          class="grid grid-cols-[repeat(auto-fill,minmax(250px,1fr))] gap-x-6 gap-y-3 mt-4"
+        >
           {#each contacts as contact (contact.label + contact.value)}
             {const Icon = contact.icon}
             <li class="flex items-center">

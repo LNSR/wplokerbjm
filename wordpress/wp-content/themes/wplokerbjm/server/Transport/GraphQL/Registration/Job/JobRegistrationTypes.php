@@ -22,7 +22,6 @@ use WPLokerBJM\Services\GraphQL\GraphQLJobData;
  * @phpstan-import-type JobGridData from HomepageComponents
  * @phpstan-import-type JobGridResponse from HomepageComponents
  * @phpstan-import-type LoadMoreResponse from GraphQLRegistration
- * @phpstan-import-type LoadMoreData from GraphQLRegistration
  * @phpstan-import-type SearchFilters from JobQuery
  * @phpstan-import-type SearchJobsResponse from GraphQLRegistration
  * @phpstan-import-type CardData from GraphQLJobData

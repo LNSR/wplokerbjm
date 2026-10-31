@@ -325,11 +325,10 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'plan_action',
                 executeIf: $attr->executeIf,
-                executeIfParams: (new WPHookPlanProvider())->buildCallablePlan($attr->executeIf)
+                executeIfParams: $this->container->get(WPHookPlanProvider::class)->buildCallablePlan($attr->executeIf)
             ),
         ];
         
-        $targetResolver = new HookTargetResolver();
         $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
