@@ -1,6 +1,6 @@
 /// <reference lib="WebWorker" />
-import { BookmarkIDB } from "@/services/IndexedDB";
-import { BookmarkTaskController } from "@/workers/bookmark/taskController";
+import { BookmarkIDB } from "#src/services/IndexedDB.js";
+import { BookmarkTaskController } from "#src/workers/bookmark/taskController.js";
 import { expose } from "comlink";
 import { BookmarkSyncQueueTask } from "./taskController";
 

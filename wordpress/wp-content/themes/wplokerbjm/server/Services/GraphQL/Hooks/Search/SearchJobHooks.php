@@ -61,12 +61,13 @@ final class SearchJobHooks
             return $info->fieldName === JobRegistrationTypes::TYPE_SEARCH_JOBS;
         }
     )]
-    private function boot(
+    protected function boot(
         mixed $source,
         array $args,
         AppContext $context,
         ResolveInfo $info,
     ) {
+        \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
         \do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, __CLASS__);
     }
 

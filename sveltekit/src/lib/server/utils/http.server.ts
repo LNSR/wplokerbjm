@@ -1,4 +1,4 @@
-import type { JobDetailResponse } from "@/types";
+import type { JobDetailResponse } from "#src/types/index.js";
 import { cookieJwtName } from "#lib/server/constants/constants.js";
 
 type LinkAs = HTMLLinkElement[ 'as' ] & ("audio" | "document" | "embed" | "fetch" | "font" | "image" | "object" | "script" | "style" | "track" | "video" | "worker");

@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import type { CardJob, CarouselProps, JobCardProps } from "@/types";
+  import type { CardJob, CarouselProps, JobCardProps } from "#src/types/index.js";
   import type { SwiperModule, SwiperOptions, VirtualData } from "swiper/types";
   function sortJobsByDeadline(jobs: CardJob[] | null): CardJob[] {
     if (!jobs) return [];
@@ -23,14 +23,14 @@
 </script>
 
 <script lang="ts">
-  import JobCard from "@components/ui/Shared/JobCard.svelte";
+  import JobCard from "#lib/components/ui/Shared/JobCard.svelte";
   import { routeStateStore } from "#lib/stores/Route.svelte.js";
-  import { gotoWithFallback } from "@/utils/navigation";
-  import { APIServiceShared } from "@/services/graphql/APIService";
-  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
+  import { gotoWithFallback } from "#src/utils/navigation.js";
+  import { APIServiceShared } from "#src/services/graphql/APIService.js";
+  import LoadingSpinner from "#lib/components/ui/Shared/LoadingSpinner.svelte";
+  import RefreshSpinner from "#lib/components/ui/Shared/RefreshSpinner.svelte";
   import { flushSync, onMount } from "svelte";
-  import { useRIC } from "@/utils/window";
+  import { useRIC } from "#src/utils/window.js";
   import { innerWidth } from "svelte/reactivity/window";
   import SwiperCore, { type Swiper } from "swiper";
   import { Navigation, Pagination, Autoplay, Virtual } from "swiper/modules";
@@ -546,7 +546,7 @@
 </section>
 
 <style lang="postcss">
-  @reference "@css/app.css";
+  @reference "../../../assets/css/app.css";
 
   :global(.job-carousel),
   :global(.job-carousel .swiper-wrapper),

@@ -28,15 +28,15 @@
     SocialMediaItem,
     CustomFields,
     JobSummary,
-  } from "@/types";
-  import { SocialMediaPlatform } from "@/types";
+  } from "#src/types/index.js";
+  import { SocialMediaPlatform } from "#src/types/index.js";
   import type { Component } from "svelte";
   import { browser } from "$app/env";
   import ViewerModule from "viewerjs";
   import "viewerjs/dist/viewer.min.css";
-  import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
+  import BookmarkButton from "#lib/components/ui/Shared/BookmarkButton.svelte";
   import { onMount } from "svelte";
-  import type { JobDetailResponse } from "@/types";
+  import type { JobDetailResponse } from "#src/types/index.js";
   import { page } from "$app/state";
   import { showSummaryJob, showTimeAgo } from "#lib/composables/JobUI.svelte.js";
 
@@ -732,7 +732,7 @@
 {/if}
 
 <style lang="postcss">
-  @reference "@css/app.css";
+  @reference "../../../assets/css/app.css";
   @utility job-detail-base-content {
     @apply rounded-xl border-1 border-[var(--wpl-global-color-1)] bg-[var(--wpl-global-color-5)];
   }

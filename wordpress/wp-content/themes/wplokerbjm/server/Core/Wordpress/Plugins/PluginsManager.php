@@ -97,11 +97,12 @@ class PluginManager
 
     #[Action('mu_plugin_loaded', executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
         if ($pluginPath !== $bootstrap->nameMUpluginFile) return false;
-        do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [__CLASS__, 'boot']);
         return true;
     })]
     private function boot(string $pluginPath): void
     {
+        do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
+        
         $activeCount = $this->unregisterInactivePluginHooks();
         if ($activeCount === 0) {
             do_action(ContainerRegistryHookEvent::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
@@ -233,8 +234,7 @@ class PluginManager
     #region filter hooks sequence
     /**
      * activation hooks steps
-     * @phpstan-ignore-next-line
-     * @var __CLASS__::class
+     * @var class@anonymous::class
      */
     private ?ModuleClassHookMetadata $pluginEnvironmentCheck {
         get {
@@ -259,7 +259,7 @@ class PluginManager
                  * Temporarily disable specific plugins if simulating production environment on local machine.
                  */
                 #[Filter('option_active_plugins', 0, once: true, registerIf: static function (): bool {
-                    return SharedUtils::isLocalhost();
+                    return !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
                 })]
                 public function disablePluginsforSimulatedProdImpl(array $plugins): array
                 {
@@ -301,17 +301,14 @@ class PluginManager
                  */
                 private function filteredPlugins(array $plugins, array $pluginsToDisable): array
                 {
-                    $cb = static function (string $plugin) use ($pluginsToDisable): bool {
+                    return array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
                         foreach ($pluginsToDisable as $disable) {
                             if (str_starts_with($plugin, $disable)) {
                                 return false;
                             }
                         }
                         return true;
-                    };
-                    $filtered = array_filter($plugins, $cb);
-
-                    return array_values($filtered);
+                    });
                 }
             };
         }

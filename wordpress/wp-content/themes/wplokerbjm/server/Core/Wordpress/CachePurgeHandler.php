@@ -34,8 +34,7 @@ class CachePurgeHandler
      * is handled separately by {@see self::purgeGlobalCacheOnce}.
      *
      * Registered only on hooks that carry post context.
-     * @phpstan-ignore-next-line
-     * @var __CLASS__::class
+     * @var class@anonymous::class
      */
     #[Action('init', 10, 0, once: true)]
     public private(set) ?ModuleClassHookMetadata $invalidatePostCache {

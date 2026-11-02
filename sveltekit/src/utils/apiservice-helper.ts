@@ -1,8 +1,8 @@
 import typia from "typia";
 import type {
     CardJob,
-} from "@/types";
-import { FRAGMENT_JOB_CARD_FIELDS } from "@/services/graphql/query/shared/job";
+} from "#src/types/index.js";
+import { FRAGMENT_JOB_CARD_FIELDS } from "#src/services/graphql/query/shared/job.js";
 import { type FragmentOf, readFragment } from "gql.tada";
 
 export class APIServiceHelper

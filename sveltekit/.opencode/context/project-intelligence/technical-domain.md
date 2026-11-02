@@ -94,22 +94,29 @@ Runes mode is enabled globally in `sveltekit({ compilerOptions: { runes: true } 
 
 Prefer a named `Props` type with `$props()` over `$props<Props>()`; the latter is not accepted by the current Svelte tooling.
 
-## Module Imports and Path Aliases
+## Module Imports
 
 `package.json#imports` declares Node subpath imports:
 
 ```json
 {
   "imports": {
-    "#lib/*": "./src/lib/*"
+    "#lib/*": "./src/lib/*",
+    "#src/*": "./src/*"
   }
 }
 ```
 
-- `#lib/*` imports **must** include the file extension: `#lib/server/cache/eTagCache.js`, `#lib/components/ui/Shared/JobCard.svelte`.
-- `@` maps to `src`; `@components` maps to `src/lib/components`; `@css` maps to `src/lib/assets/css`.
-- These aliases are still declared in `sveltekit({ alias })` in `vite.config.ts`. `kit.alias` is deprecated in SvelteKit 3; the full migration to package subpath imports is a follow-up. The unused `@@` alias was removed.
-- For new shared library code, prefer `#lib/*` with explicit extensions.
+- `#lib/*` covers `src/lib`; `#src/*` covers every other directory under `src`.
+- Every package-subpath import **must** include a file extension:
+  - TypeScript modules: `#src/services/graphql/APIService.js`
+  - Runes modules: `#lib/stores/Route.svelte.js`
+  - Components: `#lib/components/ui/Shared/JobCard.svelte`
+  - Type declarations: `#src/graphql-env.d.ts`
+  - Directory entry points: `#src/types/index.js`
+  - Vite query imports keep `.ts`: `#src/workers/network/graphql/fetch.worker.ts?worker`
+- There are no path aliases: `sveltekit({ alias })`, `@`, `@components`, and `@css` were removed from `vite.config.ts`.
+- CSS imports and Tailwind `@reference` directives use relative paths instead of an alias.
 
 ## Data Fetching (`+page.server.ts`)
 
@@ -117,7 +124,7 @@ Server loads use `APIServiceServer` from `src/services/graphql/APIService.ts`. T
 
 ```typescript
 import type { PageServerLoad } from './$types';
-import { APIServiceServer } from '@/services/graphql/APIService';
+import { APIServiceServer } from '#src/services/graphql/APIService.js';
 
 export const load: PageServerLoad = async ({ params }) => {
   try {
@@ -130,7 +137,8 @@ export const load: PageServerLoad = async ({ params }) => {
 ```
 
 **Rules**:
-- Server-only modules live under `src/lib/server/` or use the `*.server.ts` suffix.
+
+- Server-only modules live under folder `**/server/` or use the `*.server.ts` suffix.
 - Never import server-only modules into browser code; Kit 3 enforces this at build time.
 - Return empty/null data on failure so pages still render.
 
@@ -154,6 +162,7 @@ Query documents live in `src/services/graphql/query/`:
 `ssr/` is intentionally **not** named `server/`: Kit 3 treats any `server` directory as server-only, and `fetch.worker.ts` imports `fetch.ts`, which contains `ServerFetch`. A future refactor should split browser and server fetch modules so the directory can follow the stricter convention.
 
 **Rules**:
+
 - Modules in `browser/` must never import from `ssr/`.
 - Shared fragments live in `shared/` and are imported by both sides.
 - Place a new query by which fetch class consumes it.
@@ -177,7 +186,7 @@ Use classes with `$state()` fields and methods; import them as singletons.
 - WordPress-specific styles: `src/lib/assets/css/wordpress.css`.
 - Tailwind 4 is CSS-first; configuration lives in `src/lib/assets/css/app.css`.
 - DaisyUI 5 provides components and themes.
-- In component `<style>` blocks, use `@reference "@css/app.css";` before `@apply` or theme utilities.
+- In component `<style>` blocks, use a relative `@reference` to `src/lib/assets/css/app.css` before `@apply` or theme utilities.
 - Responsive design is mobile-first (`sm:`, `md:`, `lg:`).
 
 ## Cloudflare Workers Deployment
@@ -198,7 +207,7 @@ Use classes with `$state()` fields and methods; import them as singletons.
 - `bun run check` runs `svelte-check` and `tsc --noEmit` in parallel.
 - `bun run prepare` runs `ts-patch install` and `svelte-kit sync`.
 - `typia` validates GraphQL responses at runtime; `@typia/unplugin` handles Vite transforms.
-- `#lib/*` imports require extensions; `@` alias imports follow the existing no-extension style.
+- `#lib/*` and `#src/*` imports require explicit file extensions.
 
 ## Security Requirements
 

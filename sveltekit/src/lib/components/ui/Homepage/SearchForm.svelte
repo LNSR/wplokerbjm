@@ -1,7 +1,7 @@
 <script lang="ts">
   import { onMount, type Component } from "svelte";
   import { taxonomyStore } from "#lib/stores/Taxonomy.svelte.js";
-  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
+  import LoadingSpinner from "#lib/components/ui/Shared/LoadingSpinner.svelte";
   import {
     MagnifyingGlassSolid,
     MapMarkerAltSolid,
@@ -14,7 +14,7 @@
     SortAmountUpSolid,
     SortAmountDownSolid,
   } from "svelte-awesome-icons";
-  import { useRIC } from "@/utils/window";
+  import { useRIC } from "#src/utils/window.js";
   import type {
     SearchFilters,
     TaxonomyType,
@@ -22,13 +22,13 @@
     SortOption,
     TaxonomyGroup,
     KeyboardKeysEvent,
-  } from "@/types";
-  import { WPPostType } from "@/types";
+  } from "#src/types/index.js";
+  import { WPPostType } from "#src/types/index.js";
   import { jobListingStore } from "#lib/stores/JobListingStore.svelte.js";
   import { isJobGridEl } from "#lib/utils/elements.svelte.js";
-  import { SearchUtils } from "@/utils/search";
-  import { componentRegistry } from "@/lib/stores/ComponentRegistry.svelte";
-  import { APIServiceBrowser } from "@/services/graphql/APIService";
+  import { SearchUtils } from "#src/utils/search.js";
+  import { componentRegistry } from "#lib/stores/ComponentRegistry.svelte.js";
+  import { APIServiceBrowser } from "#src/services/graphql/APIService.js";
   import { debounce } from "es-toolkit";
   import typia from "typia";
 
@@ -841,7 +841,7 @@
 </section>
 
 <style lang="postcss">
-  @reference "@css/app.css";
+  @reference "../../../assets/css/app.css";
 
   button {
     @apply text-[var(--wpl-global-color-1)] hover:border-3;

@@ -1,7 +1,7 @@
 import {
   APIServiceBrowser,
   APIServiceShared,
-} from "@/services/graphql/APIService";
+} from "#src/services/graphql/APIService.js";
 import type {
   SearchFilters,
   CardJob,
@@ -10,8 +10,8 @@ import type {
   SortOption,
   SearchContext,
   SearchTitle,
-} from "@/types";
-import { SearchUtils } from "@/utils/search";
+} from "#src/types/index.js";
+import { SearchUtils } from "#src/utils/search.js";
 import { routeStateStore } from "#lib/stores/Route.svelte.js";
 /**
  * Handle state and actions related to job search and job grid display.

@@ -7,8 +7,8 @@ import type {
   DocumentInput,
 } from "@urql/core";
 import typia from "typia";
-import { getCmsOrigin } from "@/utils/environment";
-import type { WPLokerBJMThemedData } from "@/types";
+import { getCmsOrigin } from "#src/utils/environment.js";
+import type { WPLokerBJMThemedData } from "#src/types/index.js";
 
 abstract class URQLBaseManager {
   private readonly clients = new Map<string, Client>();

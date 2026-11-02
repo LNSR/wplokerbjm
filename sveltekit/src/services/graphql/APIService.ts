@@ -1,7 +1,7 @@
 import { browser } from "$app/env";
-import { URQLServerManager } from "@/services/graphql/config/urql";
+import { URQLServerManager } from "#src/services/graphql/config/urql.js";
 import { wrap } from "comlink";
-import graphFetchWorker from "@/workers/network/graphql/fetch.worker?worker";
+import graphFetchWorker from "#src/workers/network/graphql/fetch.worker.ts?worker";
 import type { BrowserFetch as fetchWorker } from "./fetch";
 import { ServerFetch } from "./fetch";
 

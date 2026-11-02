@@ -1,11 +1,11 @@
 <script lang="ts">
-  import SearchForm from "@components/ui/Homepage/SearchForm.svelte";
-  import Hero from "@components/ui/Homepage/Hero.svelte";
-  import JobCarousel from "@components/ui/Homepage/JobCarousel.svelte";
-  import JobGrid from "@components/ui/Homepage/JobGrid.svelte";
+  import SearchForm from "#lib/components/ui/Homepage/SearchForm.svelte";
+  import Hero from "#lib/components/ui/Homepage/Hero.svelte";
+  import JobCarousel from "#lib/components/ui/Homepage/JobCarousel.svelte";
+  import JobGrid from "#lib/components/ui/Homepage/JobGrid.svelte";
   import { page } from "$app/state";
   import type { PageProps } from "./$types";
-  import type { CarouselProps, JobGridProps } from "@/types";
+  import type { CarouselProps, JobGridProps } from "#src/types/index.js";
 
   interface Props {
     data: {

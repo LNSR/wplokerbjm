@@ -1,4 +1,4 @@
-import type { ThemeScriptData } from "@/types";
+import type { ThemeScriptData } from "#src/types/index.js";
 
 export function isTheme(
   value: string | null | undefined,

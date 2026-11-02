@@ -1,15 +1,15 @@
 <script lang="ts">
   import { page } from "$app/state";
   import { type Attachment } from "svelte/attachments";
-  import type { JobDetailResponse } from "@/types";
-  import { routeStore } from "@/lib/stores/Route.svelte";
+  import type { JobDetailResponse } from "#src/types/index.js";
+  import { routeStore } from "#lib/stores/Route.svelte.js";
   import { themePropsStore } from "#lib/stores/Theme.svelte.js";
-  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
+  import LoadingSpinner from "#lib/components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
-  import { useSidePanel } from "@/lib/composables/SidePanel.svelte";
-  import JobDetail from "@components/ui/Shared/JobDetail.svelte";
-  import SkeletonSingleLowongan from "@components/ui/Skeletons/SkeletonSingleLowongan.svelte";
-  import { getCmsOrigin } from "@/utils/environment";
+  import { useSidePanel } from "#lib/composables/SidePanel.svelte.js";
+  import JobDetail from "#lib/components/ui/Shared/JobDetail.svelte";
+  import SkeletonSingleLowongan from "#lib/components/ui/Skeletons/SkeletonSingleLowongan.svelte";
+  import { getCmsOrigin } from "#src/utils/environment.js";
 
   const data = $derived((page.data?.job as JobDetailResponse | null) ?? null);
   const editPostId = $derived((data?.id as JobDetailResponse["id"]) ?? null);

@@ -1,7 +1,7 @@
 <script lang="ts">
   import JobDetail from "#lib/components/ui/Shared/JobDetail.svelte";
-  import type { JobDetailResponse, CarouselProps, JobGridProps } from "@/types";
-  import Homepage from "@/routes/+page.svelte";
+  import type { JobDetailResponse, CarouselProps, JobGridProps } from "#src/types/index.js";
+  import Homepage from "#src/routes/+page.svelte";
   import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
   interface Props {
     data: {

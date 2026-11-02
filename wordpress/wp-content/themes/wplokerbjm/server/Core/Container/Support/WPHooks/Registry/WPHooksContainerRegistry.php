@@ -145,11 +145,10 @@ class WPHooksContainerRegistry
      * @api
      * @param class-string $class Fully qualified class name.
      */
-    public function activateDeferredByClass(string|object $class): void
+    public function activateDeferredByClass(string $class): void
     {
-        $className = is_object($class) ? $class::class : $class;
         $this->containerRegistryDeferredHookManager->activateDeferredByClass(
-            $className,
+            $class,
             $this->activateEntry
         );
     }

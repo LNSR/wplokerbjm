@@ -1,7 +1,7 @@
 import { createSubscriber } from "svelte/reactivity";
 import { on } from "svelte/events";
 import typia from "typia";
-import type { DeviceType } from "@/types";
+import type { DeviceType } from "#src/types/index.js";
 import { browser } from "$app/env";
 
 class DeviceDetector {

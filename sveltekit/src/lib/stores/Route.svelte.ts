@@ -1,6 +1,6 @@
-import type { SearchState, CarouselState, JobCardProps, CardHeightKey } from "@/types";
+import type { SearchState, CarouselState, JobCardProps, CardHeightKey } from "#src/types/index.js";
 import { SvelteMap } from "svelte/reactivity";
-import { type CardJob } from "@/types";
+import { type CardJob } from "#src/types/index.js";
 import typia from "typia";
 import { useVirtualization } from "#lib/features/Virtualization.svelte.js";
 import { deviceDetector, type DeviceDetectorInternal } from "#lib/features/DeviceDetector.svelte.js";

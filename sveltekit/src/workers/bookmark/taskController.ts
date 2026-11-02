@@ -1,5 +1,5 @@
 import { retry, delay, withTimeout, Mutex, debounce } from "es-toolkit";
-import type { CardJob, SyncToServer } from "@/types";
+import type { CardJob, SyncToServer } from "#src/types/index.js";
 /**
 * Task controller to manage sequential execution of operations and retries with timeout handling.
 */

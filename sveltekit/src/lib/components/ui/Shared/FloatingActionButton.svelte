@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { type SocialMediaItem, SocialMediaPlatform } from "@/types";
+  import { type SocialMediaItem, SocialMediaPlatform } from "#src/types/index.js";
   import {
     ArrowUpSolid,
     HeadsetSolid,

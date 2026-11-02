@@ -1,8 +1,8 @@
-import type { CardJob, JobCardProps } from "@/types";
+import type { CardJob, JobCardProps } from "#src/types/index.js";
 import { routeStateStore } from "#lib/stores/Route.svelte.js";
 import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
-import { useRIC } from "@/utils/window";
-import { gotoWithFallback } from "@/utils/navigation";
+import { useRIC } from "#src/utils/window.js";
+import { gotoWithFallback } from "#src/utils/navigation.js";
 /**
  * SidePanelManager
  *

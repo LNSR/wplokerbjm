@@ -1,10 +1,10 @@
 import type { PageServerLoad } from "./$types";
 import { error } from '@sveltejs/kit';
-import { APIServiceServer, APIServiceShared } from "@/services/graphql/APIService";
-import { getCmsOrigin } from "@/utils/environment";
+import { APIServiceServer, APIServiceShared } from "#src/services/graphql/APIService.js";
+import { getCmsOrigin } from "#src/utils/environment.js";
 import { schemaScriptAttach, schemaScriptParser } from "#lib/server/utils/scripts.server.js";
 import { collectPreloadLinksForJob } from "#lib/server/utils/http.server.js";
-import type { JobDetailResponse } from "@/types/API";
+import type { JobDetailResponse } from "#src/types/API.js";
 export const load: PageServerLoad = async ({ params, locals, url, fetch }) =>
 {
   const slug = String(params.slug ?? "");

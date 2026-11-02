@@ -1,6 +1,6 @@
 <script lang="ts">
   import { taxonomyStore } from "#lib/stores/Taxonomy.svelte.js";
-  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
+  import LoadingSpinner from "#lib/components/ui/Shared/LoadingSpinner.svelte";
   import {
     SitemapSolid,
     FolderOpenSolid,
@@ -11,8 +11,8 @@
     TrashAltSolid,
   } from "svelte-awesome-icons";
   import type { Attachment } from "svelte/attachments";
-  import { SearchUtils } from "@/utils/search";
-  import type { DropdownOption, KeyboardKeysEvent } from "@/types";
+  import { SearchUtils } from "#src/utils/search.js";
+  import type { DropdownOption, KeyboardKeysEvent } from "#src/types/index.js";
 
   type DropdownSelectionValue = string | DropdownOption;
   type ValueProp =
@@ -830,7 +830,7 @@
 </div>
 
 <style lang="postcss">
-  @reference "@css/app.css";
+  @reference "../../../../assets/css/app.css";
   .dropdown-btn {
     @apply flex max-w-full min-w-0 items-center rounded-full border p-1 px-2 text-left text-sm font-medium whitespace-normal;
     overflow-wrap: anywhere;

@@ -50,7 +50,7 @@ final class WPGraphQL implements PluginConfigInterface
     #region GraphQlPluginSettings
     /**
      * @phpstan-ignore-next-line
-     * @var __CLASS__::class
+     * @var class@anonymous::class
      */
     private ?ModuleClassHookMetadata $graphQlPluginSettings {
         get {
@@ -83,7 +83,7 @@ final class WPGraphQL implements PluginConfigInterface
 
     /**
      * @phpstan-ignore-next-line
-     * @var __CLASS__::class
+     * @var class@anonymous::class
      */
     private ?ModuleClassHookMetadata $bootGraphqlRequest {
         get {

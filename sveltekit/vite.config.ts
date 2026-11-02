@@ -60,11 +60,6 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
       version: { name: Date.now().toString() },
       prerender: { concurrency: 4 },
       adapter: adapter(),
-      alias: {
-        "@components": "src/lib/components",
-        "@css": "src/lib/assets/css",
-        "@": "src"
-      },
       paths: { origin: isDev ? "https://localhost:5173" : "https://lokerbanjarmasin.my.id" }
     }),
     UnpluginTypia({ cache: true, log: true })

@@ -113,15 +113,21 @@ trait HookProviderTrait
                 $reflectClass = $reflect->getClosureScopeClass();
                 $parentClass = $reflectClass?->getParentClass();
                 $isModuleClass = $parentClass ? $parentClass->getName() === ModuleClassHookMetadata::class : false;
-                if ($isModuleClass) {
-                    $reflectClass->isAnonymous() ? $paramType = 'self' : $paramType = $reflectClass->getName();
-                } else if ($reflectClass->isAnonymous()) {
-                    throw new RuntimeException(
-                        'Bare Anonymous class cannot be used as a parameter type hint \'self\' for hook.'
-                    );
-                } else {
-                    $paramType = $reflectClass->getName();
-                }
+
+                switch (true) {
+                    case $isModuleClass:
+                        $paramType = $reflectClass->isAnonymous()
+                            ? 'self'
+                            : $reflectClass->getName();
+                        break;
+                    case $reflectClass->isAnonymous():
+                        throw new RuntimeException(
+                            'Bare Anonymous class cannot be used as a parameter type hint \'self\' for hook.'
+                        );
+                    default:
+                        $paramType = $reflectClass->getName();
+                        break;
+                };
             } else {
                 $paramType = $type instanceof ReflectionNamedType && !$type->isBuiltin() ? $type->getName() : $paramType;
             }
@@ -170,10 +176,10 @@ trait HookProviderTrait
         try {
             $reflect = match (true) {
                 $callable instanceof \Closure => new \ReflectionFunction($callable),
-                is_object($callable) => \ReflectionMethod::createFromMethodName($callable::class . '::__invoke'),
-                is_array($callable) => \ReflectionMethod::createFromMethodName($callable[0] . '::' . $callable[1]),
-                is_string($callable) && str_contains($callable, '::') => \ReflectionMethod::createFromMethodName(...array_slice(explode('::', $callable), 0, 2)),
-                is_string($callable) => new \ReflectionFunction($callable),
+                \is_object($callable) => \ReflectionMethod::createFromMethodName($callable::class . '::__invoke'),
+                \is_array($callable) => \ReflectionMethod::createFromMethodName($callable[0] . '::' . $callable[1]),
+                \is_string($callable) && str_contains($callable, '::') => \ReflectionMethod::createFromMethodName(...array_slice(explode('::', $callable), 0, 2)),
+                \is_string($callable) => new \ReflectionFunction($callable),
                 default => null,
             };
 
@@ -194,7 +200,7 @@ trait HookProviderTrait
      * plan (names + variadic flags) instead of names only.
      *
      * @param \ReflectionProperty $property from attributes
-     * @param object|null $instance Optional runtime instance to execute getters/hooks.
+     * @param object|null $instance Optional already **instantiated** instance to execute getters/hooks.
      *
      * @return CallablePlan
      */
@@ -459,30 +465,6 @@ trait HookProviderTrait
     }
 
     /**
-     * @param CallableHookParams $param
-     *
-     * @throws RuntimeException when the parameter cannot be resolved
-     */
-    private function resolveCallableParam(array $param, ?ContainerInterface $container = null, string $label = ''): mixed
-    {
-        $type = $param['type'] ?? null;
-
-        if (is_string($type) && $type !== '' && $container !== null && $container->has($type)) {
-            return $container->get($type);
-        }
-
-        if (!empty($param['hasDefault'])) {
-            return array_key_exists('default', $param) ? $param['default'] : null;
-        }
-
-        throw new RuntimeException(sprintf(
-            'Cannot resolve parameter $%s for condition closure in %s: Class not in container and no default value set.',
-            $param['name'] ?? 'unknown',
-            $label
-        ));
-    }
-
-    /**
      * Reflection-based parameter resolution for callables without a plan.
      *
      * @return array<int, mixed>
@@ -600,5 +582,29 @@ trait HookProviderTrait
         }
 
         return $values;
+    }
+
+    /**
+     * @param CallableHookParams $param
+     *
+     * @throws RuntimeException when the parameter cannot be resolved
+     */
+    private function resolveCallableParam(array $param, ?ContainerInterface $container = null, string $label = ''): mixed
+    {
+        $type = $param['type'] ?? null;
+
+        if (is_string($type) && $type !== '' && $container !== null && $container->has($type)) {
+            return $container->get($type);
+        }
+
+        if (!empty($param['hasDefault'])) {
+            return array_key_exists('default', $param) ? $param['default'] : null;
+        }
+
+        throw new RuntimeException(sprintf(
+            'Cannot resolve parameter $%s for condition closure in %s: Class not in container and no default value set.',
+            $param['name'] ?? 'unknown',
+            $label
+        ));
     }
 }

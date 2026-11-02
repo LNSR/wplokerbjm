@@ -546,7 +546,7 @@ class PlanCache
     private function isUsableEntry(InjectionEntryDTO $entry): bool
     {
         // Ordinary type-based or explicit service-name injection.
-        if ($entry->member === null && $entry->kind === null && $entry->lazy === null && $entry->class !== '') {
+        if ($entry->member === null && $entry->kind === null && $entry->lazy === null && isset($entry->class)) {
             return true;
         }
 
@@ -569,7 +569,7 @@ class PlanCache
  * @phpstan-import-type CompiledPlan from DependencyInjector
  * @phpstan-import-type ClassTarget from DependencyInjector
  * @template CallableResult
- * @phpstan-type TFactoryClosure Closure(object, InjectionEntryDTO): CallableResult
+ * @phpstan-type TFactoryClosure Closure(ContainerInterface, InjectionEntryDTO): CallableResult
  * @phpstan-type TScopeAccessCallableResolver Closure(ContainerInterface, InjectionEntryDTO): CallableResult
  */
 class ScopeAccessFactory
@@ -604,7 +604,7 @@ class ScopeAccessFactory
                                     ? $propertyLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => Closure::bind(static fn(): mixed => $c->get($entry->class)->{$entry->member}, null, $entry->class)
                                     : $property ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): mixed => $c->get($entry->class)->{$entry->member},
                                 'method' => $entry->lazy
-                                    //** no FCC, FCC implicitly bind $this. Break lazy */
+                                    //** no FCC, FCC Break lazy */
                                     ? $methodLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => Closure::bind(static fn(...$args): mixed => $c->get($entry->class)->{$entry->member}(...$args), null, $entry->class)
                                     : $method ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): mixed => $c->get($entry->class)->{$entry->member}(),
                             },

@@ -1,9 +1,9 @@
 import type { RequestEvent } from "@sveltejs/kit";
 import { sequence, type Handle } from "@sveltejs/kit/hooks";
-import type { WPLokerBJMThemedData, DeviceType } from "@/types";
+import type { WPLokerBJMThemedData, DeviceType } from "#src/types/index.js";
 import { cookieJwtName } from "#lib/server/constants/constants.js";
 import { handleDeviceDetector } from "sveltekit-device-detector";
-import { APIServiceServer } from "@/services/graphql/APIService";
+import { APIServiceServer } from "#src/services/graphql/APIService.js";
 import { dev } from "$app/env";
 import { getEtag, setEtag } from "#lib/server/cache/eTagCache.js";
 import { getThemeCache, setThemeCache } from "#lib/server/cache/themeCache.js";

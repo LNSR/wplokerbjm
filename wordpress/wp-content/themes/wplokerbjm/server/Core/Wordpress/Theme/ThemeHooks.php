@@ -4,6 +4,7 @@ namespace WPLokerBJM\Core\Wordpress\Theme;
 
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 
 /**
  * Leverage Wordpress theme feature for easier assets (logo,favicon,etc) management and integrate to frontend
@@ -68,27 +69,52 @@ class ThemeHooks
     }
 
     /**
-     * Adds additional site icon meta tags for custom sizes.
-     */
-    #[Filter('site_icon_meta_tags')]
-    public private(set) \Closure $addSiteIconMetaTags {
+     * @var class@anonymous::class
+    */
+    #[Filter('site_icon_meta_tags', once: true)]
+    public private(set) ?ModuleClassHookMetadata $addSiteIconMetaTags {
         get {
-            return $this->addSiteIconMetaTags ??= static function (array $meta_tags): array {
+            return $this->addSiteIconMetaTags ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+                private array $additionalSizes = [48, 96, 144, 256, 384, 512];
 
-                static $additional_sizes = [48, 96, 144, 256, 384, 512];
+                public function __invoke(array $meta_tags): array
+                {
+                    foreach ($this->additionalSizes as $size) {
+                        $url = \get_site_icon_url($size);
+                        $url && $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
+                    }
+                    foreach (['png', 'ico', 'svg', 'webp', 'avif'] as $type) {
+                        $meta_tags = $this->addTypeAttribute($meta_tags, $type);
+                    }
 
-                foreach ($additional_sizes as $size) {
-                    $url = get_site_icon_url($size);
-                    $url && $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
+                    $fallbackTag = $this->addFallbackSiteIconMetaTags();
+                    $fallbackTag && $meta_tags[] = $fallbackTag;
+
+                    return $meta_tags;
                 }
 
                 /**
-                 * Add type attributes to meta tags
-                 * @param array $meta_tags
-                 * @param string $type
-                 * @return void
+                 * Adds fallback site icon meta tags for custom sizes.
+                 * WordPress may convert the original PNG to AVIF during upload(via Modern Image Formats plugin), so:
+                 * 1. Walk post_parent to find the original upload attachment.
+                 * 2. Use wp_get_original_image_url() to get the original PNG URL.
                  */
-                static $addTypeAttribute = static function (array &$meta_tags, string $type): void {
+                private function addFallbackSiteIconMetaTags(): string
+                {
+                    $cropped_id = \get_option('site_icon');
+                    if (!$cropped_id) return null;
+
+                    $cropped_post = \get_post($cropped_id);
+                    $original_id = ($cropped_post && $cropped_post->post_parent) ? $cropped_post->post_parent : 0;
+                    if (!$original_id) return null;
+
+                    $png_url = \wp_get_original_image_url($original_id);
+                    if (!$png_url) return null;
+                    return sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($png_url));
+                }
+
+                private function addTypeAttribute(array $meta_tags, string $type): array
+                {
                     foreach ($meta_tags as &$tag) {
                         // For link tags (icon and apple-touch-icon)
                         if (preg_match('/<link (?:rel="icon"|rel="apple-touch-icon")[^>]*href="[^"]*\.' . preg_quote($type, '/') . '"[^>]*>/', $tag) && !str_contains($tag, 'type=')) {
@@ -99,39 +125,9 @@ class ThemeHooks
                             $tag = str_replace(' />', ' type="image/' . $type . '" />', $tag);
                         }
                     }
-                };
-
-                /**
-                 * Adds fallback site icon meta tags for custom sizes.
-                 * WordPress may convert the original PNG to AVIF during upload(via Modern Image Formats plugin), so:
-                 * 1. Walk post_parent to find the original upload attachment.
-                 * 2. Use wp_get_original_image_url() to get the original PNG URL.
-                 * @return string|null
-                 */
-                static $addFallbackSiteIconMetaTags = static function (): string|null {
-                    $cropped_id = \get_option('site_icon');
-                    if (!$cropped_id)
-                        return null;
-
-                    $cropped_post = get_post($cropped_id);
-                    $original_id = ($cropped_post && $cropped_post->post_parent) ? $cropped_post->post_parent : 0;
-                    if (!$original_id)
-                        return null;
-
-                    $png_url = wp_get_original_image_url($original_id);
-                    if (!$png_url)
-                        return null;
-                    return sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($png_url));
-                };
-
-                foreach (['png', 'ico', 'svg', 'webp', 'avif'] as $type) {
-                    $addTypeAttribute($meta_tags, $type);
+                    unset($tag);
+                    return $meta_tags;
                 }
-
-                $fallbackTag = $addFallbackSiteIconMetaTags();
-                $fallbackTag && $meta_tags[] = $fallbackTag;
-
-                return $meta_tags;
             };
         }
     }
@@ -188,6 +184,10 @@ class ThemeHooks
         // compute optional site icon <link> tags using the same filter used in addSiteIconMetaTags()
         $siteIconTags = '';
         $tags = apply_filters('site_icon_meta_tags', []);
+        /**
+         *  @suppresswarnings PHP0410
+         */
+        $this->addSiteIconMetaTags = null;
         if (!empty($tags) && is_array($tags)) {
             $siteIconTags = implode("\n", $tags);
         }
@@ -241,8 +241,8 @@ class ThemeHooks
         $image_src = wp_get_attachment_image_src($custom_logo_id, 'full');
         if ($image_src && is_array($image_src)) {
             // wp_get_attachment_image_src returns [src, width, height]
-            $width = isset($image_src[1]) ? intval($image_src[1]) : 0;
-            $height = isset($image_src[2]) ? intval($image_src[2]) : 0;
+            $width = isset($image_src[1]) ? \intval($image_src[1]) : 0;
+            $height = isset($image_src[2]) ? \intval($image_src[2]) : 0;
         }
 
         // Fallback to theme support defaults if WP didn't provide dims (e.g., SVGs)
@@ -251,8 +251,8 @@ class ThemeHooks
             if (is_array($support) && isset($support[0]) && is_array($support[0])) {
                 $supportOpts = $support[0];
                 if (isset($supportOpts['width']) && isset($supportOpts['height'])) {
-                    $width = intval($supportOpts['width']);
-                    $height = intval($supportOpts['height']);
+                    $width = \intval($supportOpts['width']);
+                    $height = \intval($supportOpts['height']);
                 }
             }
         }

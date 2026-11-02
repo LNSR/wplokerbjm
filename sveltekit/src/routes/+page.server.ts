@@ -1,7 +1,7 @@
 import type { PageServerLoad } from "./$types";
-import { APIServiceServer, APIServiceShared } from "@/services/graphql/APIService";
-import type { JobSchemaResponse } from "@/types";
-import { getCmsOrigin } from "@/utils/environment";
+import { APIServiceServer, APIServiceShared } from "#src/services/graphql/APIService.js";
+import type { JobSchemaResponse } from "#src/types/index.js";
+import { getCmsOrigin } from "#src/utils/environment.js";
 import { schemaScriptAttach, schemaScriptParser } from "#lib/server/utils/scripts.server.js";
 export const load: PageServerLoad = async ({ url, fetch }) =>
 {

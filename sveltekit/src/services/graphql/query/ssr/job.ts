@@ -1,4 +1,4 @@
-import { graphql } from "@/services/graphql/config/tada";
+import { graphql } from "#src/services/graphql/config/tada.js";
 import { FRAGMENT_JOB_SUMMARY_FIELDS } from "../shared/job";
 
 export const GET_JOB_DETAIL = graphql(`

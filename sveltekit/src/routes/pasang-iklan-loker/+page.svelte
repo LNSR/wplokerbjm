@@ -310,7 +310,7 @@
 </main>
 
 <style lang="postcss">
-  @reference "@css/app.css";
+  @reference "../../lib/assets/css/app.css";
   .baseIconClass {
     @apply flex-shrink-0 w-8 h-8 flex items-center justify-center rounded-full mr-4 shadow-sm;
   }

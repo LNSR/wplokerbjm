@@ -1,18 +1,18 @@
 <script module lang="ts">
   import { onMount, tick } from "svelte";
-  import { type ThemeScriptData, type WPLokerBJMThemedData } from "@/types";
+  import { type ThemeScriptData, type WPLokerBJMThemedData } from "#src/types/index.js";
   import {
     applyThemeViewTransition,
     localStorageThemeActions,
-  } from "@/utils/theme";
+  } from "#src/utils/theme.js";
   import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
   import { bookmarkStore } from "#lib/stores/Bookmark.svelte.js";
   import { themePropsStore } from "#lib/stores/Theme.svelte.js";
   import {
     APIServiceBrowser,
     APIServiceShared,
-  } from "@/services/graphql/APIService";
-  import { useRIC } from "@/utils/window";
+  } from "#src/services/graphql/APIService.js";
+  import { useRIC } from "#src/utils/window.js";
   import { MediaQuery } from "svelte/reactivity";
 
   let showThemeModal = $state.raw(false);
@@ -163,7 +163,7 @@
     ExternalLinkSolid,
     KeySolid,
   } from "svelte-awesome-icons";
-  import { componentRegistry } from "@/lib/stores/ComponentRegistry.svelte";
+  import { componentRegistry } from "#lib/stores/ComponentRegistry.svelte.js";
 
   let { themeData }: { themeData: WPLokerBJMThemedData } = $props();
 

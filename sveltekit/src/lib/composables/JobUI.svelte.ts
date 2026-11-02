@@ -1,8 +1,8 @@
 //TODO: Migrate to Temporal from Old Date API
-import { type DeadlineStatus, type JobSummary, type StatusPekerjaanNumber, type StatusPekerjaanString } from "@/types";
+import { type DeadlineStatus, type JobSummary, type StatusPekerjaanNumber, type StatusPekerjaanString } from "#src/types/index.js";
 import { createSubscriber } from "svelte/reactivity";
 import { browser } from '$app/env';
-import timeWorker from '@/workers/clock/time.worker?worker';
+import timeWorker from '#src/workers/clock/time.worker.ts?worker';
 import type { Component } from 'svelte';
 import
 {

@@ -1,4 +1,4 @@
-import { graphql } from "@/services/graphql/config/tada";
+import { graphql } from "#src/services/graphql/config/tada.js";
 
 export const GET_THEME_DATA = graphql(`
   query GetThemeData {

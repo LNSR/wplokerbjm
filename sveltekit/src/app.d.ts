@@ -4,7 +4,7 @@ import type {
   CacheStorage,
   Cache,
 } from "@cloudflare/workers-types";
-import type { WPLokerBJMThemedData } from "@/types";
+import type { WPLokerBJMThemedData } from "#src/types/index.js";
 
 // See https://svelte.dev/docs/kit/types#app.d.ts
 // for information about these interfaces

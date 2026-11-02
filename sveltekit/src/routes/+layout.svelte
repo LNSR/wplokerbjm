@@ -1,10 +1,10 @@
 <script lang="ts">
-  import "@css/app.css";
+  import "../lib/assets/css/app.css";
   import {
     deviceDetector,
     type DeviceDetectorInternal,
   } from "#lib/features/DeviceDetector.svelte.js";
-  import { GoogleServices } from "@/services/Google";
+  import { GoogleServices } from "#src/services/Google.js";
   import { routeStore } from "#lib/stores/Route.svelte.js";
   import Header, { headerManager } from "#lib/components/layouts/Header.svelte";
   import Footer from "#lib/components/layouts/Footer.svelte";
@@ -12,7 +12,7 @@
   import { afterNavigate, onNavigate, beforeNavigate, type OnNavigate } from "$app/navigation";
   import { updated } from "$app/state";
   import type { LayoutProps } from "./$types";
-  import inlinedScript from "@/utils/inlineScript?inline-script";
+  import inlinedScript from "#src/utils/inlineScript.ts?inline-script";
 
   let initialPageviewSent = false;
 
@@ -116,7 +116,7 @@
 <Footer />
 
 <style lang="postcss">
-  @reference "@css/app.css";
+  @reference "../lib/assets/css/app.css";
   .page-transition {
     transition: opacity 0.1s ease-in-out;
     contain-intrinsic-size: auto

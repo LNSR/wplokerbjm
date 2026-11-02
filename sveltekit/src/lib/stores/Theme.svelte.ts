@@ -1,4 +1,4 @@
-import type { WPLokerBJMThemedData } from "@/types";
+import type { WPLokerBJMThemedData } from "#src/types/index.js";
 
 /**
  * Theme Props Manager

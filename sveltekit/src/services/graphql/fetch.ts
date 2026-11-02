@@ -12,18 +12,18 @@ import type {
     SearchResponse,
     TaxonomyTermsResponse,
     CardJob,
-} from "@/types";
-import { GET_CAROUSEL, GET_JOB_GRID } from "@/services/graphql/query/shared/job";
+} from "#src/types/index.js";
+import { GET_CAROUSEL, GET_JOB_GRID } from "#src/services/graphql/query/shared/job.js";
 import type { DocumentInput } from "urql";
-import { GET_AUTO_SUGGESTIONS, GET_LOAD_MORE, GET_SEARCH_JOBS, SYNC_BOOKMARK } from "@/services/graphql/query/browser/job";
-import { GET_THEME_NONCE } from "@/services/graphql/query/browser/theme";
-import { GET_JWT } from "@/services/graphql/query/browser/auth";
-import { GET_LOKASI_TERMS, GET_GENDER_TERMS, GET_PENDIDIKAN_TERMS } from "@/services/graphql/query/browser/taxonomy";
-import type { URQLBrowserManager } from "@/services/graphql/config/urql";
-import { APIServiceHelper } from "@/utils/apiservice-helper";
-import { GET_JOB_DETAIL, GET_JOB_DETAIL_PREVIEW, GET_JOB_SCHEMA, GET_RANK_MATH_HEAD } from "@/services/graphql/query/ssr/job";
-import { GET_THEME_DATA } from "@/services/graphql/query/ssr/theme";
-import { URQLServerManager } from "@/services/graphql/config/urql";
+import { GET_AUTO_SUGGESTIONS, GET_LOAD_MORE, GET_SEARCH_JOBS, SYNC_BOOKMARK } from "#src/services/graphql/query/browser/job.js";
+import { GET_THEME_NONCE } from "#src/services/graphql/query/browser/theme.js";
+import { GET_JWT } from "#src/services/graphql/query/browser/auth.js";
+import { GET_LOKASI_TERMS, GET_GENDER_TERMS, GET_PENDIDIKAN_TERMS } from "#src/services/graphql/query/browser/taxonomy.js";
+import type { URQLBrowserManager } from "#src/services/graphql/config/urql.js";
+import { APIServiceHelper } from "#src/utils/apiservice-helper.js";
+import { GET_JOB_DETAIL, GET_JOB_DETAIL_PREVIEW, GET_JOB_SCHEMA, GET_RANK_MATH_HEAD } from "#src/services/graphql/query/ssr/job.js";
+import { GET_THEME_DATA } from "#src/services/graphql/query/ssr/theme.js";
+import { URQLServerManager } from "#src/services/graphql/config/urql.js";
 type BookmarkResponse = CardJob[];
 class SharedFetch {
 
