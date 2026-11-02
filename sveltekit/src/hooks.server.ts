@@ -1,16 +1,16 @@
-import { sequence } from "@sveltejs/kit/hooks";
-import type { Handle, RequestEvent } from "@sveltejs/kit";
+import type { RequestEvent } from "@sveltejs/kit";
+import { sequence, type Handle } from "@sveltejs/kit/hooks";
 import type { WPLokerBJMThemedData, DeviceType } from "@/types";
-import { cookieJwtName } from "$lib/server/constants/constants";
+import { cookieJwtName } from "#lib/server/constants/constants.js";
 import { handleDeviceDetector } from "sveltekit-device-detector";
 import { APIServiceServer } from "@/services/graphql/APIService";
-import { dev } from "$app/environment";
-import { getEtag, setEtag } from "$lib/server/cache/eTagCache";
-import { getThemeCache, setThemeCache } from "$lib/server/cache/themeCache";
+import { dev } from "$app/env";
+import { getEtag, setEtag } from "#lib/server/cache/eTagCache.js";
+import { getThemeCache, setThemeCache } from "#lib/server/cache/themeCache.js";
 import {
   buildPreloadLink,
   isAuthenticated,
-} from "$lib/server/utils/http.server";
+} from "#lib/server/utils/http.server.js";
 
 class HttpUtils {
   private static readonly encoder = new TextEncoder();
@@ -75,15 +75,11 @@ class HttpUtils {
       .split(";")
       .map((p) => p.trim())
       .filter((cook) => {
-        const name = cook.split("=")[0] || "";
-        const lowerName = name.toLowerCase();
-        return (
-          lowerName.startsWith("wordpress") ||
-          lowerName.startsWith("wp") ||
-          lowerName.startsWith(cookieJwtName)
-        );
-      })
-      .join("; ");
+      const name = cook.split("=")[0] || "";
+      const lowerName = name.toLowerCase();
+
+      return lowerName.startsWith("wordpress") || lowerName.startsWith("wp") || lowerName.startsWith(cookieJwtName);
+    }).join("; ");
   }
   public static setCrossOriginIsolationHeaders(headers: Headers): void {
     headers.set("Cross-Origin-Opener-Policy", "same-origin");
@@ -92,6 +88,15 @@ class HttpUtils {
     headers.set("Origin-Agent-Cluster", "?1");
   }
 }
+
+const setEventFetch = (
+  event: RequestEvent,
+  wrappedFetch: typeof globalThis.fetch,
+): void => {
+  // Kit 3 types event.fetch as readonly; the runtime event object is writable.
+  Object.assign(event, { fetch: wrappedFetch });
+};
+
 // --- Middleware Split ---
 
 /**
@@ -129,7 +134,7 @@ const handleClientIp: Handle = async ({ event, resolve }) => {
 const handleSecurityContext: Handle = async ({ event, resolve }) => {
   const originalFetch = event.fetch;
 
-  event.fetch = async (input, init = {}) => {
+  const securityFetch: typeof globalThis.fetch = async (input, init = {}) => {
     const headers = new Headers(init.headers);
 
     if (event.locals.clientIp) {
@@ -163,6 +168,8 @@ const handleSecurityContext: Handle = async ({ event, resolve }) => {
     });
   };
 
+  setEventFetch(event, securityFetch);
+
   const response = await resolve(event);
 
   response.headers.append("Vary", "Cookie");
@@ -179,7 +186,7 @@ const handleSecurityContext: Handle = async ({ event, resolve }) => {
 const handleGraphQLETag: Handle = async ({ event, resolve }) => {
   const originalFetch = event.fetch;
 
-  event.fetch = (...args: Parameters<typeof originalFetch>) => {
+  const etagFetch: typeof globalThis.fetch = (...args) => {
     const [input, init = {}] = args;
     const url =
       typeof input === "string"
@@ -226,6 +233,8 @@ const handleGraphQLETag: Handle = async ({ event, resolve }) => {
       return response;
     })();
   };
+
+  setEventFetch(event, etagFetch);
 
   return resolve(event);
 };

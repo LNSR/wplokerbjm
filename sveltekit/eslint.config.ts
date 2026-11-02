@@ -6,10 +6,15 @@ import svelteParser from 'svelte-eslint-parser';
 import { defineConfig } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
-import svelteConfig from './svelte.config.ts';
+import { vitePreprocess } from '@sveltejs/vite-plugin-svelte';
+
+const svelteConfig = {
+	preprocess: vitePreprocess({ script: true }),
+	compilerOptions: { runes: true, modernAst: true },
+};
 
 const themeRootPath = path.dirname(fileURLToPath(import.meta.url));
-const gitignorePath = path.resolve(themeRootPath, '../../../../.gitignore');
+const gitignorePath = path.resolve(themeRootPath, '../.gitignore');
 
 export default defineConfig(
 	includeIgnoreFile(gitignorePath),
@@ -27,7 +32,6 @@ export default defineConfig(
 			"node_modules/**",
 			"stats.html",
 			".gitignore",
-			"svelte.config.ts",
 			"vite.config.ts",
 			"eslint.config.ts",
 			"eslint.config.cjs",
@@ -35,7 +39,6 @@ export default defineConfig(
 			"vite-plugins/**/*.d.ts",
 			"vite-plugins/**/*.js",
 			".svelte-kit/**",
-			"static/**",
 		]
 	},
 
@@ -98,7 +101,7 @@ export default defineConfig(
 				caughtErrorsIgnorePattern: "^_",
 				varsIgnorePattern: "^_",
 			} ],
-			"svelte/prefer-svelte-reactive": "warn",
+			"svelte/prefer-svelte-reactivity": "warn",
 			"svelte/valid-compile": "error",
 			"svelte/no-inspect": "warn",
 			"svelte/no-at-html-tags": "off",

@@ -1,8 +1,8 @@
 import type { CardJob, JobCardProps } from "@/types";
-import { routeStateStore } from "$lib/stores/Route.svelte";
-import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+import { routeStateStore } from "#lib/stores/Route.svelte.js";
+import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
 import { useRIC } from "@/utils/window";
-import { goto } from "$app/navigation";
+import { gotoWithFallback } from "@/utils/navigation";
 /**
  * SidePanelManager
  *
@@ -43,7 +43,7 @@ class SidePanelManager
         const url = new URL(job.permalink, window.location.origin);
         const path = url.pathname + url.search + url.hash;
 
-        goto(path, { replaceState: true, noScroll: true, keepFocus: true }).then(() =>
+        gotoWithFallback(path, { replace: true, reset: false }).then(() =>
         {
           if (!gotoCB) return;
           return Promise.try(gotoCB).catch((err) =>

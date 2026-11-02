@@ -21,8 +21,8 @@ import { GET_JWT } from "@/services/graphql/query/browser/auth";
 import { GET_LOKASI_TERMS, GET_GENDER_TERMS, GET_PENDIDIKAN_TERMS } from "@/services/graphql/query/browser/taxonomy";
 import type { URQLBrowserManager } from "@/services/graphql/config/urql";
 import { APIServiceHelper } from "@/utils/apiservice-helper";
-import { GET_JOB_DETAIL, GET_JOB_DETAIL_PREVIEW, GET_JOB_SCHEMA, GET_RANK_MATH_HEAD } from "@/services/graphql/query/server/job";
-import { GET_THEME_DATA } from "@/services/graphql/query/server/theme";
+import { GET_JOB_DETAIL, GET_JOB_DETAIL_PREVIEW, GET_JOB_SCHEMA, GET_RANK_MATH_HEAD } from "@/services/graphql/query/ssr/job";
+import { GET_THEME_DATA } from "@/services/graphql/query/ssr/theme";
 import { URQLServerManager } from "@/services/graphql/config/urql";
 type BookmarkResponse = CardJob[];
 class SharedFetch {

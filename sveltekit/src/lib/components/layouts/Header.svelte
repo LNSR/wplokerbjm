@@ -5,9 +5,9 @@
     applyThemeViewTransition,
     localStorageThemeActions,
   } from "@/utils/theme";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
-  import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
-  import { themePropsStore } from "$lib/stores/Theme.svelte";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
+  import { bookmarkStore } from "#lib/stores/Bookmark.svelte.js";
+  import { themePropsStore } from "#lib/stores/Theme.svelte.js";
   import {
     APIServiceBrowser,
     APIServiceShared,

@@ -7,7 +7,7 @@
  * in-memory cache (dev AND production within the same Worker lifecycle).
  */
 
-import { dev } from '$app/environment';
+import { dev } from '$app/env';
 import { LRUCache } from 'lru-cache';
 
 interface CacheEntry {
@@ -42,8 +42,8 @@ export async function getEtag(hash: string): Promise<CacheEntry | null> {
         const response = await caches.default.match(cfCacheUrl(hash));
         if (!response) return null;
 
-        const entry = (await response.json()) as CacheEntry;
-        
+        const entry = await response.json() as CacheEntry;
+
         lru.set(hash, entry, { ttl: DEFAULT_TTL_SECONDS * 1000 });
         return entry;
     } catch (error) {
@@ -73,7 +73,7 @@ export async function setEtag(
                 'Cache-Control': `public, max-age=${ttl}` 
             },
         });
-		//@ts-expect-error
+		// @ts-expect-error Cloudflare's global CacheStorage exposes caches.default, which is not in the standard lib type
         await caches.default.put(cfCacheUrl(hash), response);
     } catch (error) {
         console.error(`[Cache API Set Error] Failed to write hash ${hash}:`, error);

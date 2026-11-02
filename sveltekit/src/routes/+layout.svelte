@@ -3,15 +3,14 @@
   import {
     deviceDetector,
     type DeviceDetectorInternal,
-  } from "$lib/features/DeviceDetector.svelte";
+  } from "#lib/features/DeviceDetector.svelte.js";
   import { GoogleServices } from "@/services/Google";
-  import { routeStore } from "$lib/stores/Route.svelte";
-  import Header, { headerManager } from "$lib/components/layouts/Header.svelte";
-  import Footer from "$lib/components/layouts/Footer.svelte";
-  import FloatingActionButton from "$lib/components/ui/Shared/FloatingActionButton.svelte";
-  import { afterNavigate, onNavigate, beforeNavigate } from "$app/navigation";
+  import { routeStore } from "#lib/stores/Route.svelte.js";
+  import Header, { headerManager } from "#lib/components/layouts/Header.svelte";
+  import Footer from "#lib/components/layouts/Footer.svelte";
+  import FloatingActionButton from "#lib/components/ui/Shared/FloatingActionButton.svelte";
+  import { afterNavigate, onNavigate, beforeNavigate, type OnNavigate } from "$app/navigation";
   import { updated } from "$app/state";
-  import type { OnNavigate } from "@sveltejs/kit";
   import type { LayoutProps } from "./$types";
   import inlinedScript from "@/utils/inlineScript?inline-script";
 
@@ -19,13 +18,18 @@
 
   const { children, data }: LayoutProps = $props();
 
+  // Escape the closing tag so the HTML parser does not terminate this script block.
+  const inlinedScriptTag = `<script id="wplokerbjm-theme-inline-script">${inlinedScript}<\/script>`;
+
   const { themeData, rankMathHead, deviceType } = $derived({
-    themeData: data?.themeData!,
+    themeData: data.themeData!,
     rankMathHead: data?.rankMathHead,
     deviceType: data?.deviceType,
   });
 
-  beforeNavigate(({ to, willUnload }) => {
+  beforeNavigate(({ to, willUnload, shallow, type }) => {
+    if (shallow && type === 'goto') return;
+
     try {
       if (updated.current && !willUnload && to?.url)
         location.href = to.url.href;
@@ -39,12 +43,8 @@
   });
 
   onNavigate((navigation: OnNavigate) => {
-    if (
-      typeof document.startViewTransition !== "function" ||
-      document.activeViewTransition ||
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    )
-      return;
+    if (navigation.shallow && navigation.type === 'goto') return;
+    if (typeof document.startViewTransition !== "function" || document.activeViewTransition || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
 
     return new Promise((resolve, reject) => {
       const transition = document.startViewTransition();
@@ -65,26 +65,22 @@
     });
   });
 
-  afterNavigate(() => {
+  afterNavigate(({ shallow, type }) => {
+    if (shallow && type === 'goto') return;
+
     routeStore.setIsLoading = false;
     routeStore.setIsTransitioningRoute = false;
-    if (
-      !routeStore.isInitialLoad &&
-      initialPageviewSent &&
-      GoogleServices.gtmLoaded
-    )
-      return GoogleServices.sendPageView();
 
-    GoogleServices.injectGTMScript()
-      .then(() => {
-        if (GoogleServices.gtmLoaded) {
-          GoogleServices.sendPageView();
-          initialPageviewSent ||= true;
-        }
+    if (!routeStore.isInitialLoad && initialPageviewSent && GoogleServices.gtmLoaded) return GoogleServices.sendPageView();
+    GoogleServices.injectGTMScript().then(() => {
+      if (GoogleServices.gtmLoaded) {
+        GoogleServices.sendPageView();
+        initialPageviewSent ||= true;
+      }
       })
       .catch(() => {
-        console.error("Failed to inject GTM script on initial load");
-      });
+      console.error("Failed to inject GTM script on initial load");
+    });
   });
 
   // IIFE to avoid closure Svelte warning; set initialDeviceSSR for DeviceDetector during SSR
@@ -97,7 +93,7 @@
 
 <svelte:head>
   {#if routeStore.isInitialLoad}
-    {@html `<script id="wplokerbjm-theme-inline-script">${inlinedScript}</script>`}
+    {@html inlinedScriptTag}
   {/if}
   {#if themeData?.siteIconTags}
     {@html themeData.siteIconTags}
@@ -107,7 +103,7 @@
   {/if}
 </svelte:head>
 
-<Header {themeData} />
+<Header themeData={themeData} />
 <div
   class="route-container !pt-20"
   style="--site-header-height: {headerManager.currentHeight}px; --site-scroll-padding-top: {headerManager.currentHeight}px; padding-top: {headerManager.currentHeight}px;"

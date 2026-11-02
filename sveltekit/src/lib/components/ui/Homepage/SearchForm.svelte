@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, type Component } from "svelte";
-  import { taxonomyStore } from "$lib/stores/Taxonomy.svelte";
+  import { taxonomyStore } from "#lib/stores/Taxonomy.svelte.js";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import {
     MagnifyingGlassSolid,
@@ -24,8 +24,8 @@
     KeyboardKeysEvent,
   } from "@/types";
   import { WPPostType } from "@/types";
-  import { jobListingStore } from "$lib/stores/JobListingStore.svelte";
-  import { isJobGridEl } from "$lib/utils/elements.svelte";
+  import { jobListingStore } from "#lib/stores/JobListingStore.svelte.js";
+  import { isJobGridEl } from "#lib/utils/elements.svelte.js";
   import { SearchUtils } from "@/utils/search";
   import { componentRegistry } from "@/lib/stores/ComponentRegistry.svelte";
   import { APIServiceBrowser } from "@/services/graphql/APIService";

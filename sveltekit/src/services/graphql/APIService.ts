@@ -1,15 +1,15 @@
-import { browser } from "$app/environment";
+import { browser } from "$app/env";
 import { URQLServerManager } from "@/services/graphql/config/urql";
 import { wrap } from "comlink";
 import graphFetchWorker from "@/workers/network/graphql/fetch.worker?worker";
 import type { BrowserFetch as fetchWorker } from "./fetch";
 import { ServerFetch } from "./fetch";
 
-const fetchWorkerBrowser = function() {
+const fetchWorkerBrowser = (function () {
   if (!browser) return;
   const workerInstance = wrap<fetchWorker>(new graphFetchWorker());
   return workerInstance;
-}() as ReturnType<typeof wrap<fetchWorker>>;
+})() as ReturnType<typeof wrap<fetchWorker>>;
 
 /**
  * ? Move to dedicated *.server file, maybe not

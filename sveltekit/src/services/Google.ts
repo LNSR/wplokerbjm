@@ -1,4 +1,4 @@
-import { themePropsStore } from "$lib/stores/Theme.svelte";
+import { themePropsStore } from "#lib/stores/Theme.svelte.js";
 import
 {
   partytownSnippet,

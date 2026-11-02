@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
+  import { gotoWithFallback } from "@/utils/navigation";
   import type { DOMAttributes } from "svelte/elements";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
+  import { routeStateStore, routeStore } from "#lib/stores/Route.svelte.js";
   import {
     CalendarSolid,
     ExclamationTriangleSolid,
@@ -17,7 +17,7 @@
     StatusPekerjaanNumber,
     StatusPekerjaanString,
   } from "@/types";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
   import {
     showDeadline,
     showStatusJob,
@@ -115,7 +115,7 @@
 
     if (isMobile) {
       if (permalink)
-        void goto(new URL(permalink, window.location.origin).pathname);
+        void gotoWithFallback(new URL(permalink, window.location.origin).pathname);
       return;
     }
   }

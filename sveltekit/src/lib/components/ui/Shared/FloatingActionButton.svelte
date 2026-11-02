@@ -9,8 +9,8 @@
     FacebookBrands,
     ThreadsBrands,
   } from "svelte-awesome-icons";
-  import { isJobGridEl } from "$lib/utils/elements.svelte";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  import { isJobGridEl } from "#lib/utils/elements.svelte.js";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
 
   const isMobile = $derived(deviceDetector.isPlatformMobile);
 

@@ -2,8 +2,8 @@ import type { SearchState, CarouselState, JobCardProps, CardHeightKey } from "@/
 import { SvelteMap } from "svelte/reactivity";
 import { type CardJob } from "@/types";
 import typia from "typia";
-import { useVirtualization } from "$lib/features/Virtualization.svelte";
-import { deviceDetector, type DeviceDetectorInternal } from "$lib/features/DeviceDetector.svelte";
+import { useVirtualization } from "#lib/features/Virtualization.svelte.js";
+import { deviceDetector, type DeviceDetectorInternal } from "#lib/features/DeviceDetector.svelte.js";
 
 type LastVisitedJobState = {
   slug: CardJob[ "slug" ];

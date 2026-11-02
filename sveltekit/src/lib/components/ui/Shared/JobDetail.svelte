@@ -31,14 +31,14 @@
   } from "@/types";
   import { SocialMediaPlatform } from "@/types";
   import type { Component } from "svelte";
-  import { browser } from "$app/environment";
+  import { browser } from "$app/env";
   import ViewerModule from "viewerjs";
   import "viewerjs/dist/viewer.min.css";
   import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
   import { onMount } from "svelte";
   import type { JobDetailResponse } from "@/types";
   import { page } from "$app/state";
-  import { showSummaryJob, showTimeAgo } from "$lib/composables/JobUI.svelte";
+  import { showSummaryJob, showTimeAgo } from "#lib/composables/JobUI.svelte.js";
 
   interface ContactRow {
     type: "email" | "phone" | "website";

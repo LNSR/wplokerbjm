@@ -3,7 +3,7 @@
   import { type Attachment } from "svelte/attachments";
   import type { JobDetailResponse } from "@/types";
   import { routeStore } from "@/lib/stores/Route.svelte";
-  import { themePropsStore } from "$lib/stores/Theme.svelte";
+  import { themePropsStore } from "#lib/stores/Theme.svelte.js";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import { PenToSquareSolid, CopySolid } from "svelte-awesome-icons";
   import { useSidePanel } from "@/lib/composables/SidePanel.svelte";

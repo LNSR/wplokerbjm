@@ -1,3 +1,5 @@
+import adapter from "@sveltejs/adapter-cloudflare";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import devtoolsJson from "vite-plugin-devtools-json";
 import UnpluginTypia from '@typia/unplugin/vite'
 import tailwindcss from "@tailwindcss/vite";
@@ -45,12 +47,28 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
     : undefined;
 
   const sharedPlugins: UserConfig["plugins"] = [
-    sveltekit(),
-    UnpluginTypia({
-      cache: true,
-      log: true,
+    sveltekit({
+      files: { assets: "public" },
+      preprocess: vitePreprocess({ script: true }),
+      compilerOptions: {
+        runes: true,
+        modernAst: true,
+        hmr: isDev,
+        discloseVersion: false,
+        dev: isDev
+      },
+      version: { name: Date.now().toString() },
+      prerender: { concurrency: 4 },
+      adapter: adapter(),
+      alias: {
+        "@components": "src/lib/components",
+        "@css": "src/lib/assets/css",
+        "@": "src"
+      },
+      paths: { origin: isDev ? "https://localhost:5173" : "https://lokerbanjarmasin.my.id" }
     }),
-  ]
+    UnpluginTypia({ cache: true, log: true })
+  ];
 
   const plugins: UserConfig["plugins"] = [
     tailwindcss({
@@ -128,7 +146,7 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
     async load(id) {
       if (!id.endsWith("?inline-script")) return null;
 
-      const entry = id.slice(0, -"?inline-script".length);
+      const entry = id.slice(0, -("?inline-script").length);
 
       this.addWatchFile(entry);
 
@@ -137,7 +155,7 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
         mode,
         configFile: false,
         publicDir: false,
-        logLevel: "warn", // Toned down to avoid flooding the console on every edit
+        logLevel: "warn" /* Toned down to avoid flooding the console on every edit */,
 
         resolve: {
           alias: resolveConfig?.alias,

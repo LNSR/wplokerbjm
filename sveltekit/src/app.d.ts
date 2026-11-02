@@ -1,12 +1,8 @@
 import { type PartytownConfig } from "@qwik.dev/partytown/integration";
 import type { DevicePayload } from "sveltekit-device-detector/dist/types";
 import type {
-  Env,
-  ExecutionContext,
   CacheStorage,
   Cache,
-  IncomingRequestCfProperties,
-  KVNamespace,
 } from "@cloudflare/workers-types";
 import type { WPLokerBJMThemedData } from "@/types";
 
@@ -102,14 +98,6 @@ declare global
     {
       deviceType: DevicePayload,
       jobSchemaScript?: string // This is a string containing a <script type="application/ld+json"> 
-    }
-
-    interface Platform
-    {
-      env: Env; 
-      ctx: ExecutionContext;
-      caches: CacheStorage;
-      cf?: IncomingRequestCfProperties;
     }
 
     interface PrivateEnv { }

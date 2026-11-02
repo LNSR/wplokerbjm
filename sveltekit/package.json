@@ -13,8 +13,8 @@
     "ci:deploy": "bun run bun:config vite build",
     "preview": "bun run bun:config wrangler dev > log/vite.preview.log 2>&1",
     "prepare": "bun run bun:config --parallel \"ts-patch install\" \"svelte-kit sync || echo ''\"",
-    "check": "bun run bun:config --bun --parallel \"svelte-check-rs --tsconfig ./tsconfig.json\" \"tsgo\"",
-    "check:watch": "bun run bun:config --parallel \"svelte-check-rs --tsconfig ./tsconfig.json --watch\"",
+    "check": "bun run bun:config --bun --parallel \"svelte-check --tsconfig ./tsconfig.json\" \"tsc --noEmit\"",
+    "check:watch": "bun run bun:config --parallel \"svelte-check --tsconfig ./tsconfig.json --watch\"",
     "generate-types": "bun run bun:config --parallel \"wrangler types\" \"gql-tada generate-output --output './src/graphql-env.d.ts'\" \"gql-tada generate turbo\""
   },
   "graphql": {
@@ -34,8 +34,9 @@
     "@cloudflare/workers-types": "^5.20261101.1",
     "@eslint/compat": "^2.1.1",
     "@gql.tada/svelte-support": "^1.0.3",
-    "@sveltejs/adapter-cloudflare": "^7.2.9",
-    "@sveltejs/kit": "^2.70.3",
+    "@sveltejs/adapter-cloudflare": "^8.0.2",
+    "@sveltejs/kit": "^3.1.1",
+    "@sveltejs/vite-plugin-svelte": "^7.3.1",
     "@tailwindcss/vite": "4.3.3",
     "@tsconfig/svelte": "^5.0.8",
     "@types/node": "^26.6.6",
@@ -70,5 +71,8 @@
     "typescript": "^6.0.3",
     "@typia/unplugin": "^12.1.1",
     "typia": "^12.1.1"
+  },
+  "imports": {
+    "#lib/*": "./src/lib/*"
   }
 }

@@ -1,17 +1,17 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
-  import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
+  import { bookmarkStore } from "#lib/stores/Bookmark.svelte.js";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import { useVirtualization } from "$lib/features/Virtualization.svelte";
+  import { useVirtualization } from "#lib/features/Virtualization.svelte.js";
   import type { ListVirtualizationState } from "@/lib/features/Virtualization.svelte";
   import type { CardJob } from "@/types";
-  import { isJobGridEl } from "$lib/utils/elements.svelte";
+  import { isJobGridEl } from "#lib/utils/elements.svelte.js";
   import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import { goto } from "$app/navigation";
-  import { routeStateStore } from "$lib/stores/Route.svelte";
+  import { gotoWithFallback } from "@/utils/navigation";
+  import { routeStateStore } from "#lib/stores/Route.svelte.js";
   import JobCard from "@components/ui/Shared/JobCard.svelte";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
   import {
     BookmarkSolid,
     XmarkSolid,
@@ -26,8 +26,8 @@
     showDeadline,
     showStatusJob,
     showTimeAgo,
-  } from "$lib/composables/JobUI.svelte";
-  import { useSidePanel } from "$lib/composables/SidePanel.svelte";
+  } from "#lib/composables/JobUI.svelte.js";
+  import { useSidePanel } from "#lib/composables/SidePanel.svelte.js";
   import { useRIC } from "@/utils/window";
 
   interface Props {
@@ -349,7 +349,7 @@
           "bookmarkModal",
         );
         const url = new URL(job.permalink, window.location.origin);
-        goto(url.pathname + url.search + url.hash).then(() => {
+        gotoWithFallback(url.pathname + url.search + url.hash).then(() => {
           this.closeModal();
         });
       }

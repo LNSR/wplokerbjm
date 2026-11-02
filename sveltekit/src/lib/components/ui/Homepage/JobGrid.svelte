@@ -7,17 +7,17 @@
     SearchState,
     StatusPekerjaanNumber, StatusPekerjaanString
   } from "@/types";
-  import { goto } from "$app/navigation";
-  import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
-  import { jobListingStore } from "$lib/stores/JobListingStore.svelte";
+  import { gotoWithFallback } from "@/utils/navigation";
+  import { routeStore, routeStateStore } from "#lib/stores/Route.svelte.js";
+  import { jobListingStore } from "#lib/stores/JobListingStore.svelte.js";
   import { APIServiceBrowser } from "@/services/graphql/APIService";
   import { withTimeout } from "es-toolkit";
   import { SearchUtils } from "@/utils/search";
   import { useVirtualization } from "@/lib/features/Virtualization.svelte";
   import { scrollY, innerHeight } from "svelte/reactivity/window";
-  import { browser } from "$app/environment";
-  import { useSidePanel } from "$lib/composables/SidePanel.svelte";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  import { browser } from "$app/env";
+  import { useSidePanel } from "#lib/composables/SidePanel.svelte.js";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
 
   const isMobile = $derived(deviceDetector.isPlatformMobile);
   const displayJobs = $derived.by(() => {
@@ -57,7 +57,7 @@
       // navigate to SingleLowongan.svelte route
       const url = new URL(String(job.permalink), window.location.origin);
       jobGridManager.saveGridStates();
-      void goto(url.pathname + url.search + url.hash);
+      void gotoWithFallback(url.pathname + url.search + url.hash);
     }
     public static handleJobClick(job: CardJob): void {
       if (!job.permalink) return;

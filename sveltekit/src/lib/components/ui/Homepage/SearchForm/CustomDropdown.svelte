@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { taxonomyStore } from "$lib/stores/Taxonomy.svelte";
+  import { taxonomyStore } from "#lib/stores/Taxonomy.svelte.js";
   import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
   import {
     SitemapSolid,

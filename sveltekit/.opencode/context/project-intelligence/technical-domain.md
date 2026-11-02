@@ -1,36 +1,38 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 1.1 | Updated: 2026-07-04 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 2.0 | Updated: 2026-11-01 -->
 
 # Technical Domain — Lowker Site Frontend
 
-> SvelteKit frontend — headless job board consuming WordPress GraphQL API. Svelte 5 runes, TypeScript 6, Tailwind CSS 4, Cloudflare Workers.
+> SvelteKit 3 frontend — headless job board consuming a WordPress GraphQL API. Svelte 5 runes, TypeScript 6, Vite 8, Tailwind CSS 4, Cloudflare Workers.
 
 ## Quick Reference
 
-- **Purpose**: Understand frontend architecture, component patterns, data fetching, styling
-- **Update When**: New components, data patterns, build/config changes, dependency updates
+- **Purpose**: Understand frontend architecture, component patterns, data fetching, styling, and deployment
+- **Update When**: Components, data patterns, build/config changes, dependency updates, Kit/Vite majors
 - **Audience**: Frontend developers working on the SvelteKit app
 
 ## Primary Stack
 
-| Layer           | Technology              | Version | Rationale                                                    |
-| --------------- | ----------------------- | ------- | ------------------------------------------------------------ |
-| Framework       | SvelteKit               | latest  | Svelte 5 runes mode; file-based routing; SSR/SSG support     |
-| UI              | Svelte 5 + runes        | 5.x     | `$props()`, `$state()`, `$derived()`, `$derived.by()`        |
-| Language        | TypeScript              | 6.x     | Strict mode; typia for runtime validation                    |
-| Styling         | Tailwind CSS + DaisyUI  | 4 + 5   | Utility-first CSS; PostCSS with `@reference`; DaisyUI components |
-| Data Fetching   | GraphQL (urql + gql.tada)| latest  | Typed GraphQL queries; urql client with cache                |
-| Package Manager | Bun                     | latest  | Fast installs; native TypeScript support                     |
-| Adapter         | Cloudflare Workers      | latest  | Edge deployment via Wrangler CLI                             |
-| Workers         | Web Workers + comlink   | —       | Off-thread GraphQL data fetching for performance             |
+| Layer | Technology | Version | Notes |
+|---|---|---|---|
+| Framework | SvelteKit | 3.x (3.1.1) | File-based routing; SSR-first with SPA navigation |
+| UI | Svelte 5 + runes | 5.57.x | `$props()`, `$state()`, `$derived()`, `$derived.by()` |
+| Language | TypeScript | 6.0.x | Strict mode; typia runtime validation |
+| Bundler | Vite + Rolldown | 8.3.x | Config lives in `vite.config.ts` |
+| Styling | Tailwind CSS + DaisyUI | 4.x + 5.x | CSS-first Tailwind 4; `@reference` for component styles |
+| Data | GraphQL (urql + gql.tada) | 5.x / 1.x | Typed queries; urql cache |
+| Adapter | `@sveltejs/adapter-cloudflare` | 8.x | Workers + static assets via `wrangler.jsonc` |
+| Runtime | Cloudflare Workers | wrangler 4.x | `.svelte-kit/cloudflare/_worker.js` |
+| Package manager | Bun | 1.4.x | `bun install`, `bun run …` |
 
 ## Architecture Pattern
 
 ```
-Type: Headless SPA via SvelteKit (SSR-first, SPA navigation)
-Pattern: +page.server.ts (server load) → GraphQL (urql) → $state() stores → Svelte 5 components
+Type: Headless SSR app with SPA navigation
+Flow: +page.server.ts (server load) → APIServiceServer → GraphQL (urql) → components
+      Browser interactions → APIServiceBrowser → comlink worker → GraphQL
 ```
 
-**Why this architecture?** SvelteKit provides SSR for SEO and initial load speed, with SPA-style client-side navigation. GraphQL via urql + gql.tada gives fully typed data fetching. Web Workers offload GraphQL queries off the main thread. Cloudflare Workers adapter enables edge deployment at global scale.
+SvelteKit renders HTML on the server for SEO and first paint, then hydrates into an SPA. Server-only data access goes through `src/lib/server` and `*.server.ts` modules. Browser-side GraphQL runs in a Web Worker wrapped with comlink.
 
 ## Project Structure
 
@@ -38,44 +40,42 @@ Pattern: +page.server.ts (server load) → GraphQL (urql) → $state() stores �
 sveltekit/
 ├── src/
 │   ├── lib/
-│   │   ├── components/          # Reusable UI components
-│   │   ├── stores/              # $state()-based reactive stores
-│   │   │   ├── JobListingStore.svelte.ts
-│   │   │   └── taxonomyStore.svelte.ts
-│   │   ├── graphql/             # GraphQL queries, urql client, gql.tada types
-│   │   ├── workers/             # Web Workers + comlink for off-thread GraphQL
-│   │   ├── utils/               # Utility functions
-│   │   └── css/                 # Tailwind entry point, PostCSS config
-│   ├── routes/                  # SvelteKit file-based routing
-│   │   ├── +page.svelte         # Home page
-│   │   ├── +page.server.ts      # Server load (SSR data fetching)
-│   │   └── lowongan/            # Job listing routes
-│   ├── app.css                  # Tailwind imports
-│   ├── app.d.ts                 # TypeScript declarations
-│   └── app.html                 # HTML shell
-├── static/                      # Static assets
-├── svelte.config.js             # SvelteKit config (adapter, aliases)
-├── tailwind.config.ts           # Tailwind + DaisyUI config
-├── postcss.config.js            # PostCSS (with @reference)
-├── tsconfig.json                # TypeScript config
-├── wrangler.toml               # Cloudflare Workers config
-└── package.json                 # Dependencies (Bun)
+│   │   ├── assets/css/           # Tailwind entry + WordPress styles
+│   │   ├── components/           # UI, layout, and page components
+│   │   ├── composables/          # Class-based UI controllers (*.svelte.ts)
+│   │   ├── features/             # Device detection, virtualization
+│   │   ├── server/               # Server-only cache, constants, middleware, utils
+│   │   ├── services/             # Client-side service helpers
+│   │   ├── stores/               # Runes-based global stores (*.svelte.ts)
+│   │   └── utils/                # Shared utilities
+│   ├── routes/                   # SvelteKit routes (+page, +layout, +server)
+│   ├── services/
+│   │   └── graphql/              # urql config, fetch classes, query documents
+│   ├── types/                    # App, WordPress, and worker types
+│   ├── utils/                    # Environment, navigation, decorators
+│   ├── workers/                  # Web Workers (bookmark, clock, network/GraphQL)
+│   ├── app.d.ts                  # Global App types and CacheStorage augmentation
+│   ├── app.html                  # HTML shell
+│   ├── env.ts                    # defineEnvVars declarations
+│   └── hooks.server.ts           # Server hooks (auth, ETag, theme, device, cache)
+├── public/                       # Static assets, including ~partytown/
+├── vite.config.ts                # SvelteKit + Vite config (sveltekit({...}))
+├── tsconfig.json                 # Extends $app/tsconfig
+├── eslint.config.ts              # Flat ESLint config
+├── wrangler.jsonc                # Workers, assets, KV, routes
+└── package.json                  # Bun scripts and dependencies
 ```
 
 ## Svelte 5 Runes Pattern
 
-**Concept**: Svelte 5's runes mode replaces legacy `$:` reactive declarations and `export let` props. All components use the new runes syntax.
+Runes mode is enabled globally in `sveltekit({ compilerOptions: { runes: true } })`.
 
-**Key runes**:
-
-| Rune              | Purpose                                 | Example                                      |
-| ----------------- | --------------------------------------- | -------------------------------------------- |
-| `$props()`        | Component props (replaces `export let`) | `let { title, jobs }: Props = $props();`     |
-| `$state()`        | Reactive local state                    | `let count = $state(0);`                     |
-| `$derived()`      | Computed value from state               | `let doubled = $derived(count * 2);`         |
-| `$derived.by()`   | Complex derived with logic block        | `let filtered = $derived.by(() => {...});`   |
-
-**Example**:
+| Rune | Purpose | Example |
+|---|---|---|
+| `$props()` | Component props | `let { title, jobs }: Props = $props();` |
+| `$state()` | Reactive local state | `let count = $state(0);` |
+| `$derived()` | Computed value | `let doubled = $derived(count * 2);` |
+| `$derived.by()` | Computed value with logic | `let filtered = $derived.by(() => jobs.filter(...));` |
 
 ```svelte
 <script lang="ts">
@@ -87,169 +87,139 @@ sveltekit/
   let { title, jobs }: Props = $props();
   let searchQuery = $state('');
   let filtered = $derived.by(() =>
-    jobs.filter(j => j.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    jobs.filter((j) => j.title.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 </script>
-
-<h1>{title}</h1>
-{#each filtered as job}
-  <JobCard {job} />
-{/each}
 ```
 
-## Path Aliases
+Prefer a named `Props` type with `$props()` over `$props<Props>()`; the latter is not accepted by the current Svelte tooling.
 
-Aliases configured in `svelte.config.js` and `tsconfig.json`:
+## Module Imports and Path Aliases
 
-| Alias            | Path               | Usage                             |
-| ---------------- | ------------------ | --------------------------------- |
-| `@components`    | `src/lib/components` | `import Card from '@components/Card.svelte'` |
-| `@css`           | `src/lib/css`      | `import '@css/global.css'`        |
-| `@`              | `src/lib`          | `import { store } from '@'`       |
+`package.json#imports` declares Node subpath imports:
 
-## Data Fetching Pattern (+page.server.ts)
+```json
+{
+  "imports": {
+    "#lib/*": "./src/lib/*"
+  }
+}
+```
 
-**Concept**: Page-level data fetching happens in `+page.server.ts` with `PageServerLoad`. Each function uses try/catch with graceful fallbacks — never throws to the client.
+- `#lib/*` imports **must** include the file extension: `#lib/server/cache/eTagCache.js`, `#lib/components/ui/Shared/JobCard.svelte`.
+- `@` maps to `src`; `@components` maps to `src/lib/components`; `@css` maps to `src/lib/assets/css`.
+- These aliases are still declared in `sveltekit({ alias })` in `vite.config.ts`. `kit.alias` is deprecated in SvelteKit 3; the full migration to package subpath imports is a follow-up. The unused `@@` alias was removed.
+- For new shared library code, prefer `#lib/*` with explicit extensions.
 
-**Pattern**:
+## Data Fetching (`+page.server.ts`)
+
+Server loads use `APIServiceServer` from `src/services/graphql/APIService.ts`. The contract is to return data with a graceful error shape and never throw to the client.
 
 ```typescript
 import type { PageServerLoad } from './$types';
+import { APIServiceServer } from '@/services/graphql/APIService';
 
-export const load: PageServerLoad = async ({ fetch, url }) => {
+export const load: PageServerLoad = async ({ params }) => {
   try {
-    const response = await fetch('/api/graphql', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: JOBS_QUERY, variables: { paged: 1 } }),
-    });
-    const data = await response.json();
-    return { jobs: data.jobs, error: null };
+    const job = await APIServiceServer.fetchJobDetailGraphQL(params.slug);
+    return { job, error: null };
   } catch (error) {
-    return { jobs: [], error: 'Failed to load jobs' };
+    return { job: null, error: 'Failed to load job' };
   }
 };
 ```
 
-**Key rules**:
-- Always return `{ data, error }` shape — never throw
-- Use typed queries via gql.tada for full type safety
-- Return `null`/empty arrays on failure, not errors
-- Pages render even when data fails (graceful degradation)
+**Rules**:
+- Server-only modules live under `src/lib/server/` or use the `*.server.ts` suffix.
+- Never import server-only modules into browser code; Kit 3 enforces this at build time.
+- Return empty/null data on failure so pages still render.
 
 ## GraphQL (urql + gql.tada)
 
-**Concept**: Typed GraphQL queries using `gql.tada` for compile-time type generation. `urql` client handles caching and request lifecycle.
+- `urql` manages request lifecycle and caching.
+- `gql.tada` provides compile-time typed documents.
+- `src/services/graphql/fetch.ts` exports `BrowserFetch` and `ServerFetch`.
+- `src/workers/network/graphql/fetch.worker.ts` exposes `BrowserFetch` through comlink.
 
-**Stack**:
-- **urql**: GraphQL client with built-in caching (document cache)
-- **gql.tada**: TypeScript-first GraphQL without code generation — types inferred from query strings
-- **Web Workers**: comlink wraps urql client in a Web Worker for off-thread execution
+### Query Organization
 
-**Web Worker Pattern**:
+Query documents live in `src/services/graphql/query/`:
 
-```typescript
-// main thread
-import { wrap } from 'comlink';
-const worker = new Worker(new URL('./graphql.worker.ts', import.meta.url));
-const { query } = wrap<WorkerAPI>(worker);
+| Directory | Purpose | Files |
+|---|---|---|
+| `browser/` | Browser-only queries | `auth.ts`, `job.ts`, `taxonomy.ts`, `theme.ts` |
+| `ssr/` | Server-side queries | `job.ts`, `theme.ts` |
+| `shared/` | Fragments and shared queries | `job.ts` (`FRAGMENT_*`, `GET_CAROUSEL`, `GET_JOB_GRID`) |
 
-// Off-thread GraphQL query
-const result = await query(JOBS_QUERY, { paged: 1 });
-```
+`ssr/` is intentionally **not** named `server/`: Kit 3 treats any `server` directory as server-only, and `fetch.worker.ts` imports `fetch.ts`, which contains `ServerFetch`. A future refactor should split browser and server fetch modules so the directory can follow the stricter convention.
 
-### Query File Organization
+**Rules**:
+- Modules in `browser/` must never import from `ssr/`.
+- Shared fragments live in `shared/` and are imported by both sides.
+- Place a new query by which fetch class consumes it.
 
-**Concept**: GraphQL query files are split into `browser/`, `server/`, and `shared/` subdirectories by which fetch class consumes them (`BrowserFetch`, `ServerFetch`, or both via `SharedFetch`).
+## Reactive Stores
 
-**Why split**: `gql.tada`'s `graphql()` tagged template calls are seen as potentially side-effecting by Rollup/Rolldown — tree-shaking fails. When browser-only and server-only queries lived in the same file, unused query ASTs leaked into both the main-thread and web-worker bundles (~120KB wasted per query group). Splitting by usage boundary at the **import level** ensures each bundle only pulls the query modules it actually needs.
+Global state lives in `src/lib/stores/*.svelte.ts`:
 
-**Directory structure** (`src/services/graphql/query/`):
+- `JobListingStore.svelte.ts` — job listing, filters, pagination
+- `Taxonomy.svelte.ts` — taxonomy terms
+- `Bookmark.svelte.ts` — bookmarks and IndexedDB sync
+- `Route.svelte.ts` — route and side-panel state
+- `Theme.svelte.ts` — theme selection
+- `ComponentRegistry.svelte.ts` — component registry
 
-| Directory    | Purpose                         | Files                                     |
-|-------------|----------------------------------|-------------------------------------------|
-| `browser/`  | `BrowserFetch`-only queries    | `auth.ts`, `job.ts`, `taxonomy.ts`, `theme.ts` |
-| `server/`   | `ServerFetch`-only queries     | `job.ts`, `theme.ts`                      |
-| `shared/`   | Fragments + `SharedFetch` queries | `job.ts` (FRAGMENT_*, GET_CAROUSEL, GET_JOB_GRID) |
+Use classes with `$state()` fields and methods; import them as singletons.
 
-**Key rules**:
-- Modules in `browser/` must **never** import from `server/` (or vice versa)
-- Shared GraphQL fragments (`FRAGMENT_*`) live in `shared/` and are imported by both
-- New query → determine which class uses it → place in the matching directory
-- `apiservice-helper.ts` imports only from `shared/` (fragments)
+## Styling (Tailwind 4 + DaisyUI 5)
 
-**📂 Codebase References**: `src/services/graphql/query/{browser,server,shared}/`
-
-## Reactive Stores Pattern
-
-**Concept**: Global reactive state using `$state()`-based stores in `*.svelte.ts` files. Composables pattern inspired by Vue composition API.
-
-**Store files** (in `src/lib/stores/`):
-- `JobListingStore.svelte.ts` — job listing state, filters, pagination
-- `taxonomyStore.svelte.ts` — taxonomy/category state
-
-**Pattern**:
-
-```typescript
-// taxonomyStore.svelte.ts
-export class taxonomyStore = {
-  categories: $state<string[]>([]),
-  selectedCategory: $state<string | null>(null),
-
-  setCategory(cat: string) {
-    this.selectedCategory = cat;
-  },
-};
-```
-
-## Styling (Tailwind CSS 4 + DaisyUI 5)
-
-**Concept**: Utility-first CSS via Tailwind 4 with DaisyUI 5 component library. PostCSS with `@reference` for composable styles.
-
-**Key points**:
-- Tailwind 4: JIT mode by default, new config format
-- DaisyUI 5: Pre-built components (buttons, cards, modals, navs)
-- PostCSS `@reference`: Import Tailwind utilities without bundling full CSS
-- Responsive: mobile-first with `sm:`, `md:`, `lg:` breakpoints
-- Theming: DaisyUI theme system with custom Lowker color palette
+- Entry point: `src/lib/assets/css/app.css`.
+- WordPress-specific styles: `src/lib/assets/css/wordpress.css`.
+- Tailwind 4 is CSS-first; configuration lives in `src/lib/assets/css/app.css`.
+- DaisyUI 5 provides components and themes.
+- In component `<style>` blocks, use `@reference "@css/app.css";` before `@apply` or theme utilities.
+- Responsive design is mobile-first (`sm:`, `md:`, `lg:`).
 
 ## Cloudflare Workers Deployment
 
-**Concept**: SvelteKit app deployed to Cloudflare Workers edge network via Wrangler.
+- Adapter: `@sveltejs/adapter-cloudflare@8`.
+- Config: `wrangler.jsonc` (compatibility date 2026-09-23, `nodejs_compat`, KV binding `wplokerbjm`, HTTPS dev port 8787).
+- Build output: `.svelte-kit/cloudflare/_worker.js` plus assets in `.svelte-kit/cloudflare`.
+- `sveltekit({ files: { assets: "public" } })` keeps static assets in `public/`; do not remove it.
+- Cloudflare APIs are **not** on `platform`:
+  - `env`, `ctx.waitUntil` → import from `cloudflare:workers`
+  - `request.cf` → property on `Request`
+  - `caches` → global (`caches.default` is used by `src/lib/server/cache/eTagCache.ts`)
+- `src/app.d.ts` augments `CacheStorage` with `default: Cache`.
 
-**Key points**:
-- Adapter: `@sveltejs/adapter-cloudflare-workers`
-- Config: `wrangler.toml` with routes, bindings, KV namespaces
-- Build: `bun run build` → Wrangler deploy
-- Edge: Runs at Cloudflare's global edge network (low latency worldwide)
+## TypeScript and Checks
 
-## TypeScript 6 + typia
-
-**Concept**: TypeScript 6 with strict mode. `typia` for runtime type validation of API responses.
-
-**Key points**:
-- `strict: true` in tsconfig
-- `typia` validates GraphQL responses at runtime (catches schema drift)
-- Type-only imports for GraphQL types from gql.tada
-- Path aliases shared between `svelte.config.js` and `tsconfig.json`
+- `tsconfig.json` extends `$app/tsconfig` and includes `src` plus `vite.config.ts`.
+- `bun run check` runs `svelte-check` and `tsc --noEmit` in parallel.
+- `bun run prepare` runs `ts-patch install` and `svelte-kit sync`.
+- `typia` validates GraphQL responses at runtime; `@typia/unplugin` handles Vite transforms.
+- `#lib/*` imports require extensions; `@` alias imports follow the existing no-extension style.
 
 ## Security Requirements
 
-- GraphQL endpoint calls via server-side `fetch` in `+page.server.ts` (not exposed to client)
-- Environment variables (`.env`) never bundled — server-only
-- CSP headers configured in `svelte.config.js`
-- Input validation: typia runtime checks on all API responses
+- Server-only code stays in `src/lib/server/` or `*.server.ts`; Kit 3 blocks accidental browser imports.
+- GraphQL calls that need secrets run through `APIServiceServer` / `event.fetch`.
+- `hooks.server.ts` filters forwarded cookies to WordPress/wp/JWT cookies and injects `Authorization`.
+- Environment variables are declared in `src/env.ts` with `defineEnvVars`; import public values from `$app/env/public` and server values from `$app/env/private`.
+- Do not reintroduce `platform.env` or other removed adapter APIs.
 
-## 📂 Codebase References
+## Codebase References
 
-**Components**: `src/lib/components/`
-**Stores**: `src/lib/stores/`
-**GraphQL**: `src/services/graphql/query/{browser,server,shared}/`
-**Workers**: `src/workers/`
-**Routes**: `src/routes/`
+- Components: `src/lib/components/`
+- Composables: `src/lib/composables/`
+- Server utilities: `src/lib/server/`
+- GraphQL: `src/services/graphql/`
+- Queries: `src/services/graphql/query/{browser,ssr,shared}/`
+- Workers: `src/workers/`
+- Routes: `src/routes/`
 
 ## Related Files
 
 - `./navigation.md` — Frontend context navigation
-- `../../.opencode/context/project-intelligence/technical-domain.md` — Root infrastructure context
-- `../../wordpress/wp-content/themes/wplokerbjm/.opencode/context/project-intelligence/technical-domain.md` — Backend API context
+- `../../../../.opencode/context/project-intelligence/technical-domain.md` — Root infrastructure context
+- `../../../../wordpress/wp-content/themes/wplokerbjm/.opencode/context/project-intelligence/technical-domain.md` — Backend API context

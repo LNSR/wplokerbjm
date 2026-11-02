@@ -12,7 +12,7 @@ import type {
   SearchTitle,
 } from "@/types";
 import { SearchUtils } from "@/utils/search";
-import { routeStateStore } from "$lib/stores/Route.svelte";
+import { routeStateStore } from "#lib/stores/Route.svelte.js";
 /**
  * Handle state and actions related to job search and job grid display.
  * Both components need each other to function properly, so they are combined into a single store for better state management
