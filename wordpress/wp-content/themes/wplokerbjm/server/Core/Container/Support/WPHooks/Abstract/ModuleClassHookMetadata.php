@@ -35,21 +35,19 @@ use WPLokerBJM\Core\Container\Attributes\Injectable;
  * ```
  *
  * `$parentClass` accepts either a class-string or the parent object itself —
- * {@see getParentClass()} normalizes an object parent via get_class().
- * @template TClass
- * @template T of class-string<TClass>|object<TClass>
+ * {@see getParentClassString()} normalizes an object parent via get_class().
+ * @template T
+ * @extends parent<T>
  */
 abstract class ModuleClassHookMetadata extends AsChildClass
 {
-
     /**
-     * @param T $parentClass    The class-string containing this hook, or the
+     * @param T      $parentClass    The class-string containing this hook, or the
      *                                            parent object to resolve via get_class().
-     * @param string              $parentProperty The property name holding this instance.
+     * @param string $parentProperty The property name holding this instance.
      */
     public function __construct(
-        #[Override]
-        protected string|object $parentClass,
+        string|object $parentClass,
         public private(set) readonly string $parentProperty,
     ) {
         parent::__construct($parentClass, $parentProperty);
@@ -59,7 +57,6 @@ abstract class ModuleClassHookMetadata extends AsChildClass
      *! NOTE: If you relying on this: Be careful, even module class itself can retain its own strong reference like
      * @example:
      * ```php
-     * <?php
      * #[Injectable(skip: true)]
      * class ReferenceTest extends ModuleClassHookMetadata 
      * {

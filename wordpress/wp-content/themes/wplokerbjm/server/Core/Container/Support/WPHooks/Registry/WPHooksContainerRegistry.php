@@ -175,7 +175,7 @@ class WPHooksContainerRegistry
      * Fast-path resolution when a method manages its own hook status. DRY and refactor-proof via `__FUNCTION__` or `__PROPERTY__`.
      * ```php
      *! $registry->activateDeferredByCallable([$this, __FUNCTION__]);
-     *! $registry->activateDeferredByCallable([$this->getParentClass(), $this->parentProperty]);
+     *! $registry->activateDeferredByCallable([$this->getParentClassString(), $this->parentProperty]);
      * ```
      *
      ** 3. String Identifier (Class::method):**
@@ -1380,12 +1380,12 @@ class HookTargetResolver
         // Anonymous class extending ModuleClassHookMetadata —
         // reads parent class & property directly, no backtrace needed.
         if ($target instanceof ModuleClassHookMetadata) {
-            return [$target->getParentClass(), $target->parentProperty];
+            return [$target->getParentClassString(), $target->parentProperty];
         }
 
         // Best-effort fallback for anonymous classes: walk the call stack
         // to find which object's property holds this instance.
-        if ((new \ReflectionClass($target))->isAnonymous()) {
+        if (new \ReflectionClass($target)->isAnonymous()) {
             $frames = Backtrace::create()
                 ->withArguments(false)
                 ->limit(10)

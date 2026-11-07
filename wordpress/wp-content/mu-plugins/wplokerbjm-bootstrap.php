@@ -30,7 +30,6 @@ class WPLokerBJMBootstrap
     public protected(set) static bool $alreadyLoaded = false;
     public protected(set) string $themeRoot;
     public protected(set) string $nameMUpluginFile = __FILE__;
-    protected ContainerInterface $container;
     public protected(set) RobotLoader $robotloader;
 
     public function __construct(string $themeName)
@@ -96,14 +95,12 @@ class WPLokerBJMBootstrap
             $this->container = new WPLokerBJMContainer(
                 robotLoader: $this->robotloader,
                 cacheDir: \sprintf('%s/cache', $this->themeInfo->themeRoot)
-            )
-                ->initContainerBuilder()
+            )->initContainerBuilder()
                 ->setExtraRuntimeDefinitionsSet([
                     RobotLoader::class => $this->robotloader,
                     WPLokerBJMBootstrap::class => $this
                 ])
-                ->buildContainer();
-            $this->container
+                ->buildContainer()
                 ->get(Init::class)
                 ->initialize();
         } catch (\Throwable $e) {

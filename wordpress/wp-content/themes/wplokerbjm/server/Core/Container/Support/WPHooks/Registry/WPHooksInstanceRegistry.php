@@ -129,7 +129,7 @@ class WPHooksInstanceRegistry
         /** @var RuntimeRegistryHandlerEntry[] $records */
         $records = [];
         if ($instance instanceof ModuleClassHookMetadata) {
-            $cached = $this->cache?->get($instance->getParentClass(), $instance->parentProperty);
+            $cached = $this->cache?->get($instance->getParentClassString(), $instance->parentProperty);
             if ($cached !== null) {
                 $this->scanned[$instance] = true;
                 $this->weakRegistry[$instance] = $this->registerCachedEntries($cached, $instance);
@@ -149,7 +149,7 @@ class WPHooksInstanceRegistry
                     return;
                 }
                 $hookKey = new HookKey(
-                    class: \spl_object_hash($instance),
+                    class: (string) \spl_object_id($instance),
                     method: $method->getName(),
                     target: 'method',
                     type: $attr instanceof Action ? 'action' : 'filter',
@@ -181,11 +181,11 @@ class WPHooksInstanceRegistry
                 if ($this->provider !== null) {
                     $gatePassed = $this->provider->evaluateRuntimeRegisterIf($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf), $method->getName(), $instance);
                     if (!$gatePassed) {
-                        Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $method->getName() . ' with hook ' . $hook . ' and ' . 'priority ' . (string) $attr->priority . ' skipped');
+                        Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClassString() . '->' . $instance->parentProperty : $instance::class) . '->' . $method->getName() . ' with hook ' . $hook . ' and ' . 'priority ' . (string) $attr->priority . ' skipped');
                         return;
                     }
                 } elseif (!$this->evaluateRegisterIf($attr->registerIf, $instance, $method->getName())) {
-                    Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $method->getName() . ' with hook ' . $hook . ' and ' . 'priority ' . (string) $attr->priority . ' skipped');
+                    Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClassString() . '->' . $instance->parentProperty : $instance::class) . '->' . $method->getName() . ' with hook ' . $hook . ' and ' . 'priority ' . (string) $attr->priority . ' skipped');
                     return;
                 }
                 $weakRef = \WeakReference::create($instance);
@@ -245,7 +245,7 @@ class WPHooksInstanceRegistry
                 }
 
                 $hookKey = new HookKey(
-                    class: \spl_object_hash($instance),
+                    class: (string) \spl_object_id($instance),
                     method: $target,
                     target: $property->getName(),
                     type: $attr instanceof Action ? 'action' : 'filter',
@@ -276,11 +276,11 @@ class WPHooksInstanceRegistry
                 if ($this->provider !== null) {
                     $gatePassed = $this->provider->evaluateRuntimeRegisterIf($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf), $property->getName(), $instance);
                     if (!$gatePassed) {
-                        Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $property->getName() . ' with hook ' . $hook . ' and ' . 'priority' . (string) $attr->priority . ' skipped');
+                        Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClassString() . '->' . $instance->parentProperty : $instance::class) . '->' . $property->getName() . ' with hook ' . $hook . ' and ' . 'priority' . (string) $attr->priority . ' skipped');
                         return;
                     }
                 } elseif (!$this->evaluateRegisterIf($attr->registerIf, $instance, $property->getName())) {
-                    Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $property->getName() . ' with hook ' . $hook . ' and ' . 'priority' . (string) $attr->priority . ' skipped');
+                    Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClassString() . '->' . $instance->parentProperty : $instance::class) . '->' . $property->getName() . ' with hook ' . $hook . ' and ' . 'priority' . (string) $attr->priority . ' skipped');
                     return;
                 }
                 $weakRef = \WeakReference::create($instance);
@@ -334,7 +334,7 @@ class WPHooksInstanceRegistry
         $this->weakRegistry[$instance] = array_merge($this->weakRegistry[$instance] ?? [], $records);
 
         if ($instance instanceof ModuleClassHookMetadata && $metadata !== []) {
-            $this->cache?->set($instance->getParentClass(), $instance->parentProperty, $metadata);
+            $this->cache?->set($instance->getParentClassString(), $instance->parentProperty, $metadata);
         }
         \is_string($autoUnregisterAtHook) && $this->scheduleAutoUnregister($instance, $autoUnregisterAtHook);
     }
@@ -401,11 +401,11 @@ class WPHooksInstanceRegistry
             if ($this->provider !== null) {
                 $gatePassed = $this->provider->evaluateRuntimeRegisterIf($entry->registerIf, $this->provider->buildCallablePlan($entry->registerIf), $entry->targetName, $instance);
                 if (!$gatePassed) {
-                    Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $entry->targetName . ' with hook ' . $entry->hook . ' and ' . 'priority ' . (string) $entry->priority . ' skipped');
+                    Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClassString() . '->' . $instance->parentProperty : $instance::class) . '->' . $entry->targetName . ' with hook ' . $entry->hook . ' and ' . 'priority ' . (string) $entry->priority . ' skipped');
                     continue;
                 }
             } elseif (!$this->evaluateRegisterIf($entry->registerIf, $instance, $entry->targetName)) {
-                Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClass() . '->' . $instance->parentProperty : $instance::class) . '->' . $entry->targetName . ' with hook ' . $entry->hook . ' and ' . 'priority ' . (string) $entry->priority . ' skipped');
+                Logger::info('WPHooksInstanceRegistry', 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->getParentClassString() . '->' . $instance->parentProperty : $instance::class) . '->' . $entry->targetName . ' with hook ' . $entry->hook . ' and ' . 'priority ' . (string) $entry->priority . ' skipped');
                 continue;
             }
             $weakRef = \WeakReference::create($instance);
@@ -440,7 +440,7 @@ class WPHooksInstanceRegistry
                 ),
             };
             $hookKey = new HookKey(
-                class: \spl_object_hash($instance),
+                class: (string) \spl_object_id($instance),
                 method: $entry->targetName,
                 target: $entry->target,
                 priority: $entry->priority,
@@ -706,7 +706,7 @@ class WPHooksInstanceRegistry
             }
         }
         $hookKey = new HookKey(
-            class: \spl_object_hash($owner),
+            class: (string) \spl_object_id($owner),
             method: '#manual-registration:' . $this->manualRegistrationIdentity($callback),
             target: '#manual',
             type: $type,
@@ -767,10 +767,10 @@ class WPHooksInstanceRegistry
     {
         return match (true) {
             is_array($callback) => (is_object($callback[0])
-                ? $callback[0]::class . '#' . \spl_object_hash($callback[0])
+                ? $callback[0]::class . '#' . (string) \spl_object_id($callback[0])
                 : (string) $callback[0]) . '::' . $callback[1],
             is_string($callback) => $callback,
-            is_object($callback) => $callback::class . '#' . \spl_object_hash($callback),
+            is_object($callback) => $callback::class . '#' . (string) \spl_object_id($callback),
             default => 'callable',
         };
     }
@@ -826,10 +826,10 @@ class InstanceRegistryDeferredHookManager
     public function unregisterInstanceMatchingDeferredEntries(object $instance): void
     {
         $this->unregisterMatchingDeferredEntries(
-            $this->entriesIndexer->byClass[\spl_object_hash($instance)] ?? [],
+            $this->entriesIndexer->byClass[(string) \spl_object_id($instance)] ?? [],
             static fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
         );
-        unset($this->entriesIndexer->byClass[\spl_object_hash($instance)]);
+        unset($this->entriesIndexer->byClass[(string) \spl_object_id($instance)]);
     }
 
     /**

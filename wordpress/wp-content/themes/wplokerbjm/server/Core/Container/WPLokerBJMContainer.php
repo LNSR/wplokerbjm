@@ -56,6 +56,7 @@ class WPLokerBJMContainer
     private ?object $containerConfigurationState {
         get => $this->containerConfigurationState ??= new class() {
             /** @var array<class-string,object> */
+            public ?Container $containerDI = null;
             public array $extraRuntimeDefinitionsSet = [];
             public bool $configured = false;
             public ?ContainerBuilder $containerBuilder = null;
@@ -92,6 +93,10 @@ class WPLokerBJMContainer
             Logger::flush();
             throw $e;
         }
+    }
+
+    public function getContainerDI(): ?Container {
+        return $this->containerConfigurationState?->containerDI ?? null;
     }
 
     private function reset(): void
@@ -145,7 +150,7 @@ final class WPLokerBJMContainerBuilderConfiguration
             $c->set($class, $instance);
         }
         $this->containerConfigurationState->configured = true;
-        return $c;
+        return $this->containerConfigurationState->containerDI = $c;
     }
 
     private function statusException(): void

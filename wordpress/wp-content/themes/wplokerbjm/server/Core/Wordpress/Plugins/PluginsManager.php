@@ -96,13 +96,12 @@ class PluginManager
     ];
 
     #[Action('mu_plugin_loaded', executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
-        if ($pluginPath !== $bootstrap->nameMUpluginFile) return false;
-        return true;
+        return $pluginPath === $bootstrap->nameMUpluginFile;
     })]
     private function boot(string $pluginPath): void
     {
         do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
-        
+
         $activeCount = $this->unregisterInactivePluginHooks();
         if ($activeCount === 0) {
             do_action(ContainerRegistryHookEvent::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
@@ -110,7 +109,7 @@ class PluginManager
             return;
         }
         do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
-        do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $this->pluginEnvironmentCheck, 'plugins_loaded');
+        do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
     }
 
     /**

@@ -25,7 +25,7 @@ class QueuedHooksCleaner
 
     /** @var \WeakMap<Invokers, ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
     private \WeakMap $entries;
-    private int $priority = 0;
+    private int $priority = \PHP_INT_MIN;
 
     public function __construct()
     {
@@ -76,7 +76,7 @@ class QueuedHooksCleaner
                  * 'all' hook is the only place inbetween end of last priority hook stack and beginning of new named hook dispatch
                  * * 'all' run before named hook
                  */
-                !$this->schedulerCleanerDispatched && \add_action('all', $this->scheduleCleanup, $this->priority = \mt_rand(\PHP_INT_MIN, -20000000));
+                !$this->schedulerCleanerDispatched && \add_action('all', $this->scheduleCleanup, $this->priority);
 
                 /**
                  * This ideal during sequential adjacent `once` priorities hook

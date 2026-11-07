@@ -125,6 +125,7 @@
     "python.analysis.typeEvaluation.strictListInference": true,
     "python.analysis.typeEvaluation.strictSetInference": true,
     "php.validate.enable": true,
+    "typescript.tsserver.maxTsServerMemory": 8196,
   },
   "extensions": {
     "recommendations": [

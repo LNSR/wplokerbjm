@@ -112,7 +112,7 @@ class CachePurgeHandler
     private \Closure $purgeGlobalCacheOnce {
         get {
             static $__propertyName = __PROPERTY__;
-            return $this->purgeGlobalCacheOnce ??= function () use ($__propertyName) {
+            return $this->purgeGlobalCacheOnce ??= function (...$args) use ($__propertyName) {
                 static $alreadyRun = false;
                 if ($alreadyRun) return;
                 $alreadyRun = true;

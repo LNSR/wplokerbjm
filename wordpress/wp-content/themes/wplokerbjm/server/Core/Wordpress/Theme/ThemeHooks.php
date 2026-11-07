@@ -5,6 +5,7 @@ namespace WPLokerBJM\Core\Wordpress\Theme;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Leverage Wordpress theme feature for easier assets (logo,favicon,etc) management and integrate to frontend
@@ -70,8 +71,8 @@ class ThemeHooks
 
     /**
      * @var class@anonymous::class
-    */
-    #[Filter('site_icon_meta_tags', once: true)]
+     */
+    #[Filter('site_icon_meta_tags')]
     public private(set) ?ModuleClassHookMetadata $addSiteIconMetaTags {
         get {
             return $this->addSiteIconMetaTags ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
@@ -81,7 +82,10 @@ class ThemeHooks
                 {
                     foreach ($this->additionalSizes as $size) {
                         $url = \get_site_icon_url($size);
-                        $url && $meta_tags[] = sprintf('<link rel="icon" href="%s" sizes="%dx%d" />', esc_url($url), $size, $size);
+                        $html = <<<'HTML'
+                            <link rel="icon" href="%s" sizes="%dx%d" />
+                        HTML;
+                        $url && $meta_tags[] = sprintf($html, esc_url($url), $size, $size);
                     }
                     foreach (['png', 'ico', 'svg', 'webp', 'avif'] as $type) {
                         $meta_tags = $this->addTypeAttribute($meta_tags, $type);
@@ -110,7 +114,10 @@ class ThemeHooks
 
                     $png_url = \wp_get_original_image_url($original_id);
                     if (!$png_url) return null;
-                    return sprintf('<link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />', esc_url($png_url));
+                    $html = <<<'HTML'
+                        <link rel="icon" href="%s" sizes="600x600" data-title-attribute="Favicon PNG fallback" />
+                    HTML;
+                    return sprintf($html, esc_url($png_url));
                 }
 
                 private function addTypeAttribute(array $meta_tags, string $type): array

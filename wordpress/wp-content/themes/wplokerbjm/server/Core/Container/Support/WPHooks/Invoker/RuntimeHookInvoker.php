@@ -173,7 +173,7 @@ final class RuntimeInstanceHookInvoker
         $objectId = \spl_object_id($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClassString() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->method;
 
         if ($this->visibility !== 'public') {
@@ -244,7 +244,7 @@ final class RuntimeInstancePropertyHookInvoker
         $objectId = \spl_object_id($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClassString() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->property;
 
         if ($this->visibility !== 'public') {
@@ -308,7 +308,7 @@ final class RuntimeCallableHookInvoker
         public readonly bool $once = false,
     ) {
         $this->label = $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . (is_array($callback)
-            ? get_debug_type($callback[0]) . '::' . $callback[1] : ($callback instanceof \Closure ? 'closure:' . spl_object_hash($callback)
+            ? get_debug_type($callback[0]) . '::' . $callback[1] : ($callback instanceof \Closure ? 'closure:' . (string) \spl_object_id($callback)
                 : get_debug_type($callback)));
     }
 
