@@ -74,13 +74,13 @@ class HTTPHooks
             return !SharedUtils::isDevelopment() && !SharedUtils::isWPCLI();
         },
         executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
-            if ($pluginPath !== $bootstrap->nameMUpluginFile) return false;
-            \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [__CLASS__, 'setRemoteAddr']);
-            return true;
+            return $pluginPath === $bootstrap->nameMUpluginFile;
         }
     )]
     public function setRemoteAddr($pluginPath): void
     {
+        \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
+
         if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) {
             $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_CF_CONNECTING_IP'];
             return;

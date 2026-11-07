@@ -257,7 +257,6 @@ abstract class BaseHookAttribute
      *   flag), while the **physical** `remove_action()` may be deferred to a
      *   temporary `all` hook. This avoids corrupting `WP_Hook`'s iteration when
      *   a priority bucket empties mid-dispatch:
-     * @link https://core.trac.wordpress.org/ticket/61263
      * @link https://core.trac.wordpress.org/ticket/64653
      * * Until that flush the callback is still present in `$wp_filter` but
      *   cannot run twice.

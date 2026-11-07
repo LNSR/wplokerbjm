@@ -35,21 +35,19 @@ use WPLokerBJM\Core\Container\Attributes\Injectable;
  * ```
  *
  * `$parentClass` accepts either a class-string or the parent object itself —
- * {@see getParentClass()} normalizes an object parent via get_class().
- * @template TClass
- * @template T of class-string<TClass>|object<TClass>
+ * {@see getParentClassString()} normalizes an object parent via get_class().
+ * @template T
+ * @extends parent<T>
  */
 abstract class ModuleClassHookMetadata extends AsChildClass
 {
-
     /**
-     * @param T $parentClass    The class-string containing this hook, or the
+     * @param T      $parentClass    The class-string containing this hook, or the
      *                                            parent object to resolve via get_class().
-     * @param string              $parentProperty The property name holding this instance.
+     * @param string $parentProperty The property name holding this instance.
      */
     public function __construct(
-        #[Override]
-        protected string|object $parentClass,
+        string|object $parentClass,
         public private(set) readonly string $parentProperty,
     ) {
         parent::__construct($parentClass, $parentProperty);
@@ -76,8 +74,8 @@ abstract class ModuleClassHookMetadata extends AsChildClass
         if (\defined('WPLOKERBJM_TEST_ENV') && WPLOKERBJM_TEST_ENV) return;
         \do_action(InstanceRuntimeRegistryHookEvent::UNREGISTER_HOOKS, $this);
 
-        if (!\method_exists($this, '__invoke')) return;
-        \do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
-        \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
+        if (!\method_exists($this, '__invoke') && !\str_contains($this->getParentClassString(), '@anonymous')) return;
+        \do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->getParentClassString(), $this->parentProperty]);
+        \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this->getParentClassString(), $this->parentProperty]);
     }
 }

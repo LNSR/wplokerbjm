@@ -363,8 +363,11 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         $captured = [];
 
-        $anon = new class($captured) {
-            public function __construct(private array &$captured) {}
+        $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
+            public function __construct(RuntimeRegistryTest $test, string $identifier, private array &$captured)
+            {
+                parent::__construct($test, $identifier);
+            }
 
             #[Action(hook: 'rt_isolated_action', acceptedArgs: 1)]
             public function onAction(string $v): void
@@ -1264,7 +1267,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
             }
         };
 
-        $registry = $this->container()->make(WPHooksInstanceRegistry::class, [
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
             'cache' => $cache,
             'queuedHooksCleaner' => $this->queuedHooksCleaner,
         ]);
@@ -1274,7 +1277,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $first = $factory($log);
 
         // First instance populates the cache (reflection scan path).
-        $registry->registerHooksOn($first);
+        $registry()->registerHooksOn($first);
 
         self::assertNull(
             $this->findRegisteredHook('action', 'cached_deferred_destination'),
@@ -1287,7 +1290,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 
         // Second instance hits the cache.
         $second = $factory($log);
-        $registry->registerHooksOn($second);
+        $registry()->registerHooksOn($second);
 
         self::assertNull(
             $this->findRegisteredHook('action', 'cached_deferred_destination'),

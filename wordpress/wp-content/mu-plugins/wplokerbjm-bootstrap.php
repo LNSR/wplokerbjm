@@ -30,7 +30,6 @@ class WPLokerBJMBootstrap
     public protected(set) static bool $alreadyLoaded = false;
     public protected(set) string $themeRoot;
     public protected(set) string $nameMUpluginFile = __FILE__;
-    protected ContainerInterface $container;
     public protected(set) RobotLoader $robotloader;
 
     public function __construct(string $themeName)
@@ -68,8 +67,7 @@ class WPLokerBJMBootstrap
                     $this->themeRoot = WP_CONTENT_DIR . '/themes/' . $themeName;
                     return;
                     /**
-                     * Double dead code alias, self::class seem more reliable for intelephense LSP, but cause PHP(PHP0413) warning
-                     * __CLASS__ ones help silence the warning
+                     * Double dead code alias, self::class seem to cause PHP(PHP0413) warning, so using both __CLASS__ and self::class to silence the warning
                      * !Important for full autocomplete IDE by tricking LSP to use virtual class, no need for interface or abstract class
                      * !Make sure to use object type and attach @var/@param phpdoc for autocomplete if used without accessing this class
                      */
@@ -93,17 +91,15 @@ class WPLokerBJMBootstrap
     protected function init(): void
     {
         try {
-            $this->container = new WPLokerBJMContainer(
+            new WPLokerBJMContainer(
                 robotLoader: $this->robotloader,
                 cacheDir: \sprintf('%s/cache', $this->themeInfo->themeRoot)
-            )
-                ->initContainerBuilder()
+            )->initContainerBuilder()
                 ->setExtraRuntimeDefinitionsSet([
                     RobotLoader::class => $this->robotloader,
                     WPLokerBJMBootstrap::class => $this
                 ])
-                ->buildContainer();
-            $this->container
+                ->buildContainer()
                 ->get(Init::class)
                 ->initialize();
         } catch (\Throwable $e) {

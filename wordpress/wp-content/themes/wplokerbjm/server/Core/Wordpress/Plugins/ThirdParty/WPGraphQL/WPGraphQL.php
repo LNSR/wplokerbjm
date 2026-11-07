@@ -57,7 +57,7 @@ final class WPGraphQL implements PluginConfigInterface
             return $this->graphQlPluginSettings ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
                 /**
                  * @see get_graphql_setting
-                 * @see \WPGraphQL\Admin\Settings\Settings::register_settings() -> {
+                 * @see \WPGraphQL\Admin\Settings\Settings::register_settings() => {
                  *  public_introspection_enabled,
                  *  debug_mode_enabled,
                  * }

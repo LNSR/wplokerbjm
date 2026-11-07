@@ -174,7 +174,6 @@ abstract class WplokerbjmTestCase extends TestCase
                 if ($queued === []) return;
 
                 foreach ($queued as $idx => $entry) {
-                    if ($entry->isCurrentlyExecuting()) continue;
                     $entry->unregister();
                     unset($this->queuedRemovalEntry[$idx]);
                 }

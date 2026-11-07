@@ -15,8 +15,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * Builder for the PHP-DI container.
  * 
  * @note class_alias used for virtual typed classes without polluting global runtime namespace
- * * double dead code alias, self::class seem more reliable for intelephense LSP, but cause PHP(PHP0413) warning
- * * __CLASS__ ones help silence the warning
+ * * Double dead code alias, self::class seem to cause PHP(PHP0413) warning, so using both __CLASS__ and self::class to silence the warning
  */
 #[Injectable(skip: true)]
 class WPLokerBJMContainer
@@ -56,6 +55,7 @@ class WPLokerBJMContainer
     private ?object $containerConfigurationState {
         get => $this->containerConfigurationState ??= new class() {
             /** @var array<class-string,object> */
+            public ?Container $containerDI = null;
             public array $extraRuntimeDefinitionsSet = [];
             public bool $configured = false;
             public ?ContainerBuilder $containerBuilder = null;
@@ -92,6 +92,10 @@ class WPLokerBJMContainer
             Logger::flush();
             throw $e;
         }
+    }
+
+    public function getContainerDI(): ?Container {
+        return $this->containerConfigurationState?->containerDI ?? null;
     }
 
     private function reset(): void
@@ -135,7 +139,6 @@ final class WPLokerBJMContainerBuilderConfiguration
         $builder->useAutowiring(false);
         $builder->useAttributes(true);
         $this->setupCache();
-        /** @var Container $c */
         $c = $builder->build();
         $postRegisteration = [
             WPLokerBJMContainer::class => $this->wpLokerContainer,
@@ -145,7 +148,7 @@ final class WPLokerBJMContainerBuilderConfiguration
             $c->set($class, $instance);
         }
         $this->containerConfigurationState->configured = true;
-        return $c;
+        return $this->containerConfigurationState->containerDI = $c;
     }
 
     private function statusException(): void

@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract;
 
-use WPGraphQL;
 use WPLokerBJM\Core\Wordpress\DependencyInjectorEvent;
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -12,36 +11,65 @@ use WPLokerBJM\Shared\Log\Logger;
  * Base metadata contract for anonymous child objects owned by a parent property.
  * @see DependencyInjector
  * * Intended usage: Passing external deps without needing host class carrying constructor boilerplate.
- * @template TClass
- * @template T of class-string<TClass>|object<TClass>
+ * @template T
+ * @example passing phpdoc generic for autocomplete $parentClass(if passing ParentClass instance)
+ * * phpdoc for anonymous class:
+ * ```php
+ * $instance = new
+ *  \/**
+ *   * @extends parent<NamedParentClass>
+ *   *
+ *   \/*
+ *   class extends AsChildClass {...};
+ * ```
+ * ! Must be inbetween 'new' and 'class', verified work on VSCode according
+ * @link https://github.com/phpstan/phpstan/issues/8770#issuecomment-1402742332 code sample
  */
 abstract class AsChildClass
+
 {
+    /**
+     * @var ?T
+     */
+    protected private(set) string|object|null $parentClass {
+        get => $this->parentClass instanceof \WeakReference ? $this->parentClass->get() : $this->parentClass;
+        set => $this->parentClass = \is_object($value) ? \WeakReference::create($value) : $value;
+    }
+
+    public readonly string $constructCurrentClassIdentity;
+
     /**
      * @param T $parentClass The class-string containing this child, or the
      *                       parent object to resolve via get_class().
      * @param string $identifier The property or method or any magic string holding this instance.
      */
     public function __construct(
-        protected string|object $parentClass,
+        string|object $parentClass,
         public private(set) readonly string $identifier,
     ) {
-        if (defined('WPLOKERBJM_TEST_ENV')) return;
+        $this->parentClass = $parentClass;
+
+        $this->constructCurrentClassIdentity = $this->parentClass instanceof static
+            ? \sprintf("%s->%s", $this->parentClass->constructCurrentClassIdentity, $this->identifier)
+            : \sprintf("%s->%s", $this->getParentClassString(), $this->identifier);
+
+        if (\defined('WPLOKERBJM_TEST_ENV')) return;
+
         do_action(DependencyInjectorEvent::INJECT_ON, $this);
     }
 
     /**
      * Resolve the parent class-string, normalizing an object parent via get_class().
-     * @return T
+     * @return class-string<T>
      */
-    public function getParentClass(): string
+    public function getParentClassString(): string
     {
-        return is_object($this->parentClass) ? get_class($this->parentClass) : $this->parentClass;
+        return \is_object($this->parentClass) ? \get_class($this->parentClass) : $this->parentClass;
     }
 
     /**
      * For Recursive Anon Classes
-     * @param property-hook-string<T> $currentClassPropertryIdentifier magic constant
+     * @param property-hook-string $currentClassPropertryIdentifier magic constant
      * @example
      * ```php
      * $instance = new class(parent: __CLASS__, identifier: __PROPERTY__) extends AsChildClass {
@@ -54,13 +82,11 @@ abstract class AsChildClass
      */
     protected function createIdentityClass(string $currentClassPropertryIdentifier): array
     {
-        return [
-            sprintf("%s->%s", $this->getParentClass(), $this->identifier),
-            $currentClassPropertryIdentifier
-        ];
+        /**
+         * ! Respect outer chain of self for recursive anon classes
+         */
+        return [$this->parentClass instanceof static ? $this : $this->constructCurrentClassIdentity, $currentClassPropertryIdentifier];
     }
-
-    public private(set) string $constructCurrentClassIdentity { get => $this->constructCurrentClassIdentity ??= \sprintf("%s->%s", $this->getParentClass(), $this->identifier); }
 
     /**
      * ! Must be an instance Closure

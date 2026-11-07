@@ -6,7 +6,7 @@ use DI\Attribute\Injectable;
 use GraphQL\Type\Definition\FieldDefinition;
 use GraphQL\Type\Definition\ResolveInfo;
 use WPGraphQL\AppContext;
-use WPLokerBJM\Controllers\GraphQL\Resolvers\JobsDataResolver;
+use WPLokerBJM\Transport\GraphQL\Resolvers\Job\JobsDataResolver;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\QueryBuilders\JobQuery;
 use WPLokerBJM\Services\GraphQL\GraphQLRegistration;

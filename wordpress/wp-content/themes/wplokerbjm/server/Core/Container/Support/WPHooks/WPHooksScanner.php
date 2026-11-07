@@ -43,7 +43,6 @@ class WPHooksScanner
      * @param WPHookPlanProvider|null $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
     public function __construct(
-        private ContainerInterface $container,
         private array $compiledContainerMap,
         private string $namespace = 'WPLokerBJM',
         private string $cacheLocation = '',
@@ -65,11 +64,9 @@ class WPHooksScanner
      */
     public function getHookRegistrations(): array
     {
-        if ($this->cachedHookRegistrations !== null) {
-            return $this->cachedHookRegistrations;
-        }
+        if ($this->cachedHookRegistrations !== null) return $this->cachedHookRegistrations;
 
-        if (!empty($this->cacheLocation) && is_file($this->cacheLocation)) {
+        if (!empty($this->cacheLocation) && \is_readable($this->cacheLocation)) {
             $loaded = require $this->cacheLocation;
             if (is_array($loaded)) {
                 return $this->cachedHookRegistrations = array_map(

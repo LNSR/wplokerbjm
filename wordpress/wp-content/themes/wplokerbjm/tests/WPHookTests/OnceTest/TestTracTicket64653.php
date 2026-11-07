@@ -22,7 +22,6 @@ use PHPUnit\Framework\TestCase;
  *    resort_active_iterations() already rescues the isolated-minimum case
  *  - the production strategy (defer the removal until the hook is no longer
  *    dispatching) keeps every consecutive priority firing
- * @link https://core.trac.wordpress.org/ticket/61263
  * @link https://core.trac.wordpress.org/ticket/64653
  */
 final class TestTracTicket64653 extends TestCase

@@ -109,8 +109,10 @@ final class ContainerLazyHookInvoker
 {
     use ContainerLazyHookInvokerTrait;
 
-    /** @var \Closure|null */
+    /** @var (\Closure(object, method-string, mixed...):mixed)|null Closure to invoke the method on the stored instance (for non-public methods) */
     private ?\Closure $invoker = null;
+    /** @var array<class-string, (\Closure(object, method-string, mixed...):mixed)> */
+    private static array $methodInvokerCache = [];
 
     /** Plan provider used for condition gates and hook-name resolution. */
     private readonly WPHookPlanProvider $planProvider;
@@ -144,7 +146,7 @@ final class ContainerLazyHookInvoker
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
-            $this->invoker = \Closure::bind(
+            $this->invoker = self::$methodInvokerCache[$this->class] ??= \Closure::bind(
                 static::$templateClosure ??= static fn(object $instance, string $methodName, mixed ...$args): mixed => $instance->{$methodName}(...$args),
                 null,
                 $this->class,
@@ -180,8 +182,10 @@ final class ContainerLazyPropertyHookInvoker
 {
     use ContainerLazyHookInvokerTrait;
 
-    /** @var \Closure(object, string):mixed|null */
+    /** @var (\Closure(object, string):mixed)|null */
     private ?\Closure $reader = null;
+    /** @var array<class-string, (\Closure(object, property-string|property-hook-string):mixed)> */
+    private static array $classPropertyClosureCache = [];
 
     /** Plan provider used for condition gates and hook-name resolution. */
     private readonly WPHookPlanProvider $planProvider;
@@ -217,8 +221,8 @@ final class ContainerLazyPropertyHookInvoker
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
-            $this->reader = \Closure::bind(
-                static::$templateClosure ??= static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
+            $this->reader = self::$classPropertyClosureCache[$this->class] ??= \Closure::bind(
+                static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
                 null,
                 $this->class,
             );

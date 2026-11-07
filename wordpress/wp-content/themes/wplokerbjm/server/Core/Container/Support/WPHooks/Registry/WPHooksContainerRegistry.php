@@ -175,7 +175,7 @@ class WPHooksContainerRegistry
      * Fast-path resolution when a method manages its own hook status. DRY and refactor-proof via `__FUNCTION__` or `__PROPERTY__`.
      * ```php
      *! $registry->activateDeferredByCallable([$this, __FUNCTION__]);
-     *! $registry->activateDeferredByCallable([$this->getParentClass(), $this->parentProperty]);
+     *! $registry->activateDeferredByCallable([$this->getParentClassString(), $this->parentProperty]);
      * ```
      *
      ** 3. String Identifier (Class::method):**
@@ -598,19 +598,15 @@ class WPHooksContainerRegistry
     /**
      * @Internal remove a once-registration from the active pool after its
      * first fire (consume-on-any-evaluation). Idempotent.
-     * @var \Closure(ContainerRegistryHandlerEntry): \Closure(ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker): void
+     * @var \Closure(ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker): void
      */
     private \Closure $removeOnceEntry {
         get {
             return $this->removeOnceEntry ??= function (ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $invoker): void {
                 $entry = $this->queuedHooksCleaner->getEntry($invoker);
-                if ($entry === null) {
-                    return;
-                }
+                if ($entry === null) return;
                 $uniqueKey = $entry->toUniqueKey();
-                if (!isset($this->handlers[$uniqueKey])) {
-                    return;
-                }
+                if (!isset($this->handlers[$uniqueKey])) return;
 
                 $entry = $this->handlers[$uniqueKey];
                 /**
@@ -621,7 +617,6 @@ class WPHooksContainerRegistry
                  * (resort_active_iterations skips the immediately-following priority).
                  * The consumed flag already prevents re-firing, so the callback can
                  * safely linger in $wp_filter until the next invoker order or beginning hook(all).
-                 * @link https://core.trac.wordpress.org/ticket/61263
                  * @link https://core.trac.wordpress.org/ticket/64653
                  */
                 $this->queuedHooksCleaner->cleanUpCallback($invoker);
@@ -1380,12 +1375,12 @@ class HookTargetResolver
         // Anonymous class extending ModuleClassHookMetadata —
         // reads parent class & property directly, no backtrace needed.
         if ($target instanceof ModuleClassHookMetadata) {
-            return [$target->getParentClass(), $target->parentProperty];
+            return [$target->getParentClassString(), $target->parentProperty];
         }
 
         // Best-effort fallback for anonymous classes: walk the call stack
         // to find which object's property holds this instance.
-        if ((new \ReflectionClass($target))->isAnonymous()) {
+        if (new \ReflectionClass($target)->isAnonymous()) {
             $frames = Backtrace::create()
                 ->withArguments(false)
                 ->limit(10)

@@ -20,7 +20,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  *
  * ## Usage
  * Call `initialize()` to register all discovered hooks with WordPress.
- * @see WPLokerBJM\WPLokerBJMBootstrap
+ * @see WPLokerBJM\WPLokerBJMBootstrap from MU-Plugin
  * @see \WPLokerBJM\Core\Container\Definitions\Core
  */
 class Init

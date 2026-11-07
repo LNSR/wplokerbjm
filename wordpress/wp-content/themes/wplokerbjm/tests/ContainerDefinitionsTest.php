@@ -37,7 +37,6 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
     private function createScanner(): WPHooksScanner
     {
         return new WPHooksScanner(
-            $this->container(),
             $this->testRobotLoader->getIndexedClasses(),
             self::$NAMESPACE,
             '',

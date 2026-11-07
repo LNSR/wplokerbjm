@@ -31,7 +31,6 @@ class HookScannerMagicMethodTest extends WplokerbjmTestCase
         $this->expectExceptionMessageIsOrContains('magic method');
 
         $scanner = new WPHooksScanner(
-            $this->container(),
             $this->robotLoader->getIndexedClasses(),
             'MagicHookRejected',
             '',
@@ -43,7 +42,6 @@ class HookScannerMagicMethodTest extends WplokerbjmTestCase
     public function testInvokeIsAllowed(): void
     {
         $scanner = new WPHooksScanner(
-            $this->container(),
             $this->robotLoader->getIndexedClasses(),
             'MagicHookAllowed',
             '',

@@ -196,7 +196,7 @@ trait HookProviderTrait
     /**
      * Build the resolution plan for a property's callable value or default value.
      *
-     * Mirrors {@see extractPropertyCallableParamNames()} but returns the full
+     * Mirrors {@see self::extractPropertyCallableParamNames()} but returns the full
      * plan (names + variadic flags) instead of names only.
      *
      * @param \ReflectionProperty $property from attributes

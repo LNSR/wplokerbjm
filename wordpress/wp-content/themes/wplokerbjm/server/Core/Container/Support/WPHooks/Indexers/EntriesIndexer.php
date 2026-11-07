@@ -24,7 +24,7 @@ class EntriesIndexer
 {
     /** @var array<string, array<TKey, TKey>> */
     public array $byHook = [];
-    /** @var array<class-string, array<TKey, TKey>> */
+    /** @var array<class-string|string, array<TKey, TKey>> */
     public array $byClass = [];
     /** @var array<string, array<TKey, TKey>> */
     public array $byTag = [];

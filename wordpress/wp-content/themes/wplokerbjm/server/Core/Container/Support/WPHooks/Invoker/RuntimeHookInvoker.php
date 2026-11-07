@@ -105,11 +105,10 @@ trait RuntimeInstanceInvokerTrait
         if ($this->removed || $this->removeCallback === null) {
             return;
         }
-
-        $this->removed = true;
-
+        
         try {
             ($this->removeCallback)($this);
+            $this->removed = true;
         } catch (\Throwable $e) {
             Logger::error(
                 static::class,
@@ -142,8 +141,10 @@ final class RuntimeInstanceHookInvoker
 {
     use RuntimeInstanceInvokerTrait;
 
-    /** @var \Closure|null Closure to invoke the method on the stored instance (for non-public methods) */
+    /** @var (\Closure(object, method-string, mixed...):mixed)|null Closure to invoke the method on the stored instance (for non-public methods) */
     private ?\Closure $invoker = null;
+    /** @var \WeakMap<object, (\Closure(object, method-string, mixed...):mixed)> */
+    private static \WeakMap $methodInvokerCache;
 
     /**
      * @template TClass
@@ -169,21 +170,22 @@ final class RuntimeInstanceHookInvoker
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
     ) {
+        self::$methodInvokerCache ??= new \WeakMap();
         $instance = $this->instanceRef->get();
         $objectId = \spl_object_id($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClassString() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->method;
 
         if ($this->visibility !== 'public') {
 
             // Bind inside the instance's class scope so
             // $instance->privateMethod(...) works natively.
-            $this->invoker = \Closure::bind(
+            $this->invoker = self::$methodInvokerCache[$instance] ??= \Closure::bind(
                 static::$templateClosure ??= static fn(object $target, string $methodName, mixed ...$args): mixed => $target->{$methodName}(...$args),
                 null,
-                $instance::class,
+                $instance,
             );
         }
     }
@@ -212,8 +214,10 @@ final class RuntimeInstancePropertyHookInvoker
 {
     use RuntimeInstanceInvokerTrait;
 
-    /** @var \Closure(object, string):mixed|null */
+    /** @var (\Closure(object, string):mixed)|null */
     private ?\Closure $reader = null;
+    /** @var \WeakMap<object, (\Closure(object, property-string|property-hook-string):mixed)> */
+    private static \WeakMap $classPropertyClosureCache;
 
 
     /**
@@ -240,20 +244,21 @@ final class RuntimeInstancePropertyHookInvoker
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
     ) {
+        self::$classPropertyClosureCache ??= new \WeakMap();
         $instance = $this->instanceRef->get() ?? null;
         $objectId = \spl_object_id($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClass() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClassString() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->property;
 
         if ($this->visibility !== 'public') {
             // Bind inside the instance's class scope so
             // $instance->privateProp works natively.
-            $this->reader = \Closure::bind(
+            $this->reader = self::$classPropertyClosureCache[$instance] ??= \Closure::bind(
                 static::$templateClosure ??= static fn(object $target, string $propertyName): mixed => $target->{$propertyName},
                 null,
-                $instance::class,
+                $instance,
             );
         }
     }
@@ -308,7 +313,7 @@ final class RuntimeCallableHookInvoker
         public readonly bool $once = false,
     ) {
         $this->label = $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . (is_array($callback)
-            ? get_debug_type($callback[0]) . '::' . $callback[1] : ($callback instanceof \Closure ? 'closure:' . spl_object_hash($callback)
+            ? get_debug_type($callback[0]) . '::' . $callback[1] : ($callback instanceof \Closure ? 'closure:' . (string) \spl_object_id($callback)
                 : get_debug_type($callback)));
     }
 
@@ -333,11 +338,11 @@ final class RuntimeCallableHookInvoker
                     );
                 }
 
-                Logger::debug('RuntimeCallableHookInvoker', 'executeIf for ' . $this->label . ': ' . ($allowed ? 'PASS' : 'FAIL'));
+                Logger::debug(static::class, 'executeIf for ' . $this->label . ': ' . ($allowed ? 'PASS' : 'FAIL'));
 
                 if ($allowed === false) {
                     Logger::info(
-                        'RuntimeCallableHookInvoker',
+                        static::class,
                         'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                     );
                     return $this->filterPassthrough($args);
@@ -352,7 +357,7 @@ final class RuntimeCallableHookInvoker
             return $result;
         } catch (\Throwable $e) {
             Logger::error(
-                'RuntimeCallableHookInvoker',
+                static::class,
                 'Error invoking hook ' . $this->label . ': ',
                 [
                     'error' => $e->getMessage(),

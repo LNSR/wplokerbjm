@@ -52,7 +52,6 @@ class Core implements DefinitionProviderInterface
             HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
-                \DI\get(ContainerInterface::class),
                 static fn() => \CompiledContainer::METHOD_MAPPING,
                 $namespace,
                 static fn() => get_stylesheet_directory() . "/cache",

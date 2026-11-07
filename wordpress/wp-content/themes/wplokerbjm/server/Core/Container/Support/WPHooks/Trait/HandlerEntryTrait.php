@@ -8,27 +8,37 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyHookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyPropertyHookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{RuntimeRegistryHandlerEntry, ContainerRegistryHandlerEntry, WPHooksInstanceRegistry};
 use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * @mixin ContainerRegistryHandlerEntry&RuntimeRegistryHandlerEntry
+ * @template TShape
  */
 trait HandlerEntryTrait
 {
+    /** @use TraitDataObject<TShape> */
+    use TraitDataObject;
+
+    private bool $registered = false;
+
     /**
-     * Automatically unregister handler when the this entry have 0 reference, useful for @see WPHooksInstanceRegistry.
+     * Automatically unregister handler when this entry have 0 reference, useful for @see WPHooksInstanceRegistry.
      */
     public function __destruct()
     {
+        if (!$this->registered) return;
         $this->unregister();
     }
 
     public function register(): static
     {
+        if ($this->registered) return $this;
         match ($this->type) {
             'action' => add_action($this->hook, $this->handler, $this->priority, $this->acceptedArgs),
             'filter' => add_filter($this->hook, $this->handler, $this->priority, $this->acceptedArgs),
         };
+        $this->registered = true;
         return $this;
     }
 
@@ -38,6 +48,7 @@ trait HandlerEntryTrait
             'action' => remove_action($this->hook, $this->handler, $this->priority),
             'filter' => remove_filter($this->hook, $this->handler, $this->priority),
         };
+        $this->registered = false;
         return $this;
     }
 
