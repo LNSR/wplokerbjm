@@ -49,6 +49,10 @@ trait HookProviderTrait
      * @var \WeakMap<\Closure, array<class-string<TClass>, \Closure>>
      */
     private \WeakMap $boundClosureCache { get => $this->boundClosureCache ??= new \WeakMap(); }
+    /**
+     * @var \WeakMap<object, CallablePlan>
+     */
+    private \WeakMap $callablePlanCache { get => $this->callablePlanCache ??= new \WeakMap(); }
 
     /**
      * Build the resolution plan for a callable closure.
@@ -77,7 +81,7 @@ trait HookProviderTrait
         }
 
         try {
-            return $this->buildCallablePlanFromReflector(new ReflectionFunction($callable));
+            return $this->callablePlanCache[$callable] ??= $this->buildCallablePlanFromReflector(new ReflectionFunction($callable));
         } catch (ReflectionException) {
             return $empty;
         }
@@ -98,6 +102,8 @@ trait HookProviderTrait
      */
     public function buildCallablePlanFromReflector(\ReflectionFunctionAbstract $reflect): array
     {
+        if (isset($this->callablePlanCache[$reflect])) return $this->callablePlanCache[$reflect];
+
         /**
          * @var list<CallableHookParams> $params
          */
@@ -153,7 +159,7 @@ trait HookProviderTrait
             $params[] = $planParam;
         }
 
-        return [
+        return $this->callablePlanCache[$reflect] ??= [
             'isStatic' => $reflect->isStatic(),
             'params' => $params,
         ];
@@ -206,6 +212,8 @@ trait HookProviderTrait
      */
     public function extractPropertyCallablePlan(\ReflectionProperty $property, ?object $instance = null): array
     {
+        if (isset($this->callablePlanCache[$property])) return $this->callablePlanCache[$property];
+
         /** @suppress PHP0406 */
         if ($instance !== null && $property->hasHook(\PropertyHookType::Get)) {
             // For hooked properties, reading the property executes the `get` hook.
@@ -219,7 +227,7 @@ trait HookProviderTrait
             return $this->callablePlan($property->getDefaultValue());
         }
 
-        return ['isStatic' => true, 'params' => []];
+        return $this->callablePlanCache[$property] ??= ['isStatic' => true, 'params' => []];
     }
 
     /**
@@ -314,6 +322,53 @@ trait HookProviderTrait
         }
 
         return $allowed;
+    }
+
+    /**
+     * @param CallablePlan $onUnregisterDoParams
+     * @param string $label
+     * @param object|null|string $targetClass
+     * @return (callable:mixed)|null
+     */
+    public function resolveOnUnregisterDo(
+        ?\Closure $onUnregisterDo = null,
+        array $onUnregisterDoParams = [],
+        ?ContainerInterface $container = null,
+        string $label = '',
+        object|null|string $targetClass = null,
+    ): \Closure|null {
+        if ($onUnregisterDo === null) {
+            return null;
+        }
+
+        $targetInstanceWeakRef = null;
+        if (is_object($targetClass)) {
+            $targetInstanceWeakRef = $targetClass instanceof \WeakReference ? $targetClass : \WeakReference::create($targetClass);
+            $targetClass = $targetClass::class;
+        }
+
+        return function () use ($onUnregisterDo, $onUnregisterDoParams, $container, $label, $targetClass, $targetInstanceWeakRef): mixed {
+            static $alreadyRun = false;
+            if ($alreadyRun) return null;
+            $alreadyRun = true;
+            if (did_action('shutdown') || doing_action('shutdown')) return null;
+
+            try {
+                $onUnregisterDo = $this->bindToTarget($onUnregisterDo, $onUnregisterDoParams, $targetClass);
+                $values = $this->resolveCallableParameters($onUnregisterDo, $onUnregisterDoParams, $container, $label, [], $targetInstanceWeakRef?->get() ?? null);
+
+                return $onUnregisterDo(...$values);
+            } catch (\Throwable $e) {
+                Logger::error(self::class, 'Failed to execute onUnregisterDo', [
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'invokerLabel' => $label
+                ]);
+                return null;
+            }
+        };
     }
 
     /**
@@ -456,9 +511,7 @@ trait HookProviderTrait
             return $closure;
         }
 
-        if (!isset($this->boundClosureCache[$closure])) {
-            $this->boundClosureCache[$closure] = [];
-        }
+        if (!isset($this->boundClosureCache[$closure])) $this->boundClosureCache[$closure] = [];
 
         return $this->boundClosureCache[$closure][$targetClass]
             ??= \Closure::bind($closure, null, $targetClass);

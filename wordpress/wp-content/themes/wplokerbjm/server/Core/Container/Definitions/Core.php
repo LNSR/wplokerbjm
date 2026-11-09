@@ -7,7 +7,11 @@ use Nette\Loaders\RobotLoader;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyAutowireScanner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, HookRuntimeResolver, HookTargetResolver, InstanceRegistryDeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{HookRuntimeResolver, HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{
+    InstanceRegistryDeferredHookManager,
+    ContainerRegistryDeferredHookManager
+};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;

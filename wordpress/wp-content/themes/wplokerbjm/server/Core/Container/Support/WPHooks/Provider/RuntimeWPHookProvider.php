@@ -1,9 +1,12 @@
 <?php
 
 declare(strict_types=1);
+
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Provider;
 
 use CallableHookParams;
+use CallablePlan;
+use Closure;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 
@@ -21,6 +24,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
  * Attribute-argument closures are static and already scoped to the declaring
  * class resolve via self:: and no instance binding is needed.
  * @phpstan-import-type CallableHookParams from HookProviderTrait
+ * @phpstan-import-type CallablePlan from HookProviderTrait
  */
 class RuntimeWPHookProvider
 {
@@ -28,8 +32,7 @@ class RuntimeWPHookProvider
 
     public function __construct(
         private readonly ?ContainerInterface $container = null,
-    ) {
-    }
+    ) {}
 
     /**
      * Resolve the hook name, optionally supplying dependencies to the closure.
@@ -41,21 +44,47 @@ class RuntimeWPHookProvider
      *
      * @return string The resolved hook name.
      */
-    public function resolveRuntimeHookName(string|\Closure $hook, array $hookParams, string $label, object|null|string $instanceTarget = null): string
-    {
+    public function resolveRuntimeHookName(
+        string|\Closure $hook,
+        array $hookParams,
+        string $label,
+        object|null|string $instanceTarget = null
+    ): string {
         return $this->resolveHookName($hook, $this->container, $hookParams, $label, $instanceTarget);
+    }
+
+    /**
+     * Resolve onUnregisterDo, for InstanceRegistry its invokers give callable since we dont know when instance may be GC-ed
+     * @param \Closure|null $onUnregisterDo
+     * @param CallablePlan $onUnregisterDoParams
+     * @param string $label
+     * @param \WeakReference|null|string   $targetClass
+     * @return (callable:mixed)|null
+     */
+    public function resolveRuntimeOnUnregisterDo(
+        ?Closure $onUnregisterDo = null,
+        array $onUnregisterDoParams = [],
+        string $label = '',
+        \WeakReference|null|string $targetClass = null
+    ): ?callable {
+        if ($onUnregisterDo === null) return null;
+        return $this->resolveOnUnregisterDo($onUnregisterDo, $onUnregisterDoParams, $this->container, $label, $targetClass);
     }
 
     /**
      * Evaluate a registerIf gate, optionally supplying dependencies to the closure.
      *
      * @param \Closure|null $registerIf   Gate closure (null = no gate).
-     * @param CallableHookParams $params Callable plan params.
+     * @param CallablePlan $params Callable plan params.
      * @param string        $label        Descriptive label for error messages.
      * @param string|object|null   $targetClass  Class whose scope the closure was declared in.
      */
-    public function evaluateRuntimeRegisterIf(?\Closure $registerIf, array $params, string $label, object|null|string $targetClass = null): bool
-    {
+    public function evaluateRuntimeRegisterIf(
+        ?\Closure $registerIf,
+        array $params,
+        string $label,
+        object|null|string $targetClass = null
+    ): bool {
         return $this->evaluateRegistrationGate($registerIf, $params, $this->container, $label, $targetClass);
     }
 
@@ -64,13 +93,19 @@ class RuntimeWPHookProvider
      * dependencies (container or named hook arguments) to the closure.
      *
      * @param \Closure|null $executeIf    Gate closure (null = no gate).
-     * @param CallableHookParams $params Callable plan params.
+     * @param CallablePlan $params Callable plan params.
      * @param string        $label        Descriptive label for error messages.
      * @param object|null|string   $targetClass  Class whose scope the closure was declared in.
-     * @param array<string, mixed> $hookArgs Named hook arguments (hook parameter name → value).
+     * @param CallableHookParams $hookArgs Named hook arguments (hook parameter name → value).
      */
-    public function evaluateRuntimeExecuteIf(?\Closure $executeIf, array $params, string $label, object|null|string $targetClass = null, array $hookArgs = [], ?string $variadicHookArg = null): bool
-    {
+    public function evaluateRuntimeExecuteIf(
+        ?\Closure $executeIf,
+        array $params,
+        string $label,
+        object|null|string $targetClass = null,
+        array $hookArgs = [],
+        ?string $variadicHookArg = null
+    ): bool {
         return $this->evaluateExecuteIf($executeIf, $params, $this->container, $label, $targetClass, $hookArgs, $variadicHookArg);
     }
 }

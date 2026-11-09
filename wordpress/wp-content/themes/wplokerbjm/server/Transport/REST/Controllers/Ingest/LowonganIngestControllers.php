@@ -15,9 +15,6 @@ use WPLokerBJM\Shared\Log\Logger;
 
 class LowonganIngestController extends RESTIngestController
 {
-    public function __construct(
-        private readonly LowonganIngestService $service,
-    ) {}
 
     /**
      * @return true|\WP_Error
@@ -70,11 +67,8 @@ class LowonganIngestController extends RESTIngestController
     }
 }
 
-class LowonganIngestOptionsController extends LowonganIngestController
+class LowonganIngestOptionsController extends RESTIngestController
 {
-    public function __construct(
-        private readonly LowonganIngestService $service,
-    ) {}
 
     /**
      * Permission callback for the REST route.
@@ -106,9 +100,12 @@ class LowonganIngestOptionsController extends LowonganIngestController
 }
 
 
-#[Injectable(skip: true)]
 abstract class RESTIngestController
 {
+
+    public function __construct(
+        protected readonly LowonganIngestService $service,
+    ) {}
 
     /**
      * @param \WP_REST_Request|mixed $request

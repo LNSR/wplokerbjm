@@ -118,8 +118,8 @@ class JWTService
             'domain' => $domain(),
             'expires' => time() + (7 * 60 * 60 * 24), // 7 day
             'path' => '/',
-            'secure' => SharedUtils::isDevelopment() ? \is_ssl() : true,
-            'httponly' => SharedUtils::isDevelopment() ? \is_ssl() : true,
+            'secure' => true,
+            'httponly' => true,
             'samesite' => 'Lax',
         ]);
     }

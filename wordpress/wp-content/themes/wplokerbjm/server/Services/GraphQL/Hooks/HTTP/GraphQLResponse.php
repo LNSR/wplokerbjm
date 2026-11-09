@@ -52,7 +52,7 @@ final class GraphQLResponse
          * @var GraphQLDataType $data
          */
         $data = $graphql_response->data ?? null;
-        if (array_key_exists('jwt', $data) && !$data['jwt']) {
+        if (\is_array($data) && \array_key_exists('jwt', $data) && !$data['jwt']) {
             return 401;
         }
         return $http_status_code;

@@ -2,6 +2,8 @@
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
+use Closure;
+use HookType;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
 use WPLokerBJM\Shared\Log\Logger;
@@ -16,6 +18,13 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
 trait ContainerLazyHookInvokerTrait
 {
     use HookInvokerTrait;
+
+    public function initOnUnregisterDoCallback(): void
+    {
+        $this->onUnregisterDoCallback ??= $this->planProvider->resolveOnUnregisterDo($this->onUnregisterDo, $this->onUnregisterDoParams, $this->container, $this->label, $this->class);
+    }
+
+
     /**
      * Invoke the actual hook callback on the (alive) owner instance.
      *
@@ -32,8 +41,6 @@ trait ContainerLazyHookInvokerTrait
 
         try {
             $this->dispatching = true;
-            $hookArgs = $this->buildHookArgs($args);
-
             if ($this->once) {
                 if ($this->consumed) {
                     return $this->filterPassthrough($args);
@@ -41,40 +48,42 @@ trait ContainerLazyHookInvokerTrait
                 $this->consumed = true;
                 $this->consumeOnceAndClean();
             }
-
-            try {
-                $gatePassed = $this->planProvider->evaluateExecuteIf(
-                    $this->executeIf,
-                    $this->executeIfParams,
-                    $this->container,
-                    $this->label,
-                    $this->class,
-                    $hookArgs,
-                    $this->variadicHookArgName()
-                );
-            } catch (\Throwable $e) {
-                if (!$this->once) {
-                    throw $e;
+            if ($this->executeIf !== null) {
+                try {
+                    $hookArgs = $this->buildHookArgs($args);
+                    $gatePassed = $this->planProvider->evaluateExecuteIf(
+                        $this->executeIf,
+                        $this->executeIfParams,
+                        $this->container,
+                        $this->label,
+                        $this->class,
+                        $hookArgs,
+                        $this->variadicHookArgName()
+                    );
+                } catch (\Throwable $e) {
+                    if (!$this->once) {
+                        throw $e;
+                    }
+                    Logger::info(
+                        static::class,
+                        'executeIf gate unresolvable for once-hook ' . $this->label . ' — treated as pass.',
+                        [
+                            'message' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                        ]
+                    );
+                    $gatePassed = true;
                 }
-                Logger::info(
-                    static::class,
-                    'executeIf gate unresolvable for once-hook ' . $this->label . ' — treated as pass.',
-                    [
-                        'message' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                        'file' => $e->getFile(),
-                        'line' => $e->getLine(),
-                    ]
-                );
-                $gatePassed = true;
-            }
 
-            if (!$gatePassed) {
-                Logger::info(
-                    static::class,
-                    'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
-                );
-                return $this->filterPassthrough($args);
+                if (!$gatePassed) {
+                    Logger::info(
+                        static::class,
+                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
+                    );
+                    return $this->filterPassthrough($args);
+                }
             }
 
             $instance = $this->container->get($this->class);
@@ -126,6 +135,7 @@ final class ContainerLazyHookInvoker
      * @param HookType['executeIfParams'] $executeIfParams
      * @param HookType['hookArgs'] $hookArgNames
      * @param HookType['once'] $once
+     * @param HookType['onUnregisterDo'] $onUnregisterDo
      */
     public function __construct(
         private readonly ContainerInterface $container,
@@ -141,6 +151,8 @@ final class ContainerLazyHookInvoker
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
+        private readonly ?\Closure $onUnregisterDo = null,
+        private readonly array $onUnregisterDoParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->method;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
@@ -201,6 +213,7 @@ final class ContainerLazyPropertyHookInvoker
      * @param HookType['executeIfParams'] $executeIfParams
      * @param HookType['hookArgs'] $hookArgNames
      * @param HookType['once'] $once
+     * @param HookType['onUnregisterDo'] $onUnregisterDo
      */
     public function __construct(
         private readonly ContainerInterface $container,
@@ -216,13 +229,15 @@ final class ContainerLazyPropertyHookInvoker
         private readonly ?WPHookPlanProvider $hookPlanProvider = null,
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
+        private readonly ?\Closure $onUnregisterDo = null,
+        public readonly array $onUnregisterDoParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->property;
         $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
             $this->reader = self::$classPropertyClosureCache[$this->class] ??= \Closure::bind(
-                static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
+                static::$templateClosure ??= static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
                 null,
                 $this->class,
             );

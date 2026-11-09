@@ -68,7 +68,7 @@ final readonly class Injectable extends AbstractDataObject
      * @param TInjectable['skip'] $skip Skip the class from being scanned.
      */
     public function __construct(
-        public ?bool $lazy = null,
+        public bool $lazy = false,
         public bool $skip = false
     ) {
     }

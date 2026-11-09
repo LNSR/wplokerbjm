@@ -60,6 +60,7 @@ final class NestedOnceDepthTest extends WplokerbjmTestCase
                     $this->midRuns++;
                     $this->log[] = 'mid';
                     \do_action('nested_inner', $assertCallback);
+                    \do_action('nested_outer', $assertCallback);
                 }
 
                 public function inner(array $assertCallback): void
@@ -71,6 +72,7 @@ final class NestedOnceDepthTest extends WplokerbjmTestCase
 
                     // Re-enter the outer hook while every ancestor is still on the stack.
                     \do_action('nested_outer', $assertCallback);
+                    \do_action('nested_mid', $assertCallback);
                 }
             };
         }

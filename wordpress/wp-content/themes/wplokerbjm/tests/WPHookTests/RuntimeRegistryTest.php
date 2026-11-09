@@ -19,9 +19,14 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
 {
     private WPHooksInstanceRegistry $registry;
 
+    /** Mutable flag read by deferred-gate closures (attribute gates must be static). */
+    public static bool $deferredGateOpen = false;
+
     protected function setUp(): void
     {
         parent::setUp();
+
+        self::$deferredGateOpen = false;
 
         $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, [
             'provider' => null,
@@ -961,6 +966,135 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $this->assertNull($this->findRegisteredHook('action', 'rt_deferred_gated_hook'));
     }
 
+    public function testDeferredRegisterIfIsNotEvaluatedAtScanTime(): void
+    {
+        // Gate is false while the attribute is scanned …
+        self::$deferredGateOpen = false;
+
+        $captured = [];
+
+        $anon = new class($captured) {
+            public function __construct(private array &$captured) {}
+
+            #[Action(
+                hook: 'rt_deferred_late_gate',
+                deferRegisterUntilHook: 'rt_late_gate_trigger',
+                registerIf: static function (): bool {
+                    return RuntimeRegistryTest::$deferredGateOpen;
+                },
+                acceptedArgs: 1,
+            )]
+            public function doSomething(string $val): void
+            {
+                $this->captured[] = $val;
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNull(
+            $this->findRegisteredHook('action', 'rt_deferred_late_gate'),
+            'A false gate at scan time must not discard the deferred entry.',
+        );
+
+        // … and only becomes true before the trigger fires.
+        self::$deferredGateOpen = true;
+        do_action('rt_late_gate_trigger');
+
+        $this->assertNotNull(
+            $this->findRegisteredHook('action', 'rt_deferred_late_gate'),
+            'The gate must be evaluated at activation time, not at scan time.',
+        );
+
+        do_action('rt_deferred_late_gate', 'fired');
+        $this->assertSame(['fired'], $captured);
+    }
+
+    public function testDeferredRegisterIfRejectsAtActivationEvenWhenItPassedAtScanTime(): void
+    {
+        // Gate is true while the attribute is scanned …
+        self::$deferredGateOpen = true;
+
+        $anon = new class {
+            #[Action(
+                hook: 'rt_deferred_rejected_late',
+                deferRegisterUntilHook: 'rt_reject_trigger',
+                registerIf: static function (): bool {
+                    return RuntimeRegistryTest::$deferredGateOpen;
+                },
+            )]
+            public function doSomething(): void {}
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        // … and turns false before the trigger fires.
+        self::$deferredGateOpen = false;
+        do_action('rt_reject_trigger');
+
+        $this->assertNull(
+            $this->findRegisteredHook('action', 'rt_deferred_rejected_late'),
+            'Activation must re-evaluate the gate instead of trusting the scan-time result.',
+        );
+    }
+
+    public function testCacheHitDeferredRegisterIfIsEvaluatedAtActivation(): void
+    {
+        self::$deferredGateOpen = false;
+
+        /** @var \ArrayObject<int, string> $log */
+        $log = new \ArrayObject();
+        $cache = new WPHooksInstanceObjectCache();
+
+        $factory = static fn(\ArrayObject $log): ModuleClassHookMetadata => new class($log) extends ModuleClassHookMetadata {
+            public function __construct(private \ArrayObject $log)
+            {
+                parent::__construct('CachedDeferredGateHost', 'hooks');
+            }
+
+            #[Action(
+                hook: 'cached_gate_destination',
+                deferRegisterUntilHook: 'cached_gate_trigger',
+                registerIf: static function (): bool {
+                    return RuntimeRegistryTest::$deferredGateOpen;
+                },
+            )]
+            public function onDestination(): void
+            {
+                $this->log[] = 'fired';
+            }
+        };
+
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner,
+        ]);
+
+        // First instance populates the cache (scan path).
+        $first = $factory($log);
+        $registry()->registerHooksOn($first);
+
+        // Second instance takes the cache-hit path — it must NOT be gated eagerly.
+        $second = $factory($log);
+        $registry()->registerHooksOn($second);
+
+        $this->assertNull(
+            $this->findRegisteredHook('action', 'cached_gate_destination'),
+            'Neither the scanned nor the cached deferred entry may register before the trigger.',
+        );
+
+        self::$deferredGateOpen = true;
+        do_action('cached_gate_trigger');
+
+        $this->assertNotNull(
+            $this->findRegisteredHook('action', 'cached_gate_destination'),
+            'Both cache paths must gate the deferred entry at activation time.',
+        );
+
+        do_action('cached_gate_destination');
+        $this->assertCount(2, $log->getArrayCopy(), 'Both instances must fire.');
+    }
+
     public function testUnregisterHooksOnSweepsDeferredPool(): void
     {
         $anon = new class {
@@ -1001,7 +1135,6 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         // Drop the only strong reference — the handler holds a WeakReference,
         // so the owner is garbage-collected and the hook nukes itself.
         unset($anon);
-        gc_collect_cycles();
 
         do_action('rt_lifetime_action', 'x');
         $this->assertSame([], $captured);
@@ -1018,7 +1151,6 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $this->registry->registerHooksOn($anon);
 
         unset($anon);
-        gc_collect_cycles();
 
         // Owner is dead — the deferred entry must never activate.
         do_action('rt_trigger');

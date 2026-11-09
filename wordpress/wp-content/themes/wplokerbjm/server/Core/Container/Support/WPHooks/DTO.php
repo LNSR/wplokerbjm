@@ -9,14 +9,7 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryHandlerEntry, WPHooksContainerRegistry, WPHooksInstanceRegistry};
-
-trait HandlerEntryUniqueKey
-{
-    public function toUniqueKey(): string
-    {
-        return $this->hook . ':' . $this->key->toString();
-    }
-}
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryUniqueKey;
 
 
 /**
@@ -114,6 +107,8 @@ final readonly class HookKey extends AbstractDataObject
  *  deferRegisterUntilHook: null|string|\Closure(TObject...): string,
  *  deferRegisterUntilHookParams: CallablePlan,
  *  once: bool,
+ *  onUnregisterDo: null|\Closure(TObject...): void,
+ *  onUnregisterDoParams: CallablePlan
  * }
  * @extends parent<HookType>
  */
@@ -141,6 +136,8 @@ final readonly class HookRegistration extends AbstractDataObject
      * @param HookType['deferRegisterUntilHook'] $deferRegisterUntilHook
      * @param HookType['deferRegisterUntilHookParams'] $deferRegisterUntilHookParams
      * @param HookType['once'] $once
+     * @param HookType['onUnregisterDo'] $onUnregisterDo
+     * @param HookType['onUnregisterDoParams']
      */
     public function __construct(
         public string $class,
@@ -164,6 +161,8 @@ final readonly class HookRegistration extends AbstractDataObject
         public string|\Closure|null $deferRegisterUntilHook = null,
         public array $deferRegisterUntilHookParams = [],
         public bool $once = false,
+        public ?\Closure $onUnregisterDo = null,
+        public array $onUnregisterDoParams = []
     ) {}
 }
 #endregion
@@ -199,10 +198,12 @@ final readonly class HookRegistration extends AbstractDataObject
  *  target: HookType['target'],
  *  targetName: HookType['method'],
  *  visibility: HookType['visibility'],
+ *  onUnregisterDo: HookType['onUnregisterDo'],
+ *  onUnregisterDoParams: HookType['onUnregisterDoParams'],
  * }
  * @extends parent<InstanceHookMetadataData>
  */
-readonly class InstanceHookMetadata extends AbstractDataObject
+final readonly class InstanceHookMetadata extends AbstractDataObject
 {
     /**
      * @param InstanceHookMetadataData['hook'] $hook
@@ -220,6 +221,8 @@ readonly class InstanceHookMetadata extends AbstractDataObject
      * @param InstanceHookMetadataData['target'] $target
      * @param InstanceHookMetadataData['targetName'] $targetName
      * @param InstanceHookMetadataData['visibility'] $visibility
+     * @param InstanceHookMetadataData['onUnregisterDo'] $onUnregisterDo
+     * @param InstanceHookMetadataData['onUnregisterDoParams'] $onUnregisterDoParams
      */
     public function __construct(
         public string $hook,
@@ -237,6 +240,8 @@ readonly class InstanceHookMetadata extends AbstractDataObject
         public string $target = 'method',
         public string $targetName = '',
         public string $visibility = 'public',
+        public ?\Closure $onUnregisterDo = null,
+        public array $onUnregisterDoParams = []
     ) {}
 }
 #endregion

@@ -310,7 +310,6 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $container->method('has')->willReturn(false);
 
         Terminal::out("\n\033[1;34m⏭️  WPHooksContainerRegistry — Skip Behavior\033[0m\n");
-        $targetResolver = new HookTargetResolver();
         $registry = $this->createRegistry([
             [
                 'class' => 'NonExistentService',

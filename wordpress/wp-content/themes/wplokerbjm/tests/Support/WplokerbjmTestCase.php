@@ -9,7 +9,8 @@ use \DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{ContainerRegistryDeferredHookManager,InstanceRegistryDeferredHookManager};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 
 abstract class WplokerbjmTestCase extends TestCase
@@ -21,10 +22,17 @@ abstract class WplokerbjmTestCase extends TestCase
      * before reading WordPress state, so assertions observe the settled
      * (post-removal) registrations. Set to false to inspect the raw queue
      * while entries are still deferred — e.g. to assert the queued state and
-     * then flush it explicitly with {@see flushQueuedRemovals()}.
+     * then flush it explicitly with @see self::flushQueuedRemovals.
      */
     protected bool $flushQueuedRemovalsAfterDispatch = true;
-    protected QueuedHooksCleaner $queuedHooksCleaner { get => $this->queuedHooksCleaner ??= new QueuedHooksCleaner(); }
+    public protected(set) QueuedHooksCleaner|\WeakReference|null $queuedHooksCleaner = null {
+        get {
+            if (!($this->queuedHooksCleaner instanceof \WeakReference)) return $this->queuedHooksCleaner ??= new QueuedHooksCleaner();
+            if ($this->queuedHooksCleaner->get() === null) return $this->queuedHooksCleaner = new QueuedHooksCleaner();
+            return $this->queuedHooksCleaner->get();
+        } 
+        set => $value instanceof \WeakReference ? $value : \WeakReference::create($value);
+    }
 
     protected function setUp(): void
     {
@@ -145,7 +153,12 @@ abstract class WplokerbjmTestCase extends TestCase
      *
      * @param string $type 'action' or 'filter' (ignored)
      * @param string $hook Hook name
-     * @return array<string,mixed>|null
+     * @return ?array{
+     *  hook: string,
+     *  callable: callable,
+     *  priority: int,
+     *  acceptedArgs: int,
+     * }
      */
     protected function findRegisteredHook(string $type, string $hook): ?array
     {
@@ -167,15 +180,14 @@ abstract class WplokerbjmTestCase extends TestCase
         return null;
     }
 
-    private \Closure $flushQueuedRemovals {
+    private ?\Closure $flushQueuedRemovals = null {
         get {
             return $this->flushQueuedRemovals ??= \Closure::bind(function () {
                 $queued = $this->queuedRemovalEntry ?? [];
                 if ($queued === []) return;
 
                 foreach ($queued as $idx => $entry) {
-                    $entry->unregister();
-                    unset($this->queuedRemovalEntry[$idx]);
+                    $this->immediatelyScheduleRemove($entry);
                 }
             }, $this->queuedHooksCleaner, $this->queuedHooksCleaner);
         }
@@ -221,6 +233,8 @@ abstract class WplokerbjmTestCase extends TestCase
         $planProvider = new WPHookPlanProvider();
         $resolver = new HookTargetResolver();
         $entriesIndexer = new EntriesIndexer();
+        $queuedHooksCleaner = new QueuedHooksCleaner();
+        $this->queuedHooksCleaner = \WeakReference::create($queuedHooksCleaner);
 
         $registry = new WPHooksContainerRegistry(
             $container,
@@ -228,7 +242,7 @@ abstract class WplokerbjmTestCase extends TestCase
             $planProvider,
             new ContainerRegistryDeferredHookManager($planProvider, $container, $resolver, $entriesIndexer),
             $resolver,
-            $this->queuedHooksCleaner = new QueuedHooksCleaner(),
+            $queuedHooksCleaner,
             $entriesIndexer
         );
         return $registry;

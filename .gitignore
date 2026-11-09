@@ -33,6 +33,7 @@ wordpress/wp-content/themes/*
 **/tests/cache
 **/tests/cache-dir
 **/tests/robotloader-cache
+.phpunit.*
 source.zsh
 mkcert
 localhost.pem

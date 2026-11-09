@@ -76,7 +76,7 @@ final class SearchJobHooks
      * @param \WP_Query     $wp_query The WP_Query object being executed.
      * @return string Modified search SQL fragment.
      */
-    #[Filter('posts_search', acceptedArgs: 2, deferRegister: true, once: true)]
+    #[Filter('posts_search', acceptedArgs: 2, deferRegister: true)]
     public function filterPostsSearch(string $search, \WP_Query $wp_query): string
     {
         return JobQuery::buildPostsSearchSql(

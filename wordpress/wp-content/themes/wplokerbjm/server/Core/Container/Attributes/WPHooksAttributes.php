@@ -41,6 +41,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * declaring class, so `self::`, private constants and private static helpers of
  * that class are reachable.
  *
+ * - Closure is internally cached, static `$variables` persist across all execution cycles
+ *
  * Closures execute in three very different moments:
  *
  * - `$hook`, `$tag`, `$deferRegisterUntilHook` → **eagerly**, during
@@ -86,6 +88,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * | `$registerIf`             | yes               | yes                     |
  * | `$executeIf`              | yes               | yes                     |
  * | `$once`                   | yes               | yes                     |
+ * | `$onUnregisterDo`         | yes               | yes                     |
  *
  * ---------------------------------------------------------------------------
  * ## Known limitations
@@ -186,8 +189,10 @@ abstract class BaseHookAttribute
      *
      * @param (\Closure(TParams...): bool)|null $registerIf Registration gate.
      * * Return `true` to attach the hook, `false` to skip it.
-     * * Evaluated at registration time, and **re-evaluated at every deferred
-     *   activation attempt**.
+     * * Non-deferred entries are evaluated once, at registration time.
+     * * Deferred entries (`deferRegister` / `deferRegisterUntilHook`) are
+     *   **not** gated during the scan: the gate runs at activation, and again
+     *   on every activation attempt.
      * * Parameters resolve from the DI container only. There are no hook
      *   arguments at registration/activation time, so a parameter named like a
      *   hook argument will **not** receive it (it will throw unless it is
@@ -265,6 +270,21 @@ abstract class BaseHookAttribute
      * ! Remember the once/gate interaction from `$executeIf`: a throwing or
      * ! non-bool gate is treated as PASS on once-hooks, so a broken gate does
      * ! not prevent execution — it silently enables it.
+     * 
+     * @param (\Closure(TParams...): void)|null $onUnregisterDo Cleanup side effect for live wordpress registration:
+     * !        fired once when the invoker object is released (its PHP
+     * !       `__destruct()`): after an explicit unregister, or its removal is flushed out of `$wp_filter`.
+     * * **No hook arguments**: parameters resolve from the DI container, then
+     *   defaults — exactly like `$registerIf`.
+     * * Resolution is lazy and both resolution and execution are guarded: a
+     *   broken cleanup closure is logged and never aborts registration or the
+     *   destructor.
+     * * Deferred entries activate at activation time, failed registerIf gate for InstanceRegistry will never activate it
+     * * If registered on hook `shutdown`, it's noop, registry internally guard using this condition.
+     * ! The instance registry binds the cleanup to the invoker, not the owner:
+     * ! if the owner dies first the chain event command cleanup still runs from the invoker's
+     * ! destructor.
+     * ! This assume no application smell code mutate global $wp_filter directly
      */
     public function __construct(
         public readonly string|\Closure $hook,
@@ -276,6 +296,7 @@ abstract class BaseHookAttribute
         public readonly string|\Closure|null $deferRegisterUntilHook = null,
         public bool $deferRegister = false,
         public readonly bool $once = false,
+        public readonly ?\Closure $onUnregisterDo = null,
     ) {
         $this->deferRegister = $deferRegisterUntilHook !== null ? true : $deferRegister;
     }

@@ -46,7 +46,7 @@ class WPHooksScanner
         private array $compiledContainerMap,
         private string $namespace = 'WPLokerBJM',
         private string $cacheLocation = '',
-        private ?WPHookPlanProvider $hookPlanProvider = null
+        private WPHookPlanProvider $hookPlanProvider = new WPHookPlanProvider()
     ) {
         $this->namespace = trim($namespace, '\\');
         $this->cacheLocation = is_dir($cacheLocation) || str_ends_with($cacheLocation, '/') || str_ends_with($cacheLocation, '\\')
@@ -116,16 +116,18 @@ class WPHooksScanner
                         target: 'method',
                         visibility: $visibility,
                         executeIf: $attr->executeIf,
-                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf),
-                        hookArgs: $attr->executeIf ? $this->hookPlanProvider->buildCallablePlanFromReflector($method)['params'] : [],
+                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
+                        hookArgs: $this->hookPlanProvider->buildCallablePlanFromReflector($method)['params'],
                         registerIf: $attr->registerIf,
-                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
+                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                         deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                         deferRegisterUntilHookParams: $this->hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                         once: $attr->once,
+                        onUnregisterDo: $attr->onUnregisterDo,
+                        onUnregisterDoParams: $this->hookPlanProvider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
                     );
                 });
 
@@ -135,23 +137,25 @@ class WPHooksScanner
                         method: $property->getName(),
                         type: $type,
                         hook: $attr->hook,
-                        hookParams: $attr->hook instanceof \Closure ? $this->hookPlanProvider->buildCallablePlan($attr->hook) : [],
+                        hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                         priority: $attr->priority,
                         acceptedArgs: $attr->acceptedArgs,
                         deferRegister: $attr->deferRegister,
                         target: $target,
                         visibility: $visibility,
                         executeIf: $attr->executeIf,
-                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf),
-                        hookArgs: $attr->executeIf ? $this->hookPlanProvider->extractPropertyCallablePlan($property)['params'] : [],
+                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
+                        hookArgs: $this->hookPlanProvider->extractPropertyCallablePlan($property)['params'],
                         registerIf: $attr->registerIf,
-                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
+                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                         deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                         deferRegisterUntilHookParams: $this->hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                         once: $attr->once,
+                        onUnregisterDo: $attr->onUnregisterDo,
+                        onUnregisterDoParams: $this->hookPlanProvider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
                     );
                 });
             } catch (\RuntimeException $e) {

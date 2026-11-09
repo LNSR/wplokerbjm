@@ -72,7 +72,7 @@ class ThemeHooks
     /**
      * @var class@anonymous::class
      */
-    #[Filter('site_icon_meta_tags')]
+    #[Filter('site_icon_meta_tags', once: true)]
     public private(set) ?ModuleClassHookMetadata $addSiteIconMetaTags {
         get {
             return $this->addSiteIconMetaTags ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
@@ -103,7 +103,7 @@ class ThemeHooks
                  * 1. Walk post_parent to find the original upload attachment.
                  * 2. Use wp_get_original_image_url() to get the original PNG URL.
                  */
-                private function addFallbackSiteIconMetaTags(): string
+                private function addFallbackSiteIconMetaTags(): ?string
                 {
                     $cropped_id = \get_option('site_icon');
                     if (!$cropped_id) return null;
@@ -191,10 +191,6 @@ class ThemeHooks
         // compute optional site icon <link> tags using the same filter used in addSiteIconMetaTags()
         $siteIconTags = '';
         $tags = apply_filters('site_icon_meta_tags', []);
-        /**
-         *  @suppresswarnings PHP0410
-         */
-        $this->addSiteIconMetaTags = null;
         if (!empty($tags) && is_array($tags)) {
             $siteIconTags = implode("\n", $tags);
         }

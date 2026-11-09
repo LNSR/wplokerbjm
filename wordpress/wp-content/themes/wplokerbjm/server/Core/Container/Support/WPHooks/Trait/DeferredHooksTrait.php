@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookEntryHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 
 
@@ -48,7 +48,7 @@ trait DeferredHooksTrait
     private function addDeferred(DeferredHookEntryHandler $entry): void
     {
         $this->deferredHandlers[$entry->toUniqueKey()] = $entry;
-        $this->entriesIndexer->setIndexes($entry);
+        $this->entriesIndexer?->setIndexes($entry);
     }
 
     /**
@@ -67,6 +67,11 @@ trait DeferredHooksTrait
         foreach ($keys as $key) {
             $entry = $this->deferredHandlers[$key] ?? null;
             if ($entry === null) continue;
+            if ($entry->handler === null) {
+                $this->entriesIndexer?->removeIndexes($entry);
+                unset($this->deferredHandlers[$key]);
+                continue;
+            };
             if (!$this->gateDeferredActivation($entry)) {
                 continue;
             }
@@ -74,7 +79,7 @@ trait DeferredHooksTrait
                 continue;
             }
             $activated++;
-            $this->entriesIndexer->removeIndexes($entry);
+            $this->entriesIndexer?->removeIndexes($entry);
             unset($this->deferredHandlers[$key]);
         }
         return $activated;
@@ -83,7 +88,7 @@ trait DeferredHooksTrait
     /**
      * Sweep the deferred pool and remove every entry matching the predicate.
      * @param list<TKey> $keys
-     * @param callable(DeferredHookEntryHandler): bool $matches Predicate over ($hook, $entry, $key).
+     * @param callable(DeferredHookEntryHandler): bool $matches
      */
     private function unregisterMatchingDeferredEntries(array $keys, callable $matches): void
     {
@@ -91,10 +96,14 @@ trait DeferredHooksTrait
         foreach ($keys as $key) {
             $entry = $this->deferredHandlers[$key] ?? null;
             if ($entry === null) continue;
+            if ($entry->handler === null) {
+                $this->entriesIndexer?->removeIndexes($entry);
+                unset($this->deferredHandlers[$key]);
+            };
             if (!$matches($entry)) {
                 continue;
             }
-            $this->entriesIndexer->removeIndexes($entry);
+            $this->entriesIndexer?->removeIndexes($entry);
             unset($this->deferredHandlers[$key]);
         }
     }

@@ -42,7 +42,7 @@
     "php.workspace.includePath": "wordpress/",
     "php.problems.scope": "opened",
     "php.validate.run": "onType",
-    "php.inlayHints.parameters.enabled": true,
+    "php.inlayHints.parameters.enabled": false,
     "php.suggest.basic": false, // Handled by Intelephense
     "php.files.exclude": {
       "**/node_modules/**": true,
@@ -63,16 +63,16 @@
     "intelephense.maxMemory": 8196,
     "intelephense.diagnostics.memberAccess": false,
     "intelephense.diagnostics.enable": false, // Leave diagnostics to Devsense to prevent conflicts
-    "intelephense.diagnostics.argumentCount": "on",
-    "intelephense.codeLens.implementations.enable": true, // Disable to prevent duplicate CodeLens with Devsense
-    "intelephense.codeLens.parent.enable": true,
-    "intelephense.completion.insertUseDeclaration": true,
-    "intelephense.completion.fullyQualifyGlobalConstantsAndFunctions": true,
+    "intelephense.diagnostics.argumentCount": "off",
+    "intelephense.codeLens.implementations.enable": false, // Disable to prevent duplicate CodeLens with Devsense
+    "intelephense.codeLens.parent.enable": false,
+    "intelephense.completion.insertUseDeclaration": false,
+    "intelephense.completion.fullyQualifyGlobalConstantsAndFunctions": false,
     "intelephense.rename.namespaceMode": "all",
-    "intelephense.codeLens.overrides.enable": true,
+    "intelephense.codeLens.overrides.enable": false,
     "intelephense.environment.phpVersion": "8.6.0",
-    "intelephense.codeLens.references.enable": true,
-    "intelephense.codeLens.usages.enable": true,
+    "intelephense.codeLens.references.enable": false,
+    "intelephense.codeLens.usages.enable": false,
     "intelephense.files.maxSize": 100000000,
     "intelephense.files.exclude": [
       "**/.git/**",

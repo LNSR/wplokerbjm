@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
+use InstanceHookMetadataData;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
@@ -95,6 +96,17 @@ trait RuntimeInstanceInvokerTrait
         }
     }
 
+    public function initOnUnregisterDoCallback(): void
+    {
+        if ($this->instanceRef->get() === null) return;
+        $this->onUnregisterDoCallback ??= $this->hookPlanProvider?->resolveRuntimeOnUnregisterDo(
+            $this->onUnregisterDo,
+            $this->onUnregisterDoParams,
+            $this->label,
+            $this->instanceRef
+        );
+    }
+
     /**
      * Nuke the registration when its owning instance has been garbage-collected
      * (instance-lifetime scoping). Idempotent — shares the $removed guard with
@@ -105,10 +117,10 @@ trait RuntimeInstanceInvokerTrait
         if ($this->removed || $this->removeCallback === null) {
             return;
         }
-        
+
         try {
-            ($this->removeCallback)($this);
             $this->removed = true;
+            ($this->removeCallback)($this);
         } catch (\Throwable $e) {
             Logger::error(
                 static::class,
@@ -143,8 +155,8 @@ final class RuntimeInstanceHookInvoker
 
     /** @var (\Closure(object, method-string, mixed...):mixed)|null Closure to invoke the method on the stored instance (for non-public methods) */
     private ?\Closure $invoker = null;
-    /** @var \WeakMap<object, (\Closure(object, method-string, mixed...):mixed)> */
-    private static \WeakMap $methodInvokerCache;
+    /** @var array<class-string, (\Closure(object, method-string, mixed...):mixed)> */
+    private static array $methodInvokerCache = [];
 
     /**
      * @template TClass
@@ -155,6 +167,8 @@ final class RuntimeInstanceHookInvoker
      * @param InstanceHookMetadataData['executeIfParams'] $executeIfParams
      * @param InstanceHookMetadataData['hookArgNames'] $hookArgNames
      * @param InstanceHookMetadataData['once'] $once
+     * @param InstanceHookMetadataData['onUnregisterDo'] $onUnregisterDo
+     * @param InstanceHookMetadataData['onUnregisterDoParams'] $onUnregisterDoParams
      */
     public function __construct(
         private readonly \WeakReference $instanceRef,
@@ -166,23 +180,24 @@ final class RuntimeInstanceHookInvoker
         public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
         private readonly ?RuntimeWPHookProvider $hookPlanProvider = null,
-        private readonly array $executeIfParams = [],
-        private readonly array $hookArgNames = [],
+        public readonly array $executeIfParams = [],
+        public readonly array $hookArgNames = [],
         public readonly bool $once = false,
+        private readonly ?\Closure $onUnregisterDo = null,
+        public readonly array $onUnregisterDoParams = [],
     ) {
-        self::$methodInvokerCache ??= new \WeakMap();
         $instance = $this->instanceRef->get();
         $objectId = \spl_object_id($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClassString() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->method;
 
         if ($this->visibility !== 'public') {
 
             // Bind inside the instance's class scope so
             // $instance->privateMethod(...) works natively.
-            $this->invoker = self::$methodInvokerCache[$instance] ??= \Closure::bind(
+            $this->invoker = self::$methodInvokerCache[$instance::class] ??= \Closure::bind(
                 static::$templateClosure ??= static fn(object $target, string $methodName, mixed ...$args): mixed => $target->{$methodName}(...$args),
                 null,
                 $instance,
@@ -216,8 +231,8 @@ final class RuntimeInstancePropertyHookInvoker
 
     /** @var (\Closure(object, string):mixed)|null */
     private ?\Closure $reader = null;
-    /** @var \WeakMap<object, (\Closure(object, property-string|property-hook-string):mixed)> */
-    private static \WeakMap $classPropertyClosureCache;
+    /** @var array<class-string, (\Closure(object, property-string|property-hook-string):mixed)> */
+    private static array $classPropertyClosureCache = [];
 
 
     /**
@@ -229,6 +244,8 @@ final class RuntimeInstancePropertyHookInvoker
      * @param InstanceHookMetadataData['executeIf'] $executeIf Optional gate: invoked directly, must return bool.
      * @param InstanceHookMetadataData['hookArgNames'] $hookArgNames
      * @param InstanceHookMetadataData['once'] $once
+     * @param InstanceHookMetadataData['onUnregisterDo'] $onUnregisterDo
+     * @param InstanceHookMetadataData['onUnregisterDoParams'] $onUnregisterDoParams
      */
     public function __construct(
         private readonly \WeakReference $instanceRef,
@@ -240,22 +257,23 @@ final class RuntimeInstancePropertyHookInvoker
         public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
         private readonly ?RuntimeWPHookProvider $hookPlanProvider = null,
-        private readonly array $executeIfParams = [],
-        private readonly array $hookArgNames = [],
+        public readonly array $executeIfParams = [],
+        public readonly array $hookArgNames = [],
         public readonly bool $once = false,
+        private readonly ?\Closure $onUnregisterDo = null,
+        public readonly array $onUnregisterDoParams = [],
     ) {
-        self::$classPropertyClosureCache ??= new \WeakMap();
         $instance = $this->instanceRef->get() ?? null;
         $objectId = \spl_object_id($instance);
 
         $this->label = $instance instanceof ModuleClassHookMetadata
-            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->getParentClassString() . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
+            ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->property;
 
         if ($this->visibility !== 'public') {
             // Bind inside the instance's class scope so
             // $instance->privateProp works natively.
-            $this->reader = self::$classPropertyClosureCache[$instance] ??= \Closure::bind(
+            $this->reader = self::$classPropertyClosureCache[$instance::class] ??= \Closure::bind(
                 static::$templateClosure ??= static fn(object $target, string $propertyName): mixed => $target->{$propertyName},
                 null,
                 $instance,
@@ -291,6 +309,7 @@ final class RuntimeInstancePropertyHookInvoker
  * condition closure is invoked directly before the callback and must return
  * bool.
  * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
+ * @internal
  */
 final class RuntimeCallableHookInvoker
 {
@@ -302,6 +321,7 @@ final class RuntimeCallableHookInvoker
      * @param InstanceHookMetadataData['type'] $type
      * @param InstanceHookMetadataData['once'] $once      When true, the registration removes itself after its first
      *                                   fire where the executeIf gate is evaluated (consume-on-any-evaluation).
+     * @param InstanceHookMetadataData['onUnregisterDo'] $onUnregisterDo
      */
     public function __construct(
         private readonly mixed $callback,
@@ -311,10 +331,42 @@ final class RuntimeCallableHookInvoker
         public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
         public readonly bool $once = false,
+        private readonly ?\Closure $onUnregisterDo = null
     ) {
         $this->label = $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . (is_array($callback)
             ? get_debug_type($callback[0]) . '::' . $callback[1] : ($callback instanceof \Closure ? 'closure:' . (string) \spl_object_id($callback)
                 : get_debug_type($callback)));
+    }
+
+    public function initOnUnregisterDoCallback(): void
+    {
+        if ($this->onUnregisterDo === null || $this->onUnregisterDoCallback !== null) {
+            return;
+        }
+
+        $onUnregisterDo = $this->onUnregisterDo;
+        $label = $this->label;
+
+        // Manual registrations have no provider, so the closure is invoked
+        // without argument resolution — but it must never let an exception
+        // escape a destructor (that would abort shutdown).
+        $this->onUnregisterDoCallback = static function () use ($onUnregisterDo, $label): void {
+            static $alreadyRun = false;
+            if ($alreadyRun) return;
+            $alreadyRun = true;
+
+            try {
+                $onUnregisterDo();
+            } catch (\Throwable $e) {
+                Logger::error(self::class, 'Failed to execute onUnregisterDo', [
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'invokerLabel' => $label,
+                ]);
+            }
+        };
     }
 
     public function __invoke(mixed ...$args): mixed

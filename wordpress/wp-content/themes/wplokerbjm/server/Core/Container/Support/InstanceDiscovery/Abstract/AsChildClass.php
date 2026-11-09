@@ -36,6 +36,9 @@ abstract class AsChildClass
         set => $this->parentClass = \is_object($value) ? \WeakReference::create($value) : $value;
     }
 
+    /** @var class-string<T>|string */
+    public readonly string $parentClassString;
+
     public readonly string $constructCurrentClassIdentity;
 
     /**
@@ -48,23 +51,24 @@ abstract class AsChildClass
         public private(set) readonly string $identifier,
     ) {
         $this->parentClass = $parentClass;
+        
+        if (is_object($this->parentClass) && !str_contains($parentClass::class, "@anonymous")) {
+            $this->parentClassString = $parentClass::class;
+        } elseif ($this->parentClass instanceof static) {
+            $this->parentClassString = $this->parentClass->constructCurrentClassIdentity;
+        } elseif (\is_string($this->parentClass)) {
+            $this->parentClassString = $this->parentClass;
+        } else {
+            $this->parentClassString = 'Parent expired . ' . $this->identifier;
+        }
 
         $this->constructCurrentClassIdentity = $this->parentClass instanceof static
             ? \sprintf("%s->%s", $this->parentClass->constructCurrentClassIdentity, $this->identifier)
-            : \sprintf("%s->%s", $this->getParentClassString(), $this->identifier);
+            : \sprintf("%s->%s", $this->parentClassString, $this->identifier);
 
         if (\defined('WPLOKERBJM_TEST_ENV')) return;
 
         do_action(DependencyInjectorEvent::INJECT_ON, $this);
-    }
-
-    /**
-     * Resolve the parent class-string, normalizing an object parent via get_class().
-     * @return class-string<T>
-     */
-    public function getParentClassString(): string
-    {
-        return \is_object($this->parentClass) ? \get_class($this->parentClass) : $this->parentClass;
     }
 
     /**

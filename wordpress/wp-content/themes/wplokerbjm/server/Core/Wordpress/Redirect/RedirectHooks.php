@@ -55,6 +55,7 @@ class RedirectHooks
     #[Action(
         'template_redirect',
         deferRegister: true,
+        once: true,
         executeIf: static function (self $self): bool {
             return !$self->shouldSkipRedirect() && !$self->isDraftPreviewRequest() && is_404() && is_singular(PostTypes::POST_TYPE_LOWONGAN);
         },

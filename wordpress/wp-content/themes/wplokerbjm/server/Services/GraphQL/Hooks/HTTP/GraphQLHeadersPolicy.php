@@ -3,6 +3,8 @@
 namespace WPLokerBJM\Services\GraphQL\Hooks\HTTP;
 
 use GraphQL\Executor\ExecutionResult;
+use WPGraphQL\Router;
+use WPGraphQL\SmartCache\Cache\Results;
 use WPGraphQL\SmartCache\Document\MaxAge;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
@@ -40,17 +42,22 @@ final class GraphQLHeadersPolicy
         registerIf: static function (): bool {
             return !\is_admin();
         },
+        once: true,
+        onUnregisterDo: static function (): void {
+            /**
+             * remove WPGraphQL author hooks and inbuit core nocache Headers which force 'no-store'
+             * @see Results::init
+             * @see MaxAge::init
+             * @see Router::get_response_headers
+             */
+            \remove_all_filters('graphql_response_headers_to_send', \PHP_INT_MAX);
+            do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [__CLASS__, 'disableGraphQLNocacheHeader']);
+            do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [__CLASS__, 'applyCachePolicy']);
+        }
     )]
-    protected function ModifyHeaderGraphQL(array $headers): array
+    public function modifyHeaderGraphQL(array $headers): array
     {
-        /**
-         * remove WPGraphQL author hooks and inbuit core nocache Headers
-         * @see Results::init
-         * @see MaxAge::init
-         */
-        \remove_all_filters('graphql_response_headers_to_send');
         $origin = $_SERVER['HTTP_ORIGIN'] ?? '';
-
         if (in_array($origin, $this->allowedOrigins(), true)) $headers['Access-Control-Allow-Origin'] = $origin;
 
         // Headers relevant to both preflight and actual responses.
@@ -80,11 +87,8 @@ final class GraphQLHeadersPolicy
 
         $headers = $this->applyCachePolicy($headers);
         if (!is_user_logged_in()) return $headers;
-
         $headers['Logged-In'] = 'true';
         $headers['X-WP-Nonce'] = \graphql_get_nonce();
-        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'disableGraphQLNocacheHeader']);
-        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [$this, 'applyCachePolicy']);
 
         return $headers;
     }
@@ -94,13 +98,15 @@ final class GraphQLHeadersPolicy
         11,
         once: true,
         deferRegister: true,
-        registerIf: static function (): bool {
-            return \is_user_logged_in() && !\is_admin();
+        onUnregisterDo: static function (): void {
+            /**
+             *@see Router::get_response_headers
+             */
+            \remove_all_filters('graphql_send_nocache_headers');
         }
     )]
-    protected function disableGraphQLNocacheHeader(): bool
+    public function disableGraphQLNocacheHeader(): bool
     {
-        \remove_all_filters('graphql_send_nocache_headers');
         return false;
     }
 
@@ -108,11 +114,12 @@ final class GraphQLHeadersPolicy
         'nocache_headers',
         9,
         deferRegister: true,
-        registerIf: static function (): bool {
-            return \is_user_logged_in() && !\is_admin();
+        once: true,
+        onUnregisterDo: static function (): void {
+            \remove_all_filters('nocache_headers');
         }
     )]
-    protected function applyCachePolicy(array $headers): array
+    public function applyCachePolicy(array $headers): array
     {
         $loggedIn = is_user_logged_in();
         $isDev = SharedUtils::isDevelopment();
@@ -121,7 +128,6 @@ final class GraphQLHeadersPolicy
             default => $loggedIn ? 'private, no-cache, must-revalidate' : 'public, max-age=60, stale-while-revalidate=3600',
         };
         $headers['Cache-Control'] = $cacheValue;
-        \remove_all_filters('nocache_headers');
         return $headers;
     }
 

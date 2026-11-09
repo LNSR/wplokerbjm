@@ -185,6 +185,7 @@ class InstanceRuntimeRegistryHookEvent
 {
     public const REGISTER_HOOKS = 'wplokerbjm_register_runtime_hook';
     public const UNREGISTER_HOOKS = 'wplokerbjm_unregister_runtime_hook';
+    public const UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE = 'wplokerbjm_unregister_by_callable_in_live_instance';
 
     public function __construct(private readonly WPHooksInstanceRegistry $runtimeRegistry) {}
 
@@ -197,6 +198,10 @@ class InstanceRuntimeRegistryHookEvent
     protected function unregisterRuntimeHook(ModuleClassHookMetadata $target): void
     {
         $this->runtimeRegistry->unregisterHooksOn($target);
+    }
+    #[Action(self::UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE, 10, 1)]
+    protected function unregisterByCallableInLiveInstance(array|callable $target): void {
+        $this->runtimeRegistry->unregisterByCallableInLiveInstance($target);
     }
 }
 

@@ -24,7 +24,7 @@ class ModuleClassHookMetadataTest extends WplokerbjmTestCase
             }
         };
 
-        $this->assertSame('App\\ParentService', $hook->getParentClassString());
+        $this->assertSame('App\\ParentService', $hook->parentClassString);
         $this->assertSame('onFilter', $hook->parentProperty);
     }
 
@@ -40,7 +40,7 @@ class ModuleClassHookMetadataTest extends WplokerbjmTestCase
         };
 
         // parentClass is encapsulated (private); getParentClassString() normalizes it.
-        $this->assertSame(\stdClass::class, $hook->getParentClassString());
+        $this->assertSame(\stdClass::class, $hook->parentClassString);
     }
 
     public function testResolverNormalizesObjectParentViaGetClass(): void

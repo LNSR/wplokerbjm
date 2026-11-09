@@ -82,7 +82,7 @@ final class TestTracTicket64653 extends TestCase
     }
 
     /**
-     * The real #61263 shape: a non-removing callback survives at a LOWER
+     * The real #64653 shape: a non-removing callback survives at a LOWER
      * priority, so the removing priorities are never the minimum remaining.
      * The `$current < $min` guard does not apply, resort_active_iterations()
      * lands the pointer past the removed priority, and the next one is skipped.
@@ -161,6 +161,49 @@ final class TestTracTicket64653 extends TestCase
         self::assertSame([0, 1, 2, 3, 4, 5], $log->getArrayCopy());
         self::assertFalse(doing_action('spike_defer'), 'dispatch finished');
         self::assertTrue(has_action('spike_defer'), 'callbacks linger until flushed outside dispatch');
+    }
+
+    public function testTracTicket61263ExactReproduction(): void
+    {
+        $log = new ArrayObject();
+
+        add_action('spike_61263_exact', static function () use ($log): void {
+            $log[] = 999;
+
+            remove_all_actions('spike_61263_exact', 999);
+        }, 999);
+
+        add_action('spike_61263_exact', static function () use ($log): void {
+            $log[] = 1000;
+        }, 1000);
+
+        do_action('spike_61263_exact');
+
+        self::assertSame([999, 1000], $log->getArrayCopy());
+    }
+
+    public function testTracTicket61263RemoveAllActionsSkipsHigherPriority(): void
+    {
+        $log = new ArrayObject();
+
+        add_action('spike_61263', static function () use ($log): void {
+            $log[] = 10;
+        }, 10);
+
+        add_action('spike_61263', static function () use ($log): void {
+            $log[] = 999;
+
+            // The #61263 removal operation.
+            remove_all_actions('spike_61263', 999);
+        }, 999);
+
+        add_action('spike_61263', static function () use ($log): void {
+            $log[] = 1000;
+        }, 1000);
+
+        do_action('spike_61263');
+
+        self::assertSame([10, 999], $log->getArrayCopy());
     }
 }
 

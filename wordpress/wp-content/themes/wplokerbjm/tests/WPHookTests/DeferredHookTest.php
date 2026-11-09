@@ -6,7 +6,8 @@ namespace WPLokerBJM\Tests\WPHookTests;
 
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, ContainerRegistryDeferredHookManager, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\ContainerRegistryDeferredHookManager;
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
@@ -38,7 +39,6 @@ class DeferredHookTest extends WplokerbjmTestCase
     private EntriesIndexer $entriesIndexer;
     private WPHookPlanProvider $planProvider;
     private HookTargetResolver $targetResolver;
-    protected QueuedHooksCleaner $queuedHooksCleaner;
 
     protected function setUp(): void
     {
@@ -51,7 +51,6 @@ class DeferredHookTest extends WplokerbjmTestCase
         $this->planProvider = new WPHookPlanProvider();
         $this->targetResolver = new HookTargetResolver();
         $this->entriesIndexer = new EntriesIndexer();
-        $this->queuedHooksCleaner = new QueuedHooksCleaner();
         $this->ContainerRegistryDeferredHookManager = new ContainerRegistryDeferredHookManager($this->planProvider, $this->container, $this->targetResolver, $this->entriesIndexer);
         $this->registry = new WPHooksContainerRegistry($this->container, [], $this->planProvider, $this->ContainerRegistryDeferredHookManager, $this->targetResolver, $this->queuedHooksCleaner, $this->entriesIndexer);
     }

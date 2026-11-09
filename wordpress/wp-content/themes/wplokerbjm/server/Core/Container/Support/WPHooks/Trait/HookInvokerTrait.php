@@ -27,35 +27,54 @@ trait HookInvokerTrait
     /** @var 'action'|'filter' */
     public readonly string $type;
     public readonly bool $once;
-    public private(set) int $numberExecutions = 0;
     /** Current hook callback execution */
+    public private(set) int $numberExecutions = 0;
     public private(set) bool $dispatching = false;
 
+    /** @var \Closure(): void  */
+    public private(set) ?\Closure $onUnregisterDoCallback = null;
+
     /** 
-     * @var (\Closure(static): void)|null Callback that nukes this registration once consumed (once-hook) or the owner dies (lifetime scoping). 
-     * @see WPHooksContainerRegistry::$removeOnceEntry
+     * @var (\Closure(static, bool = false): void)|null Callback that nukes this registration once consumed (once-hook) or the owner dies (lifetime scoping). 
+     * @see WPHooksContainerRegistry::$removeEntry
      * @see WPHooksInstanceRegistry::$removeRuntimeHook
      */
     private ?\Closure $removeCallback = null;
+
 
     /** Whether the once-hook has been consumed (first fire reached gate evaluation). */
     private bool $consumed = false;
 
     /** Whether the removal callback has fired — idempotency guard. */
     private bool $removed = false;
+
+    /** destruction state */
+    public private(set) bool $isDestructed = false;
+
     /** template closure for caching stateless closure */
     private static ?\Closure $templateClosure = null;
-
     /**
      * Attach the scheduler removal callback (set by the owning registry) so the handler
      * can nuke its own registrations when consumed (once) or when the owner
      * instance dies (runtime lifetime scoping).
      *
-     * @param \Closure(static): void $callback Registry-side removal callback.
+     * @param (\Closure(static, bool = false): void) $callback Registry-side removal callback.
      */
     public function setCleanupCallback(?\Closure $callback): void
     {
         $this->removeCallback ??= $callback;
+    }
+
+    /**
+     * @return void
+     */
+    abstract public function initOnUnregisterDoCallback(): void;
+
+    public function __destruct()
+    {
+        if (is_callable($this->onUnregisterDoCallback)) ($this->onUnregisterDoCallback)();
+        $this->isDestructed = true;
+        if (is_callable($this->removeCallback)) ($this->removeCallback)($this, true);
     }
 
     /**
@@ -69,8 +88,8 @@ trait HookInvokerTrait
         }
 
         try {
-            ($this->removeCallback)($this);
             $this->removed = true;
+            ($this->removeCallback)($this);
         } catch (\Throwable $e) {
             Logger::error(static::class, 'Error removing once-hook ' . $this->label . ': ', [
                 'error' => $e->getMessage(),

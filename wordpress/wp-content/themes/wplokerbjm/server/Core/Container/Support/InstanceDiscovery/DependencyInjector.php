@@ -438,8 +438,7 @@ class PlanCache
 {
     /** @var CompiledPlans */
     public private(set) array $compiledPlans = [];
-    /** @var CompiledPlans */
-    private array $snapshotCache = [];
+    public private(set) bool $isDirty = false;
 
     public function __construct(
         public private(set) string $cacheLocation,
@@ -448,8 +447,7 @@ class PlanCache
     public function __destruct()
     {
         try {
-            $allCache = array_replace_recursive($this->compiledPlans, $this->snapshotCache);
-            if ($allCache === $this->snapshotCache) return;
+            if (! $this->isDirty) return;
 
             $this->flushPlansToCache();
         } catch (\Throwable $e) {
@@ -487,7 +485,6 @@ class PlanCache
         if (!is_array($plans)) {
             throw new RuntimeException('Dependency injector cache must return an array.');
         }
-        $this->snapshotCache = $plans;
         return $this->compiledPlans = $plans;
     }
 
@@ -523,6 +520,7 @@ class PlanCache
             throw new RuntimeException('Dependency injector cache directory is not writable: ' . $directory . '.');
         }
         $this->compiledPlans = $plans;
+        $this->isDirty = true;
     }
 
     private function flushPlansToCache(): void
@@ -601,11 +599,11 @@ class ScopeAccessFactory
                         $factory = Closure::bind(
                             match ($entry->kind) {
                                 'property' => $entry->lazy
-                                    ? $propertyLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => Closure::bind(static fn(): mixed => $c->get($entry->class)->{$entry->member}, null, $entry->class)
+                                    ? $propertyLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => static fn(): mixed => $c->get($entry->class)->{$entry->member}
                                     : $property ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): mixed => $c->get($entry->class)->{$entry->member},
                                 'method' => $entry->lazy
                                     //** no FCC, FCC Break lazy */
-                                    ? $methodLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => Closure::bind(static fn(...$args): mixed => $c->get($entry->class)->{$entry->member}(...$args), null, $entry->class)
+                                    ? $methodLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => static fn(...$args): mixed => $c->get($entry->class)->{$entry->member}(...$args)
                                     : $method ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): mixed => $c->get($entry->class)->{$entry->member}(),
                             },
                             null,

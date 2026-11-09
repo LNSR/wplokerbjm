@@ -67,15 +67,16 @@ abstract class ModuleClassHookMetadata extends AsChildClass
      * }
      * ```
      * this instance closure has `$this` reference from its own class
-     * it will take ZEND Engine for a while to collect cycle.
+     * it will take ZEND Engine for a while to collect cycle or can just explicitly flush via \gc_collect_cycles() fn.
      */
     public function __destruct()
     {
         if (\defined('WPLOKERBJM_TEST_ENV') && WPLOKERBJM_TEST_ENV) return;
         \do_action(InstanceRuntimeRegistryHookEvent::UNREGISTER_HOOKS, $this);
 
-        if (!\method_exists($this, '__invoke') && !\str_contains($this->getParentClassString(), '@anonymous')) return;
-        \do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->getParentClassString(), $this->parentProperty]);
-        \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this->getParentClassString(), $this->parentProperty]);
+        // ContainerRegister is exclusively for named class
+        if (!\method_exists($this, '__invoke') && \str_contains($this->parentClassString, '@anonymous')) return;
+        \do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->parentClassString, $this->parentProperty]);
+        \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this->parentClassString, $this->parentProperty]);
     }
 }

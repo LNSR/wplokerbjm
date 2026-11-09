@@ -116,6 +116,7 @@ class CachePurgeHandler
                 static $alreadyRun = false;
                 if ($alreadyRun) return;
                 $alreadyRun = true;
+                
                 do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
                 try {
                     Cache::deleteMultiple([
