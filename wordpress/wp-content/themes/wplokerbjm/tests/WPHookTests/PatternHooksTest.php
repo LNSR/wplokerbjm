@@ -185,6 +185,68 @@ class PatternHooksTest extends WplokerbjmTestCase
         $this->assertSame(['y'], OnceActionService::$capturedValues);
     }
 
+    /**
+     * Removing one tag family must not wipe the shared tag buckets of entries
+     * that live in several families but did not match the pattern.
+     *
+     * E1: ['shared', 'email_alerts']  → matches email_*
+     * E2: ['shared']                  → must stay reachable through 'shared'
+     *
+     * The old implementation unset the whole byTag['shared'] bucket after
+     * removing E1, orphaning E2: it stayed in the deferred pool but could no
+     * longer be found by tag.
+     */
+    public function testUnregisterDeferredByTagPatternKeepsSharedBucketsIntact(): void
+    {
+        $registrations = [
+            $this->action(OnceActionService::class, 'onOnceAction', 'a_hook', tags: ['shared', 'email_alerts'], deferRegister: true),
+            $this->action(OnceActionService::class, 'onOnceAction', 'b_hook', tags: ['shared'], deferRegister: true),
+        ];
+
+        $registry = $this->createRegistry($registrations, $this->container);
+        $registry->initialize();
+
+        $registry->unregisterDeferredByTagPattern(['email_*']);
+
+        // E2 did not match, so it must still be discoverable via its only tag.
+        $this->assertSame(
+            1,
+            $registry->activateDeferredByTags(['shared']),
+            'Non-matching entries sharing the wiped tag bucket must remain indexed.',
+        );
+
+        $this->assertNull($this->findRegisteredHook('action', 'a_hook'));
+        $this->assertNotNull($this->findRegisteredHook('action', 'b_hook'));
+
+        do_action('b_hook', 'kept');
+        $this->assertSame(['kept'], OnceActionService::$capturedValues);
+    }
+
+    /**
+     * An entry carrying two matching tags lives in two buckets; activation
+     * must count and run it exactly once.
+     */
+    public function testActivateDeferredByTagPatternActivatesMultiTagEntryExactlyOnce(): void
+    {
+        $registrations = [
+            $this->action(OnceActionService::class, 'onOnceAction', 'multi_hook', tags: ['email_alerts', 'digest_daily'], deferRegister: true),
+        ];
+
+        $registry = $this->createRegistry($registrations, $this->container);
+        $registry->initialize();
+
+        $this->assertSame(
+            1,
+            $registry->activateDeferredByTagPattern(['email_*', 'digest_*']),
+            'A multi-tag entry matching several buckets must activate once.',
+        );
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'multi_hook'));
+
+        do_action('multi_hook', 'once');
+        $this->assertSame(['once'], OnceActionService::$capturedValues);
+    }
+
     public function testEmptyTagPatternListIsNoOp(): void
     {
         $registrations = [

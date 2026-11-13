@@ -126,9 +126,8 @@ final class ContainerLazyHookInvoker
     /** Plan provider used for condition gates and hook-name resolution. */
     private readonly WPHookPlanProvider $planProvider;
     /**
-     * @template TClass
-     * @param class-string<TClass> $class
-     * @param method-string<TClass> $method
+     * @param class-string $class
+     * @param method-string $method
      * @param HookType['visibility'] $visibility
      * @param HookType['type'] $type
      * @param HookType['executeIf'] $executeIf
@@ -203,10 +202,9 @@ final class ContainerLazyPropertyHookInvoker
     private readonly WPHookPlanProvider $planProvider;
 
     /**
-     * @template TClass
      * @param ContainerInterface $container
-     * @param class-string<TClass> $class
-     * @param property-string<TClass> $property
+     * @param class-string $class
+     * @param property-string $property
      * @param HookType['visibility'] $visibility
      * @param HookType['type'] $type
      * @param HookType['executeIf'] $executeIf

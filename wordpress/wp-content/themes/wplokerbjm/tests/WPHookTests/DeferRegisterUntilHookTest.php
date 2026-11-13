@@ -8,7 +8,7 @@ use Closure;
 use DI\Container;
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryDeferredHookManager;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\HookTargetResolver;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;

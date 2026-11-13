@@ -6,7 +6,6 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     WPHooksInstanceRegistry,
-    HookRuntimeResolver,
     RuntimeRegistryHandlerEntry
 };
 
@@ -16,6 +15,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookSca
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
 
 /**
  * @phpstan-import-type ActivateRuntimeEntry from WPHooksInstanceRegistry
@@ -26,7 +26,7 @@ class InstanceRegistryDeferredHookManager
 
     public function __construct(
         private ?RuntimeWPHookProvider $provider = null,
-        private HookRuntimeResolver $runtimeResolver = new HookRuntimeResolver(),
+        private InstanceRegistryRuntimeHookResolver $runtimeResolver = new InstanceRegistryRuntimeHookResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
     ) {}
 
@@ -101,6 +101,8 @@ class InstanceRegistryDeferredHookManager
             );
 
             \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+            $entry = $this->deferredHandlers[$deferredKey] ?? null;
+            if ($entry === null) return;
             unset($this->deferredHandlers[$deferredKey]);
         }, PHP_INT_MIN, 0);
 
@@ -123,7 +125,6 @@ class InstanceRegistryDeferredHookManager
         $owner = $data->instance?->get();
         if ($owner === null) {
             unset($this->deferredHandlers[$data->toUniqueKey()]);
-            $this->entriesIndexer->removeIndexes($data);
             return false;
         }
 

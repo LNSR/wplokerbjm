@@ -263,7 +263,9 @@ final class OnUnregisterDoTest extends WplokerbjmTestCase
 
     public function testShutdownHookPreventOnUnregisterDoRuns(): void
     {
+        $this->flushQueuedRemovalsAfterDispatch = false;
         $cleanups = 0;
+
         $registry = $this->createRegistry([
             $this->registration([
                 'onUnregisterDo' => static function () use (&$cleanups): void {
@@ -271,16 +273,21 @@ final class OnUnregisterDoTest extends WplokerbjmTestCase
                 },
             ]),
         ]);
+        
         $registry->initialize();
 
-        self::assertNotNull($this->findRegisteredHook('action', 'on_unregister_hook'));
+        $hook = $this->findRegisteredHook('action', 'on_unregister_hook');
+        self::assertNotNull($hook);
 
-        unset($registry);
+        \add_action('shutdown', static function () use ($hook): void {
+            \remove_action($hook['hook'], $hook['callable'], $hook['priority']);
+        }, 10, 0);
+
         \do_action('shutdown');
-        self::assertSame(
-            0,
-            $cleanups,
-            'entries that are removed on shutdown shouldn\'t run cleanup'
+
+        self::assertNull(
+            $this->findRegisteredHook('action', 'on_unregister_hook')
         );
+        self::assertSame(0, $cleanups);
     }
 }

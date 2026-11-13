@@ -131,16 +131,17 @@ class MyClassName
 
 Every attribute parameter maps to a WordPress registration concern:
 
-| Parameter                | Type       | Purpose                                                                             |
-| ------------------------ | ---------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `priority`               | `int`      | Execution order (default `10`)                                                      |
-| `acceptedArgs`           | `int`      | Number of arguments passed to the callable (default `1`)                            |
-| `once`                   | `bool`     | Self-removes after the first evaluation, whatever the gate result                   |
-| `deferRegister`          | `bool`     | Skips registration by default; opt-in via `activateDeferredBy*()`                   |
-| `deferRegisterUntilHook` | `string`   | Implies deferral; auto-activates when the trigger hook fires (or has already fired) |
-| `registerIf`             | `callable` | Registration-time gate, evaluated once before the hook enters a pool                |
-| `executeIf`              | `callable` | Per-fire gate, evaluated on every `do_action` / `apply_filters`                     |
-| `tag`                    | `array     | callable`                                                                           | Static list or callable returning tags; powers the selector APIs |
+| Parameter                | Type                      | Purpose                                                                                          |
+| ------------------------ | ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `priority`               | `int`                     | Execution order (default `10`)                                                                   |
+| `acceptedArgs`           | `int`                     | Number of arguments passed to the callable (default `1`)                                         |
+| `once`                   | `bool`                    | Self-removes after the first evaluation, whatever the gate result                                |
+| `deferRegister`          | `bool`                    | Container path: skips registration until activated. **Ignored on the runtime/instance path**     |
+| `deferRegisterUntilHook` | `string\|\Closure\|null`  | Implies deferral; auto-activates when the trigger fires (or has already fired)                   |
+| `registerIf`             | `\Closure\|null`          | Registration gate — once for eager hooks, re-evaluated on every deferred activation attempt      |
+| `executeIf`              | `\Closure\|null`          | Per-fire gate, evaluated on every `do_action` / `apply_filters`                                  |
+| `tag`                    | `string\|array\|\Closure` | Grouping/selector tags (items: `string` or `BackedEnum`); an invalid tag skips that one hook     |
+| `onUnregisterDo`         | `\Closure\|null`          | Cleanup after unregistration — once-consume, explicit unregister, or owner GC                    |
 
 #### Minimal Examples
 
@@ -185,7 +186,7 @@ public function injectOncePerRequest(): void
 
 ```php
 #[Filter('posts_search', deferRegister: true, tag: ['lowongan'])]
-public function optInSearch(string $search, \WP_Query$wp_query): string
+public function optInSearch(string $search, \WP_Query $wp_query): string
 {
     return $search;
 }
@@ -225,7 +226,8 @@ public function graphqlSearch(string $search, \WP_Query$wp_query): string
 
 ```php
 // Inside a service with the registry autowired:
-$this->hooksRegistry->unregisterByTags(['lowongan']);       // exact tag match$this->hooksRegistry->unregisterByHookPattern('posts_*');   // wildcard (prefix ≥ 2 chars)
+$this->hooksRegistry->unregisterByTags(['lowongan']);       // exact tag match
+$this->hooksRegistry->unregisterByHookPattern('posts_*');    // wildcard (prefix ≥ 2 chars)
 
 ```
 
@@ -366,10 +368,10 @@ class ThemeProp
 ### How Hook Registration Works
 
 - **Two registration paths.** Container path: the `DependencyAutowireScanner` finds `#[Action]` / `#[Filter]` methods, and the `Init` service registers them as lazy `ContainerLazyHookInvoker`s when the container initializes — the service is resolved from the DI container only when the hook actually fires. Runtime path: `WPHooksInstanceRegistry::registerHooksOn($object)` registers the hooks of an already-instantiated object immediately (attribute closures resolved via `RuntimeWPHookProvider`, static closures required).
-- **Gates.** `registerIf` runs once at registration time; `executeIf` runs on every fire — when it fails, filters pass the original value through unchanged and actions return `null`.
-- **Deferred pool.** `deferRegister` hooks skip registration until activated via `activateDeferredByHook()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()`; `deferRegisterUntilHook` auto-activates when its trigger hook fires.
-- **Lifecycle.** `once` hooks self-remove after the first evaluation; `unregisterByCallable()` / `ByHook()` / `ByClass()` / `ByNamespace()` / `ByTags()` plus wildcard `unregisterByHookPattern()` / `unregisterByTagPattern()` tear hooks down.
-- Supports both static and instance methods; priority and accepted args are configurable via the attribute.
+- **Gates.** `registerIf` runs once for eager hooks, but is **re-evaluated on every deferred activation attempt** — a trigger that keeps firing can retry until the gate passes. `executeIf` runs on every fire — when it fails, filters pass the original value through unchanged and actions return `null`.
+- **Deferred pool.** On the container path, `deferRegister` hooks skip registration until activated via `activateDeferredByHook()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()`. On the runtime path (`WPHooksInstanceRegistry`) plain `deferRegister` is **ignored** — only `deferRegisterUntilHook` is understood, and it auto-activates when its trigger hook fires. Active-pool selectors (`unregisterBy*`) never sweep deferred entries; use the matching `unregisterDeferredBy*` API for those.
+- **Lifecycle.** `once` hooks self-remove after the first evaluation; `unregisterByCallable()` / `ByHook()` / `ByClass()` / `ByNamespace()` / `ByTags()` plus wildcard `unregisterByHookPattern()` / `unregisterByTagPattern()` tear active hooks down, while `onUnregisterDo` runs the cleanup side effect.
+- Static methods and inherited (non-declared) methods are skipped — declare hooks on the class that owns them. Stack attributes on one member for multi-priority registration.
 
 This approach keeps hook registration declarative and centralized.
 

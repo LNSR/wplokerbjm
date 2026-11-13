@@ -27,7 +27,7 @@
 | `registerAction()` / `registerFilter()` | Manual runtime path for captured closures and callbacks; params: `executeIf`, `once`, `deferRegisterUntilHook`, `owner`. Identical (hook, callback, priority) registrations are deduplicated. |
 | `unregisterHooksOn()` | Remove every runtime handler owned by one object (incl. its deferred entries). |
 
-`ContainerRegistryDeferredHookManager` and `HookTargetResolver` are implemented in `Registry/WPHooksContainerRegistry.php`. The resolver accepts array callables, `Class::method` strings, bound first-class callables, invokable objects, property-hook closures, and the anonymous-property metadata object.
+`ContainerRegistryDeferredHookManager` and `ContainerRegistryHookTargetResolver` are implemented in `Registry/WPHooksContainerRegistry.php`. The resolver accepts array callables, `Class::method` strings, bound first-class callables, invokable objects, property-hook closures, and the anonymous-property metadata object.
 
 ## Invokers and utilities
 
@@ -39,7 +39,7 @@
 - `ContainerLazyHookInvokerTrait` — `executeHook()` pipeline; unresolvable gate on a once-hook is treated as pass (`Invoker/ContainerLazyHookInvoker.php`).
 - `DeferredHooksTrait` — shared deferred pool: `addDeferred`, `activateMatchingDeferredEntries`, `unregisterMatchingDeferredEntries`, abstract `gateDeferredActivation` (`Trait/DeferredHooksTrait.php`).
 - `HookProviderTrait` — shared plan core for both providers: `buildCallablePlan`, `resolveHookName`, `evaluateExecuteIf`, `evaluateRegistrationGate`, `resolveTagCallable`, `callableParamNames` (`Trait/HookProviderTrait.php`).
-- `HookRuntimeResolver` — runtime owner inference (`resolveOwner`), closure hook names (`resolveClosureHook`), method param names (`resolveHookArgNames`) — in `Registry/WPHooksInstanceRegistry.php`.
+- `InstanceRegistryRuntimeHookResolver` — runtime owner inference (`resolveOwner`), closure hook names (`resolveClosureHook`), method param names (`resolveHookArgNames`) — in `Registry/WPHooksInstanceRegistry.php`.
 - `HookPattern` — wildcard validation/matching: exactly one trailing asterisk, literal prefix ≥ 2 chars, else `InvalidArgumentException`; `matches` / `matchesAny` (`Utilities/HookPattern.php`).
 - `HookTagUtilities::normalizeTags()` / `normalizeTagValue()` — accept strings or string-backed enums and deduplicate tags.
 - `HookTags::GRAPHQL_NOCACHE_HEADERS` — current shared tag constant.
@@ -48,7 +48,7 @@
 ## 📂 Codebase References
 
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — container registry, deferred manager, and target resolver.
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — runtime registry + `HookRuntimeResolver`.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — runtime registry + `InstanceRegistryRuntimeHookResolver`.
 - `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — runtime handlers + `RuntimeInstanceInvokerTrait`.
 - `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — lazy handlers + `ContainerLazyHookInvokerTrait`.
 - `server/Core/Container/Support/WPHooks/Provider/RuntimeWPHookProvider.php` — runtime closure resolution.

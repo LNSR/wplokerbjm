@@ -5,7 +5,8 @@
     cacheDirectory="tests/cache"
     displayDetailsOnTestsThatTriggerDeprecations="true"
     displayDetailsOnTestsThatTriggerWarnings="true"
-    displayDetailsOnTestsThatTriggerNotices="true">
+    displayDetailsOnTestsThatTriggerNotices="true"
+>
     <testsuites>
         <testsuite name="default">
             <directory>tests</directory>

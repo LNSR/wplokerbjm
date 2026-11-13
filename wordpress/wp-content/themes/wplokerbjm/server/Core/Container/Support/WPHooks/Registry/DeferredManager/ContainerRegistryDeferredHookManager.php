@@ -23,8 +23,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     WPHooksContainerRegistry,
-    HookTargetResolver,
 };
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 
 /**
  * @internal not for external use beyond @see WPHooksContainerRegistry
@@ -45,13 +45,13 @@ class ContainerRegistryDeferredHookManager
     /**
      * @param WPHookPlanProvider  $planProvider Plan provider used for registerIf gates.
      * @param ContainerInterface $container    Container used by gate closures.
-     * @param HookTargetResolver $resolverTarget 
+     * @param ContainerRegistryHookTargetResolver $resolverTarget 
      * @param EntriesIndexer $entriesIndexer for fast lookup of matching entries
      */
     public function __construct(
         private WPHookPlanProvider $planProvider,
         private ContainerInterface $container,
-        private HookTargetResolver $resolverTarget = new HookTargetResolver(),
+        private ContainerRegistryHookTargetResolver $resolverTarget = new ContainerRegistryHookTargetResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer()
     ) {}
 
@@ -218,17 +218,22 @@ class ContainerRegistryDeferredHookManager
         }
         HookPattern::assertValidAll($patterns);
         $entries = $this->entriesIndexer->byTag;
+        // Deduplicate: one entry may live in several matching tag buckets.
         $keys = [];
-        foreach ($entries as $key => $value) {
-            foreach ($value as $entry) {
-                if (HookPattern::matchesAny($this->deferredHandlers[$entry]->tags, $patterns)) {
-                    $keys[] = $entry;
+        foreach ($entries as $value) {
+            foreach ($value as $uniqueKey) {
+                $entry = $this->deferredHandlers[$uniqueKey] ?? null;
+                if ($entry === null) {
+                    continue;
+                }
+                if (HookPattern::matchesAny($entry->tags, $patterns)) {
+                    $keys[$uniqueKey] = true;
                 }
             }
         }
 
         return $this->activateMatchingDeferredEntries(
-            $keys,
+            \array_keys($keys),
             $activateEntry,
         );
     }
@@ -261,7 +266,6 @@ class ContainerRegistryDeferredHookManager
         $activated = $activateEntry($data);
         if (!$activated) return false;
 
-        $this->entriesIndexer->removeIndexes($data);
         unset($this->deferredHandlers[$uniqueKey]);
 
         return true;
@@ -282,7 +286,6 @@ class ContainerRegistryDeferredHookManager
                 continue;
             }
             $handler = $this->deferredHandlers[$key];
-            $this->entriesIndexer->removeIndexes($handler);
             unset($this->deferredHandlers[$key]);
         }
     }
@@ -300,7 +303,6 @@ class ContainerRegistryDeferredHookManager
                 continue;
             }
             $handler = $this->deferredHandlers[$key];
-            $this->entriesIndexer->removeIndexes($handler);
             unset($this->deferredHandlers[$key]);
         }
     }
@@ -318,7 +320,6 @@ class ContainerRegistryDeferredHookManager
                 continue;
             }
             $handler = $this->deferredHandlers[$key];
-            $this->entriesIndexer->removeIndexes($handler);
             unset($this->deferredHandlers[$key]);
         }
     }
@@ -343,7 +344,6 @@ class ContainerRegistryDeferredHookManager
             if (!$handler->key->isWithinNamespace($namespace)) {
                 continue;
             }
-            $this->entriesIndexer->removeIndexes($handler);
             unset($this->deferredHandlers[$key]);
         }
     }
@@ -371,10 +371,8 @@ class ContainerRegistryDeferredHookManager
                 if ($entry === null) {
                     continue;
                 }
-                $this->entriesIndexer->removeIndexes($entry);
                 unset($this->deferredHandlers[$key]);
             }
-            unset($this->entriesIndexer->byTag[$tag]);
         }
     }
 
@@ -395,8 +393,6 @@ class ContainerRegistryDeferredHookManager
                 if (!($entry instanceof DeferredHookEntryHandler)) continue;
                 if (HookPattern::matches($entry->hook, $pattern)) {
                     unset($this->deferredHandlers[$key]);
-                    $this->entriesIndexer->removeIndexes($entry);
-                    unset($this->entriesIndexer->byHook[$entry->hook]);
                 }
             }
         }
@@ -417,14 +413,12 @@ class ContainerRegistryDeferredHookManager
         }
         HookPattern::assertValidAll($patterns);
         $tags = $this->entriesIndexer->byTag ?? [];
-        foreach ($tags as $tag => $keys) {
+        foreach ($tags as $keys) {
             foreach ($keys as $key) {
                 $entry = $this->deferredHandlers[$key] ?? null;
                 if (!($entry instanceof DeferredHookEntryHandler)) continue;
                 if (HookPattern::matchesAny($entry->tags, $patterns)) {
                     unset($this->deferredHandlers[$key]);
-                    $this->entriesIndexer->removeIndexes($entry);
-                    unset($this->entriesIndexer->byTag[$tag]);
                 }
             }
         }
@@ -451,13 +445,13 @@ class ContainerRegistryDeferredHookManager
                 $data->registerIf,
                 $data->registerIfParams ?? [],
                 $this->container,
-                $data->cachedHandlerLabel,
+                $data->handler->label,
                 $data->key->class
             );
         } catch (\Throwable $e) {
             Logger::error(
                 self::class,
-                'Skipping deferred hook activation: ' . $data->cachedHandlerLabel .  ' — error ' . $e->getMessage()
+                'Skipping deferred hook activation: ' . $data->handler->label .  ' — error ' . $e->getMessage()
             );
             return false;
         }
@@ -465,7 +459,7 @@ class ContainerRegistryDeferredHookManager
         if (!$allowed) {
             Logger::info(
                 self::class,
-                'Skipping deferred hook activation: ' . $data->cachedHandlerLabel .  ' — registerIf gate returned false.'
+                'Skipping deferred hook activation: ' . $data->handler->label .  ' — registerIf gate returned false.'
             );
             return false;
         }

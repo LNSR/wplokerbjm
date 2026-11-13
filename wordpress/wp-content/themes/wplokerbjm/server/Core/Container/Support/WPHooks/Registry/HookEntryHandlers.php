@@ -19,17 +19,18 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredH
  *  hook: string,
  *  key: HookKey,
  *  handler: ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker,
- *  type: HookType['type'],
- *  priority: HookType['priority'],
- *  acceptedArgs: HookType['acceptedArgs'],
- *  tags: HookType['tags'],
- *  registerIf: HookType['registerIf'],
- *  registerIfParams: HookType['registerIfParams'],
- *  executeIf: HookType['executeIf'],
- *  executeIfParams: HookType['executeIfParams'],
- *  once: HookType['once'],
- *  onUnregisterDo: HookType['onUnregisterDo'],
- *  onUnregisterDoParams: HookType['onUnregisterDoParams'],
+ *  type: 'action'|'filter',
+ *  priority: int,
+ *  acceptedArgs: int,
+ *  tags: array,
+ *  registerIf: \Closure(...): bool,
+ *  registerIfParams: CallablePlan,
+ *  executeIf: \Closure(...): bool,
+ *  executeIfParams: CallablePlan,
+ *  once: bool,
+ *  onUnregisterDo: \Closure(...): void,
+ *  onUnregisterDoParams: CallablePlan,
+ *  removeEntryIndexCallback: (callable(static $entry): void)|null
  * }
  */
 final class ContainerRegistryHandlerEntry
@@ -52,6 +53,7 @@ final class ContainerRegistryHandlerEntry
      * @param HandlerEntry['executeIfParams'] $executeIfParams
      * @param HandlerEntry['once'] $once
      * @param HandlerEntry['onUnregisterDo'] $onUnregisterDo
+     * @param HandlerEntry['removeEntryIndexCallback'] $removeEntryIndexCallback
      */
     public function __construct(
         public readonly string $hook,
@@ -67,11 +69,27 @@ final class ContainerRegistryHandlerEntry
         public readonly array $executeIfParams,
         public readonly bool $once,
         public readonly ?\Closure $onUnregisterDo,
-        public readonly array $onUnregisterDoParams
+        public readonly array $onUnregisterDoParams,
+        private ?\Closure $removeEntryIndexCallback = null
     ) {
         $this->handler = $handler;
         $this->invokerLabel = $handler->label;
     }
+
+    /**
+     * Override @see HandlerEntryTrait::__destruct
+     */
+    public function __destruct()
+    {
+        if ($this->registered) $this->unregister();
+        \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
+    }
+
+    /** @param HandlerEntry['removeEntryIndexCallback'] $callback */
+    public function setOnEntryRemovalCallback(\Closure $callback): void {
+        $this->removeEntryIndexCallback = $callback;
+    }
+    
     public static function fromDeferredEntry(DeferredHookEntryHandler $deferredEntry): self
     {
         return new static(
@@ -100,19 +118,20 @@ final class ContainerRegistryHandlerEntry
 /**
  * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
  * @phpstan-import-type HookType from HookRegistration
+ * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-type RuntimeHandlerEntry array{
- *     hook: InstanceHookMetadataData['hook'],
+ *     hook: string,
  *     handler: RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker|RuntimeCallableHookInvoker,
- *     type: InstanceHookMetadataData['type'],
- *     priority: InstanceHookMetadataData['priority'],
- *     acceptedArgs: InstanceHookMetadataData['acceptedArgs'],
- *     registerIf: InstanceHookMetadataData['registerIf'],
- *     registerIfParams: InstanceHookMetadataData['registerIfParams'],
- *     executeIf: InstanceHookMetadataData['executeIf'],
- *     executeIfParams: InstanceHookMetadataData['executeIfParams'],
- *     once: InstanceHookMetadataData['once'],
- *     onUnregisterDo: InstanceHookMetadataData['onUnregisterDo'],
- *     onUnregisterDoParams: InstanceHookMetadataData['onUnregisterDoParams'],
+ *     type: 'action'|'filter',
+ *     priority: int,
+ *     acceptedArgs: int,
+ *     registerIf: \Closure(...): bool,
+ *     registerIfParams: CallablePlan,
+ *     executeIf: \Closure(...): bool,
+ *     executeIfParams: CallablePlan,
+ *     once: bool,
+ *     onUnregisterDo: \Closure(...): void,
+ *     onUnregisterDoParams: CallablePlan,
  *     hookKey: HookKey,
  *     owner: WeakReference<object>,
  *     callback?: callable

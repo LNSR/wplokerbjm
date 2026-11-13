@@ -24,10 +24,9 @@ use WPLokerBJM\Shared\Log\Logger;
  * file, and resolved from the container at hook-fire time — so the hot path
  * never needs reflection unless a plan is missing (stale cache / unexportable
  * defaults).
- * @template TClass
  * @phpstan-type CallableHookParams array{
  *      name: string, 
- *      type: string|class-string<TClass>|null, 
+ *      type: string|class-string|null, 
  *      hasDefault: bool, 
  *      default: mixed,
  *      isVariadic: bool
@@ -46,7 +45,7 @@ trait HookProviderTrait
      * rule), so scope-only binds are immutable — each pair binds at most
      * once per provider lifetime. Entries are dropped automatically when
      * the source closure is garbage-collected.
-     * @var \WeakMap<\Closure, array<class-string<TClass>, \Closure>>
+     * @var \WeakMap<\Closure, array<class-string, \Closure>>
      */
     private \WeakMap $boundClosureCache { get => $this->boundClosureCache ??= new \WeakMap(); }
     /**
@@ -219,12 +218,12 @@ trait HookProviderTrait
             // For hooked properties, reading the property executes the `get` hook.
             $value = $property->getValue($instance);
             if (is_callable($value)) {
-                return $this->callablePlan($value);
+                return $this->callablePlanCache[$property] ??= $this->callablePlan($value);
             }
         }
 
         if ($property->hasDefaultValue()) {
-            return $this->callablePlan($property->getDefaultValue());
+            return $this->callablePlanCache[$property] ??= $this->callablePlan($property->getDefaultValue());
         }
 
         return $this->callablePlanCache[$property] ??= ['isStatic' => true, 'params' => []];

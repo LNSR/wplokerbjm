@@ -8,7 +8,8 @@ use Closure;
 use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry};
+use \WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
@@ -49,7 +50,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testTaggedHookWithoutDeferRegistersImmediately(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         $registry = $this->createRegistry([
             $this->action(
@@ -70,7 +71,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testUnregisterByTagsRemovesActiveButLeavesDeferredIntact(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         $registry = $this->createRegistry([
             $this->action(
@@ -108,7 +109,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testUnregisterDeferredByTagsRemovesDeferredButLeavesActiveIntact(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         $registry = $this->createRegistry([
             $this->action(
@@ -142,7 +143,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testTaggedHookWithDeferLandsInDeferredPool(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         $registry = $this->createRegistry([
             $this->action(
@@ -170,7 +171,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testActivateDeferredByTagsActivatesOnlyMatchingGroup(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         $registry = $this->createRegistry([
             $this->action(
@@ -213,7 +214,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testMultiTagHookIsMatchedByAnyTag(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         $registry = $this->createRegistry([
             $this->action(
@@ -232,7 +233,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testStringAndArrayTagFormsAreEquivalent(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         // String form.
         $registry = $this->createRegistry([
@@ -264,7 +265,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testUnknownOrEmptyTagsAreNoOps(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         $registry = $this->createRegistry([
             $this->action(
@@ -302,7 +303,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     {
         // Tagged + deferred + condition false: activation registers the hook,
         // but the condition gate still suppresses every fire.
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         $registry = $this->createRegistry([
             $this->action(
@@ -347,7 +348,7 @@ class TaggedHookTest extends WplokerbjmTestCase
 
     public function testUnregisterByTagsUnregistersActiveHandlers(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $planProvider = new WPHookPlanProvider();
         $registry = $this->createRegistry([
             $this->action(

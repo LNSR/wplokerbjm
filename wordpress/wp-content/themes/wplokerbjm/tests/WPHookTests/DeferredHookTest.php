@@ -6,7 +6,8 @@ namespace WPLokerBJM\Tests\WPHookTests;
 
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry};
+use \WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\ContainerRegistryDeferredHookManager;
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
@@ -38,7 +39,7 @@ class DeferredHookTest extends WplokerbjmTestCase
     private ContainerRegistryDeferredHookManager $ContainerRegistryDeferredHookManager;
     private EntriesIndexer $entriesIndexer;
     private WPHookPlanProvider $planProvider;
-    private HookTargetResolver $targetResolver;
+    private ContainerRegistryHookTargetResolver $targetResolver;
 
     protected function setUp(): void
     {
@@ -49,7 +50,7 @@ class DeferredHookTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $this->container = $builder->build();
         $this->planProvider = new WPHookPlanProvider();
-        $this->targetResolver = new HookTargetResolver();
+        $this->targetResolver = new ContainerRegistryHookTargetResolver();
         $this->entriesIndexer = new EntriesIndexer();
         $this->ContainerRegistryDeferredHookManager = new ContainerRegistryDeferredHookManager($this->planProvider, $this->container, $this->targetResolver, $this->entriesIndexer);
         $this->registry = new WPHooksContainerRegistry($this->container, [], $this->planProvider, $this->ContainerRegistryDeferredHookManager, $this->targetResolver, $this->queuedHooksCleaner, $this->entriesIndexer);
@@ -491,6 +492,51 @@ class DeferredHookTest extends WplokerbjmTestCase
         $this->assertSame(2, $this->deferredHandlersCount(), 'Boundary namespace must be a no-op');
     }
 
+    public function testActivateDeferredByParentNamespaceCoversSubNamespaces(): void
+    {
+        $this->seedRegistrations([
+            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\LazyHookService', 'method' => 'onAction', 'type' => 'action', 'hook' => 'ns_parent_a', 'priority' => 10, 'acceptedArgs' => 1, 'deferRegister' => true],
+            ['class' => self::class, 'method' => 'dummyDeferredA', 'type' => 'action', 'hook' => 'ns_parent_b', 'priority' => 10, 'acceptedArgs' => 1, 'deferRegister' => true],
+        ]);
+
+        $this->assertSame(2, $this->deferredHandlersCount());
+
+        // The fixture lives in ...\Fixtures — a CHILD of the queried namespace.
+        $this->assertSame(
+            1,
+            $this->registry->activateDeferredByNamespace('WPLokerBJM\Tests\Support'),
+            'A parent-namespace query must activate its whole subtree',
+        );
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'ns_parent_a'));
+        $this->assertNull($this->findRegisteredHook('action', 'ns_parent_b'), 'Sibling namespace must stay deferred');
+
+        // Boundary: same textual prefix, different segment.
+        $this->assertSame(
+            0,
+            $this->registry->activateDeferredByNamespace('WPLokerBJM\Tests\SupportExtra'),
+            'Sibling prefix must match nothing',
+        );
+    }
+
+    public function testUnregisterDeferredByParentNamespaceCoversSubNamespaces(): void
+    {
+        $this->seedRegistrations([
+            ['class' => 'WPLokerBJM\Tests\Support\Fixtures\LazyHookService', 'method' => 'onAction', 'type' => 'action', 'hook' => 'ns_parent_c', 'priority' => 10, 'acceptedArgs' => 1, 'deferRegister' => true],
+            ['class' => self::class, 'method' => 'dummyDeferredB', 'type' => 'filter', 'hook' => 'ns_parent_d', 'priority' => 10, 'acceptedArgs' => 1, 'deferRegister' => true],
+        ]);
+
+        $this->assertSame(2, $this->deferredHandlersCount());
+
+        $this->registry->unregisterDeferredByNamespace('WPLokerBJM\Tests\Support');
+
+        $this->assertSame(
+            1,
+            $this->deferredHandlersCount(),
+            'The sub-namespace handler must be swept, the sibling one kept',
+        );
+    }
+
     public function testUnregisterDeferredByMethod(): void
     {
         $this->seedRegistrations([
@@ -606,7 +652,7 @@ class DeferredHookTest extends WplokerbjmTestCase
     {
         return array_values(array_filter(
             $this->registeredHooks(),
-            fn(array $reg): bool => $reg['hook'] === $hook,
+            static fn(array $reg): bool => $reg['hook'] === $hook,
         ));
     }
 }

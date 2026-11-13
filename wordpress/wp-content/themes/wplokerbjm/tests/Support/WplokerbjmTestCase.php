@@ -9,8 +9,9 @@ use \DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{ContainerRegistryDeferredHookManager,InstanceRegistryDeferredHookManager};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 
 abstract class WplokerbjmTestCase extends TestCase
@@ -120,7 +121,7 @@ abstract class WplokerbjmTestCase extends TestCase
     protected function registeredHooks(): array
     {
         if ($this->flushQueuedRemovalsAfterDispatch) {
-            ($this->flushQueuedRemovals)();
+            ($this->flushQueuedRemovals)($this->queuedHooksCleaner);
         }
 
         $hooks = [];
@@ -163,7 +164,7 @@ abstract class WplokerbjmTestCase extends TestCase
     protected function findRegisteredHook(string $type, string $hook): ?array
     {
         if ($this->flushQueuedRemovalsAfterDispatch) {
-            ($this->flushQueuedRemovals)();
+            ($this->flushQueuedRemovals)($this->queuedHooksCleaner);
         }
 
         foreach ($GLOBALS['wp_filter'][$hook]->callbacks ?? [] as $priority => $callbacks) {
@@ -182,14 +183,14 @@ abstract class WplokerbjmTestCase extends TestCase
 
     private ?\Closure $flushQueuedRemovals = null {
         get {
-            return $this->flushQueuedRemovals ??= \Closure::bind(function () {
-                $queued = $this->queuedRemovalEntry ?? [];
+            return $this->flushQueuedRemovals ??= \Closure::bind(static function (QueuedHooksCleaner $cleaner) {
+                $queued = $cleaner->queuedRemovalEntry ?? [];
                 if ($queued === []) return;
 
                 foreach ($queued as $idx => $entry) {
-                    $this->immediatelyScheduleRemove($entry);
+                    $cleaner->immediatelyScheduleRemove($entry);
                 }
-            }, $this->queuedHooksCleaner, $this->queuedHooksCleaner);
+            }, null, $this->queuedHooksCleaner);
         }
     }
 
@@ -231,7 +232,7 @@ abstract class WplokerbjmTestCase extends TestCase
     {
         $container ??= $this->container();
         $planProvider = new WPHookPlanProvider();
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $entriesIndexer = new EntriesIndexer();
         $queuedHooksCleaner = new QueuedHooksCleaner();
         $this->queuedHooksCleaner = \WeakReference::create($queuedHooksCleaner);

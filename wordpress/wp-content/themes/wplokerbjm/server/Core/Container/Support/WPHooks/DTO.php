@@ -20,12 +20,12 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryUniqueKey;
  * (by class, class+method, or namespace) without string prefix parsing.
  * @phpstan-import-type HookType from HookRegistration
  * @phpstan-type HookKeyShape array{
- *    class: HookType['class'],
- *    method: HookType['method'],
- *    target: HookType['target'],
- *    type: HookType['type'],
- *    priority: HookType['priority'],
- *    acceptedArgs: HookType['acceptedArgs'],
+ *    class: class-string,
+ *    method: method-string|property-string|property-hook-string|'#manual-registration',
+ *    target: 'method'|'property'|'property-hook'|'#manual',
+ *    type: 'action'|'filter',
+ *    priority: int,
+ *    acceptedArgs: int,
  * }
  * @extends parent<HookKeyShape>
  */
@@ -80,34 +80,32 @@ final readonly class HookKey extends AbstractDataObject
  ======================================================================*/
 
 /**
- * @template TObject
- * @template TClass
  * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-import-type CallableHookParams from HookProviderTrait
  * *Master Hook Type*
  * @phpstan-type HookType array{
- *  class: class-string<TClass>,
- *  method: method-string<TClass>|property-string<TClass>|property-hook-string<TClass>|'#manual-registration',
+ *  class: class-string,
+ *  method: method-string|property-string|property-hook-string|'#manual-registration',
  *  type: 'action'|'filter',
- *  hook: string|\Closure(TObject...): string,
+ *  hook: string|\Closure(...): string,
  *  priority: int,
  *  acceptedArgs: int,
  *  deferRegister: bool,
  *  target: 'method'|'property'|'property-hook'|'#manual',
  *  visibility: 'public'|'protected'|'private',
- *  executeIf: null|\Closure(TObject...): bool,
+ *  executeIf: null|\Closure(...): bool,
  *  executeIfParams: CallablePlan,
- *  registerIf: null|(\Closure(TObject...): bool),
+ *  registerIf: null|(\Closure(...): bool),
  *  registerIfParams: CallablePlan,
  *  hookParams: CallablePlan,
  *  hookArgs: list<CallableHookParams>,
  *  tags: array,
- *  tagCallable: null|\Closure(TObject...): array,
+ *  tagCallable: null|\Closure(...): array,
  *  tagCallableParams: CallablePlan,
- *  deferRegisterUntilHook: null|string|\Closure(TObject...): string,
+ *  deferRegisterUntilHook: null|string|\Closure(...): string,
  *  deferRegisterUntilHookParams: CallablePlan,
  *  once: bool,
- *  onUnregisterDo: null|\Closure(TObject...): void,
+ *  onUnregisterDo: null|\Closure(...): void,
  *  onUnregisterDoParams: CallablePlan
  * }
  * @extends parent<HookType>
@@ -182,24 +180,25 @@ final readonly class HookRegistration extends AbstractDataObject
  * remove callbacks) is intentionally NOT part of the DTO.
  * @phpstan-import-type HookType from HookRegistration
  * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-import-type CallableHookParams from HookProviderTrait
  * @phpstan-type InstanceHookMetadataData array{
  *  hook: string,
- *  type: HookType['type'],
- *  priority: HookType['priority'],
- *  acceptedArgs: HookType['acceptedArgs'],
- *  once: HookType['once'],
- *  executeIf: HookType['executeIf'],
- *  executeIfParams: HookType['executeIfParams'],
- *  registerIf: HookType['registerIf'],
- *  registerIfParams: HookType['registerIfParams'],
+ *  type: 'action'|'filter',
+ *  priority: int,
+ *  acceptedArgs: int,
+ *  once: bool,
+ *  executeIf: ?\Closure(...):bool,
+ *  executeIfParams: CallablePlan,
+ *  registerIf: ?\Closure(...):bool,
+ *  registerIfParams: CallablePlan,
  *  deferRegisterUntilHook: HookType['deferRegisterUntilHook'],
  *  deferRegisterUntilHookParams: HookType['deferRegisterUntilHookParams'],
- *  hookArgNames: HookType['hookArgs'],
- *  target: HookType['target'],
- *  targetName: HookType['method'],
- *  visibility: HookType['visibility'],
- *  onUnregisterDo: HookType['onUnregisterDo'],
- *  onUnregisterDoParams: HookType['onUnregisterDoParams'],
+ *  hookArgNames: list<CallableHookParams>,
+ *  target: 'method'|'property'|'property-hook'|'#manual',
+ *  targetName: method-string|property-string|property-hook-string|'#manual-registration',
+ *  visibility: 'public'|'protected'|'private',
+ *  onUnregisterDo: ?\Closure(...):void,
+ *  onUnregisterDoParams: CallablePlan,
  * }
  * @extends parent<InstanceHookMetadataData>
  */

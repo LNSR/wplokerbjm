@@ -5,12 +5,12 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\WPHookTests;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\HookTargetResolver;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
  * Covers the opt-in anonymous-hook contract: ModuleClassHookMetadata
- * captures parent class + property at construction so HookTargetResolver can
+ * captures parent class + property at construction so ContainerRegistryHookTargetResolver can
  * resolve the hook target without walking the call stack.
  */
 class ModuleClassHookMetadataTest extends WplokerbjmTestCase
@@ -45,7 +45,7 @@ class ModuleClassHookMetadataTest extends WplokerbjmTestCase
 
     public function testResolverNormalizesObjectParentViaGetClass(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
         $parent = new \stdClass();
 
         $hook = new class ($parent, 'onFilter') extends ModuleClassHookMetadata {
@@ -60,7 +60,7 @@ class ModuleClassHookMetadataTest extends WplokerbjmTestCase
 
     public function testResolverUsesCapturedParentWithoutBacktrace(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
 
         $hook = new class ('App\\ParentService', 'onFilter') extends ModuleClassHookMetadata {
             public function __invoke(): bool
@@ -76,7 +76,7 @@ class ModuleClassHookMetadataTest extends WplokerbjmTestCase
 
     public function testResolverCachesAnonHookResolution(): void
     {
-        $resolver = new HookTargetResolver();
+        $resolver = new ContainerRegistryHookTargetResolver();
 
         $hook = new class ('App\\ParentService', 'onFilter') extends ModuleClassHookMetadata {
             public function __invoke(): bool

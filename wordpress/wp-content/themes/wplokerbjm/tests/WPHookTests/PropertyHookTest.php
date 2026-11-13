@@ -7,7 +7,8 @@ namespace WPLokerBJM\Tests\WPHookTests;
 use DI\ContainerBuilder;
 use DI\Container;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyPropertyHookInvoker;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, HookTargetResolver, WPHooksContainerRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyActionService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyDeferredService;
@@ -43,7 +44,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
         $this->container = $builder->build();
-        $resolverTarget = new HookTargetResolver();
+        $resolverTarget = new ContainerRegistryHookTargetResolver();
         $this->registry = $this->createRegistry([], $this->container);
 
         // Reset fixture static state

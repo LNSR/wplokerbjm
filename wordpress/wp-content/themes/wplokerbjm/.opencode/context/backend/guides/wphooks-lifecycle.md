@@ -48,7 +48,7 @@ Use `WPHooksInstanceRegistry` when the object already exists or cannot be discov
 - Plain `deferRegister` is still ignored on the attribute path (nothing would activate it); `deferRegisterUntilHook` IS supported — the entry sits in the deferred pool and auto-activates when the trigger fires (`deferUntilTriggerHook`, `did_action` short-circuit or `PHP_INT_MIN` listener). There is no manual activation API on the runtime path.
 - Static members are silently skipped.
 - Hooks are instance-lifetime scoped: the registry keeps a `WeakReference` to the owner; when the owner is garbage-collected the handler nukes itself (`consumeLifetime`) from the pool and `wp_filter`.
-- Manual `registerAction()` / `registerFilter()` support closures, captured state, explicit owners, `executeIf`, `once`, and `deferRegisterUntilHook`; `HookRuntimeResolver::resolveOwner()` infers the owner from array callables, bound closures, or invokable objects.
+- Manual `registerAction()` / `registerFilter()` support closures, captured state, explicit owners, `executeIf`, `once`, and `deferRegisterUntilHook`; `InstanceRegistryRuntimeHookResolver::resolveOwner()` infers the owner from array callables, bound closures, or invokable objects.
 - `AnonClassHookPropertyAbstract` stores a parent class/property pair so the container target resolver can identify an anonymous property value without a call-stack search.
 
 ## 6. Teardown

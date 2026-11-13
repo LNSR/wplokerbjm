@@ -6,7 +6,7 @@ namespace WPLokerBJM\Tests\WPHookTests;
 
 use DI\ContainerBuilder;
 use DI\Container;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyHookInvoker;
 use WPLokerBJM\Tests\Support\Fixtures\FilterService;
@@ -33,7 +33,6 @@ class ContainerLazyHookInvokerTest extends WplokerbjmTestCase
         $builder->useAttributes(false);
         $this->container = $builder->build();
 
-        $targetResolver = new HookTargetResolver();
         $this->registry = $this->createRegistry([], $this->container);
 
         LazyHookService::reset();

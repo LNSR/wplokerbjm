@@ -5,13 +5,14 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests;
 
 use Nette\Loaders\RobotLoader;
+use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Definitions\Factory;
 use WPLokerBJM\Tests\Support\Terminal;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Definitions\Core;
 use WPLokerBJM\Core\Container\Definitions\DefinitionProviderInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     ContainerLazyHookInvoker,
     ContainerLazyPropertyHookInvoker,
@@ -23,6 +24,7 @@ use WPLokerBJM\Services\WebHooks\CloudflareCachePurger;
 use WPLokerBJM\Adapter\RedisAdapter;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 
+#[AllowMockObjectsWithoutExpectations]
 class ContainerDefinitionsTest extends WplokerbjmTestCase
 {
     public static string $NAMESPACE = "WPLokerBJM";
@@ -235,7 +237,6 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $container->method('get')
             ->willReturnCallback(fn(string $class) => $this->createMock($class));
 
-        $targetResolver = new HookTargetResolver();
         // Create registry with registrations via constructor, then initialize
         $registry = $this->createRegistry($registrations, $container);
         $registry->initialize();
@@ -405,8 +406,8 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
         $hookClasses = array_unique(array_column($registrations, 'class'));
 
         $container = $this->createMock(ContainerInterface::class);
-        $container->method('has')->willReturnCallback(fn(string $class): bool => in_array($class, $hookClasses, true));
-        $container->method('get')->willReturnCallback(fn(string $class): object => $this->createMock($class));
+        $container->expects(self::any())->method('has')->willReturnCallback(fn(string $class): bool => in_array($class, $hookClasses, true));
+        $container->expects(self::any())->method('get')->willReturnCallback($this->createMock(...));
 
         $fixturesNs = 'WPLokerBJM\Tests\Support\Fixtures';
         $expectedRemoved = count(array_filter(
@@ -434,6 +435,53 @@ class ContainerDefinitionsTest extends WplokerbjmTestCase
             $before - $expectedRemoved,
             count($this->registeredHooks()),
             'Boundary namespace must be a no-op',
+        );
+    }
+
+    public function testUnregisterByParentNamespaceCoversSubNamespaces(): void
+    {
+        $scanner = $this->createScanner();
+        $registrations = $scanner->getHookRegistrations();
+
+        if (empty($registrations)) {
+            $this->markTestSkipped('No hook registrations discovered to test namespace unregistration.');
+        }
+
+        $hookClasses = array_unique(array_column($registrations, 'class'));
+
+        $container = $this->createMock(ContainerInterface::class);
+        $container->expects(self::any())->method('has')->willReturnCallback(fn(string $class): bool => in_array($class, $hookClasses, true));
+        $container->expects(self::any())->method('get')->willReturnCallback(fn(string $class): object => $this->createMock($class));
+
+        // The fixtures live in ...\Support\Fixtures — a CHILD of the queried
+        // namespace, so the parent query must reach its whole subtree.
+        $parentNs = 'WPLokerBJM\Tests\Support';
+        $expectedRemoved = count(array_filter(
+            $registrations,
+            static fn($reg): bool => str_starts_with($reg->class, $parentNs . '\\') && empty($reg->deferRegister),
+        ));
+
+        $this->assertGreaterThan(0, $expectedRemoved, 'Sub-namespace fixture hooks should exist to unregister');
+
+        $registry = $this->createRegistry($registrations, $container);
+        $registry->initialize();
+        $before = count($this->registeredHooks());
+
+        $registry->unregisterByNamespace($parentNs);
+
+        $this->assertSame(
+            $before - $expectedRemoved,
+            count($this->registeredHooks()),
+            'A parent-namespace query must remove its whole subtree',
+        );
+
+        // Boundary: same textual prefix, different segment.
+        $registry->unregisterByNamespace($parentNs . 'Extra');
+
+        $this->assertSame(
+            $before - $expectedRemoved,
+            count($this->registeredHooks()),
+            'Sibling prefix must be a no-op',
         );
     }
 

@@ -13,6 +13,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     RuntimeRegistryHandlerEntry,
     ContainerRegistryHandlerEntry
 };
+use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
 
 /*======================================================================
  | Deferred Hook metadata DTOs
@@ -20,30 +21,31 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
 
 /**
  * @phpstan-import-type HookType from HookRegistration
+ * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-import-type AvailaibleHandlerType from HandlerEntryTrait
  * @phpstan-type DeferredHookEntry array{
  *     hook: string,
  *     handler: AvailaibleHandlerType,
- *     type: HookType['type'],
- *     priority: HookType['priority'],
- *     acceptedArgs: HookType['acceptedArgs'],
- *     tags: HookType['tags']|null,
- *     registerIf: HookType['registerIf'],
- *     registerIfParams: HookType['registerIfParams'],
- *     executeIf: HookType['executeIf'],
- *     executeIfParams: HookType['executeIfParams'],
- *     once: HookType['once'],
- *     onUnregisterDo: HookType['onUnregisterDo'],
- *     onUnregisterDoParams: HookType['onUnregisterDoParams'],
+ *     type: 'action'|'filter',
+ *     priority: int,
+ *     acceptedArgs: int,
+ *     tags: ?array,
+ *     registerIf: \Closure(...): bool,
+ *     registerIfParams: CallablePlan,
+ *     executeIf: \Closure(...): bool,
+ *     executeIfParams: CallablePlan,
+ *     once: bool,
+ *     onUnregisterDo: \Closure(...): void,
+ *     onUnregisterDoParams: CallablePlan,
  *     key: HookKey,
- *     instance: WeakReference<object>|null
+ *     instance: WeakReference<object>|null,
+ *     removeEntryIndexCallback: (\Closure(static $entry): void)|null
  * }>>
- * @extends parent<DeferredHookEntry>
  */
-final readonly class DeferredHookEntryHandler extends AbstractDataObject
+final class DeferredHookEntryHandler
 {
-    public string $cachedHandlerLabel;
-
+    /** @use TraitDataObject<DeferredHookEntry> */
+    use TraitDataObject;
     use HandlerEntryUniqueKey;
     /**
      * @param DeferredHookEntry['hook'] $hook
@@ -61,32 +63,43 @@ final readonly class DeferredHookEntryHandler extends AbstractDataObject
      * @param DeferredHookEntry['onUnregisterDoParams'] $onUnregisterDoParams
      * @param DeferredHookEntry['key'] $key
      * @param DeferredHookEntry['instance'] $instance Exclusive for @see WPHooksInstanceRegistry owner
+     * @param DeferredHookEntry['removeEntryIndexCallback'] $removeEntryIndexCallback
      */
     public function __construct(
-        public string $hook,
-        public ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
-        public string $type,
-        public int $priority,
-        public int $acceptedArgs,
-        public ?array $tags,
-        public ?\Closure $registerIf,
-        public array $registerIfParams,
-        public ?\Closure $executeIf,
-        public array $executeIfParams,
-        public bool $once,
-        public ?\Closure $onUnregisterDo,
-        public array $onUnregisterDoParams,
-        public HookKey $key,
-        public ?WeakReference $instance = null
-    ) {
-        $this->cachedHandlerLabel = $handler->label;
+        public readonly string $hook,
+        public readonly ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
+        public readonly string $type,
+        public readonly int $priority,
+        public readonly int $acceptedArgs,
+        public readonly ?array $tags,
+        public readonly ?\Closure $registerIf,
+        public readonly array $registerIfParams,
+        public readonly ?\Closure $executeIf,
+        public readonly array $executeIfParams,
+        public readonly bool $once,
+        public readonly ?\Closure $onUnregisterDo,
+        public readonly array $onUnregisterDoParams,
+        public readonly HookKey $key,
+        public readonly ?WeakReference $instance = null,
+        private ?\Closure $removeEntryIndexCallback = null,
+    ) {}
+
+    public function __destruct()
+    {
+        \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
     }
+
+    /** @param DeferredHookEntry['removeEntryIndexCallback'] $callback */
+    public function setOnEntryRemovalCallback(\Closure $callback): void {
+        $this->removeEntryIndexCallback = $callback;
+    }
+    
     public static function fromContainerRegistryHandlerEntry(ContainerRegistryHandlerEntry $entry): self
     {
         return new static(
             hook: $entry->hook,
             key: $entry->key,
-            handler: $entry->handler ?? null,
+            handler: $entry->handler,
             type: $entry->type,
             priority: $entry->priority,
             acceptedArgs: $entry->acceptedArgs,

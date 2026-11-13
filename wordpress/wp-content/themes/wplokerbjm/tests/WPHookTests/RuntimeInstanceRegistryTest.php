@@ -11,11 +11,12 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstanceHookInvoke
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{HookRuntimeResolver, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
+use \WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
-class RuntimeRegistryTest extends WplokerbjmTestCase
+class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 {
     private WPHooksInstanceRegistry $registry;
 
@@ -369,7 +370,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
         $captured = [];
 
         $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
-            public function __construct(RuntimeRegistryTest $test, string $identifier, private array &$captured)
+            public function __construct(RuntimeInstanceRegistryTest $test, string $identifier, private array &$captured)
             {
                 parent::__construct($test, $identifier);
             }
@@ -980,7 +981,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
                 hook: 'rt_deferred_late_gate',
                 deferRegisterUntilHook: 'rt_late_gate_trigger',
                 registerIf: static function (): bool {
-                    return RuntimeRegistryTest::$deferredGateOpen;
+                    return RuntimeInstanceRegistryTest::$deferredGateOpen;
                 },
                 acceptedArgs: 1,
             )]
@@ -1020,7 +1021,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
                 hook: 'rt_deferred_rejected_late',
                 deferRegisterUntilHook: 'rt_reject_trigger',
                 registerIf: static function (): bool {
-                    return RuntimeRegistryTest::$deferredGateOpen;
+                    return RuntimeInstanceRegistryTest::$deferredGateOpen;
                 },
             )]
             public function doSomething(): void {}
@@ -1056,7 +1057,7 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
                 hook: 'cached_gate_destination',
                 deferRegisterUntilHook: 'cached_gate_trigger',
                 registerIf: static function (): bool {
-                    return RuntimeRegistryTest::$deferredGateOpen;
+                    return RuntimeInstanceRegistryTest::$deferredGateOpen;
                 },
             )]
             public function onDestination(): void
@@ -1118,8 +1119,10 @@ class RuntimeRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class($captured) {
-            public function __construct(private array &$captured) {}
+        $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
+            public function __construct(RuntimeInstanceRegistryTest $parentClass, $identifier, private array &$captured) {
+                parent::__construct($parentClass, $identifier);
+            }
 
             #[Action(hook: 'rt_lifetime_action', acceptedArgs: 1)]
             public function doSomething(string $val): void

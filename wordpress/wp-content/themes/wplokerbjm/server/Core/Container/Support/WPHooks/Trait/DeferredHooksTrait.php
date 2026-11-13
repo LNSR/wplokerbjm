@@ -25,6 +25,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker,
  * surface.
  * @phpstan-import-type CallableHookParams from HookProviderTrait
  * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-import-type DeferredHookEntry from DeferredHookEntryHandler
  * @phpstan-import-type ActivateEntry from WPHooksContainerRegistry
  * @template TKey
  * @phpstan-type IndexedHandler array<TKey, DeferredHookEntryHandler>
@@ -40,6 +41,9 @@ trait DeferredHooksTrait
      * @var IndexedHandler
      */
     public private(set) array $deferredHandlers = [];
+    /** @var DeferredHookEntry['removeEntryIndexCallback'] */
+    protected ?\Closure $destroyIndexes = null;
+
 
     /**
      * Store a deferred hook entry under its unique key.
@@ -48,7 +52,8 @@ trait DeferredHooksTrait
     private function addDeferred(DeferredHookEntryHandler $entry): void
     {
         $this->deferredHandlers[$entry->toUniqueKey()] = $entry;
-        $this->entriesIndexer?->setIndexes($entry);
+        $this->entriesIndexer->setIndexes($entry);
+        $entry->setOnEntryRemovalCallback($this->destroyIndexes ??= $this->entriesIndexer->removeIndexes(...));
     }
 
     /**
@@ -67,11 +72,6 @@ trait DeferredHooksTrait
         foreach ($keys as $key) {
             $entry = $this->deferredHandlers[$key] ?? null;
             if ($entry === null) continue;
-            if ($entry->handler === null) {
-                $this->entriesIndexer?->removeIndexes($entry);
-                unset($this->deferredHandlers[$key]);
-                continue;
-            };
             if (!$this->gateDeferredActivation($entry)) {
                 continue;
             }
@@ -79,7 +79,6 @@ trait DeferredHooksTrait
                 continue;
             }
             $activated++;
-            $this->entriesIndexer?->removeIndexes($entry);
             unset($this->deferredHandlers[$key]);
         }
         return $activated;
@@ -96,14 +95,9 @@ trait DeferredHooksTrait
         foreach ($keys as $key) {
             $entry = $this->deferredHandlers[$key] ?? null;
             if ($entry === null) continue;
-            if ($entry->handler === null) {
-                $this->entriesIndexer?->removeIndexes($entry);
-                unset($this->deferredHandlers[$key]);
-            };
             if (!$matches($entry)) {
                 continue;
             }
-            $this->entriesIndexer?->removeIndexes($entry);
             unset($this->deferredHandlers[$key]);
         }
     }

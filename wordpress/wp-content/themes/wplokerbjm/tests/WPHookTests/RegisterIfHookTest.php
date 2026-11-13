@@ -7,7 +7,7 @@ use Closure;
 use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -43,7 +43,6 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfTrueRegistersAndFires(): void
     {
-        $resolver = new HookTargetResolver();
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -62,7 +61,6 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfFalseSkipsRegistrationEntirely(): void
     {
-        $resolver = new HookTargetResolver();
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -83,7 +81,6 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfFalseSkipsDeferredHookEvenAfterActivation(): void
     {
-        $resolver = new HookTargetResolver();
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -105,7 +102,6 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfNonBoolResultIsLoggedAndSkipped(): void
     {
-        $resolver = new HookTargetResolver();
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -124,7 +120,6 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfThrowingGateIsLoggedAndSkipped(): void
     {
-        $resolver = new HookTargetResolver();
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -142,7 +137,6 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
     public function testRegisterIfReceivesContainerResolvedParams(): void
     {
-        $resolver = new HookTargetResolver();
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,

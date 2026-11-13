@@ -73,7 +73,7 @@ interface PluginConfigInterface
    ========================================================================== */
 class PluginManager
 {
-    public const MUST_HAVE_PLUGINS = [
+    public const array MUST_HAVE_PLUGINS = [
         PluginList::LiteSpeed->value,
         PluginList::WpGraphql->value,
         PluginList::RankMath->value,
@@ -86,7 +86,7 @@ class PluginManager
      * 
      * @var array<class-string<PluginConfigInterface>>
      */
-    public const THIRD_PARTY_INTEGRATIONS = [
+    public const array THIRD_PARTY_INTEGRATIONS = [
         Litespeed::class,
         LiteSpeedGraphQLIntegration::class,
         MetaBox::class,

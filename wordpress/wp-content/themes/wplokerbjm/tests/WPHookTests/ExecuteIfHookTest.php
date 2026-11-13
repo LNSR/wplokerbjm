@@ -9,7 +9,7 @@ use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, HookRuntimeResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, InstanceRegistryRuntimeHookResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
@@ -70,7 +70,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $targetResolver = new HookTargetResolver();
         $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
@@ -91,7 +90,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $targetResolver = new HookTargetResolver();
         $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
@@ -115,7 +113,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $targetResolver = new HookTargetResolver();
         $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
@@ -145,7 +142,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $targetResolver = new HookTargetResolver();
         $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 
@@ -166,7 +162,6 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             ),
         ];
 
-        $targetResolver = new HookTargetResolver();
         $registry = $this->createRegistry($registrations, $this->container);
         $registry->initialize();
 

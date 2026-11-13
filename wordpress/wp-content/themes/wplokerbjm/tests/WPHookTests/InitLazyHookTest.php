@@ -7,7 +7,8 @@ namespace WPLokerBJM\Tests\WPHookTests;
 use DI\ContainerBuilder;
 use DI\Container;
 use WPLokerBJM\Core\Container\Init;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceRegistry, Hook, HookTargetResolver};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\ContainerLazyHookInvoker;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -56,7 +57,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
      */
     private function createInit(array $registrations): Init
     {
-        $targetResolver = new HookTargetResolver();
+        $targetResolver = new ContainerRegistryHookTargetResolver();
         $registry = $this->createRegistry($registrations, $this->container);
         return new Init($registry);
     }

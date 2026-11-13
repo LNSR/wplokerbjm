@@ -25,6 +25,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{
     ContainerRegistryDeferredHookManager,
     DeferredHookEntryHandler
 };
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 
 /**
  * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
@@ -34,6 +35,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{
  * Service resolution is deferred to hook-fire time (lazy loading).
  * @phpstan-import-type HookType from HookRegistration
  * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-import-type HandlerEntry from ContainerRegistryHandlerEntry
  * @phpstan-import-type HookTargetResolve from ContainerRegistryDeferredHookManager
  * @phpstan-type ActivateEntry \Closure(DeferredHookEntryHandler): bool
  * @template TKey of string
@@ -60,13 +62,17 @@ class WPHooksContainerRegistry
      * @var list<\WeakReference<DeferredHookEntryHandler>>
      */
     public private(set) array $pendingDeferredActivation = [];
+    /**
+     * @var HandlerEntry['removeEntryIndexCallback']
+     */
+    private ?\Closure $destroyIndexes = null { get => $this->destroyIndexes ??= $this->entriesIndexer->removeIndexes(...); }
 
     /**
      * @param ContainerInterface $container
      * @param HookRegistration[] $hooksRegistration
      * @param WPHookPlanProvider $planProvider Plan provider for condition/hook-name resolution.
      * @param ContainerRegistryDeferredHookManager $containerRegistryDeferredHookManager Deferred hook manager.
-     * @param HookTargetResolver $resolverTarget Resolves callable targets to class/method pairs.
+     * @param ContainerRegistryHookTargetResolver $resolverTarget Resolves callable targets to class/method pairs.
      * @param EntriesIndexer $entriesIndexer For fast lookup of handler indexes.
      */
     public function __construct(
@@ -74,7 +80,7 @@ class WPHooksContainerRegistry
         private array $hooksRegistration,
         private WPHookPlanProvider $planProvider,
         private ContainerRegistryDeferredHookManager $containerRegistryDeferredHookManager,
-        private HookTargetResolver $resolverTarget,
+        private ContainerRegistryHookTargetResolver $resolverTarget,
         private QueuedHooksCleaner $queuedHooksCleaner = new QueuedHooksCleaner(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
     ) {
@@ -94,10 +100,17 @@ class WPHooksContainerRegistry
         foreach ($this->handlers as $key => $data) {
             try {
                 $this->entriesIndexer->setIndexes($data);
+                $data->setOnEntryRemovalCallback($this->destroyIndexes);
             } catch (\Exception $e) {
                 Logger::error(
                     self::class,
-                    "Error registering {$data->type} '{$data->hook}' with 'priority' " . (string) $data->priority . " and 'acceptedArgs' " . (string) $data->acceptedArgs . " for {$key}: {$e->getMessage()}"
+                    "Error registering {$data->invokerLabel}",
+                    [
+                        'message' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ]
                 );
             }
         }
@@ -401,7 +414,16 @@ class WPHooksContainerRegistry
     /**
      * Unregister a registered hook via first-class callable, array lookup,
      * or class-string identifier.
-     * ! sweep all attribute attached to property or method
+     *
+     * Sweeps every ACTIVE attribute attached to the resolved property or
+     * method (all priorities/attributes of that member).
+     *
+     * ! Only touches the active pool — deferred entries are never swept and
+     * ! will still activate when their trigger fires. Use
+     * ! {@see ContainerRegistryDeferredHookManager::unregisterDeferredByCallable()}
+     * ! (or unregisterDeferredByHook/ByClass/ByNamespace) for the deferred
+     * ! pool.
+     *
      * @api
      * @param HookTargetResolve $target
      */
@@ -416,7 +438,6 @@ class WPHooksContainerRegistry
             }
             $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
             unset($this->handlers[$uniqueKey]);
-            $this->entriesIndexer->removeIndexes($entry);
         }
     }
 
@@ -435,7 +456,6 @@ class WPHooksContainerRegistry
             }
             $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
             unset($this->handlers[$uniqueKey]);
-            $this->entriesIndexer->removeIndexes($entry);
         }
     }
 
@@ -454,7 +474,6 @@ class WPHooksContainerRegistry
             }
             $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
             unset($this->handlers[$uniqueKey]);
-            $this->entriesIndexer->removeIndexes($entry);
         }
     }
 
@@ -477,7 +496,6 @@ class WPHooksContainerRegistry
             }
             $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
             unset($this->handlers[$uniqueKey]);
-            $this->entriesIndexer->removeIndexes($entry);
         }
     }
 
@@ -511,7 +529,6 @@ class WPHooksContainerRegistry
                 $entry = $this->handlers[$key];
                 $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                 unset($this->handlers[$key]);
-                $this->entriesIndexer->removeIndexes($entry);
             }
         }
     }
@@ -541,7 +558,6 @@ class WPHooksContainerRegistry
                 }
                 $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                 unset($this->handlers[$uniqueKey]);
-                $this->entriesIndexer->removeIndexes($entry);
             }
         }
     }
@@ -576,7 +592,6 @@ class WPHooksContainerRegistry
                 }
                 $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                 unset($this->handlers[$uniqueKey]);
-                $this->entriesIndexer->removeIndexes($entry);
             }
         }
     }
@@ -598,6 +613,7 @@ class WPHooksContainerRegistry
                 $entry = $this->handlers[$uniqueKey] = ContainerRegistryHandlerEntry::fromDeferredEntry($data);
                 $this->entriesByInvokers[$data->handler] = $entry;
                 $this->entriesIndexer->setIndexes($entry);
+                $entry->setOnEntryRemovalCallback($this->destroyIndexes);
                 $entry->register();
                 $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
                 return true;
@@ -619,7 +635,6 @@ class WPHooksContainerRegistry
                     if ($entry === null) return;
                     $key = $entry->toUniqueKey();
                     $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
-                    $this->entriesIndexer->removeIndexes($entry);
                     unset($this->handlers[$key]);
                     // SharedUtils::isDevelopment() && Logger::warning(__CLASS__, "{$entry->invokerLabel} died, removing entry");
                     return;
@@ -642,7 +657,6 @@ class WPHooksContainerRegistry
                  * @link https://core.trac.wordpress.org/ticket/64653
                  */
                 $this->queuedHooksCleaner->cleanUpCallback($invoker);
-                $this->entriesIndexer->removeIndexes($entry);
                 unset($this->entriesByInvokers[$entry->handler]);
                 unset($this->handlers[$uniqueKey]);
             };
@@ -657,6 +671,7 @@ class WPHooksContainerRegistry
      */
     private function registerAll(array $registrations): void
     {
+        $normalizeTagValue = HookTagUtilities::normalizeTagValue(...);
         foreach ($registrations as $reg) {
             $registration = $reg instanceof HookRegistration ? $reg : HookRegistration::fromArray($reg);
 
@@ -728,7 +743,7 @@ class WPHooksContainerRegistry
                 }
 
                 $resolvedTags = array_map(
-                    static fn($tag) => HookTagUtilities::normalizeTagValue($tag),
+                    $normalizeTagValue,
                     $resolvedTags
                 );
             } catch (\Throwable $e) {
@@ -739,94 +754,116 @@ class WPHooksContainerRegistry
                 continue;
             }
 
-            $handler = $registration->target === 'method'
-                ? new ContainerLazyHookInvoker(
-                    $this->container,
-                    $hookName,
-                    $registration->priority,
-                    $registration->class,
-                    $registration->method,
-                    $registration->visibility,
-                    $registration->type,
-                    $registration->acceptedArgs,
-                    $registration->executeIf,
-                    $registration->executeIfParams,
-                    $this->planProvider,
-                    $registration->hookArgs,
-                    $registration->once,
-                    $registration->onUnregisterDo,
-                    $registration->onUnregisterDoParams
-                )
-                : new ContainerLazyPropertyHookInvoker(
-                    $this->container,
-                    $hookName,
-                    $registration->priority,
-                    $registration->class,
-                    $registration->method,
-                    $registration->visibility,
-                    $registration->type,
-                    $registration->acceptedArgs,
-                    $registration->executeIf,
-                    $registration->executeIfParams,
-                    $this->planProvider,
-                    $registration->hookArgs,
-                    $registration->once,
-                    $registration->onUnregisterDo,
-                    $registration->onUnregisterDoParams
-                );
+            [$handler, $entry] = $this->createHandlerAndEntry($registration, $hookName, $resolvedTags);
 
-            $entry = new ContainerRegistryHandlerEntry(
-                hook: $hookName,
-                key: HookKey::fromRegistration($registration),
-                handler: $handler,
-                type: $registration->type,
-                priority: $registration->priority,
-                acceptedArgs: $registration->acceptedArgs,
-                tags: $resolvedTags,
-                registerIf: $registration->registerIf,
-                registerIfParams: $registration->registerIfParams,
-                executeIf: $registration->executeIf,
-                executeIfParams: $registration->executeIfParams,
-                once: $registration->once,
-                onUnregisterDo: $registration->onUnregisterDo,
-                onUnregisterDoParams: $registration->onUnregisterDoParams
+            if (!$registration->deferRegister && $registration->deferRegisterUntilHook === null) {
+                $this->handlers[$entry->toUniqueKey()] = $entry->register();
+                continue;
+            }
+
+            $recordEntry = $entry->toDeferredEntryDTO();
+            $this->containerRegistryDeferredHookManager->addDeferredEntry($recordEntry);
+
+            if ($registration->deferRegisterUntilHook === null) continue;
+
+            $triggerHook = $registration->deferRegisterUntilHook;
+            if ($triggerHook === null) continue;
+
+            if ($triggerHook instanceof \Closure) {
+                try {
+                    $triggerHook = $this->planProvider->resolveHookName(
+                        $registration->deferRegisterUntilHook,
+                        $this->container,
+                        $registration->deferRegisterUntilHookParams ?? [],
+                        $registration->class . '::' . $registration->method
+                    );
+                } catch (\RuntimeException $e) {
+                    Logger::error(
+                        self::class,
+                        'Skipping hook for: ' . $handler->label,
+                        [
+                            'message' => $e->getMessage(),
+                            'trace'   => $e->getTraceAsString(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                            'code' => $e->getCode(),
+                        ]
+                    );
+                    continue;
+                }
+            }
+
+            $this->scheduleDeferredActivation(
+                $triggerHook,
+                $recordEntry
+            );
+        }
+    }
+
+    /**
+     * @return array{ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker,ContainerRegistryHandlerEntry}
+     */
+    private function createHandlerAndEntry(HookRegistration $registration, string $hookName, array $resolvedTags): array
+    {
+
+        $handler = $registration->target === 'method'
+            ? new ContainerLazyHookInvoker(
+                $this->container,
+                $hookName,
+                $registration->priority,
+                $registration->class,
+                $registration->method,
+                $registration->visibility,
+                $registration->type,
+                $registration->acceptedArgs,
+                $registration->executeIf,
+                $registration->executeIfParams,
+                $this->planProvider,
+                $registration->hookArgs,
+                $registration->once,
+                $registration->onUnregisterDo,
+                $registration->onUnregisterDoParams
+            )
+            : new ContainerLazyPropertyHookInvoker(
+                $this->container,
+                $hookName,
+                $registration->priority,
+                $registration->class,
+                $registration->method,
+                $registration->visibility,
+                $registration->type,
+                $registration->acceptedArgs,
+                $registration->executeIf,
+                $registration->executeIfParams,
+                $this->planProvider,
+                $registration->hookArgs,
+                $registration->once,
+                $registration->onUnregisterDo,
+                $registration->onUnregisterDoParams
             );
 
-            $this->entriesByInvokers[$handler] = $entry;
-            $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
-            $handler?->setCleanupCallback($this->removeEntry);
+        $entry = new ContainerRegistryHandlerEntry(
+            hook: $hookName,
+            key: HookKey::fromRegistration($registration),
+            handler: $handler,
+            type: $registration->type,
+            priority: $registration->priority,
+            acceptedArgs: $registration->acceptedArgs,
+            tags: $resolvedTags,
+            registerIf: $registration->registerIf,
+            registerIfParams: $registration->registerIfParams,
+            executeIf: $registration->executeIf,
+            executeIfParams: $registration->executeIfParams,
+            once: $registration->once,
+            onUnregisterDo: $registration->onUnregisterDo,
+            onUnregisterDoParams: $registration->onUnregisterDoParams
+        );
 
-            if ($registration->deferRegister || $registration->deferRegisterUntilHook !== null) {
-                $recordEntry = $entry->toDeferredEntryDTO();
-                $this->containerRegistryDeferredHookManager->addDeferredEntry($recordEntry);
+        $this->entriesByInvokers[$handler] = $entry;
+        $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
+        $handler->setCleanupCallback($this->removeEntry);
 
-                if ($registration->deferRegisterUntilHook !== null) {
-                    $triggerHook = $registration->deferRegisterUntilHook;
-                    if ($triggerHook instanceof \Closure) {
-                        try {
-                            $triggerHook = $this->planProvider->resolveHookName(
-                                $registration->deferRegisterUntilHook,
-                                $this->container,
-                                $registration->deferRegisterUntilHookParams ?? [],
-                                $registration->class . '::' . $registration->method
-                            );
-                        } catch (\RuntimeException $e) {
-                            Logger::error(
-                                self::class,
-                                'Skipping hook for ' . $handler?->label . ' — error ' . $e->getMessage()
-                            );
-                            continue;
-                        }
-                    }
-                    $this->scheduleDeferredActivation(
-                        $triggerHook,
-                        $recordEntry
-                    );
-                }
-            } else {
-                $this->handlers[$entry->toUniqueKey()] = $entry->register();
-            }
-        }
+        return [$handler, $entry];
     }
 
     /**
@@ -857,139 +894,5 @@ class WPHooksContainerRegistry
 
             $activated && remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
         }, PHP_INT_MIN, 0);
-    }
-}
-/**
- * @internal not for use beyond \WPLokerBJM\Core\Container\Support\WPHooks\Registry\
- * @template TClass
- * @phpstan-import-type HookTargetResolve from ContainerRegistryDeferredHookManager
- */
-class HookTargetResolver
-{
-    /**
-     * Per-request cache of resolved callable → [FQCN, memberName].
-     *
-     * WeakMap automatically drops entries when their key (the callable
-     * object) is garbage-collected, avoiding memory leaks.
-     *
-     * @var \WeakMap<object<TClass>, array{class-string<TClass>, callable-string<TClass>}>
-     */
-    private \WeakMap $callableTargetCache { get => $this->callableTargetCache ??= new \WeakMap(); }
-
-    /**
-     * @param HookTargetResolve $target
-     * @return array{class-string<TClass>, callable-string<TClass>}
-     */
-    public function resolve(object|callable|array|string $target): array
-    {
-        if (is_object($target) && isset($this->callableTargetCache[$target])) {
-            return $this->callableTargetCache[$target];
-        }
-
-        $result = $this->doResolveCallableTarget($target);
-
-        if (is_object($target)) {
-            $this->callableTargetCache[$target] = $result;
-        }
-        return $result;
-    }
-
-    /**
-     * @param HookTargetResolve $target
-     * @return array{class-string<TClass>, callable-string<TClass>}
-     */
-    private function doResolveCallableTarget(object|callable|array|string $target): array
-    {
-        // 1. Array [$object, 'memberName'] — fast path
-        if (is_array($target)) {
-            if (is_object($target[0])) {
-                return [get_class($target[0]), $target[1]];
-            } elseif (is_string($target[0])) {
-                return [$target[0], $target[1]];
-            }
-        }
-
-        // 2. String 'Class::method' — static fallback
-        if (is_string($target)) {
-            $parts = explode('::', $target, 2);
-            return [$parts[0], $parts[1] ?? '__invoke'];
-        }
-
-        // 3. Invokable Object Instance (anonymous class from a property)
-        if (!$target instanceof \Closure && is_object($target)) {
-            return $this->analyseObject($target);
-        }
-
-        // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
-        $ref = new \ReflectionFunction($target);
-        $calledClass = $ref->getClosureThis() ?? null;
-
-        if ($calledClass === null) {
-            throw new \InvalidArgumentException('Callable target must be bound to an object instance.');
-        }
-
-        $name = $ref->getName();
-
-        // Standard Instance Method ($service->method(...))
-        if (!str_contains($name, '{closure')) {
-            return [$calledClass::class, $name];
-        }
-
-        // PHP 8.4 Property Hook Closure ("{closure:FQCN::$propertyName::get():line}")
-        if (str_contains($name, '::$')) {
-            $start = strpos($name, '::$') + 3;
-            $end = strpos($name, '::', $start);
-
-            if ($start !== false && $end !== false) {
-                return [$calledClass::class, substr($name, $start, $end - $start)];
-            }
-        }
-
-        throw new \InvalidArgumentException('Unable to resolve hook target for class ' . $calledClass::class . '.');
-    }
-
-    /**
-     * @param object<TClass> $target
-     * @return array{class-string<TClass>, callable-string<TClass>}
-     */
-    private function analyseObject(object $target): array
-    {
-        $className = $target::class;
-
-        // Anonymous class extending ModuleClassHookMetadata —
-        // reads parent class & property directly, no backtrace needed.
-        if ($target instanceof ModuleClassHookMetadata) {
-            return [$target->parentClassString, $target->parentProperty];
-        }
-
-        // Best-effort fallback for anonymous classes: walk the call stack
-        // to find which object's property holds this instance.
-        if (new \ReflectionClass($target)->isAnonymous()) {
-            $frames = Backtrace::create()
-                ->withArguments(false)
-                ->limit(10)
-                ->frames();
-
-            /** @var Frame $frame */
-            foreach ($frames as $frame) {
-                $callerObject = $frame->object;
-                if ($callerObject === null) {
-                    continue;
-                }
-
-                $refClass = new \ReflectionClass($callerObject);
-                foreach ($refClass->getProperties() as $property) {
-                    if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
-                        Logger::info(
-                            "WPHooksContainerRegistry: ",
-                            "Anon class without extending ModuleClassHookMetadata, it's recommended to use 'ModuleClassHookMetadata'." . $refClass->getName() . "::" . $property->getName()
-                        );
-                        return [$refClass->getName(), $property->getName()];
-                    }
-                }
-            }
-        }
-
-        return [$className, '__invoke'];
     }
 }

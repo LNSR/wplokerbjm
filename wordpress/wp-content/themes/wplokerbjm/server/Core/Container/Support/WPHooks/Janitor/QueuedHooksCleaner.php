@@ -81,8 +81,9 @@ class QueuedHooksCleaner
                 !$this->schedulerCleanerDispatched && $this->allHookActionCommand('add');
 
                 /**
-                 * This ideal during sequential adjacent `once` priorities hook
-                 * * Make sure previous priority wiped at next priority order to prevent chance of re-entrancy despite invoker logically guarded
+                 * This is ideal for sequential adjacent `once` priorities on the same hook:
+                 * wipe the previous priority's callback at the next priority, closing the
+                 * re-entrancy window even though the invoker is already logically guarded.
                  */
                 ($this->scheduleCleanup)($invoker);
                 break;
