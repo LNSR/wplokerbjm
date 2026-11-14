@@ -26,6 +26,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryUniqueKey;
  *    type: 'action'|'filter',
  *    priority: int,
  *    acceptedArgs: int,
+ *    attributeIndex: int,
  * }
  * @extends parent<HookKeyShape>
  */
@@ -38,6 +39,7 @@ final readonly class HookKey extends AbstractDataObject
      * @param HookKeyShape['type'] $type
      * @param HookKeyShape['priority'] $priority
      * @param HookKeyShape['acceptedArgs'] $acceptedArgs
+     * @param HookKeyShape['attributeIndex'] $attributeIndex
      */
     public function __construct(
         public string $class,
@@ -46,6 +48,7 @@ final readonly class HookKey extends AbstractDataObject
         public string $type,
         public int $priority,
         public int $acceptedArgs,
+        public int $attributeIndex = 0,
     ) {}
 
     public static function fromRegistration(HookRegistration $registration): self
@@ -57,13 +60,15 @@ final readonly class HookKey extends AbstractDataObject
             type: $registration->type,
             priority: $registration->priority,
             acceptedArgs: $registration->acceptedArgs,
+            attributeIndex: $registration->attributeIndex,
         );
     }
 
     public function toString(): string
     {
         return $this->class . '::' . $this->method . '::' . $this->target
-            . '::' . $this->type . '::' . $this->priority . '::' . $this->acceptedArgs;
+            . '::' . $this->type . '::' . $this->priority . '::' . $this->acceptedArgs
+            . '::' . $this->attributeIndex;
     }
 
     public function isWithinNamespace(string $namespace): bool
@@ -90,6 +95,7 @@ final readonly class HookKey extends AbstractDataObject
  *  hook: string|\Closure(...): string,
  *  priority: int,
  *  acceptedArgs: int,
+ *  attributeIndex: int,
  *  deferRegister: bool,
  *  target: 'method'|'property'|'property-hook'|'#manual',
  *  visibility: 'public'|'protected'|'private',
@@ -136,6 +142,7 @@ final readonly class HookRegistration extends AbstractDataObject
      * @param HookType['once'] $once
      * @param HookType['onUnregisterDo'] $onUnregisterDo
      * @param HookType['onUnregisterDoParams']
+     * @param HookType['attributeIndex'] $attributeIndex
      */
     public function __construct(
         public string $class,
@@ -160,7 +167,8 @@ final readonly class HookRegistration extends AbstractDataObject
         public array $deferRegisterUntilHookParams = [],
         public bool $once = false,
         public ?\Closure $onUnregisterDo = null,
-        public array $onUnregisterDoParams = []
+        public array $onUnregisterDoParams = [],
+        public int $attributeIndex = 0,
     ) {}
 }
 #endregion

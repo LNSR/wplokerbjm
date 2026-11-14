@@ -1,0 +1,97 @@
+name: WPHooks Tests
+
+# Focused CI for the attribute-hook engine only.
+# Runs tests/WPHookTests against a freshly downloaded WordPress core
+# (the checkout itself does not have to carry a full WP install).
+
+on:
+  push:
+    paths:
+      - '.github/workflows/wphooks-tests.yml'
+      - 'wordpress/wp-content/themes/wplokerbjm/composer.json'
+      - 'wordpress/wp-content/themes/wplokerbjm/phpunit.xml'
+      - 'wordpress/wp-content/themes/wplokerbjm/tests/bootstrap.php'
+      - 'wordpress/wp-content/themes/wplokerbjm/tests/Support/**'
+      - 'wordpress/wp-content/themes/wplokerbjm/tests/WPHookTests/**'
+      - 'wordpress/wp-content/themes/wplokerbjm/server/Core/Container/**'
+      - 'wordpress/wp-content/themes/wplokerbjm/server/Shared/**'
+  pull_request:
+    paths:
+      - '.github/workflows/wphooks-tests.yml'
+      - 'wordpress/wp-content/themes/wplokerbjm/composer.json'
+      - 'wordpress/wp-content/themes/wplokerbjm/phpunit.xml'
+      - 'wordpress/wp-content/themes/wplokerbjm/tests/bootstrap.php'
+      - 'wordpress/wp-content/themes/wplokerbjm/tests/Support/**'
+      - 'wordpress/wp-content/themes/wplokerbjm/tests/WPHookTests/**'
+      - 'wordpress/wp-content/themes/wplokerbjm/server/Core/Container/**'
+      - 'wordpress/wp-content/themes/wplokerbjm/server/Shared/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wphooks-tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  wphooks:
+    name: WPHookTests (PHP 8.5)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    env:
+      WPLOKERBJM_WP_ROOT: ${{ github.workspace }}/.ci/wordpress
+
+    defaults:
+      run:
+        working-directory: wordpress/wp-content/themes/wplokerbjm
+
+    steps:
+      - uses: actions/setup-node@v6
+        with:
+          node-version: latest
+          check-latest: true
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          tools: composer:v2
+
+      - name: Get Composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('wordpress/wp-content/themes/wplokerbjm/composer.json') }}
+          restore-keys: ${{ runner.os }}-composer-
+
+      - name: Install dependencies
+        # --no-scripts skips the post-install dump-autoload --apcu hook
+        # (APCu is not guaranteed on the runner; the plain autoloader is enough
+        # because tests/bootstrap.php registers Nette RobotLoader for the app).
+        run: composer install --no-interaction --prefer-dist --no-progress --no-scripts
+
+      - name: Download latest WordPress core
+        working-directory: ${{ github.workspace }}
+        run: |
+          mkdir -p .ci
+          curl -fsSL https://wordpress.org/latest.tar.gz -o /tmp/wordpress.tar.gz
+          tar -xzf /tmp/wordpress.tar.gz -C .ci
+          test -f .ci/wordpress/wp-includes/plugin.php
+
+      - name: Run WPHookTests
+        run: |
+          vendor/bin/phpunit \
+            --colors=always \
+            --display-warnings \
+            --testdox \
+            --exclude-filter 'GraphQLTest|LowonganIngestRestTest|\bCacheTest::' \
+            tests/WPHookTests

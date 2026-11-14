@@ -26,6 +26,21 @@ $testRobotLoader->register();
 // Real WordPress hook engine (add_action / add_filter / do_action /
 // apply_filters / remove_action / ... / WP_Hook). Loaded once per process;
 // the test harness resets the hook globals before each test.
+//
+// WPLOKERBJM_WP_ROOT lets CI point at a WordPress core downloaded separately,
+// so the checkout does not have to carry a full WordPress install.
 if (!function_exists('add_action')) {
-    require_once dirname(__DIR__, 4) . '/wp-includes/plugin.php';
+    $wpRoot = getenv('WPLOKERBJM_WP_ROOT') ?: dirname(__DIR__, 4);
+    $wpPluginApi = rtrim($wpRoot, '/\\') . '/wp-includes/plugin.php';
+
+    if (!is_readable($wpPluginApi)) {
+        fwrite(
+            STDERR,
+            "WordPress hook engine not found at {$wpPluginApi}.\n"
+                . "Install WordPress under wp-includes/ or set WPLOKERBJM_WP_ROOT.\n"
+        );
+        exit(1);
+    }
+
+    require_once $wpPluginApi;
 }

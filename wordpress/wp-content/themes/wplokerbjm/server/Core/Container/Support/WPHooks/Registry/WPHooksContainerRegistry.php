@@ -97,14 +97,16 @@ class WPHooksContainerRegistry
             return;
         }
         $this->registerAll($this->hooksRegistration);
-        foreach ($this->handlers as $key => $data) {
+        foreach ($this->handlers as $key => $entry) {
             try {
-                $this->entriesIndexer->setIndexes($data);
-                $data->setOnEntryRemovalCallback($this->destroyIndexes);
+                $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
+                $this->entriesIndexer->setIndexes($entry);
+                $entry->setOnEntryRemovalCallback($this->destroyIndexes);
+                $this->entriesByInvokers[$entry->handler] = $entry;
             } catch (\Exception $e) {
                 Logger::error(
                     self::class,
-                    "Error registering {$data->invokerLabel}",
+                    "Error registering {$entry->invokerLabel}",
                     [
                         'message' => $e->getMessage(),
                         'trace' => $e->getTraceAsString(),
@@ -616,6 +618,7 @@ class WPHooksContainerRegistry
                 $entry->setOnEntryRemovalCallback($this->destroyIndexes);
                 $entry->register();
                 $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
+                SharedUtils::isDevelopment() && Logger::debug(self::class, 'Activated deferred hook ' . $data->handler->label);
                 return true;
             };
         }
@@ -859,8 +862,6 @@ class WPHooksContainerRegistry
             onUnregisterDoParams: $registration->onUnregisterDoParams
         );
 
-        $this->entriesByInvokers[$handler] = $entry;
-        $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
         $handler->setCleanupCallback($this->removeEntry);
 
         return [$handler, $entry];

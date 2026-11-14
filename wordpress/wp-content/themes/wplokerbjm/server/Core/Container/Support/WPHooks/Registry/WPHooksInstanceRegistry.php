@@ -133,6 +133,8 @@ class WPHooksInstanceRegistry
         $metadata = [];
         /** @var RuntimeRegistryHandlerEntry[] $records */
         $records = [];
+        /** @var array<string, int> $attributeOrdinals */
+        $attributeOrdinals = [];
         if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
             $cached = $this->cache?->get($instance->parentClassString, $instance->parentProperty);
             if ($cached !== null) {
@@ -146,13 +148,15 @@ class WPHooksInstanceRegistry
         $ref = new ReflectionClass($instance);
         $this->scanMethodHooks(
             $ref,
-            function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records, &$metadata, $forceNoCache): void {
+            function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records, &$metadata, $forceNoCache, &$attributeOrdinals): void {
                 $hook = $this->provider !== null && $attr->hook instanceof \Closure
                     ? $this->provider->resolveRuntimeHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $method->getName())
                     : $this->runtimeResolver->resolveClosureHook($attr->hook, $instance, $method->getName());
                 if ($hook === null) {
                     return;
                 }
+                $ordinalKey = 'method:' . $method->getName();
+                $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                 $hookKey = new HookKey(
                     class: (string) \spl_object_id($instance),
                     method: $method->getName(),
@@ -160,6 +164,7 @@ class WPHooksInstanceRegistry
                     type: $attr instanceof Action ? 'action' : 'filter',
                     priority: $attr->priority,
                     acceptedArgs: $attr->acceptedArgs,
+                    attributeIndex: $attributeIndex,
                 );
 
                 if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
@@ -231,11 +236,11 @@ class WPHooksInstanceRegistry
                     owner: $weakRef,
                     callback: null,
                 );
-                $this->entriesByInvokers[$handler] = $record;
-                $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                 $handler->setCleanupCallback($this->removeRuntimeHook);
                 if ($attr->deferRegisterUntilHook === null) {
                     $records[] = $record->register();
+                    $this->entriesByInvokers[$handler] = $record;
+                    $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                     return;
                 }
 
@@ -249,7 +254,7 @@ class WPHooksInstanceRegistry
 
         $this->scanPropertyHooks(
             $ref,
-            function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records, &$metadata, &$hookKey, $forceNoCache): void {
+            function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records, &$metadata, &$hookKey, $forceNoCache, &$attributeOrdinals): void {
                 $hook = $this->provider !== null && $attr->hook instanceof \Closure
                     ? $this->provider->resolveRuntimeHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $property->getName(), $instance)
                     : $this->runtimeResolver->resolveClosureHook($attr->hook, $instance, $property->getName());
@@ -257,6 +262,8 @@ class WPHooksInstanceRegistry
                     return;
                 }
 
+                $ordinalKey = 'property:' . $property->getName();
+                $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                 $hookKey = new HookKey(
                     class: (string) \spl_object_id($instance),
                     method: $target,
@@ -264,6 +271,7 @@ class WPHooksInstanceRegistry
                     type: $attr instanceof Action ? 'action' : 'filter',
                     priority: $attr->priority,
                     acceptedArgs: $attr->acceptedArgs,
+                    attributeIndex: $attributeIndex,
                 );
 
                 if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
@@ -338,12 +346,12 @@ class WPHooksInstanceRegistry
                     callback: null,
                 );
 
-                $this->entriesByInvokers[$handler] = $record;
-                $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                 $handler->setCleanupCallback($this->removeRuntimeHook);
 
                 if ($attr->deferRegisterUntilHook === null) {
                     $records[] = $record->register();
+                    $this->entriesByInvokers[$handler] = $record;
+                    $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                 } else {
                     $this->instanceRegistryDeferredHookManager->deferManualUntilHook(
                         deferRegisterUntilHook: $attr->deferRegisterUntilHook,
@@ -460,7 +468,7 @@ class WPHooksInstanceRegistry
         /** @var list<RuntimeRegistryHandlerEntry> $records */
         $records = [];
 
-        foreach ($entries as $entry) {
+        foreach ($entries as $attributeIndex => $entry) {
             if ($entry->deferRegisterUntilHook !== null) {
                 // Cached deferred entries are gated at activation time only.
             } elseif ($this->provider !== null) {
@@ -515,6 +523,7 @@ class WPHooksInstanceRegistry
                 priority: $entry->priority,
                 type: $entry->type,
                 acceptedArgs: $entry->acceptedArgs,
+                attributeIndex: $attributeIndex,
             );
             $record = new RuntimeRegistryHandlerEntry(
                 hook: $entry->hook,
@@ -533,12 +542,12 @@ class WPHooksInstanceRegistry
                 owner: $weakRef,
                 callback: null,
             );
-            $this->entriesByInvokers[$handler] = $record;
-            $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
             $handler->setCleanupCallback($this->removeRuntimeHook);
-
+            
             if ($entry->deferRegisterUntilHook === null) {
                 $records[] = $record->register();
+                $this->entriesByInvokers[$handler] = $record;
+                $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                 continue;
             }
 

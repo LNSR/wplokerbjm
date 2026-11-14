@@ -134,7 +134,6 @@ final class RegistryInvokerReferenceTest extends WplokerbjmTestCase
         self::assertNotNull($hook);
 
         $invoker = $hook['callable'];
-        $priority = $hook['priority'];
         $reference = \WeakReference::create($invoker);
 
         \do_action('invoker_ref_hook');

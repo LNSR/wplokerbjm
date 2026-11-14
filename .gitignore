@@ -49,3 +49,5 @@ worker-configuration.d.ts
 **/.claude
 **/.phpstorm.meta.php
 wordpress/wp-content/themes/wplokerbjm/tools/Composer/Scripts/generate-meta-hooks/cache
+# CI-downloaded WordPress core
+.ci/
