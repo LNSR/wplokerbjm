@@ -7,6 +7,8 @@ namespace WPLokerBJM\Tests\WPHookTests;
 use DI\Container;
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
@@ -30,7 +32,10 @@ final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
         parent::setUp();
         /** @suppresswarnings PHP0410 */
         $this->deferredIsolationService = null;
-        $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, ['provider' => null, 'queuedHooksCleaner' => $this->queuedHooksCleaner]);
+        $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, [
+            'provider' => new RuntimeWPHookProvider(null),
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
+        ]);
 
         $builder = new ContainerBuilder();
         $builder->useAutowiring(true);

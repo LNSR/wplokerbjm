@@ -116,23 +116,9 @@ trait HookProviderTrait
             $paramType = $injectInstance?->name ?? null;
             if ($type instanceof ReflectionNamedType && $type->getName() === 'self' && $paramType === null) {
                 $reflectClass = $reflect->getClosureScopeClass();
-                $parentClass = $reflectClass?->getParentClass();
-                $isModuleClass = $parentClass ? $parentClass->getName() === ModuleClassHookMetadata::class : false;
-
-                switch (true) {
-                    case $isModuleClass:
-                        $paramType = $reflectClass->isAnonymous()
-                            ? 'self'
-                            : $reflectClass->getName();
-                        break;
-                    case $reflectClass->isAnonymous():
-                        throw new RuntimeException(
-                            'Bare Anonymous class cannot be used as a parameter type hint \'self\' for hook.'
-                        );
-                    default:
-                        $paramType = $reflectClass->getName();
-                        break;
-                };
+                $paramType = $reflectClass?->isAnonymous()
+                    ? 'self'
+                    : $reflectClass?->getName();
             } else {
                 $paramType = $type instanceof ReflectionNamedType && !$type->isBuiltin() ? $type->getName() : $paramType;
             }
@@ -341,8 +327,12 @@ trait HookProviderTrait
         }
 
         $targetInstanceWeakRef = null;
-        if (is_object($targetClass)) {
-            $targetInstanceWeakRef = $targetClass instanceof \WeakReference ? $targetClass : \WeakReference::create($targetClass);
+        if ($targetClass instanceof \WeakReference) {
+            $targetInstanceWeakRef = $targetClass;
+            $instance = $targetClass->get();
+            $targetClass = $instance !== null ? $instance::class : null;
+        } elseif (is_object($targetClass)) {
+            $targetInstanceWeakRef = \WeakReference::create($targetClass);
             $targetClass = $targetClass::class;
         }
 
@@ -537,14 +527,14 @@ trait HookProviderTrait
 
             if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
                 $className = $reflect->getClosureScopeClass()->getName();
-                if ($container !== null && $container->has($className)) {
-                    $values[] = $container->get($className);
+                if ($container !== null && $container?->has($className)) {
+                    $values[] = $container?->get($className);
                     $resolved = true;
                 }
             } elseif ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
                 $className = $type->getName();
-                if ($container !== null && $container->has($className)) {
-                    $values[] = $container->get($className);
+                if ($container !== null && $container?->has($className)) {
+                    $values[] = $container?->get($className);
                     $resolved = true;
                 }
             }
@@ -623,8 +613,7 @@ trait HookProviderTrait
              */
             if (
                 ($param['type'] ?? null) === 'self'
-                && $instanceTarget instanceof ModuleClassHookMetadata
-                && ($container === null || !$container->has($instanceTarget::class))
+                && $instanceTarget !== null
             ) {
                 $values[] = $instanceTarget;
                 continue;
@@ -645,8 +634,8 @@ trait HookProviderTrait
     {
         $type = $param['type'] ?? null;
 
-        if (is_string($type) && $type !== '' && $container !== null && $container->has($type)) {
-            return $container->get($type);
+        if (is_string($type) && $type !== '' && $container !== null && $container?->has($type)) {
+            return $container?->get($type);
         }
 
         if (!empty($param['hasDefault'])) {

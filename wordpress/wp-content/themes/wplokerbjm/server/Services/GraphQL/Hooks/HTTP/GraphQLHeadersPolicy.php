@@ -51,6 +51,7 @@ final class GraphQLHeadersPolicy
              * @see Router::get_response_headers
              */
             \remove_all_filters('graphql_response_headers_to_send', \PHP_INT_MAX);
+            if (!\is_user_logged_in()) return;
             do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [__CLASS__, 'disableGraphQLNocacheHeader']);
             do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [__CLASS__, 'applyCachePolicy']);
         }

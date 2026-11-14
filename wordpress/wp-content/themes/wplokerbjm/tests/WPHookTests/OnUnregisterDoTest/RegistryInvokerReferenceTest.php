@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests\WPHookTests;
+namespace WPLokerBJM\Tests\WPHookTests\OnUnregisterDoTest;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
@@ -26,6 +26,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  * destructor-driven cleanup never runs).
  *
  ** Note: No explicit \gc_collect_cycles() called. Circular reference may goes unnoticed.
+ * ! Foundation for OnUnregisterDo tests relevancy
  */
 final class RegistryInvokerReferenceTest extends WplokerbjmTestCase
 {
@@ -134,7 +135,6 @@ final class RegistryInvokerReferenceTest extends WplokerbjmTestCase
         self::assertNotNull($hook);
 
         $invoker = $hook['callable'];
-        $priority = $hook['priority'];
         $reference = \WeakReference::create($invoker);
 
         \do_action('invoker_ref_hook');

@@ -31,7 +31,7 @@
     "viewerjs": "^1.15.2"
   },
   "devDependencies": {
-    "@cloudflare/workers-types": "^5.20261114.1",
+    "@cloudflare/workers-types": "^5.20261115.1",
     "@eslint/compat": "^2.1.1",
     "@gql.tada/svelte-support": "^1.0.3",
     "@sveltejs/adapter-cloudflare": "^8.0.2",
@@ -43,12 +43,12 @@
     "@typescript-eslint/eslint-plugin": "^8.72.2",
     "@typia/unplugin": "^12.1.1",
     "@urql/exchange-persisted": "^5.0.1",
-    "daisyui": "^5.8.0",
+    "daisyui": "^5.8.1",
     "es-toolkit": "^1.53.2",
     "eslint": "^10.15.0",
     "eslint-plugin-svelte": "^3.24.1",
     "globals": "^17.14.0",
-    "gql.tada": "^1.11.4",
+    "gql.tada": "^1.11.5",
     "graphql": "^17.1.0",
     "runed": "^0.37.1",
     "svelte": "^5.57.3",

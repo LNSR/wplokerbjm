@@ -54,13 +54,13 @@ class WPLokerBJMContainer
      */
     private ?object $containerConfigurationState {
         get => $this->containerConfigurationState ??= new class() {
-            /** @var array<class-string,object> */
-            public ?Container $containerDI = null;
-            public array $extraRuntimeDefinitionsSet = [];
-            public bool $configured = false;
-            public ?ContainerBuilder $containerBuilder = null;
-            public function __construct()
-            {
+            /** @param array<class-string,object> $extraRuntimeDefinitionsSet */
+            public function __construct(
+                public ?Container $containerDI = null,
+                public array $extraRuntimeDefinitionsSet = [],
+                public bool $configured = false,
+                public ?ContainerBuilder $containerBuilder = null,
+            ) {
                 return;
                 \class_alias(__CLASS__, __WPLokerBJMContainerConfigurationState::class);
                 \class_alias(self::class, __WPLokerBJMContainerConfigurationState::class);
@@ -94,7 +94,8 @@ class WPLokerBJMContainer
         }
     }
 
-    public function getContainerDI(): ?Container {
+    public function getContainerDI(): ?Container
+    {
         return $this->containerConfigurationState?->containerDI ?? null;
     }
 

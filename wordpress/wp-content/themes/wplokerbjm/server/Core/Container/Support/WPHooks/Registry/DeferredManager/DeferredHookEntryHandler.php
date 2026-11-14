@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HookProviderTrait, HandlerEntryUniqueKey};
+use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, InstanceHookMetadata, HookKey};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
@@ -87,13 +89,18 @@ final class DeferredHookEntryHandler
     public function __destruct()
     {
         \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
+        SharedUtils::isDevelopment() && Logger::debug(__CLASS__, "Deferred entry destroyed; removing entry indexes: ", [
+            'invokerLabel' => $this->handler->label,
+            'key' => $this->key->toString(),
+        ]);
     }
 
     /** @param DeferredHookEntry['removeEntryIndexCallback'] $callback */
-    public function setOnEntryRemovalCallback(\Closure $callback): void {
+    public function setOnEntryRemovalCallback(\Closure $callback): void
+    {
         $this->removeEntryIndexCallback = $callback;
     }
-    
+
     public static function fromContainerRegistryHandlerEntry(ContainerRegistryHandlerEntry $entry): self
     {
         return new static(

@@ -9,6 +9,7 @@ use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, InstanceRegistryRuntimeHookResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -174,7 +175,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
     public function testRuntimeRegistryRegistersExecuteIfGatedHooksButGatesAtFireTime(): void
     {
         $registry = $this->container->make(WPHooksInstanceRegistry::class, [
-            'provider' => null
+            'provider' => new RuntimeWPHookProvider(null)
         ]);
         $registry->registerHooksOn(new RuntimeExecuteIfService());
 

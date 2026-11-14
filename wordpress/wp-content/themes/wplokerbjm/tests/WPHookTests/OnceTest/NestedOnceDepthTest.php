@@ -5,7 +5,6 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\WPHookTests\OnceTest;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
-use WPLokerBJM\Tests\Support\Fixtures\NestedOnceService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
@@ -27,15 +26,17 @@ final class NestedOnceDepthTest extends WplokerbjmTestCase
     protected function setUp(): void
     {
         parent::setUp();
-        /** @suppresswarnings PHP0410 */
         $this->nestedOnceService = null;
-        $this->container()->set($this->nestedOnceService::class, $this->nestedOnceService);
+        $this->container()->set(NestedOnceService::class, $this->nestedOnceService);
         $this->flushQueuedRemovalsAfterDispatch = false;
     }
 
-    private $nestedOnceService {
+    private ?NestedOnceService $nestedOnceService { 
         get {
             return $this->nestedOnceService ??= new class() {
+                public function __construct() {
+                   !\class_exists(NestedOnceService::class) && \class_alias(__CLASS__, NestedOnceService::class);
+                }
                 public array $log = [];
 
                 public int $outerRuns = 0;
@@ -113,7 +114,7 @@ final class NestedOnceDepthTest extends WplokerbjmTestCase
     {
         return [
             [
-                'class' => $this->nestedOnceService::class,
+                'class' => NestedOnceService::class,
                 'method' => 'outer',
                 'type' => 'action',
                 'hook' => 'nested_outer',
@@ -125,7 +126,7 @@ final class NestedOnceDepthTest extends WplokerbjmTestCase
                 'executeIfParams' => [],
             ],
             [
-                'class' => $this->nestedOnceService::class,
+                'class' => NestedOnceService::class,
                 'method' => 'mid',
                 'type' => 'action',
                 'hook' => 'nested_mid',
@@ -138,7 +139,7 @@ final class NestedOnceDepthTest extends WplokerbjmTestCase
                 'executeIfParams' => [],
             ],
             [
-                'class' => $this->nestedOnceService::class,
+                'class' => NestedOnceService::class,
                 'method' => 'inner',
                 'type' => 'action',
                 'hook' => 'nested_inner',

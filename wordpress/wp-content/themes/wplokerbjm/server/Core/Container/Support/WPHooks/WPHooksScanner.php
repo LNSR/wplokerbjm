@@ -103,12 +103,17 @@ class WPHooksScanner
             }
             try {
                 $reflection = new ReflectionClass($className);
-                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations): void {
+                /** @var array<string, int> $attributeOrdinals */
+                $attributeOrdinals = [];
+                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, &$attributeOrdinals): void {
+                    $ordinalKey = 'method:' . $method->getName();
+                    $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $method->getName(),
                         type: $type,
                         hook: $attr->hook,
+                        attributeIndex: $attributeIndex,
                         hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                         priority: $attr->priority,
                         acceptedArgs: $attr->acceptedArgs,
@@ -131,12 +136,15 @@ class WPHooksScanner
                     );
                 });
 
-                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations): void {
+                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations, &$attributeOrdinals): void {
+                    $ordinalKey = 'property:' . $property->getName();
+                    $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $property->getName(),
                         type: $type,
                         hook: $attr->hook,
+                        attributeIndex: $attributeIndex,
                         hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                         priority: $attr->priority,
                         acceptedArgs: $attr->acceptedArgs,

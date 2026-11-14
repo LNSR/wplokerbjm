@@ -20,12 +20,12 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * ## Two registries, one attribute
  * ---------------------------------------------------------------------------
  *
- * - `WPHooksContainerRegistry` — attribute-discovered **services**. The handler/invoker
+ * - `WPHooksContainerRegistry(primary registry)` — attribute-discovered **services**. The handler/invoker
  *   is a lazy proxy: the service is resolved with `$container->get()` on first
  *   dispatch, so its constructor (DB clients, HTTP clients, …) does not run
  *   until the hook actually fires. Supports tags, deferred activation and the
  *   batch activation/unregistration APIs.
- * - `WPHooksInstanceRegistry` — **runtime instances**, normally anonymous
+ * - `WPHooksInstanceRegistry(secondary registry)` — **runtime instances**, normally anonymous
  *   classes extending {@see ModuleClassHookMetadata}. The handler keeps only a
  *   `WeakReference` to the live instance; when that instance is garbage
  *   collected the handler becomes inert and detaches itself.

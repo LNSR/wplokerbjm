@@ -7,6 +7,7 @@ namespace WPLokerBJM\Tests\WPHookTests;
 use DI\Container;
 use DI\ContainerBuilder;
 use Nette\Loaders\RobotLoader;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, InstanceRegistryRuntimeHookResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
@@ -115,7 +116,7 @@ class InheritedHookTest extends WplokerbjmTestCase
     public function testRuntimeRegistryIsDeclaredOnly(): void
     {
         $runtime = $this->container()->make(WPHooksInstanceRegistry::class, [
-            'provider' => null,
+            'provider' => new RuntimeWPHookProvider(null),
         ]);
 
         // Inherited parent hook is NOT registered on the child instance.

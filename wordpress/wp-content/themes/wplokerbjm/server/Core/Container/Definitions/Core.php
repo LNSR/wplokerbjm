@@ -57,16 +57,16 @@ class Core implements DefinitionProviderInterface
         $core = [
             QueuedHooksCleaner::class => \DI\autowire(QueuedHooksCleaner::class),
             WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class),
-            ContainerRegistryHookTargetResolve::class => \DI\autowire(ContainerRegistryHookTargetResolver::class),
+            ContainerRegistryHookTargetResolver::class => \DI\autowire(ContainerRegistryHookTargetResolver::class),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
                 static fn() => \CompiledContainer::METHOD_MAPPING,
                 $namespace,
-                static fn() => get_stylesheet_directory() . "/cache",
+                defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache" : get_stylesheet_directory() . "/cache",
                 \DI\get(WPHookPlanProvider::class)
             ),
             WPHooksInstanceObjectCache::class => \DI\autowire(WPHooksInstanceObjectCache::class)->constructor(
-                static fn(): string => get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
+                static fn(): string => defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache/WPHooksInstanceObjectCache.php" : get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
             ),
             InstanceRegistryDeferredHookManager::class => \DI\autowire(InstanceRegistryDeferredHookManager::class)->constructor(
                 \DI\get(RuntimeWPHookProvider::class),
@@ -106,7 +106,7 @@ class Core implements DefinitionProviderInterface
             PlanCompiler::class => \DI\autowire(PlanCompiler::class),
             ScopeAccessFactory::class => \DI\autowire(ScopeAccessFactory::class),
             PlanCache::class => \DI\autowire(PlanCache::class)->constructor(
-                static fn(): string => get_stylesheet_directory() . '/cache/DependencyInjectorCache.php'
+                static fn(): string => defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache/DependencyInjectorCache.php" : get_stylesheet_directory() . "/cache/DependencyInjectorCache.php"
             ),
             DependencyInjector::class => \DI\autowire(DependencyInjector::class)->constructor(
                 \DI\get(ContainerInterface::class),

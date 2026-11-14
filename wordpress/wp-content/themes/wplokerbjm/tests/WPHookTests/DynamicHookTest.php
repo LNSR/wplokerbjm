@@ -8,7 +8,7 @@ use Closure;
 use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{RuntimeWPHookProvider, WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, InstanceRegistryRuntimeHookResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, ContainerRegistryHookTargetResolver};
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\Fixtures\DynamicHookService;
@@ -165,7 +165,7 @@ class DynamicHookTest extends WplokerbjmTestCase
     public function testRuntimeRegistryRegistersClosureHooks(): void
     {
         $runtimeRegistry = $this->container->make(WPHooksInstanceRegistry::class, [
-            'provider' => null
+            'provider' => new RuntimeWPHookProvider(null)
         ]);
 
         // The instance must be kept alive — runtime hooks are instance-lifetime

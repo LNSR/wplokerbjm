@@ -7,6 +7,8 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryUniqueKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HookProviderTrait};
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
+use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, InstanceHookMetadata, HookKey};
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
@@ -81,15 +83,21 @@ final class ContainerRegistryHandlerEntry
      */
     public function __destruct()
     {
-        if ($this->registered) $this->unregister();
+        if ($this->registered) {
+            $this->unregister();
+            SharedUtils::isDevelopment() && Logger::debug(__CLASS__, "Container Registry Handler Entry destroyed before explicit registry unregistration, removing entry indexes: ", [
+                'invokerLabel' => $this->invokerLabel,
+            ]);
+        }
         \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
     }
 
     /** @param HandlerEntry['removeEntryIndexCallback'] $callback */
-    public function setOnEntryRemovalCallback(\Closure $callback): void {
+    public function setOnEntryRemovalCallback(\Closure $callback): void
+    {
         $this->removeEntryIndexCallback = $callback;
     }
-    
+
     public static function fromDeferredEntry(DeferredHookEntryHandler $deferredEntry): self
     {
         return new static(
@@ -203,4 +211,3 @@ final class RuntimeRegistryHandlerEntry
         );
     }
 }
-

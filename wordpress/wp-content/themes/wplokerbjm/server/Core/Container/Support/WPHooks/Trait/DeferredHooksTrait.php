@@ -40,7 +40,7 @@ trait DeferredHooksTrait
      *
      * @var IndexedHandler
      */
-    public private(set) array $deferredHandlers = [];
+    public protected(set) array $deferredHandlers = [];
     /** @var DeferredHookEntry['removeEntryIndexCallback'] */
     protected ?\Closure $destroyIndexes = null;
 

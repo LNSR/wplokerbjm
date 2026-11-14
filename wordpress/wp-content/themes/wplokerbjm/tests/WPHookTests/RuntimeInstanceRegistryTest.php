@@ -30,8 +30,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         self::$deferredGateOpen = false;
 
         $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, [
-            'provider' => null,
-            'queuedHooksCleaner' => $this->queuedHooksCleaner,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner(),
         ]);
     }
 
@@ -361,10 +360,10 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
     public function testSeparateRegistriesAreIsolated(): void
     {
         $registryA = $this->container()->make(WPHooksInstanceRegistry::class, [
-            'provider' => null,
+            'provider' => new RuntimeWPHookProvider(null),
         ]);
         $registryB = $this->container()->make(WPHooksInstanceRegistry::class, [
-            'provider' => null,
+            'provider' => new RuntimeWPHookProvider(null),
         ]);
 
         $captured = [];
@@ -1068,7 +1067,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
             'cache' => $cache,
-            'queuedHooksCleaner' => $this->queuedHooksCleaner,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
         ]);
 
         // First instance populates the cache (scan path).
@@ -1120,7 +1119,8 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $captured = [];
 
         $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
-            public function __construct(RuntimeInstanceRegistryTest $parentClass, $identifier, private array &$captured) {
+            public function __construct(RuntimeInstanceRegistryTest $parentClass, $identifier, private array &$captured)
+            {
                 parent::__construct($parentClass, $identifier);
             }
 
@@ -1401,10 +1401,10 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
                 $this->log[] = 'fired';
             }
         };
-
+        $cleaner = new QueuedHooksCleaner();
         $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
             'cache' => $cache,
-            'queuedHooksCleaner' => $this->queuedHooksCleaner,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = $cleaner
         ]);
 
         // Both instances must stay alive: the registry binds handlers through

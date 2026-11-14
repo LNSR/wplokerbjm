@@ -25,7 +25,7 @@ class InstanceRegistryDeferredHookManager
     use DeferredHooksTrait;
 
     public function __construct(
-        private ?RuntimeWPHookProvider $provider = null,
+        private RuntimeWPHookProvider $provider = new RuntimeWPHookProvider(null),
         private InstanceRegistryRuntimeHookResolver $runtimeResolver = new InstanceRegistryRuntimeHookResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
     ) {}
@@ -74,12 +74,7 @@ class InstanceRegistryDeferredHookManager
     ): void {
         $triggerHook = $deferRegisterUntilHook;
         if ($triggerHook instanceof \Closure) {
-            $triggerHook = $this->provider !== null
-                ? $this->provider->resolveRuntimeHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook instanceof \Closure ? $triggerHook : null), 'manual', $entry->instance?->get())
-                : $this->runtimeResolver->resolveClosureHook($triggerHook, $entry->instance?->get(), 'manual');
-            if ($triggerHook === null) {
-                return;
-            }
+            $triggerHook = $this->provider->resolveRuntimeHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook instanceof \Closure ? $triggerHook : null), 'manual', $entry->instance?->get());
         }
 
         $this->addDeferred($entry);

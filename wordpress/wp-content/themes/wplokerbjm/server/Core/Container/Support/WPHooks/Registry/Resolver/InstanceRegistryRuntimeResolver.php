@@ -58,46 +58,6 @@ class InstanceRegistryRuntimeHookResolver
     }
 
     /**
-     * Resolve a hook name from a static string or an attribute-parameter closure.
-     *
-     * Closures declared in attribute parameters are static and already scoped
-     * to the declaring class (PHP 8.1 RFC 'Closures in constant expressions'),
-     * so private members resolve via self:: and the closure is invoked directly.
-     *
-     * @param string|\Closure $hook       Static hook name or closure resolving to one.
-     * @param object          $instance   Owner instance.
-     * @param string          $targetName Method/property name (for log messages).
-     *
-     * @return string|null The resolved hook name, or null when it could not be resolved.
-     */
-    public function resolveClosureHook(string|\Closure $hook, object $instance, string $targetName): ?string
-    {
-        if (\is_string($hook)) {
-            return $hook;
-        }
-
-        try {
-            $resolved = $hook();
-        } catch (\Throwable $e) {
-            Logger::warning(
-                self::class,
-                'Skipping hook on ' . $targetName . ' — hook closure failed: ' . $e->getMessage()
-            );
-            return null;
-        }
-
-        if (!\is_string($resolved) || $resolved === '') {
-            Logger::warning(
-                self::class,
-                'Skipping hook on ' . $targetName . ' — hook closure did not resolve to a non-empty string'
-            );
-            return null;
-        }
-
-        return $resolved;
-    }
-
-    /**
      * Resolve the parameter names of a hook-annotated method, used to build
      * named hook args for executeIf parameter resolution.
      *

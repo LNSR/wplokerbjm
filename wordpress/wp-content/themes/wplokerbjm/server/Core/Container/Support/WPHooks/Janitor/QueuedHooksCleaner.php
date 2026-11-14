@@ -145,7 +145,7 @@ class QueuedHooksCleaner
                  * * 'all' hook is in different active stack it's ok to indiscriminately remove invokers immediately
                  */
                 foreach ($this->queuedRemovalEntry as $idx => $entry) {
-                    if ($invoker !== null && $entry->handler === $invoker) {
+                    if ($entry->handler === $invoker) {
                         continue;
                     }
                     $capturedLabel = $entry->handler?->label ?? null;

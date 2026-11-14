@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Tests\WPHookTests;
+namespace WPLokerBJM\Tests\WPHookTests\OnUnregisterDoTest;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
@@ -14,11 +14,11 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  * Pins the `onUnregisterDo` lifecycle on the container registry path:
  * the cleanup side effect is released exactly once, lazily, and can never
  * abort registration, dispatch or the destructor.
- ** Note: No explicit \gc_collect_cycles() called. Circular reference may goes unnoticed.
+ ** Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed.
  *
  * @see \WPLokerBJM\Core\Container\Attributes\BaseHookAttribute::$onUnregisterDo
  */
-final class OnUnregisterDoTest extends WplokerbjmTestCase
+final class OnUnregisterDoTestContainerRegistry extends WplokerbjmTestCase
 {
     protected function setUp(): void
     {
@@ -279,8 +279,9 @@ final class OnUnregisterDoTest extends WplokerbjmTestCase
         $hook = $this->findRegisteredHook('action', 'on_unregister_hook');
         self::assertNotNull($hook);
 
-        \add_action('shutdown', static function () use ($hook): void {
+        \add_action('shutdown', static function () use (&$hook): void {
             \remove_action($hook['hook'], $hook['callable'], $hook['priority']);
+            unset($hook);
         }, 10, 0);
 
         \do_action('shutdown');
