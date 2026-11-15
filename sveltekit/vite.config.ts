@@ -1,8 +1,16 @@
+import adapter from "@sveltejs/adapter-cloudflare";
+import { vitePreprocess } from "@sveltejs/vite-plugin-svelte";
 import devtoolsJson from "vite-plugin-devtools-json";
-import UnpluginTypia from '@typia/unplugin/vite'
+import UnpluginTypia from "@typia/unplugin/vite";
 import tailwindcss from "@tailwindcss/vite";
 import { sveltekit } from "@sveltejs/kit/vite";
-import { type ConfigEnv, type UserConfig, type Plugin, type LibraryFormats, type ResolvedConfig } from "vite";
+import {
+  type ConfigEnv,
+  type UserConfig,
+  type Plugin,
+  type LibraryFormats,
+  type ResolvedConfig,
+} from "vite";
 import { defineConfig, build as viteBuild } from "vite";
 import fs from "fs";
 import { resolve } from "path";
@@ -10,47 +18,57 @@ import { analyzer } from "vite-bundle-analyzer";
 import { partytownVite, copyLibFiles } from "@qwik.dev/partytown/utils";
 
 export default defineConfig((configEnv: ConfigEnv): UserConfig => {
-  const isDev = configEnv.mode === "development" || configEnv.mode === "preview";
+  const isDev =
+    configEnv.mode === "development" || configEnv.mode === "preview";
 
   const optimizeDeps: UserConfig["optimizeDeps"] = {
-    include: [
-      "comlink",
-      "idb",
-      "lru-cache",
-      "swiper",
-      "viewerjs",
-      "es-toolkit",
-    ],
+    exclude: ["@sveltejs/kit"],
   };
 
   const devServer: UserConfig["server"] = isDev
     ? {
-      host: true,
-      https:
-        fs.existsSync("../certs/localhost.key") && fs.existsSync("../certs/localhost.crt")
-          ? {
-            key: fs.readFileSync("../certs/localhost.key"),
-            cert: fs.readFileSync("../certs/localhost.crt"),
-          }
-          : undefined,
-      hmr: {
-        port: 50001,
-        clientPort: 50001,
-      },
-      headers: {
-        'Cross-Origin-Opener-Policy': 'same-origin',
-        'Cross-Origin-Embedder-Policy': 'credentialless',
-      },
-    }
+        host: true,
+        https:
+          fs.existsSync("../certs/localhost.key") &&
+          fs.existsSync("../certs/localhost.crt")
+            ? {
+                key: fs.readFileSync("../certs/localhost.key"),
+                cert: fs.readFileSync("../certs/localhost.crt"),
+              }
+            : undefined,
+        hmr: {
+          port: 50001,
+          clientPort: 50001,
+        },
+        headers: {
+          "Cross-Origin-Opener-Policy": "same-origin",
+          "Cross-Origin-Embedder-Policy": "credentialless",
+        },
+      }
     : undefined;
 
   const sharedPlugins: UserConfig["plugins"] = [
-    sveltekit(),
-    UnpluginTypia({
-      cache: true,
-      log: true,
+    sveltekit({
+      files: { assets: "public" },
+      preprocess: vitePreprocess({ script: true }),
+      compilerOptions: {
+        runes: true,
+        modernAst: true,
+        hmr: isDev,
+        discloseVersion: false,
+        dev: isDev,
+      },
+      version: { name: Date.now().toString() },
+      prerender: { concurrency: 4 },
+      adapter: adapter(),
+      paths: {
+        origin: isDev
+          ? "https://localhost:5173"
+          : "https://lokerbanjarmasin.my.id",
+      },
     }),
-  ]
+    UnpluginTypia({ cache: true, log: true }),
+  ];
 
   const plugins: UserConfig["plugins"] = [
     tailwindcss({
@@ -70,7 +88,9 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
       openAnalyzer: false,
       analyzerMode: "static",
     }),
-    copyPartytownAssets(resolve(import.meta.dirname, ".svelte-kit", "cloudflare", "~partytown")),
+    copyPartytownAssets(
+      resolve(import.meta.dirname, ".svelte-kit", "cloudflare", "~partytown"),
+    ),
   ];
 
   const build: UserConfig["build"] = {
@@ -87,11 +107,9 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
     },
   };
 
-  const worker: UserConfig['worker'] = {
+  const worker: UserConfig["worker"] = {
     format: "es",
-    plugins: () => [
-      ...sharedPlugins,
-    ],
+    plugins: () => [...sharedPlugins],
     rolldownOptions: {
       output: {
         codeSplitting: true,
@@ -99,7 +117,14 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
     },
   };
 
+  const ssr: UserConfig["ssr"] = {
+    optimizeDeps: {
+      exclude: ["@sveltejs/kit"],
+    },
+  };
+
   return {
+    ssr,
     plugins,
     optimizeDeps,
     server: devServer,
@@ -109,9 +134,9 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
 });
 
 function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
-  let root: ResolvedConfig['root'] = process.cwd();
-  let mode: ResolvedConfig['mode'] = "production";
-  let command: ResolvedConfig['command'] = "build";
+  let root: ResolvedConfig["root"] = process.cwd();
+  let mode: ResolvedConfig["mode"] = "production";
+  let command: ResolvedConfig["command"] = "build";
   let resolveConfig: UserConfig["resolve"];
 
   return {
@@ -137,7 +162,8 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
         mode,
         configFile: false,
         publicDir: false,
-        logLevel: "warn", // Toned down to avoid flooding the console on every edit
+        logLevel:
+          "warn" /* Toned down to avoid flooding the console on every edit */,
 
         resolve: {
           alias: resolveConfig?.alias,
@@ -170,7 +196,8 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
 
       // Vite's build returns an array or a single output object depending on configuration
       const buildOutput = Array.isArray(result) ? result[0] : result;
-      const output = buildOutput && 'output' in buildOutput ? buildOutput.output : null;
+      const output =
+        buildOutput && "output" in buildOutput ? buildOutput.output : null;
 
       if (!output) return null;
 
@@ -182,7 +209,7 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
       // Extract dependencies found during the sub-build and register them to the main watcher
       if (chunk && chunk.modules) {
         Object.keys(chunk.modules).forEach((modulePath) => {
-          if (!modulePath.includes('\0') && fs.existsSync(modulePath)) {
+          if (!modulePath.includes("\0") && fs.existsSync(modulePath)) {
             this.addWatchFile(resolve(modulePath));
           }
         });
@@ -196,7 +223,6 @@ function transformInlinedScript(format: LibraryFormats = "iife"): Plugin {
   };
 }
 
-
 function copyPartytownAssets(dest: string): Plugin {
   return {
     name: "copy-partytown-assets",
@@ -204,9 +230,11 @@ function copyPartytownAssets(dest: string): Plugin {
       try {
         await copyLibFiles(dest);
       } catch (error) {
-        console.warn("failed to copy Partytown assets to cloudflare dir", error);
+        console.warn(
+          "failed to copy Partytown assets to cloudflare dir",
+          error,
+        );
       }
-    }
-  }
+    },
+  };
 }
-

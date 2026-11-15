@@ -1,5 +1,5 @@
-import { APIServiceBrowser } from '@/services/graphql/APIService'
-import type { TaxonomyTerm, TaxonomyTermsResponse, TaxonomyType, TaxonomyGroup, WPBasePost } from '@/types'
+import { APIServiceBrowser } from '#src/services/graphql/APIService.js'
+import type { TaxonomyTerm, TaxonomyTermsResponse, TaxonomyType, TaxonomyGroup, WPBasePost } from '#src/types/index.js'
 import { SvelteMap } from 'svelte/reactivity'
 import typia from 'typia'
 

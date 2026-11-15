@@ -2,7 +2,7 @@ import type {
     SearchFilters,
     TaxonomyTerm,
     DropdownOption,
-} from '@/types'
+} from '#src/types/index.js'
 /**
  * Utility class for search-related functions, such as sanitizing filters and mapping taxonomy terms to dropdown options.
  * This class provides static methods that can be used across the application wherever search functionality is needed,

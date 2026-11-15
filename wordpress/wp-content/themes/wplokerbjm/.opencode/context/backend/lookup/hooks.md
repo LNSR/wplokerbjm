@@ -1,9 +1,9 @@
-<!-- Context: backend/lookup | Priority: high | Version: 1.0 | Updated: 2026-07-27 -->
+<!-- Context: backend/lookup | Priority: high | Version: 1.1 | Updated: 2026-11-18 -->
 
 # Lookup: Registered Hooks
 
 **Purpose**: Reference of all registered WordPress actions and filters
-**Last Updated**: 2026-07-27
+**Last Updated**: 2026-11-18
 
 ## Actions
 
@@ -64,15 +64,15 @@
 ## 📂 Codebase References
 
 **Hook Registration**:
-- `server/Core/Container/Support/WPHooks/WPHooksContainerRegistry.php` — Central hook registry
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — Central hook registry
 - `server/Core/Container/Support/WPHooks/WPHooksScanner.php` — Attribute discovery
-- `server/Core/Container/Definitions/Factory.php` — Lazy loading definitions
+- `server/Core/Container/Definitions/Factories.php` — Lazy loading definitions
 
 **Hook Sources**:
-- `server/Core/GlobalHooks.php` — Global WP hooks
-- `server/Core/Theme/ThemeHooks.php` — Theme support hooks
-- `server/Core/Plugins/ThirdParty/` — Plugin integration hooks
-- `server/Core/Cron/WPCron.php` — Scheduled cron hooks
+- `server/Core/Wordpress/GlobalHooks.php` — Global WP hooks
+- `server/Core/Wordpress/Theme/ThemeHooks.php` — Theme support hooks
+- `server/Core/Wordpress/Plugins/ThirdParty/` — Plugin integration hooks
+- `server/Core/Wordpress/Cron/WPCron.php` — Scheduled cron hooks
 
 ## Related
 - `concepts/hook-system.md` — How hooks work

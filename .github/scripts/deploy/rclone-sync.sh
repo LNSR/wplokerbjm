@@ -15,16 +15,16 @@ MEMORY_USAGE=$(free | grep Mem | awk '{printf "%.0f", $3/$2 * 100.0}' 2>/dev/nul
 CPU_USAGE=$(top -bn1 | grep "Cpu(s)" | sed "s/.*, *\([0-9.]*\)%* id.*/\1/" | awk '{printf "%.0f", 100 - $1}' 2>/dev/null || echo "N/A")
 
 if [ "$MEMORY_USAGE" != "N/A" ] && [ "$CPU_USAGE" != "N/A" ]; then
-    echo "Memory usage: ${MEMORY_USAGE}%"
-    echo "CPU usage: ${CPU_USAGE}%"
-    
-    # Warn if system is already heavily loaded
-    if [ "$MEMORY_USAGE" -gt 85 ] || [ "$CPU_USAGE" -gt 85 ]; then
-        echo "⚠️  Warning: System is heavily loaded (${MEMORY_USAGE}% memory, ${CPU_USAGE}% CPU)"
-        echo "Deployment may be slower than usual"
-    fi
+  echo "Memory usage: ${MEMORY_USAGE}%"
+  echo "CPU usage: ${CPU_USAGE}%"
+
+  # Warn if system is already heavily loaded
+  if [ "$MEMORY_USAGE" -gt 85 ] || [ "$CPU_USAGE" -gt 85 ]; then
+    echo "⚠️ Warning: System is heavily loaded (${MEMORY_USAGE}% memory, ${CPU_USAGE}% CPU)"
+    echo "Deployment may be slower than usual"
+  fi
 else
-    echo "Resource monitoring not available (non-Linux system)"
+  echo "Resource monitoring not available (non-Linux system)"
 fi
 
 eval "$(ssh-agent -s)"
@@ -40,7 +40,7 @@ if ! ssh-add -l >/dev/null 2>&1; then
 fi
 PORT=${SSH_PORT:-22}
 mkdir -p ~/.ssh
-ssh-keyscan -p $PORT $HOST >> ~/.ssh/known_hosts || true
+ssh-keyscan -p $PORT $HOST >>~/.ssh/known_hosts || true
 
 rclone config create sftpdeploy sftp host ${HOST} user ${SSH_USER} port ${SSH_PORT:-22} use-agent true disable-hashcheck true
 
@@ -94,12 +94,31 @@ for p in "${SELECTED[@]}"; do
   fi
 done
 
-# Start mu-plugin sync if needed
+# Start mu-plugin sync with fallback to infra-mu-plugins if primary mu-plugin path is locked/not writable
 if [ -n "${MU_PLUGIN_REMOTE_PATH:-}" ]; then
   MU_PLUGIN_FILE="../../mu-plugins/wplokerbjm-bootstrap.php"
   if [ -f "$MU_PLUGIN_FILE" ]; then
-    echo "Starting syncing wplokerbjm-bootstrap.php to $MU_PLUGIN_REMOTE_PATH"
-    rclone copy $DRY_FLAG $RCLONE_BASE_OPTS "$MU_PLUGIN_FILE" "sftpdeploy:$MU_PLUGIN_REMOTE_PATH" 2>&1 || true &
+    echo "Checking writability of primary mu-plugin path ($MU_PLUGIN_REMOTE_PATH)..."
+    ACTIVE_MU_PATH="$MU_PLUGIN_REMOTE_PATH"
+
+    if ! ssh -p $PORT $SSH_USER@$HOST "mkdir -p '$MU_PLUGIN_REMOTE_PATH' 2>/dev/null && [ -w '$MU_PLUGIN_REMOTE_PATH' ]"; then
+      echo "⚠️ Warning: Primary mu-plugin path ($MU_PLUGIN_REMOTE_PATH) is locked or not writable."
+      if [ -n "$MU_PLUGIN_FALLBACK_REMOTE_PATH" ]; then
+        echo "🔄 Falling back to alternative mu-plugin path: $MU_PLUGIN_FALLBACK_REMOTE_PATH"
+
+        if ssh -p $PORT $SSH_USER@$HOST "mkdir -p '$MU_PLUGIN_FALLBACK_REMOTE_PATH' && [ -w '$MU_PLUGIN_FALLBACK_REMOTE_PATH' ]"; then
+          ACTIVE_MU_PATH="$MU_PLUGIN_FALLBACK_REMOTE_PATH"
+          echo "✅ Fallback mu-plugin directory verified and writable."
+        else
+          echo "❌ Error: Fallback mu-plugin path ($MU_PLUGIN_FALLBACK_REMOTE_PATH) is also not writable."
+        fi
+      fi
+    else
+      echo "✅ Primary mu-plugin path is writable."
+    fi
+
+    echo "Starting syncing wplokerbjm-bootstrap.php to sftpdeploy:$ACTIVE_MU_PATH"
+    rclone copy $DRY_FLAG $RCLONE_BASE_OPTS "$MU_PLUGIN_FILE" "sftpdeploy:$ACTIVE_MU_PATH" 2>&1 || true &
     PIDS+=($!)
     sleep 1
   else
@@ -132,8 +151,6 @@ echo "Duration: ${DURATION} seconds"
 echo "Rclone options: $RCLONE_BASE_OPTS"
 echo "Note: Using conservative settings to prevent server overload (BW: ${RCLONE_BWLIMIT:-20M}, TPS: ${RCLONE_TPSLIMIT:-1}, concurrent operations, delete-after for safety, checksum verification)"
 echo "Check the run logs in Actions for details."
-
-
 
 # cleanup: stop agent and remove temporary private key file
 ssh-agent -k || true

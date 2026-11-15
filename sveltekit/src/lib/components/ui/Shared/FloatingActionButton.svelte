@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount, onDestroy } from "svelte";
-  import { type SocialMediaItem, SocialMediaPlatform } from "@/types";
+  import { type SocialMediaItem, SocialMediaPlatform } from "#src/types/index.js";
   import {
     ArrowUpSolid,
     HeadsetSolid,
@@ -9,8 +9,8 @@
     FacebookBrands,
     ThreadsBrands,
   } from "svelte-awesome-icons";
-  import { isJobGridEl } from "$lib/utils/elements.svelte";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  import { isJobGridEl } from "#lib/utils/elements.svelte.js";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
 
   const isMobile = $derived(deviceDetector.isPlatformMobile);
 

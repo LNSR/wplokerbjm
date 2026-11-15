@@ -1,3 +1,5 @@
+<!-- Context: backend/guides | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # WPHooks Lifecycle Guide
 
 **Purpose**: Trace discovery, registration, execution, activation, and teardown for attribute-based WordPress hooks.
@@ -43,13 +45,12 @@ If a gate returns false, a filter receives its original first argument unchanged
 
 Use `WPHooksInstanceRegistry` when the object already exists or cannot be discovered from files. `registerHooksOn()` scans attributes once per object and registers supported hooks immediately.
 
-- With a `RuntimeWPHookProvider` injected, attribute closures (hook name, `registerIf`, `executeIf`) are resolved: parameters inject by name from hook args, then from the container, then defaults. Without one, closures are invoked with no arguments — only zero-parameter or defaulted closures work.
+- Attribute closures (hook name, `registerIf`, `executeIf`) always resolve through the DI-container-backed `WPHookPlanProvider`: parameters inject by name from hook args first, then from the container, then defaults.
 - Attribute-argument closures must be static closures (PHP 8.1 constant-expression rule); private members resolve via `self::`, no instance binding is needed.
-- Plain `deferRegister` is still ignored on the attribute path (nothing would activate it); `deferRegisterUntilHook` IS supported — the entry sits in the deferred pool and auto-activates when the trigger fires (`deferUntilTriggerHook`, `did_action` short-circuit or `PHP_INT_MIN` listener). There is no manual activation API on the runtime path.
+- Plain `deferRegister` holds the entry in the deferred pool until `registerDeferredByCallableInLiveInstance()` activates it; `deferRegisterUntilHook` auto-activates when the trigger fires (`did_action` short-circuit or `PHP_INT_MIN` listener, retrying on each fire while a `registerIf` gate keeps failing). `unregisterDeferredByCallableInLiveInstance()` removes a held entry.
 - Static members are silently skipped.
 - Hooks are instance-lifetime scoped: the registry keeps a `WeakReference` to the owner; when the owner is garbage-collected the handler nukes itself (`consumeLifetime`) from the pool and `wp_filter`.
-- Manual `registerAction()` / `registerFilter()` support closures, captured state, explicit owners, `executeIf`, `once`, and `deferRegisterUntilHook`; `HookRuntimeResolver::resolveOwner()` infers the owner from array callables, bound closures, or invokable objects.
-- `AnonClassHookPropertyAbstract` stores a parent class/property pair so the container target resolver can identify an anonymous property value without a call-stack search.
+- `ModuleClassHookMetadata` stores a parent class/property pair so the container target resolver can identify an anonymous property value without a call-stack search.
 
 ## 6. Teardown
 
@@ -65,9 +66,8 @@ Use `unregisterByHook()`, `unregisterByClass()`, `unregisterByNamespace()`, `unr
 ## 📂 Codebase References
 
 - `server/Core/Container/Support/WPHooks/WPHooksScanner.php` — discovery, memoization, and cache export.
-- `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — callable plans, gates, dynamic names, and tag resolution (container path).
-- `server/Core/Container/Support/WPHooks/Provider/RuntimeWPHookProvider.php` — same resolution on the runtime path.
+- `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — callable plans, gates, dynamic names, and tag resolution (single provider for BOTH container and runtime paths).
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — active/deferred lifecycle and selectors.
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — immediate object and manual registration.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — immediate object (attribute-driven) registration.
 - `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — lazy execution and filter fallback behavior.
 - `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — runtime execution, once, and GC cleanup.

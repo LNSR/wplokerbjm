@@ -4,7 +4,9 @@ namespace WPLokerBJM\Core\Wordpress\Plugins;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Wordpress\{ContainerRegistryHookEvent, InstanceRuntimeRegistryHookEvent};
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\{
     WPGraphQL\WPGraphQL,
@@ -58,7 +60,6 @@ enum PluginList: string
     }
 }
 
-
 /* ==========================================================================
    INTERFACE CONFIG
    ========================================================================== */
@@ -73,7 +74,7 @@ interface PluginConfigInterface
    ========================================================================== */
 class PluginManager
 {
-    public const MUST_HAVE_PLUGINS = [
+    public const array MUST_HAVE_PLUGINS = [
         PluginList::LiteSpeed->value,
         PluginList::WpGraphql->value,
         PluginList::RankMath->value,
@@ -86,7 +87,7 @@ class PluginManager
      * 
      * @var array<class-string<PluginConfigInterface>>
      */
-    public const THIRD_PARTY_INTEGRATIONS = [
+    public const array THIRD_PARTY_INTEGRATIONS = [
         Litespeed::class,
         LiteSpeedGraphQLIntegration::class,
         MetaBox::class,
@@ -95,21 +96,24 @@ class PluginManager
         WPGraphQL::class,
     ];
 
-    #[Action('mu_plugin_loaded', executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
-        if ($pluginPath !== $bootstrap->nameMUpluginFile) return false;
-        do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [__CLASS__, 'boot']);
-        return true;
-    })]
+    #[Action(
+        'mu_plugin_loaded',
+        executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
+            return $pluginPath === $bootstrap->nameMUpluginFile;
+        },
+    )]
     private function boot(string $pluginPath): void
     {
+        do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
+
         $activeCount = $this->unregisterInactivePluginHooks();
         if ($activeCount === 0) {
-            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
-            do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            do_action(WPHooksContainerRegistry::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            do_action(WPHooksContainerRegistry::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
             return;
         }
-        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
-        do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $this->pluginEnvironmentCheck, 'plugins_loaded');
+        do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CLASS, self::class);
+        do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
     }
 
     /**
@@ -127,15 +131,21 @@ class PluginManager
                 continue;
             }
             Logger::warning("Plugin status", $integrationClass . ' is inactive');
-            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, $integrationClass);
-            do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CLASS, $integrationClass);
+            do_action(WPHooksContainerRegistry::UNREGISTER_BY_CLASS, $integrationClass);
+            do_action(WPHooksContainerRegistry::UNREGISTER_DEFERRED_BY_CLASS, $integrationClass);
         }
         return $activeCount;
     }
     /**
      * Remove the "Deactivate" action link for required plugins.
      */
-    #[Filter('plugin_action_links', 4, 2, deferRegister: true, once: true)]
+    #[Filter(
+        'plugin_action_links',
+        4,
+        2,
+        deferRegister: true,
+        once: true,
+    )]
     public function lockPluginActionLinks(array $actions, string $pluginFile): array
     {
         if (in_array($pluginFile, self::MUST_HAVE_PLUGINS) && isset($actions['deactivate'])) {
@@ -162,9 +172,9 @@ class PluginManager
             $pluginKey = array_search($plugin, $plugins, true);
             if ($pluginKey !== false) {
                 unset($plugins[$pluginKey]);
-                if ($alreadyUnregistred) continue;
-                do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, WPGraphQL::class);
-                do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
+                if ($alreadyUnregistred) break;
+                do_action(WPHooksContainerRegistry::UNREGISTER_BY_CLASS, WPGraphQL::class);
+                do_action(WPHooksContainerRegistry::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
                 $alreadyUnregistred = true;
             }
         }
@@ -229,12 +239,10 @@ class PluginManager
 
     #endregion
 
-
     #region filter hooks sequence
     /**
      * activation hooks steps
-     * @phpstan-ignore-next-line
-     * @var __CLASS__::class
+     * @var class@anonymous::class
      */
     private ?ModuleClassHookMetadata $pluginEnvironmentCheck {
         get {
@@ -254,12 +262,11 @@ class PluginManager
                     return $this->filteredPlugins($plugins, $pluginsToDisable);
                 }
 
-
                 /**
                  * Temporarily disable specific plugins if simulating production environment on local machine.
                  */
                 #[Filter('option_active_plugins', 0, once: true, registerIf: static function (): bool {
-                    return SharedUtils::isLocalhost();
+                    return !SharedUtils::isDevelopment() && SharedUtils::isLocalhost();
                 })]
                 public function disablePluginsforSimulatedProdImpl(array $plugins): array
                 {
@@ -290,7 +297,6 @@ class PluginManager
                     return $plugins;
                 }
 
-
                 /**
 
                  * Filters the list of active plugins by removing specified plugins.
@@ -301,17 +307,14 @@ class PluginManager
                  */
                 private function filteredPlugins(array $plugins, array $pluginsToDisable): array
                 {
-                    $cb = static function (string $plugin) use ($pluginsToDisable): bool {
+                    return array_filter($plugins, static function (string $plugin) use ($pluginsToDisable): bool {
                         foreach ($pluginsToDisable as $disable) {
                             if (str_starts_with($plugin, $disable)) {
                                 return false;
                             }
                         }
                         return true;
-                    };
-                    $filtered = array_filter($plugins, $cb);
-
-                    return array_values($filtered);
+                    });
                 }
             };
         }

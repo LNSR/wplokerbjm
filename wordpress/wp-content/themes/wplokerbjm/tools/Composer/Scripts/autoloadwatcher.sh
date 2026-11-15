@@ -4,7 +4,7 @@ setopt errexit nounset pipefail
 : "${REDIS_PWD:?\"Redis Password env missing\"}"
 : "${WP_ENV:?\"WP_ENV env missing\"}"
 
-watch_paths=(server composer.json composer.lock)
+watch_paths=(server composer.json composer.lock ../../mu-plugins/wplokerbjm-bootstrap.php)
 
 # Exit if current directory isn't wplokerbjm
 echo "Running in directory $(pwd)"

@@ -10,8 +10,8 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use WP_User;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
-use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryHookEvent;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations\LiteSpeedGraphQLIntegration;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations\LitespeedIntegrationCommands;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\WPRestJWTHooks;
@@ -31,11 +31,10 @@ final class WPGraphQL implements PluginConfigInterface
         return PluginList::WpGraphql->isActive();
     }
 
-
     #[Action('graphql_init', once: true)]
     private function boot(): void
     {
-        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_TAGS, ['graphql']);
+        do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_TAGS, ['graphql']);
 
         $modules = [
             $this->graphQlPluginSettings,
@@ -43,21 +42,21 @@ final class WPGraphQL implements PluginConfigInterface
         ];
 
         foreach ($modules as $module) {
-            do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $module);
+            do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $module);
         }
     }
     
     #region GraphQlPluginSettings
     /**
      * @phpstan-ignore-next-line
-     * @var __CLASS__::class
+     * @var class@anonymous::class
      */
     private ?ModuleClassHookMetadata $graphQlPluginSettings {
         get {
             return $this->graphQlPluginSettings ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
                 /**
                  * @see get_graphql_setting
-                 * @see \WPGraphQL\Admin\Settings\Settings::register_settings() -> {
+                 * @see \WPGraphQL\Admin\Settings\Settings::register_settings() => {
                  *  public_introspection_enabled,
                  *  debug_mode_enabled,
                  * }
@@ -65,7 +64,7 @@ final class WPGraphQL implements PluginConfigInterface
                  * @param 'public_introspection_enabled'|'debug_mode_enabled' $option_name
                  */
                 #[Filter('graphql_get_setting_section_field_value', \PHP_INT_MAX, 3)]
-                public function setSettings(?string $value, ?string $default_value, string $option_name): mixed
+                public function setSettings(mixed $value, mixed $default_value, string $option_name): mixed
                 {
                     return match ($option_name) {
                         'public_introspection_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',
@@ -83,7 +82,7 @@ final class WPGraphQL implements PluginConfigInterface
 
     /**
      * @phpstan-ignore-next-line
-     * @var __CLASS__::class
+     * @var class@anonymous::class
      */
     private ?ModuleClassHookMetadata $bootGraphqlRequest {
         get {
@@ -98,7 +97,6 @@ final class WPGraphQL implements PluginConfigInterface
 
                 #[Inject([JWTService::class, 'injectJwtFromCookie'], lazy: true)]
                 private \Closure $injectJwtFromCookie;
-
 
                 /**
                  * Unified init request handler: checks ETag cache before performing auth.

@@ -1,17 +1,17 @@
 <script lang="ts">
   import { onMount } from "svelte";
   import { SvelteSet } from "svelte/reactivity";
-  import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
-  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import { useVirtualization } from "$lib/features/Virtualization.svelte";
-  import type { ListVirtualizationState } from "@/lib/features/Virtualization.svelte";
-  import type { CardJob } from "@/types";
-  import { isJobGridEl } from "$lib/utils/elements.svelte";
-  import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
-  import { goto } from "$app/navigation";
-  import { routeStateStore } from "$lib/stores/Route.svelte";
-  import JobCard from "@components/ui/Shared/JobCard.svelte";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  import { bookmarkStore } from "#lib/stores/Bookmark.svelte.js";
+  import LoadingSpinner from "#lib/components/ui/Shared/LoadingSpinner.svelte";
+  import { useVirtualization } from "#lib/features/Virtualization.svelte.js";
+  import type { ListVirtualizationState } from "#lib/features/Virtualization.svelte.js";
+  import type { CardJob } from "#src/types/index.js";
+  import { isJobGridEl } from "#lib/utils/elements.svelte.js";
+  import RefreshSpinner from "#lib/components/ui/Shared/RefreshSpinner.svelte";
+  import { gotoWithFallback } from "#src/utils/navigation.js";
+  import { routeStateStore } from "#lib/stores/Route.svelte.js";
+  import JobCard from "#lib/components/ui/Shared/JobCard.svelte";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
   import {
     BookmarkSolid,
     XmarkSolid,
@@ -21,14 +21,14 @@
     MagnifyingGlassSolid,
   } from "svelte-awesome-icons";
   import type { Attachment } from "svelte/attachments";
-  import type { KeyboardKeysEvent } from "@/types";
+  import type { KeyboardKeysEvent } from "#src/types/index.js";
   import {
     showDeadline,
     showStatusJob,
     showTimeAgo,
-  } from "$lib/composables/JobUI.svelte";
-  import { useSidePanel } from "$lib/composables/SidePanel.svelte";
-  import { useRIC } from "@/utils/window";
+  } from "#lib/composables/JobUI.svelte.js";
+  import { useSidePanel } from "#lib/composables/SidePanel.svelte.js";
+  import { useRIC } from "#src/utils/window.js";
 
   interface Props {
     open: boolean;
@@ -349,7 +349,7 @@
           "bookmarkModal",
         );
         const url = new URL(job.permalink, window.location.origin);
-        goto(url.pathname + url.search + url.hash).then(() => {
+        gotoWithFallback(url.pathname + url.search + url.hash).then(() => {
           this.closeModal();
         });
       }

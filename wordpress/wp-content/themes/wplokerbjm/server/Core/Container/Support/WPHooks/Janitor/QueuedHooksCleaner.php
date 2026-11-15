@@ -2,30 +2,22 @@
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Janitor;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
-    ContainerLazyHookInvoker,
-    ContainerLazyPropertyHookInvoker,
-    RuntimeInstanceHookInvoker,
-    RuntimeCallableHookInvoker,
-    RuntimeInstancePropertyHookInvoker,
-};
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryHandlerEntry, RuntimeRegistryHandlerEntry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\UnregistrationSource;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{ContainerRegistryHandlerEntry, RuntimeRegistryHandlerEntry};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
-/**
- * @template Invokers of ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker
- */
 class QueuedHooksCleaner
 {
     public private(set) bool $schedulerCleanerDispatched = false;
 
     /** @var list<ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
-    private array $queuedRemovalEntry = [];
+    protected array $queuedRemovalEntry = [];
 
-    /** @var \WeakMap<Invokers, ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
-    private \WeakMap $entries;
-    private int $priority = 0;
+    /** @var \WeakMap<HookInvoker, ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
+    protected \WeakMap $entries;
+    private int $priority = \PHP_INT_MIN;
 
     public function __construct()
     {
@@ -37,7 +29,8 @@ class QueuedHooksCleaner
     public function addContainerRegistryItsEntries(array $entries): void
     {
         foreach ($entries as $entry) {
-            if (!$entry->handler->once) continue;
+            if ($entry->handler === null || !$entry->registered) continue;
+            if (!($entry->handler?->once ?? false)) continue;
             $this->entries[$entry->handler] = $entry;
         }
     }
@@ -46,29 +39,31 @@ class QueuedHooksCleaner
     public function addRuntimeRegistryItsEntries(array $entries): void
     {
         foreach ($entries as $entry) {
+            if ($entry->handler === null || !$entry->registered) continue;
             $this->entries[$entry->handler] = $entry;
         }
     }
 
     public function immediatelyScheduleRemove(ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry $entry): void
     {
+        if ($entry->handler === null || !$entry->registered) return;
         $this->entries[$entry->handler] = $entry;
         $this->cleanUpCallback($entry->handler);
     }
 
-    public function getEntry(ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker): ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry|null
+    public function getEntry(HookInvoker $invoker): ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry|null
     {
         return $this->entries[$invoker] ?? null;
     }
 
-    public function cleanUpCallback(ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker): void
+    public function cleanUpCallback(HookInvoker $invoker): void
     {
         $entry = $this->entries[$invoker] ?? null;
         if ($entry === null) {
             return;
         }
-
-        switch ($entry->isCurrentlyExecuting()) {
+        $hasCallbackRegistered = $entry->hasCallbackRegisteredOnWordpress();
+        switch ($entry->isCurrentlyExecuting() && $hasCallbackRegistered) {
             case true:
                 $this->queuedRemovalEntry[] = $entry;
 
@@ -76,17 +71,24 @@ class QueuedHooksCleaner
                  * 'all' hook is the only place inbetween end of last priority hook stack and beginning of new named hook dispatch
                  * * 'all' run before named hook
                  */
-                !$this->schedulerCleanerDispatched && \add_action('all', $this->scheduleCleanup, $this->priority = \mt_rand(\PHP_INT_MIN, -20000000));
+                !$this->schedulerCleanerDispatched && $this->allHookActionCommand('add');
 
                 /**
-                 * This ideal during sequential adjacent `once` priorities hook
-                 * * Make sure previous priority wiped at next priority order to prevent chance of re-entrancy despite invoker logically guarded
+                 * This is ideal for sequential adjacent `once` priorities on the same hook:
+                 * wipe the previous priority's callback at the next priority, closing the
+                 * re-entrancy window even though the invoker is already logically guarded.
                  */
                 ($this->scheduleCleanup)($invoker);
                 break;
             default:
-                $entry->unregister();
-                SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned immediately: ', [
+                $result = $entry->unregister(UnregistrationSource::Cleaner);
+                if (!$result && $hasCallbackRegistered) {
+                    $this->queuedRemovalEntry[] = $entry;
+                    !$this->schedulerCleanerDispatched && $this->allHookActionCommand('add');
+                    break;
+                }
+                ($this->scheduleCleanup)($invoker);
+                $result && SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned immediately: ', [
                     'InvokerLabel' => $invoker->label,
                     'CurrentHookContext' => current_filter(),
                 ]);
@@ -95,44 +97,68 @@ class QueuedHooksCleaner
         unset($this->entries[$invoker]);
     }
 
+    /** 
+     * @param 'add'|'remove'|'has' $command 
+     * @return bool
+     * */
+    private function allHookActionCommand(string $command): bool
+    {
+        switch ($command) {
+            case 'add':
+                return (bool) \add_action('all', $this->scheduleCleanup, $this->priority, 0);
+            case 'remove':
+                return (bool) \remove_action('all', $this->scheduleCleanup, $this->priority);
+            case 'has':
+                return (bool) \has_action('all', $this->scheduleCleanup, $this->priority);
+            default:
+                throw new \InvalidArgumentException('Argument $command only allow add, remove, has but got: ' . $command);
+        }
+    }
+
     private \Closure $scheduleCleanup {
         get {
             return $this->scheduleCleanup ??= function (mixed ...$args): void {
-                $this->schedulerCleanerDispatched = true;
+                $this->schedulerCleanerDispatched = $this->allHookActionCommand('has');
                 $invoker = null;
                 if (
-                    array_key_exists(0, $args) && (
-                        //Container Invokers
-                        $args[0] instanceof ContainerLazyHookInvoker
-                        || $args[0] instanceof ContainerLazyPropertyHookInvoker
-                        //RuntimeInstance Invokers
-                        || $args[0] instanceof RuntimeCallableHookInvoker
-                        || $args[0] instanceof RuntimeInstanceHookInvoker
-                        || $args[0] instanceof RuntimeInstancePropertyHookInvoker
-                    )
+                    array_key_exists(0, $args)
+                    && $args[0] instanceof HookInvoker
                 ) {
                     $invoker = $args[0];
                 }
 
+                /**
+                 * * 'all' hook is in different active stack it's ok to indiscriminately remove invokers immediately
+                 */
                 foreach ($this->queuedRemovalEntry as $idx => $entry) {
-                    /**
-                     * * 'all' hook is in different active inner call stack it's ok to remove previous handler(invoker) immediately
-                     */
-                    if ($invoker !== null && $entry->handler === $invoker) {
+                    if ($entry->handler === $invoker) {
                         continue;
                     }
-                    $entry->unregister();
+                    $capturedLabel = $entry->handler?->label ?? null;
+                    $result = $entry->unregister(UnregistrationSource::Cleaner);
+
                     SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned at: ', [
-                        'CleanedEntryHandler' => $entry->handler->label,
-                        'CleanedAtInvokersLabel' => $invoker?->label ?: 'No label, mean this run on ALL Hook',
+                        'CleanedEntryHandler' => $capturedLabel ?: "Invoker gone before cleanup. (cachedLabel: {$entry->invokerLabel})",
+                        'CleanedAtInvokersLabel' => $invoker?->label
+                            ? "via {$invoker?->label} (" . ($invoker?->isDestructed ? 'via destructor' : 'via cleanup') . ")"
+                            : 'all-hook scheduler',
+                        'unregistrationFailureCount' => $entry->unregistrationFailureCount,
                         'CurrentHookContext' => \current_filter(),
+                        'resultUnregistration' => $result,
                     ]);
-                    unset($this->queuedRemovalEntry[$idx]);
+
+                    if (
+                        $entry->handler === null ||
+                        $result ||
+                        !$entry->hasCallbackRegisteredOnWordpress() ||
+                        $entry->unregistrationFailureCount >= 3
+                    ) {
+                        unset($this->queuedRemovalEntry[$idx]);
+                    }
                 }
                 if ($this->queuedRemovalEntry !== []) return;
-                if (\has_action('all', \Closure::getCurrent(), $this->priority)) \remove_action('all', \Closure::getCurrent(), $this->priority);
-                $this->schedulerCleanerDispatched = false;
-                // \gc_collect_cycles(); // make sure self-reference purged
+                if ($this->schedulerCleanerDispatched) $this->allHookActionCommand('remove') && $this->schedulerCleanerDispatched = false;
+                // \gc_collect_cycles(); // make sure circular-reference, or self-reference purged
             };
         }
     }

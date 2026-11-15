@@ -1,9 +1,9 @@
-import type { ThemeScriptData } from "@/types";
+import type { ThemeScriptData } from "#src/types/index.js";
 import {
     applyThemeAttribute,
     prefersDarkMode,
     localStorageThemeActions,
-} from "@/utils/theme";
+} from "#src/utils/theme.js";
 
 void function inlineThemeScript(): void
 {

@@ -1,11 +1,11 @@
 <script lang="ts">
-  import { bookmarkStore } from "$lib/stores/Bookmark.svelte";
-  import type { JobCardProps, WPBasePost } from "@/types";
+  import { bookmarkStore } from "#lib/stores/Bookmark.svelte.js";
+  import type { JobCardProps, WPBasePost } from "#src/types/index.js";
   import { BookmarkSolid, TrashAltSolid } from "svelte-awesome-icons";
-  import { componentRegistry } from "$lib/stores/ComponentRegistry.svelte";
-  import { useRIC } from "@/utils/window";
+  import { componentRegistry } from "#lib/stores/ComponentRegistry.svelte.js";
+  import { useRIC } from "#src/utils/window.js";
   import { onDestroy } from "svelte";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
   interface Props {
     jobId: WPBasePost["id"];
     variant: JobCardProps["variant"];

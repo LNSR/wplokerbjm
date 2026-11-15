@@ -1,5 +1,7 @@
 <?php
 
+declare(strict_types=1);
+
 namespace WPLokerBJM\Core\Container\Definitions;
 
 use DI\Container;
@@ -7,10 +9,17 @@ use Nette\Loaders\RobotLoader;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyAutowireScanner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, HookRuntimeResolver, HookTargetResolver, InstanceRegistryDeferredHookManager, WPHooksContainerRegistry, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
+use \WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\{
+    ContainerRegistryHookTargetResolver,
+    InstanceRegistryRuntimeHookResolver,
+};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{
+    InstanceRegistryDeferredHookManager,
+    ContainerRegistryDeferredHookManager
+};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\{DependencyInjector, PlanCache, PlanCompiler, ScopeAccessFactory};
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
@@ -25,7 +34,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
  *
  * How it works:
  * 1. WPhooksScanner scans the server/ directory for #[Action] and #[Filter] attributes.
- * 2. WPHooksContainerRegistry receives the scanner results and pre-builds ContainerLazyHookInvoker and ContainerLazyPropertyHookInvoker instances
+ * 2. WPHooksContainerRegistry receives the scanner results and pre-builds HookInvoker instances
  *    (named invocable objects that defer container resolution to hook-fire time).
  * 3. Init delegates to WPHooksContainerRegistry::initialize() which registers hooks with WordPress
  *    via add_action/add_filter using the stored handler instances.
@@ -48,35 +57,32 @@ class Core implements DefinitionProviderInterface
 
         $core = [
             QueuedHooksCleaner::class => \DI\autowire(QueuedHooksCleaner::class),
-            WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class),
-            HookTargetResolver::class => \DI\autowire(HookTargetResolver::class),
-            RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class)),
+            WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class)->constructor(\DI\get(ContainerInterface::class)),
+            ContainerRegistryHookTargetResolver::class => \DI\autowire(ContainerRegistryHookTargetResolver::class),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
-                \DI\get(ContainerInterface::class),
                 static fn() => \CompiledContainer::METHOD_MAPPING,
+                \DI\get(WPHookPlanProvider::class),
                 $namespace,
-                static fn() => get_stylesheet_directory() . "/cache",
-                \DI\get(WPHookPlanProvider::class)
+                static fn () => \defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache" : get_stylesheet_directory() . "/cache",
             ),
             WPHooksInstanceObjectCache::class => \DI\autowire(WPHooksInstanceObjectCache::class)->constructor(
-                static fn(): string => get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
+                static fn(): string => \defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache/WPHooksInstanceObjectCache.php" : get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
             ),
             InstanceRegistryDeferredHookManager::class => \DI\autowire(InstanceRegistryDeferredHookManager::class)->constructor(
-                \DI\get(RuntimeWPHookProvider::class),
-                \DI\get(HookRuntimeResolver::class),
+                \DI\get(WPHookPlanProvider::class),
+                \DI\get(InstanceRegistryRuntimeHookResolver::class),
                 static fn() => new EntriesIndexer(),
             ),
             WPHooksInstanceRegistry::class => \DI\autowire(WPHooksInstanceRegistry::class)->constructor(
                 \DI\get(InstanceRegistryDeferredHookManager::class),
+                \DI\get(WPHookPlanProvider::class),
                 \DI\get(QueuedHooksCleaner::class),
-                \DI\get(HookRuntimeResolver::class),
+                \DI\get(InstanceRegistryRuntimeHookResolver::class),
                 \DI\get(WPHooksInstanceObjectCache::class),
-                \DI\get(RuntimeWPHookProvider::class),
             ),
             ContainerRegistryDeferredHookManager::class => \DI\autowire(ContainerRegistryDeferredHookManager::class)->constructor(
                 \DI\get(WPHookPlanProvider::class),
-                \DI\get(ContainerInterface::class),
-                \DI\get(HookTargetResolver::class),
+                \DI\get(ContainerRegistryHookTargetResolver::class),
                 static fn() => new EntriesIndexer(),
             ),
             WPHooksContainerRegistry::class => \DI\autowire(WPHooksContainerRegistry::class)->constructor(
@@ -84,7 +90,7 @@ class Core implements DefinitionProviderInterface
                 static fn(WPHooksScanner $scanner): array => $scanner->getHookRegistrations(),
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(ContainerRegistryDeferredHookManager::class),
-                \DI\get(HookTargetResolver::class),
+                \DI\get(ContainerRegistryHookTargetResolver::class),
                 \DI\get(QueuedHooksCleaner::class),
                 static fn() => new EntriesIndexer(),
             ),
@@ -99,7 +105,7 @@ class Core implements DefinitionProviderInterface
             PlanCompiler::class => \DI\autowire(PlanCompiler::class),
             ScopeAccessFactory::class => \DI\autowire(ScopeAccessFactory::class),
             PlanCache::class => \DI\autowire(PlanCache::class)->constructor(
-                static fn(): string => get_stylesheet_directory() . '/cache/DependencyInjectorCache.php'
+                static fn(): string => defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache/DependencyInjectorCache.php" : get_stylesheet_directory() . "/cache/DependencyInjectorCache.php"
             ),
             DependencyInjector::class => \DI\autowire(DependencyInjector::class)->constructor(
                 \DI\get(ContainerInterface::class),

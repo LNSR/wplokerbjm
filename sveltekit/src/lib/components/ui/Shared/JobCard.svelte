@@ -1,10 +1,10 @@
 <script lang="ts">
   import { onMount } from "svelte";
-  import { goto } from "$app/navigation";
+  import { gotoWithFallback } from "#src/utils/navigation.js";
   import type { DOMAttributes } from "svelte/elements";
-  import BookmarkButton from "@components/ui/Shared/BookmarkButton.svelte";
-  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import { routeStateStore, routeStore } from "$lib/stores/Route.svelte";
+  import BookmarkButton from "#lib/components/ui/Shared/BookmarkButton.svelte";
+  import LoadingSpinner from "#lib/components/ui/Shared/LoadingSpinner.svelte";
+  import { routeStateStore, routeStore } from "#lib/stores/Route.svelte.js";
   import {
     CalendarSolid,
     ExclamationTriangleSolid,
@@ -16,14 +16,14 @@
     JobCardProps,
     StatusPekerjaanNumber,
     StatusPekerjaanString,
-  } from "@/types";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  } from "#src/types/index.js";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
   import {
     showDeadline,
     showStatusJob,
     showSummaryJob,
     showTimeAgo,
-  } from "@/lib/composables/JobUI.svelte";
+  } from "#lib/composables/JobUI.svelte.js";
   interface Props {
     jobdata: JobCardProps["jobdata"];
     variant: JobCardProps["variant"];
@@ -115,7 +115,7 @@
 
     if (isMobile) {
       if (permalink)
-        void goto(new URL(permalink, window.location.origin).pathname);
+        void gotoWithFallback(new URL(permalink, window.location.origin).pathname);
       return;
     }
   }
@@ -248,7 +248,7 @@
 </div>
 
 <style lang="postcss">
-  @reference "@css/app.css";
+  @reference "../../../assets/css/app.css";
   div[data-job-slug] {
     /* Make native scrolling consider header height if browser supports this CSS property. */
     scroll-margin-top: var(--site-scroll-padding-top, 0px);

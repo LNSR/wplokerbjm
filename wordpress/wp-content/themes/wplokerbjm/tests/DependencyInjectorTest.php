@@ -985,7 +985,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $injectable = new Injectable();
 
-        $this->assertNull($injectable->lazy);
+        $this->assertFalse($injectable->lazy);
         $this->assertFalse($injectable->skip);
     }
 

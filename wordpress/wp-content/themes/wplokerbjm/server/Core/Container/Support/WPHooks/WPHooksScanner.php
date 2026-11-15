@@ -11,6 +11,7 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
 use ReflectionProperty;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookRegistration;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
@@ -40,14 +41,14 @@ class WPHooksScanner
      * @param array $compiledContainerMap list of classes in compiled container
      * @param string $namespace namespace to scan
      * @param string $cacheLocation directory where cache file will be stored
-     * @param WPHookPlanProvider|null $hookPlanProvider plan builder for condition gates and dynamic hook names
+     * @param WPHookPlanProvider $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
     public function __construct(
-        private ContainerInterface $container,
         private array $compiledContainerMap,
+        private WPHookPlanProvider $hookPlanProvider,
         private string $namespace = 'WPLokerBJM',
         private string $cacheLocation = '',
-        private ?WPHookPlanProvider $hookPlanProvider = null
+        public private(set) bool $forceNoCache = false
     ) {
         $this->namespace = trim($namespace, '\\');
         $this->cacheLocation = is_dir($cacheLocation) || str_ends_with($cacheLocation, '/') || str_ends_with($cacheLocation, '\\')
@@ -65,11 +66,9 @@ class WPHooksScanner
      */
     public function getHookRegistrations(): array
     {
-        if ($this->cachedHookRegistrations !== null) {
-            return $this->cachedHookRegistrations;
-        }
+        if ($this->cachedHookRegistrations !== null) return $this->cachedHookRegistrations;
 
-        if (!empty($this->cacheLocation) && is_file($this->cacheLocation)) {
+        if (!$this->forceNoCache && !empty($this->cacheLocation) && \is_readable($this->cacheLocation)) {
             $loaded = require $this->cacheLocation;
             if (is_array($loaded)) {
                 return $this->cachedHookRegistrations = array_map(
@@ -81,7 +80,7 @@ class WPHooksScanner
 
         $registrations = $this->performHookRegistrationScan();
         $this->cachedHookRegistrations = $registrations;
-        $this->exportCache();
+        if (!$this->forceNoCache) $this->exportCache();
         return $registrations;
     }
 
@@ -106,12 +105,17 @@ class WPHooksScanner
             }
             try {
                 $reflection = new ReflectionClass($className);
-                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations): void {
+                /** @var array<string, int> $attributeOrdinals */
+                $attributeOrdinals = [];
+                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, &$attributeOrdinals): void {
+                    $ordinalKey = 'method:' . $method->getName();
+                    $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $method->getName(),
                         type: $type,
                         hook: $attr->hook,
+                        attributeIndex: $attributeIndex,
                         hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                         priority: $attr->priority,
                         acceptedArgs: $attr->acceptedArgs,
@@ -119,46 +123,65 @@ class WPHooksScanner
                         target: 'method',
                         visibility: $visibility,
                         executeIf: $attr->executeIf,
-                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf),
-                        hookArgs: $attr->executeIf ? $this->hookPlanProvider->buildCallablePlanFromReflector($method)['params'] : [],
+                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
+                        hookArgs: $this->hookPlanProvider->buildCallablePlanFromReflector($method)['params'],
                         registerIf: $attr->registerIf,
-                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
+                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                         deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                         deferRegisterUntilHookParams: $this->hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                         once: $attr->once,
+                        onUnregisterDo: $attr->onUnregisterDo,
+                        onUnregisterDoParams: $this->hookPlanProvider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
+                        debugDeferredRegistration: $attr->debugDeferredRegistration,
+                        debugDeferredRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugDeferredRegistration),
+                        debugLiveRegistration: $attr->debugLiveRegistration,
+                        debugLiveRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveRegistration),
+                        debugLiveUnregistration: $attr->debugLiveUnregistration,
+                        debugLiveUnregistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveUnregistration),
                     );
                 });
 
-                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations): void {
+                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations, &$attributeOrdinals): void {
+                    $ordinalKey = 'property:' . $property->getName();
+                    $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                     $registrations[] = new HookRegistration(
                         class: $className,
                         method: $property->getName(),
                         type: $type,
                         hook: $attr->hook,
-                        hookParams: $attr->hook instanceof \Closure ? $this->hookPlanProvider->buildCallablePlan($attr->hook) : [],
+                        attributeIndex: $attributeIndex,
+                        hookParams: $this->hookPlanProvider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                         priority: $attr->priority,
                         acceptedArgs: $attr->acceptedArgs,
                         deferRegister: $attr->deferRegister,
                         target: $target,
                         visibility: $visibility,
                         executeIf: $attr->executeIf,
-                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf),
-                        hookArgs: $attr->executeIf ? $this->hookPlanProvider->extractPropertyCallablePlan($property)['params'] : [],
+                        executeIfParams: $this->hookPlanProvider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
+                        hookArgs: $this->hookPlanProvider->extractPropertyCallablePlan($property)['params'],
                         registerIf: $attr->registerIf,
-                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf),
+                        registerIfParams: $this->hookPlanProvider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
                         tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                         tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
                         tagCallableParams: $this->hookPlanProvider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                         deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                         deferRegisterUntilHookParams: $this->hookPlanProvider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                         once: $attr->once,
+                        onUnregisterDo: $attr->onUnregisterDo,
+                        onUnregisterDoParams: $this->hookPlanProvider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
+                        debugDeferredRegistration: $attr->debugDeferredRegistration,
+                        debugDeferredRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugDeferredRegistration),
+                        debugLiveRegistration: $attr->debugLiveRegistration,
+                        debugLiveRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveRegistration),
+                        debugLiveUnregistration: $attr->debugLiveUnregistration,
+                        debugLiveUnregistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveUnregistration),
                     );
                 });
             } catch (\RuntimeException $e) {
-                Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ', [
+                Logger::error(__METHOD__, 'Error scanning hooks for class ' . $className . ': ', [
                     'message' => $e->getMessage(),
                     'line' => $e->getLine(),
                     'file' => $e->getFile(),
@@ -177,7 +200,7 @@ class WPHooksScanner
         $targetFile = $this->cacheLocation;
 
         if (empty($targetFile)) {
-            Logger::error('WPHooksScanner', 'Delete failed: No target file path provided.');
+            Logger::error(__METHOD__, 'Delete failed: No target file path provided.');
             return false;
         }
 
@@ -196,10 +219,10 @@ class WPHooksScanner
     public function exportCache(): bool
     {
         $targetFile = $this->cacheLocation;
-        $registrations = $this->getHookRegistrations();
+        $registrations = $this->cachedHookRegistrations ?? $this->cachedHookRegistrations = $this->performHookRegistrationScan();
 
         if (empty($targetFile)) {
-            Logger::error('WPHooksScanner', 'Export failed: No target file path provided.');
+            Logger::error(__METHOD__, 'Export failed: No target file path provided.');
             return false;
         }
 
@@ -207,13 +230,13 @@ class WPHooksScanner
 
         if (!is_dir($directory)) {
             if (!mkdir($directory, 0755, true)) {
-                Logger::error('WPHooksScanner', "Failed to create directory: {$directory}");
+                Logger::error(__METHOD__, "Failed to create directory: {$directory}");
                 return false;
             }
         }
 
         if (!is_writable($directory)) {
-            Logger::error('WPHooksScanner', "Directory is not writable: {$directory}");
+            Logger::error(__METHOD__, "Directory is not writable: {$directory}");
             return false;
         }
 

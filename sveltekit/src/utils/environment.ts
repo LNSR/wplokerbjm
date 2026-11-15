@@ -1,5 +1,5 @@
-import { PUBLIC_CMS_ORIGIN, PUBLIC_CMS_ORIGIN_DEV } from "$env/static/public";
-import { dev } from "$app/environment";
+import { PUBLIC_CMS_ORIGIN, PUBLIC_CMS_ORIGIN_DEV } from '$app/env/public';
+import { dev } from '$app/env';
 
 /**
  * Return the canonical origin that should be used when constructing

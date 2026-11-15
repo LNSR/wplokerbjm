@@ -6,18 +6,18 @@
     SearchResponse,
     SearchState,
     StatusPekerjaanNumber, StatusPekerjaanString
-  } from "@/types";
-  import { goto } from "$app/navigation";
-  import { routeStore, routeStateStore } from "$lib/stores/Route.svelte";
-  import { jobListingStore } from "$lib/stores/JobListingStore.svelte";
-  import { APIServiceBrowser } from "@/services/graphql/APIService";
+  } from "#src/types/index.js";
+  import { gotoWithFallback } from "#src/utils/navigation.js";
+  import { routeStore, routeStateStore } from "#lib/stores/Route.svelte.js";
+  import { jobListingStore } from "#lib/stores/JobListingStore.svelte.js";
+  import { APIServiceBrowser } from "#src/services/graphql/APIService.js";
   import { withTimeout } from "es-toolkit";
-  import { SearchUtils } from "@/utils/search";
-  import { useVirtualization } from "@/lib/features/Virtualization.svelte";
+  import { SearchUtils } from "#src/utils/search.js";
+  import { useVirtualization } from "#lib/features/Virtualization.svelte.js";
   import { scrollY, innerHeight } from "svelte/reactivity/window";
-  import { browser } from "$app/environment";
-  import { useSidePanel } from "$lib/composables/SidePanel.svelte";
-  import { deviceDetector } from "$lib/features/DeviceDetector.svelte";
+  import { browser } from "$app/env";
+  import { useSidePanel } from "#lib/composables/SidePanel.svelte.js";
+  import { deviceDetector } from "#lib/features/DeviceDetector.svelte.js";
 
   const isMobile = $derived(deviceDetector.isPlatformMobile);
   const displayJobs = $derived.by(() => {
@@ -57,7 +57,7 @@
       // navigate to SingleLowongan.svelte route
       const url = new URL(String(job.permalink), window.location.origin);
       jobGridManager.saveGridStates();
-      void goto(url.pathname + url.search + url.hash);
+      void gotoWithFallback(url.pathname + url.search + url.hash);
     }
     public static handleJobClick(job: CardJob): void {
       if (!job.permalink) return;
@@ -318,12 +318,12 @@
 
 <script lang="ts">
   import type { Attachment } from "svelte/attachments";
-  import JobCard from "@components/ui/Shared/JobCard.svelte";
-  import SingleSidePanel from "@components/ui/Homepage/JobGrid/SingleSidePanel.svelte";
-  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
+  import JobCard from "#lib/components/ui/Shared/JobCard.svelte";
+  import SingleSidePanel from "#lib/components/ui/Homepage/JobGrid/SingleSidePanel.svelte";
+  import LoadingSpinner from "#lib/components/ui/Shared/LoadingSpinner.svelte";
+  import RefreshSpinner from "#lib/components/ui/Shared/RefreshSpinner.svelte";
   import { onMount, tick } from "svelte";
-  import { useRIC } from "@/utils/window";
+  import { useRIC } from "#src/utils/window.js";
 
   const props: JobGridProps = $props();
 

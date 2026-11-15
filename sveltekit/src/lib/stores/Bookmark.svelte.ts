@@ -1,13 +1,13 @@
 import { throttle, type ThrottledFunction } from "es-toolkit";
 import { SvelteMap, SvelteSet } from "svelte/reactivity";
-import { APIServiceBrowser } from "@/services/graphql/APIService";
-import type { CardJob, SyncToServer, SyncResult } from "@/types";
-import { BaseBroadcastChannel } from "@/services/BroadcastChannel";
+import { APIServiceBrowser } from "#src/services/graphql/APIService.js";
+import type { CardJob, SyncToServer, SyncResult } from "#src/types/index.js";
+import { BaseBroadcastChannel } from "#src/services/BroadcastChannel.js";
 import typia from "typia";
 import { on } from "svelte/events";
-import { useRIC } from "@/utils/window";
-import BookmarkWorker from "@/workers/bookmark/bookmark.worker.ts?sharedworker";
-import type { BookmarkWorkerInstance } from "@/workers/bookmark/bookmark.worker";
+import { useRIC } from "#src/utils/window.js";
+import BookmarkWorker from "#src/workers/bookmark/bookmark.worker.ts?sharedworker";
+import type { BookmarkWorkerInstance } from "#src/workers/bookmark/bookmark.worker.js";
 import { proxy, wrap, type Remote } from "comlink";
 
 interface BookmarkBroadcastMessage

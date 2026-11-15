@@ -59,11 +59,11 @@ final class DependencyInjector
      * @return ClassTarget The same target, for fluent usage.
      * @throws InvalidArgumentException When the target or injection shape is invalid.
      */
-    public function injectOn(AsChildClass $target): AsChildClass
+    public function injectOn(AsChildClass $target, bool $forceNoCache = false): AsChildClass
     {
         $this->assertTarget($target);
         $cacheKey = $target->constructCurrentClassIdentity;
-        $plan = $this->getOrCompilePlan($cacheKey, $target);
+        $plan = $this->getOrCompilePlan($cacheKey, $target, $forceNoCache);
         if ($plan['properties'] === [])
             return $target;
         $setterKey = $cacheKey . "\0" . $target::class;
@@ -78,18 +78,17 @@ final class DependencyInjector
      * @param ClassTarget $target
      * @return CompiledPlan
      */
-    private function getOrCompilePlan(string $cacheKey, AsChildClass $target): array
+    private function getOrCompilePlan(string $cacheKey, AsChildClass $target, bool $forceNoCache = false): array
     {
         $plans = $this->planCache->loadPlans();
         $cachedPlan = $plans[$cacheKey] ?? null;
 
-        if ($this->planCache->isUsablePlan($cachedPlan))
-            return $cachedPlan;
+        if (!$forceNoCache && $this->planCache->isUsablePlan($cachedPlan)) return $cachedPlan;
 
         $reflection = new ReflectionClass($target);
         $plan = $this->planCompiler->discoverPlan($reflection);
         $plans[$cacheKey] = $plan;
-        $this->planCache->writePlans($plans);
+        if (!$forceNoCache) $this->planCache->writePlans($plans);
         return $plan;
     }
     /**
@@ -438,22 +437,21 @@ class PlanCache
 {
     /** @var CompiledPlans */
     public private(set) array $compiledPlans = [];
-    /** @var CompiledPlans */
-    private array $snapshotCache = [];
+    public private(set) bool $isDirty = false;
 
     public function __construct(
         public private(set) string $cacheLocation,
+        public private(set) bool $forceNoCache = false
     ) {}
 
     public function __destruct()
     {
         try {
-            $allCache = array_replace_recursive($this->compiledPlans, $this->snapshotCache);
-            if ($allCache === $this->snapshotCache) return;
+            if (!$this->isDirty || $this->forceNoCache) return;
 
             $this->flushPlansToCache();
         } catch (\Throwable $e) {
-            Logger::error(__CLASS__, "Unable to write dependency injector cache", [
+            Logger::error(__METHOD__, "Unable to write dependency injector cache", [
                 'message' => $e->getMessage(),
                 'stack_trace' => $e->getTraceAsString()
             ]);
@@ -487,7 +485,6 @@ class PlanCache
         if (!is_array($plans)) {
             throw new RuntimeException('Dependency injector cache must return an array.');
         }
-        $this->snapshotCache = $plans;
         return $this->compiledPlans = $plans;
     }
 
@@ -523,6 +520,7 @@ class PlanCache
             throw new RuntimeException('Dependency injector cache directory is not writable: ' . $directory . '.');
         }
         $this->compiledPlans = $plans;
+        $this->isDirty = true;
     }
 
     private function flushPlansToCache(): void
@@ -546,7 +544,7 @@ class PlanCache
     private function isUsableEntry(InjectionEntryDTO $entry): bool
     {
         // Ordinary type-based or explicit service-name injection.
-        if ($entry->member === null && $entry->kind === null && $entry->lazy === null && $entry->class !== '') {
+        if ($entry->member === null && $entry->kind === null && $entry->lazy === null && isset($entry->class)) {
             return true;
         }
 
@@ -569,7 +567,7 @@ class PlanCache
  * @phpstan-import-type CompiledPlan from DependencyInjector
  * @phpstan-import-type ClassTarget from DependencyInjector
  * @template CallableResult
- * @phpstan-type TFactoryClosure Closure(object, InjectionEntryDTO): CallableResult
+ * @phpstan-type TFactoryClosure Closure(ContainerInterface, InjectionEntryDTO): CallableResult
  * @phpstan-type TScopeAccessCallableResolver Closure(ContainerInterface, InjectionEntryDTO): CallableResult
  */
 class ScopeAccessFactory
@@ -601,11 +599,11 @@ class ScopeAccessFactory
                         $factory = Closure::bind(
                             match ($entry->kind) {
                                 'property' => $entry->lazy
-                                    ? $propertyLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => Closure::bind(static fn(): mixed => $c->get($entry->class)->{$entry->member}, null, $entry->class)
+                                    ? $propertyLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => static fn(): mixed => $c->get($entry->class)->{$entry->member}
                                     : $property ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): mixed => $c->get($entry->class)->{$entry->member},
                                 'method' => $entry->lazy
-                                    //** no FCC, FCC implicitly bind $this. Break lazy */
-                                    ? $methodLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => Closure::bind(static fn(...$args): mixed => $c->get($entry->class)->{$entry->member}(...$args), null, $entry->class)
+                                    //** no FCC, FCC Break lazy */
+                                    ? $methodLazy ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): Closure => static fn(...$args): mixed => $c->get($entry->class)->{$entry->member}(...$args)
                                     : $method ??= static fn(ContainerInterface $c, InjectionEntryDTO $entry): mixed => $c->get($entry->class)->{$entry->member}(),
                             },
                             null,

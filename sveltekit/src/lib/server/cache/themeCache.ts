@@ -7,7 +7,7 @@
  */
 
 import { LRUCache } from "lru-cache";
-import type { WPLokerBJMThemedData } from "@/types";
+import type { WPLokerBJMThemedData } from "#src/types/index.js";
 type CachedThemeData = Omit<WPLokerBJMThemedData, "wpGraphqlNonce">;
 /** Theme data without the request-scoped. */
 

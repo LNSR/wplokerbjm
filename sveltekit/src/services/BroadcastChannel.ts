@@ -1,4 +1,4 @@
-import { browser, version } from "$app/environment";
+import { browser, version } from '$app/env';
 
 export class BaseBroadcastChannel
 {

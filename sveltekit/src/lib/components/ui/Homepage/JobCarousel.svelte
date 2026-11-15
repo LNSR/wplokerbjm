@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import type { CardJob, CarouselProps, JobCardProps } from "@/types";
+  import type { CardJob, CarouselProps, JobCardProps } from "#src/types/index.js";
   import type { SwiperModule, SwiperOptions, VirtualData } from "swiper/types";
   function sortJobsByDeadline(jobs: CardJob[] | null): CardJob[] {
     if (!jobs) return [];
@@ -23,14 +23,14 @@
 </script>
 
 <script lang="ts">
-  import JobCard from "@components/ui/Shared/JobCard.svelte";
-  import { routeStateStore } from "$lib/stores/Route.svelte";
-  import { goto } from "$app/navigation";
-  import { APIServiceShared } from "@/services/graphql/APIService";
-  import LoadingSpinner from "@components/ui/Shared/LoadingSpinner.svelte";
-  import RefreshSpinner from "@components/ui/Shared/RefreshSpinner.svelte";
+  import JobCard from "#lib/components/ui/Shared/JobCard.svelte";
+  import { routeStateStore } from "#lib/stores/Route.svelte.js";
+  import { gotoWithFallback } from "#src/utils/navigation.js";
+  import { APIServiceShared } from "#src/services/graphql/APIService.js";
+  import LoadingSpinner from "#lib/components/ui/Shared/LoadingSpinner.svelte";
+  import RefreshSpinner from "#lib/components/ui/Shared/RefreshSpinner.svelte";
   import { flushSync, onMount } from "svelte";
-  import { useRIC } from "@/utils/window";
+  import { useRIC } from "#src/utils/window.js";
   import { innerWidth } from "svelte/reactivity/window";
   import SwiperCore, { type Swiper } from "swiper";
   import { Navigation, Pagination, Autoplay, Virtual } from "swiper/modules";
@@ -42,9 +42,9 @@
   import "swiper/css/navigation";
   import "swiper/css/pagination";
   import "swiper/css/virtual";
-  import { useSidePanel } from "$lib/composables/SidePanel.svelte";
+  import { useSidePanel } from "#lib/composables/SidePanel.svelte.js";
   import type { Attachment } from "svelte/attachments";
-  import { browser } from "$app/environment";
+  import { browser } from '$app/env';
 
   let { jobs }: CarouselProps = $props();
   const title = $state.raw("Lowongan Darurat");
@@ -116,10 +116,7 @@
               dynamicMainBullets: 4,
             }
           : { clickable: true, dynamicBullets: true, dynamicMainBullets: 4 },
-        navigation: {
-          nextEl: nextEl,
-          prevEl: prevEl,
-        },
+        navigation: { nextEl, prevEl },
         watchSlidesProgress: true,
         passiveListeners: true,
         touchStartPreventDefault: false,
@@ -192,8 +189,8 @@
         const targetSlideIndex = savedState?.slideIndex;
         const clampedIndex =
           typeof targetSlideIndex === "number" && this.jobCount > 0
-            ? Math.max(0, Math.min(this.jobCount - 1, targetSlideIndex))
-            : 0;
+          ? Math.max(0, Math.min(this.jobCount - 1, targetSlideIndex))
+          : 0;
 
         this.#initialSlide = clampedIndex;
 
@@ -223,29 +220,17 @@
      *
      * */
     public createSwiper(attempt = 0): void {
-      const containerEl: Element | null =
-        document.querySelector(".job-carousel");
-      const el =
-        containerEl instanceof HTMLElement
-          ? containerEl
-          : this.swiperContainerEl;
-      if (!el) return;
+      const containerEl: Element | null = document.querySelector(".job-carousel");
+      const el = containerEl instanceof HTMLElement ? containerEl : this.swiperContainerEl;
 
+      if (!el) return;
       if (this.#isInitializing) return;
       this.#isInitializing = true;
       this.swiperFailed = false;
 
-      const paginationEl =
-        (document.querySelector(".swiper-pagination") as HTMLDivElement | null) ??
-        this.paginationEl;
-
-      const nextEl =
-        (document.querySelector(".job-carousel-next") as HTMLButtonElement | null) ??
-        this.nextButtonEl;
-
-      const prevEl =
-        (document.querySelector(".job-carousel-prev") as HTMLButtonElement | null) ??
-        this.prevButtonEl;
+      const paginationEl = document.querySelector(".swiper-pagination") as HTMLDivElement | null ?? this.paginationEl;
+      const nextEl = document.querySelector(".job-carousel-next") as HTMLButtonElement | null ?? this.nextButtonEl;
+      const prevEl = document.querySelector(".job-carousel-prev") as HTMLButtonElement | null ?? this.prevButtonEl;
 
       try {
         this.initializeSwiperInstance(el, paginationEl, nextEl, prevEl);
@@ -357,8 +342,8 @@
 
       const slideIndex =
         typeof clickedSlideIndex === "number"
-          ? clickedSlideIndex
-          : (swiperManager.swiperInstance?.activeIndex ?? 0);
+        ? clickedSlideIndex
+        : swiperManager.swiperInstance?.activeIndex ?? 0;
 
       routeStateStore.saveCarouselState({ slideIndex });
     }
@@ -377,7 +362,7 @@
         // Mobile: mark visited for carousel then use SPA navigation to SingleLowongan.svelte route
         routeStateStore.MarkVisitedJob(slug, "carousel");
         const url = new URL(String(permalink), window.location.origin);
-        void goto(url.pathname + url.search + url.hash);
+        void gotoWithFallback(url.pathname + url.search + url.hash);
       }
     }
   }
@@ -561,7 +546,7 @@
 </section>
 
 <style lang="postcss">
-  @reference "@css/app.css";
+  @reference "../../../assets/css/app.css";
 
   :global(.job-carousel),
   :global(.job-carousel .swiper-wrapper),

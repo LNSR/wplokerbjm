@@ -131,16 +131,23 @@ class MyClassName
 
 Every attribute parameter maps to a WordPress registration concern:
 
-| Parameter                | Type       | Purpose                                                                             |
-| ------------------------ | ---------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `priority`               | `int`      | Execution order (default `10`)                                                      |
-| `acceptedArgs`           | `int`      | Number of arguments passed to the callable (default `1`)                            |
-| `once`                   | `bool`     | Self-removes after the first evaluation, whatever the gate result                   |
-| `deferRegister`          | `bool`     | Skips registration by default; opt-in via `activateDeferredBy*()`                   |
-| `deferRegisterUntilHook` | `string`   | Implies deferral; auto-activates when the trigger hook fires (or has already fired) |
-| `registerIf`             | `callable` | Registration-time gate, evaluated once before the hook enters a pool                |
-| `executeIf`              | `callable` | Per-fire gate, evaluated on every `do_action` / `apply_filters`                     |
-| `tag`                    | `array     | callable`                                                                           | Static list or callable returning tags; powers the selector APIs |
+| Parameter                | Type                      | Purpose                                                                                          |
+| ------------------------ | ------------------------- | ------------------------------------------------------------------------------------------------ |
+| `priority`               | `int`                     | Execution order (default `10`)                                                                   |
+| `acceptedArgs`           | `int`                     | Number of arguments passed to the callable (default `1`)                                         |
+| `once`                   | `bool`                    | Self-removes after the first evaluation, whatever the gate result                                |
+| `deferRegister`          | `bool`                    | Holds the entry in the deferred pool. Container: `activateDeferredBy*`. Runtime/instance: `activateDeferredBy*InLiveInstance()` |
+| `deferRegisterUntilHook` | `string\|\Closure\|null`  | Implies deferral; auto-activates when the trigger fires (or has already fired)                   |
+| `registerIf`             | `\Closure\|null`          | Registration gate — once for eager hooks, re-evaluated on every deferred activation attempt      |
+| `executeIf`              | `\Closure\|null`          | Per-fire gate, evaluated on every `do_action` / `apply_filters`                                  |
+| `tag`                    | `array\|\Closure`         | Grouping/selector tags; array items are `string` or string-backed `BackedEnum`. Invalid tags skip that one hook |
+| `onUnregisterDo`         | `\Closure\|null`          | Cleanup after unregistration — once-consume, explicit unregister, or owner GC                    |
+
+#### Tag semantics
+
+Tag matching is **OR** and duplicates are removed. Items may be strings or string-backed `BackedEnum` cases; enums normalize to `->value`, so `[HookTag::Lowongan, 'lowongan']` becomes `['lowongan']`. Invalid tag values in an attribute (`int`, `null`, int-backed enums, objects) fail that one registration and are logged; invalid selector input throws.
+
+Container tags resolve at registration. Runtime tag definitions are cached per hook site but resolved per live instance, so owner-specific tag closures never leak between sibling instances. Active and deferred entries are separate pools: use `unregisterByTags()` for active entries and `unregisterDeferredByTags()` for deferred ones; the runtime equivalents add the `...InLiveInstance()` suffix. Tag-pattern selectors take wildcard strings, not enum objects.
 
 #### Minimal Examples
 
@@ -150,7 +157,7 @@ Every attribute parameter maps to a WordPress registration concern:
 #[Filter('posts_search', registerIf: static function (): bool {
     return \defined('GRAPHQL_REQUEST') && !is_admin() && !SharedUtils::isWPCLI();
 })]
-public function graphqlOnly(string $search, \WP_Query$wp_query): string
+public function graphqlOnly(string $search, \WP_Query $wp_query): string
 {
     return $search;
 }
@@ -163,7 +170,7 @@ public function graphqlOnly(string $search, \WP_Query$wp_query): string
 #[Filter('posts_search', executeIf: static function (\WP_Query $q): bool {
     return in_array(PostTypes::POST_TYPE_LOWONGAN, (array) $q->get('post_type'), true);
 })]
-public function lowonganOnly(string $search, \WP_Query$wp_query): string
+public function lowonganOnly(string $search, \WP_Query $wp_query): string
 {
     return $search;
 }
@@ -185,7 +192,7 @@ public function injectOncePerRequest(): void
 
 ```php
 #[Filter('posts_search', deferRegister: true, tag: ['lowongan'])]
-public function optInSearch(string $search, \WP_Query$wp_query): string
+public function optInSearch(string $search, \WP_Query $wp_query): string
 {
     return $search;
 }
@@ -214,18 +221,33 @@ class SearchActivator
 
 ```php
 #[Filter('posts_search', 10, 2, deferRegisterUntilHook: 'init_graphql_request')]
-public function graphqlSearch(string $search, \WP_Query$wp_query): string
+public function graphqlSearch(string $search, \WP_Query $wp_query): string
 {
     // equivalent to add_action('init_graphql_request', fn () => add_filter('posts_search', ...))
 }
 
 ```
 
-##### `tag` + selectors — group hooks, unregister by tag or pattern
+##### `tag` + selectors — group hooks, activate or unregister by tag or pattern
 
 ```php
-// Inside a service with the registry autowired:
-$this->hooksRegistry->unregisterByTags(['lowongan']);       // exact tag match$this->hooksRegistry->unregisterByHookPattern('posts_*');   // wildcard (prefix ≥ 2 chars)
+enum HookTag: string
+{
+    case Lowongan = 'lowongan';
+    case Search = 'search';
+}
+
+// Container registry (attribute-discovered service hooks)
+$this->hooksRegistry->activateDeferredByTags([HookTag::Lowongan]);
+$this->hooksRegistry->unregisterByTags([HookTag::Lowongan]);
+$this->hooksRegistry->unregisterByTagPattern(['lowongan_*']); // tag wildcard
+$this->hooksRegistry->unregisterByHookPattern('posts_*');      // hook-name wildcard
+
+// Runtime/instance registry — every selector is scoped to one live owner
+// $instanceRegistry: WPHooksInstanceRegistry, $service: the live owner instance
+$instanceRegistry->activateDeferredByTagsInLiveInstance($service, [HookTag::Lowongan]);
+$instanceRegistry->unregisterByTagsInLiveInstance($service, [HookTag::Lowongan]);
+$instanceRegistry->unregisterByTagPatternInLiveInstance($service, ['lowongan_*']);
 
 ```
 
@@ -280,15 +302,15 @@ class SearchHooks
             return in_array(PostTypes::POST_TYPE_LOWONGAN, $postTypes, true);
         }
     )]
-    public function jobPostsSearchFilterImpl(string $search, \WP_Query$wp_query): string
+    public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
         $q = (string) ($wp_query->query_vars['s'] ?? '');
-        if ($wpdb === null \vert{}\vert{}$q === '') {
+        if ($wpdb === null || $q === '') {
             return $search;
         }
 
-        return JobQuery::buildPostsSearchSql($wpdb,$q);
+        return JobQuery::buildPostsSearchSql($wpdb, $q);
     }
 }
 
@@ -355,7 +377,7 @@ class ThemeProp
         if ($loggedIn) {$wpThemeData['wpGraphqlNonce'] = wp_create_nonce('wp_rest');
         }
 
-        Cache::set($cacheKey,$wpThemeData, 86400); // Cache for 1 day
+        Cache::set($cacheKey, $wpThemeData, 86400); // Cache for 1 day
 
         return $wpThemeData;
     }
@@ -363,13 +385,63 @@ class ThemeProp
 
 ````
 
+### Registration & Lifecycle Flow
+
+```mermaid
+flowchart TD
+    subgraph DISCOVERY["1 · Discovery (cold cache)"]
+        A1["RobotLoader class index"] --> A2["WPHooksScanner::getHookRegistrations()"]
+        A2 --> A3["HookRegistration DTO<br/>plan · HookKey · attributeIndex"]
+        A3 --> A4[("WphooksRegistryContainerCache.php")]
+    end
+
+    subgraph CONTAINER["2 · Container path (Init)"]
+        B1["WPHooksContainerRegistry::initialize()"] --> B2{"registerIf gate"}
+        B2 -->|pass| B3["active pool"]
+        B2 -->|deferRegister| B4["ContainerRegistryDeferredHookManager"]
+        B3 --> B5["ContainerLazyHookInvoker → add_action / add_filter"]
+        B4 -.->|"deferRegisterUntilHook fires<br/>PHP_INT_MIN listener"| B6["activateDeferredBy*"]
+        B6 --> B5
+    end
+
+    subgraph RUNTIME["3 · Runtime path (existing object)"]
+        C1["WPHooksInstanceRegistry::registerHooksOn(object)"] --> C2["scan attributes<br/>plan via WPHookPlanProvider"]
+        C2 --> C3{"deferRegister?"}
+        C3 -->|no| C4["RuntimeInstanceHookInvoker<br/>owner = WeakReference"]
+        C3 -->|yes| C5["InstanceRegistryDeferredHookManager"]
+        C5 -.->|"trigger or owner-scoped API"| C6["activateDeferredBy*InLiveInstance()"]
+        C6 --> C4
+        C4 --> B5
+        C4 -.->|"owner GC → next dispatch"| G1["consumeLifetimeAndClean()"]
+    end
+
+    subgraph DISPATCH["4 · Dispatch & teardown"]
+        B5 --> D1["WP_Hook::apply_filters() → invoker"]
+        D1 --> D2{"executeIf"}
+        D2 -->|false| D3["action: null<br/>filter: passthrough"]
+        D2 -->|true| D4["resolve service (container)<br/>or use owner (runtime)"]
+        D4 --> D5{"once?"}
+        D5 -->|yes| D6["consumed = true<br/>queue removal"]
+        D5 -->|no| D7["invoke handler"]
+        D6 --> D7
+        D7 --> D8["removal → invoker destructor"]
+        D6 -.->|"WP #64653: cannot remove mid-dispatch"| D9["QueuedHooksCleaner sweep<br/>(nested: outer entries wiped first)"]
+        D9 --> D8
+        D8 --> D10["onUnregisterDo → registry bookkeeping<br/>→ EntriesIndexer buckets released"]
+        G1 --> D8
+        E1["external remove_action / remove_all_*"] --> D8
+    end
+```
+
+**Legend**: solid arrows = active pool; dashed arrows = deferred activation or destructor-driven cleanup. `$wp_filter` is the only strong owner of an active invoker — see `project-intelligence/wphooks-ownership-raii.md`.
+
 ### How Hook Registration Works
 
-- **Two registration paths.** Container path: the `DependencyAutowireScanner` finds `#[Action]` / `#[Filter]` methods, and the `Init` service registers them as lazy `ContainerLazyHookInvoker`s when the container initializes — the service is resolved from the DI container only when the hook actually fires. Runtime path: `WPHooksInstanceRegistry::registerHooksOn($object)` registers the hooks of an already-instantiated object immediately (attribute closures resolved via `RuntimeWPHookProvider`, static closures required).
-- **Gates.** `registerIf` runs once at registration time; `executeIf` runs on every fire — when it fails, filters pass the original value through unchanged and actions return `null`.
-- **Deferred pool.** `deferRegister` hooks skip registration until activated via `activateDeferredByHook()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()`; `deferRegisterUntilHook` auto-activates when its trigger hook fires.
-- **Lifecycle.** `once` hooks self-remove after the first evaluation; `unregisterByCallable()` / `ByHook()` / `ByClass()` / `ByNamespace()` / `ByTags()` plus wildcard `unregisterByHookPattern()` / `unregisterByTagPattern()` tear hooks down.
-- Supports both static and instance methods; priority and accepted args are configurable via the attribute.
+- **Two registration paths.** Container path: the `DependencyAutowireScanner` finds `#[Action]` / `#[Filter]` methods, and the `Init` service registers them as lazy `ContainerLazyHookInvoker`s when the container initializes — the service is resolved from the DI container only when the hook actually fires. Runtime path: `WPHooksInstanceRegistry::registerHooksOn($object)` registers the hooks of an already-instantiated object immediately (attribute closures resolved via the DI-container-backed `WPHookPlanProvider`, static closures required).
+- **Gates.** `registerIf` runs once for eager hooks, but is **re-evaluated on every deferred activation attempt** — a trigger that keeps firing can retry until the gate passes. `executeIf` runs on every fire — when it returns `false` or cannot be evaluated (throw, non-bool, unresolvable dependency), the handler is **declined**: filters pass the original value through unchanged, actions return `null`, and an ERROR is logged. With `once: true` the hook is consumed regardless of gate outcome.
+- **Deferred pool.** `deferRegister` holds an entry out of `$wp_filter` until it is activated. Container path: `activateDeferredByHook()` / `ByHookPattern()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()` / `ByTagPattern()`. Runtime path (`WPHooksInstanceRegistry`): the same selector families with the owner-scoped `...InLiveInstance($instance, ...)` suffix; `deferRegisterUntilHook` can also auto-activate on its trigger. Active-pool selectors (`unregisterBy*`) never sweep deferred entries — use `unregisterDeferredBy*` (or the matching `...InLiveInstance()` method) instead.
+- **Lifecycle.** `once` hooks self-remove after the first evaluation; active hooks can be removed with `unregisterByHook()` / `ByHookPattern()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()` / `ByTagPattern()`; the runtime path uses the matching `...InLiveInstance($instance, ...)` methods. `onUnregisterDo` runs the cleanup side effect.
+- Static methods and inherited (non-declared) methods are skipped — declare hooks on the class that owns them. Stack attributes on one member for multi-priority registration.
 
 This approach keeps hook registration declarative and centralized.
 
@@ -412,11 +484,15 @@ If you are already inside the container, run PHPUnit directly:
 
 ### Test Files
 
-- `tests/CacheTest.php` — cache behavior and WordPress cache mocks.
+- `tests/WPHookTests/` — attribute-driven hook subsystem suite, split by domain: `Attribute/`, `Registration/`, `Execution/`, `Deferral/`, `Once/`, `Lifecycle/`, `Tag/`, `Registry/`, `Integration/`.
+- `tests/WPHookTests/Registry/` — container/runtime selector behavior, event bridge coverage, and owner-scoped tag/tag-pattern lifecycle.
+- `tests/WPHookTests/Tag/` — tag normalization, dynamic tag callables, and string-backed enum values.
 - `tests/ContainerDefinitionsTest.php` — PHP-DI container definition coverage.
-- `tests/GraphQLTest.php` — GraphQL query and response behavior.
-- `tests/LowonganIngestOptionsRestTest.php` — ingest options REST endpoint behavior.
+- `tests/DependencyInjectorTest.php` — autowiring and dependency injection behavior.
+- `tests/CacheTest.php` — cache behavior and WordPress cache mocks.
 - `tests/LowonganIngestRestTest.php` — lowongan ingest REST endpoint behavior.
+
+The hook suite runs against the real WordPress hook engine (`wp-includes/plugin.php`). Set `WPLOKERBJM_WP_ROOT` when WordPress is not at the repository's default location.
 
 ## 📝 Development Notes
 
@@ -424,19 +500,3 @@ If you are already inside the container, run PHPUnit directly:
 >
 > - 🔗 See [Init.php](https://www.google.com/search?q=server/Core/Container/Init.php) and [PHP-DI Container](https://www.google.com/search?q=server/Core/Container.php) for WordPress event-driven hooks implementation
 > - 🔗 See the **Dependency Injection System** section above for details on automatic class discovery and registration
-
-## 📋 Mini Kanban Table
-
-| 📥 BACKLOG                                 | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                                                           |
-| ------------------------------------------ | ------- | -------------- | ---------------------------------------------------------------------- |
-| 🗺️ Add Job Fair Page (map & event details) |         |                | ✅ Migrate from AlpineJS to Vue                                        |
-|                                            |         |                | ✅ Migrate from Vue to bare theme and Svelte for frontend `<body>` CSR |
-|                                            |         |                | ✅ Playwright Github Action microservice for SSG                       |
-|                                            |         |                | ✅ Client side bookmark system                                         |
-|                                            |         |                | ✅ Add SkeletonHTML for SEO efficiency                                 |
-|                                            |         |                | ✅ Virtualization listing for better performance                       |
-|                                            |         |                | ✅ Migrated to SvelteKit                                               |
-
-```
-
-```

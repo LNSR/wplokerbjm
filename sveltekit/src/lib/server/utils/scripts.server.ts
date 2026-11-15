@@ -1,7 +1,7 @@
 import { isNil } from "es-toolkit";
 //eslint-disable-next-line
-import type { JobSchemaResponse, WPBasePost } from "@/types";
-import { type APIServiceServer } from "@/services/graphql/APIService";
+import type { JobSchemaResponse, WPBasePost } from "#src/types/index.js";
+import { type APIServiceServer } from "#src/services/graphql/APIService.js";
 
 /**
  * Attaches a JSON-LD schema script to the HTML.

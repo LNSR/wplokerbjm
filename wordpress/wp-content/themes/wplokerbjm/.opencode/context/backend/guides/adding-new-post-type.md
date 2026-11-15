@@ -1,9 +1,9 @@
-<!-- Context: backend/guides | Priority: high | Version: 1.0 | Updated: 2026-07-27 -->
+<!-- Context: backend/guides | Priority: high | Version: 1.1 | Updated: 2026-11-18 -->
 
 # Guide: Adding a New Post Type
 
 **Purpose**: Register a custom post type following the established schema pattern
-**Last Updated**: 2026-07-27
+**Last Updated**: 2026-11-18
 
 ## Prerequisites
 - Understand `#[Action('init')]` attribute pattern (see `examples/adding-a-hook.md`)
@@ -51,7 +51,7 @@ public function registerNewPostType(): void
 ### 3. Update Container Definitions
 If the post type needs custom behavior, add to `Factory::getDefinitions()` in:
 ```
-server/Core/Container/Definitions/Factory.php
+server/Core/Container/Definitions/Factories.php
 ```
 
 ### 4. Add Custom Fields (Optional)
@@ -63,7 +63,7 @@ public const NEW_FIELD = 'new_custom_field';
 ### 5. Add GraphQL Support (Optional)
 If the post type should be queryable via GraphQL, add object types and resolvers:
 - Add type to `server/Services/GraphQL/GraphQLRegistration.php`
-- Add resolver to `server/Controllers/GraphQL/Resolvers/`
+- Add resolver to `server/Transport/GraphQL/Resolvers/`
 - See `guides/graphql-resolvers.md` for details
 
 ## Verification
@@ -89,7 +89,7 @@ composer test
 - `server/Models/Schema/PostTypes.php` — Existing `lowongan` post type (reference pattern)
 
 **Container Definitions**:
-- `server/Core/Container/Definitions/Factory.php` — Post type service registrations
+- `server/Core/Container/Definitions/Factories.php` — Post type service registrations
 
 **Cron for Post Type**:
 - `server/Core/Cron/Posts/` — WP-Cron jobs for post lifecycle management

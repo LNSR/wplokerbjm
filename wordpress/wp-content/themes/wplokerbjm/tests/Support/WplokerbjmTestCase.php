@@ -9,7 +9,9 @@ use \DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, HookTargetResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{ContainerRegistryDeferredHookManager,InstanceRegistryDeferredHookManager};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 
 abstract class WplokerbjmTestCase extends TestCase
@@ -21,10 +23,17 @@ abstract class WplokerbjmTestCase extends TestCase
      * before reading WordPress state, so assertions observe the settled
      * (post-removal) registrations. Set to false to inspect the raw queue
      * while entries are still deferred — e.g. to assert the queued state and
-     * then flush it explicitly with {@see flushQueuedRemovals()}.
+     * then flush it explicitly with @see self::flushQueuedRemovals.
      */
     protected bool $flushQueuedRemovalsAfterDispatch = true;
-    protected QueuedHooksCleaner $queuedHooksCleaner { get => $this->queuedHooksCleaner ??= new QueuedHooksCleaner(); }
+    public protected(set) QueuedHooksCleaner|\WeakReference|null $queuedHooksCleaner = null {
+        get {
+            if (!($this->queuedHooksCleaner instanceof \WeakReference)) return $this->queuedHooksCleaner ??= new QueuedHooksCleaner();
+            if ($this->queuedHooksCleaner->get() === null) return $this->queuedHooksCleaner = new QueuedHooksCleaner();
+            return $this->queuedHooksCleaner->get();
+        } 
+        set => $value instanceof \WeakReference ? $value : \WeakReference::create($value);
+    }
 
     protected function setUp(): void
     {
@@ -112,7 +121,7 @@ abstract class WplokerbjmTestCase extends TestCase
     protected function registeredHooks(): array
     {
         if ($this->flushQueuedRemovalsAfterDispatch) {
-            ($this->flushQueuedRemovals)();
+            ($this->flushQueuedRemovals)($this->queuedHooksCleaner);
         }
 
         $hooks = [];
@@ -138,6 +147,30 @@ abstract class WplokerbjmTestCase extends TestCase
     }
 
     /**
+     * Registered hooks minus the control-plane event bridges.
+     *
+     * Both registries expose their selector APIs through raw WordPress events
+     * (booted by `initialize()` / first `registerHooksOn()`). Those listeners
+     * are infrastructure, not application registrations, so assertions about
+     * "nothing was registered" should use this view.
+     *
+     * @return list<array{hook: string, callable: callable, priority: int, acceptedArgs: int}>
+     */
+    protected function registeredApplicationHooks(): array
+    {
+        static $bridgeHooks = null;
+        $bridgeHooks ??= [
+            ...\array_keys(WPHooksContainerRegistry::EVENT_BRIDGE_HOOKS),
+            ...\array_keys(WPHooksInstanceRegistry::EVENT_BRIDGE_HOOKS),
+        ];
+
+        return \array_values(\array_filter(
+            $this->registeredHooks(),
+            static fn(array $registered): bool => !\in_array($registered['hook'], $bridgeHooks, true),
+        ));
+    }
+
+    /**
      * Find the first registered callback for the given hook name.
      *
      * The `$type` parameter is kept for call-site compatibility; the real
@@ -145,12 +178,17 @@ abstract class WplokerbjmTestCase extends TestCase
      *
      * @param string $type 'action' or 'filter' (ignored)
      * @param string $hook Hook name
-     * @return array<string,mixed>|null
+     * @return ?array{
+     *  hook: string,
+     *  callable: callable,
+     *  priority: int,
+     *  acceptedArgs: int,
+     * }
      */
     protected function findRegisteredHook(string $type, string $hook): ?array
     {
         if ($this->flushQueuedRemovalsAfterDispatch) {
-            ($this->flushQueuedRemovals)();
+            ($this->flushQueuedRemovals)($this->queuedHooksCleaner);
         }
 
         foreach ($GLOBALS['wp_filter'][$hook]->callbacks ?? [] as $priority => $callbacks) {
@@ -167,18 +205,16 @@ abstract class WplokerbjmTestCase extends TestCase
         return null;
     }
 
-    private \Closure $flushQueuedRemovals {
+    private ?\Closure $flushQueuedRemovals = null {
         get {
-            return $this->flushQueuedRemovals ??= \Closure::bind(function () {
-                $queued = $this->queuedRemovalEntry ?? [];
+            return $this->flushQueuedRemovals ??= \Closure::bind(static function (QueuedHooksCleaner $cleaner) {
+                $queued = $cleaner->queuedRemovalEntry ?? [];
                 if ($queued === []) return;
 
                 foreach ($queued as $idx => $entry) {
-                    if ($entry->isCurrentlyExecuting()) continue;
-                    $entry->unregister();
-                    unset($this->queuedRemovalEntry[$idx]);
+                    $cleaner->immediatelyScheduleRemove($entry);
                 }
-            }, $this->queuedHooksCleaner, $this->queuedHooksCleaner);
+            }, null, $this->queuedHooksCleaner);
         }
     }
 
@@ -219,17 +255,19 @@ abstract class WplokerbjmTestCase extends TestCase
     protected function createRegistry(array $registrations, ?ContainerInterface $container = null): WPHooksContainerRegistry
     {
         $container ??= $this->container();
-        $planProvider = new WPHookPlanProvider();
-        $resolver = new HookTargetResolver();
+        $planProvider = new WPHookPlanProvider($container ?? $this->container());
+        $resolver = new ContainerRegistryHookTargetResolver();
         $entriesIndexer = new EntriesIndexer();
+        $queuedHooksCleaner = new QueuedHooksCleaner();
+        $this->queuedHooksCleaner = \WeakReference::create($queuedHooksCleaner);
 
         $registry = new WPHooksContainerRegistry(
             $container,
             $registrations,
             $planProvider,
-            new ContainerRegistryDeferredHookManager($planProvider, $container, $resolver, $entriesIndexer),
+            new ContainerRegistryDeferredHookManager($planProvider, $resolver, $entriesIndexer),
             $resolver,
-            $this->queuedHooksCleaner = new QueuedHooksCleaner(),
+            $queuedHooksCleaner,
             $entriesIndexer
         );
         return $registry;

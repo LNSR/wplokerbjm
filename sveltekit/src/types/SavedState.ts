@@ -1,5 +1,5 @@
 // Homepage job grid saved state types
-import type { SearchContext, SearchFilters, CardJob, SearchTitle } from '@/types';
+import type { SearchContext, SearchFilters, CardJob, SearchTitle } from '#src/types/index.js';
 export interface SearchState {
   jobs?: CardJob[] | null
   context: SearchContext

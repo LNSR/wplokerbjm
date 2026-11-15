@@ -8,8 +8,7 @@ use Override;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
-use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
-use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryHookEvent;
+
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\Injectable;
 
@@ -35,21 +34,19 @@ use WPLokerBJM\Core\Container\Attributes\Injectable;
  * ```
  *
  * `$parentClass` accepts either a class-string or the parent object itself —
- * {@see getParentClass()} normalizes an object parent via get_class().
- * @template TClass
- * @template T of class-string<TClass>|object<TClass>
+ * {@see getParentClassString()} normalizes an object parent via get_class().
+ * @template T
+ * @extends parent<T>
  */
 abstract class ModuleClassHookMetadata extends AsChildClass
 {
-
     /**
-     * @param T $parentClass    The class-string containing this hook, or the
+     * @param T      $parentClass    The class-string containing this hook, or the
      *                                            parent object to resolve via get_class().
-     * @param string              $parentProperty The property name holding this instance.
+     * @param string $parentProperty The property name holding this instance.
      */
     public function __construct(
-        #[Override]
-        protected string|object $parentClass,
+        string|object $parentClass,
         public private(set) readonly string $parentProperty,
     ) {
         parent::__construct($parentClass, $parentProperty);
@@ -69,15 +66,16 @@ abstract class ModuleClassHookMetadata extends AsChildClass
      * }
      * ```
      * this instance closure has `$this` reference from its own class
-     * it will take ZEND Engine for a while to collect cycle.
+     * it will take ZEND Engine for a while to collect cycle or can just explicitly flush via \gc_collect_cycles() fn.
      */
     public function __destruct()
     {
         if (\defined('WPLOKERBJM_TEST_ENV') && WPLOKERBJM_TEST_ENV) return;
-        \do_action(InstanceRuntimeRegistryHookEvent::UNREGISTER_HOOKS, $this);
+        \do_action(WPHooksInstanceRegistry::UNREGISTER_HOOKS, $this);
 
-        if (!\method_exists($this, '__invoke')) return;
-        \do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
-        \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this->parentClass, $this->parentProperty]);
+        // ContainerRegister is exclusively for named class
+        if (!\method_exists($this, '__invoke') && \str_contains($this->parentClassString, '@anonymous')) return;
+        \do_action(WPHooksContainerRegistry::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->parentClassString, $this->parentProperty]);
+        \do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this->parentClassString, $this->parentProperty]);
     }
 }

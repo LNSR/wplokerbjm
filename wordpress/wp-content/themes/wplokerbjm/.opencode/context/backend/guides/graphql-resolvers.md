@@ -1,9 +1,9 @@
-<!-- Context: backend/guides | Priority: high | Version: 1.0 | Updated: 2026-07-27 -->
+<!-- Context: backend/guides | Priority: high | Version: 1.1 | Updated: 2026-11-18 -->
 
 # Guide: Adding GraphQL Resolvers
 
 **Purpose**: Add new GraphQL queries, mutations, and custom types via WPGraphQL
-**Last Updated**: 2026-07-27
+**Last Updated**: 2026-11-18
 
 ## Prerequisites
 - WPGraphQL plugin active
@@ -15,7 +15,7 @@
 ## Steps
 
 ### 1. Create Resolver Class
-Create in `server/Controllers/GraphQL/Resolvers/`:
+Create in `server/Transport/GraphQL/Resolvers/`:
 ```php
 <?php
 namespace WPLokerBJM\Controllers\GraphQL\Resolvers;
@@ -86,7 +86,7 @@ public function resolveNewQuery(array $args): array
 
 ## Key Patterns
 
-- **Resolver location**: `Controllers/GraphQL/Resolvers/` — one class per domain
+- **Resolver location**: `Transport/GraphQL/Resolvers/` — one class per domain
 - **Type registration**: `GraphQLRegistration::registerTypes()` via `#[Action('graphql_register_types')]`
 - **Argument passing**: Use arrow functions `fn(...$args) => $this->resolver->method(...$args)`
 - **Custom scalar JSON**: Registered once in `registerScalars()`; use for flexible data shapes
@@ -112,10 +112,10 @@ public function resolveNewQuery(array $args): array
 - `server/Services/GraphQL/GraphQLJobData.php` — Shared data methods
 
 **Resolvers**:
-- `server/Controllers/GraphQL/Resolvers/JobsDataResolver.php` — Job queries
-- `server/Controllers/GraphQL/Resolvers/TaxonomyResolver.php` — Taxonomy queries
-- `server/Controllers/GraphQL/Resolvers/ThemeDataResolver.php` — Theme data
-- `server/Controllers/GraphQL/Resolvers/Auth/JWTDataResolver.php` — JWT auth
+- `server/Transport/GraphQL/Resolvers/Job/JobsDataResolver.php` — Job queries
+- `server/Transport/GraphQL/Resolvers/Job/TaxonomyResolver.php` — Taxonomy queries
+- `server/Transport/GraphQL/Resolvers/ThemeDataResolver.php` — Theme data
+- `server/Transport/GraphQL/Resolvers/Auth/JWTDataResolver.php` — JWT auth
 
 ## Related
 - `concepts/caching.md` — Cache GraphQL responses

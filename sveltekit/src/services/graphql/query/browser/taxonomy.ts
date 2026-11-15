@@ -1,4 +1,4 @@
-import { graphql } from "@/services/graphql/config/tada";
+import { graphql } from "#src/services/graphql/config/tada.js";
 
 
 // GraphQL queries for taxonomy terms using JSON scalar

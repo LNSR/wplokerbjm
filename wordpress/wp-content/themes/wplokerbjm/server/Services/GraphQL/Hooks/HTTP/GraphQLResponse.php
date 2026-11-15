@@ -8,8 +8,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use WP_User;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
-use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryHookEvent;
+
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations\LiteSpeedGraphQLIntegration;
 use WPLokerBJM\Services\GraphQL\ETag\WPGraphQLETag;
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
@@ -52,7 +51,7 @@ final class GraphQLResponse
          * @var GraphQLDataType $data
          */
         $data = $graphql_response->data ?? null;
-        if (array_key_exists('jwt', $data) && !$data['jwt']) {
+        if (\is_array($data) && \array_key_exists('jwt', $data) && !$data['jwt']) {
             return 401;
         }
         return $http_status_code;

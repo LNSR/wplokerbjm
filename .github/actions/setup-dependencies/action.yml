@@ -15,7 +15,7 @@ runs:
   using: "composite"
   steps:
     - name: Install latest node
-      uses: actions/setup-node@v6
+      uses: actions/setup-node@v7
       with:
         node-version: latest
         check-latest: true
@@ -41,7 +41,7 @@ runs:
 
     - name: Cache APT archives and lists
       if: ${{ inputs.enable-apt-cache == 'true' }}
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       id: apt-cache
       with:
         path: |
@@ -52,18 +52,12 @@ runs:
           ${{ runner.os }}-apt-
 
     - name: Setup Bun
-      uses: oven-sh/setup-bun@v1
+      uses: oven-sh/setup-bun@v2
       with:
         bun-version: latest
 
-    - name: Update and verify Bun installation
-      run: |
-        bun upgrade --stable
-        echo "Bun: $(bun --version || echo 'bun not found')"
-      shell: bash
-
     - name: Cache node_modules
-      uses: actions/cache@v4
+      uses: actions/cache@v6
       id: bun-cache
       with:
         path: ${{ inputs.sveltekit-dir }}/node_modules

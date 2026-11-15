@@ -4,13 +4,17 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Indexers;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryHandlerEntry;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredHookEntryHandler;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\RuntimeRegistryHandlerEntry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{ContainerRegistryHandlerEntry, RuntimeRegistryHandlerEntry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler;
 
 /**
  * Indexes hook entries by hook / class / tag / callable / namespace for O(K)
  * lookup.
+ *
+ * Namespace buckets store every ANCESTOR prefix of the entry class, so a
+ * parent-namespace query (`App\Core`) matches its whole subtree
+ * (`App\Core\Sub\Foo`) while never matching a sibling prefix
+ * (`App\CoreExtra\Foo`).
  *
  * Every bucket is keyed by the entry's own unique key (`toUniqueKey()`), so
  * {@see setIndexes()} and {@see removeIndexes()} are perfectly symmetric and a
@@ -24,7 +28,7 @@ class EntriesIndexer
 {
     /** @var array<string, array<TKey, TKey>> */
     public array $byHook = [];
-    /** @var array<class-string, array<TKey, TKey>> */
+    /** @var array<class-string|string, array<TKey, TKey>> */
     public array $byClass = [];
     /** @var array<string, array<TKey, TKey>> */
     public array $byTag = [];
@@ -46,8 +50,7 @@ class EntriesIndexer
             $this->byTag[$tag][$uniqueKey] = $uniqueKey;
         }
         $this->byCallable[$this->getCallable($entry)][$uniqueKey] = $uniqueKey;
-        $namespace = $this->getNamespace($entry);
-        if ($namespace !== '') {
+        foreach ($this->getNamespaceChain($entry->key->class) as $namespace) {
             $this->byNamespace[$namespace][$uniqueKey] = $uniqueKey;
         }
     }
@@ -55,7 +58,7 @@ class EntriesIndexer
     /**
      * Remove hook entry indexes.
      *
-     * Mirrors {@see setIndexes()} exactly (same buckets, same keys) and drops
+     * Mirrors {@see self::setIndexes()} exactly (same buckets, same keys) and drops
      * emptied buckets so repeated register/unregister cycles never leak.
      *
      */
@@ -68,8 +71,7 @@ class EntriesIndexer
             $this->unsetIndex($this->byTag, $tag, $uniqueKey);
         }
         $this->unsetIndex($this->byCallable, $this->getCallable($entry), $uniqueKey);
-        $namespace = $this->getNamespace($entry);
-        if ($namespace !== '') {
+        foreach ($this->getNamespaceChain($entry->key->class) as $namespace) {
             $this->unsetIndex($this->byNamespace, $namespace, $uniqueKey);
         }
     }
@@ -90,20 +92,39 @@ class EntriesIndexer
     }
 
     /**
-     * Get the namespace of the entry.
+     * Get the immediate namespace of the entry (the deepest ancestor).
      *
      * @param IndexEntryShape $entry
-     * @return string
+     * @return string Empty string for a class in the global namespace.
      */
     public function getNamespace(DeferredHookEntryHandler|ContainerRegistryHandlerEntry $entry): string
     {
-        $className = trim($entry->key->class, '\\');
+        return $this->getNamespaceChain($entry->key->class)[0] ?? '';
+    }
 
-        $position = strrpos($className, '\\');
+    /**
+     * Every ancestor namespace of a class, deepest first.
+     *
+     * `setIndexes()` indexes the whole chain, so a parent-namespace lookup
+     * stays O(K): `byNamespace['App\Core']` contains `App\Core\Foo`,
+     * `App\Core\Sub\Foo`, … without scanning bucket keys. Sibling prefixes are
+     * never included (`App\CoreExtra` is absent from `App\Core`).
+     *
+     * @return list<string> `A\B\C\Foo` → ['A\B\C', 'A\B', 'A']; global class → [].
+     */
+    public function getNamespaceChain(string $className): array
+    {
+        $parts = \explode('\\', \trim($className, '\\'));
+        \array_pop($parts); // drop the class short name
 
-        return $position === false
-            ? ''
-            : substr($className, 0, $position);
+        $chain = [];
+
+        while ($parts !== []) {
+            $chain[] = \implode('\\', $parts);
+            \array_pop($parts);
+        }
+
+        return $chain;
     }
 
     /**

@@ -1,8 +1,10 @@
 <script lang="ts">
-  const { srLabel = "Memuat...", size = "md" } = $props<{
+  type Props = {
     srLabel?: string;
     size?: "sm" | "md" | "lg" | string;
-  }>();
+  };
+
+  const { srLabel = "Memuat...", size = "md" }: Props = $props();
 
   const sizeClass = $derived(
     size === "sm" ? "h-5 w-5" : size === "lg" ? "h-12 w-12" : "h-8 w-8"

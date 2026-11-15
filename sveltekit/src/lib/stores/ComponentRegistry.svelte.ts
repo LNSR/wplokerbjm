@@ -1,9 +1,9 @@
 import { isNil } from "es-toolkit";
 import { type Component, type ComponentProps } from "svelte";
 import { SvelteMap } from "svelte/reactivity";
-import type BookmarkModal from "@components/ui/Header/BookmarkModal.svelte";
-import type CustomDropdown from "@components/ui/Homepage/SearchForm/CustomDropdown.svelte";
-import type LoginModal from "@components/ui/Header/LoginModal.svelte";
+import type BookmarkModal from "#lib/components/ui/Header/BookmarkModal.svelte";
+import type CustomDropdown from "#lib/components/ui/Homepage/SearchForm/CustomDropdown.svelte";
+import type LoginModal from "#lib/components/ui/Header/LoginModal.svelte";
 
 interface ComponentRegistryMap
 {
@@ -17,9 +17,9 @@ class ComponentRegistry
   #components = new SvelteMap<keyof ComponentRegistryMap, ComponentRegistryMap[ keyof ComponentRegistryMap ]>();
   #componentLoading = false;
   #registry: Record<keyof ComponentRegistryMap, () => Promise<{ default: any }>> = {
-    BookmarkModal: () => import("@components/ui/Header/BookmarkModal.svelte"),
-    CustomDropdown: () => import("@components/ui/Homepage/SearchForm/CustomDropdown.svelte"),
-    LoginModal: () => import("@components/ui/Header/LoginModal.svelte"),
+    BookmarkModal: () => import("#lib/components/ui/Header/BookmarkModal.svelte"),
+    CustomDropdown: () => import("#lib/components/ui/Homepage/SearchForm/CustomDropdown.svelte"),
+    LoginModal: () => import("#lib/components/ui/Header/LoginModal.svelte"),
   };
 
   /**

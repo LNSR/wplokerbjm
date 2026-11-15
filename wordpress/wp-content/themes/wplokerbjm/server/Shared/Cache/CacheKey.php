@@ -1,5 +1,6 @@
 <?php
 namespace WPLokerBJM\Shared\Cache;
+use WPLokerBJM\Adapter\RedisAdapter;
 /**
  * Cache key definitions
  *
@@ -46,8 +47,8 @@ class CacheKey
 
     /**
      * Prefixes whose keys are recorded in the Redis purge registry
-     * ({@see WPLokerBJM\Shared\Cache\CacheRegistry::record()}) and bulk-deleted by
-     * {@see WPLokerBJM\Adapter\RedisAdapter::deletePattern()}.
+     * @see CacheRegistry::record() and bulk-deleted by
+     * @see RedisAdapter::deletePattern()
      */
     const PATTERN_PURGE_PREFIXES = [
         self::JOB_GRID_PREFIX,

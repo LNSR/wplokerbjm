@@ -8,6 +8,8 @@ use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 
 /**
  * Centralized cache purge when posts, meta, terms, or status change.
@@ -34,8 +36,7 @@ class CachePurgeHandler
      * is handled separately by {@see self::purgeGlobalCacheOnce}.
      *
      * Registered only on hooks that carry post context.
-     * @phpstan-ignore-next-line
-     * @var __CLASS__::class
+     * @var class@anonymous::class
      */
     #[Action('init', 10, 0, once: true)]
     public private(set) ?ModuleClassHookMetadata $invalidatePostCache {
@@ -46,7 +47,7 @@ class CachePurgeHandler
 
                 public function __invoke(): void
                 {
-                    do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $this);
+                    do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $this);
                 }
 
                 #[Action('wp_after_insert_post', 10, 4)]
@@ -113,11 +114,12 @@ class CachePurgeHandler
     private \Closure $purgeGlobalCacheOnce {
         get {
             static $__propertyName = __PROPERTY__;
-            return $this->purgeGlobalCacheOnce ??= function () use ($__propertyName) {
+            return $this->purgeGlobalCacheOnce ??= function (...$args) use ($__propertyName) {
                 static $alreadyRun = false;
                 if ($alreadyRun) return;
                 $alreadyRun = true;
-                do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
+                
+                do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
                 try {
                     Cache::deleteMultiple([
                         CacheKey::CAROUSEL_JOBS,

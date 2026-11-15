@@ -1,6 +1,8 @@
 /// <reference lib="webworker" />
-import { BrowserFetch } from "@/services/graphql/fetch";
-import { URQLBrowserManager } from "@/services/graphql/config/urql";
+import "../../worker-env";
+import { BrowserFetch } from "#src/services/graphql/fetch.js";
+import { URQLBrowserManager } from "#src/services/graphql/config/urql.js";
 import { expose } from "comlink";
-const BrowserFetchWorker = new BrowserFetch(new URQLBrowserManager());
-expose(BrowserFetchWorker);
+
+const browserFetchWorker = new BrowserFetch(new URQLBrowserManager());
+expose(browserFetchWorker);

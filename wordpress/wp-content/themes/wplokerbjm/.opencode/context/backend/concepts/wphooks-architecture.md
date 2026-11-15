@@ -1,3 +1,5 @@
+<!-- Context: backend/concepts | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # WPHooks Architecture
 
 **Purpose**: Explain how attribute-driven WordPress hooks move from reflection metadata to active or deferred handlers.
@@ -18,7 +20,7 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 
 ## Runtime flow
 
-`WPHooksInstanceRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. When a `RuntimeWPHookProvider` is injected, attribute closures (hook name, `registerIf`, `executeIf`) are resolved with optional container / named hook-argument injection; without one, closures must be zero-parameter. Manual `registerAction()` / `registerFilter()` use `RuntimeCallableHookInvoker`, letting closures capture runtime state without container resolution.
+`WPHooksInstanceRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. Attribute closures (hook name, `registerIf`, `executeIf`) always resolve through the container-backed `WPHookPlanProvider` (named hook-argument injection first, then the container, then defaults). Plain `deferRegister` holds the entry in the deferred pool until a live-instance selector activates it; `deferRegisterUntilHook` auto-activates when the trigger fires (with gate-retry on each fire).
 
 ## Deferred pool (shared)
 
@@ -28,17 +30,17 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 - `activateMatchingDeferredEntries()` sweeps the pool, re-evaluates the registration gate via the abstract `gateDeferredActivation()`, and hands matches to an activate callback.
 - `unregisterMatchingDeferredEntries()` removes entries without touching active handlers.
 
-`ContainerRegistryDeferredHookManager` (container path) exposes the micromanage selectors; `WPHooksInstanceRegistry` consumes the same mechanics behind an automatic-only surface (`deferRegisterUntilHook` only).
+`ContainerRegistryDeferredHookManager` (container path) exposes the global micromanage selectors. The instance path consumes the same mechanics through `InstanceRegistryDeferredHookManager`, scoped to one live owner: hook (`...ByHookInLiveInstance()`), hook pattern (`...ByHookPatternInLiveInstance()`), tags (`...ByTagsInLiveInstance()`), tag pattern (`...ByTagPatternInLiveInstance()`), callable (`...ByCallableInLiveInstance()`), and owner-wide (`...ByClassInLiveInstance()`) activation/removal. Namespace selectors are intentionally not planned for the instance path.
 
 ## The important boundary
 
 | Concern | Container path | Runtime path |
 |---|---|---|
 | Target lifetime | Resolved lazily at hook fire | Existing object held via `WeakMap`; handler self-nukes on owner GC |
-| Dynamic hook names | Supported through `WPHookPlanProvider` | Supported through `RuntimeWPHookProvider` |
+| Dynamic hook names | Supported through `WPHookPlanProvider` | Supported through `WPHookPlanProvider` |
 | Conditions | `registerIf` once; `executeIf` per fire | Attribute `registerIf`/`executeIf` resolved via provider |
-| Deferred hooks | `deferRegister` + `deferRegisterUntilHook`, many selectors | `deferRegisterUntilHook` auto-activates on trigger |
-| Anonymous classes | Use resolver metadata or `AnonClassHookPropertyAbstract` | Direct instance handlers work naturally |
+| Deferred hooks | `deferRegister` + `deferRegisterUntilHook`, many selectors | `deferRegister` + `deferRegisterUntilHook`; owner-scoped hook/hook-pattern/tag/tag-pattern/callable/class activate/remove |
+| Anonymous classes | Use resolver metadata or `ModuleClassHookMetadata` | Direct instance handlers work naturally |
 
 ## Minimal shape
 
@@ -63,4 +65,4 @@ The attribute declares intent; the registry owns lifecycle and the invoker owns 
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — container registry, deferred manager, and target resolver.
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — immediate object/runtime registration path.
 - `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — ContainerLazyHookInvokerTrait, ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker.
-- `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — RuntimeInstanceInvokerTrait, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker, RuntimeCallableHookInvoker.
+- `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — RuntimeInstanceInvokerTrait, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker.

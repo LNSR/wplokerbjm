@@ -1,6 +1,6 @@
 import type { RequestHandler } from "./$types";
 
-import { getCmsOrigin } from "@/utils/environment";
+import { getCmsOrigin } from "#src/utils/environment.js";
 
 // we'll still normalise the result so it never ends with a slash
 function normaliseOrigin(o: string) {

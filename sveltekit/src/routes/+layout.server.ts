@@ -1,7 +1,7 @@
 import type { LayoutServerLoad } from "./$types";
-import { APIServiceServer } from "@/services/graphql/APIService";
-import type { WPLokerBJMThemedData } from "@/types";
-import { getCmsOrigin } from "@/utils/environment";
+import { APIServiceServer } from "#src/services/graphql/APIService.js";
+import type { WPLokerBJMThemedData } from "#src/types/index.js";
+import { getCmsOrigin } from "#src/utils/environment.js";
 export const load: LayoutServerLoad = async ({ locals, url, fetch }) =>
 {
   try

@@ -61,10 +61,10 @@ class LitespeedIntegrationCommands
     }
     public function addLitespeedTagHeader(array $headers = []): array
     {
-        if (isset($headers['X-GraphQL-Keys'])) {
-            do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
-            unset($headers['X-GraphQL-Keys']);
-        }
+        if (!isset($headers['X-GraphQL-Keys'])) return $headers;
+
+        do_action('litespeed_tag_add', explode(' ', $headers['X-GraphQL-Keys']));
+        unset($headers['X-GraphQL-Keys']);
 
         return $headers;
     }

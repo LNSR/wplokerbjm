@@ -1,4 +1,4 @@
-import { graphql } from "@/services/graphql/config/tada";
+import { graphql } from "#src/services/graphql/config/tada.js";
 import { FRAGMENT_JOB_CARD_FIELDS, FRAGMENT_JOB_FILTER_FIELDS, FRAGMENT_JOB_SUMMARY_FIELDS } from "../shared/job";
 
 export const GET_AUTO_SUGGESTIONS = graphql(`

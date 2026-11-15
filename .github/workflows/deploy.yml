@@ -28,7 +28,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup dependencies
         uses: ./.github/actions/setup-dependencies
@@ -74,6 +74,7 @@ jobs:
           RCLONE_LOW_RETRIES: ${{ env.RCLONE_LOW_RETRIES }}
           RCLONE_LOG_LEVEL: ${{ env.RCLONE_LOG_LEVEL }}
           MU_PLUGIN_REMOTE_PATH: ${{ secrets.MU_PLUGIN_REMOTE_PATH }}
+          MU_PLUGIN_FALLBACK_REMOTE_PATH: ${{ secrets.MU_PLUGIN_FALLBACK_REMOTE_PATH }}
           WRANGLER_ENV: production
           CLOUDFLARE_API_TOKEN: ${{ secrets.EDIT_CLOUDFLARE_WORKER_SVELTEKIT }}
         run: |

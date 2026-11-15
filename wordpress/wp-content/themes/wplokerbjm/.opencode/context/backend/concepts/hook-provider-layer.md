@@ -1,10 +1,12 @@
+<!-- Context: backend/concepts | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # Concept: Hook Provider Layer
 
 **Purpose**: Explain how condition gates, dynamic hook names, and tag closures get DI-powered parameter resolution without reflection on the hot path.
 
 ## Core Idea
 
-`HookProviderTrait` is the shared resolution core for both providers — `WPHookPlanProvider` (container path) and `RuntimeWPHookProvider` (runtime path). Callable metadata is captured into a serializable **plan at scan time**; the plan is exported to the hooks cache and resolved at fire time, so the hot path never needs reflection unless a plan is missing (stale cache / unexportable defaults).
+`WPHookPlanProvider` is the single DI resolution core for BOTH paths — container and runtime (the former `HookProviderTrait` was merged into it, and `RuntimeWPHookProvider` removed). It requires a non-nullable `ContainerInterface`. Callable metadata is captured into a serializable **plan at scan time**; the plan is exported to the hooks cache and resolved at fire time, so the hot path never needs reflection unless a plan is missing (stale cache / unexportable defaults).
 
 ## Plan model
 
@@ -47,6 +49,4 @@ public function search(string $sql, object $query): string
 
 ## 📂 Codebase References
 
-- `server/Core/Container/Support/WPHooks/Trait/HookProviderTrait.php` — `buildCallablePlan`, `resolveHookName`, `resolveCallableParameters`, `evaluateExecuteIf`, `evaluateRegistrationGate`, `resolveTagCallable`, `callableParamNames`, `extractPropertyCallableParamNames`.
-- `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — container-side provider.
-- `server/Core/Container/Support/WPHooks/Provider/RuntimeWPHookProvider.php` — runtime-side provider with optional container (`resolveRuntimeHookName`, `evaluateRuntimeRegisterIf`, `evaluateRuntimeExecuteIf`).
+- `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — the single provider (plan core + container-backed closure resolution for both paths): `buildCallablePlan`, `resolveHookName`, `resolveCallableParameters`, `evaluateExecuteIf`, `evaluateRegistrationGate`, `resolveTagCallable`, `callablePlan`, `extractPropertyCallableParamNames`.

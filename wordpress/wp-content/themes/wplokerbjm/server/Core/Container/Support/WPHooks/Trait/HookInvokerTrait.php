@@ -4,21 +4,27 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
-    ContainerLazyHookInvoker,
-    ContainerLazyPropertyHookInvoker,
-    RuntimeInstanceHookInvoker,
-    RuntimeInstancePropertyHookInvoker,
-    RuntimeCallableHookInvoker
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
+    DeferredActivationResultDTO,
+    DeferredActivationSource,
+    DeferredDebugPhase,
+    DeferredRegistrationSnapshotDTO,
+    HookDebugEmitter,
+    HookDebugState,
+    LiveDebugPhase,
+    LiveExecutionResultDTO,
+    LiveUnregistrationPhase,
+    LiveUnregistrationResultDTO,
+    UnregistrationSource,
 };
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{HookArgumentBag, HookInvoker, HookRemovalController};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
-use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Shared invoker mechanics used by BOTH the container-side lazy handlers and
  * the runtime instance handlers: the once/removal callback plumbing and the
  * named hook-args builder.
- * @mixin (ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker|RuntimeCallableHookInvoker)
+ * @mixin (HookInvoker)
  */
 trait HookInvokerTrait
 {
@@ -27,35 +33,143 @@ trait HookInvokerTrait
     /** @var 'action'|'filter' */
     public readonly string $type;
     public readonly bool $once;
-    public private(set) int $numberExecutions = 0;
     /** Current hook callback execution */
+    public private(set) int $numberExecutions = 0;
     public private(set) bool $dispatching = false;
 
-    /** 
-     * @var (\Closure(static): void)|null Callback that nukes this registration once consumed (once-hook) or the owner dies (lifetime scoping). 
-     * @see WPHooksContainerRegistry::$removeOnceEntry
-     * @see WPHooksInstanceRegistry::$removeRuntimeHook
+    /** @var \Closure(): void  */
+    public private(set) ?\Closure $onUnregisterDoCallback = null;
+
+    /**
+     * Removal/cleanup lifecycle collaborator, initialized by each invoker constructor.
      */
-    private ?\Closure $removeCallback = null;
+    private readonly HookRemovalController $removal;
 
     /** Whether the once-hook has been consumed (first fire reached gate evaluation). */
     private bool $consumed = false;
 
-    /** Whether the removal callback has fired — idempotency guard. */
-    private bool $removed = false;
-    /** template closure for caching stateless closure */
-    private static ?\Closure $templateClosure = null;
+    /** destruction state */
+    public private(set) bool $isDestructed = false;
+
+    /**
+     * Per-invoker debug collaborator, initialized by each invoker constructor.
+     */
+    private readonly HookDebugEmitter $debugEmitter;
+
+    /**
+     * Emit one live-registration debug payload (registered/dispatching/...).
+     */
+    public function emitLiveDebug(
+        LiveDebugPhase $phase,
+        bool $registered = true,
+        ?LiveExecutionResultDTO $after = null,
+        ?object $owner = null,
+        bool $ownerAlive = true,
+    ): void {
+        if (!$this->debugEmitter->hasLive()) return;
+        $this->debugEmitter->live($this->debugState(), $phase, $registered, $after, $owner, $ownerAlive);
+    }
+
+    /**
+     * Emit one deferred-lifecycle debug payload (queued/activation/...).
+     */
+    public function emitDeferredDebug(
+        DeferredDebugPhase $phase,
+        DeferredRegistrationSnapshotDTO $before,
+        ?DeferredActivationResultDTO $after = null,
+        ?object $owner = null,
+        bool $ownerAlive = true,
+        ?DeferredActivationSource $source = null,
+    ): void {
+        if (!$this->debugEmitter->hasDeferred()) return;
+        $this->debugEmitter->deferred($this->debugState(), $phase, $before, $after, $owner, $ownerAlive, $source);
+    }
+
+    /**
+     * Emit one unregistration/lifecycle debug payload.
+     */
+    public function emitLiveUnregistrationDebug(
+        LiveUnregistrationPhase $phase,
+        bool $registered = true,
+        ?LiveUnregistrationResultDTO $result = null,
+    ): void {
+        if (!$this->debugEmitter->hasUnregistration()) return;
+        $this->debugEmitter->unregistration($this->debugState(), $phase, $registered, $result);
+    }
+
+    /**
+     * Emit a terminal live outcome (completed/failed/skipped) with timing.
+     */
+    private function emitLiveOutcome(
+        LiveDebugPhase $phase,
+        string $status,
+        int $startedAt,
+        mixed $result = null,
+        ?\Throwable $error = null,
+        ?object $owner = null,
+        bool $ownerAlive = true,
+    ): void {
+        if (!$this->debugEmitter->hasLive()) return;
+        $this->debugEmitter->outcome($this->debugState(), $phase, $status, $startedAt, $result, $error, $owner, $ownerAlive);
+    }
+
+    private function debugState(): HookDebugState
+    {
+        return new HookDebugState(
+            consumed: $this->consumed,
+            executions: $this->numberExecutions,
+            dispatching: $this->dispatching,
+        );
+    }
+
+    private function elapsedUs(int $startedAt): int
+    {
+        return HookDebugEmitter::elapsedUs($startedAt);
+    }
 
     /**
      * Attach the scheduler removal callback (set by the owning registry) so the handler
      * can nuke its own registrations when consumed (once) or when the owner
      * instance dies (runtime lifetime scoping).
      *
-     * @param \Closure(static): void $callback Registry-side removal callback.
+     * @param (\Closure(static, bool = false): void) $callback Registry-side removal callback.
      */
     public function setCleanupCallback(?\Closure $callback): void
     {
-        $this->removeCallback ??= $callback;
+        $this->removal->setCleanupCallback($callback);
+    }
+
+    /**
+     * @return void
+     */
+    abstract public function initOnUnregisterDoCallback(): void;
+
+    public function __destruct()
+    {
+        if ($this->isDestructed) {
+            return;
+        }
+        $this->isDestructed = true;
+
+        $this->removal->release(
+            $this,
+            $this->onUnregisterDoCallback,
+            function (bool $removed, int $elapsedUs): void {
+                $this->emitLiveUnregistrationDebug(
+                    LiveUnregistrationPhase::ProxyReleased,
+                    registered: true,
+                    result: new LiveUnregistrationResultDTO(
+                        requestedBy: UnregistrationSource::Destructor,
+                        removed: $removed,
+                        failureCount: 0,
+                        stillDispatching: $this->dispatching,
+                        elapsedUs: $elapsedUs,
+                    ),
+                );
+            },
+        );
+
+        unset($this->onUnregisterDoCallback);
     }
 
     /**
@@ -64,21 +178,23 @@ trait HookInvokerTrait
      */
     private function consumeOnceAndClean(): void
     {
-        if (!$this->once || $this->removed || $this->removeCallback === null) {
-            return;
-        }
-
-        try {
-            ($this->removeCallback)($this);
-            $this->removed = true;
-        } catch (\Throwable $e) {
-            Logger::error(static::class, 'Error removing once-hook ' . $this->label . ': ', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-        }
+        $this->removal->consumeOnce(
+            $this->once,
+            $this,
+            function (bool $removed, int $elapsedUs): void {
+                $this->emitLiveUnregistrationDebug(
+                    LiveUnregistrationPhase::OnceConsumed,
+                    registered: true,
+                    result: new LiveUnregistrationResultDTO(
+                        requestedBy: UnregistrationSource::Once,
+                        removed: $removed,
+                        failureCount: 0,
+                        stillDispatching: $this->dispatching,
+                        elapsedUs: $elapsedUs,
+                    ),
+                );
+            },
+        );
     }
 
     /**
@@ -88,68 +204,23 @@ trait HookInvokerTrait
      *
      * @return array<string, mixed> Named args (empty when no names are known).
      */
+    /**
+     * Per-invoker argument shaping, initialized by each invoker constructor.
+     */
+    private readonly HookArgumentBag $argumentBag;
+
     private function buildHookArgs(array $args): array
     {
-        $names = $this->hookArgNames;
-        if ($names === []) {
-            return [];
-        }
-
-        if (is_string($names[0])) {
-            return \array_combine(\array_slice($names, 0, \count($args)), $args) ?: [];
-        }
-
-        /** @var list<string> $paramNames */
-        $paramNames = array_map(static fn(array $p): string => $p['name'], $names);
-
-        $last = $names[\count($names) - 1];
-
-        // Variadic is always the LAST parameter: forward the
-        // whole remainder truthfully under its name — the caller decide what to do with it.
-        if (($last['isVariadic'] ?? false)) {
-            $headCount = \count($paramNames) - 1;
-            $mapped = \array_combine(
-                \array_slice($paramNames, 0, \min($headCount, \count($args))),
-                \array_slice($args, 0, \min($headCount, \count($args)))
-            ) ?: [];
-            $mapped[$last['name']] = \array_slice($args, $headCount);
-
-            return $mapped;
-        }
-
-        return \array_combine(\array_slice($paramNames, 0, \count($args)), $args) ?: [];
+        return $this->argumentBag->named($args);
     }
 
-    /**
-     * The handler's variadic hook-argument name (plan-B descriptor form only).
-     *
-     * Null for the legacy `list<string>` form and for non-variadic handlers.
-     * Used to splat the handler's variadic bucket into `...` executeIf/condition
-     * parameters instead of injecting a single value.
-     */
     private function variadicHookArgName(): ?string
     {
-        $names = $this->hookArgNames;
-        if ($names === [] || is_string($names[0])) {
-            return null;
-        }
-
-        $last = $names[\count($names) - 1];
-        if (!($last['isVariadic'] ?? false)) {
-            return null;
-        }
-
-        return $last['name'];
+        return $this->argumentBag->variadicName();
     }
 
-    /**
-     * Value a filter must pass through (or null for actions) when the handler
-     * or its gate fails.
-     *
-     * @param array<int, mixed> $args Hook arguments received at fire time.
-     */
     private function filterPassthrough(array $args): mixed
     {
-        return $this->type === 'filter' && \array_key_exists(0, $args) ? $args[0] : null;
+        return $this->argumentBag->passthrough($args);
     }
 }

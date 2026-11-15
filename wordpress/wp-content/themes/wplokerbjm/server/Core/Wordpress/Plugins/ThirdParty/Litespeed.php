@@ -9,7 +9,7 @@ use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -28,7 +28,7 @@ final class Litespeed implements PluginConfigInterface
     #[Action('plugins_loaded', once: true)]
     public function boot(): void
     {
-        \do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_TAGS, ['litespeed']);
+        \do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_TAGS, ['litespeed']);
     }
 
     /**

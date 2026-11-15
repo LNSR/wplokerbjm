@@ -33,7 +33,10 @@ class DependencyAutowireScanner
         private RobotLoader $robotLoader,
         array $excludedSubNamespaces = [],
     ) {
-        $formatExcludedNamespaces = array_map(static fn(string $namespace): string => trim($namespace, '\\'), $excludedSubNamespaces);
+        $formatExcludedNamespaces = array_map(
+            static fn(string $namespace): string => trim($namespace, '\\'),
+            $excludedSubNamespaces
+        );
         $this->checkClass = new AutowireClassesChecker($formatExcludedNamespaces);
     }
 
@@ -135,7 +138,7 @@ class AutowireClassesChecker
     {
         $options['isAutowirable'] ??= false;
         $options['isLazy'] ??= false;
-        return new readonly class (...$options) {
+        return new readonly class(...$options) {
             public function __construct(public bool $isAutowirable = false, public bool $isLazy = false) {}
         };
     }

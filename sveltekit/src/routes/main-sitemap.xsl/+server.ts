@@ -1,5 +1,5 @@
 import type { RequestHandler } from './$types';
-import { getCmsOrigin } from '@/utils/environment';
+import { getCmsOrigin } from '#src/utils/environment.js';
 
 // mirror whatever the CMS serves for the XSL file so that the
 // browser doesn't have to reach back to the backend origin.  We don't

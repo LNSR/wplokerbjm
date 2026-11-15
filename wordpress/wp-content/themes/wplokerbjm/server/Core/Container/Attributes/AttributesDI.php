@@ -6,7 +6,7 @@ namespace WPLokerBJM\Core\Container\Attributes;
 
 use Attribute;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 
 /**
@@ -33,7 +33,7 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
  * }
  * ```
  * @note TARGET::METHOD unused currently and has no implementation (implementation is set to TARGET_PROPERTY only) for @see DependencyInjector
- * While TARGET_PARAMETER currently used for WPHooks side @see HookProviderTrait::buildCallablePlanFromReflector
+ * While TARGET_PARAMETER currently used for WPHooks side @see WPHookPlanProvider::buildCallablePlanFromReflector
  *
  */
 #[Attribute(Attribute::TARGET_PROPERTY | Attribute::TARGET_METHOD | Attribute::TARGET_PARAMETER)]
@@ -68,7 +68,7 @@ final readonly class Injectable extends AbstractDataObject
      * @param TInjectable['skip'] $skip Skip the class from being scanned.
      */
     public function __construct(
-        public ?bool $lazy = null,
+        public bool $lazy = false,
         public bool $skip = false
     ) {
     }

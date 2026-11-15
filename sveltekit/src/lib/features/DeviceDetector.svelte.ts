@@ -1,10 +1,10 @@
 import { createSubscriber } from "svelte/reactivity";
 import { on } from "svelte/events";
 import typia from "typia";
-import type { DeviceType } from "@/types";
-import { browser } from "$app/environment";
-class DeviceDetector
-{
+import type { DeviceType } from "#src/types/index.js";
+import { browser } from "$app/env";
+
+class DeviceDetector {
     #mediaQuery?: MediaQueryList;
     #initialDeviceSSR? = $state.raw<DeviceType | undefined>(undefined); // set by root layout during SSR.
     #onDeviceChange?: () => void;
