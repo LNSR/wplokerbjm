@@ -355,11 +355,22 @@ final class OnUnregisterDoInstanceRegistryTest extends WplokerbjmTestCase
             #[Action('test_onUnregisterDoCleanupDoesntRun', 11, deferRegisterUntilHook: 'shutdown', onUnregisterDo: static function (self $self) {
                 $self->parentClass->cleanups++;
             })]
-            private function onShutdown0() {}
+            private function onShutdown0()
+            {
+                $this->parentClass->cleanups++;
+            }
             #[Action('test_onUnregisterDoCleanupDoesntRun', 10, onUnregisterDo: static function (self $self) {
                 $self->parentClass->cleanups++;
             })]
-            private function onShutdown1() {}
+            private function onShutdown1()
+            {
+                $this->parentClass->cleanups++;
+            }
+
+            #[Action('test_onUnregisterDoCleanupDoesntRun', 12, deferRegister: true, onUnregisterDo: static function (self $self) {
+                $self->parentClass->cleanups++;
+            })]
+            public ?\Closure $onShutdown2 { get => $this->onShutdown2 ??= fn() => $this->parentClass->cleanups++; }
         };
         $callbackCount = static fn(): int => array_sum(array_map('count', $GLOBALS['wp_filter']['test_onUnregisterDoCleanupDoesntRun']->callbacks ?? []));
         $this->registry->registerHooksOn($owner, forceNoCache: true);
@@ -367,12 +378,16 @@ final class OnUnregisterDoInstanceRegistryTest extends WplokerbjmTestCase
         $weakRef = \WeakReference::create($owner);
 
         self::assertSame(1, $callbackCount(), 'only the priority-10 should be registered');
-        \add_action('shutdown', function () use($weakRef, $callbackCount): void {
+        \add_action('shutdown', function () use ($weakRef, $callbackCount): void {
             self::assertSame(2, $callbackCount(), 'deferred priority-11 should be activated');
+            $this->registry->activateDeferredByCallableInLiveInstance($weakRef->get()->onShutdown2);
+            self::assertSame(3, $callbackCount(), 'deferred priority-12 should be activated');
             $this->registry->unregisterHooksOn($weakRef->get());
+            do_action('test_onUnregisterDoCleanupDoesntRun');
             \remove_action('shutdown', \Closure::getCurrent(), 10);
         }, 10);
         \do_action('shutdown');
+        $owner->onShutdown2 = null;
         unset($owner);
         self::assertSame(0, $cleanup->cleanups, ' hook [test_onUnregisterDoCleanupDoesntRun] should not be called after hook shutdown');
         self::assertNull($weakRef->get());

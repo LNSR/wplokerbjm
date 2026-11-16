@@ -53,19 +53,10 @@ class WPHooksContainerRegistry
     private \WeakMap $entriesByInvokers;
 
     public private(set) bool $initialized = false;
-
-    /**
-     * deferRegisterUntilHook entries whose trigger hook already fired before
-     * initialize(). Processed after registerAll's handler loop so no handler
-     * is registered twice.
-     *
-     * @var list<\WeakReference<DeferredHookEntryHandler>>
-     */
-    public private(set) array $pendingDeferredActivation = [];
     /**
      * @var HandlerEntry['removeEntryIndexCallback']
      */
-    private ?\Closure $destroyIndexes = null { get => $this->destroyIndexes ??= $this->entriesIndexer->removeIndexes(...); }
+    private ?\Closure $destroyIndexes = null;
 
     /**
      * @param ContainerInterface $container
@@ -85,6 +76,7 @@ class WPHooksContainerRegistry
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
     ) {
         $this->entriesByInvokers = new \WeakMap();
+        $this->destroyIndexes = $this->entriesIndexer->removeIndexes(...);
     }
 
     /**
@@ -116,18 +108,6 @@ class WPHooksContainerRegistry
                 );
             }
         }
-
-        // Trigger hooks that had already fired before boot: activate the
-        // entries now that the active pool is fully registered (deferring this
-        // avoids double-registering handlers that were activated mid-registerAll).
-        foreach ($this->pendingDeferredActivation as $weakRef) {
-            $entry = $weakRef?->get();
-            if ($entry === null) {
-                continue;
-            }
-            $this->containerRegistryDeferredHookManager->activateDeferredByKey($entry, $this->activateEntry);
-        }
-        $this->pendingDeferredActivation = [];
 
         $this->initialized = true;
     }
@@ -759,52 +739,20 @@ class WPHooksContainerRegistry
 
             [$handler, $entry] = $this->createHandlerAndEntry($registration, $hookName, $resolvedTags);
 
-            if (!$registration->deferRegister && $registration->deferRegisterUntilHook === null) {
+            if (!$registration->deferRegister && $registration->deferRegisterUntilHook === null && $entry instanceof ContainerRegistryHandlerEntry) {
                 $this->handlers[$entry->toUniqueKey()] = $entry->register();
-                continue;
+            } else {
+                $this->containerRegistryDeferredHookManager->deferRegistration(
+                    $registration,
+                    $entry,
+                    $this->activateEntry,
+                );
             }
-
-            $recordEntry = $entry->toDeferredEntryDTO();
-            $this->containerRegistryDeferredHookManager->addDeferredEntry($recordEntry);
-
-            if ($registration->deferRegisterUntilHook === null) continue;
-
-            $triggerHook = $registration->deferRegisterUntilHook;
-            if ($triggerHook === null) continue;
-
-            if ($triggerHook instanceof \Closure) {
-                try {
-                    $triggerHook = $this->planProvider->resolveHookName(
-                        $registration->deferRegisterUntilHook,
-                        $this->container,
-                        $registration->deferRegisterUntilHookParams ?? [],
-                        $registration->class . '::' . $registration->method
-                    );
-                } catch (\RuntimeException $e) {
-                    Logger::error(
-                        self::class,
-                        'Skipping hook for: ' . $handler->label,
-                        [
-                            'message' => $e->getMessage(),
-                            'trace'   => $e->getTraceAsString(),
-                            'file' => $e->getFile(),
-                            'line' => $e->getLine(),
-                            'code' => $e->getCode(),
-                        ]
-                    );
-                    continue;
-                }
-            }
-
-            $this->scheduleDeferredActivation(
-                $triggerHook,
-                $recordEntry
-            );
         }
     }
 
     /**
-     * @return array{ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker,ContainerRegistryHandlerEntry}
+     * @return array{ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker, ContainerRegistryHandlerEntry|DeferredHookEntryHandler}
      */
     private function createHandlerAndEntry(HookRegistration $registration, string $hookName, array $resolvedTags): array
     {
@@ -845,55 +793,41 @@ class WPHooksContainerRegistry
                 $registration->onUnregisterDoParams
             );
 
-        $entry = new ContainerRegistryHandlerEntry(
-            hook: $hookName,
-            key: HookKey::fromRegistration($registration),
-            handler: $handler,
-            type: $registration->type,
-            priority: $registration->priority,
-            acceptedArgs: $registration->acceptedArgs,
-            tags: $resolvedTags,
-            registerIf: $registration->registerIf,
-            registerIfParams: $registration->registerIfParams,
-            executeIf: $registration->executeIf,
-            executeIfParams: $registration->executeIfParams,
-            once: $registration->once,
-            onUnregisterDo: $registration->onUnregisterDo,
-            onUnregisterDoParams: $registration->onUnregisterDoParams
-        );
+        $entry = ($registration->deferRegister || $registration->deferRegisterUntilHook !== null) ?
+            new DeferredHookEntryHandler(
+                hook: $hookName,
+                handler: $handler,
+                type: $registration->type,
+                priority: $registration->priority,
+                acceptedArgs: $registration->acceptedArgs,
+                tags: $resolvedTags,
+                registerIf: $registration->registerIf,
+                registerIfParams: $registration->registerIfParams,
+                executeIf: $registration->executeIf,
+                executeIfParams: $registration->executeIfParams,
+                once: $registration->once,
+                onUnregisterDo: $registration->onUnregisterDo,
+                onUnregisterDoParams: $registration->onUnregisterDoParams,
+                key: HookKey::fromRegistration($registration),
+            ) : new ContainerRegistryHandlerEntry(
+                hook: $hookName,
+                key: HookKey::fromRegistration($registration),
+                handler: $handler,
+                type: $registration->type,
+                priority: $registration->priority,
+                acceptedArgs: $registration->acceptedArgs,
+                tags: $resolvedTags,
+                registerIf: $registration->registerIf,
+                registerIfParams: $registration->registerIfParams,
+                executeIf: $registration->executeIf,
+                executeIfParams: $registration->executeIfParams,
+                once: $registration->once,
+                onUnregisterDo: $registration->onUnregisterDo,
+                onUnregisterDoParams: $registration->onUnregisterDoParams
+            );
 
         $handler->setCleanupCallback($this->removeEntry);
 
         return [$handler, $entry];
-    }
-
-    /**
-     * Schedule one-shot activation of a deferRegisterUntilHook entry when the
-     * trigger hook fires. If the trigger already fired (did_action), the entry
-     * is activated immediately.
-     *
-     * The deferred entry stays attached while the gates keep failing, so a later
-     * call to method activateDeferredBy*(...) can still activate them.
-     *
-     * @param string $triggerHook WordPress hook that gates activation.
-     */
-    private function scheduleDeferredActivation(string $triggerHook, DeferredHookEntryHandler $entry): void
-    {
-        $reference = \WeakReference::create($entry);
-        if (did_action($triggerHook)) {
-            $this->pendingDeferredActivation[] = $reference;
-            return;
-        }
-
-        add_action($triggerHook, function () use ($triggerHook, $reference): void {
-            $entry = $reference->get() ?? null;
-            if ($entry === null) {
-                remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-                return;
-            }
-            $activated = $this->containerRegistryDeferredHookManager->activateDeferredByKey($entry, $this->activateEntry);
-
-            $activated && remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-        }, PHP_INT_MIN, 0);
     }
 }

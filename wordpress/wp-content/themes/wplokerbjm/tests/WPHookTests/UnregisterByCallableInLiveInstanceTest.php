@@ -85,7 +85,7 @@ final class UnregisterByCallableInLiveInstanceTest extends WplokerbjmTestCase
         self::assertSame([10, 20], $this->hookPriorities('live_alpha'));
     }
 
-    public function testDropsDeferredEntrySoItCannotResurrect(): void
+    public function testKeepsDeferredEntryUntilTheDeferredRemovalApiIsUsed(): void
     {
         $service = new OnUnregisterLiveService();
         $registry = $this->instanceRegistry();
@@ -93,7 +93,11 @@ final class UnregisterByCallableInLiveInstanceTest extends WplokerbjmTestCase
 
         self::assertSame([], $this->hookPriorities('live_deferred'), 'entry starts deferred');
 
-        self::assertSame(1, $registry->unregisterByCallableInLiveInstance([$service, 'onDeferred']));
+        // Active-pool removal no longer sweeps the deferred pool.
+        self::assertSame(0, $registry->unregisterByCallableInLiveInstance([$service, 'onDeferred']));
+
+        // The deferred-pool API is the one that drops it.
+        self::assertSame(1, $registry->unregisterDeferredByCallableInLiveInstance([$service, 'onDeferred']));
 
         \do_action('live_trigger');
 

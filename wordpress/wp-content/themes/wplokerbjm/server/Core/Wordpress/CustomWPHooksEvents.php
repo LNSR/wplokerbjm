@@ -186,6 +186,8 @@ class InstanceRuntimeRegistryHookEvent
     public const REGISTER_HOOKS = 'wplokerbjm_register_runtime_hook';
     public const UNREGISTER_HOOKS = 'wplokerbjm_unregister_runtime_hook';
     public const UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE = 'wplokerbjm_unregister_by_callable_in_live_instance';
+    public const UNREGISTER_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE = 'wplokerbjm_unregister_deferred_by_callable_in_live_instance';
+    public const ACTIVATE_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE = 'wplokerbjm_activate_deferred_by_callable_in_live_instance';
 
     public function __construct(private readonly WPHooksInstanceRegistry $runtimeRegistry) {}
 
@@ -200,8 +202,19 @@ class InstanceRuntimeRegistryHookEvent
         $this->runtimeRegistry->unregisterHooksOn($target);
     }
     #[Action(self::UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE, 10, 1)]
-    protected function unregisterByCallableInLiveInstance(array|callable $target): void {
+    protected function unregisterByCallableInLiveInstance(array|callable $target): void
+    {
         $this->runtimeRegistry->unregisterByCallableInLiveInstance($target);
+    }
+    #[Action(self::UNREGISTER_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE, 10, 1)]
+    protected function unregisterDeferredByCallableInLiveInstance(array|callable $target): void
+    {
+        $this->runtimeRegistry->unregisterDeferredByCallableInLiveInstance($target);
+    }
+    #[Action(self::ACTIVATE_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE, 10, 1)]
+    protected function activateDeferredByCallableInLiveInstance(array|callable $target): void
+    {
+        $this->runtimeRegistry->activateDeferredByCallableInLiveInstance($target);
     }
 }
 

@@ -200,12 +200,19 @@ trait HookProviderTrait
         if (isset($this->callablePlanCache[$property])) return $this->callablePlanCache[$property];
 
         /** @suppress PHP0406 */
-        if ($instance !== null && $property->hasHook(\PropertyHookType::Get)) {
+        if ($instance !== null && $property->hasHook(\PropertyHookType::Get) && $property->isInitialized($instance)) {
             // For hooked properties, reading the property executes the `get` hook.
-            $value = $property->getValue($instance);
-            if (is_callable($value)) {
-                return $this->callablePlanCache[$property] ??= $this->callablePlan($value);
-            }
+            try {
+                $value = $property->getValue($instance);
+                if (is_callable($value)) {
+                    return $this->callablePlanCache[$property] ??= $this->callablePlan($value);
+                }
+            } catch (ReflectionException $e) {
+                Logger::error(static::class, 'Error getting property value', [
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
+            };
         }
 
         if ($property->hasDefaultValue()) {

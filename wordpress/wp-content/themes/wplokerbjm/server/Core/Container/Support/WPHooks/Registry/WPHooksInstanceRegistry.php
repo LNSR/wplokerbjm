@@ -43,12 +43,11 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{Instance
  *  } 
  * ```
  *
- *! All attribute hooks are registered eagerly — the plain `deferRegister`
- *! flag is still ignored on the attribute path (no trigger means nothing
- *! would ever activate it), and static methods are silently skipped.
- *! `deferRegisterUntilHook` (registerUnderHook) IS supported: the entry is
- *! held in the deferred pool and auto-activates when the trigger hook fires
- *! — no manual activation API on the runtime path.
+ *! `deferRegister` holds the entry in the deferred pool: together with
+ *! `deferRegisterUntilHook` it activates automatically when the trigger
+ *! fires; on its own it waits for
+ *! {@see activateDeferredByCallableInLiveInstance()}. Static methods are
+ *! silently skipped.
  *! Hooks are instance-lifetime scoped: the registry keeps only a weak
  *! reference to the owner, so when the instance is garbage-collected the
  *! handler nukes itself from the pool and wp_filter (GC-aware auto-cleanup).
@@ -171,6 +170,7 @@ class WPHooksInstanceRegistry
                         priority: $attr->priority,
                         acceptedArgs: $attr->acceptedArgs,
                         once: $attr->once,
+                        deferRegister: $attr->deferRegister,
                         executeIf: $attr->executeIf,
                         executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
                         registerIf: $attr->registerIf,
@@ -187,7 +187,7 @@ class WPHooksInstanceRegistry
                 }
 
 
-                if ($attr->deferRegisterUntilHook !== null) {
+                if ($attr->deferRegister) {
                     // Deferred entries are gated at activation time (and
                     // re-gated on every activation attempt), never at scan time.
                 } else {
@@ -234,16 +234,16 @@ class WPHooksInstanceRegistry
                     callback: null,
                 );
                 $handler->setCleanupCallback($this->removeRuntimeHook);
-                if ($attr->deferRegisterUntilHook === null) {
+                if (!$attr->deferRegister) {
                     $records[] = $record->register();
                     $this->entriesByInvokers[$handler] = $record;
                     $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                     return;
                 }
 
-                $this->instanceRegistryDeferredHookManager->deferManualUntilHook(
-                    deferRegisterUntilHook: $attr->deferRegisterUntilHook,
+                $this->instanceRegistryDeferredHookManager->deferManualRegistration(
                     entry: $record->toDeferredEntryDTO(),
+                    deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                     activateEntry: $this->activateRuntimeEntry
                 );
             }
@@ -275,6 +275,7 @@ class WPHooksInstanceRegistry
                         priority: $attr->priority,
                         acceptedArgs: $attr->acceptedArgs,
                         once: $attr->once,
+                        deferRegister: $attr->deferRegister,
                         executeIf: $attr->executeIf,
                         executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
                         registerIf: $attr->registerIf,
@@ -290,7 +291,7 @@ class WPHooksInstanceRegistry
                     );
                 }
 
-                if ($attr->deferRegisterUntilHook !== null) {
+                if ($attr->deferRegister) {
                     // Deferred entries are gated at activation time.
                 } else {
                     $gatePassed = $this->provider->evaluateRuntimeRegisterIf($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null), $property->getName(), $instance);
@@ -339,14 +340,14 @@ class WPHooksInstanceRegistry
 
                 $handler->setCleanupCallback($this->removeRuntimeHook);
 
-                if ($attr->deferRegisterUntilHook === null) {
+                if (!$attr->deferRegister) {
                     $records[] = $record->register();
                     $this->entriesByInvokers[$handler] = $record;
                     $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                 } else {
-                    $this->instanceRegistryDeferredHookManager->deferManualUntilHook(
-                        deferRegisterUntilHook: $attr->deferRegisterUntilHook,
+                    $this->instanceRegistryDeferredHookManager->deferManualRegistration(
                         entry: $record->toDeferredEntryDTO(),
+                        deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                         activateEntry: $this->activateRuntimeEntry
                     );
                 }
@@ -387,18 +388,23 @@ class WPHooksInstanceRegistry
     }
 
     /**
-     * Remove every active hook registration bound to one callable target of a
+     * Activate every deferred registration bound to one callable target of a
      * live instance (all priorities / attributes of that member).
      *
-     * @api
-     * @param array{0: object, 1: string}|\Closure $target `[$instance, 'member']`
-     *        or a first-class callable produced from the live instance.
-     * @return int Number of removed registrations.
+     * Mirrors {@see WPHooksContainerRegistry::activateDeferredByCallable()} on
+     * the runtime path. Entries carrying `deferRegister` without a trigger sit
+     * in the deferred pool until this call; entries with
+     * `deferRegisterUntilHook` may also be activated early. The `registerIf`
+     * gate is re-evaluated immediately before activation, so a rejecting gate
+     * leaves the entry parked for a later attempt.
      *
-     * ! Deferred entries for the same member are dropped too, so they cannot
-     * ! resurrect the hook when their trigger fires.
+     * @api
+     * @param array{0: object, 1: string}|\Closure|object $target `[$instance, 'member']`,
+     *        a first-class callable/property-hook closure bound to the live instance,
+     *        or an invokable object (targets its `__invoke`).
+     * @return int Number of newly activated registrations.
      */
-    public function unregisterByCallableInLiveInstance(array|\Closure $target): int
+    public function activateDeferredByCallableInLiveInstance(object|callable|array|string $target): int
     {
         [$instance, $targetName] = $this->runtimeResolver->resolveLiveCallableTarget($target);
 
@@ -406,10 +412,40 @@ class WPHooksInstanceRegistry
             return 0;
         }
 
-        $count = $this->instanceRegistryDeferredHookManager->unregisterInstanceCallableDeferredEntries($instance, $targetName);
+        return $this->instanceRegistryDeferredHookManager->activateInstanceCallableDeferredEntries(
+            $instance,
+            $targetName,
+            $this->activateRuntimeEntry,
+        );
+    }
+
+    /**
+     * Remove every active hook registration bound to one callable target of a
+     * live instance (all priorities / attributes of that member).
+     *
+     * @api
+     * @param array{0: object, 1: string}|\Closure|object $target `[$instance, 'member']`,
+     *        a first-class callable/property-hook closure bound to the live instance,
+     *        or an invokable object (targets its `__invoke`).
+     * @return int Number of removed active registrations.
+     *
+     * ! Only touches the active pool — deferred entries are never swept and
+     * ! still activate when their trigger fires or when
+     * ! {@see self::activateDeferredByCallableInLiveInstance()} is called. Use
+     * ! {@see self::unregisterDeferredByCallableInLiveInstance()} for the deferred pool.
+     */
+    public function unregisterByCallableInLiveInstance(object|callable|array|string $target): int
+    {
+        [$instance, $targetName] = $this->runtimeResolver->resolveLiveCallableTarget($target);
+
+        if ($instance === null || $targetName === null) {
+            return 0;
+        }
+
+        $count = 0;
 
         $records = $this->weakRegistry[$instance] ?? [];
-        if ($records === []) return $count;
+        if ($records === []) return 0;
 
         $remaining = [];
         foreach ($records as $record) {
@@ -424,6 +460,34 @@ class WPHooksInstanceRegistry
 
         $this->weakRegistry[$instance] = $remaining;
         return $count;
+    }
+
+    /**
+     * Remove every deferred registration bound to one callable target of a
+     * live instance, without touching its active registrations.
+     *
+     * The counterpart of {@see self::activateDeferredByCallableInLiveInstance()}:
+     * use it when the member must not activate later, e.g. after a runtime
+     * disable, while still keeping any already-active priorities.
+     *
+     * @api
+     * @param array{0: object, 1: string}|\Closure|object $target `[$instance, 'member']`,
+     *        a first-class callable/property-hook closure bound to the live instance,
+     *        or an invokable object (targets its `__invoke`).
+     * @return int Number of removed deferred registrations.
+     */
+    public function unregisterDeferredByCallableInLiveInstance(object|callable|array|string $target): int
+    {
+        [$instance, $targetName] = $this->runtimeResolver->resolveLiveCallableTarget($target);
+
+        if ($instance === null || $targetName === null) {
+            return 0;
+        }
+
+        return $this->instanceRegistryDeferredHookManager->unregisterInstanceCallableDeferredEntries(
+            $instance,
+            $targetName,
+        );
     }
 
 
@@ -460,7 +524,8 @@ class WPHooksInstanceRegistry
         $records = [];
 
         foreach ($entries as $attributeIndex => $entry) {
-            if ($entry->deferRegisterUntilHook !== null) {
+            $isDeferred = $entry->deferRegister || $entry->deferRegisterUntilHook !== null;
+            if ($isDeferred) {
                 // Cached deferred entries are gated at activation time only.
             } else {
                 $gatePassed = $this->provider->evaluateRuntimeRegisterIf($entry->registerIf, $this->provider->buildCallablePlan($entry->registerIf instanceof \Closure ? $entry->registerIf : null), $entry->targetName, $instance);
@@ -532,16 +597,16 @@ class WPHooksInstanceRegistry
             );
             $handler->setCleanupCallback($this->removeRuntimeHook);
 
-            if ($entry->deferRegisterUntilHook === null) {
+            if (!$isDeferred) {
                 $records[] = $record->register();
                 $this->entriesByInvokers[$handler] = $record;
                 $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                 continue;
             }
 
-            $this->instanceRegistryDeferredHookManager->deferManualUntilHook(
-                deferRegisterUntilHook: $entry->deferRegisterUntilHook,
+            $this->instanceRegistryDeferredHookManager->deferManualRegistration(
                 entry: $record->toDeferredEntryDTO(),
+                deferRegisterUntilHook: $entry->deferRegisterUntilHook,
                 activateEntry: $this->activateRuntimeEntry
             );
         }
@@ -882,6 +947,8 @@ class WPHooksInstanceRegistry
 class WPHooksInstanceObjectCache
 {
 
+    public private(set) bool $isDirty = false;
+
     /**
      * @param string|null $file file path cache to configure
      */
@@ -892,6 +959,7 @@ class WPHooksInstanceObjectCache
 
     public function __destruct()
     {
+        if (!$this->isDirty) return;
         $this->flush();
     }
 
@@ -998,6 +1066,7 @@ class WPHooksInstanceObjectCache
     public function set(string $parentClass, string $parentProperty, array $metadata): void
     {
         $this->cacheState->bufferRuntime[$parentClass][$parentProperty] = $metadata;
+        $this->isDirty = true;
     }
 
     /**

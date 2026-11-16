@@ -52,11 +52,38 @@ class InstanceRegistryDeferredHookManager
 
         $this->unregisterMatchingDeferredEntries(
             $this->entriesIndexer->byClass[(string) \spl_object_id($instance)] ?? [],
-            fn(DeferredHookEntryHandler $data): bool => $data->instance->get() === $instance
+            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance
                 && $this->runtimeResolver->matchesCallableTarget($data->key, $targetName),
         );
 
         return $before - \count($this->deferredHandlers);
+    }
+
+    /**
+     * Activate deferred entries for one callable target of a live instance.
+     *
+     * Mirrors {@see WPHooksInstanceRegistry::activateDeferredByCallableInLiveInstance()}:
+     * entries are re-gated through {@see gateDeferredActivation()} immediately
+     * before activation, so a `registerIf` that still rejects keeps them
+     * parked for a later attempt.
+     *
+     * @param callable(DeferredHookEntryHandler): bool $activateEntry
+     * @return int Number of newly activated entries.
+     */
+    public function activateInstanceCallableDeferredEntries(object $instance, string $targetName, callable $activateEntry): int
+    {
+        $keys = [];
+        $instanceId = (string) \spl_object_id($instance);
+
+        foreach ($this->entriesIndexer->byClass[$instanceId] ?? [] as $key) {
+            $entry = $this->deferredHandlers[$key] ?? null;
+            if ($entry === null) continue;
+            if ($entry->instance?->get() !== $instance) continue;
+            if (!$this->runtimeResolver->matchesCallableTarget($entry->key, $targetName)) continue;
+            $keys[$key] = $key;
+        }
+
+        return $this->activateMatchingDeferredEntries(array_values($keys), $activateEntry);
     }
 
     /**
@@ -88,20 +115,53 @@ class InstanceRegistryDeferredHookManager
             );
             return;
         }
+        $cb = null;
+        \add_action($triggerHook, $cb = function () use ($triggerHook, $deferredKey, $activateEntry): void {
+            $entry = $this->deferredHandlers[$deferredKey] ?? null;
+            if ($entry === null) {
+                \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                return;
+            }
 
-        \add_action($triggerHook, function () use ($triggerHook, $deferredKey, $activateEntry): void {
-            $this->activateMatchingDeferredEntries(
+            if ($entry->instance?->get() === null) {
+                unset($this->deferredHandlers[$deferredKey]);
+                \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                return;
+            }
+
+            $activated = $this->activateMatchingDeferredEntries(
                 [$deferredKey],
                 $activateEntry,
             );
 
+            if ($activated === 0) return;
+
             \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-            $entry = $this->deferredHandlers[$deferredKey] ?? null;
-            if ($entry === null) return;
             unset($this->deferredHandlers[$deferredKey]);
         }, PHP_INT_MIN, 0);
 
-        Logger::debug(self::class, 'Deferred ' . $entry->handler->label . ' until trigger ' . $triggerHook);
+        $entry->setOnEntryRemovalRemoveSchedulerCallback(static fn () => \remove_action($triggerHook, $cb, PHP_INT_MIN));
+    }
+
+    /**
+     * Hold a deferred entry for manual activation.
+     *
+     * With a trigger this delegates to {@see deferManualUntilHook()}; without
+     * one the entry simply sits in the pool until
+     * {@see WPHooksInstanceRegistry::activateDeferredByCallableInLiveInstance()}
+     * (or another deferred activation API) picks it up.
+     */
+    public function deferManualRegistration(
+        DeferredHookEntryHandler $entry,
+        string|\Closure|null $deferRegisterUntilHook,
+        callable $activateEntry
+    ): void {
+        if ($deferRegisterUntilHook === null) {
+            $this->addDeferred($entry);
+            return;
+        }
+
+        $this->deferManualUntilHook($deferRegisterUntilHook, $entry, $activateEntry);
     }
 
     /**

@@ -55,11 +55,6 @@ class ContainerRegistryDeferredHookManager
         private EntriesIndexer $entriesIndexer = new EntriesIndexer()
     ) {}
 
-    public function addDeferredEntry(DeferredHookEntryHandler $entry): void
-    {
-        $this->addDeferred($entry);
-    }
-
     /**
      * Activate all deferred handlers registered for a specific WordPress hook.
      *
@@ -239,39 +234,6 @@ class ContainerRegistryDeferredHookManager
     }
 
     /**
-     * Activate a single deferred handler by exact hook + key.
-     *
-     * One-shot entry point for deferRegisterUntilHook entries: the trigger
-     * hook listener calls this when the trigger fires. registerIf is
-     * re-evaluated as with every activation.
-     * @internal
-     * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
-     * @return bool True when the entry was newly activated; false when the
-     *              entry is unknown, already active, or a gate rejected it.
-     */
-    public function activateDeferredByKey(DeferredHookEntryHandler $deferredHookEntry, \Closure $activateEntry): bool
-    {
-        $uniqueKey = $deferredHookEntry->toUniqueKey();
-        if (!isset($this->deferredHandlers[$uniqueKey])) {
-            return false;
-        }
-
-        $data = $this->deferredHandlers[$uniqueKey];
-
-        // Registration gate: re-evaluated at activation time.
-        if (!$this->gateDeferredActivation($data)) {
-            return false;
-        }
-
-        $activated = $activateEntry($data);
-        if (!$activated) return false;
-
-        unset($this->deferredHandlers[$uniqueKey]);
-
-        return true;
-    }
-
-    /**
      * Unregister a deferred hook using a first-class callable, array lookup,
      * or class-string identifier.
      *
@@ -422,6 +384,73 @@ class ContainerRegistryDeferredHookManager
                 }
             }
         }
+    }
+
+    /**
+     * Schedule one-shot activation of a deferRegisterUntilHook entry when the
+     * trigger hook fires. If the trigger already fired (did_action), the entry
+     * is activated immediately.
+     *
+     * The deferred entry stays attached while the gates keep failing, so a later
+     * call to method activateDeferredBy*(...) can still activate them.
+     *
+     * @param string $triggerHook WordPress hook that gates activation.
+     * @param ActivateEntry $activateEntry
+     */
+    private function scheduleDeferredActivation(string $triggerHook, string $key, \Closure $activateEntry): void
+    {
+        if (did_action($triggerHook)) {
+            $this->activateMatchingDeferredEntries([$key], $activateEntry);
+            return;
+        }
+
+        $cb = null;
+        add_action($triggerHook, $cb = function () use ($triggerHook, $key, $activateEntry): void {
+            $entry = $this->deferredHandlers[$key] ?? null;
+            if ($entry === null) {
+                remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                return;
+            }
+            $activated = $this->activateMatchingDeferredEntries([$key], $activateEntry);
+            if ($activated === 0) return;
+            remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+            unset($this->deferredHandlers[$key]);
+        }, PHP_INT_MIN, 0);
+        
+        $this->deferredHandlers[$key]->setOnEntryRemovalRemoveSchedulerCallback(static fn() => remove_action($triggerHook, $cb, PHP_INT_MIN));
+    }
+
+    public function deferRegistration(
+        HookRegistration $registration,
+        DeferredHookEntryHandler $entry,
+        callable $activateEntry,
+    ): void {
+        $triggerHook = $registration->deferRegisterUntilHook;
+        if ($triggerHook instanceof \Closure) {
+            try {
+                $triggerHook = $this->planProvider->resolveHookName(
+                    $registration->deferRegisterUntilHook,
+                    $this->container,
+                    $registration->deferRegisterUntilHookParams,
+                    $entry->handler->label
+                );
+            } catch (\RuntimeException $e) {
+                Logger::error(
+                    self::class,
+                    'Skipping hook for: ' . $entry->handler->label,
+                    [
+                        'message' => $e->getMessage(),
+                        'trace'   => $e->getTraceAsString(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'code' => $e->getCode(),
+                    ]
+                );
+            }
+        }
+        $this->addDeferred($entry);
+        if ($triggerHook === null) return;
+        $this->scheduleDeferredActivation($triggerHook, $entry->toUniqueKey(), $activateEntry);
     }
 
     /**

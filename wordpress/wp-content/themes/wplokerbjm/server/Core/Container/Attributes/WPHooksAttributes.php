@@ -83,7 +83,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * |---------------------------|-------------------|-------------------------|
  * | `$hook` closure           | yes               | yes                     |
  * | `$tag`                    | yes               | **ignored**             |
- * | `$deferRegister`          | yes               | **ignored**             |
+ * | `$deferRegister`          | yes               | yes                     |
  * | `$deferRegisterUntilHook` | yes               | yes                     |
  * | `$registerIf`             | yes               | yes                     |
  * | `$executeIf`              | yes               | yes                     |
@@ -250,8 +250,9 @@ abstract class BaseHookAttribute
      * * Forced to `true` whenever `$deferRegisterUntilHook` is set.
      * * `registerIf` is re-evaluated at activation time (not only at
      *   registration time).
-     * ! Ignored by the InstanceRegistry, which has no activation APIs — use
-     * ! `$deferRegisterUntilHook` there.
+     * * Runtime path: activated per callable member through
+     *   `activateDeferredByCallableInLiveInstance()` and its unregister counterpart`
+     *   (or automatically when `$deferRegisterUntilHook` is also set).
      * ! A deferred entry that nothing activates never registers; no warning is
      * ! emitted.
      *

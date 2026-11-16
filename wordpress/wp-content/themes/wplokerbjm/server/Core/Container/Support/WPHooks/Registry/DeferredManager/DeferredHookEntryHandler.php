@@ -41,7 +41,8 @@ use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
  *     onUnregisterDoParams: CallablePlan,
  *     key: HookKey,
  *     instance: WeakReference<object>|null,
- *     removeEntryIndexCallback: (\Closure(static $entry): void)|null
+ *     removeEntryIndexCallback: (\Closure(static $entry): void)|null,
+ *     removeAutoSchedulerCallback: (\Closure(): void)|null,
  * }>>
  */
 final class DeferredHookEntryHandler
@@ -84,11 +85,13 @@ final class DeferredHookEntryHandler
         public readonly HookKey $key,
         public readonly ?WeakReference $instance = null,
         private ?\Closure $removeEntryIndexCallback = null,
+        private ?\Closure $removeAutoSchedulerCallback = null,
     ) {}
 
     public function __destruct()
     {
         \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
+        \is_callable($this->removeAutoSchedulerCallback) && ($this->removeAutoSchedulerCallback)();
         SharedUtils::isDevelopment() && Logger::debug(__CLASS__, "Deferred entry destroyed; removing entry indexes: ", [
             'invokerLabel' => $this->handler->label,
             'key' => $this->key->toString(),
@@ -99,6 +102,10 @@ final class DeferredHookEntryHandler
     public function setOnEntryRemovalCallback(\Closure $callback): void
     {
         $this->removeEntryIndexCallback = $callback;
+    }
+    public function setOnEntryRemovalRemoveSchedulerCallback(\Closure $callback): void
+    {
+        $this->removeAutoSchedulerCallback = $callback;
     }
 
     public static function fromContainerRegistryHandlerEntry(ContainerRegistryHandlerEntry $entry): self

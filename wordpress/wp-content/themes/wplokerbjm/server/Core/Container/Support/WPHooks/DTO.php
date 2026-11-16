@@ -195,12 +195,13 @@ final readonly class HookRegistration extends AbstractDataObject
  *  priority: int,
  *  acceptedArgs: int,
  *  once: bool,
+ *  deferRegister: bool,
  *  executeIf: ?\Closure(...):bool,
  *  executeIfParams: CallablePlan,
  *  registerIf: ?\Closure(...):bool,
  *  registerIfParams: CallablePlan,
- *  deferRegisterUntilHook: HookType['deferRegisterUntilHook'],
- *  deferRegisterUntilHookParams: HookType['deferRegisterUntilHookParams'],
+ *  deferRegisterUntilHook: null|string|\Closure(...): string,
+ *  deferRegisterUntilHookParams: CallablePlan,
  *  hookArgNames: list<CallableHookParams>,
  *  target: 'method'|'property'|'property-hook'|'#manual',
  *  targetName: method-string|property-string|property-hook-string|'#manual-registration',
@@ -218,6 +219,7 @@ final readonly class InstanceHookMetadata extends AbstractDataObject
      * @param InstanceHookMetadataData['priority'] $priority
      * @param InstanceHookMetadataData['acceptedArgs'] $acceptedArgs
      * @param InstanceHookMetadataData['once'] $once
+     * @param InstanceHookMetadataData['deferRegister'] $deferRegister
      * @param InstanceHookMetadataData['executeIf'] $executeIf
      * @param InstanceHookMetadataData['executeIfParams'] $executeIfParams
      * @param InstanceHookMetadataData['registerIf'] $registerIf
@@ -248,7 +250,8 @@ final readonly class InstanceHookMetadata extends AbstractDataObject
         public string $targetName = '',
         public string $visibility = 'public',
         public ?\Closure $onUnregisterDo = null,
-        public array $onUnregisterDoParams = []
+        public array $onUnregisterDoParams = [],
+        public bool $deferRegister = false
     ) {}
 }
 #endregion

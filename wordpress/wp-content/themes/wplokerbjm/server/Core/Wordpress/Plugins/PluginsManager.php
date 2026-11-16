@@ -162,7 +162,7 @@ class PluginManager
             $pluginKey = array_search($plugin, $plugins, true);
             if ($pluginKey !== false) {
                 unset($plugins[$pluginKey]);
-                if ($alreadyUnregistred) continue;
+                if ($alreadyUnregistred) break;
                 do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, WPGraphQL::class);
                 do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
                 $alreadyUnregistred = true;
