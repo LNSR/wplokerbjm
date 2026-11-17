@@ -17,7 +17,7 @@ final class OnUnregisterProbe
     /** @var array<string, int> */
     public static array $calls = [];
 
-    public static ?OnUnregisterDependency $dependency = null;
+    public static ?object $dependency = null;
 
     public static function reset(): void
     {

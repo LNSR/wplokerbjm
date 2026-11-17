@@ -99,7 +99,7 @@ final class DeferredHookEntryHandler
     }
 
     /** @param DeferredHookEntry['removeEntryIndexCallback'] $callback */
-    public function setOnEntryRemovalCallback(\Closure $callback): void
+    public function setOnEntryRemovalRemoveIndexesCallback(\Closure $callback): void
     {
         $this->removeEntryIndexCallback = $callback;
     }

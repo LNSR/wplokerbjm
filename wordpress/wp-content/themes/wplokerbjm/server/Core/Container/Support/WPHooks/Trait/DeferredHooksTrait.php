@@ -53,7 +53,7 @@ trait DeferredHooksTrait
     {
         $this->deferredHandlers[$entry->toUniqueKey()] = $entry;
         $this->entriesIndexer->setIndexes($entry);
-        $entry->setOnEntryRemovalCallback($this->destroyIndexes ??= $this->entriesIndexer->removeIndexes(...));
+        $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes ??= $this->entriesIndexer->removeIndexes(...));
     }
 
     /**

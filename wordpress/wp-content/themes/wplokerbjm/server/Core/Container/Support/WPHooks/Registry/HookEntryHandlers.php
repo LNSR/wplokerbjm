@@ -93,7 +93,7 @@ final class ContainerRegistryHandlerEntry
     }
 
     /** @param HandlerEntry['removeEntryIndexCallback'] $callback */
-    public function setOnEntryRemovalCallback(\Closure $callback): void
+    public function setOnEntryRemovalRemoveIndexesCallback(\Closure $callback): void
     {
         $this->removeEntryIndexCallback = $callback;
     }

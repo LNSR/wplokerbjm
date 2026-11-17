@@ -93,7 +93,7 @@ class WPHooksContainerRegistry
             try {
                 $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
                 $this->entriesIndexer->setIndexes($entry);
-                $entry->setOnEntryRemovalCallback($this->destroyIndexes);
+                $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes);
                 $this->entriesByInvokers[$entry->handler] = $entry;
             } catch (\Exception $e) {
                 Logger::error(
@@ -595,7 +595,7 @@ class WPHooksContainerRegistry
                 $entry = $this->handlers[$uniqueKey] = ContainerRegistryHandlerEntry::fromDeferredEntry($data);
                 $this->entriesByInvokers[$data->handler] = $entry;
                 $this->entriesIndexer->setIndexes($entry);
-                $entry->setOnEntryRemovalCallback($this->destroyIndexes);
+                $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes);
                 $entry->register();
                 $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
                 SharedUtils::isDevelopment() && Logger::debug(self::class, 'Activated deferred hook ' . $data->handler->label);
