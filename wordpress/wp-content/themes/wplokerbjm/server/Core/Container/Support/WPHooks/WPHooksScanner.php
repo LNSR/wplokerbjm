@@ -40,13 +40,14 @@ class WPHooksScanner
      * @param array $compiledContainerMap list of classes in compiled container
      * @param string $namespace namespace to scan
      * @param string $cacheLocation directory where cache file will be stored
-     * @param WPHookPlanProvider|null $hookPlanProvider plan builder for condition gates and dynamic hook names
+     * @param WPHookPlanProvider $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
     public function __construct(
         private array $compiledContainerMap,
+        private WPHookPlanProvider $hookPlanProvider,
         private string $namespace = 'WPLokerBJM',
         private string $cacheLocation = '',
-        private WPHookPlanProvider $hookPlanProvider = new WPHookPlanProvider()
+        public private(set) bool $forceNoCache = false
     ) {
         $this->namespace = trim($namespace, '\\');
         $this->cacheLocation = is_dir($cacheLocation) || str_ends_with($cacheLocation, '/') || str_ends_with($cacheLocation, '\\')
@@ -66,7 +67,7 @@ class WPHooksScanner
     {
         if ($this->cachedHookRegistrations !== null) return $this->cachedHookRegistrations;
 
-        if (!empty($this->cacheLocation) && \is_readable($this->cacheLocation)) {
+        if (!$this->forceNoCache && !empty($this->cacheLocation) && \is_readable($this->cacheLocation)) {
             $loaded = require $this->cacheLocation;
             if (is_array($loaded)) {
                 return $this->cachedHookRegistrations = array_map(
@@ -78,7 +79,7 @@ class WPHooksScanner
 
         $registrations = $this->performHookRegistrationScan();
         $this->cachedHookRegistrations = $registrations;
-        $this->exportCache();
+        if (!$this->forceNoCache) $this->exportCache();
         return $registrations;
     }
 
@@ -205,7 +206,7 @@ class WPHooksScanner
     public function exportCache(): bool
     {
         $targetFile = $this->cacheLocation;
-        $registrations = $this->getHookRegistrations();
+        $registrations = $this->cachedHookRegistrations ?? $this->cachedHookRegistrations = $this->performHookRegistrationScan();
 
         if (empty($targetFile)) {
             Logger::error('WPHooksScanner', 'Export failed: No target file path provided.');

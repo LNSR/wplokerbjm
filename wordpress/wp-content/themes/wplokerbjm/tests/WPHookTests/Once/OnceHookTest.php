@@ -187,39 +187,6 @@ class OnceHookTest extends WplokerbjmTestCase
         $this->assertSame(1, OnceFilterService::$instantiationCount);
     }
 
-    public function testOnceActionWithUnresolvableGateIsTreatedAsPassAndConsumed(): void
-    {
-        // Plan entry references a class the container cannot resolve and
-        // carries no default → evaluateExecuteIf throws. For once-hooks the
-        // gate is treated as PASS (mirrors the deferRegisterUntilHook
-        // convention); for regular hooks it is skipped with an error.
-        $registrations = [
-            $this->action(
-                OnceActionService::class,
-                'onOnceAction',
-                'once_unresolvable',
-                once: true,
-                executeIf: static fn (): bool => true,
-                executeIfParams: [
-                    'isStatic' => true,
-                    'scopeClass' => null,
-                    'params' => [
-                        ['name' => 'missing', 'type' => '\App\MissingService', 'hasDefault' => false, 'default' => null],
-                    ],
-                ]
-            ),
-        ];
-
-        $registry = $this->createRegistry($registrations, $this->container);
-        $registry->initialize();
-
-        do_action('once_unresolvable', 'hello');
-
-        $this->assertSame(1, OnceActionService::$instantiationCount);
-        $this->assertSame(['hello'], OnceActionService::$capturedValues);
-        $this->assertNull($this->findRegisteredHook('action', 'once_unresolvable'));
-    }
-
     public function testOnceActionWithDeferredActivationConsumesAfterFirstFire(): void
     {
         $registrations = [

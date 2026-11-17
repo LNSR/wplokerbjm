@@ -32,9 +32,9 @@ class HookScannerMagicMethodTest extends WplokerbjmTestCase
 
         $scanner = new WPHooksScanner(
             $this->robotLoader->getIndexedClasses(),
+            new WPHookPlanProvider($this->container()),
             'MagicHookRejected',
             '',
-            new WPHookPlanProvider()
         );
         $scanner->getHookRegistrations();
     }
@@ -43,9 +43,9 @@ class HookScannerMagicMethodTest extends WplokerbjmTestCase
     {
         $scanner = new WPHooksScanner(
             $this->robotLoader->getIndexedClasses(),
+            new WPHookPlanProvider($this->container()),
             'MagicHookAllowed',
             '',
-            new WPHookPlanProvider()
         );
         $registrations = $scanner->getHookRegistrations();
 

@@ -41,7 +41,7 @@ class DynamicTagTest extends WplokerbjmTestCase
             ExecuteIfActionService::class => \DI\autowire(),
         ]);
         $this->container = $builder->build();
-        $this->planProvider = new WPHookPlanProvider();
+        $this->planProvider = new WPHookPlanProvider($this->container());
 
         ExecuteIfActionService::reset();
     }

@@ -4,10 +4,11 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HookProviderTrait};
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryTrait;
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WeakReference;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryHandlerEntry, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryUniqueKey;
 
@@ -85,8 +86,8 @@ final readonly class HookKey extends AbstractDataObject
  ======================================================================*/
 
 /**
- * @phpstan-import-type CallablePlan from HookProviderTrait
- * @phpstan-import-type CallableHookParams from HookProviderTrait
+ * @phpstan-import-type CallablePlan from WPHookPlanProvider
+ * @phpstan-import-type CallableHookParams from WPHookPlanProvider
  * *Master Hook Type*
  * @phpstan-type HookType array{
  *  class: class-string,
@@ -187,8 +188,8 @@ final readonly class HookRegistration extends AbstractDataObject
  * metadata lives here — per-instance state (owner instance, WeakReference,
  * remove callbacks) is intentionally NOT part of the DTO.
  * @phpstan-import-type HookType from HookRegistration
- * @phpstan-import-type CallablePlan from HookProviderTrait
- * @phpstan-import-type CallableHookParams from HookProviderTrait
+ * @phpstan-import-type CallablePlan from WPHookPlanProvider
+ * @phpstan-import-type CallableHookParams from WPHookPlanProvider
  * @phpstan-type InstanceHookMetadataData array{
  *  hook: string,
  *  type: 'action'|'filter',

@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 
 
 /**
@@ -23,8 +24,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker,
  * unregisterDeferredBy*) stays on the container-side ContainerRegistryDeferredHookManager; the
  * runtime registry consumes the same mechanics behind an automatic-only
  * surface.
- * @phpstan-import-type CallableHookParams from HookProviderTrait
- * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-import-type CallableHookParams from WPHookPlanProvider
+ * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-import-type DeferredHookEntry from DeferredHookEntryHandler
  * @phpstan-import-type ActivateEntry from WPHooksContainerRegistry
  * @phpstan-import-type ActivateRuntimeEntry from WPHooksInstanceRegistry
@@ -41,7 +42,7 @@ trait DeferredHooksTrait
      *
      * @var IndexedHandler
      */
-    public protected(set) array $deferredHandlers = [];
+    protected array $deferredHandlers = [];
     /** @var DeferredHookEntry['removeEntryIndexCallback'] */
     protected ?\Closure $destroyIndexes = null;
 

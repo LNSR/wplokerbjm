@@ -115,7 +115,7 @@ final class OnUnregisterDoContainerRegistryTest extends WplokerbjmTestCase
 
     public function testUnresolvableParameterNeverAbortsRegistrationOrCleanup(): void
     {
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $cleanup = static function (int $definitelyMissing): void {
             // Never reached — the parameter cannot be resolved (no container
             // entry, no default). The destructor must swallow the failure.
@@ -167,7 +167,7 @@ final class OnUnregisterDoContainerRegistryTest extends WplokerbjmTestCase
     public function testParametersResolveLazilyAndFromTheContainer(): void
     {
         $captured = null;
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $cleanup = static function (OnUnregisterDependency $dependency) use (&$captured): void {
             $captured = $dependency;
         };

@@ -8,7 +8,7 @@ use DI\Container;
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
@@ -19,7 +19,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  * DIFFERENT trigger hooks. Each trigger must activate ONLY its own entry —
  * activating by the shared target-hook bucket would wake every entry that
  * listens on that hook name (the production `CrossIsolationDeferRegister`
- * case). Covered for the instance registry (attribute + manual paths) and
+ * case). Covered for the instance registry (attribute path) and
  * the container registry.
  */
 final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
@@ -33,7 +33,7 @@ final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
         /** @suppresswarnings PHP0410 */
         $this->deferredIsolationService = null;
         $this->registry = $this->container()->make(WPHooksInstanceRegistry::class, [
-            'provider' => new RuntimeWPHookProvider(null),
+            'provider' => new WPHookPlanProvider($this->container()),
             'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
         ]);
 
@@ -84,47 +84,6 @@ final class DeferredTriggerIsolationTest extends WplokerbjmTestCase
         do_action('trigger_a');
         do_action('shared_destination');
         $this->assertSame(['B', 'B', 'A'], $log);
-    }
-
-    public function testEachManualDeferredEntryActivatesOnlyOnItsOwnTrigger(): void
-    {
-        $log = [];
-
-        // Static closures carry no bound `$this`, so the owner cannot be
-        // inferred — pass it explicitly.
-        $owner = new \stdClass();
-
-        // Both entries share hook+type+priority+acceptedArgs. Their uniqueness
-        // comes from the per-callback fingerprint folded into the manual
-        // HookKey; without it the second entry would overwrite the first in
-        // the deferred pool and never register.
-        $this->registry->registerAction(
-            'manual_shared',
-            static function () use (&$log): void {
-                $log[] = 'MA';
-            },
-            deferRegisterUntilHook: 'manual_trigger_a',
-            owner: $owner,
-        );
-
-        $this->registry->registerAction(
-            'manual_shared',
-            static function () use (&$log): void {
-                $log[] = 'MB';
-            },
-            deferRegisterUntilHook: 'manual_trigger_b',
-            owner: $owner,
-        );
-
-        $this->assertNull($this->findRegisteredHook('action', 'manual_shared'));
-
-        do_action('manual_trigger_b');
-        do_action('manual_shared');
-        $this->assertSame(['MB'], $log, 'the trigger_a entry must stay deferred');
-
-        do_action('manual_trigger_a');
-        do_action('manual_shared');
-        $this->assertSame(['MB', 'MB', 'MA'], $log);
     }
 
     public function testEachContainerDeferredEntryActivatesOnlyOnItsOwnTrigger(): void

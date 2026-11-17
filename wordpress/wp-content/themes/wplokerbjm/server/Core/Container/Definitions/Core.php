@@ -20,7 +20,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\WPLokerBJMContainer;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\{DependencyInjector, PlanCache, PlanCompiler, ScopeAccessFactory};
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
@@ -60,27 +59,26 @@ class Core implements DefinitionProviderInterface
             QueuedHooksCleaner::class => \DI\autowire(QueuedHooksCleaner::class),
             WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             ContainerRegistryHookTargetResolver::class => \DI\autowire(ContainerRegistryHookTargetResolver::class),
-            RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
                 static fn() => \CompiledContainer::METHOD_MAPPING,
+                \DI\get(WPHookPlanProvider::class),
                 $namespace,
-                defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache" : get_stylesheet_directory() . "/cache",
-                \DI\get(WPHookPlanProvider::class)
+                static fn () => \defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache" : get_stylesheet_directory() . "/cache",
             ),
             WPHooksInstanceObjectCache::class => \DI\autowire(WPHooksInstanceObjectCache::class)->constructor(
-                static fn(): string => defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache/WPHooksInstanceObjectCache.php" : get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
+                static fn(): string => \defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache/WPHooksInstanceObjectCache.php" : get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
             ),
             InstanceRegistryDeferredHookManager::class => \DI\autowire(InstanceRegistryDeferredHookManager::class)->constructor(
-                \DI\get(RuntimeWPHookProvider::class),
+                \DI\get(WPHookPlanProvider::class),
                 \DI\get(InstanceRegistryRuntimeHookResolver::class),
                 static fn() => new EntriesIndexer(),
             ),
             WPHooksInstanceRegistry::class => \DI\autowire(WPHooksInstanceRegistry::class)->constructor(
                 \DI\get(InstanceRegistryDeferredHookManager::class),
+                \DI\get(WPHookPlanProvider::class),
                 \DI\get(QueuedHooksCleaner::class),
                 \DI\get(InstanceRegistryRuntimeHookResolver::class),
                 \DI\get(WPHooksInstanceObjectCache::class),
-                \DI\get(RuntimeWPHookProvider::class),
             ),
             ContainerRegistryDeferredHookManager::class => \DI\autowire(ContainerRegistryDeferredHookManager::class)->constructor(
                 \DI\get(WPHookPlanProvider::class),

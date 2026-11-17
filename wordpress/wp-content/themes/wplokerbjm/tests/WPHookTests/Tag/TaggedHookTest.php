@@ -51,7 +51,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testTaggedHookWithoutDeferRegistersImmediately(): void
     {
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -72,7 +72,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testUnregisterByTagsRemovesActiveButLeavesDeferredIntact(): void
     {
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -110,7 +110,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testUnregisterDeferredByTagsRemovesDeferredButLeavesActiveIntact(): void
     {
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -144,7 +144,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testTaggedHookWithDeferLandsInDeferredPool(): void
     {
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -172,7 +172,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testActivateDeferredByTagsActivatesOnlyMatchingGroup(): void
     {
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -215,7 +215,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testMultiTagHookIsMatchedByAnyTag(): void
     {
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -234,7 +234,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testStringAndArrayTagFormsAreEquivalent(): void
     {
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         // String form.
         $registry = $this->createRegistry([
             $this->action(
@@ -266,7 +266,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testUnknownOrEmptyTagsAreNoOps(): void
     {
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -304,7 +304,7 @@ class TaggedHookTest extends WplokerbjmTestCase
         // Tagged + deferred + condition false: activation registers the hook,
         // but the condition gate still suppresses every fire.
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
@@ -349,7 +349,7 @@ class TaggedHookTest extends WplokerbjmTestCase
     public function testUnregisterByTagsUnregistersActiveHandlers(): void
     {
         $resolver = new ContainerRegistryHookTargetResolver();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,

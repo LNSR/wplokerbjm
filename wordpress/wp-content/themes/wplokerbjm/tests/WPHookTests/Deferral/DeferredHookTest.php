@@ -54,6 +54,7 @@ class DeferredHookTest extends WplokerbjmTestCase
         $this->entriesIndexer = new EntriesIndexer();
         $this->ContainerRegistryDeferredHookManager = new ContainerRegistryDeferredHookManager($this->planProvider, $this->targetResolver, $this->entriesIndexer);
         $this->registry = new WPHooksContainerRegistry($this->container, [], $this->planProvider, $this->ContainerRegistryDeferredHookManager, $this->targetResolver, $this->queuedHooksCleaner, $this->entriesIndexer);
+        $this->deferredHandlersCount = null;
     }
 
     /**
@@ -68,13 +69,18 @@ class DeferredHookTest extends WplokerbjmTestCase
         $bind($this->registry, $registrations);
     }
 
+    private ?\Closure $deferredHandlersCount {
+        get => $this->deferredHandlersCount ??= \Closure::bind(
+            fn(): int => \count($this->deferredHandlers),
+            $this->ContainerRegistryDeferredHookManager,
+            $this->ContainerRegistryDeferredHookManager
+        );
+    }
+
     /**
      * Count items in the deferred handlers map.
      */
-    private function deferredHandlersCount(): int
-    {
-        return count($this->ContainerRegistryDeferredHookManager->deferredHandlers);
-    }
+
 
     public function testDeferredHooksNotRegisteredOnInitialize(): void
     {
@@ -138,7 +144,7 @@ class DeferredHookTest extends WplokerbjmTestCase
 
         $this->assertSame(
             1,
-            $this->deferredHandlersCount(),
+            ($this->deferredHandlersCount)(),
             'Deferred hook should be stored in deferredHandlers',
         );
     }
@@ -230,7 +236,7 @@ class DeferredHookTest extends WplokerbjmTestCase
             ['class' => self::class, 'method' => 'dummyDeferredC', 'type' => 'action', 'hook' => 'ns_action_c', 'priority' => 10, 'acceptedArgs' => 1, 'deferRegister' => true],
         ]);
 
-        $this->assertSame(3, $this->deferredHandlersCount(), 'Should start with 3 deferred handlers');
+        $this->assertSame(3, ($this->deferredHandlersCount)(), 'Should start with 3 deferred handlers');
 
         $activated = $this->registry->activateDeferredByNamespace('WPLokerBJM\Tests\Support\Fixtures');
 
@@ -247,7 +253,7 @@ class DeferredHookTest extends WplokerbjmTestCase
             $this->findRegisteredHook('action', 'ns_action_c'),
             'self::class handler must stay deferred',
         );
-        $this->assertSame(1, $this->deferredHandlersCount(), 'Only the self::class handler should remain deferred');
+        $this->assertSame(1, ($this->deferredHandlersCount)(), 'Only the self::class handler should remain deferred');
 
         // Boundary: singular 'Fixture' must not match the plural 'Fixtures' namespace.
         $this->assertSame(
@@ -395,13 +401,13 @@ class DeferredHookTest extends WplokerbjmTestCase
             ],
         ]);
 
-        $this->assertSame(3, $this->deferredHandlersCount(), 'Should start with 3 deferred handlers');
+        $this->assertSame(3, ($this->deferredHandlersCount)(), 'Should start with 3 deferred handlers');
 
         $this->registry->unregisterDeferredByHook('purge_hook');
 
         $this->assertSame(
             1,
-            $this->deferredHandlersCount(),
+            ($this->deferredHandlersCount)(),
             'Only purge_hook deferred handlers should be removed; other_hook should remain',
         );
     }
@@ -424,7 +430,7 @@ class DeferredHookTest extends WplokerbjmTestCase
 
         $this->assertSame(
             1,
-            $this->deferredHandlersCount(),
+            ($this->deferredHandlersCount)(),
             'No-op should not affect existing deferred handlers',
         );
     }
@@ -461,13 +467,13 @@ class DeferredHookTest extends WplokerbjmTestCase
             ],
         ]);
 
-        $this->assertSame(3, $this->deferredHandlersCount(), 'Should start with 3 deferred handlers');
+        $this->assertSame(3, ($this->deferredHandlersCount)(), 'Should start with 3 deferred handlers');
 
         $this->registry->unregisterDeferredByClass(self::class);
 
         $this->assertSame(
             0,
-            $this->deferredHandlersCount(),
+            ($this->deferredHandlersCount)(),
             'All deferred handlers for self::class should be removed',
         );
     }
@@ -480,16 +486,16 @@ class DeferredHookTest extends WplokerbjmTestCase
             ['class' => 'WPLokerBJM\Tests\Support\Fixtures\LazyHookService', 'method' => 'onAction', 'type' => 'action', 'hook' => 'ns_d_c', 'priority' => 10, 'acceptedArgs' => 1, 'deferRegister' => true],
         ]);
 
-        $this->assertSame(3, $this->deferredHandlersCount(), 'Should start with 3 deferred handlers');
+        $this->assertSame(3, ($this->deferredHandlersCount)(), 'Should start with 3 deferred handlers');
 
         $this->registry->unregisterDeferredByNamespace('WPLokerBJM\Tests\Support\Fixtures');
 
-        $this->assertSame(2, $this->deferredHandlersCount(), 'Only the Fixtures-namespace handler should be removed');
+        $this->assertSame(2, ($this->deferredHandlersCount)(), 'Only the Fixtures-namespace handler should be removed');
 
         // Boundary: singular 'Fixture' must not match the plural 'Fixtures' namespace.
         $this->registry->unregisterDeferredByNamespace('WPLokerBJM\Tests\Support\Fixture');
 
-        $this->assertSame(2, $this->deferredHandlersCount(), 'Boundary namespace must be a no-op');
+        $this->assertSame(2, ($this->deferredHandlersCount)(), 'Boundary namespace must be a no-op');
     }
 
     public function testActivateDeferredByParentNamespaceCoversSubNamespaces(): void
@@ -499,7 +505,7 @@ class DeferredHookTest extends WplokerbjmTestCase
             ['class' => self::class, 'method' => 'dummyDeferredA', 'type' => 'action', 'hook' => 'ns_parent_b', 'priority' => 10, 'acceptedArgs' => 1, 'deferRegister' => true],
         ]);
 
-        $this->assertSame(2, $this->deferredHandlersCount());
+        $this->assertSame(2, ($this->deferredHandlersCount)());
 
         // The fixture lives in ...\Fixtures — a CHILD of the queried namespace.
         $this->assertSame(
@@ -526,13 +532,13 @@ class DeferredHookTest extends WplokerbjmTestCase
             ['class' => self::class, 'method' => 'dummyDeferredB', 'type' => 'filter', 'hook' => 'ns_parent_d', 'priority' => 10, 'acceptedArgs' => 1, 'deferRegister' => true],
         ]);
 
-        $this->assertSame(2, $this->deferredHandlersCount());
+        $this->assertSame(2, ($this->deferredHandlersCount)());
 
         $this->registry->unregisterDeferredByNamespace('WPLokerBJM\Tests\Support');
 
         $this->assertSame(
             1,
-            $this->deferredHandlersCount(),
+            ($this->deferredHandlersCount)(),
             'The sub-namespace handler must be swept, the sibling one kept',
         );
     }
@@ -560,13 +566,13 @@ class DeferredHookTest extends WplokerbjmTestCase
             ],
         ]);
 
-        $this->assertSame(2, $this->deferredHandlersCount());
+        $this->assertSame(2, ($this->deferredHandlersCount)());
 
         $this->registry->unregisterDeferredByCallable([$this, 'dummyRemove']);
 
         $this->assertSame(
             1,
-            $this->deferredHandlersCount(),
+            ($this->deferredHandlersCount)(),
             'Only the specific method should be removed; sibling method should remain',
         );
     }
@@ -589,7 +595,7 @@ class DeferredHookTest extends WplokerbjmTestCase
 
         $this->assertSame(
             1,
-            $this->deferredHandlersCount(),
+            ($this->deferredHandlersCount)(),
             'No-op should not affect existing deferred handlers',
         );
     }
@@ -636,7 +642,7 @@ class DeferredHookTest extends WplokerbjmTestCase
         // Deferred should be gone from internal store
         $this->assertSame(
             0,
-            $this->deferredHandlersCount(),
+            ($this->deferredHandlersCount)(),
             'All deferred handlers for mixed_hook should be removed',
         );
     }

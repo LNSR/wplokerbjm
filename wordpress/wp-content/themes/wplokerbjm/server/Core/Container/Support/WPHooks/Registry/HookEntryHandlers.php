@@ -5,18 +5,19 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryUniqueKey;
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HookProviderTrait};
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryTrait;
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, InstanceHookMetadata, HookKey};
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler;
 
 /**
  * @phpstan-import-type HookType from HookRegistration
- * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-type HandlerEntry array{
  *  hook: string,
  *  key: HookKey,
@@ -90,6 +91,7 @@ final class ContainerRegistryHandlerEntry
             ]);
         }
         \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
+        $this->removeEntryIndexCallback = null;
     }
 
     /** @param HandlerEntry['removeEntryIndexCallback'] $callback */
@@ -126,10 +128,10 @@ final class ContainerRegistryHandlerEntry
 /**
  * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
  * @phpstan-import-type HookType from HookRegistration
- * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-type RuntimeHandlerEntry array{
  *     hook: string,
- *     handler: RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker|RuntimeCallableHookInvoker,
+ *     handler: RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker,
  *     type: 'action'|'filter',
  *     priority: int,
  *     acceptedArgs: int,
@@ -142,7 +144,6 @@ final class ContainerRegistryHandlerEntry
  *     onUnregisterDoParams: CallablePlan,
  *     hookKey: HookKey,
  *     owner: WeakReference<object>,
- *     callback?: callable
  * }
  */
 final class RuntimeRegistryHandlerEntry
@@ -164,11 +165,10 @@ final class RuntimeRegistryHandlerEntry
      * @param RuntimeHandlerEntry['onUnregisterDoParams'] $onUnregisterDoParams
      * @param RuntimeHandlerEntry['hookKey'] $hookKey
      * @param RuntimeHandlerEntry['owner'] $owner
-     * @param RuntimeHandlerEntry['callback'] $callback if using manual registerAction() or registerFilter() it will hold the callback, otherwise it will be null.
      */
     public function __construct(
         public readonly string $hook,
-        RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker|RuntimeCallableHookInvoker $handler,
+        RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
         public readonly string $type,
         public readonly int $priority,
         public readonly int $acceptedArgs,
@@ -181,7 +181,6 @@ final class RuntimeRegistryHandlerEntry
         public readonly array $onUnregisterDoParams,
         public readonly HookKey $hookKey,
         public readonly ?WeakReference $owner = null,
-        public readonly mixed $callback = null,
     ) {
         $this->handler = $handler;
         $this->invokerLabel = $handler->label;

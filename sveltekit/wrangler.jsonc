@@ -13,7 +13,6 @@
     "binding": "ASSETS",
     "directory": ".svelte-kit/cloudflare"
   },
-  "minify": true,
   "cache": { "enabled": false, "cross_version_cache": false },
   "observability": {
     "enabled": true

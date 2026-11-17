@@ -9,7 +9,6 @@ use DI\ContainerBuilder;
 use DI\Container;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, InstanceRegistryRuntimeHookResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -175,7 +174,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
     public function testRuntimeRegistryRegistersExecuteIfGatedHooksButGatesAtFireTime(): void
     {
         $registry = $this->container->make(WPHooksInstanceRegistry::class, [
-            'provider' => new RuntimeWPHookProvider(null)
+            'provider' => new WPHookPlanProvider($this->container())
         ]);
         $registry->registerHooksOn(new RuntimeExecuteIfService());
 
@@ -204,7 +203,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 'onExecuteIfAction',
                 'bind_target_action',
                 executeIf: $gate,
-                executeIfParams: (new WPHookPlanProvider())->buildCallablePlan($gate)
+                executeIfParams: (new WPHookPlanProvider($this->container()))->buildCallablePlan($gate)
             ),
         ];
 
@@ -231,7 +230,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 'register_if_bound',
                 executeIf: static fn (): bool => true,
                 registerIf: $gate,
-                registerIfParams: (new WPHookPlanProvider())->buildCallablePlan($gate)
+                registerIfParams: (new WPHookPlanProvider($this->container()))->buildCallablePlan($gate)
             ),
         ];
 
@@ -278,7 +277,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             }
         );
 
-        $plan = (new WPHookPlanProvider())->buildCallablePlan($attr->executeIf);
+        $plan = (new WPHookPlanProvider($this->container()))->buildCallablePlan($attr->executeIf);
 
         $this->assertTrue($plan['isStatic']);
         $this->assertCount(1, $plan['params']);
@@ -288,7 +287,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $this->assertNull($plan['params'][0]['default']);
 
         // Builtin params carry no type but keep their default value.
-        $builtin = (new WPHookPlanProvider())->buildCallablePlan(
+        $builtin = (new WPHookPlanProvider($this->container()))->buildCallablePlan(
             static fn (int $x = 5): bool => true
         );
         $this->assertTrue($builtin['isStatic']);
@@ -298,7 +297,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $this->assertSame(5, $builtin['params'][0]['default']);
 
         // No condition → empty plan.
-        $empty = (new WPHookPlanProvider())->buildCallablePlan(null);
+        $empty = (new WPHookPlanProvider($this->container()))->buildCallablePlan(null);
         $this->assertSame([], $empty['params']);
         $this->assertTrue($empty['isStatic']);
     }

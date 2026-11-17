@@ -10,7 +10,6 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, HookKey, Provider\WPHookPlanProvider};
@@ -34,7 +33,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistr
  * enabling unregistration by hook name, class, or specific class::method.
  * Service resolution is deferred to hook-fire time (lazy loading).
  * @phpstan-import-type HookType from HookRegistration
- * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-import-type HandlerEntry from ContainerRegistryHandlerEntry
  * @phpstan-import-type HookTargetResolve from ContainerRegistryDeferredHookManager
  * @phpstan-type ActivateEntry \Closure(DeferredHookEntryHandler): bool
@@ -45,12 +44,12 @@ class WPHooksContainerRegistry
     /**
      * @var array<TKey, ContainerRegistryHandlerEntry>
      */
-    private array $handlers = [];
+    protected array $handlers = [];
 
     /**
      * @var \WeakMap<ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker, ContainerRegistryHandlerEntry>
      */
-    private \WeakMap $entriesByInvokers;
+    protected \WeakMap $entriesByInvokers;
 
     public private(set) bool $initialized = false;
     /**
@@ -619,7 +618,7 @@ class WPHooksContainerRegistry
                     $key = $entry->toUniqueKey();
                     $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                     unset($this->handlers[$key]);
-                    SharedUtils::isDevelopment() && Logger::warning(__CLASS__, "Entry Died: {$entry->invokerLabel}");
+                    SharedUtils::isDevelopment() && Logger::debug(__CLASS__, "Entry Died: {$entry->invokerLabel}");
                     return;
                 };
 
@@ -671,7 +670,8 @@ class WPHooksContainerRegistry
                 $hookName = $this->planProvider->resolveHookName(
                     $registration->hook,
                     $registration->hookParams,
-                    $registration->class . '::' . $registration->method
+                    $registration->class . '::' . $registration->method,
+                    $registration->class
                 );
             } catch (\RuntimeException $e) {
                 Logger::error(
@@ -756,38 +756,38 @@ class WPHooksContainerRegistry
 
         $handler = $registration->target === 'method'
             ? new ContainerLazyHookInvoker(
-                $this->container,
-                $hookName,
-                $registration->priority,
-                $registration->class,
-                $registration->method,
-                $registration->visibility,
-                $registration->type,
-                $registration->acceptedArgs,
-                $registration->executeIf,
-                $registration->executeIfParams,
-                $this->planProvider,
-                $registration->hookArgs,
-                $registration->once,
-                $registration->onUnregisterDo,
-                $registration->onUnregisterDoParams
+                container: $this->container,
+                planProvider: $this->planProvider,
+                hookName: $hookName,
+                priority: $registration->priority,
+                class: $registration->class,
+                method: $registration->method,
+                visibility: $registration->visibility,
+                type: $registration->type,
+                acceptedArgs: $registration->acceptedArgs,
+                executeIf: $registration->executeIf,
+                executeIfParams: $registration->executeIfParams,
+                hookArgNames: $registration->hookArgs,
+                once: $registration->once,
+                onUnregisterDo: $registration->onUnregisterDo,
+                onUnregisterDoParams: $registration->onUnregisterDoParams
             )
             : new ContainerLazyPropertyHookInvoker(
-                $this->container,
-                $hookName,
-                $registration->priority,
-                $registration->class,
-                $registration->method,
-                $registration->visibility,
-                $registration->type,
-                $registration->acceptedArgs,
-                $registration->executeIf,
-                $registration->executeIfParams,
-                $this->planProvider,
-                $registration->hookArgs,
-                $registration->once,
-                $registration->onUnregisterDo,
-                $registration->onUnregisterDoParams
+                container: $this->container,
+                planProvider: $this->planProvider,
+                hookName: $hookName,
+                priority: $registration->priority,
+                class: $registration->class,
+                property: $registration->method,
+                visibility: $registration->visibility,
+                type: $registration->type,
+                acceptedArgs: $registration->acceptedArgs,
+                executeIf: $registration->executeIf,
+                executeIfParams: $registration->executeIfParams,
+                hookArgNames: $registration->hookArgs,
+                once: $registration->once,
+                onUnregisterDo: $registration->onUnregisterDo,
+                onUnregisterDoParams: $registration->onUnregisterDoParams
             );
 
         $entry = ($registration->deferRegister || $registration->deferRegisterUntilHook !== null) ?

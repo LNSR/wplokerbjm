@@ -97,7 +97,7 @@ Support/WPHooks/
 └── Indexers/EntriesIndexer.php · Utilities/   # O(K) hook/class/tag/callable/namespace · HookPattern · Tag
 ```
 
-- **Container path**: scan → `HookRegistration` → lazy invoker (DI resolves only on fire). **Runtime path**: `registerHooksOn($object)` — weak owner refs, GC auto-clean, manual `registerAction()/registerFilter()`.
+- **Container path**: scan → `HookRegistration` → lazy invoker (DI resolves only on fire). **Runtime path**: `registerHooksOn($object)` — weak owner refs, GC auto-clean, attribute-driven only.
 - **Deferred**: `activateDeferredBy{Hook,Class,Namespace,Callable,Tags,TagPattern}`; `unregisterDeferredBy*` mirrors it. Active-pool selectors (`unregisterByCallable()`, …) never sweep deferred entries.
 
 ## REST API Pattern
@@ -186,7 +186,7 @@ public function registerTypes(): void
 
 ## 📂 Codebase References
 
-**Hook System**: `server/Core/Container/Attributes/WPHooksAttributes.php`, `server/Core/Container/Support/WPHooks/WPHooksScanner.php`, `server/Core/Container/Support/WPHooks/DTO.php`, `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php`, `server/Core/Container/Support/WPHooks/Provider/RuntimeWPHookProvider.php`, `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/HookEntryHandlers.php`, `server/Core/Container/Support/WPHooks/Registry/DeferredManager/*`, `server/Core/Container/Support/WPHooks/Registry/Resolver/*`, `server/Core/Container/Support/WPHooks/Invoker/*`, `server/Core/Container/Support/WPHooks/Janitor/QueuedHooksCleaner.php`, `server/Core/Container/Support/WPHooks/Indexers/EntriesIndexer.php`, `server/Core/Container/Support/WPHooks/Utilities/*`, `server/Core/Container/Support/WPHooks/Abstract/ModuleClassHookMetadata.php`, `server/Core/Container/Support/WPHooks/Trait/*`, `server/Core/Container/Init.php`, `server/Core/Wordpress/GlobalHooks.php`
+**Hook System**: `server/Core/Container/Attributes/WPHooksAttributes.php`, `server/Core/Container/Support/WPHooks/WPHooksScanner.php`, `server/Core/Container/Support/WPHooks/DTO.php`, `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php`, `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/HookEntryHandlers.php`, `server/Core/Container/Support/WPHooks/Registry/DeferredManager/*`, `server/Core/Container/Support/WPHooks/Registry/Resolver/*`, `server/Core/Container/Support/WPHooks/Invoker/*`, `server/Core/Container/Support/WPHooks/Janitor/QueuedHooksCleaner.php`, `server/Core/Container/Support/WPHooks/Indexers/EntriesIndexer.php`, `server/Core/Container/Support/WPHooks/Utilities/*`, `server/Core/Container/Support/WPHooks/Abstract/ModuleClassHookMetadata.php`, `server/Core/Container/Support/WPHooks/Trait/*`, `server/Core/Container/Init.php`, `server/Core/Wordpress/GlobalHooks.php`
 
 **REST**: `server/Transport/REST/Route/LowonganIngestRoute.php`, `server/Transport/REST/Controllers/Ingest/LowonganIngestControllers.php`
 

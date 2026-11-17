@@ -35,7 +35,7 @@ class HookArgGateTest extends WplokerbjmTestCase
             HookArgSearchService::class => \DI\autowire(),
         ]);
         $this->container = $builder->build();
-        $this->planProvider = new WPHookPlanProvider();
+        $this->planProvider = new WPHookPlanProvider($this->container());
 
         HookArgSearchService::reset();
     }

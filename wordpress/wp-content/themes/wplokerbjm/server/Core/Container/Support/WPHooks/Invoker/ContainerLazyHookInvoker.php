@@ -59,13 +59,10 @@ trait ContainerLazyHookInvokerTrait
                         $hookArgs,
                         $this->variadicHookArgName()
                     );
-                } catch (\Throwable $e) {
-                    if (!$this->once) {
-                        throw $e;
-                    }
-                    Logger::info(
+                } catch (\RuntimeException $e) {
+                    Logger::error(
                         static::class,
-                        'executeIf gate unresolvable for once-hook ' . $this->label . ' — treated as pass.',
+                        'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
                         [
                             'message' => $e->getMessage(),
                             'trace' => $e->getTraceAsString(),
@@ -74,6 +71,7 @@ trait ContainerLazyHookInvokerTrait
                         ]
                     );
                     $gatePassed = true;
+                    return $this->filterPassthrough($args);
                 }
 
                 if (!$gatePassed) {
@@ -121,9 +119,6 @@ final class ContainerLazyHookInvoker
     private ?\Closure $invoker = null;
     /** @var array<class-string, (\Closure(object, method-string, mixed...):mixed)> */
     private static array $methodInvokerCache = [];
-
-    /** Plan provider used for condition gates and hook-name resolution. */
-    private readonly WPHookPlanProvider $planProvider;
     /**
      * @param class-string $class
      * @param method-string $method
@@ -137,6 +132,7 @@ final class ContainerLazyHookInvoker
      */
     public function __construct(
         private readonly ContainerInterface $container,
+        private readonly WPHookPlanProvider $planProvider,
         public readonly string $hookName,
         public readonly int $priority,
         public readonly string $class,
@@ -146,14 +142,12 @@ final class ContainerLazyHookInvoker
         public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
         private readonly array $executeIfParams = [],
-        private readonly ?WPHookPlanProvider $hookPlanProvider = null,
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
         private readonly ?\Closure $onUnregisterDo = null,
         private readonly array $onUnregisterDoParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->method;
-        $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
             $this->invoker = self::$methodInvokerCache[$this->class] ??= \Closure::bind(
@@ -197,9 +191,6 @@ final class ContainerLazyPropertyHookInvoker
     /** @var array<class-string, (\Closure(object, property-string|property-hook-string):mixed)> */
     private static array $classPropertyClosureCache = [];
 
-    /** Plan provider used for condition gates and hook-name resolution. */
-    private readonly WPHookPlanProvider $planProvider;
-
     /**
      * @param ContainerInterface $container
      * @param class-string $class
@@ -214,6 +205,7 @@ final class ContainerLazyPropertyHookInvoker
      */
     public function __construct(
         private readonly ContainerInterface $container,
+        private readonly WPHookPlanProvider $planProvider,
         public readonly string $hookName,
         public readonly int $priority,
         public readonly string $class,
@@ -223,14 +215,12 @@ final class ContainerLazyPropertyHookInvoker
         public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
         private readonly array $executeIfParams = [],
-        private readonly ?WPHookPlanProvider $hookPlanProvider = null,
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
         private readonly ?\Closure $onUnregisterDo = null,
         public readonly array $onUnregisterDoParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->property;
-        $this->planProvider = $hookPlanProvider ?? new WPHookPlanProvider();
 
         if ($this->visibility !== 'public') {
             $this->reader = self::$classPropertyClosureCache[$this->class] ??= \Closure::bind(

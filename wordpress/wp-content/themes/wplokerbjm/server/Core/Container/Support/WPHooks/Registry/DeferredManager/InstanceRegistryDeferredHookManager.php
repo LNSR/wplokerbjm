@@ -10,7 +10,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     RuntimeRegistryHandlerEntry
 };
 
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
@@ -26,7 +26,7 @@ class InstanceRegistryDeferredHookManager
     use DeferredHooksTrait;
 
     public function __construct(
-        private RuntimeWPHookProvider $provider = new RuntimeWPHookProvider(null),
+        private WPHookPlanProvider $provider,
         private InstanceRegistryRuntimeHookResolver $runtimeResolver = new InstanceRegistryRuntimeHookResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
     ) {}
@@ -79,7 +79,10 @@ class InstanceRegistryDeferredHookManager
         foreach ($this->entriesIndexer->byClass[$instanceId] ?? [] as $key) {
             $entry = $this->deferredHandlers[$key] ?? null;
             if ($entry === null) continue;
-            if ($entry->instance?->get() !== $instance) continue;
+            if ($entry->instance?->get() !== $instance) {
+                unset($this->deferredHandlers[$key]);
+                continue;
+            }
             if (!$this->runtimeResolver->matchesCallableTarget($entry->key, $targetName)) continue;
             $keys[$key] = $key;
         }
@@ -102,7 +105,7 @@ class InstanceRegistryDeferredHookManager
     ): void {
         $triggerHook = $deferRegisterUntilHook;
         if ($triggerHook instanceof \Closure) {
-            $triggerHook = $this->provider->resolveHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook instanceof \Closure ? $triggerHook : null), 'manual', $entry->instance?->get());
+            $triggerHook = $this->provider->resolveHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook), 'manual', $entry->instance?->get() ?? null);
         }
 
         $this->addDeferred($entry);
@@ -141,7 +144,10 @@ class InstanceRegistryDeferredHookManager
             unset($this->deferredHandlers[$deferredKey]);
         }, PHP_INT_MIN, 0);
 
-        $entry->setOnEntryRemovalRemoveSchedulerCallback(static fn () => \remove_action($triggerHook, $cb, PHP_INT_MIN));
+        $entry->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
+            \remove_action($triggerHook, $cb, PHP_INT_MIN);
+            SharedUtils::isDevelopment() && Logger::debug(__CLASS__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+        });
     }
 
     /**
@@ -186,14 +192,12 @@ class InstanceRegistryDeferredHookManager
         }
 
         try {
-            $allowed = $this->provider !== null
-                ? $this->provider->evaluateRegistrationGate(
-                    $registerIf,
-                    $data->registerIfParams ?? [],
-                    $data->handler->label,
-                    $owner,
-                )
-                : $this->runtimeResolver->evaluateRegisterIf($registerIf, $owner, $data->hook);
+            $allowed = $this->provider->evaluateRegistrationGate(
+                $registerIf,
+                $data->registerIfParams ?? [],
+                $data->handler->label,
+                $owner,
+            );
         } catch (\Throwable $e) {
             Logger::warning(self::class, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate threw: ' . $e->getMessage());
             return false;

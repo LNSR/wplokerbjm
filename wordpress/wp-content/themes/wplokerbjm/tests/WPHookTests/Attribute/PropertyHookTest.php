@@ -366,7 +366,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         $gate = static function (string $value): bool {
             return $value === 'go';
         };
-        $plan = (new WPHookPlanProvider())->buildCallablePlan($gate);
+        $plan = (new WPHookPlanProvider($this->container()))->buildCallablePlan($gate);
 
         $this->seedRegistrations([
             [

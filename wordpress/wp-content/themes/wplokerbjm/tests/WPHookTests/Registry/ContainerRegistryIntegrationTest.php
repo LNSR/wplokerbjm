@@ -41,9 +41,9 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
     {
         return new WPHooksScanner(
             $this->testRobotLoader->getIndexedClasses(),
+            new WPHookPlanProvider($this->container()),
             self::$NAMESPACE,
             '',
-            new WPHookPlanProvider()
         );
     }
 
@@ -140,7 +140,7 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
         // so exclude them from the count assertion. RegisterIf-gated hooks whose
         // gate evaluates to false (environment-dependent, e.g. !isWPCLI() in
         // tests) are also skipped by the registry — mirror those semantics.
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $nonDeferred = array_filter(
             $registrations,
             function ($r) use ($planProvider, $container) {
@@ -425,7 +425,7 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
         $registeredCount = count($registeredHooks);
 
         // Skip breakdown — mirrors registry semantics (deferred excluded first)
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($this->container());
         $gateSkipped = 0;
         $notInContainer = 0;
         foreach ($registrations as $reg) {

@@ -171,10 +171,7 @@ abstract class BaseHookAttribute
      * * gate returns `false` → handler skipped. With `once: true` the hook is
      *   **consumed anyway**; a false gate is final and never retried.
      * * gate **throws** (or returns non-bool) → without `once` the handler is
-     *   skipped and an ERROR is logged; **with `once` the gate is treated as
-     *   PASS** (INFO logged) and the handler still runs, so a once-hook can
-     *   never leak. Consequence: a mis-configured gate on a once-hook silently
-     *   always passes.
+     *   skipped and an ERROR is logged; if gate dependencies unresolvable treated as PASS
      *
      * ! Property-hook limitation: for a `get`-hooked property the callable is
      * ! produced lazily. To learn its parameter names the scanner would have to
@@ -268,9 +265,6 @@ abstract class BaseHookAttribute
      *   cannot run twice.
      * * For deferred entries the counter starts at **activation**, not at
      *   declaration.
-     * ! Remember the once/gate interaction from `$executeIf`: a throwing or
-     * ! non-bool gate is treated as PASS on once-hooks, so a broken gate does
-     * ! not prevent execution — it silently enables it.
      * 
      * @param (\Closure(TParams...): void)|null $onUnregisterDo Cleanup side effect for live wordpress registration:
      * !        fired once when the invoker object is released (its PHP

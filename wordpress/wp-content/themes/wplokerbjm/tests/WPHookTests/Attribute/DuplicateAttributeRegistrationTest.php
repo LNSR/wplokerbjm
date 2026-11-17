@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\WPHookTests\Attribute;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -91,6 +92,7 @@ final class DuplicateAttributeRegistrationTest extends WplokerbjmTestCase
     {
         $scanner = new WPHooksScanner(
             [DuplicateAttributeService::class => static fn(): object => new DuplicateAttributeService()],
+            new WPHookPlanProvider($this->container()),
             'WPLokerBJM\\Tests\\WPHookTests',
         );
 

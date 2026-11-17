@@ -6,7 +6,7 @@ use InstanceHookMetadataData;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{RuntimeWPHookProvider};
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
 
@@ -17,7 +17,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
  * Cross-domain members (once-removal plumbing, named hook-args builder,
  * filter passthrough) come from the shared {@see HookInvokerTrait}; the
  * actual invocation step is domain-specific via {@see invokeOn()}.
- * @mixin RuntimeInstanceHookInvoker&RuntimeInstancePropertyHookInvoker&RuntimeCallableHookInvoker
+ * @mixin RuntimeInstanceHookInvoker&RuntimeInstancePropertyHookInvoker
  */
 trait RuntimeInstanceInvokerTrait
 {
@@ -53,22 +53,25 @@ trait RuntimeInstanceInvokerTrait
             }
 
             if ($this->executeIf !== null) {
-                $allowed = $this->hookPlanProvider !== null
-                    ? $this->hookPlanProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->label, $instance, $this->buildHookArgs($args), $this->variadicHookArgName())
-                    : ($this->executeIf)();
-                if (!is_bool($allowed)) {
-                    throw new \RuntimeException(
-                        'Condition for ' . $this->label . ' must return bool, got ' . get_debug_type($allowed)
+                try {
+                    $gatePassed = $this->hookPlanProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->label, $instance, $this->buildHookArgs($args), $this->variadicHookArgName());
+                } catch (\RuntimeException $e) {
+                    Logger::error(
+                        static::class,
+                        'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
+                        [
+                            'message' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                        ]
                     );
+                    $gatePassed = true;
+                    return $this->filterPassthrough($args);
                 }
 
-                Logger::debug(static::class, 'executeIf for ' . $this->label . ': ' . ($allowed ? 'PASS' : 'FAIL'));
-
-                if ($allowed === false) {
-                    Logger::info(
-                        static::class,
-                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
-                    );
+                if (!$gatePassed) {
+                    Logger::info(static::class, 'Skipping hook ' . $this->label . ' — executeIf gate returned false.');
                     return $this->filterPassthrough($args);
                 }
             }
@@ -99,7 +102,7 @@ trait RuntimeInstanceInvokerTrait
     public function initOnUnregisterDoCallback(): void
     {
         if ($this->instanceRef->get() === null) return;
-        $this->onUnregisterDoCallback ??= $this->hookPlanProvider?->resolveOnUnregisterDo(
+        $this->onUnregisterDoCallback ??= $this->hookPlanProvider->resolveOnUnregisterDo(
             $this->onUnregisterDo,
             $this->onUnregisterDoParams,
             $this->label,
@@ -179,7 +182,7 @@ final class RuntimeInstanceHookInvoker
         public readonly string $type = 'action',
         public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
-        private readonly ?RuntimeWPHookProvider $hookPlanProvider = null,
+        private readonly ?WPHookPlanProvider $hookPlanProvider = null,
         public readonly array $executeIfParams = [],
         public readonly array $hookArgNames = [],
         public readonly bool $once = false,
@@ -249,6 +252,7 @@ final class RuntimeInstancePropertyHookInvoker
      */
     public function __construct(
         private readonly \WeakReference $instanceRef,
+        private readonly WPHookPlanProvider $hookPlanProvider,
         public readonly string $hookName,
         public readonly int $priority,
         public readonly string $property,
@@ -256,7 +260,6 @@ final class RuntimeInstancePropertyHookInvoker
         public readonly string $type = 'action',
         public readonly int $acceptedArgs = 0,
         private readonly ?\Closure $executeIf = null,
-        private readonly ?RuntimeWPHookProvider $hookPlanProvider = null,
         public readonly array $executeIfParams = [],
         public readonly array $hookArgNames = [],
         public readonly bool $once = false,
@@ -297,132 +300,5 @@ final class RuntimeInstancePropertyHookInvoker
         }
 
         return $callable(...$args);
-    }
-}
-
-/**
- * Invocable wrapper for callables registered manually on the runtime registry.
- *
- * Used by WPHooksInstanceRegistry::registerAction()/registerFilter() so the
- * callback (closure, array-callable, invokable object) can capture the
- * surrounding scope directly — no container resolution involved. An optional
- * condition closure is invoked directly before the callback and must return
- * bool.
- * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
- * @internal
- */
-final class RuntimeCallableHookInvoker
-{
-    use HookInvokerTrait;
-
-    /**
-     * @param callable $callback  Callable invoked when the hook fires.
-     * @param InstanceHookMetadataData['executeIf']   $executeIf Optional gate: invoked directly, must return bool.
-     * @param InstanceHookMetadataData['type'] $type
-     * @param InstanceHookMetadataData['once'] $once      When true, the registration removes itself after its first
-     *                                   fire where the executeIf gate is evaluated (consume-on-any-evaluation).
-     * @param InstanceHookMetadataData['onUnregisterDo'] $onUnregisterDo
-     */
-    public function __construct(
-        private readonly mixed $callback,
-        public readonly string $hookName,
-        public readonly int $priority,
-        public readonly string $type = 'action',
-        public readonly int $acceptedArgs = 0,
-        private readonly ?\Closure $executeIf = null,
-        public readonly bool $once = false,
-        private readonly ?\Closure $onUnregisterDo = null
-    ) {
-        $this->label = $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . (is_array($callback)
-            ? get_debug_type($callback[0]) . '::' . $callback[1] : ($callback instanceof \Closure ? 'closure:' . (string) \spl_object_id($callback)
-                : get_debug_type($callback)));
-    }
-
-    public function initOnUnregisterDoCallback(): void
-    {
-        if ($this->onUnregisterDo === null || $this->onUnregisterDoCallback !== null) {
-            return;
-        }
-
-        $onUnregisterDo = $this->onUnregisterDo;
-        $label = $this->label;
-
-        // Manual registrations have no provider, so the closure is invoked
-        // without argument resolution — but it must never let an exception
-        // escape a destructor (that would abort shutdown).
-        $this->onUnregisterDoCallback = static function () use ($onUnregisterDo, $label): void {
-            static $alreadyRun = false;
-            if ($alreadyRun) return;
-            $alreadyRun = true;
-
-            try {
-                $onUnregisterDo();
-            } catch (\Throwable $e) {
-                Logger::error(self::class, 'Failed to execute onUnregisterDo', [
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'invokerLabel' => $label,
-                ]);
-            }
-        };
-    }
-
-    public function __invoke(mixed ...$args): mixed
-    {
-        try {
-            $this->dispatching = true;
-
-            if ($this->once) {
-                if ($this->consumed) {
-                    return $this->filterPassthrough($args);
-                }
-                $this->consumed = true;
-                $this->consumeOnceAndClean();
-            }
-
-            if ($this->executeIf !== null) {
-                $allowed = ($this->executeIf)();
-                if (!is_bool($allowed)) {
-                    throw new \RuntimeException(
-                        'Condition for ' . $this->label . ' must return bool, got ' . get_debug_type($allowed)
-                    );
-                }
-
-                Logger::debug(static::class, 'executeIf for ' . $this->label . ': ' . ($allowed ? 'PASS' : 'FAIL'));
-
-                if ($allowed === false) {
-                    Logger::info(
-                        static::class,
-                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
-                    );
-                    return $this->filterPassthrough($args);
-                }
-            }
-
-            $callback = $this->callback;
-
-            $result = $callback(...$args);
-
-            SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
-            return $result;
-        } catch (\Throwable $e) {
-            Logger::error(
-                static::class,
-                'Error invoking hook ' . $this->label . ': ',
-                [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                ],
-            );
-            // Filters must pass through the first argument; actions are fire-and-forget.
-            return $this->filterPassthrough($args);
-        } finally {
-            $this->consumeOnceAndClean();
-            $this->dispatching = false;
-        }
     }
 }

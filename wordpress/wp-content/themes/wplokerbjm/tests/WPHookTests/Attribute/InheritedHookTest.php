@@ -7,7 +7,6 @@ namespace WPLokerBJM\Tests\WPHookTests\Attribute;
 use DI\Container;
 use DI\ContainerBuilder;
 use Nette\Loaders\RobotLoader;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, InstanceRegistryRuntimeHookResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\{Provider\WPHookPlanProvider, WPHooksScanner};
@@ -41,7 +40,7 @@ class InheritedHookTest extends WplokerbjmTestCase
             ChildRedeclareService::class => \DI\autowire(),
         ]);
         $this->container = $builder->build();
-        $this->planProvider = new WPHookPlanProvider();
+        $this->planProvider = new WPHookPlanProvider($this->container());
 
         ParentHookService::reset();
         ChildNoRedeclareService::reset();
@@ -65,9 +64,9 @@ class InheritedHookTest extends WplokerbjmTestCase
     {
         $scanner = new WPHooksScanner(
             $this->robotLoader->getIndexedClasses(),
+            $this->planProvider,
             'WPLokerBJM\Tests\Support\Fixtures',
             '',
-            $this->planProvider
         );
         $registrations = $scanner->getHookRegistrations();
 
@@ -90,9 +89,9 @@ class InheritedHookTest extends WplokerbjmTestCase
     {
         $scanner = new WPHooksScanner(
             $this->robotLoader->getIndexedClasses(),
+            $this->planProvider,
             'WPLokerBJM\Tests\Support\Fixtures',
             '',
-            $this->planProvider
         );
         $registrations = $scanner->getHookRegistrations();
 
@@ -116,7 +115,7 @@ class InheritedHookTest extends WplokerbjmTestCase
     public function testRuntimeRegistryIsDeclaredOnly(): void
     {
         $runtime = $this->container()->make(WPHooksInstanceRegistry::class, [
-            'provider' => new RuntimeWPHookProvider(null),
+            'provider' => new WPHookPlanProvider($this->container()),
         ]);
 
         // Inherited parent hook is NOT registered on the child instance.

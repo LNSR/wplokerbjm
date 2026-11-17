@@ -10,7 +10,6 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, HookKey, Provider\WPHookPlanProvider};
@@ -31,8 +30,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistr
  * 
  * @template TargetClass
  * @phpstan-type HookTargetResolve callable|string|array{class-string<TargetClass>&object<TargetClass>, callable-string<TargetClass>}
- * @phpstan-import-type CallablePlan from HookProviderTrait
- * @phpstan-import-type CallableHookParams from HookProviderTrait
+ * @phpstan-import-type CallablePlan from WPHookPlanProvider
+ * @phpstan-import-type CallableHookParams from WPHookPlanProvider
  * @phpstan-import-type HookType from HookRegistration
  * @phpstan-import-type DeferredHookEntry from DeferredHooksTrait
  * @phpstan-import-type ActivateEntry from WPHooksContainerRegistry
@@ -414,8 +413,11 @@ class ContainerRegistryDeferredHookManager
             remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
             unset($this->deferredHandlers[$key]);
         }, PHP_INT_MIN, 0);
-        
-        $this->deferredHandlers[$key]->setOnEntryRemovalRemoveSchedulerCallback(static fn() => remove_action($triggerHook, $cb, PHP_INT_MIN));
+
+        $this->deferredHandlers[$key]->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
+            remove_action($triggerHook, $cb, PHP_INT_MIN);
+            SharedUtils::isDevelopment() && Logger::debug(__CLASS__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+        });
     }
 
     public function deferRegistration(
@@ -429,7 +431,8 @@ class ContainerRegistryDeferredHookManager
                 $triggerHook = $this->planProvider->resolveHookName(
                     $registration->deferRegisterUntilHook,
                     $registration->deferRegisterUntilHookParams,
-                    $entry->handler->label
+                    $entry->handler->label,
+                    $registration->class
                 );
             } catch (\RuntimeException $e) {
                 Logger::error(

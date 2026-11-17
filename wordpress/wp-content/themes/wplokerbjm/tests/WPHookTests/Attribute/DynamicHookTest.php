@@ -8,7 +8,7 @@ use Closure;
 use DI\Container;
 use DI\ContainerBuilder;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{RuntimeWPHookProvider, WPHookPlanProvider};
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryDeferredHookManager, InstanceRegistryRuntimeHookResolver, WPHooksContainerRegistry, WPHooksInstanceRegistry, ContainerRegistryHookTargetResolver};
 use WPLokerBJM\Tests\Support\Fixtures\ExecuteIfActionService;
 use WPLokerBJM\Tests\Support\Fixtures\DynamicHookService;
@@ -43,7 +43,7 @@ class DynamicHookTest extends WplokerbjmTestCase
         ]);
 
         $this->container = $builder->build();
-        $this->planProvider = new WPHookPlanProvider();
+        $this->planProvider = new WPHookPlanProvider($this->container());
 
         DynamicHookService::reset();
         ExecuteIfActionService::reset();
@@ -165,7 +165,7 @@ class DynamicHookTest extends WplokerbjmTestCase
     public function testRuntimeRegistryRegistersClosureHooks(): void
     {
         $runtimeRegistry = $this->container->make(WPHooksInstanceRegistry::class, [
-            'provider' => new RuntimeWPHookProvider(null)
+            'provider' => new WPHookPlanProvider($this->container())
         ]);
 
         // The instance must be kept alive — runtime hooks are instance-lifetime
@@ -184,18 +184,16 @@ class DynamicHookTest extends WplokerbjmTestCase
 
     public function testZeroParamClosureHookWithStaticClassReference(): void
     {
-        // No DI parameter needed — the closure resolves a static class
-        // reference (self::class) at registration time, plain PHP.
-        $hook = static fn (): string => self::class . '_boot';
+        $hook = static fn (): string => DynamicHookService::class . '_boot';
 
         $registry = $this->createRegistry([
             $this->action(DynamicHookService::class, 'onDynamicAction', $hook),
         ], $this->container);
         $registry->initialize();
 
-        self::assertNotNull($this->findRegisteredHook('action', self::class . '_boot'));
+        self::assertNotNull($this->findRegisteredHook('action', DynamicHookService::class . '_boot'));
 
-        do_action(self::class . '_boot', 'static');
+        do_action(DynamicHookService::class . '_boot', 'static');
 
         self::assertSame(['static'], DynamicHookService::$capturedValues);
     }

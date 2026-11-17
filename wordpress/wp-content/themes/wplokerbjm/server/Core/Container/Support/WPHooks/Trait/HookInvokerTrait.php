@@ -9,7 +9,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     ContainerLazyPropertyHookInvoker,
     RuntimeInstanceHookInvoker,
     RuntimeInstancePropertyHookInvoker,
-    RuntimeCallableHookInvoker
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Shared\Log\Logger;
@@ -18,7 +17,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * Shared invoker mechanics used by BOTH the container-side lazy handlers and
  * the runtime instance handlers: the once/removal callback plumbing and the
  * named hook-args builder.
- * @mixin (ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker|RuntimeCallableHookInvoker)
+ * @mixin (ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker)
  */
 trait HookInvokerTrait
 {
@@ -72,9 +71,11 @@ trait HookInvokerTrait
 
     public function __destruct()
     {
-        if (is_callable($this->onUnregisterDoCallback)) ($this->onUnregisterDoCallback)();
         $this->isDestructed = true;
+        if (is_callable($this->onUnregisterDoCallback)) ($this->onUnregisterDoCallback)();
         if (is_callable($this->removeCallback)) ($this->removeCallback)($this, true);
+        $this->onUnregisterDoCallback = null;
+        $this->removeCallback = null;
     }
 
     /**

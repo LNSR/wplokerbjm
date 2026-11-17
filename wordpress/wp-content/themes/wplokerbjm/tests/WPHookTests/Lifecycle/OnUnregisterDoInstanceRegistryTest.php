@@ -7,19 +7,19 @@ namespace WPLokerBJM\Tests\WPHookTests\Lifecycle;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use WPLokerBJM\Tests\Support\Fixtures\{OnUnregisterLazyDependency, OnUnregisterProbe};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
  * Pins the `onUnregisterDo` lifecycle on the INSTANCE registry path
- * (attribute-discovered and manual registrations).
+ * (attribute-discovered registrations).
  *
  * The container-side counterpart lives in {@see OnUnregisterDoContainerRegistryTest}; both
  * paths share the invoker destructor, but the ownership model differs:
  * runtime handlers are bound to an owner instance through a WeakReference and
- * their cleanup is prepared through `RuntimeWPHookProvider`.
+ * their cleanup is prepared through `WPHookPlanProvider`.
  *
  * Pinned invariants:
  *  - cleanup runs exactly once when a registration is released (explicit
@@ -51,7 +51,7 @@ final class OnUnregisterDoInstanceRegistryTest extends WplokerbjmTestCase
         // parameters are planned and resolved lazily; the harness cleaner is
         // shared so `registeredHooks()` drives the queued sweep.
         $this->registry = $container->make(WPHooksInstanceRegistry::class, [
-            'provider' => $container->get(RuntimeWPHookProvider::class),
+            'provider' => $container->get(WPHookPlanProvider::class),
             'cache' => new WPHooksInstanceObjectCache(),
             'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
         ]);
@@ -294,55 +294,48 @@ final class OnUnregisterDoInstanceRegistryTest extends WplokerbjmTestCase
         self::assertSame(1, OnUnregisterProbe::count('lifetime'));
     }
 
-    // ── Manual path ───────────────────────────────────────────────────
+    // ── Raw WordPress removal (attribute path) ────────────────────────
 
-    public function testManualRegistrationCleanupFiresOnUnregisterHooksOn(): void
+    public function testAttributeRegistrationCleanupFiresOnUnregisterHooksOn(): void
     {
-        $cleanups = 0;
-        $owner = new class {};
+        $owner = new class {
+            #[Action(hook: 'instance_manual_on_unregister', acceptedArgs: 0, onUnregisterDo: static function (): void {
+                OnUnregisterProbe::hit('manual_unregister');
+            })]
+            public function onHook(): void {}
+        };
 
-        $this->registry->registerAction(
-            hook: 'instance_manual_on_unregister',
-            callback: static function (): void {},
-            onUnregisterDo: function () use (&$cleanups): void {
-                $cleanups++;
-            },
-            owner: $owner,
-        );
+        $this->registry->registerHooksOn($owner);
 
         self::assertNotNull($this->findRegisteredHook('action', 'instance_manual_on_unregister'));
 
         $this->registry->unregisterHooksOn($owner);
 
-        self::assertSame(1, $cleanups);
+        self::assertSame(1, OnUnregisterProbe::count('manual_unregister'));
         self::assertNull($this->findRegisteredHook('action', 'instance_manual_on_unregister'));
     }
 
-    public function testManualOnceCleanupRunsOnlyAfterTheQueuedSweep(): void
+    public function testAttributeOnceCleanupRunsOnlyAfterTheQueuedSweep(): void
     {
         $this->flushQueuedRemovalsAfterDispatch = false;
 
-        $cleanups = 0;
-        $owner = new class {};
+        $owner = new class {
+            #[Action(hook: 'instance_manual_once', acceptedArgs: 0, once: true, onUnregisterDo: static function (): void {
+                OnUnregisterProbe::hit('manual_once');
+            })]
+            public function onHook(): void {}
+        };
 
-        $this->registry->registerAction(
-            hook: 'instance_manual_once',
-            callback: static function (): void {},
-            once: true,
-            onUnregisterDo: function () use (&$cleanups): void {
-                $cleanups++;
-            },
-            owner: $owner,
-        );
+        $this->registry->registerHooksOn($owner);
 
         \do_action('instance_manual_once');
 
-        self::assertSame(0, $cleanups);
+        self::assertSame(0, OnUnregisterProbe::count('manual_once'));
 
         $this->flushQueuedRemovalsAfterDispatch = true;
         $this->registeredHooks();
 
-        self::assertSame(1, $cleanups);
+        self::assertSame(1, OnUnregisterProbe::count('manual_once'));
         self::assertNull($this->findRegisteredHook('action', 'instance_manual_once'));
     }
 
@@ -394,19 +387,16 @@ final class OnUnregisterDoInstanceRegistryTest extends WplokerbjmTestCase
         self::assertNull($this->findRegisteredHook('action', 'test_onUnregisterDoCleanupDoesntRun'), 'Wordpress should release hook [test_onUnregisterDoCleanupDoesntRun] registration');
     }
 
-    public function testManualRawRemoveActionTriggersCleanup(): void
+    public function testAttributeRawRemoveActionTriggersCleanup(): void
     {
-        $cleanups = 0;
-        $owner = new class {};
+        $owner = new class {
+            #[Action(hook: 'instance_manual_raw', acceptedArgs: 0, onUnregisterDo: static function (): void {
+                OnUnregisterProbe::hit('manual_raw');
+            })]
+            public function onHook(): void {}
+        };
 
-        $this->registry->registerAction(
-            hook: 'instance_manual_raw',
-            callback: static function (): void {},
-            onUnregisterDo: function () use (&$cleanups): void {
-                $cleanups++;
-            },
-            owner: $owner,
-        );
+        $this->registry->registerHooksOn($owner);
 
         $hook = $this->findRegisteredHook('action', 'instance_manual_raw');
         self::assertNotNull($hook);
@@ -414,6 +404,6 @@ final class OnUnregisterDoInstanceRegistryTest extends WplokerbjmTestCase
         \remove_action($hook['hook'], $hook['callable'], $hook['priority']);
         unset($hook);
 
-        self::assertSame(1, $cleanups);
+        self::assertSame(1, OnUnregisterProbe::count('manual_raw'));
     }
 }

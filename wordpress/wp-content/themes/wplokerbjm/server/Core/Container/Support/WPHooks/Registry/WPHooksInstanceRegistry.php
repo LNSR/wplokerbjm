@@ -9,10 +9,9 @@ use ReflectionFunction;
 use ReflectionProperty;
 use Brick\VarExporter\VarExporter;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstancePropertyHookInvoker, RuntimeInstanceHookInvoker, RuntimeCallableHookInvoker};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstancePropertyHookInvoker, RuntimeInstanceHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookProviderTrait;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
@@ -27,13 +26,13 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{Instance
  *  @example on Property Hook:
  * ```php
  *  class Service {
- *   public $service { get => $this->service ??= new class(self::class, __PROPERTY__, $this->registry) extends ModuleClassHookMetadata {
+ *   public $service { get =>$this->service ??= new class(self::class, __PROPERTY__, $this->registry) extends ModuleClassHookMetadata {
  *       public function __construct(
  *           string $parentClass,
  *           string $propertyName,
  *           private WPHooksInstanceRegistry $registry
  *       ) {
- *           parent::__construct($parentClass, $propertyName); 
+ *           parent::__construct($parentClass,$propertyName); 
  *           $registry->registerHooksOn($this); // register
  *           $registry->unregisterHooksOn($this); // unregister (optional)
  *       }
@@ -55,14 +54,9 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{Instance
  *! supported: per PHP 8.1 RFC 'Closures in constant expressions' they must be
  *! static closures, scoped to the declaring class — private members resolve
  *! via self:: and the closure is invoked directly (no instance binding).
- *! When a RuntimeWPHookProvider is injected it resolves closure parameters
- *! (hook args by name, then the container, then defaults); without one,
- *! closures are invoked with no arguments (only zero-parameter or
- *! defaulted-parameter closures work).
- *! Manual registration (registerAction() / registerFilter()) remains the
- *! escape hatch for runtime state: hook names, callbacks and condition
- *! closures may capture the surrounding scope directly, and `condition`
- *! closures are invoked directly there too (must return bool).
+ *! The WPHookPlanProvider resolves closure parameters (hook args by name,
+ *! then the container, then defaults) — identical semantics to the container
+ *! registry.
  * @phpstan-type ActivateRuntimeEntry \Closure(DeferredHookEntryHandler): bool
  */
 class WPHooksInstanceRegistry
@@ -70,32 +64,31 @@ class WPHooksInstanceRegistry
     use HookScannerTrait;
 
     /**
-     * Every registration — attribute-discovered or manual — is owned by
+     * Every registration — attribute-discovered — is owned by
      * exactly one object; unregisterHooksOn($owner) removes all of them at once.
      *
      * @var \WeakMap<object, list<RuntimeRegistryHandlerEntry>>
      */
-    private \WeakMap $weakRegistry;
-    /** @var \WeakMap<RuntimeInstanceHookInvoker|RuntimeCallableHookInvoker|RuntimeInstancePropertyHookInvoker, RuntimeRegistryHandlerEntry> */
-    private \WeakMap $entriesByInvokers;
+    protected \WeakMap $weakRegistry;
+    /** @var \WeakMap<RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, RuntimeRegistryHandlerEntry> */
+    protected \WeakMap $entriesByInvokers;
 
     /**
-     * Ensures registerHooksOn() runs exactly once per object regardless of
-     * the order of manual registerAction()/registerFilter() calls.
+     * Ensures registerHooksOn() runs exactly once per object.
      *
      * @var \WeakMap<object, bool>
      */
     private \WeakMap $scanned;
 
     /**
-     * @param RuntimeWPHookProvider $provider may have ContainerInterface
+     * @param WPHookPlanProvider $provider resolves closure parameters from the container
      */
     public function __construct(
         private InstanceRegistryDeferredHookManager $instanceRegistryDeferredHookManager,
+        private WPHookPlanProvider $provider,
         private QueuedHooksCleaner $queuedHooksCleaner = new QueuedHooksCleaner(),
         private InstanceRegistryRuntimeHookResolver $runtimeResolver = new InstanceRegistryRuntimeHookResolver(),
         public readonly WPHooksInstanceObjectCache $cache = new WPHooksInstanceObjectCache(),
-        private RuntimeWPHookProvider $provider = new RuntimeWPHookProvider(null),
 
     ) {
         $this->weakRegistry = new \WeakMap();
@@ -145,245 +138,80 @@ class WPHooksInstanceRegistry
         }
 
         $ref = new ReflectionClass($instance);
+
         $this->scanMethodHooks(
             $ref,
             function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records, &$metadata, $forceNoCache, &$attributeOrdinals): void {
-                $hook = $attr->hook instanceof \Closure
-                    ? $this->provider->resolveHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $method->getName())
-                    : $attr->hook;
-                $ordinalKey = 'method:' . $method->getName();
+                $targetName = $method->getName();
+                $ordinalKey = 'method:' . $targetName;
                 $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
-                $hookKey = new HookKey(
-                    class: (string) \spl_object_id($instance),
-                    method: $method->getName(),
-                    target: 'method',
-                    type: $attr instanceof Action ? 'action' : 'filter',
-                    priority: $attr->priority,
-                    acceptedArgs: $attr->acceptedArgs,
-                    attributeIndex: $attributeIndex,
-                );
 
-                if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
-                    $metadata[] = new InstanceHookMetadata(
-                        hook: $hook,
-                        type: $type,
-                        priority: $attr->priority,
-                        acceptedArgs: $attr->acceptedArgs,
-                        once: $attr->once,
-                        deferRegister: $attr->deferRegister,
-                        executeIf: $attr->executeIf,
-                        executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
-                        registerIf: $attr->registerIf,
-                        registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
-                        deferRegisterUntilHook: $attr->deferRegisterUntilHook,
-                        deferRegisterUntilHookParams: $this->provider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
-                        hookArgNames: $this->runtimeResolver->resolveHookArgNames($instance, $method->getName()),
-                        target: 'method',
-                        targetName: $method->getName(),
-                        visibility: $visibility,
-                        onUnregisterDo: $attr->onUnregisterDo,
-                        onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
-                    );
-                }
-
-
-                if ($attr->deferRegister) {
-                    // Deferred entries are gated at activation time (and
-                    // re-gated on every activation attempt), never at scan time.
-                } else {
-                    $gatePassed = $this->provider->evaluateRegistrationGate($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf), $method->getName(), $instance);
-                    if (!$gatePassed) {
-                        Logger::info(self::class, 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->parentClassString . '->' . $instance->parentProperty : $instance::class) . '->' . $method->getName() . ' with hook ' . $hook . ' and ' . 'priority ' . (string) $attr->priority . ' skipped');
-                        return;
-                    }
-                }
-
-                $weakRef = \WeakReference::create($instance);
-                $handler = new RuntimeInstanceHookInvoker(
-                    instanceRef: $weakRef,
-                    hookName: $hook,
-                    priority: $attr->priority,
-                    method: $method->getName(),
-                    visibility: $visibility,
+                $entryMeta = new InstanceHookMetadata(
+                    hook: $attr->hook instanceof \Closure
+                        ? $this->provider->resolveHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $targetName, $instance)
+                        : $attr->hook,
                     type: $type,
+                    priority: $attr->priority,
                     acceptedArgs: $attr->acceptedArgs,
-                    executeIf: $attr->executeIf,
-                    hookPlanProvider: $this->provider,
-                    executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
-                    hookArgNames: $this->runtimeResolver->resolveHookArgNames($instance, $method->getName()),
                     once: $attr->once,
+                    deferRegister: $attr->deferRegister,
+                    executeIf: $attr->executeIf,
+                    executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
+                    registerIf: $attr->registerIf,
+                    registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
+                    deferRegisterUntilHook: $attr->deferRegisterUntilHook,
+                    deferRegisterUntilHookParams: $this->provider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
+                    hookArgNames: $this->provider->buildCallablePlanFromReflector($method)['params'],
+                    target: 'method',
+                    targetName: $targetName,
+                    visibility: $visibility,
                     onUnregisterDo: $attr->onUnregisterDo,
                     onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
                 );
 
-                $handler->setCleanupCallback($this->removeRuntimeHook);
-
-                if (!$attr->deferRegister && $attr->deferRegisterUntilHook === null) {
-                    $record = new RuntimeRegistryHandlerEntry(
-                        hook: $hook,
-                        handler: $handler,
-                        type: $type,
-                        priority: $attr->priority,
-                        acceptedArgs: $attr->acceptedArgs,
-                        registerIf: $attr->registerIf,
-                        registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
-                        executeIf: $attr->executeIf,
-                        executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
-                        once: $attr->once,
-                        onUnregisterDo: $attr->onUnregisterDo,
-                        onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
-                        hookKey: $hookKey,
-                        owner: $weakRef,
-                        callback: null,
-                    );
-                    $records[] = $record->register();
-                    $this->entriesByInvokers[$handler] = $record;
-                    $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
-                    return;
+                if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
+                    $metadata[] = $entryMeta;
                 }
 
-                $this->instanceRegistryDeferredHookManager->deferManualRegistration(
-                    entry: new DeferredHookEntryHandler(
-                        hook: $hook,
-                        handler: $handler,
-                        type: $type,
-                        priority: $attr->priority,
-                        acceptedArgs: $attr->acceptedArgs,
-                        tags: [],
-                        registerIf: $attr->registerIf,
-                        registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
-                        executeIf: $attr->executeIf,
-                        executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
-                        once: $attr->once,
-                        onUnregisterDo: $attr->onUnregisterDo,
-                        onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
-                        key: $hookKey,
-                        instance: $weakRef,
-                    ),
-                    deferRegisterUntilHook: $attr->deferRegisterUntilHook,
-                    activateEntry: $this->activateRuntimeEntry
-                );
+                $this->processMetadataEntry($entryMeta, $instance, $attributeIndex, $records);
             }
         );
 
         $this->scanPropertyHooks(
             $ref,
-            function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records, &$metadata, &$hookKey, $forceNoCache, &$attributeOrdinals): void {
-                $hook = $attr->hook instanceof \Closure
-                    ? $this->provider->resolveHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $property->getName(), $instance)
-                    : $attr->hook;
-
-                $ordinalKey = 'property:' . $property->getName();
+            function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records, &$metadata, $forceNoCache, &$attributeOrdinals): void {
+                $targetName = $property->getName();
+                $ordinalKey = 'property:' . $targetName;
                 $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
-                $hookKey = new HookKey(
-                    class: (string) \spl_object_id($instance),
-                    method: $target,
-                    target: $property->getName(),
-                    type: $attr instanceof Action ? 'action' : 'filter',
+
+                $entryMeta = new InstanceHookMetadata(
+                    hook: $attr->hook instanceof \Closure
+                        ? $this->provider->resolveHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $targetName, $instance)
+                        : $attr->hook,
+                    type: $type,
                     priority: $attr->priority,
                     acceptedArgs: $attr->acceptedArgs,
-                    attributeIndex: $attributeIndex,
+                    once: $attr->once,
+                    deferRegister: $attr->deferRegister,
+                    executeIf: $attr->executeIf,
+                    executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
+                    registerIf: $attr->registerIf,
+                    registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
+                    deferRegisterUntilHook: $attr->deferRegisterUntilHook,
+                    deferRegisterUntilHookParams: $this->provider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
+                    hookArgNames: $this->provider->extractPropertyCallablePlan($property, $instance)['params'],
+                    target: $target,
+                    targetName: $targetName,
+                    visibility: $visibility,
+                    onUnregisterDo: $attr->onUnregisterDo,
+                    onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
                 );
 
                 if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
-                    $metadata[] = new InstanceHookMetadata(
-                        hook: $hook,
-                        type: $type,
-                        priority: $attr->priority,
-                        acceptedArgs: $attr->acceptedArgs,
-                        once: $attr->once,
-                        deferRegister: $attr->deferRegister,
-                        executeIf: $attr->executeIf,
-                        executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
-                        registerIf: $attr->registerIf,
-                        registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
-                        deferRegisterUntilHook: $attr->deferRegisterUntilHook,
-                        deferRegisterUntilHookParams: $this->provider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
-                        hookArgNames: $this->provider->extractPropertyCallableParamNames($property, $instance),
-                        target: $target,
-                        targetName: $property->getName(),
-                        visibility: $visibility,
-                        onUnregisterDo: $attr->onUnregisterDo,
-                        onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
-                    );
+                    $metadata[] = $entryMeta;
                 }
 
-                if ($attr->deferRegister) {
-                    // Deferred entries are gated at activation time.
-                } else {
-                    $gatePassed = $this->provider->evaluateRegistrationGate($attr->registerIf, $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null), $property->getName(), $instance);
-                    if (!$gatePassed) {
-                        Logger::info(self::class, 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->parentClassString . '->' . $instance->parentProperty : $instance::class) . '->' . $property->getName() . ' with hook ' . $hook . ' and ' . 'priority' . (string) $attr->priority . ' skipped');
-                        return;
-                    }
-                }
-
-                $weakRef = \WeakReference::create($instance);
-
-                $handler = new RuntimeInstancePropertyHookInvoker(
-                    instanceRef: $weakRef,
-                    hookName: $hook,
-                    priority: $attr->priority,
-                    property: $property->getName(),
-                    visibility: $visibility,
-                    type: $type,
-                    acceptedArgs: $attr->acceptedArgs,
-                    executeIf: $attr->executeIf,
-                    hookPlanProvider: $this->provider,
-                    executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
-                    hookArgNames: $this->provider->extractPropertyCallableParamNames($property, $instance),
-                    once: $attr->once,
-                    onUnregisterDo: $attr->onUnregisterDo,
-                    onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null)
-                );
-
-                $record = new RuntimeRegistryHandlerEntry(
-                    hook: $hook,
-                    handler: $handler,
-                    type: $type,
-                    priority: $attr->priority,
-                    acceptedArgs: $attr->acceptedArgs,
-                    registerIf: $attr->registerIf,
-                    registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
-                    executeIf: $attr->executeIf,
-                    executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
-                    once: $attr->once,
-                    onUnregisterDo: $attr->onUnregisterDo,
-                    onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
-                    hookKey: $hookKey,
-                    owner: $weakRef,
-                    callback: null,
-                );
-
-                $handler->setCleanupCallback($this->removeRuntimeHook);
-
-                if (!$attr->deferRegister) {
-                    $records[] = $record->register();
-                    $this->entriesByInvokers[$handler] = $record;
-                    $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
-                } else {
-                    $this->instanceRegistryDeferredHookManager->deferManualRegistration(
-                        entry: new DeferredHookEntryHandler(
-                            hook: $hook,
-                            handler: $handler,
-                            type: $type,
-                            priority: $attr->priority,
-                            acceptedArgs: $attr->acceptedArgs,
-                            tags: [],
-                            registerIf: $attr->registerIf,
-                            registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
-                            executeIf: $attr->executeIf,
-                            executeIfParams: $this->provider->buildCallablePlan($attr->executeIf instanceof \Closure ? $attr->executeIf : null),
-                            once: $attr->once,
-                            onUnregisterDo: $attr->onUnregisterDo,
-                            onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
-                            key: $hookKey,
-                            instance: $weakRef,
-                        ),
-                        deferRegisterUntilHook: $attr->deferRegisterUntilHook,
-                        activateEntry: $this->activateRuntimeEntry
-                    );
-                }
+                $this->processMetadataEntry($entryMeta, $instance, $attributeIndex, $records);
             }
         );
 
@@ -557,112 +385,153 @@ class WPHooksInstanceRegistry
         $records = [];
 
         foreach ($entries as $attributeIndex => $entry) {
-            $isDeferred = $entry->deferRegister || $entry->deferRegisterUntilHook !== null;
-            if ($isDeferred) {
-                // Cached deferred entries are gated at activation time only.
-            } else {
-                $gatePassed = $this->provider->evaluateRegistrationGate($entry->registerIf, $this->provider->buildCallablePlan($entry->registerIf instanceof \Closure ? $entry->registerIf : null), $entry->targetName, $instance);
-                if (!$gatePassed) {
-                    Logger::info(self::class, 'registerIf for ' . ($instance instanceof ModuleClassHookMetadata ? $instance->parentClassString . '->' . $instance->parentProperty : $instance::class) . '->' . $entry->targetName . ' with hook ' . $entry->hook . ' and ' . 'priority ' . (string) $entry->priority . ' skipped');
-                    continue;
-                }
-            }
-            $weakRef = \WeakReference::create($instance);
-            $handler = match ($entry->target) {
-                'method' => new RuntimeInstanceHookInvoker(
-                    instanceRef: $weakRef,
-                    hookName: $entry->hook,
-                    priority: $entry->priority,
-                    method: $entry->targetName,
-                    visibility: $entry->visibility,
-                    type: $entry->type,
-                    acceptedArgs: $entry->acceptedArgs,
-                    executeIf: $entry->executeIf,
-                    hookPlanProvider: $this->provider,
-                    executeIfParams: $entry->executeIfParams,
-                    hookArgNames: $entry->hookArgNames,
-                    once: $entry->once,
-                    onUnregisterDo: $entry->onUnregisterDo,
-                    onUnregisterDoParams: $entry->onUnregisterDoParams,
-                ),
-                'property', 'property-hook' => new RuntimeInstancePropertyHookInvoker(
-                    instanceRef: $weakRef,
-                    hookName: $entry->hook,
-                    priority: $entry->priority,
-                    property: $entry->targetName,
-                    visibility: $entry->visibility,
-                    type: $entry->type,
-                    acceptedArgs: $entry->acceptedArgs,
-                    executeIf: $entry->executeIf,
-                    hookPlanProvider: $this->provider,
-                    executeIfParams: $entry->executeIfParams,
-                    hookArgNames: $entry->hookArgNames,
-                    once: $entry->once,
-                    onUnregisterDo: $entry->onUnregisterDo,
-                    onUnregisterDoParams: $entry->onUnregisterDoParams,
-                ),
-            };
-            $handler->setCleanupCallback($this->removeRuntimeHook);
-            $hookKey = new HookKey(
-                class: (string) \spl_object_id($instance),
-                method: $entry->targetName,
-                target: $entry->target,
-                priority: $entry->priority,
-                type: $entry->type,
-                acceptedArgs: $entry->acceptedArgs,
-                attributeIndex: $attributeIndex,
-            );
-            switch ($isDeferred) {
-                case true:
-                    $this->instanceRegistryDeferredHookManager->deferManualRegistration(
-                        entry: new DeferredHookEntryHandler(
-                            hook: $entry->hook,
-                            handler: $handler,
-                            type: $entry->type,
-                            priority: $entry->priority,
-                            acceptedArgs: $entry->acceptedArgs,
-                            tags: [],
-                            registerIf: $entry->registerIf,
-                            registerIfParams: $entry->registerIfParams,
-                            executeIf: $entry->executeIf,
-                            executeIfParams: $entry->executeIfParams,
-                            once: $entry->once,
-                            onUnregisterDo: $entry->onUnregisterDo,
-                            onUnregisterDoParams: $entry->onUnregisterDoParams,
-                            key: $hookKey,
-                            instance: $weakRef,
-                        ),
-                        deferRegisterUntilHook: $entry->deferRegisterUntilHook,
-                        activateEntry: $this->activateRuntimeEntry
-                    );
-                    break;
-                default:
-                    $record = new RuntimeRegistryHandlerEntry(
-                        hook: $entry->hook,
-                        handler: $handler,
-                        type: $entry->type,
-                        priority: $entry->priority,
-                        acceptedArgs: $entry->acceptedArgs,
-                        registerIf: $entry->registerIf,
-                        registerIfParams: $entry->registerIfParams,
-                        once: $entry->once,
-                        executeIf: $entry->executeIf,
-                        executeIfParams: $entry->executeIfParams,
-                        onUnregisterDo: $entry->onUnregisterDo,
-                        onUnregisterDoParams: $entry->onUnregisterDoParams,
-                        hookKey: $hookKey,
-                        owner: $weakRef,
-                        callback: null,
-                    );
-
-                    $records[] = $record->register();
-                    $this->entriesByInvokers[$handler] = $record;
-                    $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
-                    break;
-            }
+            $this->processMetadataEntry($entry, $instance, $attributeIndex, $records);
         }
 
         return $records;
+    }
+
+    /**
+     * Process an individual hook metadata entry: checks the registration gate, 
+     * creates the handler and entry via createHandlerAndEntry, and registers 
+     * or defers the hook.
+     */
+    private function processMetadataEntry(
+        InstanceHookMetadata $entryMeta,
+        object $instance,
+        int $attributeIndex,
+        array &$records
+    ): void {
+        $isDeferred = $entryMeta->deferRegister || $entryMeta->deferRegisterUntilHook !== null;
+
+        if (!$isDeferred) {
+            $gatePassed = $this->provider->evaluateRegistrationGate(
+                $entryMeta->registerIf,
+                $entryMeta->registerIfParams ?? $this->provider->buildCallablePlan($entryMeta->registerIf instanceof \Closure ? $entryMeta->registerIf : null),
+                $entryMeta->targetName,
+                $instance
+            );
+            if (!$gatePassed) {
+                $ownerLabel = $instance instanceof ModuleClassHookMetadata
+                    ? $instance->parentClassString . '->' . $instance->parentProperty
+                    : $instance::class;
+                Logger::info(
+                    self::class,
+                    'registerIf for ' . $ownerLabel . '->' . $entryMeta->targetName . ' with hook ' . $entryMeta->hook . ' and priority ' . (string) $entryMeta->priority . ' skipped'
+                );
+                return;
+            }
+        }
+
+        [$handler, $record] = $this->createHandlerAndEntry($entryMeta, $instance, $attributeIndex, $isDeferred);
+
+        if ($isDeferred) {
+            $this->instanceRegistryDeferredHookManager->deferManualRegistration(
+                entry: $record,
+                deferRegisterUntilHook: $entryMeta->deferRegisterUntilHook,
+                activateEntry: $this->activateRuntimeEntry
+            );
+        } else {
+            $records[] = $record->register();
+            $this->entriesByInvokers[$handler] = $record;
+            $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
+        }
+    }
+
+    /**
+     * @param bool $isDeferred
+     * @return array{
+     *  RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, 
+     *  ($isDeferred is true ? DeferredHookEntryHandler : RuntimeRegistryHandlerEntry)
+     * }
+     */
+    private function createHandlerAndEntry(
+        InstanceHookMetadata $metadata,
+        object $instance,
+        int $attributeIndex,
+        bool $isDeferred = false
+    ): array {
+        $weakRef = \WeakReference::create($instance);
+        $hookKey = new HookKey(
+            class: (string) \spl_object_id($instance),
+            method: $metadata->targetName,
+            target: $metadata->target,
+            priority: $metadata->priority,
+            type: $metadata->type,
+            acceptedArgs: $metadata->acceptedArgs,
+            attributeIndex: $attributeIndex,
+        );
+        $handler = match ($metadata->target) {
+            'method' => new RuntimeInstanceHookInvoker(
+                instanceRef: $weakRef,
+                hookName: $metadata->hook,
+                priority: $metadata->priority,
+                method: $metadata->targetName,
+                visibility: $metadata->visibility,
+                type: $metadata->type,
+                acceptedArgs: $metadata->acceptedArgs,
+                executeIf: $metadata->executeIf,
+                hookPlanProvider: $this->provider,
+                executeIfParams: $metadata->executeIfParams,
+                hookArgNames: $metadata->hookArgNames,
+                once: $metadata->once,
+                onUnregisterDo: $metadata->onUnregisterDo,
+                onUnregisterDoParams: $metadata->onUnregisterDoParams,
+            ),
+            'property', 'property-hook' => new RuntimeInstancePropertyHookInvoker(
+                instanceRef: $weakRef,
+                hookName: $metadata->hook,
+                priority: $metadata->priority,
+                property: $metadata->targetName,
+                visibility: $metadata->visibility,
+                type: $metadata->type,
+                acceptedArgs: $metadata->acceptedArgs,
+                executeIf: $metadata->executeIf,
+                hookPlanProvider: $this->provider,
+                executeIfParams: $metadata->executeIfParams,
+                hookArgNames: $metadata->hookArgNames,
+                once: $metadata->once,
+                onUnregisterDo: $metadata->onUnregisterDo,
+                onUnregisterDoParams: $metadata->onUnregisterDoParams,
+            ),
+        };
+        $entry = match ($isDeferred) {
+            true => new DeferredHookEntryHandler(
+                hook: $metadata->hook,
+                handler: $handler,
+                type: $metadata->type,
+                priority: $metadata->priority,
+                acceptedArgs: $metadata->acceptedArgs,
+                tags: [],
+                registerIf: $metadata->registerIf,
+                registerIfParams: $metadata->registerIfParams,
+                executeIf: $metadata->executeIf,
+                executeIfParams: $metadata->executeIfParams,
+                once: $metadata->once,
+                onUnregisterDo: $metadata->onUnregisterDo,
+                onUnregisterDoParams: $metadata->onUnregisterDoParams,
+                key: $hookKey,
+                instance: $weakRef,
+            ),
+            default => new RuntimeRegistryHandlerEntry(
+                hook: $metadata->hook,
+                handler: $handler,
+                type: $metadata->type,
+                priority: $metadata->priority,
+                acceptedArgs: $metadata->acceptedArgs,
+                registerIf: $metadata->registerIf,
+                registerIfParams: $metadata->registerIfParams,
+                once: $metadata->once,
+                executeIf: $metadata->executeIf,
+                executeIfParams: $metadata->executeIfParams,
+                onUnregisterDo: $metadata->onUnregisterDo,
+                onUnregisterDoParams: $metadata->onUnregisterDoParams,
+                hookKey: $hookKey,
+                owner: $weakRef,
+            ),
+        };
+        $handler->setCleanupCallback($this->removeRuntimeHook);
+        return [$handler, $entry];
     }
 
     /**
@@ -697,12 +566,12 @@ class WPHooksInstanceRegistry
      * the callback never keeps the instance alive — only the record drop
      * touches it, and only when it still exists.
      * @internal
-     * @var (\Closure(RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, bool): void) $removeRuntimeHook
+     * @var (\Closure(RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, bool = false): void) $removeRuntimeHook
      */
     private \Closure $removeRuntimeHook {
         get {
             return $this->removeRuntimeHook ??= function (
-                RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker,
+                RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker,
                 bool $invokerDied = false,
             ): void {
                 if ($invokerDied) {
@@ -712,7 +581,7 @@ class WPHooksInstanceRegistry
                     $owner = $entry->owner?->get();
                     if ($owner !== null) $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                     $this->cleanUpInstance($entry);
-                    SharedUtils::isDevelopment() && Logger::warning(__CLASS__, "Entry Died: {$entry->invokerLabel}");
+                    SharedUtils::isDevelopment() && Logger::debug(__CLASS__, "Entry Died: {$entry->invokerLabel}");
                     return;
                 }
 
@@ -744,238 +613,7 @@ class WPHooksInstanceRegistry
             static fn(RuntimeRegistryHandlerEntry $record): bool => $record !== $entry,
         );
     }
-
-    /**
-     * Register an action hook manually for an owner object.
-     *
-     * Owner inference (when $owner is omitted):
-     *   - `[$object, 'method']` array callables → the object;
-     *   - first-class callables / bound closures → the bound `$this`;
-     *   - invokable objects → the object itself.
-     *
-     * The hook name, callback and executeIf closure may capture the
-     * surrounding scope directly — no container is involved on the runtime
-     * registry.
-     *
-     * @template T
-     * @template O
-     * @param string $hook Hook name.
-     * @param T $callback Callable invoked when the hook fires.
-     * @param int $priority Hook priority.
-     * @param int $acceptedArgs Number of accepted arguments.
-     * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
-     * @param bool $once remove self after any executeIf eval fire.
-     * @param string|\Closure|null $deferRegisterUntilHook Defer hook registration until certain hook fire
-     * @param O|null $owner Owning object (defaults to inference).
-     * @internal Manual registration, subject to change; prone to error and not compatible with weak reference
-     * @private
-     * @throws \RuntimeException when the owner cannot be inferred or the callback is not callable.
-     */
-    public function registerAction(
-        string $hook,
-        callable|array $callback,
-        int $priority = 10,
-        int $acceptedArgs = 1,
-        ?\Closure $executeIf = null,
-        bool $once = false,
-        ?\Closure $onUnregisterDo = null,
-        string|\Closure|null $deferRegisterUntilHook = null,
-        ?object $owner = null,
-    ): void {
-        if (!is_callable($callback)) {
-            $error = 'Cannot register action hook ' . $hook . ' with ' . 'priority' . (string) $priority . ' and ' . 'acceptedArgs' . (string) $acceptedArgs . ' — callback is not callable.';
-            Logger::error(self::class, $error);
-            throw new \RuntimeException($error);
-        }
-
-        $this->register(
-            type: 'action',
-            hook: $hook,
-            callback: $callback,
-            priority: $priority,
-            acceptedArgs: $acceptedArgs,
-            executeIf: $executeIf,
-            once: $once,
-            onUnregisterDo: $onUnregisterDo,
-            deferRegisterUntilHook: $deferRegisterUntilHook,
-            owner: $this->runtimeResolver->resolveOwner($callback, $owner),
-        );
-    }
-
-    /**
-     * Register a filter hook manually for an owner object.
-     *
-     * Semantics identical to {@see registerAction()} — the callback result is
-     * returned to the filter pipeline, and the original value passes through
-     * untouched when the handler (or its executeIf) fails.
-     *
-     * @template T
-     * @template O
-     * @param string $hook Hook name
-     * @param T $callback Callable invoked when the hook fires.
-     * @param int $priority Hook priority
-     * @param int $acceptedArgs Number of accepted arguments.
-     * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
-     * @param bool $once remove self after any executeIf eval fire.
-     * @param string|\Closure|null $deferRegisterUntilHook Defer hook registration until certain hook fire
-     * @param O $owner Owning object (defaults to inference).
-     * @internal Manual registration, subject to change; prone to error and not compatible with weak reference
-     * @private
-     * @throws \RuntimeException when the owner cannot be inferred or the callback is not callable.
-     */
-    public function registerFilter(
-        string $hook,
-        callable|array $callback,
-        int $priority = 10,
-        int $acceptedArgs = 1,
-        ?\Closure $executeIf = null,
-        ?\Closure $onUnregisterDo = null,
-        bool $once = false,
-        string|\Closure|null $deferRegisterUntilHook = null,
-        ?object $owner = null,
-    ): void {
-        if (!is_callable($callback)) {
-            $error = 'Cannot register filter hook ' . $hook . ' with ' . 'priority' . (string) $priority . ' and ' . 'acceptedArgs' . (string) $acceptedArgs . ' — callback is not callable.';
-            Logger::error(self::class, $error);
-            throw new \RuntimeException($error);
-        }
-
-        $this->register(
-            type: 'filter',
-            hook: $hook,
-            callback: $callback,
-            priority: $priority,
-            acceptedArgs: $acceptedArgs,
-            executeIf: $executeIf,
-            once: $once,
-            onUnregisterDo: $onUnregisterDo,
-            deferRegisterUntilHook: $deferRegisterUntilHook,
-            owner: $this->runtimeResolver->resolveOwner($callback, $owner),
-        );
-    }
-
-    /**
-     * Shared core for manual registration: wraps the callback in a
-     * RuntimeCallableHookInvoker, registers it with WordPress immediately
-     * and records it under the owner for lifetime-scoped unregistration.
-     *
-     * @template T
-     * @template O
-     * @param 'action'|'filter' $type 'action' or 'filter'.
-     * @param string $hook Hook name.
-     * @param T $callback Callable invoked when the hook fires.
-     * @param int $priority Hook priority.
-     * @param int $acceptedArgs Number of accepted arguments.
-     * @param \Closure|null $executeIf Optional gate: invoked directly, must return bool.
-     * @param bool $once remove self after any executeIf eval fire.
-     * @param string|\Closure|null $deferRegisterUntilHook Defer hook registration until certain hook fire
-     * @param O $owner Owning object (resolved by the caller).
-     *
-     * @throws \RuntimeException when the callback is not callable.
-     */
-    private function register(
-        string $type,
-        string $hook,
-        callable $callback,
-        int $priority,
-        int $acceptedArgs,
-        ?\Closure $executeIf,
-        ?\Closure $onUnregisterDo,
-        object $owner,
-        bool $once = false,
-        string|\Closure|null $deferRegisterUntilHook = null,
-    ): void {
-        if (!is_callable($callback)) {
-            $error = 'Cannot register ' . $type . ' hook ' . $hook . ' with ' . 'priority' . (string) $priority . ' and ' . 'acceptedArgs' . (string) $acceptedArgs . ' — callback is not callable.';
-            Logger::error(self::class, $error);
-            throw new \RuntimeException($error);
-        }
-
-        $existing = $this->weakRegistry[$owner] ?? [];
-        foreach ($existing as $record) {
-            if (
-                $record->hook === $hook
-                && ($record->callback ?? null) === $callback
-                && $record->priority === $priority
-            ) {
-                return;
-            }
-        }
-        $hookKey = new HookKey(
-            class: (string) \spl_object_id($owner),
-            method: '#manual-registration:' . $this->manualRegistrationIdentity($callback),
-            target: '#manual',
-            type: $type,
-            priority: $priority,
-            acceptedArgs: $acceptedArgs,
-        );
-
-        $handler = new RuntimeCallableHookInvoker(
-            callback: $callback,
-            hookName: $hook,
-            priority: $priority,
-            executeIf: $executeIf,
-            type: $type,
-            acceptedArgs: $acceptedArgs,
-            once: $once,
-            onUnregisterDo: $onUnregisterDo,
-        );
-        $record = new RuntimeRegistryHandlerEntry(
-            hook: $hook,
-            handler: $handler,
-            type: $type,
-            priority: $priority,
-            acceptedArgs: $acceptedArgs,
-            registerIf: null,
-            registerIfParams: [],
-            once: $once,
-            executeIf: $executeIf,
-            executeIfParams: [],
-            onUnregisterDo: $onUnregisterDo,
-            onUnregisterDoParams: [],
-            hookKey: $hookKey,
-            owner: \WeakReference::create($owner),
-            callback: $callback,
-        );
-        $this->entriesByInvokers[$handler] = $record;
-        $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
-        $handler->setCleanupCallback($this->removeRuntimeHook);
-
-        if ($deferRegisterUntilHook !== null) {
-            $this->instanceRegistryDeferredHookManager->deferManualUntilHook(
-                deferRegisterUntilHook: $deferRegisterUntilHook,
-                entry: $record->toDeferredEntryDTO(),
-                activateEntry: $this->activateRuntimeEntry
-            );
-            return;
-        }
-
-        $existing[] = $record->register();
-        $this->weakRegistry[$owner] = $existing;
-    }
-
-    /**
-     * Stable per-callback identity used to disambiguate manual registrations.
-     *
-     * Manual registrations share the same hook/type/priority/acceptedArgs and
-     * carry no class/method pair, so their HookKey needs a callback-derived
-     * fingerprint to stay unique inside the deferred pool.
-     *
-     * @param callable|array $callback Registered callback.
-     */
-    private function manualRegistrationIdentity(callable $callback): string
-    {
-        return match (true) {
-            is_array($callback) => (is_object($callback[0])
-                ? $callback[0]::class . '#' . (string) \spl_object_id($callback[0])
-                : (string) $callback[0]) . '::' . $callback[1],
-            is_string($callback) => $callback,
-            is_object($callback) => $callback::class . '#' . (string) \spl_object_id($callback),
-            default => 'callable',
-        };
-    }
 }
-
 
 /**
  * File-backed metadata cache for runtime-registered hook sites.
@@ -1017,7 +655,7 @@ class WPHooksInstanceObjectCache
     /** 
      * @var class@anonymous::class
      */
-    private ?object $cacheState {
+    protected ?object $cacheState {
         get {
             return $this->cacheState ??= new class($this->file) {
                 public private(set) bool $alreadyLoaded = false;

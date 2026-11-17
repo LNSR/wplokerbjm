@@ -4,13 +4,14 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HookProviderTrait, HandlerEntryUniqueKey};
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HandlerEntryUniqueKey};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, InstanceHookMetadata, HookKey};
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeCallableHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     RuntimeRegistryHandlerEntry,
     ContainerRegistryHandlerEntry
@@ -23,7 +24,7 @@ use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
 
 /**
  * @phpstan-import-type HookType from HookRegistration
- * @phpstan-import-type CallablePlan from HookProviderTrait
+ * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-import-type AvailaibleHandlerType from HandlerEntryTrait
  * @phpstan-type DeferredHookEntry array{
  *     hook: string,
@@ -42,7 +43,7 @@ use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
  *     key: HookKey,
  *     instance: WeakReference<object>|null,
  *     removeEntryIndexCallback: (\Closure(static $entry): void)|null,
- *     removeAutoSchedulerCallback: (\Closure(): void)|null,
+ *     removeAutoSchedulerCallback: (\Closure(static $entry): void)|null,
  * }>>
  */
 final class DeferredHookEntryHandler
@@ -67,10 +68,11 @@ final class DeferredHookEntryHandler
      * @param DeferredHookEntry['key'] $key
      * @param DeferredHookEntry['instance'] $instance Exclusive for @see WPHooksInstanceRegistry owner
      * @param DeferredHookEntry['removeEntryIndexCallback'] $removeEntryIndexCallback
+     * @param DeferredHookEntry['removeAutoSchedulerCallback'] $removeAutoSchedulerCallback
      */
     public function __construct(
         public readonly string $hook,
-        public readonly ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
+        public readonly ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
         public readonly string $type,
         public readonly int $priority,
         public readonly int $acceptedArgs,
@@ -91,11 +93,12 @@ final class DeferredHookEntryHandler
     public function __destruct()
     {
         \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
-        \is_callable($this->removeAutoSchedulerCallback) && ($this->removeAutoSchedulerCallback)();
+        \is_callable($this->removeAutoSchedulerCallback) && ($this->removeAutoSchedulerCallback)($this);
         SharedUtils::isDevelopment() && Logger::debug(__CLASS__, "Deferred entry destroyed; removing entry indexes: ", [
             'invokerLabel' => $this->handler->label,
-            'key' => $this->key->toString(),
         ]);
+        $this->removeAutoSchedulerCallback = null;
+        $this->removeEntryIndexCallback = null;
     }
 
     /** @param DeferredHookEntry['removeEntryIndexCallback'] $callback */
@@ -103,6 +106,8 @@ final class DeferredHookEntryHandler
     {
         $this->removeEntryIndexCallback = $callback;
     }
+
+    /** @param DeferredHookEntry['removeAutoSchedulerCallback'] $callback */
     public function setOnEntryRemovalRemoveSchedulerCallback(\Closure $callback): void
     {
         $this->removeAutoSchedulerCallback = $callback;

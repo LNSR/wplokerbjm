@@ -35,7 +35,7 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
             _VariadicHookService::class => $this->variadicHookService,
         ]);
         $this->container = $builder->build();
-        $this->planProvider = new WPHookPlanProvider();
+        $this->planProvider = new WPHookPlanProvider($this->container());
     }
 
     public function testPureVariadicHandlerForwardsEveryArgumentToVariadicExecuteIf(): void

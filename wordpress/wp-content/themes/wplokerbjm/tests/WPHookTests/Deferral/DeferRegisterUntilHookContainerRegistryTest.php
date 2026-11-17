@@ -201,6 +201,28 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
         self::assertSame(['immediate'], ExecuteIfActionService::$capturedValues);
     }
 
+    public function testActivationEarlierBeforeHookTriggerWillTriggerSchedulerUnregister(): void {
+        $registry = $this->createRegistry([
+            $this->action(
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
+                'defer_register_closure_trigger',
+                registerIf: static fn (): bool => true,
+                deferRegisterUntilHook: 'scheduler',
+            ),
+        ]);
+        $registry->initialize();
+
+        self::assertNull($this->findRegisteredHook('action', 'defer_register_closure_trigger'));
+        self::assertNotNull($this->findRegisteredHook('action', 'scheduler'));
+        $registry->activateDeferredByHook('defer_register_closure_trigger');
+        // manual activation remove deferRegisterUntilHook its scheduler
+        self::assertNull($this->findRegisteredHook('action', 'scheduler'));
+
+        do_action('defer_register_closure_trigger', 'dynamic');
+        self::assertSame(['dynamic'], ExecuteIfActionService::$capturedValues);
+    }
+
     /**
      * Build a registration array for an action hook.
      */

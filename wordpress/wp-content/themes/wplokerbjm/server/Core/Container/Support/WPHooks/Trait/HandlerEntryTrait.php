@@ -9,7 +9,6 @@ use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     ContainerLazyHookInvoker,
     ContainerLazyPropertyHookInvoker,
-    RuntimeCallableHookInvoker,
     RuntimeInstanceHookInvoker,
     RuntimeInstancePropertyHookInvoker
 };
@@ -24,7 +23,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
  * @mixin ContainerRegistryHandlerEntry&RuntimeRegistryHandlerEntry
- * @phpstan-type AvailaibleHandlerType ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeCallableHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker
+ * @phpstan-type AvailaibleHandlerType ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker
  * @template TShape
  */
 trait HandlerEntryTrait

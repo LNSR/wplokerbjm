@@ -7,10 +7,10 @@ namespace WPLokerBJM\Tests\WPHookTests\Registry;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstanceHookInvoker, RuntimeCallableHookInvoker, RuntimeInstancePropertyHookInvoker};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use \WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
@@ -34,7 +34,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         ]);
     }
 
-    // ── Basic registration ────────────────────────────────────────────
 
     public function testActionHookRegisteredAndFired(): void
     {
@@ -78,7 +77,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertSame('input_transformed', $result);
     }
 
-    // ── Multiple hooks on one instance ─────────────────────────────────
 
     public function testMultipleHooksOnSameInstance(): void
     {
@@ -133,7 +131,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertSame('iny', $fy);
     }
 
-    // ── Visibility ─────────────────────────────────────────────────────
 
     public function testProtectedMethodHook(): void
     {
@@ -172,7 +169,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertSame('hello_private_suffix', $result);
     }
 
-    // ── Unregistration ─────────────────────────────────────────────────
 
     public function testUnregisterRemovesHooks(): void
     {
@@ -202,7 +198,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertCount(1, $captured, 'Hook should not fire after unregistration');
     }
 
-    // ── Idempotency / guards ───────────────────────────────────────────
 
     public function testDoubleRegistrationIsNoOp(): void
     {
@@ -236,7 +231,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertTrue(true);
     }
 
-    // ── Static method skip ─────────────────────────────────────────────
 
     public function testStaticMethodSkipped(): void
     {
@@ -260,7 +254,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         );
     }
 
-    // ── Priority ───────────────────────────────────────────────────────
 
     public function testPriorityOnAction(): void
     {
@@ -293,7 +286,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertSame(5, $hook['priority']);
     }
 
-    // ── Error handling ─────────────────────────────────────────────────
 
     public function testFilterPassthroughOnError(): void
     {
@@ -329,7 +321,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertTrue(true, 'Exception should not propagate');
     }
 
-    // ── Accepted args ──────────────────────────────────────────────────
 
     public function testAcceptedArgsLimitsArguments(): void
     {
@@ -355,15 +346,14 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertSame(['a', 'b'], $captured[0]);
     }
 
-    // ── Separate registries ────────────────────────────────────────────
 
     public function testSeparateRegistriesAreIsolated(): void
     {
         $registryA = $this->container()->make(WPHooksInstanceRegistry::class, [
-            'provider' => new RuntimeWPHookProvider(null),
+            'provider' => new WPHookPlanProvider($this->container()),
         ]);
         $registryB = $this->container()->make(WPHooksInstanceRegistry::class, [
-            'provider' => new RuntimeWPHookProvider(null),
+            'provider' => new WPHookPlanProvider($this->container()),
         ]);
 
         $captured = [];
@@ -393,228 +383,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertCount(1, $captured);
     }
 
-    // ── Manual registration (registerAction / registerFilter) ─────────
-
-    public function testManualRegisterActionInfersOwnerFromArrayCallable(): void
-    {
-        $captured = [];
-
-        $owner = new class($captured) {
-            public function __construct(private array &$captured) {}
-
-            public function boot(string $value): void
-            {
-                $this->captured[] = $value;
-            }
-        };
-
-        $this->registry->registerAction(hook: 'rt_manual_action', callback: [$owner, 'boot']);
-
-        $registered = $this->findRegisteredHook('action', 'rt_manual_action');
-        $this->assertNotNull($registered);
-        $this->assertInstanceOf(RuntimeCallableHookInvoker::class, $registered['callable']);
-
-        do_action('rt_manual_action', 'manual');
-        $this->assertSame(['manual'], $captured);
-    }
-
-    public function testManualRegisterInfersOwnerFromFirstClassCallable(): void
-    {
-        $captured = [];
-
-        $owner = new class($captured) {
-            public function __construct(private array &$captured) {}
-
-            public function boot(string $value): void
-            {
-                $this->captured[] = $value;
-            }
-        };
-
-        $this->registry->registerAction(hook: 'rt_manual_first_class', callback: $owner->boot(...));
-
-        do_action('rt_manual_first_class', 'fc');
-        $this->assertSame(['fc'], $captured);
-    }
-
-    public function testExplicitOwnerWinsOverInference(): void
-    {
-        $captured = [];
-
-        $feature = new class($captured) {
-            public function __construct(private array &$captured) {}
-
-            public function warm(string $value): void
-            {
-                $this->captured[] = $value;
-            }
-        };
-
-        $cache = new class($captured) {
-            public function __construct(private array &$captured) {}
-
-            public function warm(string $value): void
-            {
-                $this->captured[] = $value;
-            }
-        };
-
-        // Explicit owner: $feature — even though the callback belongs to $cache.
-        $this->registry->registerAction(hook: 'rt_manual_owner', callback: [$cache, 'warm'], owner: $feature);
-
-        do_action('rt_manual_owner', 'explicit');
-        $this->assertSame(['explicit'], $captured);
-
-        // Unregister via the EXPLICIT owner — the hook must disappear.
-        $this->registry->unregisterHooksOn($feature);
-        $this->assertNull($this->findRegisteredHook('action', 'rt_manual_owner'));
-    }
-
-    public function testOwnerlessStaticClosureThrows(): void
-    {
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageIsOrContains('Cannot infer owner for hook registration — pass owner: explicitly.');
-
-        $this->registry->registerAction(
-            hook: 'rt_manual_no_owner',
-            callback: static fn(): string => 'noop',
-        );
-    }
-
-    public function testManualAndAttributeRegistrationMergeUnderOneOwner(): void
-    {
-        $captured = [];
-
-        $owner = new class($captured) {
-            public function __construct(private array &$captured) {}
-
-            #[Action(hook: 'rt_merge_attr', acceptedArgs: 1)]
-            public function fromAttribute(string $v): void
-            {
-                $this->captured[] = "attr:$v";
-            }
-
-            public function fromManual(string $v): void
-            {
-                $this->captured[] = "manual:$v";
-            }
-        };
-
-        // Manual registration FIRST, then attribute scan — order must not matter.
-        $this->registry->registerAction(hook: 'rt_merge_manual', callback: [$owner, 'fromManual']);
-        $this->registry->registerHooksOn($owner);
-
-        do_action('rt_merge_attr', 'a');
-        do_action('rt_merge_manual', 'm');
-        $this->assertSame(['attr:a', 'manual:m'], $captured);
-
-        // Unregistration removes BOTH owned hooks.
-        $this->registry->unregisterHooksOn($owner);
-        $this->assertNull($this->findRegisteredHook('action', 'rt_merge_attr'));
-        $this->assertNull($this->findRegisteredHook('action', 'rt_merge_manual'));
-    }
-
-    public function testManualRegistrationDeduplicatesIdenticalHookHandlerPriority(): void
-    {
-        $captured = [];
-
-        $owner = new class($captured) {
-            public function __construct(private array &$captured) {}
-
-            public function boot(string $v): void
-            {
-                $this->captured[] = $v;
-            }
-        };
-
-        $callback = [$owner, 'boot'];
-        $this->registry->registerAction(hook: 'rt_manual_dedupe', callback: $callback, priority: 10);
-        $this->registry->registerAction(hook: 'rt_manual_dedupe', callback: $callback, priority: 10);
-
-        do_action('rt_manual_dedupe', 'once');
-        $this->assertSame(['once'], $captured, 'Identical registration must fire exactly once');
-    }
-
-    public function testManualConditionGateControlsFiring(): void
-    {
-        $captured = [];
-
-        $owner = new class($captured) {
-            public function __construct(private array &$captured) {}
-
-            public function boot(string $v): void
-            {
-                $this->captured[] = $v;
-            }
-        };
-
-        // Condition true → fires.
-        $this->registry->registerAction(
-            hook: 'rt_manual_cond_true',
-            callback: [$owner, 'boot'],
-            executeIf: fn(): bool => true,
-        );
-        do_action('rt_manual_cond_true', 'yes');
-        $this->assertSame(['yes'], $captured);
-
-        // Condition false → skipped entirely.
-        $this->registry->registerAction(
-            hook: 'rt_manual_cond_false',
-            callback: [$owner, 'boot'],
-            executeIf: fn(): bool => false,
-        );
-        do_action('rt_manual_cond_false', 'no');
-        $this->assertSame(['yes'], $captured, 'Condition false must skip the hook');
-    }
-
-    public function testManualNonBoolConditionPassesFilterThrough(): void
-    {
-        $owner = new class {
-            public function transform(string $v): string
-            {
-                return $v . '_transformed';
-            }
-        };
-
-        $this->registry->registerFilter(
-            hook: 'rt_manual_cond_bad',
-            callback: [$owner, 'transform'],
-            executeIf: fn() => 'not-a-bool',
-        );
-
-        // Non-bool condition → RuntimeException caught → logged + passthrough.
-        $result = apply_filters('rt_manual_cond_bad', 'input');
-        $this->assertSame('input', $result);
-    }
-
-    public function testManualFilterPassthroughOnHandlerThrow(): void
-    {
-        $owner = new class {
-            public function transform(string $_v): string
-            {
-                throw new \RuntimeException('simulated manual failure');
-            }
-        };
-
-        $this->registry->registerFilter(hook: 'rt_manual_throw', callback: [$owner, 'transform']);
-
-        $result = apply_filters('rt_manual_throw', 'passthrough');
-        $this->assertSame('passthrough', $result);
-    }
-
-    public function testInvalidCallableThrowsAndLogs(): void
-    {
-        $owner = new class {
-            public function boot(): void {}
-        };
-
-        $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessageIsOrContains('callback is not callable');
-
-        $this->registry->registerAction(hook: 'rt_manual_invalid', callback: [$owner, 'missingMethod']);
-    }
-
-    // ── Closure support on the attribute path (hook / registerIf / executeIf) ────
 
     public function testClosureHookNameResolvedAndFires(): void
     {
@@ -762,7 +530,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertSame('original', $result);
     }
 
-    // ── RuntimeWPHookProvider dependency resolution ────
 
     public function testProviderResolvesExecuteIfContainerDependencies(): void
     {
@@ -839,7 +606,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertNotNull($this->findRegisteredHook('action', 'rt_provider_register_default_true'));
     }
 
-    // ── Runtime once (consume-on-any-evaluation) ──
 
     public function testOnceActionFiresOnceThenAutoRemoves(): void
     {
@@ -919,7 +685,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertSame('beta', $second);
     }
 
-    // ── Runtime registerUnderHook (deferRegisterUntilHook) ────
 
     public function testRegisterUnderHookDefersUntilTriggerFires(): void
     {
@@ -1112,7 +877,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertNull($this->findRegisteredHook('action', 'rt_deferred_swept_hook'));
     }
 
-    // ── Runtime instance-lifetime (GC-aware auto-cleanup) ────
 
     public function testInstanceDeathNukesActiveHooks(): void
     {
@@ -1160,7 +924,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertNull($this->findRegisteredHook('action', 'rt_lifetime_deferred'));
     }
 
-    // ── Property hook args (callable parameter names) ────
 
     public function testPropertyHookExecuteIfResolvesHookArgsByName(): void
     {
@@ -1206,7 +969,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertSame('no', apply_filters('rt_prop_invokable', 'no'));
     }
 
-    // ── Property hook args (getter pattern / live value) ────
 
     public function testPropertyHookGetterPatternResolvesHookArgs(): void
     {
@@ -1229,80 +991,6 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertSame('no', apply_filters('rt_prop_getter', 'no'));
     }
 
-    // ── Manual API: once + registerUnderHook ────
-
-    public function testManualRegisterActionWithOnceFiresOnceThenAutoRemoves(): void
-    {
-        $captured = [];
-        $owner = new class {};
-
-        $this->registry->registerAction(
-            'rt_manual_once',
-            static function (string $val) use (&$captured): void {
-                $captured[] = $val;
-            },
-            once: true,
-            owner: $owner,
-        );
-
-        $this->assertNotNull($this->findRegisteredHook('action', 'rt_manual_once'));
-
-        do_action('rt_manual_once', 'fired');
-        $this->assertSame(['fired'], $captured);
-
-        // Consumed → auto-removed.
-        $this->assertNull($this->findRegisteredHook('action', 'rt_manual_once'));
-
-        do_action('rt_manual_once', 'again');
-        $this->assertSame(['fired'], $captured);
-    }
-
-    public function testManualRegisterActionWithDeferRegisterUntilHook(): void
-    {
-        $captured = [];
-        $owner = new class {};
-
-        $this->registry->registerAction(
-            'rt_manual_deferred',
-            static function (string $val) use (&$captured): void {
-                $captured[] = $val;
-            },
-            deferRegisterUntilHook: 'rt_trigger',
-            owner: $owner,
-        );
-
-        // Not registered yet — waiting for the trigger hook.
-        $this->assertNull($this->findRegisteredHook('action', 'rt_manual_deferred'));
-
-        do_action('rt_trigger');
-
-        $this->assertNotNull($this->findRegisteredHook('action', 'rt_manual_deferred'));
-
-        do_action('rt_manual_deferred', 'fired');
-        $this->assertSame(['fired'], $captured);
-    }
-
-    public function testManualRegisterFilterWithOnceInterceptsOnce(): void
-    {
-        $owner = new class {};
-
-        $this->registry->registerFilter(
-            'rt_manual_once_filter',
-            static function (string $v): string {
-                return strtoupper($v);
-            },
-            once: true,
-            owner: $owner,
-        );
-
-        $this->assertSame('ALPHA', apply_filters('rt_manual_once_filter', 'alpha'));
-
-        $this->assertNull($this->findRegisteredHook('filter', 'rt_manual_once_filter'));
-
-        $this->assertSame('beta', apply_filters('rt_manual_once_filter', 'beta'));
-    }
-
-    // ── Anon self-registering getter pattern (PluginManagement) ───────
 
     public function testAnonSelfRegisteringGetterPatternInvokes(): void
     {
@@ -1450,7 +1138,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 }
 
 /**
- * Simple container service used to prove RuntimeWPHookProvider dependency
+ * Simple container service used to prove WPHookPlanProvider dependency
  * resolution on the runtime attribute path.
  */
 class RuntimeProviderFlagService

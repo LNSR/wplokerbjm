@@ -206,7 +206,7 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
         self::assertSame(1, $anon->runs);
     }
 
-    public function testDeferredActivationEarlierBeforeHookTriggerWillTriggerSchedulerUnregister(): void
+    public function testActivationEarlierBeforeHookTriggerWillTriggerSchedulerUnregister(): void
     {
         $anon = new class {
             public int $runs = 0;

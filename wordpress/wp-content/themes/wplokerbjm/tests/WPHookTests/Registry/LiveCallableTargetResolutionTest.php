@@ -6,7 +6,7 @@ namespace WPLokerBJM\Tests\WPHookTests\Registry;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\RuntimeWPHookProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\{
     ContainerRegistryHookTargetResolver,
     InstanceRegistryRuntimeHookResolver,
@@ -39,7 +39,7 @@ final class LiveCallableTargetResolutionTest extends WplokerbjmTestCase
     private function registry(): WPHooksInstanceRegistry
     {
         return $this->container()->make(WPHooksInstanceRegistry::class, [
-            'provider' => $this->container()->get(RuntimeWPHookProvider::class),
+            'provider' => $this->container()->get(WPHookPlanProvider::class),
             'cache' => new WPHooksInstanceObjectCache(),
             'queuedHooksCleaner' => $this->queuedHooksCleaner,
         ]);
