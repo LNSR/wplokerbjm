@@ -1,5 +1,7 @@
 <?php
+
 declare(strict_types=1);
+
 namespace WPLokerBJM\Core\Container\Definitions;
 
 use DI\Container;
@@ -56,7 +58,7 @@ class Core implements DefinitionProviderInterface
 
         $core = [
             QueuedHooksCleaner::class => \DI\autowire(QueuedHooksCleaner::class),
-            WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class),
+            WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             ContainerRegistryHookTargetResolver::class => \DI\autowire(ContainerRegistryHookTargetResolver::class),
             RuntimeWPHookProvider::class => \DI\autowire(RuntimeWPHookProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
@@ -82,7 +84,6 @@ class Core implements DefinitionProviderInterface
             ),
             ContainerRegistryDeferredHookManager::class => \DI\autowire(ContainerRegistryDeferredHookManager::class)->constructor(
                 \DI\get(WPHookPlanProvider::class),
-                \DI\get(ContainerInterface::class),
                 \DI\get(ContainerRegistryHookTargetResolver::class),
                 static fn() => new EntriesIndexer(),
             ),

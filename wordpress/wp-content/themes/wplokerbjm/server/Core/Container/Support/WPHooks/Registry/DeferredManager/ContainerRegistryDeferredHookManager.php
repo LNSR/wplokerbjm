@@ -44,13 +44,11 @@ class ContainerRegistryDeferredHookManager
 
     /**
      * @param WPHookPlanProvider  $planProvider Plan provider used for registerIf gates.
-     * @param ContainerInterface $container    Container used by gate closures.
      * @param ContainerRegistryHookTargetResolver $resolverTarget 
      * @param EntriesIndexer $entriesIndexer for fast lookup of matching entries
      */
     public function __construct(
         private WPHookPlanProvider $planProvider,
-        private ContainerInterface $container,
         private ContainerRegistryHookTargetResolver $resolverTarget = new ContainerRegistryHookTargetResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer()
     ) {}
@@ -430,7 +428,6 @@ class ContainerRegistryDeferredHookManager
             try {
                 $triggerHook = $this->planProvider->resolveHookName(
                     $registration->deferRegisterUntilHook,
-                    $this->container,
                     $registration->deferRegisterUntilHookParams,
                     $entry->handler->label
                 );
@@ -473,7 +470,6 @@ class ContainerRegistryDeferredHookManager
             $allowed = $this->planProvider->evaluateRegistrationGate(
                 $data->registerIf,
                 $data->registerIfParams ?? [],
-                $this->container,
                 $data->handler->label,
                 $data->key->class
             );

@@ -58,7 +58,7 @@ class EntriesIndexer
     /**
      * Remove hook entry indexes.
      *
-     * Mirrors {@see setIndexes()} exactly (same buckets, same keys) and drops
+     * Mirrors {@see self::setIndexes()} exactly (same buckets, same keys) and drops
      * emptied buckets so repeated register/unregister cycles never leak.
      *
      */

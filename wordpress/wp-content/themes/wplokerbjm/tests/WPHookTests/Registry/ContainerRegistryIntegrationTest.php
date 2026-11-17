@@ -154,7 +154,6 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
                     return $planProvider->evaluateRegistrationGate(
                         $r->registerIf,
                         $r->registerIfParams ?? [],
-                        $container,
                         $r->class . '::' . $r->method
                     );
                 } catch (\Throwable) {
@@ -444,7 +443,6 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
                 $allowed = $planProvider->evaluateRegistrationGate(
                     $reg->registerIf,
                     $reg->registerIfParams ?? [],
-                    $container,
                     $reg->class . '::' . $reg->method
                 );
                 if ($allowed !== true) {

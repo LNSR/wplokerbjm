@@ -311,20 +311,20 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
             public function onDeferred(): void {}
         };
 
-        $registry = fn(): WPHooksInstanceRegistry => $this->container()->make(WPHooksInstanceRegistry::class, [
+        $registry = $this->container()->make(WPHooksInstanceRegistry::class, [
             'cache' => $cache,
             'queuedHooksCleaner' => $this->queuedHooksCleaner,
         ]);
 
         $first = $factory();
-        $registry()->registerHooksOn($first);
+        $registry->registerHooksOn($first);
 
         self::assertNull($this->findRegisteredHook('action', 'defer_register_cache_hook'));
         self::assertNotNull($cache->get('DeferRegisterCacheHost', 'hooks'));
 
         // Cache-hit path — must not lose the flag.
         $second = $factory();
-        $registry()->registerHooksOn($second);
+        $registry->registerHooksOn($second);
 
         self::assertNull(
             $this->findRegisteredHook('action', 'defer_register_cache_hook'),
@@ -333,7 +333,7 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
 
         self::assertSame(
             1,
-            $registry()->activateDeferredByCallableInLiveInstance([$second, 'onDeferred']),
+            $registry->activateDeferredByCallableInLiveInstance([$second, 'onDeferred']),
         );
         self::assertNotNull($this->findRegisteredHook('action', 'defer_register_cache_hook'));
     }

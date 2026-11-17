@@ -53,6 +53,10 @@ trait HookProviderTrait
      */
     private \WeakMap $callablePlanCache { get => $this->callablePlanCache ??= new \WeakMap(); }
 
+    public function __construct(private readonly ?ContainerInterface $container = null) {
+
+    }
+
     /**
      * Build the resolution plan for a callable closure.
      *
@@ -232,7 +236,6 @@ trait HookProviderTrait
      */
     public function resolveHookName(
         string|\Closure $hook,
-        ?ContainerInterface $container = null,
         array $hookParams = [],
         string $label = '',
         ?object $instanceTarget = null
@@ -241,7 +244,7 @@ trait HookProviderTrait
             return $hook;
         }
 
-        $values = $this->resolveCallableParameters($hook, $hookParams, $container, $label, [], $instanceTarget);
+        $values = $this->resolveCallableParameters($hook, $hookParams, $label, [], $instanceTarget);
         $name = $hook(...$values);
 
         if (!is_string($name)) {
@@ -273,7 +276,6 @@ trait HookProviderTrait
     public function evaluateExecuteIf(
         ?\Closure $executeIf,
         array $executeIfParams,
-        ?ContainerInterface $container = null,
         string $label = '',
         object|null|string $targetClass = null,
         array $hookArgs = [],
@@ -304,7 +306,7 @@ trait HookProviderTrait
             }
         }
 
-        $values = $this->resolveCallableParameters($executeIf, $executeIfParams, $container, $label, $hookArgs, $targetInstance, $variadicHookArg);
+        $values = $this->resolveCallableParameters($executeIf, $executeIfParams, $label, $hookArgs, $targetInstance, $variadicHookArg);
         $allowed = $executeIf(...$values);
 
         if (!is_bool($allowed)) {
@@ -325,9 +327,8 @@ trait HookProviderTrait
     public function resolveOnUnregisterDo(
         ?\Closure $onUnregisterDo = null,
         array $onUnregisterDoParams = [],
-        ?ContainerInterface $container = null,
         string $label = '',
-        object|null|string $targetClass = null,
+        \WeakReference|null|string $targetClass = null,
     ): \Closure|null {
         if ($onUnregisterDo === null) {
             return null;
@@ -343,7 +344,7 @@ trait HookProviderTrait
             $targetClass = $targetClass::class;
         }
 
-        return function () use ($onUnregisterDo, $onUnregisterDoParams, $container, $label, $targetClass, $targetInstanceWeakRef): mixed {
+        return function () use ($onUnregisterDo, $onUnregisterDoParams, $label, $targetClass, $targetInstanceWeakRef): mixed {
             static $alreadyRun = false;
             if ($alreadyRun) return null;
             $alreadyRun = true;
@@ -351,7 +352,7 @@ trait HookProviderTrait
 
             try {
                 $onUnregisterDo = $this->bindToTarget($onUnregisterDo, $onUnregisterDoParams, $targetClass);
-                $values = $this->resolveCallableParameters($onUnregisterDo, $onUnregisterDoParams, $container, $label, [], $targetInstanceWeakRef?->get() ?? null);
+                $values = $this->resolveCallableParameters($onUnregisterDo, $onUnregisterDoParams, $label, [], $targetInstanceWeakRef?->get() ?? null);
 
                 return $onUnregisterDo(...$values);
             } catch (\Throwable $e) {
@@ -383,7 +384,6 @@ trait HookProviderTrait
     public function resolveTagCallable(
         \Closure $tagCallable,
         array $plan,
-        ?ContainerInterface $container = null,
         string $label = '',
         null|object|string $targetClass = null,
     ): array {
@@ -394,7 +394,7 @@ trait HookProviderTrait
         }
 
         $tagCallable = $this->bindToTarget($tagCallable, $plan, $targetClass);
-        $values = $this->resolveCallableParameters($tagCallable, $plan, $container, $label, [], $targetInstance);
+        $values = $this->resolveCallableParameters($tagCallable, $plan, $label, [], $targetInstance);
         $result = $tagCallable(...$values);
 
         if (!is_array($result)) {
@@ -423,7 +423,6 @@ trait HookProviderTrait
     public function evaluateRegistrationGate(
         ?\Closure $registerIf,
         array $registerIfParams,
-        ?ContainerInterface $container = null,
         string $label = '',
         null|object|string $targetClass = null,
     ): bool {
@@ -451,7 +450,7 @@ trait HookProviderTrait
             }
         }
 
-        $values = $this->resolveCallableParameters($registerIf, $registerIfParams, $container, $label, [], $targetInstance);
+        $values = $this->resolveCallableParameters($registerIf, $registerIfParams, $label, [], $targetInstance);
         $allowed = $registerIf(...$values);
 
         if (!is_bool($allowed)) {
@@ -522,7 +521,6 @@ trait HookProviderTrait
      */
     private function resolveCallableFallback(
         \Closure $callable,
-        ?ContainerInterface $container = null,
         string $label = ''
     ): array {
         $reflect = new ReflectionFunction($callable);
@@ -534,14 +532,14 @@ trait HookProviderTrait
 
             if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
                 $className = $reflect->getClosureScopeClass()->getName();
-                if ($container !== null && $container?->has($className)) {
-                    $values[] = $container?->get($className);
+                if ($this->container?->has($className)) {
+                    $values[] = $this->container?->get($className);
                     $resolved = true;
                 }
             } elseif ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
                 $className = $type->getName();
-                if ($container !== null && $container?->has($className)) {
-                    $values[] = $container?->get($className);
+                if ($this->container?->has($className)) {
+                    $values[] = $this->container?->get($className);
                     $resolved = true;
                 }
             }
@@ -577,7 +575,6 @@ trait HookProviderTrait
     private function resolveCallableParameters(
         \Closure $callable,
         array $plan,
-        ?ContainerInterface $container = null,
         string $label = '',
         array $hookArgs = [],
         ?object $instanceTarget = null,
@@ -585,7 +582,7 @@ trait HookProviderTrait
     ): array {
         $params = $plan['params'] ?? [];
 
-        if ($params === []) return $this->resolveCallableFallback($callable, $container, $label);
+        if ($params === []) return $this->resolveCallableFallback($callable, $label);
 
         $values = [];
         foreach ($params as $param) {
@@ -626,7 +623,7 @@ trait HookProviderTrait
                 continue;
             }
 
-            $values[] = $this->resolveCallableParam($param, $container, $label);
+            $values[] = $this->resolveCallableParam($param, $label);
         }
 
         return $values;
@@ -637,12 +634,12 @@ trait HookProviderTrait
      *
      * @throws RuntimeException when the parameter cannot be resolved
      */
-    private function resolveCallableParam(array $param, ?ContainerInterface $container = null, string $label = ''): mixed
+    private function resolveCallableParam(array $param, string $label = ''): mixed
     {
         $type = $param['type'] ?? null;
 
-        if (is_string($type) && $type !== '' && $container !== null && $container?->has($type)) {
-            return $container?->get($type);
+        if (is_string($type) && $type !== '' && $this->container !== null && $this->container->has($type)) {
+            return $this->container->get($type);
         }
 
         if (!empty($param['hasDefault'])) {

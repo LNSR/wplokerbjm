@@ -49,10 +49,10 @@ class DeferredHookTest extends WplokerbjmTestCase
         $builder->useAutowiring(true);
         $builder->useAttributes(false);
         $this->container = $builder->build();
-        $this->planProvider = new WPHookPlanProvider();
+        $this->planProvider = new WPHookPlanProvider($this->container);
         $this->targetResolver = new ContainerRegistryHookTargetResolver();
         $this->entriesIndexer = new EntriesIndexer();
-        $this->ContainerRegistryDeferredHookManager = new ContainerRegistryDeferredHookManager($this->planProvider, $this->container, $this->targetResolver, $this->entriesIndexer);
+        $this->ContainerRegistryDeferredHookManager = new ContainerRegistryDeferredHookManager($this->planProvider, $this->targetResolver, $this->entriesIndexer);
         $this->registry = new WPHooksContainerRegistry($this->container, [], $this->planProvider, $this->ContainerRegistryDeferredHookManager, $this->targetResolver, $this->queuedHooksCleaner, $this->entriesIndexer);
     }
 

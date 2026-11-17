@@ -255,7 +255,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
                 deferRegister: true,
                 executeIf: static fn (): bool => true,
                 registerIf: $gate,
-                registerIfParams: (new WPHookPlanProvider())->buildCallablePlan($gate)
+                registerIfParams: (new WPHookPlanProvider($this->container))->buildCallablePlan($gate)
             ),
         ];
 

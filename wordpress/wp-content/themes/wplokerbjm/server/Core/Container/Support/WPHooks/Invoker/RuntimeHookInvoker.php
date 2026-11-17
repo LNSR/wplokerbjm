@@ -54,7 +54,7 @@ trait RuntimeInstanceInvokerTrait
 
             if ($this->executeIf !== null) {
                 $allowed = $this->hookPlanProvider !== null
-                    ? $this->hookPlanProvider->evaluateRuntimeExecuteIf($this->executeIf, $this->executeIfParams, $this->label, $instance, $this->buildHookArgs($args), $this->variadicHookArgName())
+                    ? $this->hookPlanProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->label, $instance, $this->buildHookArgs($args), $this->variadicHookArgName())
                     : ($this->executeIf)();
                 if (!is_bool($allowed)) {
                     throw new \RuntimeException(
@@ -99,7 +99,7 @@ trait RuntimeInstanceInvokerTrait
     public function initOnUnregisterDoCallback(): void
     {
         if ($this->instanceRef->get() === null) return;
-        $this->onUnregisterDoCallback ??= $this->hookPlanProvider?->resolveRuntimeOnUnregisterDo(
+        $this->onUnregisterDoCallback ??= $this->hookPlanProvider?->resolveOnUnregisterDo(
             $this->onUnregisterDo,
             $this->onUnregisterDoParams,
             $this->label,

@@ -21,7 +21,7 @@ trait ContainerLazyHookInvokerTrait
 
     public function initOnUnregisterDoCallback(): void
     {
-        $this->onUnregisterDoCallback ??= $this->planProvider->resolveOnUnregisterDo($this->onUnregisterDo, $this->onUnregisterDoParams, $this->container, $this->label, $this->class);
+        $this->onUnregisterDoCallback ??= $this->planProvider->resolveOnUnregisterDo($this->onUnregisterDo, $this->onUnregisterDoParams, $this->label, $this->class);
     }
 
 
@@ -54,7 +54,6 @@ trait ContainerLazyHookInvokerTrait
                     $gatePassed = $this->planProvider->evaluateExecuteIf(
                         $this->executeIf,
                         $this->executeIfParams,
-                        $this->container,
                         $this->label,
                         $this->class,
                         $hookArgs,

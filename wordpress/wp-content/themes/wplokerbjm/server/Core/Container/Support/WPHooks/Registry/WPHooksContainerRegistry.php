@@ -670,7 +670,6 @@ class WPHooksContainerRegistry
             try {
                 $hookName = $this->planProvider->resolveHookName(
                     $registration->hook,
-                    $this->container,
                     $registration->hookParams,
                     $registration->class . '::' . $registration->method
                 );
@@ -689,7 +688,6 @@ class WPHooksContainerRegistry
                     $allowed = $this->planProvider->evaluateRegistrationGate(
                         $registration->registerIf,
                         $registration->registerIfParams,
-                        $this->container,
                         $registration->class . '::' . $registration->method,
                         $registration->class
                     );
@@ -717,7 +715,6 @@ class WPHooksContainerRegistry
                     $resolvedTags = $this->planProvider->resolveTagCallable(
                         $registration->tagCallable,
                         $registration->tagCallableParams ?? [],
-                        $this->container,
                         $registration->class . '::' . $registration->method,
                         $registration->class
                     );

@@ -231,7 +231,7 @@ abstract class WplokerbjmTestCase extends TestCase
     protected function createRegistry(array $registrations, ?ContainerInterface $container = null): WPHooksContainerRegistry
     {
         $container ??= $this->container();
-        $planProvider = new WPHookPlanProvider();
+        $planProvider = new WPHookPlanProvider($container ?? $this->container());
         $resolver = new ContainerRegistryHookTargetResolver();
         $entriesIndexer = new EntriesIndexer();
         $queuedHooksCleaner = new QueuedHooksCleaner();
@@ -241,7 +241,7 @@ abstract class WplokerbjmTestCase extends TestCase
             $container,
             $registrations,
             $planProvider,
-            new ContainerRegistryDeferredHookManager($planProvider, $container, $resolver, $entriesIndexer),
+            new ContainerRegistryDeferredHookManager($planProvider, $resolver, $entriesIndexer),
             $resolver,
             $queuedHooksCleaner,
             $entriesIndexer

@@ -27,6 +27,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker,
  * @phpstan-import-type CallablePlan from HookProviderTrait
  * @phpstan-import-type DeferredHookEntry from DeferredHookEntryHandler
  * @phpstan-import-type ActivateEntry from WPHooksContainerRegistry
+ * @phpstan-import-type ActivateRuntimeEntry from WPHooksInstanceRegistry
  * @template TKey
  * @phpstan-type IndexedHandler array<TKey, DeferredHookEntryHandler>
  * @mixin EntriesIndexer
@@ -62,7 +63,7 @@ trait DeferredHooksTrait
      * Registration gates are re-evaluated immediately before activation.
      *
      * @param list<TKey> $keys
-     * @param ActivateEntry $activateEntry Moves an accepted entry to the active pool.
+     * @param ActivateEntry&ActivateRuntimeEntry $activateEntry Moves an accepted entry to the active pool.
      * @return int Number of newly activated entries.
      */
     private function activateMatchingDeferredEntries(array $keys, callable $activateEntry): int

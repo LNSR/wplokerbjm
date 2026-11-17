@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager;
 
+use ActivateRuntimeEntry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     WPHooksInstanceRegistry,
     RuntimeRegistryHandlerEntry
@@ -67,7 +68,7 @@ class InstanceRegistryDeferredHookManager
      * before activation, so a `registerIf` that still rejects keeps them
      * parked for a later attempt.
      *
-     * @param callable(DeferredHookEntryHandler): bool $activateEntry
+     * @param ActivateRuntimeEntry $activateEntry
      * @return int Number of newly activated entries.
      */
     public function activateInstanceCallableDeferredEntries(object $instance, string $targetName, callable $activateEntry): int
@@ -101,7 +102,7 @@ class InstanceRegistryDeferredHookManager
     ): void {
         $triggerHook = $deferRegisterUntilHook;
         if ($triggerHook instanceof \Closure) {
-            $triggerHook = $this->provider->resolveRuntimeHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook instanceof \Closure ? $triggerHook : null), 'manual', $entry->instance?->get());
+            $triggerHook = $this->provider->resolveHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook instanceof \Closure ? $triggerHook : null), 'manual', $entry->instance?->get());
         }
 
         $this->addDeferred($entry);
@@ -150,6 +151,7 @@ class InstanceRegistryDeferredHookManager
      * one the entry simply sits in the pool until
      * {@see WPHooksInstanceRegistry::activateDeferredByCallableInLiveInstance()}
      * (or another deferred activation API) picks it up.
+     * @param ActivateRuntimeEntry $activateEntry
      */
     public function deferManualRegistration(
         DeferredHookEntryHandler $entry,
@@ -185,7 +187,7 @@ class InstanceRegistryDeferredHookManager
 
         try {
             $allowed = $this->provider !== null
-                ? $this->provider->evaluateRuntimeRegisterIf(
+                ? $this->provider->evaluateRegistrationGate(
                     $registerIf,
                     $data->registerIfParams ?? [],
                     $data->handler->label,
