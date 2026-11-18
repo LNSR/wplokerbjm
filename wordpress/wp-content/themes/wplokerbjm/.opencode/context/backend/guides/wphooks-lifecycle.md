@@ -1,3 +1,5 @@
+<!-- Context: backend/guides | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # WPHooks Lifecycle Guide
 
 **Purpose**: Trace discovery, registration, execution, activation, and teardown for attribute-based WordPress hooks.

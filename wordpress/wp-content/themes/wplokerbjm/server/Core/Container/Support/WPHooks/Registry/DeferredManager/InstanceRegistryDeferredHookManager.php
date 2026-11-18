@@ -31,15 +31,6 @@ class InstanceRegistryDeferredHookManager
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
     ) {}
 
-    public function unregisterInstanceMatchingDeferredEntries(object $instance): void
-    {
-        $this->unregisterMatchingDeferredEntries(
-            $this->entriesIndexer->byClass[(string) \spl_object_id($instance)] ?? [],
-            static fn(DeferredHookEntryHandler $data): bool => $data->instance->get() === $instance,
-        );
-        unset($this->entriesIndexer->byClass[(string) \spl_object_id($instance)]);
-    }
-
     /**
      * Remove deferred entries for one callable target of a live instance.
      *
@@ -88,6 +79,57 @@ class InstanceRegistryDeferredHookManager
         }
 
         return $this->activateMatchingDeferredEntries(array_values($keys), $activateEntry);
+    }
+
+    /**
+     * Activate every deferred entry owned by one live instance (all members).
+     *
+     * "Class-scoped" on the runtime path means the registration site of the
+     * given live object: runtime ownership is per instance (`spl_object_id`),
+     * so sibling instances of the same class stay untouched. Entries are
+     * re-gated through {@see gateDeferredActivation()} immediately before
+     * activation; a rejecting `registerIf` keeps them parked.
+     *
+     * @param ActivateRuntimeEntry $activateEntry
+     * @return int Number of newly activated entries.
+     */
+    public function activateInstanceClassDeferredEntries(object $instance, callable $activateEntry): int
+    {
+        $keys = [];
+        $instanceId = (string) \spl_object_id($instance);
+
+        foreach ($this->entriesIndexer->byClass[$instanceId] ?? [] as $key) {
+            $entry = $this->deferredHandlers[$key] ?? null;
+            if ($entry === null) continue;
+            if ($entry->instance?->get() !== $instance) {
+                unset($this->deferredHandlers[$key]);
+                continue;
+            }
+            $keys[$key] = $key;
+        }
+
+        return $this->activateMatchingDeferredEntries(array_values($keys), $activateEntry);
+    }
+
+    /**
+     * Remove every deferred entry owned by one live instance (all members).
+     *
+     * Counterpart of {@see activateInstanceClassDeferredEntries()}: the whole
+     * deferred scope of the instance is dropped, while already-active
+     * registrations are untouched.
+     *
+     * @return int Number of removed deferred entries.
+     */
+    public function unregisterInstanceClassDeferredEntries(object $instance): int
+    {
+        $before = \count($this->deferredHandlers);
+
+        $this->unregisterMatchingDeferredEntries(
+            $this->entriesIndexer->byClass[(string) \spl_object_id($instance)] ?? [],
+            static fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+        );
+
+        return $before - \count($this->deferredHandlers);
     }
 
     /**
@@ -145,8 +187,9 @@ class InstanceRegistryDeferredHookManager
         }, PHP_INT_MIN, 0);
 
         $entry->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
+            if (!\has_action($triggerHook, $cb, PHP_INT_MIN)) return;
             \remove_action($triggerHook, $cb, PHP_INT_MIN);
-            SharedUtils::isDevelopment() && Logger::debug(__CLASS__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
         });
     }
 
@@ -199,12 +242,12 @@ class InstanceRegistryDeferredHookManager
                 $owner,
             );
         } catch (\Throwable $e) {
-            Logger::warning(self::class, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate threw: ' . $e->getMessage());
+            Logger::warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate threw: ' . $e->getMessage());
             return false;
         }
 
         if (!$allowed) {
-            Logger::warning(self::class, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate returned false.');
+            Logger::warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate returned false.');
             return false;
         }
 

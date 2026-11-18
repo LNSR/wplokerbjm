@@ -74,8 +74,7 @@ trait HookInvokerTrait
         $this->isDestructed = true;
         if (is_callable($this->onUnregisterDoCallback)) ($this->onUnregisterDoCallback)();
         if (is_callable($this->removeCallback)) ($this->removeCallback)($this, true);
-        $this->onUnregisterDoCallback = null;
-        $this->removeCallback = null;
+        unset($this->onUnregisterDoCallback, $this->removeCallback);
     }
 
     /**
@@ -92,7 +91,7 @@ trait HookInvokerTrait
             $this->removed = true;
             ($this->removeCallback)($this);
         } catch (\Throwable $e) {
-            Logger::error(static::class, 'Error removing once-hook ' . $this->label . ': ', [
+            Logger::error(__METHOD__, 'Error removing once-hook ' . $this->label . ': ', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),

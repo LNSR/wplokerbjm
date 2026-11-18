@@ -1,3 +1,5 @@
+<!-- Context: backend/errors | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # Error: Hook Attribute on Magic Method
 
 **Purpose**: Fix the loud scanner failure when `#[Action]` / `#[Filter]` is placed on a magic method, plus related scanner contract notes.

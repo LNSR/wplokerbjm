@@ -11,7 +11,7 @@ use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use RankMath\SEO_Analysis\SEO_Analyzer;
 use RankMath\OpenGraph\Image;
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 
 /**
  * Rank Math
@@ -32,7 +32,7 @@ final class Rankmath implements PluginConfigInterface
 	#[Action('rank_math/loaded', once: true)]
 	private function boot(): void
 	{
-		\do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
+		\do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CLASS, self::class);
 	}
 
 	/**
@@ -95,7 +95,6 @@ final class Rankmath implements PluginConfigInterface
 		$query = isset($parts['query']) && $parts['query'] !== '' ? ('?' . $parts['query']) : '';
 		return rtrim($headless, '/') . $path . $query;
 	}
-
 
 	/**
 	 * Rewrite delete URL to use headless/frontend domain before Rank Math

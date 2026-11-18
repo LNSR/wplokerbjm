@@ -207,7 +207,7 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
         ], $container);
         $registry->initialize();
 
-        $this->assertCount(0, $this->registeredHooks(), 'Hooks for classes not in container should be skipped');
+        $this->assertSame([], $this->registeredApplicationHooks(), 'Hooks for classes not in container should be skipped');
 
         Terminal::out("  \033[0;32m•\033[0m Classes not in container → hook skipped with warning\n");
         Terminal::out("\n");

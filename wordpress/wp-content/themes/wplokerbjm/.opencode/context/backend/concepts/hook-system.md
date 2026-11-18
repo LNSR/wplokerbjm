@@ -1,3 +1,5 @@
+<!-- Context: backend/concepts | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # Concept: Hook System
 
 **Purpose**: Understand attribute-driven WordPress hook registration with lazy DI resolution

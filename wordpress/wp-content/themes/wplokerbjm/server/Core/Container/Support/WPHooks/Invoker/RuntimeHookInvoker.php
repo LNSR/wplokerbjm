@@ -57,7 +57,7 @@ trait RuntimeInstanceInvokerTrait
                     $gatePassed = $this->hookPlanProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->label, $instance, $this->buildHookArgs($args), $this->variadicHookArgName());
                 } catch (\RuntimeException $e) {
                     Logger::error(
-                        static::class,
+                        __METHOD__,
                         'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
                         [
                             'message' => $e->getMessage(),
@@ -71,19 +71,19 @@ trait RuntimeInstanceInvokerTrait
                 }
 
                 if (!$gatePassed) {
-                    Logger::info(static::class, 'Skipping hook ' . $this->label . ' — executeIf gate returned false.');
+                    Logger::info(__METHOD__, 'Skipping hook ' . $this->label . ' — executeIf gate returned false.');
                     return $this->filterPassthrough($args);
                 }
             }
 
             $result = $this->invokeOn($instance, ...$args);
 
-            SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
+            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
 
             return $result;
         } catch (\Throwable $e) {
             Logger::error(
-                static::class,
+                __METHOD__,
                 'Error invoking hook ' . $this->label . ': ',
                 [
                     'error' => $e->getMessage(),
@@ -126,7 +126,7 @@ trait RuntimeInstanceInvokerTrait
             ($this->removeCallback)($this);
         } catch (\Throwable $e) {
             Logger::error(
-                static::class,
+                __METHOD__,
                 'Error removing lifetime hook ' . $this->label . ': ',
                 [
                     'error' => $e->getMessage(),

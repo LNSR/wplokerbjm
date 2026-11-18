@@ -52,10 +52,71 @@ class WPHooksContainerRegistry
     protected \WeakMap $entriesByInvokers;
 
     public private(set) bool $initialized = false;
+    private bool $bridgeInitialized = false;
     /**
      * @var HandlerEntry['removeEntryIndexCallback']
      */
     private ?\Closure $destroyIndexes = null;
+
+    #region deferred handlers activation hooks
+    public const ACTIVATE_DEFERRED_BY_HOOK = 'wphooks_container_activate_deferred_by_hook';
+    public const ACTIVATE_DEFERRED_BY_CLASS = 'wphooks_container_activate_deferred_by_class';
+    public const ACTIVATE_DEFERRED_BY_CALLABLE = 'wphooks_container_activate_deferred_by_callable';
+    public const ACTIVATE_DEFERRED_BY_TAGS = 'wphooks_container_activate_deferred_by_tags';
+    public const ACTIVATE_DEFERRED_BY_NAMESPACE = 'wphooks_container_activate_deferred_by_namespace';
+    public const ACTIVATE_DEFERRED_BY_HOOK_PATTERN = 'wphooks_container_activate_deferred_by_hook_pattern';
+    public const ACTIVATE_DEFERRED_BY_TAG_PATTERN = 'wphooks_container_activate_deferred_by_tag_pattern';
+    #endregion
+
+    #region deferred handlers unregistration hooks
+    public const UNREGISTER_DEFERRED_BY_CALLABLE = 'wphooks_container_unregister_deferred_by_callable';
+    public const UNREGISTER_DEFERRED_BY_HOOK = 'wphooks_container_unregister_deferred_by_hook';
+    public const UNREGISTER_DEFERRED_BY_CLASS = 'wphooks_container_unregister_deferred_by_class';
+    public const UNREGISTER_DEFERRED_BY_NAMESPACE = 'wphooks_container_unregister_deferred_by_namespace';
+    public const UNREGISTER_DEFERRED_BY_TAGS = 'wphooks_container_unregister_deferred_by_tags';
+    public const UNREGISTER_DEFERRED_BY_HOOK_PATTERN = 'wphooks_container_unregister_deferred_by_hook_pattern';
+    public const UNREGISTER_DEFERRED_BY_TAG_PATTERN = 'wphooks_container_unregister_deferred_by_tag_pattern';
+    #endregion
+
+    #region active handlers unregistration hooks
+    public const UNREGISTER_BY_CALLABLE = 'wphooks_container_unregister_by_callable';
+    public const UNREGISTER_BY_HOOK = 'wphooks_container_unregister_by_hook';
+    public const UNREGISTER_BY_CLASS = 'wphooks_container_unregister_by_class';
+    public const UNREGISTER_BY_NAMESPACE = 'wphooks_container_unregister_by_namespace';
+    public const UNREGISTER_BY_TAGS = 'wphooks_container_unregister_by_tags';
+    public const UNREGISTER_BY_HOOK_PATTERN = 'wphooks_container_unregister_by_hook_pattern';
+    public const UNREGISTER_BY_TAG_PATTERN = 'wphooks_container_unregister_by_tag_pattern';
+    #endregion
+
+    /**
+     * Control-plane bridge: selector event name → registry method.
+     *
+     * @var array<string, non-empty-string>
+     */
+    public const EVENT_BRIDGE_HOOKS = [
+        self::ACTIVATE_DEFERRED_BY_HOOK => 'activateDeferredByHook',
+        self::ACTIVATE_DEFERRED_BY_CLASS => 'activateDeferredByClass',
+        self::ACTIVATE_DEFERRED_BY_CALLABLE => 'activateDeferredByCallable',
+        self::ACTIVATE_DEFERRED_BY_TAGS => 'activateDeferredByTags',
+        self::ACTIVATE_DEFERRED_BY_NAMESPACE => 'activateDeferredByNamespace',
+        self::ACTIVATE_DEFERRED_BY_HOOK_PATTERN => 'activateDeferredByHookPattern',
+        self::ACTIVATE_DEFERRED_BY_TAG_PATTERN => 'activateDeferredByTagPattern',
+        self::UNREGISTER_DEFERRED_BY_CALLABLE => 'unregisterDeferredByCallable',
+        self::UNREGISTER_DEFERRED_BY_HOOK => 'unregisterDeferredByHook',
+        self::UNREGISTER_DEFERRED_BY_CLASS => 'unregisterDeferredByClass',
+        self::UNREGISTER_DEFERRED_BY_NAMESPACE => 'unregisterDeferredByNamespace',
+        self::UNREGISTER_DEFERRED_BY_TAGS => 'unregisterDeferredByTags',
+        self::UNREGISTER_DEFERRED_BY_HOOK_PATTERN => 'unregisterDeferredByHookPattern',
+        self::UNREGISTER_DEFERRED_BY_TAG_PATTERN => 'unregisterDeferredByTagPattern',
+        self::UNREGISTER_BY_CALLABLE => 'unregisterByCallable',
+        self::UNREGISTER_BY_HOOK => 'unregisterByHook',
+        self::UNREGISTER_BY_CLASS => 'unregisterByClass',
+        self::UNREGISTER_BY_NAMESPACE => 'unregisterByNamespace',
+        self::UNREGISTER_BY_TAGS => 'unregisterByTags',
+        self::UNREGISTER_BY_HOOK_PATTERN => 'unregisterByHookPattern',
+        self::UNREGISTER_BY_TAG_PATTERN => 'unregisterByTagPattern',
+    ];
+
 
     /**
      * @param ContainerInterface $container
@@ -79,6 +140,49 @@ class WPHooksContainerRegistry
     }
 
     /**
+     * Register the control-plane event bridge with raw WordPress actions.
+     *
+     * Idempotent; {@see removeEventBridge()} clears the flag so the bridge can
+     * be re-registered. Array callables keep every listener removable.
+     *
+     * @internal Subject to change
+     * @private
+     */
+    public function initEventBridge(): void
+    {
+        if ($this->bridgeInitialized) {
+            return;
+        }
+        $this->bridgeInitialized = true;
+
+        foreach (self::EVENT_BRIDGE_HOOKS as $hook => $method) {
+            \add_action($hook, [$this, $method], 10, 1);
+        }
+    }
+
+    /**
+     * Remove the control-plane event bridge listeners.
+     *
+     * Flips `$bridgeInitialized` back to false so {@see initEventBridge()} can
+     * boot the bridge again — the pair is a reversible toggle, not a one-way
+     * switch.
+     *
+     * @internal Subject to change
+     * @private
+     */
+    public function removeEventBridge(): void
+    {
+        if (!$this->bridgeInitialized) {
+            return;
+        }
+        $this->bridgeInitialized = false;
+
+        foreach (self::EVENT_BRIDGE_HOOKS as $hook => $method) {
+            (void) \remove_action($hook, [$this, $method], 10);
+        }
+    }
+
+    /**
      * Register all stored hooks with WordPress via add_action/add_filter.
      * @api
      */
@@ -87,6 +191,7 @@ class WPHooksContainerRegistry
         if ($this->initialized) {
             return;
         }
+        $this->initEventBridge();
         $this->registerAll($this->hooksRegistration);
         foreach ($this->handlers as $key => $entry) {
             try {
@@ -96,7 +201,7 @@ class WPHooksContainerRegistry
                 $this->entriesByInvokers[$entry->handler] = $entry;
             } catch (\Exception $e) {
                 Logger::error(
-                    self::class,
+                    __METHOD__,
                     "Error registering {$entry->invokerLabel}",
                     [
                         'message' => $e->getMessage(),
@@ -597,7 +702,7 @@ class WPHooksContainerRegistry
                 $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes);
                 $entry->register();
                 $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
-                SharedUtils::isDevelopment() && Logger::debug(self::class, 'Activated deferred hook ' . $data->handler->label);
+                SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
                 return true;
             };
         }
@@ -612,22 +717,22 @@ class WPHooksContainerRegistry
     private \Closure $removeEntry {
         get {
             return $this->removeEntry ??= function (ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $invoker, bool $invokerDied = false): void {
+                $entry = $this->queuedHooksCleaner->getEntry($invoker) ?? $this->entriesByInvokers[$invoker] ?? null;
+                if ($entry === null) return;
+                $key = $entry->toUniqueKey();
+
                 if ($invokerDied) {
-                    $entry = $this->entriesByInvokers[$invoker] ?? null;
-                    if ($entry === null) return;
-                    $key = $entry->toUniqueKey();
                     $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                     unset($this->handlers[$key]);
-                    SharedUtils::isDevelopment() && Logger::debug(__CLASS__, "Entry Died: {$entry->invokerLabel}");
+                    unset($this->entriesByInvokers[$invoker]);
+                    SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
                     return;
                 };
 
-                $entry = $this->queuedHooksCleaner->getEntry($invoker);
-                if ($entry === null) return;
-                $uniqueKey = $entry->toUniqueKey();
-                if (!isset($this->handlers[$uniqueKey])) return;
 
-                $entry = $this->handlers[$uniqueKey];
+                if (!isset($this->handlers[$key])) return;
+
+                $entry = $this->handlers[$key];
                 /**
                  * Skip unregister hook while still in the same callback stack
                  * 
@@ -640,7 +745,7 @@ class WPHooksContainerRegistry
                  */
                 $this->queuedHooksCleaner->cleanUpCallback($invoker);
                 unset($this->entriesByInvokers[$entry->handler]);
-                unset($this->handlers[$uniqueKey]);
+                unset($this->handlers[$key]);
             };
         }
     }
@@ -659,7 +764,7 @@ class WPHooksContainerRegistry
 
             if (!$this->container->has($registration->class)) {
                 Logger::info(
-                    self::class,
+                    __METHOD__,
                     'Skipping hook ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
                         . ' — class not in container: ' . $registration->class
                 );
@@ -675,7 +780,7 @@ class WPHooksContainerRegistry
                 );
             } catch (\RuntimeException $e) {
                 Logger::error(
-                    self::class,
+                    __METHOD__,
                     'Skipping hook for ' . $registration->class . '::' . $registration->method
                         . ' on ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
                         . ' — ' . $e->getMessage()
@@ -693,14 +798,14 @@ class WPHooksContainerRegistry
                     );
                 } catch (\Throwable $e) {
                     Logger::error(
-                        self::class,
+                        __METHOD__,
                         'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
                     );
                     continue;
                 }
                 if (!$allowed) {
                     Logger::info(
-                        self::class,
+                        __METHOD__,
                         'Skipping hook ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — registerIf gate returned false.'
                     );
                     continue;
@@ -728,7 +833,7 @@ class WPHooksContainerRegistry
                 );
             } catch (\Throwable $e) {
                 Logger::error(
-                    self::class,
+                    __METHOD__,
                     'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
                 );
                 continue;

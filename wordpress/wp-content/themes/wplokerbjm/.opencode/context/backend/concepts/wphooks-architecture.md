@@ -1,3 +1,5 @@
+<!-- Context: backend/concepts | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # WPHooks Architecture
 
 **Purpose**: Explain how attribute-driven WordPress hooks move from reflection metadata to active or deferred handlers.

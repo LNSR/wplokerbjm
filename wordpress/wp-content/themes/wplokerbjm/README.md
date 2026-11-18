@@ -151,7 +151,7 @@ Every attribute parameter maps to a WordPress registration concern:
 #[Filter('posts_search', registerIf: static function (): bool {
     return \defined('GRAPHQL_REQUEST') && !is_admin() && !SharedUtils::isWPCLI();
 })]
-public function graphqlOnly(string $search, \WP_Query$wp_query): string
+public function graphqlOnly(string $search, \WP_Query $wp_query): string
 {
     return $search;
 }
@@ -164,7 +164,7 @@ public function graphqlOnly(string $search, \WP_Query$wp_query): string
 #[Filter('posts_search', executeIf: static function (\WP_Query $q): bool {
     return in_array(PostTypes::POST_TYPE_LOWONGAN, (array) $q->get('post_type'), true);
 })]
-public function lowonganOnly(string $search, \WP_Query$wp_query): string
+public function lowonganOnly(string $search, \WP_Query $wp_query): string
 {
     return $search;
 }
@@ -215,7 +215,7 @@ class SearchActivator
 
 ```php
 #[Filter('posts_search', 10, 2, deferRegisterUntilHook: 'init_graphql_request')]
-public function graphqlSearch(string $search, \WP_Query$wp_query): string
+public function graphqlSearch(string $search, \WP_Query $wp_query): string
 {
     // equivalent to add_action('init_graphql_request', fn () => add_filter('posts_search', ...))
 }
@@ -282,15 +282,15 @@ class SearchHooks
             return in_array(PostTypes::POST_TYPE_LOWONGAN, $postTypes, true);
         }
     )]
-    public function jobPostsSearchFilterImpl(string $search, \WP_Query$wp_query): string
+    public function jobPostsSearchFilterImpl(string $search, \WP_Query $wp_query): string
     {
         global $wpdb;
         $q = (string) ($wp_query->query_vars['s'] ?? '');
-        if ($wpdb === null \vert{}\vert{}$q === '') {
+        if ($wpdb === null || $q === '') {
             return $search;
         }
 
-        return JobQuery::buildPostsSearchSql($wpdb,$q);
+        return JobQuery::buildPostsSearchSql($wpdb, $q);
     }
 }
 
@@ -357,13 +357,63 @@ class ThemeProp
         if ($loggedIn) {$wpThemeData['wpGraphqlNonce'] = wp_create_nonce('wp_rest');
         }
 
-        Cache::set($cacheKey,$wpThemeData, 86400); // Cache for 1 day
+        Cache::set($cacheKey, $wpThemeData, 86400); // Cache for 1 day
 
         return $wpThemeData;
     }
 }
 
 ````
+
+### Registration & Lifecycle Flow
+
+```mermaid
+flowchart TD
+    subgraph DISCOVERY["1 · Discovery (cold cache)"]
+        A1["RobotLoader class index"] --> A2["WPHooksScanner::getHookRegistrations()"]
+        A2 --> A3["HookRegistration DTO<br/>plan · HookKey · attributeIndex"]
+        A3 --> A4[("WphooksRegistryContainerCache.php")]
+    end
+
+    subgraph CONTAINER["2 · Container path (Init)"]
+        B1["WPHooksContainerRegistry::initialize()"] --> B2{"registerIf gate"}
+        B2 -->|pass| B3["active pool"]
+        B2 -->|deferRegister| B4["ContainerRegistryDeferredHookManager"]
+        B3 --> B5["ContainerLazyHookInvoker → add_action / add_filter"]
+        B4 -.->|"deferRegisterUntilHook fires<br/>PHP_INT_MIN listener"| B6["activateDeferredBy*"]
+        B6 --> B5
+    end
+
+    subgraph RUNTIME["3 · Runtime path (existing object)"]
+        C1["WPHooksInstanceRegistry::registerHooksOn(object)"] --> C2["scan attributes<br/>plan via WPHookPlanProvider"]
+        C2 --> C3{"deferRegister?"}
+        C3 -->|no| C4["RuntimeInstanceHookInvoker<br/>owner = WeakReference"]
+        C3 -->|yes| C5["InstanceRegistryDeferredHookManager"]
+        C5 -.->|"trigger or callable-scoped API"| C6["activateDeferredByCallableInLiveInstance()"]
+        C6 --> C4
+        C4 --> B5
+        C4 -.->|"owner GC → next dispatch"| G1["consumeLifetimeAndClean()"]
+    end
+
+    subgraph DISPATCH["4 · Dispatch & teardown"]
+        B5 --> D1["WP_Hook::apply_filters() → invoker"]
+        D1 --> D2{"executeIf"}
+        D2 -->|false| D3["action: null<br/>filter: passthrough"]
+        D2 -->|true| D4["resolve service (container)<br/>or use owner (runtime)"]
+        D4 --> D5{"once?"}
+        D5 -->|yes| D6["consumed = true<br/>queue removal"]
+        D5 -->|no| D7["invoke handler"]
+        D6 --> D7
+        D7 --> D8["removal → invoker destructor"]
+        D6 -.->|"WP #64653: cannot remove mid-dispatch"| D9["QueuedHooksCleaner sweep<br/>(nested: outer entries wiped first)"]
+        D9 --> D8
+        D8 --> D10["onUnregisterDo → registry bookkeeping<br/>→ EntriesIndexer buckets released"]
+        G1 --> D8
+        E1["external remove_action / remove_all_*"] --> D8
+    end
+```
+
+**Legend**: solid arrows = active pool; dashed arrows = deferred activation or destructor-driven cleanup. `$wp_filter` is the only strong owner of an active invoker — see `project-intelligence/wphooks-ownership-raii.md`.
 
 ### How Hook Registration Works
 
@@ -414,11 +464,13 @@ If you are already inside the container, run PHPUnit directly:
 
 ### Test Files
 
-- `tests/CacheTest.php` — cache behavior and WordPress cache mocks.
+- `tests/WPHookTests/` — attribute-driven hook subsystem suite, split by domain: `Attribute/`, `Registration/`, `Execution/`, `Deferral/`, `Once/`, `Lifecycle/`, `Tag/`, `Registry/`, `Integration/`.
 - `tests/ContainerDefinitionsTest.php` — PHP-DI container definition coverage.
-- `tests/GraphQLTest.php` — GraphQL query and response behavior.
-- `tests/LowonganIngestOptionsRestTest.php` — ingest options REST endpoint behavior.
+- `tests/DependencyInjectorTest.php` — autowiring and dependency injection behavior.
+- `tests/CacheTest.php` — cache behavior and WordPress cache mocks.
 - `tests/LowonganIngestRestTest.php` — lowongan ingest REST endpoint behavior.
+
+The hook suite runs against the real WordPress hook engine (`wp-includes/plugin.php`). Set `WPLOKERBJM_WP_ROOT` when WordPress is not at the repository's default location.
 
 ## 📝 Development Notes
 
@@ -426,19 +478,3 @@ If you are already inside the container, run PHPUnit directly:
 >
 > - 🔗 See [Init.php](https://www.google.com/search?q=server/Core/Container/Init.php) and [PHP-DI Container](https://www.google.com/search?q=server/Core/Container.php) for WordPress event-driven hooks implementation
 > - 🔗 See the **Dependency Injection System** section above for details on automatic class discovery and registration
-
-## 📋 Mini Kanban Table
-
-| 📥 BACKLOG                                 | 📋 TODO | 🚧 IN PROGRESS | ✅ COMPLETED                                                           |
-| ------------------------------------------ | ------- | -------------- | ---------------------------------------------------------------------- |
-| 🗺️ Add Job Fair Page (map & event details) |         |                | ✅ Migrate from AlpineJS to Vue                                        |
-|                                            |         |                | ✅ Migrate from Vue to bare theme and Svelte for frontend `<body>` CSR |
-|                                            |         |                | ✅ Playwright Github Action microservice for SSG                       |
-|                                            |         |                | ✅ Client side bookmark system                                         |
-|                                            |         |                | ✅ Add SkeletonHTML for SEO efficiency                                 |
-|                                            |         |                | ✅ Virtualization listing for better performance                       |
-|                                            |         |                | ✅ Migrated to SvelteKit                                               |
-
-```
-
-```

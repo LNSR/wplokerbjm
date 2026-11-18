@@ -126,6 +126,7 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   │   │   ├── DefinitionProviderInterface.php
 │   │   │   └── Factories.php
 │   │   ├── Init.php           # Container initialization
+│   │   ├── WPLokerBJMContainer.php
 │   │   └── Support/           # Container support microframework
 │   │       ├── InstanceDiscovery/   # Autowiring & instance discovery
 │   │       │   ├── Abstract/
@@ -142,26 +143,33 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   │           ├── Invoker/
 │   │           │   ├── ContainerLazyHookInvoker.php
 │   │           │   └── RuntimeHookInvoker.php
+│   │           ├── Janitor/
+│   │           │   └── QueuedHooksCleaner.php
 │   │           ├── Provider/
-│   │           │   ├── RuntimeWPHookProvider.php
 │   │           │   └── WPHookPlanProvider.php
 │   │           ├── Registry/
+│   │           │   ├── DeferredManager/
+│   │           │   │   ├── ContainerRegistryDeferredHookManager.php
+│   │           │   │   ├── DeferredHookEntryHandler.php
+│   │           │   │   └── InstanceRegistryDeferredHookManager.php
+│   │           │   ├── Resolver/
+│   │           │   │   ├── ContainerRegistryHookTargetResolver.php
+│   │           │   │   └── InstanceRegistryRuntimeResolver.php
 │   │           │   ├── HookEntryHandlers.php
 │   │           │   ├── WPHooksContainerRegistry.php
 │   │           │   └── WPHooksInstanceRegistry.php
 │   │           ├── Trait/
 │   │           │   ├── DeferredHooksTrait.php
 │   │           │   ├── HandlerEntryTrait.php
+│   │           │   ├── HandlerEntryUniqueKey.php
 │   │           │   ├── HookInvokerTrait.php
-│   │           │   ├── HookProviderTrait.php
-│   │           │   └── HookScannerTrait.php
+│   │           │   ├── HookScannerTrait.php
+│   │           │   └── HookTargetResolverTrait.php
 │   │           ├── Utilities/
 │   │           │   ├── HookPattern.php
 │   │           │   └── Tag.php
 │   │           └── WPHooksScanner.php
-│   │   └── WPLokerBJMContainer.php
 │   └── Wordpress/             # Core WordPress logic and handlers
-│       ├── Abilities/
 │       ├── CachePurgeHandler.php  # Cache purge handling
 │       ├── Cron/              # Cron job management
 │       │   ├── Posts/
@@ -184,8 +192,10 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │       │           └── WPGraphQL.php
 │       ├── Redirect/
 │       │   └── RedirectHooks.php
-│       └── Theme/             # Theme-specific functionality
-│           └── ThemeHooks.php # Theme hooks
+│       ├── Theme/             # Theme-specific functionality
+│       │   └── ThemeHooks.php # Theme hooks
+│       └── Utilities/
+│           └── WPCookieInformationsUtils.php
 ├── Factories/                 # Factory classes
 │   └── JobDataFactory.php
 ├── Models/                    # Data models and schema definitions
@@ -195,7 +205,6 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │       └── Taxonomies.php
 ├── Presenters/                # Page presenters (provide initial data for view render)
 │   ├── Header/
-│   │   ├── Components/
 │   │   └── HeadersComponents.php
 │   └── Page/
 │       ├── Homepage/
@@ -203,7 +212,6 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │       │   │   └── SearchForm.php
 │       │   └── HomepageComponents.php
 │       └── JobDetail/
-│           ├── Components/
 │           └── JobDetailComponents.php
 ├── QueryBuilders/             # Query builder classes
 │   ├── JobQuery.php
@@ -213,6 +221,9 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   ├── JobRepository.php
 │   └── TaxonomyRepository.php
 ├── Services/                  # Business logic/services
+│   ├── Auth/
+│   │   └── JWT/
+│   │       └── JWTService.php
 │   ├── GraphQL/               # GraphQL services
 │   │   ├── ETag/
 │   │   │   └── WPGraphQLETag.php
@@ -220,7 +231,6 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   │   ├── GraphQLThemeData.php
 │   │   └── Hooks/
 │   │       ├── HTTP/
-│   │       │   ├── BootGraphQLRequest.php
 │   │       │   ├── GraphQLHeadersPolicy.php
 │   │       │   └── GraphQLResponse.php
 │   │       └── Search/
@@ -230,12 +240,17 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   │       └── LowonganIngestService.php
 │   ├── Schema/                # Schema services
 │   │   └── SEO/
-│   │       └── JobSchemaOrg.php
+│   │       └── JobSchemaBuilder.php
+│   ├── SEO/                   # SEO integrations
+│   │   ├── JobSchemaService.php
+│   │   └── RankMathHeadService.php
 │   └── WebHooks/              # Webhook integrations
 │       └── CloudflareCachePurger.php
 ├── Shared/                    # Shared utilities and services
 │   ├── Cache/                 # Caching utilities
-│   │   └── Cache.php
+│   │   ├── Cache.php
+│   │   ├── CacheKey.php
+│   │   └── CacheRegistry.php
 │   ├── Log/                   # Logging utilities
 │   │   └── Logger.php
 │   └── Utilities/             # General utilities
@@ -260,10 +275,11 @@ wordpress/wp-content/themes/wplokerbjm/server/
     │   └── Resolvers/         # GraphQL resolvers
     │       ├── Auth/
     │       │   └── JWTDataResolver.php
+    │       ├── Job/
+    │       │   ├── JobsDataResolver.php
+    │       │   └── TaxonomyResolver.php
     │       ├── SEO/
     │       │   └── SEOjobsResolver.php
-    │       ├── JobsDataResolver.php
-    │       ├── TaxonomyResolver.php
     │       └── ThemeDataResolver.php
     └── REST/                  # REST layer
         ├── Controllers/       # REST controllers

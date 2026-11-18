@@ -40,8 +40,10 @@ trait HookTargetResolverTrait
      *
      * @var \WeakMap<object, array{class-string, callable-string}>
      */
-    private \WeakMap $callableTargetCache {
-        get => $this->callableTargetCache ??= new \WeakMap();
+    private \WeakMap $callableTargetCache;
+
+    public function __construct() {
+        $this->callableTargetCache = new \WeakMap();
     }
 
     /**
@@ -148,7 +150,7 @@ trait HookTargetResolverTrait
                 foreach ($refClass->getProperties() as $property) {
                     if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
                         Logger::info(
-                            "WPHooksContainerRegistry: ",
+                            __METHOD__,
                             "Anon class without extending ModuleClassHookMetadata, it's recommended to use 'ModuleClassHookMetadata'." . $refClass->getName() . "::" . $property->getName()
                         );
                         return [$refClass->getName(), $property->getName()];

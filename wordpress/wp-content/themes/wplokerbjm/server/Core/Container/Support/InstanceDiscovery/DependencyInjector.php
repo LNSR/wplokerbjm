@@ -442,16 +442,17 @@ class PlanCache
 
     public function __construct(
         public private(set) string $cacheLocation,
+        public private(set) bool $forceNoCache = false
     ) {}
 
     public function __destruct()
     {
         try {
-            if (! $this->isDirty) return;
+            if (!$this->isDirty || $this->forceNoCache) return;
 
             $this->flushPlansToCache();
         } catch (\Throwable $e) {
-            Logger::error(__CLASS__, "Unable to write dependency injector cache", [
+            Logger::error(__METHOD__, "Unable to write dependency injector cache", [
                 'message' => $e->getMessage(),
                 'stack_trace' => $e->getTraceAsString()
             ]);

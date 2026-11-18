@@ -8,6 +8,8 @@ use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 
 /**
  * Centralized cache purge when posts, meta, terms, or status change.
@@ -45,7 +47,7 @@ class CachePurgeHandler
 
                 public function __invoke(): void
                 {
-                    do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $this);
+                    do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $this);
                 }
 
                 #[Action('wp_after_insert_post', 10, 4)]
@@ -117,7 +119,7 @@ class CachePurgeHandler
                 if ($alreadyRun) return;
                 $alreadyRun = true;
                 
-                do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
+                do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this, $__propertyName]);
                 try {
                     Cache::deleteMultiple([
                         CacheKey::CAROUSEL_JOBS,

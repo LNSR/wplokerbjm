@@ -11,8 +11,8 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use WP_User;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
-use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryHookEvent;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations\LiteSpeedGraphQLIntegration;
 use WPLokerBJM\Services\GraphQL\ETag\WPGraphQLETag;
 use WPLokerBJM\Transport\GraphQL\Registration\GraphQLRegistration;
@@ -52,8 +52,8 @@ final class GraphQLHeadersPolicy
              */
             \remove_all_filters('graphql_response_headers_to_send', \PHP_INT_MAX);
             if (!\is_user_logged_in()) return;
-            do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [__CLASS__, 'disableGraphQLNocacheHeader']);
-            do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CALLABLE, [__CLASS__, 'applyCachePolicy']);
+            do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CALLABLE, [__CLASS__, 'disableGraphQLNocacheHeader']);
+            do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CALLABLE, [__CLASS__, 'applyCachePolicy']);
         }
     )]
     public function modifyHeaderGraphQL(array $headers): array

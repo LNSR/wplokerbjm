@@ -94,7 +94,7 @@ class DynamicHookTest extends WplokerbjmTestCase
         $registry->initialize();
 
         // The registration was skipped — nothing was registered at all.
-        self::assertSame([], $this->registeredHooks());
+        self::assertSame([], $this->registeredApplicationHooks());
 
         do_action('42', 'nope');
         self::assertSame([], DynamicHookService::$capturedValues);
@@ -111,7 +111,7 @@ class DynamicHookTest extends WplokerbjmTestCase
         ], $this->container);
         $registry->initialize();
 
-        self::assertSame([], $this->registeredHooks());
+        self::assertSame([], $this->registeredApplicationHooks());
 
         do_action('never_registered', 'nope');
         self::assertSame([], DynamicHookService::$capturedValues);

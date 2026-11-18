@@ -61,7 +61,7 @@ trait ContainerLazyHookInvokerTrait
                     );
                 } catch (\RuntimeException $e) {
                     Logger::error(
-                        static::class,
+                        __METHOD__,
                         'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
                         [
                             'message' => $e->getMessage(),
@@ -76,7 +76,7 @@ trait ContainerLazyHookInvokerTrait
 
                 if (!$gatePassed) {
                     Logger::info(
-                        static::class,
+                        __METHOD__,
                         'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
                     );
                     return $this->filterPassthrough($args);
@@ -86,10 +86,10 @@ trait ContainerLazyHookInvokerTrait
             $instance = $this->container->get($this->class);
             $result = $this->invokeOn($instance, ...$args);
 
-            SharedUtils::isDevelopment() && Logger::debug(static::class, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
+            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
             return $result;
         } catch (\Throwable $e) {
-            Logger::error(static::class, "Error invoking hook {$this->label}: ", [
+            Logger::error(__METHOD__, "Error invoking hook {$this->label}: ", [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),

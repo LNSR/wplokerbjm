@@ -220,7 +220,7 @@ class WPHookPlanProvider
                     return $this->callablePlanCache[$property] ??= $this->callablePlan($value);
                 }
             } catch (ReflectionException $e) {
-                Logger::error(static::class, 'Error getting property value', [
+                Logger::error(__METHOD__, 'Error getting property value', [
                     'message' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                 ]);
@@ -377,7 +377,7 @@ class WPHookPlanProvider
 
                 return $onUnregisterDo(...$values);
             } catch (\Throwable $e) {
-                Logger::error(self::class, 'Failed to execute onUnregisterDo', [
+                Logger::error(__METHOD__, 'Failed to execute onUnregisterDo', [
                     'message' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                     'file' => $e->getFile(),

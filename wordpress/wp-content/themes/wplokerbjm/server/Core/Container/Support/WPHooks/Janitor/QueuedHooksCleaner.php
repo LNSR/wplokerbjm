@@ -36,6 +36,7 @@ class QueuedHooksCleaner
     public function addContainerRegistryItsEntries(array $entries): void
     {
         foreach ($entries as $entry) {
+            if ($entry->handler === null || !$entry->registered) continue;
             if (!($entry->handler?->once ?? false)) continue;
             $this->entries[$entry->handler] = $entry;
         }
@@ -45,14 +46,14 @@ class QueuedHooksCleaner
     public function addRuntimeRegistryItsEntries(array $entries): void
     {
         foreach ($entries as $entry) {
-            if ($entry->handler === null) continue;
+            if ($entry->handler === null || !$entry->registered) continue;
             $this->entries[$entry->handler] = $entry;
         }
     }
 
     public function immediatelyScheduleRemove(ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry $entry): void
     {
-        if ($entry->handler === null) return;
+        if ($entry->handler === null || !$entry->registered) return;
         $this->entries[$entry->handler] = $entry;
         $this->cleanUpCallback($entry->handler);
     }
@@ -154,6 +155,7 @@ class QueuedHooksCleaner
                         'CleanedAtInvokersLabel' => $invoker?->label
                             ? "via {$invoker?->label} (" . ($invoker?->isDestructed ? 'via destructor' : 'via cleanup') . ")"
                             : 'all-hook scheduler',
+                        'unregistrationFailureCount' => $entry->unregistrationFailureCount,
                         'CurrentHookContext' => \current_filter(),
                         'resultUnregistration' => $result,
                     ]);

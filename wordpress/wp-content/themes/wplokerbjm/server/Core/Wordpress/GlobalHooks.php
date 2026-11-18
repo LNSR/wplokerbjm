@@ -6,6 +6,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\WPLokerBJMBootstrap;
 
 /*======================================================================
@@ -79,7 +80,7 @@ class HTTPHooks
     )]
     public function setRemoteAddr($pluginPath): void
     {
-        \do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
+        \do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
 
         if (isset($_SERVER['HTTP_CF_CONNECTING_IP'])) {
             $_SERVER['REMOTE_ADDR'] = $_SERVER['HTTP_CF_CONNECTING_IP'];

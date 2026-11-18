@@ -94,11 +94,10 @@ final class DeferredHookEntryHandler
     {
         \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
         \is_callable($this->removeAutoSchedulerCallback) && ($this->removeAutoSchedulerCallback)($this);
-        SharedUtils::isDevelopment() && Logger::debug(__CLASS__, "Deferred entry destroyed; removing entry indexes: ", [
+        SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Deferred entry destroyed; removing entry indexes: ", [
             'invokerLabel' => $this->handler->label,
         ]);
-        $this->removeAutoSchedulerCallback = null;
-        $this->removeEntryIndexCallback = null;
+        unset($this->removeEntryIndexCallback, $this->removeAutoSchedulerCallback);
     }
 
     /** @param DeferredHookEntry['removeEntryIndexCallback'] $callback */

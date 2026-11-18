@@ -10,8 +10,8 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
 use WPLokerBJM\Shared\Utilities\{SharedUtils};
 use WP_User;
-use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
-use WPLokerBJM\Core\Wordpress\InstanceRuntimeRegistryHookEvent;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations\LiteSpeedGraphQLIntegration;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\Integrations\LitespeedIntegrationCommands;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\WPRestJWTHooks;
@@ -31,11 +31,10 @@ final class WPGraphQL implements PluginConfigInterface
         return PluginList::WpGraphql->isActive();
     }
 
-
     #[Action('graphql_init', once: true)]
     private function boot(): void
     {
-        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_TAGS, ['graphql']);
+        do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_TAGS, ['graphql']);
 
         $modules = [
             $this->graphQlPluginSettings,
@@ -43,7 +42,7 @@ final class WPGraphQL implements PluginConfigInterface
         ];
 
         foreach ($modules as $module) {
-            do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $module);
+            do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $module);
         }
     }
     
@@ -98,7 +97,6 @@ final class WPGraphQL implements PluginConfigInterface
 
                 #[Inject([JWTService::class, 'injectJwtFromCookie'], lazy: true)]
                 private \Closure $injectJwtFromCookie;
-
 
                 /**
                  * Unified init request handler: checks ETag cache before performing auth.

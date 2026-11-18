@@ -4,7 +4,8 @@ namespace WPLokerBJM\Core\Wordpress\Plugins;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Wordpress\{ContainerRegistryHookEvent, InstanceRuntimeRegistryHookEvent};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\{
     WPGraphQL\WPGraphQL,
@@ -58,7 +59,6 @@ enum PluginList: string
     }
 }
 
-
 /* ==========================================================================
    INTERFACE CONFIG
    ========================================================================== */
@@ -100,16 +100,16 @@ class PluginManager
     })]
     private function boot(string $pluginPath): void
     {
-        do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
+        do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
 
         $activeCount = $this->unregisterInactivePluginHooks();
         if ($activeCount === 0) {
-            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
-            do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            do_action(WPHooksContainerRegistry::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
+            do_action(WPHooksContainerRegistry::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
             return;
         }
-        do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, self::class);
-        do_action(InstanceRuntimeRegistryHookEvent::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
+        do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CLASS, self::class);
+        do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
     }
 
     /**
@@ -127,8 +127,8 @@ class PluginManager
                 continue;
             }
             Logger::warning("Plugin status", $integrationClass . ' is inactive');
-            do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, $integrationClass);
-            do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CLASS, $integrationClass);
+            do_action(WPHooksContainerRegistry::UNREGISTER_BY_CLASS, $integrationClass);
+            do_action(WPHooksContainerRegistry::UNREGISTER_DEFERRED_BY_CLASS, $integrationClass);
         }
         return $activeCount;
     }
@@ -163,8 +163,8 @@ class PluginManager
             if ($pluginKey !== false) {
                 unset($plugins[$pluginKey]);
                 if ($alreadyUnregistred) break;
-                do_action(ContainerRegistryHookEvent::UNREGISTER_BY_CLASS, WPGraphQL::class);
-                do_action(ContainerRegistryHookEvent::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
+                do_action(WPHooksContainerRegistry::UNREGISTER_BY_CLASS, WPGraphQL::class);
+                do_action(WPHooksContainerRegistry::UNREGISTER_DEFERRED_BY_CLASS, WPGraphQL::class);
                 $alreadyUnregistred = true;
             }
         }
@@ -229,7 +229,6 @@ class PluginManager
 
     #endregion
 
-
     #region filter hooks sequence
     /**
      * activation hooks steps
@@ -252,7 +251,6 @@ class PluginManager
                     ];
                     return $this->filteredPlugins($plugins, $pluginsToDisable);
                 }
-
 
                 /**
                  * Temporarily disable specific plugins if simulating production environment on local machine.
@@ -288,7 +286,6 @@ class PluginManager
                     }
                     return $plugins;
                 }
-
 
                 /**
 

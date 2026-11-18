@@ -147,6 +147,30 @@ abstract class WplokerbjmTestCase extends TestCase
     }
 
     /**
+     * Registered hooks minus the control-plane event bridges.
+     *
+     * Both registries expose their selector APIs through raw WordPress events
+     * (booted by `initialize()` / first `registerHooksOn()`). Those listeners
+     * are infrastructure, not application registrations, so assertions about
+     * "nothing was registered" should use this view.
+     *
+     * @return list<array{hook: string, callable: callable, priority: int, acceptedArgs: int}>
+     */
+    protected function registeredApplicationHooks(): array
+    {
+        static $bridgeHooks = null;
+        $bridgeHooks ??= [
+            ...\array_keys(WPHooksContainerRegistry::EVENT_BRIDGE_HOOKS),
+            ...\array_keys(WPHooksInstanceRegistry::EVENT_BRIDGE_HOOKS),
+        ];
+
+        return \array_values(\array_filter(
+            $this->registeredHooks(),
+            static fn(array $registered): bool => !\in_array($registered['hook'], $bridgeHooks, true),
+        ));
+    }
+
+    /**
      * Find the first registered callback for the given hook name.
      *
      * The `$type` parameter is kept for call-site compatibility; the real

@@ -415,8 +415,9 @@ class ContainerRegistryDeferredHookManager
         }, PHP_INT_MIN, 0);
 
         $this->deferredHandlers[$key]->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
-            remove_action($triggerHook, $cb, PHP_INT_MIN);
-            SharedUtils::isDevelopment() && Logger::debug(__CLASS__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+            if (!\has_action($triggerHook, $cb, PHP_INT_MIN)) return;
+            \remove_action($triggerHook, $cb, PHP_INT_MIN);
+            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
         });
     }
 
@@ -436,7 +437,7 @@ class ContainerRegistryDeferredHookManager
                 );
             } catch (\RuntimeException $e) {
                 Logger::error(
-                    self::class,
+                    __METHOD__,
                     'Skipping hook for: ' . $entry->handler->label,
                     [
                         'message' => $e->getMessage(),
@@ -478,7 +479,7 @@ class ContainerRegistryDeferredHookManager
             );
         } catch (\Throwable $e) {
             Logger::error(
-                self::class,
+                __METHOD__,
                 'Skipping deferred hook activation: ' . $data->handler->label .  ' — error ' . $e->getMessage()
             );
             return false;
@@ -486,7 +487,7 @@ class ContainerRegistryDeferredHookManager
 
         if (!$allowed) {
             Logger::info(
-                self::class,
+                __METHOD__,
                 'Skipping deferred hook activation: ' . $data->handler->label .  ' — registerIf gate returned false.'
             );
             return false;

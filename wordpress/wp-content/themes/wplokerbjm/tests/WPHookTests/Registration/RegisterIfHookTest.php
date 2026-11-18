@@ -73,7 +73,7 @@ class RegisterIfHookTest extends WplokerbjmTestCase
 
         // Never registered — no add_action call, nothing fires.
         self::assertNull($this->findRegisteredHook('action', 'register_if_false'));
-        self::assertSame([], $this->registeredHooks());
+        self::assertSame([], $this->registeredApplicationHooks());
 
         do_action('register_if_false', 'nope');
         self::assertSame([], ExecuteIfActionService::$capturedValues);

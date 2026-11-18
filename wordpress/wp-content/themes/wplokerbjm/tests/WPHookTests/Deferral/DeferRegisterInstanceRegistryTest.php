@@ -18,11 +18,13 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  * {@see WPHooksInstanceRegistry::activateDeferredByCallableInLiveInstance()};
  * with `deferRegisterUntilHook` it keeps the automatic trigger behaviour.
  *
- * The two deferred APIs are callable-scoped:
- *  - `activateDeferredByCallableInLiveInstance()` activates,
- *  - `unregisterDeferredByCallableInLiveInstance()` drops,
- * while `unregisterByCallableInLiveInstance()` now touches only the active
- * pool — the same segregation the container registry has.
+ * The deferred APIs are callable-scoped and class(instance)-scoped:
+ *  - `activateDeferredByCallableInLiveInstance()` / `unregisterDeferredByCallableInLiveInstance()`
+ *    target one member,
+ *  - `activateDeferredByClassInLiveInstance()` / `unregisterDeferredByClassInLiveInstance()`
+ *    target every deferred entry owned by the given live instance,
+ * while `unregisterByCallableInLiveInstance()` touches only the active pool —
+ * the same segregation the container registry has.
  */
 final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
 {
@@ -226,7 +228,9 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
         };
 
         $this->registry->registerHooksOn($anon);
-        self::assertNotNull($this->findRegisteredHook('action', 'defer_register_retry_trigger'));
+        self::assertNotNull($this->findRegisteredHook('action', 'defer_register_retry_trigger'), 'Listener must be registered after registration.');
+        do_action('defer_register_retry_trigger');
+        self::assertNull($this->findRegisteredHook('action', 'defer_register_retry_hook'), 'Hook must not be registered after when gate false.');
         self::$deferredGateOpen = true;
         $this->registry->activateDeferredByCallableInLiveInstance([$anon, 'onDeferred']);
 
@@ -238,6 +242,8 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
             $this->findRegisteredHook('action', 'defer_register_retry_hook'),
             'The deferred hook must be registered after the gate opens.',
         );
+        do_action('defer_register_retry_hook');
+        self::assertSame(1, $anon->runs, 'Hook must be executed after trigger.');
     }
 
     public function testDeferredPropertyRegistrationActivatesByPropertyName(): void
@@ -336,5 +342,105 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
             $registry->activateDeferredByCallableInLiveInstance([$second, 'onDeferred']),
         );
         self::assertNotNull($this->findRegisteredHook('action', 'defer_register_cache_hook'));
+    }
+
+    public function testActivateDeferredByClassActivatesEveryMemberOfTheLiveInstance(): void
+    {
+        $anon = new class {
+            public int $runs = 0;
+
+            #[Action('defer_register_class_a', 10, deferRegister: true)]
+            public function onA(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('defer_register_class_b', 20, deferRegister: true)]
+            public function onB(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        self::assertNull($this->findRegisteredHook('action', 'defer_register_class_a'));
+        self::assertNull($this->findRegisteredHook('action', 'defer_register_class_b'));
+
+        self::assertSame(
+            2,
+            $this->registry->activateDeferredByClassInLiveInstance($anon),
+            'Class-scoped activation must wake every deferred member of the instance.',
+        );
+
+        self::assertNotNull($this->findRegisteredHook('action', 'defer_register_class_a'));
+        self::assertNotNull($this->findRegisteredHook('action', 'defer_register_class_b'));
+
+        \do_action('defer_register_class_a');
+        \do_action('defer_register_class_b');
+        self::assertSame(2, $anon->runs);
+
+        self::assertSame(
+            0,
+            $this->registry->activateDeferredByClassInLiveInstance($anon),
+            'Already-active entries must not activate twice.',
+        );
+    }
+
+    public function testActivateDeferredByClassLeavesSiblingInstancesDeferred(): void
+    {
+        $factory = static fn(): object => new class {
+            public int $runs = 0;
+
+            #[Action('defer_register_class_scope_hook', 10, deferRegister: true)]
+            public function onDeferred(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $first = $factory();
+        $second = $factory();
+
+        $this->registry->registerHooksOn($first);
+        $this->registry->registerHooksOn($second);
+
+        self::assertSame(1, $this->registry->activateDeferredByClassInLiveInstance($first));
+
+        \do_action('defer_register_class_scope_hook');
+        self::assertSame([1, 0], [$first->runs, $second->runs], 'Only the targeted instance may activate.');
+
+        self::assertSame(1, $this->registry->activateDeferredByClassInLiveInstance($second));
+
+        \do_action('defer_register_class_scope_hook');
+        self::assertSame([2, 1], [$first->runs, $second->runs], 'Both instances are active after their own activation.');
+    }
+
+    public function testUnregisterDeferredByClassDropsEveryMemberAndPreventsActivation(): void
+    {
+        $anon = new class {
+            #[Action('defer_register_class_drop_a', 10, deferRegister: true)]
+            public function onA(): void {}
+
+            #[Action('defer_register_class_drop_b', 20, deferRegister: true)]
+            public function onB(): void {}
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        self::assertSame(2, $this->registry->unregisterDeferredByClassInLiveInstance($anon));
+        self::assertSame(
+            0,
+            $this->registry->unregisterDeferredByClassInLiveInstance($anon),
+            'A second removal is a no-op.',
+        );
+        self::assertSame(
+            0,
+            $this->registry->activateDeferredByClassInLiveInstance($anon),
+            'Dropped entries must not activate later.',
+        );
+
+        self::assertNull($this->findRegisteredHook('action', 'defer_register_class_drop_a'));
+        self::assertNull($this->findRegisteredHook('action', 'defer_register_class_drop_b'));
     }
 }

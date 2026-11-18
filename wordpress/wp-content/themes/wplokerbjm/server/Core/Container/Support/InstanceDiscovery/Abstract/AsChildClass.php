@@ -45,15 +45,16 @@ abstract class AsChildClass
      * @param T $parentClass The class-string containing this child, or the
      *                       parent object to resolve via get_class().
      * @param string $identifier The property or method or any magic string holding this instance.
+     *
      */
     public function __construct(
         string|object $parentClass,
         public private(set) readonly string $identifier,
     ) {
         $this->parentClass = $parentClass;
-        
-        if (is_object($this->parentClass) && !str_contains($parentClass::class, "@anonymous")) {
-            $this->parentClassString = $parentClass::class;
+
+        if (is_object($this->parentClass) && !str_contains($this->parentClass::class, "@anonymous")) {
+            $this->parentClassString = $this->parentClass::class;
         } elseif ($this->parentClass instanceof static) {
             $this->parentClassString = $this->parentClass->constructCurrentClassIdentity;
         } elseif (\is_string($this->parentClass)) {

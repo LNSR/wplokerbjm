@@ -43,7 +43,7 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'defer_until_skips_gate',
-                registerIf: static fn (): bool => false,
+                registerIf: static fn(): bool => false,
                 deferRegisterUntilHook: 'graphql_init'
             ),
         ]);
@@ -63,7 +63,7 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'defer_until_activate',
-                registerIf: static fn (): bool => true,
+                registerIf: static fn(): bool => true,
                 deferRegisterUntilHook: 'graphql_init'
             ),
         ]);
@@ -119,7 +119,7 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'defer_until_executeif',
-                registerIf: static fn (): bool => true,
+                registerIf: static fn(): bool => true,
                 executeIf: static function (string $value): bool {
                     return $value === 'query';
                 },
@@ -152,8 +152,8 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'defer_register_closure_trigger',
-                registerIf: static fn (): bool => true,
-                deferRegisterUntilHook: static fn (ExecuteIfActionService $service): string => 'graphql_init',
+                registerIf: static fn(): bool => true,
+                deferRegisterUntilHook: static fn(ExecuteIfActionService $service): string => 'graphql_init',
                 deferRegisterUntilHookParams: [
                     'params' => [
                         ['name' => 'service', 'type' => ExecuteIfActionService::class, 'hasDefault' => false, 'default' => null],
@@ -186,7 +186,7 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'defer_until_fired',
-                registerIf: static fn (): bool => true,
+                registerIf: static fn(): bool => true,
                 deferRegisterUntilHook: 'graphql_init'
             ),
         ]);
@@ -201,26 +201,33 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
         self::assertSame(['immediate'], ExecuteIfActionService::$capturedValues);
     }
 
-    public function testActivationEarlierBeforeHookTriggerWillTriggerSchedulerUnregister(): void {
+    public function testActivationEarlierBeforeHookTriggerWillTriggerSchedulerUnregister(): void
+    {
+        $allow = false;
         $registry = $this->createRegistry([
             $this->action(
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'defer_register_closure_trigger',
-                registerIf: static fn (): bool => true,
+                registerIf: static function () use (&$allow): bool {
+                    return $allow;
+                },
                 deferRegisterUntilHook: 'scheduler',
             ),
         ]);
         $registry->initialize();
 
-        self::assertNull($this->findRegisteredHook('action', 'defer_register_closure_trigger'));
-        self::assertNotNull($this->findRegisteredHook('action', 'scheduler'));
+        self::assertNull($this->findRegisteredHook('action', 'defer_register_closure_trigger'), 'Hook must not be registered.');
+        self::assertNotNull($this->findRegisteredHook('action', 'scheduler'), 'Listener must be registered after registration.');
+        do_action('scheduler');
+        self::assertNull($this->findRegisteredHook('action', 'defer_register_closure_trigger'), 'Hook must not be registered when gate still false.');
+        $allow = true;
         $registry->activateDeferredByHook('defer_register_closure_trigger');
         // manual activation remove deferRegisterUntilHook its scheduler
-        self::assertNull($this->findRegisteredHook('action', 'scheduler'));
+        self::assertNull($this->findRegisteredHook('action', 'scheduler'), 'Listener must be removed after activation.');
 
         do_action('defer_register_closure_trigger', 'dynamic');
-        self::assertSame(['dynamic'], ExecuteIfActionService::$capturedValues);
+        self::assertSame(['dynamic'], ExecuteIfActionService::$capturedValues, 'Hook must be executed after activation.');
     }
 
     /**

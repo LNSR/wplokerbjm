@@ -35,12 +35,11 @@ trait HandlerEntryTrait
      * @var WeakReference<AvailaibleHandlerType>|AvailaibleHandlerType|null
      */
     public private(set) ?object $handler = null {
-        get => $this->handler instanceof WeakReference ? $this->handler->get() : null;
+        get => $this->handler instanceof WeakReference ? $this->handler->get() : $this->handler = null;
         set => \is_object($value) ? WeakReference::create($value) : $value;
     }
     /** Cached invoker label in case destroyed */
     public readonly string $invokerLabel;
-
     public private(set) int $unregistrationFailureCount = 0;
     public private(set) bool $registered = false;
 
@@ -64,7 +63,7 @@ trait HandlerEntryTrait
         try {
             $this->handler->initOnUnregisterDoCallback();
         } catch (\Throwable $e) {
-            Logger::error(static::class, 'Failed to prepare onUnregisterDo for ', [
+            Logger::error(__METHOD__, 'Failed to prepare onUnregisterDo for ', [
                 'invokerLabel' => $this->handler->label,
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -77,19 +76,20 @@ trait HandlerEntryTrait
 
     public function unregister(): bool
     {
-        $hasCallback = $this->hasCallbackRegisteredOnWordpress();
-        if (!$hasCallback || $this->handler === null) return false;
+        if (!$this->hasCallbackRegisteredOnWordpress()) return false;
 
         $result = match ($this->type) {
             'action' => remove_action($this->hook, $this->handler, $this->priority),
             'filter' => remove_filter($this->hook, $this->handler, $this->priority),
         };
 
-        if (!$result) $this->unregistrationFailureCount++;
-        if ($result) {
-            $this->registered = false;
-            if (is_callable($this->handler?->onUnregisterDoCallback ?? null)) ($this->handler->onUnregisterDoCallback)();
+        if (!$result) {
+            $this->unregistrationFailureCount++;
+            return $result;
         }
+
+        $this->registered = false;
+        if (is_callable($this->handler?->onUnregisterDoCallback ?? null)) ($this->handler->onUnregisterDoCallback)();
         return $result;
     }
 

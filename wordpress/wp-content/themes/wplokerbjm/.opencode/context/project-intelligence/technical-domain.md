@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.5 | Updated: 2026-11-13 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.7 | Updated: 2026-11-19 -->
 
 # Technical Domain — Lowker Site Theme
 
@@ -98,7 +98,7 @@ Support/WPHooks/
 ```
 
 - **Container path**: scan → `HookRegistration` → lazy invoker (DI resolves only on fire). **Runtime path**: `registerHooksOn($object)` — weak owner refs, GC auto-clean, attribute-driven only.
-- **Deferred**: `activateDeferredBy{Hook,Class,Namespace,Callable,Tags,TagPattern}`; `unregisterDeferredBy*` mirrors it. Active-pool selectors (`unregisterByCallable()`, …) never sweep deferred entries.
+- **Deferred**: `activateDeferredBy{Hook,Class,Namespace,Callable,Tags,TagPattern}`; `unregisterDeferredBy*` mirrors it. Active-pool selectors (`unregisterByCallable()`, …) never sweep deferred entries. Ownership/RAII: `wphooks-ownership-raii.md`; selector event bridge: `wphooks-registry-events.md`.
 
 ## REST API Pattern
 

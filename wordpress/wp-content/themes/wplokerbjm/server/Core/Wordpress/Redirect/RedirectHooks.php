@@ -6,7 +6,7 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Injectable};
-use WPLokerBJM\Core\Wordpress\ContainerRegistryHookEvent;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 
 /*======================================================================
  | REDIRECTS
@@ -26,7 +26,7 @@ class RedirectHooks
     })]
     private function boot(): void
     {
-        \do_action(ContainerRegistryHookEvent::ACTIVATE_DEFERRED_BY_CLASS, __CLASS__);
+        \do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CLASS, __CLASS__);
     }
 
     private static function shouldRegister(): bool

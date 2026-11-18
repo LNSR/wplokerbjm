@@ -66,7 +66,7 @@ class Logger
     private static function log(string $level, string $category, string $message, array $context = []): void
     {
         self::$buffer[] = [
-            'timestamp' => date('Y-m-d H:i:s'),
+            'timestamp' => new \DateTimeImmutable()->format('Y-m-d H:i:s.u'),
             'environment' => self::getEnvironment(),
             'level' => $level,
             'category' => $category,

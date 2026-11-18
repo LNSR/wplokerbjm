@@ -113,7 +113,7 @@ class DynamicTagTest extends WplokerbjmTestCase
         $registry->initialize();
 
         self::assertNull($this->findRegisteredHook('action', 'dynamic_tag_bad'));
-        self::assertSame([], $this->registeredHooks());
+        self::assertSame([], $this->registeredApplicationHooks());
     }
 
     public function testStaticArrayTagFormStillWorks(): void
@@ -150,7 +150,7 @@ class DynamicTagTest extends WplokerbjmTestCase
         $registry->initialize();
 
         self::assertNull($this->findRegisteredHook('action', 'bad_tuple_tag'));
-        self::assertSame([], $this->registeredHooks());
+        self::assertSame([], $this->registeredApplicationHooks());
     }
 
     public function testEnumTagNormalizesToValue(): void

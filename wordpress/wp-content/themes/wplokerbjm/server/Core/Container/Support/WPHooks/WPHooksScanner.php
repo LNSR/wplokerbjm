@@ -168,7 +168,7 @@ class WPHooksScanner
                     );
                 });
             } catch (\RuntimeException $e) {
-                Logger::error('WPhooksScanner', 'Error scanning hooks for class ' . $className . ': ', [
+                Logger::error(__METHOD__, 'Error scanning hooks for class ' . $className . ': ', [
                     'message' => $e->getMessage(),
                     'line' => $e->getLine(),
                     'file' => $e->getFile(),
@@ -187,7 +187,7 @@ class WPHooksScanner
         $targetFile = $this->cacheLocation;
 
         if (empty($targetFile)) {
-            Logger::error('WPHooksScanner', 'Delete failed: No target file path provided.');
+            Logger::error(__METHOD__, 'Delete failed: No target file path provided.');
             return false;
         }
 
@@ -209,7 +209,7 @@ class WPHooksScanner
         $registrations = $this->cachedHookRegistrations ?? $this->cachedHookRegistrations = $this->performHookRegistrationScan();
 
         if (empty($targetFile)) {
-            Logger::error('WPHooksScanner', 'Export failed: No target file path provided.');
+            Logger::error(__METHOD__, 'Export failed: No target file path provided.');
             return false;
         }
 
@@ -217,13 +217,13 @@ class WPHooksScanner
 
         if (!is_dir($directory)) {
             if (!mkdir($directory, 0755, true)) {
-                Logger::error('WPHooksScanner', "Failed to create directory: {$directory}");
+                Logger::error(__METHOD__, "Failed to create directory: {$directory}");
                 return false;
             }
         }
 
         if (!is_writable($directory)) {
-            Logger::error('WPHooksScanner', "Directory is not writable: {$directory}");
+            Logger::error(__METHOD__, "Directory is not writable: {$directory}");
             return false;
         }
 

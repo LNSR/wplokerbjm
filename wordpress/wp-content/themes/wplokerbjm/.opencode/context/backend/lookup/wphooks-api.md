@@ -1,3 +1,5 @@
+<!-- Context: backend/lookup | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # WPHooks API Lookup
 
 **Purpose**: Quickly locate the implementation type or method needed when working with hook registration.
@@ -6,9 +8,9 @@
 
 | Type | File | Use |
 |---|---|---|
-| `WPHooksScanner` | `server/Core/Container/Support/WPHooks/WPHooksScanner.php` | `getHookRegistrations()` scans or loads the cache; constructor accepts namespace, cache path, and plan provider. |
+| `WPHooksScanner` | `server/Core/Container/Support/WPHooks/WPHooksScanner.php` | `getHookRegistrations()` scans or loads the cache; constructor `(array $compiledContainerMap, WPHookPlanProvider $provider, string $namespace, string $cacheLocation)`. |
 | `HookScannerTrait` | `server/Core/Container/Support/WPHooks/Trait/HookScannerTrait.php` | Scans declared non-static methods/properties and reports visibility plus action/filter type. |
-| `HookRegistration` | `server/Core/Container/Support/WPHooks/DTO.php` | Immutable metadata DTO; use `fromArray()` and `toArray()` for cache boundaries. |
+| `HookRegistration` | `server/Core/Container/Support/WPHooks/DTO.php` | Immutable metadata DTO; hydrates via `fromArray()` and exports through VarExporter `__set_state`. |
 | `HookKey` | `server/Core/Container/Support/WPHooks/DTO.php` | Canonical identity: class, member, target, type, priority, accepted args; supports class/callable/namespace matching. |
 | `WPHookPlanProvider` | `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` | Builds callable plans; resolves dynamic names, registration gates, execution gates, and dynamic tags. Single provider for BOTH container and runtime paths (non-nullable `ContainerInterface`). |
 
@@ -26,7 +28,7 @@
 | `registerDeferredByCallableInLiveInstance()` / `unregisterDeferredByCallableInLiveInstance()` | Runtime callable-scoped deferred activation/removal for held `deferRegister` entries. |
 | `unregisterHooksOn()` | Remove every runtime handler owned by one object (incl. its deferred entries). |
 
-`ContainerRegistryDeferredHookManager` and `ContainerRegistryHookTargetResolver` are implemented in `Registry/WPHooksContainerRegistry.php`. The resolver accepts array callables, `Class::method` strings, bound first-class callables, invokable objects, property-hook closures, and the anonymous-property metadata object.
+`ContainerRegistryDeferredHookManager` lives in `Registry/DeferredManager/`; `ContainerRegistryHookTargetResolver` in `Registry/Resolver/`. The resolver accepts array callables, `Class::method` strings, bound first-class callables, invokable objects, property-hook closures, and the anonymous-property metadata object.
 
 ## Invokers and utilities
 
@@ -39,7 +41,7 @@
 - `InstanceRegistryRuntimeHookResolver` — live-instance target resolution (`resolveLiveCallableTarget`, `matchesCallableTarget`), method param names (`resolveHookArgNames`) — in `Registry/WPHooksInstanceRegistry.php`.
 - `HookPattern` — wildcard validation/matching: exactly one trailing asterisk, literal prefix ≥ 2 chars, else `InvalidArgumentException`; `matches` / `matchesAny` (`Utilities/HookPattern.php`).
 - `HookTagUtilities::normalizeTags()` / `normalizeTagValue()` — accept strings or string-backed enums and deduplicate tags.
-- `HookTags::GRAPHQL_NOCACHE_HEADERS` — current shared tag constant.
+- Tags are strings or backed enums; `HookTagUtilities` normalizes and deduplicates them (`Utilities/Tag.php`).
 - `ModuleClassHookMetadata` — stores `parentClass` and `parentProperty`; filename is `Abstract/ModuleClassHookMetadata.php`.
 
 ## 📂 Codebase References
@@ -52,5 +54,4 @@
 - `server/Core/Container/Support/WPHooks/Utilities/HookPattern.php` — wildcard patterns.
 - `server/Core/Container/Support/WPHooks/Utilities/Tag.php` — tag normalization.
 - `server/Core/Container/Support/WPHooks/Trait/HookInvokerTrait.php` — invoker plumbing; `Trait/DeferredHooksTrait.php` — deferred pool.
-- `server/Core/Container/Support/WPHooks/Constants/Tags.php` — shared tag constants.
 - `server/Core/Container/Support/WPHooks/Abstract/ModuleClassHookMetadata.php` — anonymous property-hook metadata base class.

@@ -1,3 +1,5 @@
+<!-- Context: backend/nav | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # Backend Context Navigation
 
 **Purpose**: Core development patterns, architecture, and references for the WPLokerBJM headless WordPress theme backend.

@@ -1,3 +1,5 @@
+<!-- Context: backend/concepts | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+
 # Concept: Hook Provider Layer
 
 **Purpose**: Explain how condition gates, dynamic hook names, and tag closures get DI-powered parameter resolution without reflection on the hot path.
