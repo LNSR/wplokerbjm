@@ -20,6 +20,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\NonNullableSelfParameterException;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{InstanceRegistryDeferredHookManager, DeferredHookEntryHandler};
 
 /**
@@ -521,6 +522,45 @@ class WPHooksInstanceRegistry
     }
 
     /**
+     * Instance-registry closures are bound to a WeakReference owner, so any
+     * `self`/`static` parameter must be nullable: null means the owner is gone
+     * or mid-teardown. Enforced for every plan-bearing attribute closure,
+     * including entries re-hydrated from the metadata cache (plans are rebuilt
+     * here so pre-flag cache entries cannot bypass the rule).
+     */
+    private function assertNullableSelfClosures(InstanceHookMetadata $metadata, object $instance): void
+    {
+        $ownerLabel = $instance instanceof ModuleClassHookMetadata
+            ? $instance->parentClassString . '->' . $instance->parentProperty
+            : $instance::class;
+
+        $label = $ownerLabel . '->' . $metadata->targetName . ' on ' . $metadata->hook;
+
+        $closures = [
+            'executeIf' => $metadata->executeIf,
+            'registerIf' => $metadata->registerIf,
+            'deferRegisterUntilHook' => $metadata->deferRegisterUntilHook instanceof \Closure
+                ? $metadata->deferRegisterUntilHook
+                : null,
+            'onUnregisterDo' => $metadata->onUnregisterDo,
+            'debugDeferredRegistration' => $metadata->debugDeferredRegistration,
+            'debugLiveRegistration' => $metadata->debugLiveRegistration,
+        ];
+
+        foreach ($closures as $role => $closure) {
+            if ($closure === null) {
+                continue;
+            }
+
+            foreach ($this->provider->buildCallablePlan($closure)['params'] as $param) {
+                if (($param['isSelf'] ?? false) && !($param['allowsNull'] ?? false)) {
+                    throw NonNullableSelfParameterException::forParameter($role, $label, $param['name']);
+                }
+            }
+        }
+    }
+
+    /**
      * Process an individual hook metadata entry: checks the registration gate, 
      * creates the handler and entry via createHandlerAndEntry, and registers 
      * or defers the hook.
@@ -531,6 +571,8 @@ class WPHooksInstanceRegistry
         int $attributeIndex,
         array &$records
     ): void {
+        $this->assertNullableSelfClosures($entryMeta, $instance);
+
         $isDeferred = $entryMeta->deferRegister || $entryMeta->deferRegisterUntilHook !== null;
 
         if (!$isDeferred) {

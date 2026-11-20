@@ -33,7 +33,9 @@ use WPLokerBJM\Shared\Log\Logger;
  *      type: string|class-string|null,
  *      hasDefault: bool,
  *      default: mixed,
- *      isVariadic: bool
+ *      isVariadic: bool,
+ *      isSelf: bool,
+ *      allowsNull: bool
  * }
  * @phpstan-type CallablePlan array{
  *      isStatic: bool,
@@ -136,6 +138,9 @@ class WPHookPlanProvider
             $hasDefault = $param->isDefaultValueAvailable();
             $default = $hasDefault ? $param->getDefaultValue() : null;
 
+            $isSelf = $type instanceof ReflectionNamedType
+                && \in_array($type->getName(), ['self', 'static'], true);
+
             /** @var CallableHookParams $planParam */
             $planParam = [
                 'name' => $param->getName(),
@@ -143,6 +148,8 @@ class WPHookPlanProvider
                 'hasDefault' => $hasDefault,
                 'default' => $default,
                 'isVariadic' => $param->isVariadic(),
+                'isSelf' => $isSelf,
+                'allowsNull' => $param->allowsNull(),
             ];
 
             // Non-exportable defaults (objects/resources) -> set to null.

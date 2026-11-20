@@ -74,11 +74,31 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
 
         self::assertTrue($plan['isStatic']);
         self::assertSame([
-            ['name' => 'search', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => false],
-            ['name' => 'dep', 'type' => PlanProviderDependency::class, 'hasDefault' => false, 'default' => null, 'isVariadic' => false],
-            ['name' => 'count', 'type' => null, 'hasDefault' => true, 'default' => 5, 'isVariadic' => false],
-            ['name' => 'rest', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => true],
+            ['name' => 'search', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => false, 'isSelf' => false, 'allowsNull' => false],
+            ['name' => 'dep', 'type' => PlanProviderDependency::class, 'hasDefault' => false, 'default' => null, 'isVariadic' => false, 'isSelf' => false, 'allowsNull' => false],
+            ['name' => 'count', 'type' => null, 'hasDefault' => true, 'default' => 5, 'isVariadic' => false, 'isSelf' => false, 'allowsNull' => false],
+            ['name' => 'rest', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => true, 'isSelf' => false, 'allowsNull' => false],
         ], $plan['params']);
+    }
+
+    public function testPlanCapturesSelfAndNullabilityBeforeTypeNormalisation(): void
+    {
+        $plan = $this->provider->buildCallablePlan(
+            static function (?self $nullableOwner, self $requiredOwner, ?string $maybe = null): void {
+            },
+        );
+
+        [$nullableSelf, $requiredSelf, $nullableString] = $plan['params'];
+
+        self::assertTrue($nullableSelf['isSelf']);
+        self::assertTrue($nullableSelf['allowsNull']);
+        self::assertSame(self::class, $nullableSelf['type'], 'self normalises to the declaring class for non-anonymous scopes.');
+
+        self::assertTrue($requiredSelf['isSelf']);
+        self::assertFalse($requiredSelf['allowsNull']);
+
+        self::assertFalse($nullableString['isSelf']);
+        self::assertTrue($nullableString['allowsNull']);
     }
 
     public function testPlanDistinguishesStaticAndNonStaticClosures(): void

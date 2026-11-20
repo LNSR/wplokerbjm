@@ -57,6 +57,15 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * default, then throw. A parameter typed with a non-class type (`string`,
  * `int`, `array`, …) and no default is therefore unresolvable.
  *
+ * **InstanceRegistry contract:** every owner parameter on an instance-registry
+ * closure MUST be declared `?self`. The owner lives behind a `WeakReference`
+ * and may already be gone (or be mid-teardown) when a deferred gate,
+ * `$onUnregisterDo`, or a debug probe runs. Non-nullable `self`/`static`
+ * parameters are rejected at registration time with
+ * {@see \WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\NonNullableSelfParameterException},
+ * and `self` is never fabricated from the container on the instance path.
+ * Container-backed closures keep the documented `self` → container fallback.
+ *
  * ---------------------------------------------------------------------------
  * ## Scanning rules
  * ---------------------------------------------------------------------------

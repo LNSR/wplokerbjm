@@ -345,23 +345,29 @@ final class OnUnregisterDoInstanceRegistryTest extends WplokerbjmTestCase
             public int $cleanups = 0;
         };
         $owner = new class($cleanup, __FUNCTION__) extends ModuleClassHookMetadata {
-            #[Action('test_onUnregisterDoCleanupDoesntRun', 11, deferRegisterUntilHook: 'shutdown', onUnregisterDo: static function (self $self) {
-                $self->parentClass->cleanups++;
+            #[Action('test_onUnregisterDoCleanupDoesntRun', 11, deferRegisterUntilHook: 'shutdown', onUnregisterDo: static function (?self $self) {
+                if ($self !== null) {
+                    $self->parentClass->cleanups++;
+                }
             })]
             private function onShutdown0()
             {
                 $this->parentClass->cleanups++;
             }
-            #[Action('test_onUnregisterDoCleanupDoesntRun', 10, onUnregisterDo: static function (self $self) {
-                $self->parentClass->cleanups++;
+            #[Action('test_onUnregisterDoCleanupDoesntRun', 10, onUnregisterDo: static function (?self $self) {
+                if ($self !== null) {
+                    $self->parentClass->cleanups++;
+                }
             })]
             private function onShutdown1()
             {
                 $this->parentClass->cleanups++;
             }
 
-            #[Action('test_onUnregisterDoCleanupDoesntRun', 12, deferRegister: true, onUnregisterDo: static function (self $self) {
-                $self->parentClass->cleanups++;
+            #[Action('test_onUnregisterDoCleanupDoesntRun', 12, deferRegister: true, onUnregisterDo: static function (?self $self) {
+                if ($self !== null) {
+                    $self->parentClass->cleanups++;
+                }
             })]
             public ?\Closure $onShutdown2 { get => $this->onShutdown2 ??= fn() => $this->parentClass->cleanups++; }
         };
