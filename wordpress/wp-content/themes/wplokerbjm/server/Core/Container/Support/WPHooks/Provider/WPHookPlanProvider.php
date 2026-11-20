@@ -5,29 +5,24 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Provider;
 
 use Psr\Container\ContainerInterface;
-use ReflectionException;
-use ReflectionFunction;
-use ReflectionMethod;
-use ReflectionNamedType;
-use RuntimeException;
-use WPLokerBJM\Core\Container\Attributes\Inject;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\HookDebugProbeException;
+use WPLokerBJM\Core\Container\Support\WPHooks\Plan\CallablePlanFactory;
+use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ArgumentResolver;
+use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ConditionEvaluator;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
- * DI parameter-plan resolution core for hook callables.
+ * Backwards-compatible facade over the hook resolution collaborators.
  *
- * Condition gates, dynamic hook names, tags, cleanup closures and hook
- * handlers all share one resolution core: plans are pre-computed at scan time
- * (via {@see self::buildCallablePlan()}), exported to the hooks cache file,
- * and resolved from the container at hook-fire time — so the hot path never
- * needs reflection unless a plan is missing (stale cache / unexportable
- * defaults).
+ * Responsibilities now live in:
+ *  - {@see CallablePlanFactory} — reflection → plan arrays and their caches,
+ *  - {@see ArgumentResolver} — callable parameter resolution and scope binding,
+ *  - {@see ConditionEvaluator} — hook names, executeIf/registerIf, tags and
+ *    onUnregisterDo cleanup closures,
+ *  - this class retains the debug dispatcher until it is extracted in a later
+ *    phase.
  *
- * The container is mandatory: every closure parameter resolves through it
- * (typed parameters by class, then defaults), which makes the container
- * registry and the runtime/instance registry behave identically.
+ * New code should inject the collaborator it needs instead of this facade.
  *
  * @phpstan-type CallableHookParams array{
  *      name: string,
@@ -45,257 +40,66 @@ use WPLokerBJM\Shared\Log\Logger;
  */
 class WPHookPlanProvider
 {
-    /**
-     * Scope-bound gate closures, memoized per (closure, target class) pair.
-     *
-     * Attribute-argument closures are always static (constant-expression
-     * rule), so scope-only binds are immutable — each pair binds at most
-     * once per provider lifetime. Entries are dropped automatically when
-     * the source closure is garbage-collected.
-     * @var \WeakMap<\Closure, array<class-string, \Closure>>
-     */
-    private \WeakMap $boundClosureCache;
-    /**
-     * @var \WeakMap<object, CallablePlan>
-     */
-    private \WeakMap $callablePlanCache;
+    private readonly CallablePlanFactory $planFactory;
+    private readonly ArgumentResolver $resolver;
+    private readonly ConditionEvaluator $conditions;
 
     public function __construct(private readonly ContainerInterface $container)
     {
-        $this->boundClosureCache = new \WeakMap();
-        $this->callablePlanCache = new \WeakMap();
+        $this->planFactory = new CallablePlanFactory();
+        $this->resolver = new ArgumentResolver($container);
+        $this->conditions = new ConditionEvaluator($this->resolver);
     }
 
     /**
-     * Build the resolution plan for a callable closure.
-     *
-     * The plan carries BOTH parameter metadata (name, container class type,
-     * default availability/value) AND closure-level metadata (isStatic,
-     * scopeClass) captured once at scan time — so the hook-fire hot path
-     * needs no reflection at all.
-     *
-     * Returns an empty-shaped plan for null callables or when a default value
-     * cannot be safely exported to the cache (objects/resources) — in that
-     * case the registry falls back to reflection at fire time.
-     *
      * @return CallablePlan
      */
     public function buildCallablePlan(?\Closure $callable): array
     {
-        /**
-         * Strictly used for test scope discovery
-         * @var CallablePlan $empty
-         */
-        $empty = ['isStatic' => true, 'params' => []];
-
-        if ($callable === null) {
-            return $empty;
-        }
-
-        try {
-            return $this->callablePlanCache[$callable] ??= $this->buildCallablePlanFromReflector(new ReflectionFunction($callable));
-        } catch (ReflectionException) {
-            return $empty;
-        }
+        return $this->planFactory->buildCallablePlan($callable);
     }
 
     /**
-     * Build the resolution plan for ANY reflected callable (closure or method).
-     *
-     * This is the single source of truth for parameter metadata used both by
-     * gate closures (executeIf / registerIf / hook-name / tag callables, via
-     * {@see buildCallablePlan()}) and by hook HANDLERS themselves — the
-     * scanner exports a handler's own plan as `hookArgs`, so parameter names
-     * AND the variadic flag derive from the same shape, with no parallel
-     * `hookArgsVariadic` fields.
-     *
-     * @param \ReflectionFunctionAbstract $reflect
      * @return CallablePlan
      */
     public function buildCallablePlanFromReflector(\ReflectionFunctionAbstract $reflect): array
     {
-        if (isset($this->callablePlanCache[$reflect])) return $this->callablePlanCache[$reflect];
-
-        /**
-         * @var list<CallableHookParams> $params
-         */
-        $params = [];
-        foreach ($reflect->getParameters() as $param) {
-            $type = $param->getType();
-
-            $attribute = $param->getAttributes(Inject::class)[0] ?? null;
-            $injectInstance = $attribute?->newInstance();
-
-            $paramType = $injectInstance?->name ?? null;
-            if ($type instanceof ReflectionNamedType && $type->getName() === 'self' && $paramType === null) {
-                $reflectClass = $reflect->getClosureScopeClass();
-                $paramType = $reflectClass?->isAnonymous()
-                    ? 'self'
-                    : $reflectClass?->getName();
-            } else {
-                $paramType = $type instanceof ReflectionNamedType && !$type->isBuiltin() ? $type->getName() : $paramType;
-            }
-
-            $hasDefault = $param->isDefaultValueAvailable();
-            $default = $hasDefault ? $param->getDefaultValue() : null;
-
-            $isSelf = $type instanceof ReflectionNamedType
-                && \in_array($type->getName(), ['self', 'static'], true);
-
-            /** @var CallableHookParams $planParam */
-            $planParam = [
-                'name' => $param->getName(),
-                'type' => $paramType,
-                'hasDefault' => $hasDefault,
-                'default' => $default,
-                'isVariadic' => $param->isVariadic(),
-                'isSelf' => $isSelf,
-                'allowsNull' => $param->allowsNull(),
-            ];
-
-            // Non-exportable defaults (objects/resources) -> set to null.
-            if ($hasDefault && (is_object($default) || is_resource($default))) {
-                $planParam['hasDefault'] = false;
-                $planParam['default'] = null;
-            }
-
-            $params[] = $planParam;
-        }
-
-        return $this->callablePlanCache[$reflect] ??= [
-            'isStatic' => $reflect->isStatic(),
-            'params' => $params,
-        ];
+        return $this->planFactory->buildCallablePlanFromReflector($reflect);
     }
 
     /**
-     * Build the resolution plan for any callable VALUE (closure, invokable
-     * object, array callable, 'Class::method' string) — used for property
-     * hooks whose callable lives in a property default value or live instance.
-     *
-     * @param mixed $callable The callable value to introspect.
      * @return CallablePlan
      */
     public function callablePlan(mixed $callable): array
     {
-        if (!is_callable($callable)) {
-            return ['isStatic' => true, 'params' => []];
-        }
-
-        try {
-            $reflect = match (true) {
-                $callable instanceof \Closure => new \ReflectionFunction($callable),
-                \is_object($callable) => \ReflectionMethod::createFromMethodName($callable::class . '::__invoke'),
-                \is_array($callable) => \ReflectionMethod::createFromMethodName(
-                    (\is_object($callable[0]) ? $callable[0]::class : $callable[0]) . '::' . $callable[1]
-                ),
-                \is_string($callable) && str_contains($callable, '::') => \ReflectionMethod::createFromMethodName($callable),
-                \is_string($callable) => new \ReflectionFunction($callable),
-                default => null,
-            };
-
-            if ($reflect === null) {
-                return ['isStatic' => true, 'params' => []];
-            }
-
-            return $this->buildCallablePlanFromReflector($reflect);
-        } catch (\ReflectionException) {
-            return ['isStatic' => true, 'params' => []];
-        }
+        return $this->planFactory->callablePlan($callable);
     }
 
     /**
-     * Build the resolution plan for a property's callable value or default value.
-     *
-     * Mirrors {@see self::extractPropertyCallableParamNames()} but returns the full
-     * plan (names + variadic flags) instead of names only.
-     *
-     * @param \ReflectionProperty $property from attributes
-     * @param object|null $instance Optional already **instantiated** instance to execute getters/hooks.
-     *
      * @return CallablePlan
      */
     public function extractPropertyCallablePlan(\ReflectionProperty $property, ?object $instance = null): array
     {
-        if (isset($this->callablePlanCache[$property])) return $this->callablePlanCache[$property];
-
-        /** @suppress PHP0406 */
-        if ($instance !== null && $property->hasHook(\PropertyHookType::Get) && $property->isInitialized($instance)) {
-            // For hooked properties, reading the property executes the `get` hook.
-            try {
-                $value = $property->getValue($instance);
-                if (is_callable($value)) {
-                    return $this->callablePlanCache[$property] ??= $this->callablePlan($value);
-                }
-            } catch (ReflectionException $e) {
-                Logger::error(__METHOD__, 'Error getting property value', [
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
-            };
-        }
-
-        if ($property->hasDefaultValue()) {
-            return $this->callablePlanCache[$property] ??= $this->callablePlan($property->getDefaultValue());
-        }
-
-        return $this->callablePlanCache[$property] ??= ['isStatic' => true, 'params' => []];
+        return $this->planFactory->extractPropertyCallablePlan($property, $instance);
     }
 
     /**
-     * Resolve the final hook name for a registration.
-     *
-     * A plain string is used as-is; a closure is resolved through the DI
-     * container (via the plan provider) and must return a string.
-     *
-     * @throws \RuntimeException when the closure result is not a string
-     * @param object|class-string $targetClass
+     * @return array<int, string>
      */
+    public function extractPropertyCallableParamNames(\ReflectionProperty $property, ?object $instance = null): array
+    {
+        return $this->planFactory->extractPropertyCallableParamNames($property, $instance);
+    }
+
     public function resolveHookName(
         string|\Closure $hook,
         array $hookParams = [],
         string $label = '',
         object|string|null $targetClass = null
     ): string {
-        if (is_string($hook)) {
-            return $hook;
-        }
-        $targetInstance = null;
-        if (is_object($targetClass)) {
-            $targetInstance = $targetClass;
-            $targetClass = $targetClass::class;
-        }
-        
-        $hook = $this->bindToTarget($hook, $hookParams, $targetClass);
-        $values = $this->resolveCallableParameters($hook, $hookParams, $label, [], $targetInstance);
-        $name = $hook(...$values);
-
-        if (!is_string($name)) {
-            throw new \RuntimeException(
-                'Hook name for ' . $label . ' must return string, got ' . get_debug_type($name)
-            );
-        }
-
-        return $name;
+        return $this->conditions->resolveHookName($hook, $hookParams, $label, $targetClass);
     }
 
-
-    /**
-     * Evaluate an executeIf gate for a hook.
-     *
-     * A null gate always allows the hook. The closure must return a bool;
-     * anything else raises a RuntimeException (callers catch and log it,
-     * keeping the hook pipeline intact).
-     *
-     * When a target class is given, the closure is bound to that scope
-     * before invocation: a non-static closure receives the resolved
-     * service instance as `$this` (private/protected access), a static
-     * closure is scope-bound only.
-     *
-     * @param CallablePlan $executeIfParams
-     *
-     * @throws RuntimeException when the gate does not return bool
-     */
     public function evaluateExecuteIf(
         ?\Closure $executeIf,
         array $executeIfParams,
@@ -304,107 +108,38 @@ class WPHookPlanProvider
         array $hookArgs = [],
         ?string $variadicHookArg = null,
     ): bool {
-        if ($executeIf === null) {
-            return true;
-        }
-
-        $targetInstance = null;
-        if (is_object($targetClass)) {
-            $targetInstance = $targetClass;
-            $targetClass = $targetClass::class;
-        }
-
-        $executeIf = $this->bindToTarget($executeIf, $executeIfParams, $targetClass);
-
-        // Fast path: zero-parameter gates are invoked directly,
-        // without any reflection or DI resolution.
-        if (($executeIfParams['params'] ?? []) === []) {
-            try {
-                $allowed = $executeIf();
-                if (is_bool($allowed)) {
-                    return $allowed;
-                }
-
-                // Zero-parameter gate with a non-bool result: fail right away —
-                // falling through would invoke the gate a second time.
-                throw new RuntimeException(
-                    'executeIf for ' . $label . ' must return bool, got ' . get_debug_type($allowed)
-                );
-            } catch (\ArgumentCountError) {
-                // Closure actually has parameters — fall through to resolution.
-            }
-        }
-
-        $values = $this->resolveCallableParameters($executeIf, $executeIfParams, $label, $hookArgs, $targetInstance, $variadicHookArg);
-        $allowed = $executeIf(...$values);
-
-        if (!is_bool($allowed)) {
-            throw new RuntimeException(
-                'executeIf for ' . $label . ' must return bool, got ' . get_debug_type($allowed)
-            );
-        }
-
-        return $allowed;
+        return $this->conditions->evaluateExecuteIf($executeIf, $executeIfParams, $label, $targetClass, $hookArgs, $variadicHookArg);
     }
 
-    /**
-     * @param CallablePlan $onUnregisterDoParams
-     * @param string $label
-     * @param object|null|string $targetClass
-     * @return (callable:mixed)|null
-     */
     public function resolveOnUnregisterDo(
         ?\Closure $onUnregisterDo = null,
         array $onUnregisterDoParams = [],
         string $label = '',
         \WeakReference|null|string $targetClass = null,
     ): \Closure|null {
-        if ($onUnregisterDo === null) {
-            return null;
-        }
+        return $this->conditions->resolveOnUnregisterDo($onUnregisterDo, $onUnregisterDoParams, $label, $targetClass);
+    }
 
-        $targetInstanceWeakRef = null;
-        if ($targetClass instanceof \WeakReference) {
-            $targetInstanceWeakRef = $targetClass;
-            $instance = $targetClass->get();
-            $targetClass = $instance !== null ? $instance::class : null;
-        } elseif (is_object($targetClass)) {
-            $targetInstanceWeakRef = \WeakReference::create($targetClass);
-            $targetClass = $targetClass::class;
-        }
+    public function resolveTagCallable(
+        \Closure $tagCallable,
+        array $plan,
+        string $label = '',
+        null|object|string $targetClass = null,
+    ): array {
+        return $this->conditions->resolveTagCallable($tagCallable, $plan, $label, $targetClass);
+    }
 
-        return function () use ($onUnregisterDo, $onUnregisterDoParams, $label, $targetClass, $targetInstanceWeakRef): mixed {
-            static $alreadyRun = false;
-            if ($alreadyRun) return null;
-            $alreadyRun = true;
-            if (did_action('shutdown') || doing_action('shutdown')) return null;
-
-            try {
-                $onUnregisterDo = $this->bindToTarget($onUnregisterDo, $onUnregisterDoParams, $targetClass);
-                $values = $this->resolveCallableParameters($onUnregisterDo, $onUnregisterDoParams, $label, [], $targetInstanceWeakRef?->get() ?? null);
-
-                return $onUnregisterDo(...$values);
-            } catch (\Throwable $e) {
-                Logger::error(__METHOD__, 'Failed to execute onUnregisterDo', [
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'invokerLabel' => $label
-                ]);
-                return null;
-            }
-        };
+    public function evaluateRegistrationGate(
+        ?\Closure $registerIf,
+        array $registerIfParams,
+        string $label = '',
+        null|object|string $targetClass = null,
+    ): bool {
+        return $this->conditions->evaluateRegistrationGate($registerIf, $registerIfParams, $label, $targetClass);
     }
 
     /**
      * Invoke an opt-in hook debug probe with the emitted DTO.
-     *
-     * Resolution per parameter (in order):
-     *  1. the emitted DTO when its type matches,
-     *  2. the live owner for `self`/`static` (or any type the owner satisfies),
-     *  3. the DI container by type,
-     *  4. the declared default.
      *
      * In owner-optional mode (lifecycle emissions that may fire during
      * teardown), a `self`/`static` parameter is NEVER satisfied from the
@@ -412,11 +147,6 @@ class WPHookPlanProvider
      * the probe is skipped with a logged contract error. Other dependencies
      * still resolve through the container, but a mid-teardown failure falls
      * back to defaults instead of aborting the probe.
-     *
-     * Variadic parameters are ignored. A missing owner means `self` falls
-     * through to container resolution — which may CONSTRUCT the service; see
-     * the attribute PHPDoc. Failures are logged and swallowed so a probe can
-     * never interrupt the hook lifecycle.
      *
      * @param CallablePlan $plan precomputed plan for the debug closure
      */
@@ -433,7 +163,7 @@ class WPHookPlanProvider
         }
 
         try {
-            $callable = $owner !== null ? $this->bindToTarget($debug, $plan, $owner::class) : $debug;
+            $callable = $owner !== null ? $this->resolver->bindToTarget($debug, $plan, $owner::class) : $debug;
 
             $values = [];
             foreach ($plan['params'] ?? [] as $param) {
@@ -457,8 +187,6 @@ class WPHookPlanProvider
     }
 
     /**
-     * Resolve one debug-probe parameter: DTO → live owner → container → default.
-     *
      * @param CallableHookParams $param
      */
     private function resolveDebugParameter(
@@ -522,298 +250,6 @@ class WPHookPlanProvider
             throw HookDebugProbeException::unresolved($label, $param['name'] ?? 'unknown', $type);
         }
 
-        return $this->resolveCallableParam($param, $label);
-    }
-
-    /**
-     * Resolve a dynamic tag callable at registration time.
-     *
-     * The callable receives the target instance (typed params resolve from
-     * the container; bindToTarget scope-binds for private access) and must
-     * return the full resolved tag list.
-     *
-     * @param CallablePlan $plan
-     *
-     * @return array<int, string>
-     *
-     * @throws RuntimeException when the callable does not return an array
-     */
-    public function resolveTagCallable(
-        \Closure $tagCallable,
-        array $plan,
-        string $label = '',
-        null|object|string $targetClass = null,
-    ): array {
-        $targetInstance = null;
-        if (is_object($targetClass)) {
-            $targetInstance = $targetClass;
-            $targetClass = $targetClass::class;
-        }
-
-        $tagCallable = $this->bindToTarget($tagCallable, $plan, $targetClass);
-        $values = $this->resolveCallableParameters($tagCallable, $plan, $label, [], $targetInstance);
-        $result = $tagCallable(...$values);
-
-        if (!is_array($result)) {
-            throw new RuntimeException(
-                'Tag callable for ' . $label . ' must return array, got ' . get_debug_type($result)
-            );
-        }
-
-        return $result;
-    }
-
-    /**
-     * Evaluate a registerIf registration gate for a hook.
-     *
-     * Evaluated ONCE at registration time (not per fire). A null gate always
-     * allows registration; the closure must return a bool.
-     *
-     * Scope binding behaves exactly like {@see evaluateExecuteIf()}: a
-     * non-static gate closure receives the resolved service instance as
-     * `$this`, a static one is scope-bound only.
-     *
-     * @param CallablePlan $registerIfParams
-     *
-     * @throws RuntimeException when the gate does not return bool
-     */
-    public function evaluateRegistrationGate(
-        ?\Closure $registerIf,
-        array $registerIfParams,
-        string $label = '',
-        null|object|string $targetClass = null,
-    ): bool {
-        if ($registerIf === null) {
-            return true;
-        }
-
-        $targetInstance = null;
-        if (is_object($targetClass)) {
-            $targetInstance = $targetClass;
-            $targetClass = $targetClass::class;
-        }
-
-        $registerIf = $this->bindToTarget($registerIf, $registerIfParams, $targetClass);
-
-        // Fast path: zero-parameter gates are invoked directly.
-        if (($registerIfParams['params'] ?? []) === []) {
-            try {
-                $allowed = $registerIf();
-                if (is_bool($allowed)) {
-                    return $allowed;
-                }
-
-                // Zero-parameter gate with a non-bool result: fail right away —
-                // falling through would invoke the gate a second time.
-                throw new RuntimeException(
-                    'registerIf gate for ' . $label . ' must return bool, got ' . get_debug_type($allowed)
-                );
-            } catch (\ArgumentCountError) {
-                // Closure actually has parameters — fall through to resolution.
-            }
-        }
-
-        $values = $this->resolveCallableParameters($registerIf, $registerIfParams, $label, [], $targetInstance);
-        $allowed = $registerIf(...$values);
-
-        if (!is_bool($allowed)) {
-            throw new RuntimeException(
-                'registerIf gate for ' . $label . ' must return bool, got ' . get_debug_type($allowed)
-            );
-        }
-
-        return $allowed;
-    }
-
-    /**
-     * Extract parameter names from a property's callable value or default value.
-     *
-     * Handles standard properties (default values), initialized property hooks,
-     * and live object instances.
-     *
-     * @param \ReflectionProperty $property from Attribute #Action/#Filter
-     * @param object|null $instance Optional runtime instance to execute getters/hooks.
-     *
-     * @return array<int, string>
-     */
-    public function extractPropertyCallableParamNames(\ReflectionProperty $property, ?object $instance = null): array
-    {
-        return array_map(
-            static fn(array $param): string => $param['name'],
-            $this->extractPropertyCallablePlan($property, $instance)['params'],
-        );
-    }
-
-
-    /**
-     * Bind a gate closure to the target class scope before invocation.
-     *
-     * Plan-driven: uses the closure metadata captured at scan time, so no
-     * reflection happens on the hot path.
-     *
-     * The scopeClass captured at scan time is deliberately NOT trusted as a
-     * no-op signal: when the exported hooks cache is `require`d from inside
-     * the scanner, `scopeClass` only used for unit test. Binding is ALWAYS applied
-     * when a target class is given — the WeakMap memoizes one bound closure
-     * per (closure, target) pair, so repeated evaluations (per fire, per
-     * deferred activation) reuse it instead of re-allocating.
-     *
-     * Attribute-argument closures are static by rule, so only a scope-only
-     * bind is needed (no instantiation).
-     *
-     * @param CallablePlan $plan
-     */
-    private function bindToTarget(\Closure $closure, array $plan, ?string $targetClass): \Closure
-    {
-        if ($targetClass === null) {
-            return $closure;
-        }
-
-        if (!isset($this->boundClosureCache[$closure])) $this->boundClosureCache[$closure] = [];
-
-        return $this->boundClosureCache[$closure][$targetClass]
-            ??= \Closure::bind($closure, null, $targetClass);
-    }
-
-    /**
-     * Reflection-based parameter resolution for callables without a plan.
-     *
-     * @return array<int, mixed>
-     *
-     * @throws RuntimeException when a parameter cannot be resolved
-     */
-    private function resolveCallableFallback(
-        \Closure $callable,
-        string $label = ''
-    ): array {
-        $reflect = new ReflectionFunction($callable);
-        $values = [];
-
-        foreach ($reflect->getParameters() as $param) {
-            $type = $param->getType();
-            $resolved = false;
-
-            if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
-                $className = $reflect->getClosureScopeClass()?->getName();
-
-                if ($className !== null && $this->container->has($className)) {
-                    $values[] = $this->container->get($className);
-                    $resolved = true;
-                }
-            } elseif ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
-                $className = $type->getName();
-                if ($this->container->has($className)) {
-                    $values[] = $this->container->get($className);
-                    $resolved = true;
-                }
-            }
-
-            if (!$resolved) {
-                if ($param->isDefaultValueAvailable()) {
-                    $values[] = $param->getDefaultValue();
-                } else {
-                    throw new RuntimeException(sprintf(
-                        'Cannot resolve parameter $%s for condition closure in %s: Class not in container and no default value set.',
-                        $param->getName(),
-                        $label
-                    ));
-                }
-            }
-        }
-
-        return $values;
-    }
-
-    /**
-     * Resolve a callable's parameters from the container, using the
-     * pre-computed plan when available and reflection as a fallback.
-     *
-     * @param CallablePlan $plan
-     * @param list<CallableHookParams> $hookArgs
-     * @param object|ModuleClassHookMetadata $instanceTarget supplied live instance from instanceRegistry
-     *
-     * @return array<int, mixed>
-     *
-     * @throws RuntimeException when a parameter cannot be resolved
-     */
-    private function resolveCallableParameters(
-        \Closure $callable,
-        array $plan,
-        string $label = '',
-        array $hookArgs = [],
-        ?object $instanceTarget = null,
-        ?string $variadicHookArg = null
-    ): array {
-        $params = $plan['params'] ?? [];
-
-        if ($params === []) return $this->resolveCallableFallback($callable, $label);
-
-        $values = [];
-        foreach ($params as $param) {
-            // A variadic closure parameter mirrors the HANDLER's variadic
-            // bucket (the name must match $variadicHookArg): splat the
-            // whole remainder, letting the caller dissect it manually.
-            // An unmatched variadic parameter captures nothing — it never
-            // falls back to the container.
-            if (($param['isVariadic'] ?? false)) {
-                if (
-                    $variadicHookArg !== null
-                    && $param['name'] === $variadicHookArg
-                    && isset($hookArgs[$param['name']])
-                    && is_array($hookArgs[$param['name']])
-                ) {
-                    array_push($values, ...$hookArgs[$param['name']]);
-                }
-                continue;
-            }
-
-            // Exact parameter-name match wins — hook arguments are injected
-            // by name (e.g. `string $search` receives the handler's $search
-            // argument), removing any scalar-ambiguity.
-            if (array_key_exists($param['name'], $hookArgs)) {
-                $values[] = $hookArgs[$param['name']];
-                continue;
-            }
-
-            /**
-             * for `self` type in closure attribute
-             * for non extending Module but it's resolvable by container, continue to @see self::resolveCallableParam()
-             */
-            if (
-                ($param['type'] ?? null) === 'self'
-                && $instanceTarget !== null
-            ) {
-                $values[] = $instanceTarget;
-                continue;
-            }
-
-            $values[] = $this->resolveCallableParam($param, $label);
-        }
-
-        return $values;
-    }
-
-    /**
-     * @param CallableHookParams $param
-     *
-     * @throws RuntimeException when the parameter cannot be resolved
-     */
-    private function resolveCallableParam(array $param, string $label = ''): mixed
-    {
-        $type = $param['type'] ?? null;
-
-        if (is_string($type) && $type !== '' && $this->container->has($type)) {
-            return $this->container->get($type);
-        }
-
-        if (!empty($param['hasDefault'])) {
-            return array_key_exists('default', $param) ? $param['default'] : null;
-        }
-
-        throw new RuntimeException(sprintf(
-            'Cannot resolve parameter $%s for condition closure in %s: Class not in container and no default value set.',
-            $param['name'] ?? 'unknown',
-            $label
-        ));
+        return $this->resolver->resolveCallableParam($param, $label);
     }
 }
