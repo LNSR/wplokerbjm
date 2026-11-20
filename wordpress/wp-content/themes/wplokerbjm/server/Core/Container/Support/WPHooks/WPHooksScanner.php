@@ -134,6 +134,10 @@ class WPHooksScanner
                         once: $attr->once,
                         onUnregisterDo: $attr->onUnregisterDo,
                         onUnregisterDoParams: $this->hookPlanProvider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
+                        debugDeferredRegistration: $attr->debugDeferredRegistration,
+                        debugDeferredRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugDeferredRegistration),
+                        debugLiveRegistration: $attr->debugLiveRegistration,
+                        debugLiveRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveRegistration),
                     );
                 });
 
@@ -165,6 +169,10 @@ class WPHooksScanner
                         once: $attr->once,
                         onUnregisterDo: $attr->onUnregisterDo,
                         onUnregisterDoParams: $this->hookPlanProvider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
+                        debugDeferredRegistration: $attr->debugDeferredRegistration,
+                        debugDeferredRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugDeferredRegistration),
+                        debugLiveRegistration: $attr->debugLiveRegistration,
+                        debugLiveRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveRegistration),
                     );
                 });
             } catch (\RuntimeException $e) {

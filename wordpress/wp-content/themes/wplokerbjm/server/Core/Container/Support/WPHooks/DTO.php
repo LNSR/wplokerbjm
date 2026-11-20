@@ -113,7 +113,11 @@ final readonly class HookKey extends AbstractDataObject
  *  deferRegisterUntilHookParams: CallablePlan,
  *  once: bool,
  *  onUnregisterDo: null|\Closure(...): void,
- *  onUnregisterDoParams: CallablePlan
+ *  onUnregisterDoParams: CallablePlan,
+ *  debugDeferredRegistration: null|\Closure(...): void,
+ *  debugDeferredRegistrationParams: CallablePlan,
+ *  debugLiveRegistration: null|\Closure(...): void,
+ *  debugLiveRegistrationParams: CallablePlan
  * }
  * @extends parent<HookType>
  */
@@ -144,6 +148,10 @@ final readonly class HookRegistration extends AbstractDataObject
      * @param HookType['onUnregisterDo'] $onUnregisterDo
      * @param HookType['onUnregisterDoParams']
      * @param HookType['attributeIndex'] $attributeIndex
+     * @param HookType['debugDeferredRegistration'] $debugDeferredRegistration
+     * @param HookType['debugDeferredRegistrationParams'] $debugDeferredRegistrationParams
+     * @param HookType['debugLiveRegistration'] $debugLiveRegistration
+     * @param HookType['debugLiveRegistrationParams'] $debugLiveRegistrationParams
      */
     public function __construct(
         public string $class,
@@ -170,6 +178,10 @@ final readonly class HookRegistration extends AbstractDataObject
         public ?\Closure $onUnregisterDo = null,
         public array $onUnregisterDoParams = [],
         public int $attributeIndex = 0,
+        public ?\Closure $debugDeferredRegistration = null,
+        public array $debugDeferredRegistrationParams = [],
+        public ?\Closure $debugLiveRegistration = null,
+        public array $debugLiveRegistrationParams = [],
     ) {}
 }
 #endregion
@@ -209,6 +221,10 @@ final readonly class HookRegistration extends AbstractDataObject
  *  visibility: 'public'|'protected'|'private',
  *  onUnregisterDo: ?\Closure(...):void,
  *  onUnregisterDoParams: CallablePlan,
+ *  debugDeferredRegistration: null|\Closure(...): void,
+ *  debugDeferredRegistrationParams: CallablePlan,
+ *  debugLiveRegistration: null|\Closure(...): void,
+ *  debugLiveRegistrationParams: CallablePlan,
  * }
  * @extends parent<InstanceHookMetadataData>
  */
@@ -233,6 +249,10 @@ final readonly class InstanceHookMetadata extends AbstractDataObject
      * @param InstanceHookMetadataData['visibility'] $visibility
      * @param InstanceHookMetadataData['onUnregisterDo'] $onUnregisterDo
      * @param InstanceHookMetadataData['onUnregisterDoParams'] $onUnregisterDoParams
+     * @param InstanceHookMetadataData['debugDeferredRegistration'] $debugDeferredRegistration
+     * @param InstanceHookMetadataData['debugDeferredRegistrationParams'] $debugDeferredRegistrationParams
+     * @param InstanceHookMetadataData['debugLiveRegistration'] $debugLiveRegistration
+     * @param InstanceHookMetadataData['debugLiveRegistrationParams'] $debugLiveRegistrationParams
      */
     public function __construct(
         public string $hook,
@@ -252,7 +272,11 @@ final readonly class InstanceHookMetadata extends AbstractDataObject
         public string $visibility = 'public',
         public ?\Closure $onUnregisterDo = null,
         public array $onUnregisterDoParams = [],
-        public bool $deferRegister = false
+        public bool $deferRegister = false,
+        public ?\Closure $debugDeferredRegistration = null,
+        public array $debugDeferredRegistrationParams = [],
+        public ?\Closure $debugLiveRegistration = null,
+        public array $debugLiveRegistrationParams = [],
     ) {}
 }
 #endregion

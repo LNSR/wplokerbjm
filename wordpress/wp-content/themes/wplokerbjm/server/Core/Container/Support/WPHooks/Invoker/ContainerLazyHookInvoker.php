@@ -6,6 +6,7 @@ use Closure;
 use HookType;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveDebugPhase;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{WPHookPlanProvider};
@@ -39,10 +40,13 @@ trait ContainerLazyHookInvokerTrait
     private function executeHook(array $args): mixed
     {
 
+        $debugStart = \hrtime(true);
+        $this->emitLiveDebug(LiveDebugPhase::Dispatching, registered: true);
         try {
             $this->dispatching = true;
             if ($this->once) {
                 if ($this->consumed) {
+                    $this->emitLiveOutcome(LiveDebugPhase::Skipped, 'skipped', $debugStart);
                     return $this->filterPassthrough($args);
                 }
                 $this->consumed = true;
@@ -60,25 +64,27 @@ trait ContainerLazyHookInvokerTrait
                         $this->variadicHookArgName()
                     );
                 } catch (\RuntimeException $e) {
-                    Logger::error(
-                        __METHOD__,
-                        'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
-                        [
-                            'message' => $e->getMessage(),
-                            'trace' => $e->getTraceAsString(),
-                            'file' => $e->getFile(),
-                            'line' => $e->getLine(),
-                        ]
-                    );
+                    // Logger::error(
+                    //     __METHOD__,
+                    //     'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
+                    //     [
+                    //         'message' => $e->getMessage(),
+                    //         'trace' => $e->getTraceAsString(),
+                    //         'file' => $e->getFile(),
+                    //         'line' => $e->getLine(),
+                    //     ]
+                    // );
                     $gatePassed = true;
+                    $this->emitLiveOutcome(LiveDebugPhase::Failed, 'failed', $debugStart, error: $e);
                     return $this->filterPassthrough($args);
                 }
 
                 if (!$gatePassed) {
-                    Logger::info(
-                        __METHOD__,
-                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
-                    );
+                    // Logger::info(
+                    //     __METHOD__,
+                    //     'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
+                    // );
+                    $this->emitLiveOutcome(LiveDebugPhase::Skipped, 'skipped', $debugStart, error: new \RuntimeException('executeIf returned false'));
                     return $this->filterPassthrough($args);
                 }
             }
@@ -86,15 +92,17 @@ trait ContainerLazyHookInvokerTrait
             $instance = $this->container->get($this->class);
             $result = $this->invokeOn($instance, ...$args);
 
-            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
+            // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
+            $this->emitLiveOutcome(LiveDebugPhase::Completed, 'completed', $debugStart, result: $result, owner: $instance);
             return $result;
         } catch (\Throwable $e) {
-            Logger::error(__METHOD__, "Error invoking hook {$this->label}: ", [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
+            // Logger::error(__METHOD__, "Error invoking hook {$this->label}: ", [
+            //     'error' => $e->getMessage(),
+            //     'trace' => $e->getTraceAsString(),
+            //     'file' => $e->getFile(),
+            //     'line' => $e->getLine(),
+            // ]);
+            $this->emitLiveOutcome(LiveDebugPhase::Failed, 'failed', $debugStart, error: $e);
             return $this->filterPassthrough($args);
         } finally {
             $this->consumeOnceAndClean();
@@ -145,9 +153,16 @@ final class ContainerLazyHookInvoker
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
         private readonly ?\Closure $onUnregisterDo = null,
-        private readonly array $onUnregisterDoParams = []
+        private readonly array $onUnregisterDoParams = [],
+        private readonly ?\Closure $debugDeferredRegistration = null,
+        private readonly array $debugDeferredRegistrationParams = [],
+        private readonly ?\Closure $debugLiveRegistration = null,
+        private readonly array $debugLiveRegistrationParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->method;
+        $this->debugClass = $this->class;
+        $this->debugMember = $this->method;
+        $this->debugTarget = 'method';
 
         if ($this->visibility !== 'public') {
             $this->invoker = self::$methodInvokerCache[$this->class] ??= \Closure::bind(
@@ -218,9 +233,16 @@ final class ContainerLazyPropertyHookInvoker
         private readonly array $hookArgNames = [],
         public readonly bool $once = false,
         private readonly ?\Closure $onUnregisterDo = null,
-        public readonly array $onUnregisterDoParams = []
+        public readonly array $onUnregisterDoParams = [],
+        private readonly ?\Closure $debugDeferredRegistration = null,
+        private readonly array $debugDeferredRegistrationParams = [],
+        private readonly ?\Closure $debugLiveRegistration = null,
+        private readonly array $debugLiveRegistrationParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->property;
+        $this->debugClass = $this->class;
+        $this->debugMember = $this->property;
+        $this->debugTarget = 'property';
 
         if ($this->visibility !== 'public') {
             $this->reader = self::$classPropertyClosureCache[$this->class] ??= \Closure::bind(

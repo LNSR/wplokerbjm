@@ -6,6 +6,7 @@ use InstanceHookMetadataData;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveDebugPhase;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
@@ -34,6 +35,8 @@ trait RuntimeInstanceInvokerTrait
     public function __invoke(mixed ...$args): mixed
     {
 
+        $debugStart = \hrtime(true);
+        $this->emitLiveDebug(LiveDebugPhase::Dispatching, registered: true);
         try {
             $this->dispatching = true;
 
@@ -41,11 +44,13 @@ trait RuntimeInstanceInvokerTrait
             if ($instance === null) {
                 // Owner instance is gone — nuke the hook (instance-lifetime scoping).
                 $this->consumeLifetimeAndClean();
+                $this->emitLiveOutcome(LiveDebugPhase::Skipped, 'skipped', $debugStart, ownerAlive: false);
                 return $this->filterPassthrough($args);
             }
 
             if ($this->once) {
                 if ($this->consumed) {
+                    $this->emitLiveOutcome(LiveDebugPhase::Skipped, 'skipped', $debugStart, owner: $instance);
                     return $this->filterPassthrough($args);
                 }
                 $this->consumed = true;
@@ -56,42 +61,46 @@ trait RuntimeInstanceInvokerTrait
                 try {
                     $gatePassed = $this->hookPlanProvider->evaluateExecuteIf($this->executeIf, $this->executeIfParams, $this->label, $instance, $this->buildHookArgs($args), $this->variadicHookArgName());
                 } catch (\RuntimeException $e) {
-                    Logger::error(
-                        __METHOD__,
-                        'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
-                        [
-                            'message' => $e->getMessage(),
-                            'trace' => $e->getTraceAsString(),
-                            'file' => $e->getFile(),
-                            'line' => $e->getLine(),
-                        ]
-                    );
+                    // Logger::error(
+                    //     __METHOD__,
+                    //     'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
+                    //     [
+                    //         'message' => $e->getMessage(),
+                    //         'trace' => $e->getTraceAsString(),
+                    //         'file' => $e->getFile(),
+                    //         'line' => $e->getLine(),
+                    //     ]
+                    // );
                     $gatePassed = true;
+                    $this->emitLiveOutcome(LiveDebugPhase::Failed, 'failed', $debugStart, error: $e, owner: $instance);
                     return $this->filterPassthrough($args);
                 }
 
                 if (!$gatePassed) {
-                    Logger::info(__METHOD__, 'Skipping hook ' . $this->label . ' — executeIf gate returned false.');
+                    // Logger::info(__METHOD__, 'Skipping hook ' . $this->label . ' — executeIf gate returned false.');
+                    $this->emitLiveOutcome(LiveDebugPhase::Skipped, 'skipped', $debugStart, error: new \RuntimeException('executeIf returned false'), owner: $instance);
                     return $this->filterPassthrough($args);
                 }
             }
 
             $result = $this->invokeOn($instance, ...$args);
 
-            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
+            // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
 
+            $this->emitLiveOutcome(LiveDebugPhase::Completed, 'completed', $debugStart, result: $result, owner: $instance);
             return $result;
         } catch (\Throwable $e) {
-            Logger::error(
-                __METHOD__,
-                'Error invoking hook ' . $this->label . ': ',
-                [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                ],
-            );
+            // Logger::error(
+            //     __METHOD__,
+            //     'Error invoking hook ' . $this->label . ': ',
+            //     [
+            //         'error' => $e->getMessage(),
+            //         'trace' => $e->getTraceAsString(),
+            //         'file' => $e->getFile(),
+            //         'line' => $e->getLine(),
+            //     ],
+            // );
+            $this->emitLiveOutcome(LiveDebugPhase::Failed, 'failed', $debugStart, error: $e);
             return $this->filterPassthrough($args);
         } finally {
             $this->consumeOnceAndClean();
@@ -125,16 +134,16 @@ trait RuntimeInstanceInvokerTrait
             $this->removed = true;
             ($this->removeCallback)($this);
         } catch (\Throwable $e) {
-            Logger::error(
-                __METHOD__,
-                'Error removing lifetime hook ' . $this->label . ': ',
-                [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                ],
-            );
+            // Logger::error(
+            //     __METHOD__,
+            //     'Error removing lifetime hook ' . $this->label . ': ',
+            //     [
+            //         'error' => $e->getMessage(),
+            //         'trace' => $e->getTraceAsString(),
+            //         'file' => $e->getFile(),
+            //         'line' => $e->getLine(),
+            //     ],
+            // );
         }
     }
 }
@@ -188,6 +197,10 @@ final class RuntimeInstanceHookInvoker
         public readonly bool $once = false,
         private readonly ?\Closure $onUnregisterDo = null,
         public readonly array $onUnregisterDoParams = [],
+        private readonly ?\Closure $debugDeferredRegistration = null,
+        private readonly array $debugDeferredRegistrationParams = [],
+        private readonly ?\Closure $debugLiveRegistration = null,
+        private readonly array $debugLiveRegistrationParams = [],
     ) {
         $instance = $this->instanceRef->get();
         $objectId = \spl_object_id($instance);
@@ -195,6 +208,9 @@ final class RuntimeInstanceHookInvoker
         $this->label = $instance instanceof ModuleClassHookMetadata
             ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->method;
+        $this->debugClass = $instance instanceof ModuleClassHookMetadata ? $instance->parentClassString : $instance::class;
+        $this->debugMember = $instance instanceof ModuleClassHookMetadata ? $instance->parentProperty . '->' . $this->method : $this->method;
+        $this->debugTarget = 'method';
 
         if ($this->visibility !== 'public') {
 
@@ -265,6 +281,10 @@ final class RuntimeInstancePropertyHookInvoker
         public readonly bool $once = false,
         private readonly ?\Closure $onUnregisterDo = null,
         public readonly array $onUnregisterDoParams = [],
+        private readonly ?\Closure $debugDeferredRegistration = null,
+        private readonly array $debugDeferredRegistrationParams = [],
+        private readonly ?\Closure $debugLiveRegistration = null,
+        private readonly array $debugLiveRegistrationParams = [],
     ) {
         $instance = $this->instanceRef->get() ?? null;
         $objectId = \spl_object_id($instance);
@@ -272,6 +292,9 @@ final class RuntimeInstancePropertyHookInvoker
         $this->label = $instance instanceof ModuleClassHookMetadata
             ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->property;
+        $this->debugClass = $instance instanceof ModuleClassHookMetadata ? $instance->parentClassString : $instance::class;
+        $this->debugMember = $instance instanceof ModuleClassHookMetadata ? $instance->parentProperty . '->' . $this->property : $this->property;
+        $this->debugTarget = 'property';
 
         if ($this->visibility !== 'public') {
             // Bind inside the instance's class scope so

@@ -5,6 +5,11 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
+    DeferredActivationResultDTO,
+    DeferredDebugPhase,
+    DeferredRegistrationSnapshotDTO,
+};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler;
@@ -56,6 +61,33 @@ trait DeferredHooksTrait
         $this->deferredHandlers[$entry->toUniqueKey()] = $entry;
         $this->entriesIndexer->setIndexes($entry);
         $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes ??= $this->entriesIndexer->removeIndexes(...));
+        $this->emitDeferredSnapshot($entry, DeferredDebugPhase::Queued);
+    }
+
+    /**
+     * Emit one deferred phase for an entry, building its snapshot.
+     */
+    private function emitDeferredSnapshot(
+        DeferredHookEntryHandler $entry,
+        DeferredDebugPhase $phase,
+        ?DeferredActivationResultDTO $after = null,
+    ): void {
+        $owner = $entry->instance?->get();
+        $entry->handler->emitDeferredDebug(
+            $phase,
+            new DeferredRegistrationSnapshotDTO(
+                uniqueKey: $entry->toUniqueKey(),
+                deferRegister: true,
+                deferRegisterUntilHook: null,
+                tags: (array) ($entry->tags ?? []),
+                hasRegisterIf: $entry->registerIf !== null,
+                hasExecuteIf: $entry->executeIf !== null,
+                ownerAlive: $entry->instance === null || $owner !== null,
+            ),
+            $after,
+            $owner,
+            $owner !== null || $entry->instance === null,
+        );
     }
 
     /**
@@ -74,14 +106,43 @@ trait DeferredHooksTrait
         foreach ($keys as $key) {
             $entry = $this->deferredHandlers[$key] ?? null;
             if ($entry === null) continue;
+
+            $startedAt = \hrtime(true);
+            $poolBefore = \count($this->deferredHandlers);
+            $this->emitDeferredSnapshot($entry, DeferredDebugPhase::ActivationAttempt);
+
             if (!$this->gateDeferredActivation($entry)) {
+                $this->emitDeferredSnapshot($entry, DeferredDebugPhase::ActivationRejected, new DeferredActivationResultDTO(
+                    gatePassed: false,
+                    activated: false,
+                    reason: 'register_if_false',
+                    elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
+                    poolSizeBefore: $poolBefore,
+                    poolSizeAfter: \count($this->deferredHandlers),
+                ));
                 continue;
             }
             if (!$activateEntry($entry)) {
+                $this->emitDeferredSnapshot($entry, DeferredDebugPhase::ActivationFailed, new DeferredActivationResultDTO(
+                    gatePassed: true,
+                    activated: false,
+                    reason: 'activate_entry_returned_false',
+                    elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
+                    poolSizeBefore: $poolBefore,
+                    poolSizeAfter: \count($this->deferredHandlers),
+                ));
                 continue;
             }
             $activated++;
             unset($this->deferredHandlers[$key]);
+            $this->emitDeferredSnapshot($entry, DeferredDebugPhase::Activated, new DeferredActivationResultDTO(
+                gatePassed: true,
+                activated: true,
+                reason: 'activated',
+                elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
+                poolSizeBefore: $poolBefore,
+                poolSizeAfter: \count($this->deferredHandlers),
+            ));
         }
         return $activated;
     }
@@ -101,6 +162,7 @@ trait DeferredHooksTrait
                 continue;
             }
             unset($this->deferredHandlers[$key]);
+            $this->emitDeferredSnapshot($entry, DeferredDebugPhase::Released);
         }
     }
 

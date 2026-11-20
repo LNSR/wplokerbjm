@@ -89,6 +89,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * | `$executeIf`              | yes               | yes                     |
  * | `$once`                   | yes               | yes                     |
  * | `$onUnregisterDo`         | yes               | yes                     |
+ * | `$debugDeferredRegistration` | yes            | yes                     |
+ * | `$debugLiveRegistration`  | yes               | yes                     |
  *
  * ---------------------------------------------------------------------------
  * ## Known limitations
@@ -280,6 +282,33 @@ abstract class BaseHookAttribute
      * ! if the owner dies first the chain event command cleanup still runs from the invoker's
      * ! destructor.
      * ! This assume no application smell code mutate global $wp_filter directly
+     * @param (\Closure(TParams...): void)|null $debugDeferredRegistration
+     *   Observability probe for the deferred-pool lifecycle. Invoked with a
+     *   {@see \WPLokerBJM\Core\Container\Support\WPHooks\Debug\DeferredRegistrationInfoDTO}
+     *   on every deferred phase (`queued`, `activation_attempt`,
+     *   `activation_rejected`, `activated`, `activation_failed`, `released`).
+     * * Opt-in: `null` costs nothing — no DTO is built and no branch is taken
+     *   beyond the null check.
+     * * The DTO is transient: the framework keeps no reference. Call
+     *   `$dto->toArray()` if you need to retain the snapshot.
+     * * Parameters resolve from the DTO (by type), `self`/the live owner,
+     *   then the DI container, then defaults. `LoggerInterface` works when
+     *   the application binds it upstream — the hook system ships no logger
+     *   binding of its own.
+     * ! `self` injection may **construct the service** when it is resolved
+     * ! from the container. Prefer `?self` (null before an owner exists) or
+     * ! pass the values you actually need.
+     * * Never invoked from PHP destructors; release events come from explicit
+     *   release paths only.
+     * * A throwing probe is logged and never interrupts the hook lifecycle.
+     * @param (\Closure(TParams...): void)|null $debugLiveRegistration
+     *   Observability probe for live registrations. Invoked with a
+     *   {@see \WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveRegistrationInfoDTO}
+     *   on `registered`, `dispatching`, `completed`, `failed` and `skipped`.
+     * * Same opt-in, transient-DTO, resolution and `self`-construction rules
+     *   as `$debugDeferredRegistration`.
+     * * Executed synchronously on the dispatch path: keep it cheap, and never
+     *   dispatch the same hook from inside the probe.
      */
     public function __construct(
         public readonly string|\Closure $hook,
@@ -292,6 +321,8 @@ abstract class BaseHookAttribute
         public bool $deferRegister = false,
         public readonly bool $once = false,
         public readonly ?\Closure $onUnregisterDo = null,
+        public readonly ?\Closure $debugDeferredRegistration = null,
+        public readonly ?\Closure $debugLiveRegistration = null,
     ) {
         $this->deferRegister = $deferRegisterUntilHook !== null ? true : $deferRegister;
     }

@@ -82,10 +82,10 @@ class InstanceRegistryRuntimeHookResolver
         }
 
         if (!is_object($instance) || !is_string($targetName) || $targetName === '') {
-            Logger::warning(
-                self::class,
-                'unregisterByCallableInLiveInstance() expects [$liveInstance, \'member\'], a first-class callable/property-hook closure bound to the live instance, or an invokable object.',
-            );
+            // Logger::warning(
+            //     self::class,
+            //     'unregisterByCallableInLiveInstance() expects [$liveInstance, \'member\'], a first-class callable/property-hook closure bound to the live instance, or an invokable object.',
+            // );
 
             return [null, null];
         }

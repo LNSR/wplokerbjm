@@ -189,7 +189,7 @@ class InstanceRegistryDeferredHookManager
         $entry->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
             if (!\has_action($triggerHook, $cb, PHP_INT_MIN)) return;
             \remove_action($triggerHook, $cb, PHP_INT_MIN);
-            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+            // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
         });
     }
 
@@ -242,12 +242,12 @@ class InstanceRegistryDeferredHookManager
                 $owner,
             );
         } catch (\Throwable $e) {
-            Logger::warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate threw: ' . $e->getMessage());
+            // Logger::warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate threw: ' . $e->getMessage());
             return false;
         }
 
         if (!$allowed) {
-            Logger::warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate returned false.');
+            // Logger::warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate returned false.');
             return false;
         }
 

@@ -4,12 +4,25 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
+    DeferredActivationResultDTO,
+    DeferredDebugPhase,
+    DeferredRegistrationInfoDTO,
+    DeferredRegistrationSnapshotDTO,
+    HookDebugContext,
+    LiveDebugPhase,
+    LiveExecutionResultDTO,
+    LiveRegistrationInfoDTO,
+    LiveRegistrationSnapshotDTO,
+};
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     ContainerLazyHookInvoker,
     ContainerLazyPropertyHookInvoker,
     RuntimeInstanceHookInvoker,
     RuntimeInstancePropertyHookInvoker,
 };
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
 use WPLokerBJM\Shared\Log\Logger;
 
@@ -52,6 +65,173 @@ trait HookInvokerTrait
 
     /** template closure for caching stateless closure */
     private static ?\Closure $templateClosure = null;
+
+    /** Debug descriptor parts, filled by each invoker constructor. */
+    private string $debugClass = '';
+    private string $debugMember = '';
+    /** @var 'method'|'property'|'property-hook' */
+    private string $debugTarget = 'method';
+
+    /**
+     * Emit one live-registration debug payload (registered/dispatching/...).
+     *
+     * No-op when the registration has no `debugLiveRegistration` probe.
+     */
+    public function emitLiveDebug(
+        LiveDebugPhase $phase,
+        bool $registered = true,
+        ?LiveExecutionResultDTO $after = null,
+        ?object $owner = null,
+        bool $ownerAlive = true,
+    ): void {
+        $debug = $this->debugLiveRegistration ?? null;
+        if ($debug === null) return;
+        $provider = $this->debugProvider();
+        if ($provider === null) return;
+
+        try {
+            $provider->invokeHookDebug(
+                $debug,
+                $this->debugLiveRegistrationParams,
+                new LiveRegistrationInfoDTO(
+                    phase: $phase,
+                    context: $this->debugContext($owner),
+                    before: new LiveRegistrationSnapshotDTO(
+                        registered: $registered,
+                        consumed: $this->consumed,
+                        executions: $this->numberExecutions,
+                        ownerAlive: $ownerAlive,
+                    ),
+                    after: $after,
+                ),
+                $this->label,
+                $owner,
+            );
+        } catch (\Throwable $e) {
+            Logger::error(__METHOD__, 'Failed emitting live debug payload for ' . $this->label, [
+                'phase' => $phase->value,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+        }
+    }
+
+    /**
+     * Emit one deferred-lifecycle debug payload (queued/activation/...).
+     *
+     * No-op when the registration has no `debugDeferredRegistration` probe.
+     */
+    public function emitDeferredDebug(
+        DeferredDebugPhase $phase,
+        DeferredRegistrationSnapshotDTO $before,
+        ?DeferredActivationResultDTO $after = null,
+        ?object $owner = null,
+        bool $ownerAlive = true,
+    ): void {
+        $debug = $this->debugDeferredRegistration ?? null;
+        if ($debug === null) return;
+        $provider = $this->debugProvider();
+        if ($provider === null) return;
+
+        try {
+            $provider->invokeHookDebug(
+                $debug,
+                $this->debugDeferredRegistrationParams,
+                new DeferredRegistrationInfoDTO(
+                    phase: $phase,
+                    context: $this->debugContext($owner),
+                    before: $before,
+                    after: $after,
+                ),
+                $this->label,
+                $owner,
+            );
+        } catch (\Throwable $e) {
+            Logger::error(__METHOD__, 'Failed emitting deferred debug payload for ' . $this->label, [
+                'phase' => $phase->value,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+        }
+    }
+
+    /**
+     * Container invokers carry `$planProvider`; runtime invokers `$hookPlanProvider`.
+     */
+    private function debugProvider(): ?WPHookPlanProvider
+    {
+        if (property_exists($this, 'planProvider')) {
+            /** @var WPHookPlanProvider $provider */
+            $provider = $this->planProvider;
+            return $provider;
+        }
+
+        /** @var WPHookPlanProvider|null $provider */
+        $provider = $this->hookPlanProvider ?? null;
+        return $provider;
+    }
+
+    /**
+     * Emit a terminal live outcome (completed/failed/skipped) with timing.
+     */
+    private function emitLiveOutcome(
+        LiveDebugPhase $phase,
+        string $status,
+        int $startedAt,
+        mixed $result = null,
+        ?\Throwable $error = null,
+        ?object $owner = null,
+        bool $ownerAlive = true,
+    ): void {
+        $this->emitLiveDebug(
+            $phase,
+            after: new LiveExecutionResultDTO(
+                status: $status,
+                elapsedUs: $this->elapsedUs($startedAt),
+                returnType: $result !== null ? get_debug_type($result) : null,
+                errorClass: $error !== null ? $error::class : null,
+                errorMessage: $error?->getMessage(),
+                executionsAfter: $this->numberExecutions,
+            ),
+            owner: $owner,
+            ownerAlive: $ownerAlive,
+        );
+    }
+
+    private function elapsedUs(int $startedAt): int
+    {
+        return (int) ((\hrtime(true) - $startedAt) / 1000);
+    }
+
+    /**
+     * Build the stable identity block shared by every debug payload.
+     */
+    private function debugContext(?object $owner = null): HookDebugContext    {
+        $isRuntime = property_exists($this, 'instanceRef');
+        $owner ??= $isRuntime ? (($this->instanceRef)->get() ?? null) : null;
+
+        $ownerClass = $this->debugClass;
+        if ($ownerClass === '' && $owner !== null) {
+            $ownerClass = $owner instanceof ModuleClassHookMetadata ? $owner->parentClassString : $owner::class;
+        }
+
+        return new HookDebugContext(
+            path: $isRuntime ? 'runtime' : 'container',
+            hook: $this->hookName,
+            type: $this->type,
+            priority: $this->priority,
+            acceptedArgs: $this->acceptedArgs,
+            once: $this->once,
+            label: $this->label,
+            class: $ownerClass !== '' ? $ownerClass : null,
+            member: $this->debugMember !== '' ? $this->debugMember : null,
+            target: $this->debugTarget,
+            visibility: $this->visibility,
+            ownerId: $owner !== null ? \spl_object_id($owner) : null,
+        );
+    }
     /**
      * Attach the scheduler removal callback (set by the owning registry) so the handler
      * can nuke its own registrations when consumed (once) or when the owner

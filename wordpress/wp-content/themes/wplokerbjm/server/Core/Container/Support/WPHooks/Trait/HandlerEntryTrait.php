@@ -63,14 +63,15 @@ trait HandlerEntryTrait
         try {
             $this->handler->initOnUnregisterDoCallback();
         } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'Failed to prepare onUnregisterDo for ', [
-                'invokerLabel' => $this->handler->label,
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
+            // Logger::error(__METHOD__, 'Failed to prepare onUnregisterDo for ', [
+            //     'invokerLabel' => $this->handler->label,
+            //     'message' => $e->getMessage(),
+            //     'trace' => $e->getTraceAsString(),
+            //     'file' => $e->getFile(),
+            //     'line' => $e->getLine(),
+            // ]);
         }
+        $this->handler->emitLiveDebug(\WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveDebugPhase::Registered);
         return $this;
     }
 

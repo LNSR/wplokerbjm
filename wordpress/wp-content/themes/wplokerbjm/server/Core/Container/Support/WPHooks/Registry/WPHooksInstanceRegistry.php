@@ -199,6 +199,10 @@ class WPHooksInstanceRegistry
                     visibility: $visibility,
                     onUnregisterDo: $attr->onUnregisterDo,
                     onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
+                    debugDeferredRegistration: $attr->debugDeferredRegistration,
+                    debugDeferredRegistrationParams: $this->provider->buildCallablePlan($attr->debugDeferredRegistration instanceof \Closure ? $attr->debugDeferredRegistration : null),
+                    debugLiveRegistration: $attr->debugLiveRegistration,
+                    debugLiveRegistrationParams: $this->provider->buildCallablePlan($attr->debugLiveRegistration instanceof \Closure ? $attr->debugLiveRegistration : null),
                 );
 
                 if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
@@ -237,6 +241,10 @@ class WPHooksInstanceRegistry
                     visibility: $visibility,
                     onUnregisterDo: $attr->onUnregisterDo,
                     onUnregisterDoParams: $this->provider->buildCallablePlan($attr->onUnregisterDo instanceof \Closure ? $attr->onUnregisterDo : null),
+                    debugDeferredRegistration: $attr->debugDeferredRegistration,
+                    debugDeferredRegistrationParams: $this->provider->buildCallablePlan($attr->debugDeferredRegistration instanceof \Closure ? $attr->debugDeferredRegistration : null),
+                    debugLiveRegistration: $attr->debugLiveRegistration,
+                    debugLiveRegistrationParams: $this->provider->buildCallablePlan($attr->debugLiveRegistration instanceof \Closure ? $attr->debugLiveRegistration : null),
                 );
 
                 if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
@@ -476,7 +484,7 @@ class WPHooksInstanceRegistry
     private function scheduleAutoUnregister(object $instance, string $hook): void
     {
         if (\did_action($hook) >= 1) {
-            Logger::warning(__METHOD__, 'Hook ' . $hook . ' has passed lifecycle execution, cannot schedule unregister there');
+            // Logger::warning(__METHOD__, 'Hook ' . $hook . ' has passed lifecycle execution, cannot schedule unregister there');
             return;
         }
         $owner = \WeakReference::create($instance);
@@ -536,10 +544,10 @@ class WPHooksInstanceRegistry
                 $ownerLabel = $instance instanceof ModuleClassHookMetadata
                     ? $instance->parentClassString . '->' . $instance->parentProperty
                     : $instance::class;
-                Logger::info(
-                    __METHOD__,
-                    'registerIf for ' . $ownerLabel . '->' . $entryMeta->targetName . ' with hook ' . $entryMeta->hook . ' and priority ' . (string) $entryMeta->priority . ' skipped'
-                );
+                // Logger::info(
+                //     __METHOD__,
+                //     'registerIf for ' . $ownerLabel . '->' . $entryMeta->targetName . ' with hook ' . $entryMeta->hook . ' and priority ' . (string) $entryMeta->priority . ' skipped'
+                // );
                 return;
             }
         }
@@ -598,6 +606,10 @@ class WPHooksInstanceRegistry
                 once: $metadata->once,
                 onUnregisterDo: $metadata->onUnregisterDo,
                 onUnregisterDoParams: $metadata->onUnregisterDoParams,
+                debugDeferredRegistration: $metadata->debugDeferredRegistration,
+                debugDeferredRegistrationParams: $metadata->debugDeferredRegistrationParams,
+                debugLiveRegistration: $metadata->debugLiveRegistration,
+                debugLiveRegistrationParams: $metadata->debugLiveRegistrationParams,
             ),
             'property', 'property-hook' => new RuntimeInstancePropertyHookInvoker(
                 instanceRef: $weakRef,
@@ -614,6 +626,10 @@ class WPHooksInstanceRegistry
                 once: $metadata->once,
                 onUnregisterDo: $metadata->onUnregisterDo,
                 onUnregisterDoParams: $metadata->onUnregisterDoParams,
+                debugDeferredRegistration: $metadata->debugDeferredRegistration,
+                debugDeferredRegistrationParams: $metadata->debugDeferredRegistrationParams,
+                debugLiveRegistration: $metadata->debugLiveRegistration,
+                debugLiveRegistrationParams: $metadata->debugLiveRegistrationParams,
             ),
         };
         $entry = match ($isDeferred) {
@@ -676,7 +692,7 @@ class WPHooksInstanceRegistry
                 $this->weakRegistry[$owner] = $records;
                 $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                 $this->entriesByInvokers[$record->handler] = $record;
-                SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
+                // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
 
                 return true;
             };
@@ -704,7 +720,7 @@ class WPHooksInstanceRegistry
                     unset($this->entriesByInvokers[$invoker]);
                     $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                     $this->cleanUpInstance($entry);
-                    SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
+                    // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
                     return;
                 }
 
@@ -732,181 +748,5 @@ class WPHooksInstanceRegistry
             $this->weakRegistry[$owner],
             static fn(RuntimeRegistryHandlerEntry $record): bool => $record !== $entry,
         );
-    }
-}
-
-/**
- * File-backed metadata cache for runtime-registered hook sites.
- *
- * Anonymous hook classes extending ModuleClassHookMetadata carry a
- * stable (parentClass, parentProperty) pair that uniquely identifies the
- * property-hook site. The reflected metadata (resolved hook names, plans,
- * hook-arg names) for that site is accumulated in an in-memory buffer during
- * the request and flushed atomically to WPHooksInstanceObjectCache.php, so repeated
- * registerHooksOn() calls skip all reflection.
- *
- * Per-instance state (owner instance, WeakReference, remove callbacks) is
- * intentionally NOT cached — only scan-derived metadata.
- * 
- * @phpstan-import-type InstanceHookMetadataData from InstanceHookMetadata
- * @template TClass of class-string
- * @phpstan-type TCache array<TClass, array<property-string<TClass>&property-hook-string<TClass>, list<InstanceHookMetadata>&list<InstanceHookMetadataData>>>
- * @internal
- */
-class WPHooksInstanceObjectCache
-{
-
-    public private(set) bool $isDirty = false;
-
-    /**
-     * @param string|null $file file path cache to configure
-     */
-    public function __construct(private ?string $file = null)
-    {
-        $file !== null && $this->cacheState->loadCache();
-    }
-
-    public function __destruct()
-    {
-        if (!$this->isDirty) return;
-        $this->flush();
-    }
-
-    /** 
-     * @var class@anonymous::class
-     */
-    protected ?object $cacheState {
-        get {
-            return $this->cacheState ??= new class($this->file) {
-                public private(set) bool $alreadyLoaded = false;
-
-                /** @var TCache */
-                public array $bufferRuntime = [];
-                /** @var TCache */
-                public array $loadedCache = [];
-
-                public function __construct(private readonly ?string $file) {}
-
-                public function loadCache(): void
-                {
-                    if ($this->file === null || !is_readable($this->file)) {
-                        return;
-                    }
-                    $this->loadedCache = $this->mapCache(require $this->file, 'fromArray');
-                    $this->alreadyLoaded = true;
-                }
-
-                /**
-                 * @param TCache $cache
-                 * @return TCache
-                 */
-                public function extractCacheToArray(array $cache): array
-                {
-                    return $this->mapCache($cache, 'toArray');
-                }
-
-                /**
-                 * @template T
-                 * @param T $c
-                 * @param 'toArray'|'fromArray' $operation
-                 * @return TCache
-                 */
-                private function mapCache(array $c, string $operation): array
-                {
-                    return \array_map(
-                        // lvl1: parentClass
-                        static fn(array $sites): array => \array_map(
-                            // lvl2: parentProperty
-                            static fn(array $entries): array => \array_map(
-                                // lvl3: InstanceHookMetadata
-                                match ($operation) {
-                                    'toArray' => static fn(
-                                        /** @param InstanceHookMetadata|InstanceHookMetadataData $entry */
-                                        InstanceHookMetadata|array $entry
-                                    ): array => $entry instanceof InstanceHookMetadata ? $entry->toArray() : $entry,
-                                    'fromArray' => static fn(
-                                        /** @param InstanceHookMetadata|InstanceHookMetadataData $entry */
-                                        InstanceHookMetadata|array $entry
-                                    ): InstanceHookMetadata => $entry instanceof InstanceHookMetadata ? $entry : InstanceHookMetadata::fromArray($entry),
-                                },
-                                $entries,
-                            ),
-                            $sites,
-                        ),
-                        $c,
-                    );
-                }
-            };
-        }
-    }
-
-    /**
-     * Clear all runtime hooks cache.
-     */
-    public function clearCacheFile(): void
-    {
-        if (!empty($this->file) && file_exists($this->file)) {
-            try {
-                unlink($this->file);
-            } catch (\Throwable $th) {
-                Logger::Error(__METHOD__, 'Failed to clear cache file: ' . $th->getMessage());
-            }
-        }
-    }
-
-    /**
-     * @param class-string<TClass> $parentClass
-     * @param property-string<TClass>&property-hook-string<TClass> $parentProperty
-     *
-     * @return list<InstanceHookMetadata>|null
-     */
-    public function get(string $parentClass, string $parentProperty): ?array
-    {
-        return $this->cacheState->loadedCache[$parentClass][$parentProperty]
-            ?? $this->cacheState->bufferRuntime[$parentClass][$parentProperty]
-            ?? null;
-    }
-
-    /**
-     * @param class-string<TClass> $parentClass
-     * @param property-string<TClass>&property-hook-string<TClass> $parentProperty
-     * @param list<InstanceHookMetadata> $metadata
-     */
-    public function set(string $parentClass, string $parentProperty, array $metadata): void
-    {
-        $this->cacheState->bufferRuntime[$parentClass][$parentProperty] = $metadata;
-        $this->isDirty = true;
-    }
-
-    /**
-     * @return void
-     */
-    public function flush(): void
-    {
-        if ($this->file === null || $this->cacheState->bufferRuntime === []) {
-            return;
-        }
-
-        $allCache = $this->cacheState->bufferRuntime;
-        if (is_file($this->file)) {
-            $allCache = array_replace_recursive($this->cacheState->loadedCache, $this->cacheState->bufferRuntime);
-        }
-
-        $directory = dirname($this->file);
-        if (!is_dir($directory)) {
-            mkdir($directory, 0755, true);
-        }
-
-        $exported = VarExporter::export(
-            $allCache,
-            VarExporter::CLOSURE_SNAPSHOT_USES | VarExporter::ADD_RETURN | VarExporter::ADD_TYPE_HINTS
-        );
-
-        $content = "<?php\n\ndeclare(strict_types=1);\n\n/**\n * Auto-generated WP Hooks Runtime Cache\n * Generated at: " . date('Y-m-d H:i:s') . "\n */\n\n" . $exported;
-        $content = \str_replace('__CLASS__', 'self::class', $content);
-        $tmp = $this->file . '.' . bin2hex(random_bytes(4)) . '.tmp';
-        if (file_put_contents($tmp, $content, LOCK_EX) !== false) {
-            rename($tmp, $this->file);
-        }
     }
 }

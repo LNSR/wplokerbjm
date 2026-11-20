@@ -220,10 +220,10 @@ class WPHookPlanProvider
                     return $this->callablePlanCache[$property] ??= $this->callablePlan($value);
                 }
             } catch (ReflectionException $e) {
-                Logger::error(__METHOD__, 'Error getting property value', [
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                ]);
+                // Logger::error(__METHOD__, 'Error getting property value', [
+                //     'message' => $e->getMessage(),
+                //     'trace' => $e->getTraceAsString(),
+                // ]);
             };
         }
 
@@ -377,16 +377,93 @@ class WPHookPlanProvider
 
                 return $onUnregisterDo(...$values);
             } catch (\Throwable $e) {
-                Logger::error(__METHOD__, 'Failed to execute onUnregisterDo', [
-                    'message' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                    'invokerLabel' => $label
-                ]);
+                // Logger::error(__METHOD__, 'Failed to execute onUnregisterDo', [
+                //     'message' => $e->getMessage(),
+                //     'trace' => $e->getTraceAsString(),
+                //     'file' => $e->getFile(),
+                //     'line' => $e->getLine(),
+                //     'invokerLabel' => $label
+                // ]);
                 return null;
             }
         };
+    }
+
+    /**
+     * Invoke an opt-in hook debug probe with the emitted DTO.
+     *
+     * Resolution per parameter (in order):
+     *  1. the emitted DTO when its type matches,
+     *  2. the live owner for `self`/`static` (or any type the owner satisfies),
+     *  3. the DI container by type,
+     *  4. the declared default.
+     *
+     * Variadic parameters are ignored. A missing owner means `self` falls
+     * through to container resolution — which may CONSTRUCT the service; see
+     * the attribute PHPDoc. Failures are logged and swallowed so a probe can
+     * never interrupt the hook lifecycle.
+     *
+     * @param CallablePlan $plan precomputed plan for the debug closure
+     */
+    public function invokeHookDebug(
+        ?\Closure $debug,
+        array $plan,
+        object $dto,
+        string $label = '',
+        ?object $owner = null,
+    ): void {
+        if ($debug === null) {
+            return;
+        }
+
+        try {
+            $callable = $owner !== null ? $this->bindToTarget($debug, $plan, $owner::class) : $debug;
+
+            $values = [];
+            foreach ($plan['params'] ?? [] as $param) {
+                if ($param['isVariadic']) {
+                    continue;
+                }
+                $values[] = $this->resolveDebugParameter($param, $dto, $label, $owner);
+            }
+
+            $callable(...$values);
+        } catch (\Throwable $e) {
+            // Logger::error(self::class, 'Hook debug probe failed for ' . $label, [
+            //     'dto' => $dto::class,
+            //     'message' => $e->getMessage(),
+            //     'trace' => $e->getTraceAsString(),
+            //     'file' => $e->getFile(),
+            //     'line' => $e->getLine(),
+            // ]);
+        }
+    }
+
+    /**
+     * Resolve one debug-probe parameter: DTO → live owner → container → default.
+     *
+     * @param CallableHookParams $param
+     */
+    private function resolveDebugParameter(array $param, object $dto, string $label, ?object $owner): mixed
+    {
+        $type = $param['type'] ?? null;
+
+        if (\is_string($type) && $type !== '' && \is_a($dto, $type)) {
+            return $dto;
+        }
+
+        if (
+            $owner !== null
+            && (
+                $type === 'self'
+                || $type === 'static'
+                || (\is_string($type) && $type !== '' && \is_a($owner, $type))
+            )
+        ) {
+            return $owner;
+        }
+
+        return $this->resolveCallableParam($param, $label);
     }
 
     /**

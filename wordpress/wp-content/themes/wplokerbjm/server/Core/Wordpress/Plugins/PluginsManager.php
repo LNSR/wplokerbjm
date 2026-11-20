@@ -4,6 +4,7 @@ namespace WPLokerBJM\Core\Wordpress\Plugins;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, LiveRegistrationInfoDTO};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
@@ -95,9 +96,15 @@ class PluginManager
         WPGraphQL::class,
     ];
 
-    #[Action('mu_plugin_loaded', executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
-        return $pluginPath === $bootstrap->nameMUpluginFile;
-    })]
+    #[Action(
+        'mu_plugin_loaded',
+        executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
+            return $pluginPath === $bootstrap->nameMUpluginFile;
+        },
+        debugLiveRegistration: static function (LiveRegistrationInfoDTO $dto): void {
+            Logger::info(__CLASS__, 'Live Registration Info: ', $dto->toArray());
+        },
+    )]
     private function boot(string $pluginPath): void
     {
         do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
@@ -135,7 +142,19 @@ class PluginManager
     /**
      * Remove the "Deactivate" action link for required plugins.
      */
-    #[Filter('plugin_action_links', 4, 2, deferRegister: true, once: true)]
+    #[Filter(
+        'plugin_action_links',
+        4,
+        2,
+        deferRegister: true,
+        once: true,
+        debugDeferredRegistration: static function (DeferredRegistrationInfoDTO $dto): void {
+            Logger::info(__CLASS__, 'Deferred Registration Info: ', $dto->toArray());
+        },
+        debugLiveRegistration: static function(LiveRegistrationInfoDTO $dto): void {
+            Logger::info(__CLASS__, 'Live Registration Info: ', $dto->toArray());
+        }
+    )]
     public function lockPluginActionLinks(array $actions, string $pluginFile): array
     {
         if (in_array($pluginFile, self::MUST_HAVE_PLUGINS) && isset($actions['deactivate'])) {

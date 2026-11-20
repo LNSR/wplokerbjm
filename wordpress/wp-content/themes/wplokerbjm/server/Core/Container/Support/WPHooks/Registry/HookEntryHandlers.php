@@ -86,9 +86,9 @@ final class ContainerRegistryHandlerEntry
     {
         if ($this->registered) {
             $this->unregister();
-            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Container Registry Handler Entry destroyed before explicit registry unregistration, removing entry indexes: ", [
-                'invokerLabel' => $this->invokerLabel,
-            ]);
+            // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Container Registry Handler Entry destroyed before explicit registry unregistration, removing entry indexes: ", [
+            //     'invokerLabel' => $this->invokerLabel,
+            // ]);
         }
         \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
         unset($this->removeEntryIndexCallback);

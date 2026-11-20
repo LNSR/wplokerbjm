@@ -95,10 +95,10 @@ class QueuedHooksCleaner
                     break;
                 }
                 ($this->scheduleCleanup)($invoker);
-                $result && SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned immediately: ', [
-                    'InvokerLabel' => $invoker->label,
-                    'CurrentHookContext' => current_filter(),
-                ]);
+                // $result && SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned immediately: ', [
+                //     'InvokerLabel' => $invoker->label,
+                //     'CurrentHookContext' => current_filter(),
+                // ]);
                 break;
         }
         unset($this->entries[$invoker]);
@@ -150,15 +150,15 @@ class QueuedHooksCleaner
                     $capturedLabel = $entry->handler?->label ?? null;
                     $result = $entry->unregister();
 
-                    SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned at: ', [
-                        'CleanedEntryHandler' => $capturedLabel ?: "Invoker gone before cleanup. (cachedLabel: {$entry->invokerLabel})",
-                        'CleanedAtInvokersLabel' => $invoker?->label
-                            ? "via {$invoker?->label} (" . ($invoker?->isDestructed ? 'via destructor' : 'via cleanup') . ")"
-                            : 'all-hook scheduler',
-                        'unregistrationFailureCount' => $entry->unregistrationFailureCount,
-                        'CurrentHookContext' => \current_filter(),
-                        'resultUnregistration' => $result,
-                    ]);
+                    // SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned at: ', [
+                    //     'CleanedEntryHandler' => $capturedLabel ?: "Invoker gone before cleanup. (cachedLabel: {$entry->invokerLabel})",
+                    //     'CleanedAtInvokersLabel' => $invoker?->label
+                    //         ? "via {$invoker?->label} (" . ($invoker?->isDestructed ? 'via destructor' : 'via cleanup') . ")"
+                    //         : 'all-hook scheduler',
+                    //     'unregistrationFailureCount' => $entry->unregistrationFailureCount,
+                    //     'CurrentHookContext' => \current_filter(),
+                    //     'resultUnregistration' => $result,
+                    // ]);
 
                     if (
                         $entry->handler === null ||
