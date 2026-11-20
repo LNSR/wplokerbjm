@@ -132,8 +132,8 @@ class WPHooksContainerRegistry
         private WPHookPlanProvider $planProvider,
         private ContainerRegistryDeferredHookManager $containerRegistryDeferredHookManager,
         private ContainerRegistryHookTargetResolver $resolverTarget,
-        private QueuedHooksCleaner $queuedHooksCleaner = new QueuedHooksCleaner(),
-        private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
+        private QueuedHooksCleaner $queuedHooksCleaner,
+        private EntriesIndexer $entriesIndexer,
     ) {
         $this->entriesByInvokers = new \WeakMap();
         $this->destroyIndexes = $this->entriesIndexer->removeIndexes(...);

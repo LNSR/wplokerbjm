@@ -118,11 +118,16 @@ class WPHooksInstanceRegistry
     public function __construct(
         private InstanceRegistryDeferredHookManager $instanceRegistryDeferredHookManager,
         private WPHookPlanProvider $provider,
-        private QueuedHooksCleaner $queuedHooksCleaner = new QueuedHooksCleaner(),
-        private InstanceRegistryRuntimeHookResolver $runtimeResolver = new InstanceRegistryRuntimeHookResolver(),
-        public readonly WPHooksInstanceObjectCache $cache = new WPHooksInstanceObjectCache(),
+        private QueuedHooksCleaner $queuedHooksCleaner,
+        private InstanceRegistryRuntimeHookResolver $runtimeResolver,
+        public readonly WPHooksInstanceObjectCache $cache,
 
     ) {
+        $this->instanceRegistryDeferredHookManager ??= new InstanceRegistryDeferredHookManager(
+            provider: $this->provider,
+            runtimeResolver: $this->runtimeResolver,
+            entriesIndexer: new EntriesIndexer()
+        );
         $this->weakRegistry = new \WeakMap();
         $this->scanned = new \WeakMap();
         $this->entriesByInvokers = new \WeakMap();
