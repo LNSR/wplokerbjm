@@ -11,6 +11,7 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
 use ReflectionProperty;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookRegistration;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};

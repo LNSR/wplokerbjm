@@ -59,11 +59,11 @@ final class DependencyInjector
      * @return ClassTarget The same target, for fluent usage.
      * @throws InvalidArgumentException When the target or injection shape is invalid.
      */
-    public function injectOn(AsChildClass $target): AsChildClass
+    public function injectOn(AsChildClass $target, bool $forceNoCache = false): AsChildClass
     {
         $this->assertTarget($target);
         $cacheKey = $target->constructCurrentClassIdentity;
-        $plan = $this->getOrCompilePlan($cacheKey, $target);
+        $plan = $this->getOrCompilePlan($cacheKey, $target, $forceNoCache);
         if ($plan['properties'] === [])
             return $target;
         $setterKey = $cacheKey . "\0" . $target::class;
@@ -78,18 +78,17 @@ final class DependencyInjector
      * @param ClassTarget $target
      * @return CompiledPlan
      */
-    private function getOrCompilePlan(string $cacheKey, AsChildClass $target): array
+    private function getOrCompilePlan(string $cacheKey, AsChildClass $target, bool $forceNoCache = false): array
     {
         $plans = $this->planCache->loadPlans();
         $cachedPlan = $plans[$cacheKey] ?? null;
 
-        if ($this->planCache->isUsablePlan($cachedPlan))
-            return $cachedPlan;
+        if (!$forceNoCache && $this->planCache->isUsablePlan($cachedPlan)) return $cachedPlan;
 
         $reflection = new ReflectionClass($target);
         $plan = $this->planCompiler->discoverPlan($reflection);
         $plans[$cacheKey] = $plan;
-        $this->planCache->writePlans($plans);
+        if (!$forceNoCache) $this->planCache->writePlans($plans);
         return $plan;
     }
     /**

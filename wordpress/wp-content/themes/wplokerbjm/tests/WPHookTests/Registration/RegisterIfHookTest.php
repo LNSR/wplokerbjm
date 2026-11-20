@@ -166,9 +166,9 @@ class RegisterIfHookTest extends WplokerbjmTestCase
         );
         self::assertTrue($plan['isStatic']);
         self::assertCount(1, $plan['params']);
-        self::assertSame('c', $plan['params'][0]['name']);
-        self::assertSame(ContainerInterface::class, $plan['params'][0]['type']);
-        self::assertFalse($plan['params'][0]['hasDefault']);
+        self::assertSame('c', $plan['params'][0]->name);
+        self::assertSame(ContainerInterface::class, $plan['params'][0]->type);
+        self::assertFalse($plan['params'][0]->hasDefault);
 
         // Zero-parameter gate → empty params.
         $zero = $this->planProvider->buildCallablePlan(static fn (): bool => true);

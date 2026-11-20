@@ -68,6 +68,7 @@ final class HookDebugEmitter
         ?DeferredActivationResultDTO $after = null,
         ?object $owner = null,
         ?bool $ownerAlive = null,
+        ?DeferredActivationSource $source = null,
     ): void {
         if (!$this->hasDeferred()) return;
 
@@ -77,6 +78,7 @@ final class HookDebugEmitter
             phase: $phase,
             context: $this->context($owner),
             before: $before,
+            source: $source,
             after: $after,
         ), $owner, ownerOptional: false);
     }
@@ -136,6 +138,12 @@ final class HookDebugEmitter
         return (int) ((\hrtime(true) - $startedAt) / 1000);
     }
 
+    /**
+     * @param DeferredRegistrationInfoDTO|LiveRegistrationInfoDTO|LiveUnregistrationInfoDTO $dto
+     * @param null|object $owner
+     * @param bool $ownerOptional
+     * @return void
+     */
     private function emit(
         ?\Closure $probe,
         array $plan,

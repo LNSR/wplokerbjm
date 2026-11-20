@@ -13,17 +13,18 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, HookKey, Provider\WPHookPlanProvider};
+use WPLokerBJM\Core\Container\Support\WPHooks\{Registrations\HookRegistration, Registrations\HookKey, Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{ModuleClassHookMetadata};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\ContainerRegistryHandlerEntry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{
-    ContainerRegistryDeferredHookManager,
-    DeferredHookEntryHandler
+    ContainerRegistryDeferredHookManager
 };
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 
 /**
@@ -129,13 +130,19 @@ class WPHooksContainerRegistry
     public function __construct(
         private readonly ContainerInterface $container,
         private array $hooksRegistration,
-        private WPHookPlanProvider $planProvider,
-        private ContainerRegistryDeferredHookManager $containerRegistryDeferredHookManager,
-        private ContainerRegistryHookTargetResolver $resolverTarget,
-        private QueuedHooksCleaner $queuedHooksCleaner,
-        private EntriesIndexer $entriesIndexer,
+        private ?WPHookPlanProvider $planProvider = null,
+        private ?ContainerRegistryDeferredHookManager $containerRegistryDeferredHookManager = null,
+        private ContainerRegistryHookTargetResolver $resolverTarget = new ContainerRegistryHookTargetResolver(),
+        private QueuedHooksCleaner $queuedHooksCleaner = new QueuedHooksCleaner(),
+        private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
     ) {
         $this->entriesByInvokers = new \WeakMap();
+        $this->planProvider ??= new WPHookPlanProvider($container);
+        $this->containerRegistryDeferredHookManager ??= new ContainerRegistryDeferredHookManager(
+            $this->planProvider,
+            $this->resolverTarget,
+            new EntriesIndexer()
+        );
         $this->destroyIndexes = $this->entriesIndexer->removeIndexes(...);
     }
 
@@ -252,12 +259,12 @@ class WPHooksContainerRegistry
      * $registry->activateDeferredByClass(WPGraphQL::class);
      * ```
      * @api
-     * @param class-string $class Fully qualified class name.
+     * @param class-string|object $class Fully qualified class name.
      */
-    public function activateDeferredByClass(string $class): void
+    public function activateDeferredByClass(string|object $class): void
     {
         $this->containerRegistryDeferredHookManager->activateDeferredByClass(
-            $class,
+            \is_object($class) ? \get_class($class) : $class,
             $this->activateEntry
         );
     }
@@ -431,11 +438,11 @@ class WPHooksContainerRegistry
     /**
      * Unregister all deferred hooks belonging to a specific service class.
      * @api
-     * @param class-string $class Fully qualified class name.
+     * @param class-string|object $class Fully qualified class name.
      */
-    public function unregisterDeferredByClass(string $class): void
+    public function unregisterDeferredByClass(string|object $class): void
     {
-        $this->containerRegistryDeferredHookManager->unregisterDeferredByClass($class);
+        $this->containerRegistryDeferredHookManager->unregisterDeferredByClass(\is_object($class) ? get_class($class) : $class);
     }
 
     /**
@@ -548,11 +555,12 @@ class WPHooksContainerRegistry
     /**
      * Unregister all hooks belonging to a specific service class.
      * @api
-     * @param class-string $class Fully qualified class name.
+     * @param class-string|object $class Fully qualified class name.
      */
-    public function unregisterByClass(string $class): void
+    public function unregisterByClass(string|object $class): void
     {
-        $entries = $this->entriesIndexer->byClass[$class] ?? [];
+        $className = \is_object($class) ? get_class($class) : $class;
+        $entries = $this->entriesIndexer->byClass[$className] ?? [];
         foreach ($entries as $uniqueKey) {
             $entry = $this->handlers[$uniqueKey] ?? null;
             if ($entry === null) {

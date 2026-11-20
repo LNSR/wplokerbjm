@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Debug;
 
 use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{CallableHookParams, WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\HookDebugProbeException;
 use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ArgumentResolver;
 use WPLokerBJM\Shared\Log\Logger;
@@ -23,8 +24,7 @@ use WPLokerBJM\Shared\Log\Logger;
  * Failures are logged and swallowed: a probe can never interrupt the hook
  * lifecycle.
  *
- * @phpstan-import-type CallableHookParams from \WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider
- * @phpstan-import-type CallablePlan from \WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider
+ * @phpstan-import-type CallablePlan from WPHookPlanProvider
  */
 final class HookDebugDispatcher
 {
@@ -44,6 +44,7 @@ final class HookDebugDispatcher
      * back to defaults instead of aborting the probe.
      *
      * @param CallablePlan $plan precomputed plan for the debug closure
+     * @param LiveRegistrationInfoDTO|LiveUnregistrationInfoDTO|DeferredRegistrationInfoDTO $dto
      */
     public function invokeHookDebug(
         ?\Closure $debug,
@@ -62,7 +63,7 @@ final class HookDebugDispatcher
 
             $values = [];
             foreach ($plan['params'] ?? [] as $param) {
-                if ($param['isVariadic']) {
+                if ($param->isVariadic) {
                     continue;
                 }
                 $values[] = $this->resolveDebugParameter($param, $dto, $label, $owner, $ownerOptional);
@@ -83,22 +84,23 @@ final class HookDebugDispatcher
 
     /**
      * @param CallableHookParams $param
+     * @param DeferredRegistrationInfoDTO|LiveRegistrationInfoDTO|LiveUnregistrationInfoDTO $dto
      */
     private function resolveDebugParameter(
-        array $param,
+        CallableHookParams $param,
         object $dto,
         string $label,
         ?object $owner,
         bool $ownerOptional = false,
     ): mixed {
-        $type = $param['type'] ?? null;
+        $type = $param->type ?? null;
 
         if (\is_string($type) && $type !== '' && \is_a($dto, $type)) {
             return $dto;
         }
 
-        $isSelf = (bool) ($param['isSelf'] ?? false);
-        $allowsNull = (bool) ($param['allowsNull'] ?? false);
+        $isSelf = (bool) ($param->isSelf ?? false);
+        $allowsNull = (bool) ($param->allowsNull ?? false);
 
         if ($isSelf && $owner !== null) {
             return $owner;
@@ -121,7 +123,7 @@ final class HookDebugDispatcher
                     return null;
                 }
 
-                throw HookDebugProbeException::nonNullableSelf($label, $param['name'] ?? 'unknown');
+                throw HookDebugProbeException::nonNullableSelf($label, $param->name ?? 'unknown');
             }
 
             if (\is_string($type) && $type !== '') {
@@ -134,15 +136,15 @@ final class HookDebugDispatcher
                 }
             }
 
-            if (!empty($param['hasDefault'])) {
-                return $param['default'] ?? null;
+            if (!empty($param->hasDefault)) {
+                return $param->default ?? null;
             }
 
             if ($allowsNull) {
                 return null;
             }
 
-            throw HookDebugProbeException::unresolved($label, $param['name'] ?? 'unknown', $type);
+            throw HookDebugProbeException::unresolved($label, $param->name ?? 'unknown', $type);
         }
 
         return $this->resolver->resolveCallableParam($param, $label);

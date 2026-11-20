@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\WPHookTests\Registry;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceObjectCache;
-use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 class WPHooksInstanceObjectCacheTest extends WplokerbjmTestCase

@@ -18,7 +18,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  *
  * Releasing a deferred entry (explicit `unregisterDeferredBy*`,
  * `unregisterHooksOn()` or a dead-owner trigger) destroys
- * {@see \WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler},
+ * {@see \WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler},
  * whose destructor must:
  *  - remove every `EntriesIndexer` bucket entry (hook/class/callable/namespace/tag),
  *    so selectors never resolve a ghost entry,

@@ -7,7 +7,7 @@ namespace WPLokerBJM\Tests\WPHookTests\Execution;
 use DI\Container;
 use DI\ContainerBuilder;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{CallableHookParams, WPHookPlanProvider};
 use WPLokerBJM\Tests\Support\Fixtures\VariadicHookService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
@@ -52,9 +52,13 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
             'priority' => 10,
             'acceptedArgs' => 4,
             'once' => false,
-            'hookArgs' => [
-                ['name' => 'args', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => true],
-            ],
+            'hookArgs' => [new CallableHookParams(
+                'args',
+                null,
+                false,
+                null,
+                true,
+            )],
             'executeIf' => $executeIf,
             'executeIfParams' => $this->planProvider->buildCallablePlan($executeIf),
         ]];
@@ -83,8 +87,8 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
             'acceptedArgs' => 5,
             'once' => false,
             'hookArgs' => [
-                ['name' => 'source', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => false],
-                ['name' => 'args', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => true],
+                new CallableHookParams(...['name' => 'source', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => false]),
+                new CallableHookParams(...['name' => 'args', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => true]),
             ],
             'executeIf' => $executeIf,
             'executeIfParams' => $this->planProvider->buildCallablePlan($executeIf),
@@ -115,7 +119,7 @@ final class VariadicHookArgTest extends WplokerbjmTestCase
             'acceptedArgs' => 1,
             'once' => false,
             'hookArgs' => [
-                ['name' => 'value', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => false],
+                new CallableHookParams(...['name' => 'value', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => false]),
             ],
             'executeIf' => $executeIf,
             'executeIfParams' => $this->planProvider->buildCallablePlan($executeIf),

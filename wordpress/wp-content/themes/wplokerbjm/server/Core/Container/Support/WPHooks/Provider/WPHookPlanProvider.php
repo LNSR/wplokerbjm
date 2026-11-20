@@ -5,9 +5,9 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Provider;
 
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Debug\HookDebugDispatcher;
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, HookDebugDispatcher, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
 use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\NonNullableSelfParameterException;
-use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Plan\CallablePlanFactory;
 use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ArgumentResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ConditionEvaluator;
@@ -25,15 +25,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ConditionEvaluator;
  *
  * New code should inject the collaborator it needs instead of this facade.
  *
- * @phpstan-type CallableHookParams array{
- *      name: string,
- *      type: string|class-string|null,
- *      hasDefault: bool,
- *      default: mixed,
- *      isVariadic: bool,
- *      isSelf: bool,
- *      allowsNull: bool
- * }
  * @phpstan-type CallablePlan array{
  *      isStatic: bool,
  *      params: list<CallableHookParams>
@@ -70,26 +61,14 @@ class WPHookPlanProvider
 
         $label = $ownerLabel . '->' . $metadata->targetName . ' on ' . $metadata->hook;
 
-        $closures = [
-            'executeIf' => $metadata->executeIf,
-            'registerIf' => $metadata->registerIf,
-            'deferRegisterUntilHook' => $metadata->deferRegisterUntilHook instanceof \Closure
-                ? $metadata->deferRegisterUntilHook
-                : null,
-            'onUnregisterDo' => $metadata->onUnregisterDo,
-            'debugDeferredRegistration' => $metadata->debugDeferredRegistration,
-            'debugLiveRegistration' => $metadata->debugLiveRegistration,
-            'debugLiveUnregistration' => $metadata->debugLiveUnregistration,
-        ];
-
-        foreach ($closures as $role => $closure) {
-            if ($closure === null) {
+        foreach (get_object_vars($metadata) as $propertyName => $closure) {
+            if (!$closure instanceof \Closure) {
                 continue;
             }
 
             foreach ($this->buildCallablePlan($closure)['params'] as $param) {
-                if (($param['isSelf'] ?? false) && !($param['allowsNull'] ?? false)) {
-                    throw NonNullableSelfParameterException::forParameter($role, $label, $param['name']);
+                if ($param->isSelf && !$param->allowsNull) {
+                    throw NonNullableSelfParameterException::forParameter($propertyName, $label, $param->name);
                 }
             }
         }
@@ -144,6 +123,11 @@ class WPHookPlanProvider
         return $this->conditions->resolveHookName($hook, $hookParams, $label, $targetClass);
     }
 
+    /**
+     * Summary of evaluateExecuteIf
+     * @param CallablePlan $executeIfParams
+     * @return bool
+     */
     public function evaluateExecuteIf(
         ?\Closure $executeIf,
         array $executeIfParams,
@@ -155,6 +139,10 @@ class WPHookPlanProvider
         return $this->conditions->evaluateExecuteIf($executeIf, $executeIfParams, $label, $targetClass, $hookArgs, $variadicHookArg);
     }
 
+    /**
+     * @param CallablePlan $onUnregisterDoParams
+     * @return callable|null
+     */
     public function resolveOnUnregisterDo(
         ?\Closure $onUnregisterDo = null,
         array $onUnregisterDoParams = [],
@@ -164,6 +152,10 @@ class WPHookPlanProvider
         return $this->conditions->resolveOnUnregisterDo($onUnregisterDo, $onUnregisterDoParams, $label, $targetClass);
     }
 
+    /**
+     * @param CallablePlan $plan
+     * @return string[]
+     */
     public function resolveTagCallable(
         \Closure $tagCallable,
         array $plan,
@@ -173,6 +165,10 @@ class WPHookPlanProvider
         return $this->conditions->resolveTagCallable($tagCallable, $plan, $label, $targetClass);
     }
 
+    /**
+     * @param CallablePlan $registerIfParams
+     * @return bool
+     */
     public function evaluateRegistrationGate(
         ?\Closure $registerIf,
         array $registerIfParams,
@@ -184,6 +180,7 @@ class WPHookPlanProvider
 
     /**
      * @param CallablePlan $plan precomputed plan for the debug closure
+     * @param DeferredRegistrationInfoDTO|LiveRegistrationInfoDTO|LiveUnregistrationInfoDTO $dto
      */
     public function invokeHookDebug(
         ?\Closure $debug,

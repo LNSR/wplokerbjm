@@ -17,19 +17,22 @@ final class ContainerMethodTarget implements InvocationTarget
 
     private ?\Closure $invoker = null;
 
+    /**
+     * @param 'public'|'protected'|'private' $visibility
+     * @return void
+     */
     public function __construct(
         private readonly ContainerInterface $container,
         private readonly string $class,
         private readonly string $method,
         private readonly string $visibility = 'public',
     ) {
-        if ($this->visibility !== 'public') {
-            $this->invoker = self::$methodInvokerCache[$this->class] ??= \Closure::bind(
-                static fn(object $instance, string $methodName, mixed ...$args): mixed => $instance->{$methodName}(...$args),
-                null,
-                $this->class,
-            );
-        }
+        if ($this->visibility === 'public') return;
+        $this->invoker = self::$methodInvokerCache[$this->class] ??= \Closure::bind(
+            static fn(object $instance, string $methodName, mixed ...$args): mixed => $instance->{$methodName}(...$args),
+            null,
+            $this->class,
+        );
     }
 
     public function resolveOwner(): ?object

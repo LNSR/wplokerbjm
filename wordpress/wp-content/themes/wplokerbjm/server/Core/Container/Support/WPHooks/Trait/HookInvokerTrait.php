@@ -6,15 +6,18 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     DeferredActivationResultDTO,
+    DeferredActivationSource,
     DeferredDebugPhase,
     DeferredRegistrationSnapshotDTO,
+    HookDebugEmitter,
+    HookDebugState,
     LiveDebugPhase,
     LiveExecutionResultDTO,
     LiveUnregistrationPhase,
     LiveUnregistrationResultDTO,
     UnregistrationSource,
 };
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{HookArgumentBag, HookInvoker, HookRemovalController};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
 
 /**
@@ -40,7 +43,7 @@ trait HookInvokerTrait
     /**
      * Removal/cleanup lifecycle collaborator, initialized by each invoker constructor.
      */
-    private readonly \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookRemovalController $removal;
+    private readonly HookRemovalController $removal;
 
     /** Whether the once-hook has been consumed (first fire reached gate evaluation). */
     private bool $consumed = false;
@@ -48,13 +51,10 @@ trait HookInvokerTrait
     /** destruction state */
     public private(set) bool $isDestructed = false;
 
-    /** template closure for caching stateless closure */
-    private static ?\Closure $templateClosure = null;
-
     /**
      * Per-invoker debug collaborator, initialized by each invoker constructor.
      */
-    private readonly \WPLokerBJM\Core\Container\Support\WPHooks\Debug\HookDebugEmitter $debugEmitter;
+    private readonly HookDebugEmitter $debugEmitter;
 
     /**
      * Emit one live-registration debug payload (registered/dispatching/...).
@@ -79,9 +79,10 @@ trait HookInvokerTrait
         ?DeferredActivationResultDTO $after = null,
         ?object $owner = null,
         bool $ownerAlive = true,
+        ?DeferredActivationSource $source = null,
     ): void {
         if (!$this->debugEmitter->hasDeferred()) return;
-        $this->debugEmitter->deferred($this->debugState(), $phase, $before, $after, $owner, $ownerAlive);
+        $this->debugEmitter->deferred($this->debugState(), $phase, $before, $after, $owner, $ownerAlive, $source);
     }
 
     /**
@@ -112,9 +113,9 @@ trait HookInvokerTrait
         $this->debugEmitter->outcome($this->debugState(), $phase, $status, $startedAt, $result, $error, $owner, $ownerAlive);
     }
 
-    private function debugState(): \WPLokerBJM\Core\Container\Support\WPHooks\Debug\HookDebugState
+    private function debugState(): HookDebugState
     {
-        return new \WPLokerBJM\Core\Container\Support\WPHooks\Debug\HookDebugState(
+        return new HookDebugState(
             consumed: $this->consumed,
             executions: $this->numberExecutions,
             dispatching: $this->dispatching,
@@ -123,7 +124,7 @@ trait HookInvokerTrait
 
     private function elapsedUs(int $startedAt): int
     {
-        return \WPLokerBJM\Core\Container\Support\WPHooks\Debug\HookDebugEmitter::elapsedUs($startedAt);
+        return HookDebugEmitter::elapsedUs($startedAt);
     }
 
     /**
@@ -206,7 +207,7 @@ trait HookInvokerTrait
     /**
      * Per-invoker argument shaping, initialized by each invoker constructor.
      */
-    private readonly \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookArgumentBag $argumentBag;
+    private readonly HookArgumentBag $argumentBag;
 
     private function buildHookArgs(array $args): array
     {

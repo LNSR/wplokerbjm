@@ -7,12 +7,13 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     DeferredActivationResultDTO,
+    DeferredActivationSource,
     DeferredDebugPhase,
     DeferredRegistrationSnapshotDTO,
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler;
 
 
 /**
@@ -28,7 +29,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredH
  * unregisterDeferredBy*) stays on the container-side ContainerRegistryDeferredHookManager; the
  * runtime registry consumes the same mechanics behind an automatic-only
  * surface.
- * @phpstan-import-type CallableHookParams from WPHookPlanProvider
  * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-import-type DeferredHookEntry from DeferredHookEntryHandler
  * @phpstan-import-type ActivateEntry from WPHooksContainerRegistry
@@ -70,6 +70,7 @@ trait DeferredHooksTrait
         DeferredHookEntryHandler $entry,
         DeferredDebugPhase $phase,
         ?DeferredActivationResultDTO $after = null,
+        ?DeferredActivationSource $source = null,
     ): void {
         $owner = $entry->instance?->get();
         $entry->handler->emitDeferredDebug(
@@ -86,6 +87,7 @@ trait DeferredHooksTrait
             $after,
             $owner,
             $owner !== null || $entry->instance === null,
+            $source,
         );
     }
 
@@ -98,7 +100,11 @@ trait DeferredHooksTrait
      * @param ActivateEntry&ActivateRuntimeEntry $activateEntry Moves an accepted entry to the active pool.
      * @return int Number of newly activated entries.
      */
-    private function activateMatchingDeferredEntries(array $keys, callable $activateEntry): int
+    private function activateMatchingDeferredEntries(
+        array $keys,
+        callable $activateEntry,
+        DeferredActivationSource $source = DeferredActivationSource::Manual,
+    ): int
     {
         $activated = 0;
         if ($keys === []) return $activated;
@@ -108,7 +114,7 @@ trait DeferredHooksTrait
 
             $startedAt = \hrtime(true);
             $poolBefore = \count($this->deferredHandlers);
-            $this->emitDeferredSnapshot($entry, DeferredDebugPhase::ActivationAttempt);
+            $this->emitDeferredSnapshot($entry, DeferredDebugPhase::ActivationAttempt, source: $source);
 
             if (!$this->gateDeferredActivation($entry)) {
                 $this->emitDeferredSnapshot($entry, DeferredDebugPhase::ActivationRejected, new DeferredActivationResultDTO(
@@ -118,7 +124,7 @@ trait DeferredHooksTrait
                     elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
                     poolSizeBefore: $poolBefore,
                     poolSizeAfter: \count($this->deferredHandlers),
-                ));
+                ), $source);
                 continue;
             }
             if (!$activateEntry($entry)) {
@@ -129,7 +135,7 @@ trait DeferredHooksTrait
                     elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
                     poolSizeBefore: $poolBefore,
                     poolSizeAfter: \count($this->deferredHandlers),
-                ));
+                ), $source);
                 continue;
             }
             $activated++;
@@ -141,7 +147,7 @@ trait DeferredHooksTrait
                 elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
                 poolSizeBefore: $poolBefore,
                 poolSizeAfter: \count($this->deferredHandlers),
-            ));
+            ), $source);
         }
         return $activated;
     }

@@ -14,8 +14,8 @@ use PhpParser\NodeTraverser;
 use PhpParser\NodeVisitorAbstract;
 use PhpParser\ParserFactory;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
-use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookRegistration;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
 
 /**
  * Phase 4 — Collect #[Action] / #[Filter] hook registrations.
@@ -57,9 +57,19 @@ function loadHookRegistrationsFromCache(string $themeRoot): ?array
     if (!is_file($cacheFileContainerRegistry)) {
         return null;
     }
-    require $themeRoot . '/server/Core/Container/Support/WPHooks/DTO.php';
+    // The cache files export DTOs via __set_state(), so their classes must be
+    // loaded before the cache files are required. This script runs outside
+    // WordPress, where the theme autoloader is not registered.
+    require_once $themeRoot . '/server/Shared/Utilities/DataObject/AbstractDataObject.php';
+    require_once $themeRoot . '/server/Core/Container/Support/WPHooks/Provider/CallableHookParams.php';
+    require_once $themeRoot . '/server/Core/Container/Support/WPHooks/Registrations/HookRegistration.php';
+    require_once $themeRoot . '/server/Core/Container/Support/WPHooks/Registrations/HookKey.php';
+    require_once $themeRoot . '/server/Core/Container/Support/WPHooks/Registrations/InstanceHookMetadata.php';
+
     $registrationContainerRegistry = require $cacheFileContainerRegistry;
-    $registrationRuntimeRegistry = require $cacheFileRuntimeRegistry;
+    $registrationRuntimeRegistry = is_file($cacheFileRuntimeRegistry)
+        ? require $cacheFileRuntimeRegistry
+        : null;
 
 
     if (!is_array($registrationContainerRegistry)) {
@@ -97,23 +107,49 @@ function loadHookRegistrationsFromCache(string $themeRoot): ?array
         ];
     }
 
-    foreach ($registrationRuntimeRegistry as $runtime) {
-        $hook = $runtime instanceof InstanceHookMetadata ? $runtime->hook : ($runtime['hook'] ?? null);
-        if (!is_string($hook)) {
-            continue;
-        }
-        if (($runtime instanceof InstanceHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'action') {
-            $actions[] = $hook;
-        } elseif (($runtime instanceof InstanceHookMetadata ? $runtime->type : ($runtime['type'] ?? null)) === 'filter') {
-            $filters[] = $hook;
-        }
-    }
+    collectRuntimeRegistryHooks($registrationRuntimeRegistry, $actions, $filters);
 
     return [
         'actions' => Vec\unique($actions),
         'filters' => Vec\unique($filters),
         'tags' => Vec\unique($tags),
     ];
+}
+
+/**
+ * Runtime metadata is nested by parent class → property → metadata list.
+ * Walk it recursively so both the nested cache shape and legacy flat lists
+ * are accepted.
+ *
+ * @param array<mixed> $cache
+ * @param list<string> $actions
+ * @param list<string> $filters
+ */
+function collectRuntimeRegistryHooks(array $cache, array &$actions, array &$filters): void
+{
+    foreach ($cache as $node) {
+        if ($node instanceof InstanceHookMetadata) {
+            if ($node->type === 'action') {
+                $actions[] = $node->hook;
+            } elseif ($node->type === 'filter') {
+                $filters[] = $node->hook;
+            }
+            continue;
+        }
+
+        if (!is_array($node)) {
+            continue;
+        }
+
+        $hook = $node['hook'] ?? null;
+        $type = $node['type'] ?? null;
+        if (is_string($hook) && ($type === 'action' || $type === 'filter')) {
+            $type === 'action' ? $actions[] = $hook : $filters[] = $hook;
+            continue;
+        }
+
+        collectRuntimeRegistryHooks($node, $actions, $filters);
+    }
 }
 
 /**

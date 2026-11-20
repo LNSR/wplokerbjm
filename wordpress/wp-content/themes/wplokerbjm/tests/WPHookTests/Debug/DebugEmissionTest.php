@@ -7,6 +7,7 @@ namespace WPLokerBJM\Tests\WPHookTests\Debug;
 use PHPUnit\Framework\TestCase;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
+    DeferredActivationSource,
     DeferredRegistrationInfoDTO,
     LiveRegistrationInfoDTO,
     LiveUnregistrationInfoDTO,
@@ -14,12 +15,12 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     LiveUnregistrationResultDTO,
     UnregistrationSource,
 };
-use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryHandlerEntry;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\ContainerRegistryHandlerEntry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\DeferredHooksTrait;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
@@ -224,6 +225,10 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             static fn(DeferredRegistrationInfoDTO $dto): string => $dto->phase->value,
             $payloads,
         ));
+
+        self::assertNull($payloads[0]->source);
+        self::assertSame(DeferredActivationSource::Manual, $payloads[1]->source);
+        self::assertSame(DeferredActivationSource::Manual, $payloads[2]->source);
 
         $activated = $payloads[2];
         self::assertTrue($activated->after?->activated);

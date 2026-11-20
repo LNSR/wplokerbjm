@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/nav | Priority: high | Version: 1.7 | Updated: 2026-11-19 -->
+<!-- Context: project-intelligence/nav | Priority: high | Version: 1.8 | Updated: 2026-11-21 -->
 
 # Project Intelligence
 
@@ -18,7 +18,7 @@
 
 | What You Need | File | Description |
 |---------------|------|-------------|
-| Understand the "how" | `technical-domain.md` | Stack, architecture, integrations |
+| Understand the "how" | `technical-domain.md` | Stack, architecture, WPHooks DTOs/patterns |
 | Hook ownership / cleanup | `wphooks-ownership-raii.md` | Strong vs weak owners, RAII destructor chain, leak rules |
 | Registry events / adapters | `wphooks-registry-events.md` | Event bridge, `EVENT_BRIDGE_HOOKS`, boot modes |
 | All of the above | Read all files | Full project intelligence |

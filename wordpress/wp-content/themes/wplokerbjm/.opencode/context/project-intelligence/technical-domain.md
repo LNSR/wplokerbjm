@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.7 | Updated: 2026-11-19 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.8 | Updated: 2026-11-21 -->
 
 # Technical Domain — Lowker Site Theme
 
@@ -32,14 +32,14 @@ server/
 ├── Repositories/  QueryBuilders/  Models/{Schema}               # persistence + SQL
 ├── Adapter/  Configs/{Credential}  Factories/
 └── Shared/{Cache,Log,Utilities/{Auth,DataObject}}
-wplokerbjm/ root → tests/  tools/Composer/Scripts/  cache/  composer.json (classmap, NOT PSR-4)
+wplokerbjm/ root → tests/  tools/Composer/Scripts/  cache/  composer.json (tooling only)
 ```
 
 **Layering**: `Transport → Services → Repositories/QueryBuilders → Models`. `Core` = infrastructure only; `Presenters` shape output; `Adapter` isolates third-party APIs.
 
 ## Dev Workflows (Critical)
 
-**Autoload (classmap, NOT PSR-4)**: add/rename/move a class → regenerate the map or WP won't find it. VS Code task `php-composer-autoload` (`@wplokerbjm.code-workspace`) → `composer run watch:autoload` → `tools/Composer/Scripts/autoloadwatcher.sh` (inotifywait, 2s debounce → `composer dump-autoload --apcu -a -o` → `docker exec wordpress-${WP_ENV} ... litespeed-purge all`).
+**Autoload (Nette RobotLoader over `server/`, NOT Composer PSR-4)**: add/rename/move a class → regenerate the RobotLoader cache or WP won't find it. WPHooks DTO/handler files also mirror PSR-4 namespace→path. VS Code task `php-composer-autoload` (`@wplokerbjm.code-workspace`) → `composer run watch:autoload` → `tools/Composer/Scripts/autoloadwatcher.sh` (inotifywait, 2s debounce → `composer dump-autoload --apcu -a -o` → `docker exec wordpress-${WP_ENV} ... litespeed-purge all`).
 
 **Tests**: `composer run test` → `tools/Composer/Scripts/test.sh` loads `../../../../.env`, then runs PHPUnit inside `wordpress-${WP_ENV:-production}` (`--colors=always --fail-on-skipped --testdox`).
 - Hook tests: `tests/WPHookTests/` (InitLazy, Once/OnceChain, Deferred, DeferRegisterUntilHook, RuntimeRegistry, PropertyHook, TaggedHook, PatternHooks, EntriesIndexer, ExecuteIf, RegisterIf) + `TestTracTicket61263.php`; engine = real WP `wp-includes/plugin.php` (`WplokerbjmTestCase` resets `$wp_filter`/`$wp_actions` per test), brain/monkey only for non-hook WP functions. Top-level: `CacheTest`, `ContainerDefinitionsTest`, `DependencyInjectorTest`, `LowonganIngestRestTest`.
@@ -52,14 +52,14 @@ wplokerbjm/ root → tests/  tools/Composer/Scripts/  cache/  composer.json (cla
 
 **Key points**:
 
-- `#[Action(hook, priority?, acceptedArgs?, executeIf?, registerIf?, tag?, deferRegister?, deferRegisterUntilHook?, once?, onUnregisterDo?)]` / `#[Filter(...)]` on public methods and properties
+- `#[Action(hook, priority?, acceptedArgs?, executeIf?, registerIf?, tag?, deferRegisterUntilHook?, deferRegister?, once?, onUnregisterDo?, debug*?)]` / `#[Filter(...)]` on methods and properties; attributes are inert, repeatable metadata and only declared members are scanned
 - `hook`: `string|\Closure` (resolved via container, must return string); `tag`: `string|array|\Closure` — items may be `BackedEnum`, all normalized to strings; invalid tag → that hook is logged + skipped
-- `registerIf`: registration gate — once for eager hooks, re-evaluated at deferred activation; `executeIf`: fire-time gate (false → action skipped / filter passes value through)
+- `registerIf`: registration gate — once for eager hooks, re-evaluated at deferred activation; `executeIf`: fire-time gate (false → action skipped / filter passes value through); a throwing gate skips without `once` and logs, unresolvable gate deps are treated as pass
 - `deferRegister: true` → deferred pool: container activates via `activateDeferredBy*`, runtime via `activateDeferredByCallableInLiveInstance()`; adding `deferRegisterUntilHook: '<hook>'` auto-activates on the trigger (both paths). Runtime deferred removal: `unregisterDeferredByCallableInLiveInstance()`; active-pool `unregisterBy*` never sweeps deferred entries
-- Entries: `Registry/HookEntryHandlers.php` (`ContainerRegistryHandlerEntry` / `RuntimeRegistryHandlerEntry`) + `Trait/HandlerEntryTrait` (`register()` / `unregister()` / `isCurrentlyExecuting()`); `Indexers/EntriesIndexer` = O(K) lookup; `Janitor/QueuedHooksCleaner` = queued once-removal
-- Caches: scanner output → `cache/WPhooksRegistryContainerCache.php`; runtime instance metadata → `cache/WPHooksInstanceObjectCache.php`; `DTO.php` = `HookKey`, `HookRegistration`, `InstanceHookMetadata`
+- Entries: `Registry/Handlers/` (`ContainerRegistryHandlerEntry` / `RuntimeRegistryHandlerEntry`) + `Trait/HandlerEntryTrait` (`register()` / `unregister()` / `isCurrentlyExecuting()`); `Indexers/EntriesIndexer` = O(K) lookup; `Janitor/QueuedHooksCleaner` = queued once-removal
+- Caches: scanner output → `cache/WPhooksRegistryContainerCache.php`; runtime instance metadata → `cache/WPHooksInstanceObjectCache.php`; `Registrations/` + `Provider/CallableHookParams.php` are readonly `AbstractDataObject` DTOs exported via `__set_state`
 - `Abstract/ModuleClassHookMetadata` — anonymous self-registering hook hosts (was `AnonClassHookMetadata`); the instance registry auto-unregisters hooks of dead owners
-- Static methods and inherited (non-declared) methods are SKIPPED; multi-priority via stacked attributes
+- Static and inherited (non-declared) methods are SKIPPED; private/protected members work, `__invoke` is the only supported magic method, and stacked attributes provide multi-priority
 
 **Once-hooks & WP core #61263**: removing a callback while its own priority is dispatching makes `WP_Hook::resort_active_iterations()` skip the next priority whenever a *lower-priority* callback survives. Once-handlers therefore **never unregister mid-dispatch**: `isCurrentlyExecuting()` queues the entry in `QueuedHooksCleaner::$queuedRemovalEntry`, and the cleaner wipes previously-queued handlers as soon as the next invoker runs (remainder outside dispatch) — the consumed flag already prevents re-firing. See https://core.trac.wordpress.org/ticket/61263
 
@@ -87,10 +87,10 @@ public function registerCronWP(): void { ... }
 
 ```
 Support/WPHooks/
-├── WPHooksScanner.php · DTO.php        # scan → HookRegistration[] · HookKey/InstanceHookMetadata
-├── Abstract/ · Trait/                  # ModuleClassHookMetadata · scanner/provider/deferred/invoker/entry traits
-├── Registry/                           # WPHooksContainerRegistry · WPHooksInstanceRegistry · HookEntryHandlers
-│   ├── DeferredManager/                # container + instance deferred pools · DeferredHookEntryHandler
+├── WPHooksScanner.php · Registrations/ · Provider/ · Plan/ · Resolution/ # scan → DTOs · plans · resolution
+├── Debug/ · Abstract/ · Trait/         # probes/DTOs · ModuleClassHookMetadata · shared traits
+├── Registry/                           # WPHooksContainerRegistry · WPHooksInstanceRegistry · Handlers/
+│   ├── DeferredManager/Handlers/       # deferred pools · DeferredHookEntryHandler
 │   └── Resolver/                       # ContainerRegistryHookTargetResolver · InstanceRegistryRuntimeHookResolver
 ├── Invoker/                            # ContainerLazy + Runtime invokers (method/property variants)
 ├── Janitor/QueuedHooksCleaner.php      # queued once/GC removal (WP #61263)
@@ -186,7 +186,7 @@ public function registerTypes(): void
 
 ## 📂 Codebase References
 
-**Hook System**: `server/Core/Container/Attributes/WPHooksAttributes.php`, `server/Core/Container/Support/WPHooks/WPHooksScanner.php`, `server/Core/Container/Support/WPHooks/DTO.php`, `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php`, `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/HookEntryHandlers.php`, `server/Core/Container/Support/WPHooks/Registry/DeferredManager/*`, `server/Core/Container/Support/WPHooks/Registry/Resolver/*`, `server/Core/Container/Support/WPHooks/Invoker/*`, `server/Core/Container/Support/WPHooks/Janitor/QueuedHooksCleaner.php`, `server/Core/Container/Support/WPHooks/Indexers/EntriesIndexer.php`, `server/Core/Container/Support/WPHooks/Utilities/*`, `server/Core/Container/Support/WPHooks/Abstract/ModuleClassHookMetadata.php`, `server/Core/Container/Support/WPHooks/Trait/*`, `server/Core/Container/Init.php`, `server/Core/Wordpress/GlobalHooks.php`
+**Hook System**: `server/Core/Container/Attributes/WPHooksAttributes.php`, `server/Core/Container/Support/WPHooks/WPHooksScanner.php`, `server/Core/Container/Support/WPHooks/Registrations/`, `server/Core/Container/Support/WPHooks/Provider/{WPHookPlanProvider.php,CallableHookParams.php}`, `server/Core/Container/Support/WPHooks/Plan/`, `server/Core/Container/Support/WPHooks/Resolution/`, `server/Core/Container/Support/WPHooks/Debug/`, `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/Handlers/`, `server/Core/Container/Support/WPHooks/Registry/DeferredManager/*`, `server/Core/Container/Support/WPHooks/Registry/Resolver/*`, `server/Core/Container/Support/WPHooks/Invoker/*`, `server/Core/Container/Support/WPHooks/Janitor/QueuedHooksCleaner.php`, `server/Core/Container/Support/WPHooks/Indexers/EntriesIndexer.php`, `server/Core/Container/Support/WPHooks/Utilities/*`, `server/Core/Container/Support/WPHooks/Abstract/ModuleClassHookMetadata.php`, `server/Core/Container/Support/WPHooks/Trait/*`, `server/Core/Container/Init.php`, `server/Core/Wordpress/GlobalHooks.php`
 
 **REST**: `server/Transport/REST/Route/LowonganIngestRoute.php`, `server/Transport/REST/Controllers/Ingest/LowonganIngestControllers.php`
 

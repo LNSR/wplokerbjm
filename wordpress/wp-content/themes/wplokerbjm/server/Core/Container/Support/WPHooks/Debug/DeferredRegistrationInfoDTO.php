@@ -11,12 +11,14 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
  *
  * Built fresh for every phase and handed to the consumer; the framework keeps
  * no reference to it. `after` is present only for outcome phases
- * (activated / rejected / failed / released).
+ * (activated / rejected / failed / released). `source` is present for
+ * activation phases and stays null for queued / released.
  *
  * @phpstan-type DeferredRegistrationInfoData array{
  *  phase: DeferredDebugPhase,
  *  context: HookDebugContext,
  *  before: DeferredRegistrationSnapshotDTO,
+ *  source: ?DeferredActivationSource,
  *  after: ?DeferredActivationResultDTO,
  *  at: ?float,
  * }
@@ -30,6 +32,7 @@ final readonly class DeferredRegistrationInfoDTO extends AbstractDataObject
      * @param DeferredRegistrationInfoData['phase'] $phase
      * @param DeferredRegistrationInfoData['context'] $context
      * @param DeferredRegistrationInfoData['before'] $before
+     * @param DeferredRegistrationInfoData['source'] $source
      * @param DeferredRegistrationInfoData['after'] $after
      * @param DeferredRegistrationInfoData['at'] $at
      */
@@ -37,6 +40,7 @@ final readonly class DeferredRegistrationInfoDTO extends AbstractDataObject
         public DeferredDebugPhase $phase,
         public HookDebugContext $context,
         public DeferredRegistrationSnapshotDTO $before,
+        public ?DeferredActivationSource $source = null,
         public ?DeferredActivationResultDTO $after = null,
         public ?float $at = null,
     ) {}

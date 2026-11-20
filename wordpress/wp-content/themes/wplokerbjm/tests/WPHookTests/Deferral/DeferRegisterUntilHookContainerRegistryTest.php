@@ -7,6 +7,7 @@ namespace WPLokerBJM\Tests\WPHookTests\Deferral;
 use Closure;
 use DI\Container;
 use DI\ContainerBuilder;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\CallableHookParams;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryDeferredHookManager;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
@@ -81,6 +82,30 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
         self::assertSame(['hello'], ExecuteIfActionService::$capturedValues);
     }
 
+    public function testSchedulerIsAFilterAndPassesTriggerValueThrough(): void
+    {
+        $registry = $this->createRegistry([
+            $this->action(
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
+                'defer_until_filter_value',
+                registerIf: static fn(): bool => true,
+                deferRegisterUntilHook: 'defer_until_filter_trigger',
+            ),
+        ]);
+        $registry->initialize();
+
+        self::assertSame(
+            'kept',
+            apply_filters('defer_until_filter_trigger', 'kept'),
+            'The trigger listener must preserve the filtered value.',
+        );
+        self::assertNotNull(
+            $this->findRegisteredHook('action', 'defer_until_filter_value'),
+            'Activation must still run as a filter side effect.',
+        );
+    }
+
     public function testGateFailureKeepsEntryDeferredAndListenerRearms(): void
     {
         $allow = false;
@@ -124,9 +149,9 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
                     return $value === 'query';
                 },
                 executeIfParams: [
-                    'params' => [
-                        ['name' => 'value', 'type' => null, 'hasDefault' => false, 'default' => null],
-                    ],
+                    'params' => [new CallableHookParams(
+                        ...['name' => 'value', 'type' => null, 'hasDefault' => false, 'default' => null],
+                    )],
                 ],
                 hookArgs: ['value'],
                 deferRegisterUntilHook: 'graphql_init'
@@ -156,7 +181,7 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
                 deferRegisterUntilHook: static fn(ExecuteIfActionService $service): string => 'graphql_init',
                 deferRegisterUntilHookParams: [
                     'params' => [
-                        ['name' => 'service', 'type' => ExecuteIfActionService::class, 'hasDefault' => false, 'default' => null],
+                        new CallableHookParams(...['name' => 'service', 'type' => ExecuteIfActionService::class, 'hasDefault' => false, 'default' => null]),
                     ],
                 ],
             ),

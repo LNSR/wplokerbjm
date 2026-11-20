@@ -7,15 +7,17 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager;
 use ActivateRuntimeEntry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     WPHooksInstanceRegistry,
-    RuntimeRegistryHandlerEntry
 };
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\RuntimeRegistryHandlerEntry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\DeferredActivationSource;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
 
 /**
@@ -78,7 +80,7 @@ class InstanceRegistryDeferredHookManager
             $keys[$key] = $key;
         }
 
-        return $this->activateMatchingDeferredEntries(array_values($keys), $activateEntry);
+        return $this->activateMatchingDeferredEntries(array_values($keys), $activateEntry, DeferredActivationSource::Manual);
     }
 
     /**
@@ -108,7 +110,7 @@ class InstanceRegistryDeferredHookManager
             $keys[$key] = $key;
         }
 
-        return $this->activateMatchingDeferredEntries(array_values($keys), $activateEntry);
+        return $this->activateMatchingDeferredEntries(array_values($keys), $activateEntry, DeferredActivationSource::Manual);
     }
 
     /**
@@ -133,10 +135,10 @@ class InstanceRegistryDeferredHookManager
     }
 
     /**
-     * Register a deferRegisterUntilHook entry on the
-     * runtime path: the handler is held in the deferred pool until the
-     * trigger hook fires, then activated automatically — no manual
-     * activation API.
+     * Register a deferRegisterUntilHook entry on the runtime path: the handler
+     * is held in the deferred pool until the trigger hook fires, then activated
+     * automatically — no manual activation API. The trigger listener is a
+     * filter callback, so apply_filters() keeps its value during activation.
      * @param string|\Closure|null $deferRegisterUntilHook Trigger hook name or closure resolving to one.
      * @param ActivateRuntimeEntry $activateEntry
      */
@@ -154,42 +156,45 @@ class InstanceRegistryDeferredHookManager
 
         $deferredKey = $entry->toUniqueKey();
 
-        if (did_action($triggerHook)) {
+        if (did_action($triggerHook) >= 1 || did_filter($triggerHook) >= 1) {
             $this->activateMatchingDeferredEntries(
                 [$deferredKey],
                 $activateEntry,
+                DeferredActivationSource::SchedulerImmediate,
             );
             return;
         }
         $cb = null;
-        \add_action($triggerHook, $cb = function () use ($triggerHook, $deferredKey, $activateEntry): void {
+        \add_filter($triggerHook, $cb = function (mixed $value = null) use ($triggerHook, $deferredKey, $activateEntry): mixed {
             $entry = $this->deferredHandlers[$deferredKey] ?? null;
             if ($entry === null) {
-                \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-                return;
+                \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                return $value;
             }
 
             if ($entry->instance?->get() === null) {
                 unset($this->deferredHandlers[$deferredKey]);
-                \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-                return;
+                \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                return $value;
             }
 
             $activated = $this->activateMatchingDeferredEntries(
                 [$deferredKey],
                 $activateEntry,
+                DeferredActivationSource::Scheduler,
             );
 
-            if ($activated === 0) return;
+            if ($activated === 0) return $value;
 
-            \remove_action($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+            \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
             unset($this->deferredHandlers[$deferredKey]);
-        }, PHP_INT_MIN, 0);
+            return $value;
+        }, PHP_INT_MIN, 1);
 
         $entry->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
-            if (!\has_action($triggerHook, $cb, PHP_INT_MIN)) return;
-            \remove_action($triggerHook, $cb, PHP_INT_MIN);
-            // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+            if (!\has_filter($triggerHook, $cb, PHP_INT_MIN)) return;
+            \remove_filter($triggerHook, $cb, PHP_INT_MIN);
+            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
         });
     }
 

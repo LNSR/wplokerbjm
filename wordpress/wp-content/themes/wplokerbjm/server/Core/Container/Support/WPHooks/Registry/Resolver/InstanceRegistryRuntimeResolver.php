@@ -5,13 +5,12 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver;
 
 use ReflectionFunction;
-use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookTargetResolverTrait;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
- * @phpstan-import-type CallableHookParams from WPHookPlanProvider
  * @internal
  */
 class InstanceRegistryRuntimeHookResolver

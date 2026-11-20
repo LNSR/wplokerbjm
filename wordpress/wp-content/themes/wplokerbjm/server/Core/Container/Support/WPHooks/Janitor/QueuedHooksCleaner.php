@@ -4,7 +4,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Janitor;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\UnregistrationSource;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryHandlerEntry, RuntimeRegistryHandlerEntry};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{ContainerRegistryHandlerEntry, RuntimeRegistryHandlerEntry};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 

@@ -10,8 +10,10 @@
 |---|---|---|
 | `WPHooksScanner` | `server/Core/Container/Support/WPHooks/WPHooksScanner.php` | `getHookRegistrations()` scans or loads the cache; constructor `(array $compiledContainerMap, WPHookPlanProvider $provider, string $namespace, string $cacheLocation)`. |
 | `HookScannerTrait` | `server/Core/Container/Support/WPHooks/Trait/HookScannerTrait.php` | Scans declared non-static methods/properties and reports visibility plus action/filter type. |
-| `HookRegistration` | `server/Core/Container/Support/WPHooks/DTO.php` | Immutable metadata DTO; hydrates via `fromArray()` and exports through VarExporter `__set_state`. |
-| `HookKey` | `server/Core/Container/Support/WPHooks/DTO.php` | Canonical identity: class, member, target, type, priority, accepted args; supports class/callable/namespace matching. |
+| `HookRegistration` | `server/Core/Container/Support/WPHooks/Registrations/HookRegistration.php` | Immutable metadata DTO; hydrates via `fromArray()` and exports through VarExporter `__set_state`. |
+| `HookKey` | `server/Core/Container/Support/WPHooks/Registrations/HookKey.php` | Canonical identity: class, member, target, type, priority, accepted args; supports class/callable/namespace matching. |
+| `InstanceHookMetadata` | `server/Core/Container/Support/WPHooks/Registrations/InstanceHookMetadata.php` | Runtime hook-site metadata; hydrates via `fromArray()` and exports via `__set_state`. |
+| `CallableHookParams` | `server/Core/Container/Support/WPHooks/Provider/CallableHookParams.php` | Per-parameter plan DTO; extends `AbstractDataObject`, so VarExporter emits `__set_state`. |
 | `WPHookPlanProvider` | `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` | Builds callable plans; resolves dynamic names, registration gates, execution gates, and dynamic tags. Single provider for BOTH container and runtime paths (non-nullable `ContainerInterface`). |
 
 ## Registries and selectors

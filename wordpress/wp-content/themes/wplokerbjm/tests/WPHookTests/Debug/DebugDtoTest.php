@@ -7,6 +7,7 @@ namespace WPLokerBJM\Tests\WPHookTests\Debug;
 use PHPUnit\Framework\TestCase;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     DeferredActivationResultDTO,
+    DeferredActivationSource,
     DeferredDebugPhase,
     DeferredRegistrationInfoDTO,
     DeferredRegistrationSnapshotDTO,
@@ -50,6 +51,7 @@ final class DebugDtoTest extends TestCase
                 hasExecuteIf: false,
                 ownerAlive: true,
             ),
+            source: DeferredActivationSource::Scheduler,
             after: new DeferredActivationResultDTO(
                 gatePassed: true,
                 activated: true,
@@ -64,6 +66,7 @@ final class DebugDtoTest extends TestCase
         $array = $dto->toArray();
 
         self::assertSame('activated', $array['phase'], 'Backed enum must flatten to its value.');
+        self::assertSame('scheduler', $array['source'], 'Activation source must flatten to its value.');
         self::assertSame('runtime', $array['context']['path'], 'Nested context must flatten.');
         self::assertSame('activated', $array['after']['reason']);
         self::assertSame(120, $array['after']['elapsedUs']);

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\CallableHookParams;
+
 /**
  * Hook-fire argument shaping for one invoker.
  *
@@ -14,7 +16,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 final readonly class HookArgumentBag
 {
     /**
-     * @param array<int, array{name: string, isVariadic: bool}|string> $hookArgNames
+     * @param list<CallableHookParams> $hookArgNames
      * @param 'action'|'filter' $type
      */
     public function __construct(
@@ -40,19 +42,25 @@ final readonly class HookArgumentBag
         }
 
         /** @var list<string> $paramNames */
-        $paramNames = array_map(static fn(array $p): string => $p['name'], $names);
+        $paramNames = array_map(
+            static fn(CallableHookParams $p): string => $p->name,
+            $names
+        );
 
         $last = $names[\count($names) - 1];
 
         // Variadic is always the LAST parameter: forward the whole remainder
         // truthfully under its name — the caller decides what to do with it.
-        if (($last['isVariadic'] ?? false)) {
+        $lastIsVariadic = $last->isVariadic;
+        $lastName = $last->name;
+
+        if ($lastIsVariadic) {
             $headCount = \count($paramNames) - 1;
             $mapped = \array_combine(
                 \array_slice($paramNames, 0, \min($headCount, \count($args))),
                 \array_slice($args, 0, \min($headCount, \count($args)))
             ) ?: [];
-            $mapped[$last['name']] = \array_slice($args, $headCount);
+            $mapped[$lastName] = \array_slice($args, $headCount);
 
             return $mapped;
         }
@@ -71,11 +79,12 @@ final readonly class HookArgumentBag
         }
 
         $last = $names[\count($names) - 1];
-        if (!($last['isVariadic'] ?? false)) {
+
+        if (!($last->isVariadic ?? false)) {
             return null;
         }
 
-        return $last['name'];
+        return $last->name;
     }
 
     /**

@@ -11,20 +11,26 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker\Target;
 final class RuntimePropertyTarget implements InvocationTarget
 {
     private ?\Closure $reader = null;
+    /** @var array<string, \Closure> */
+    private static array $propertyReaderCache = [];
 
+    /**
+     * @param \WeakReference<object> $instanceRef
+     * @param 'public'|'protected'|'private' $visibility
+     * @return void
+     */
     public function __construct(
         private readonly \WeakReference $instanceRef,
         private readonly string $property,
         private readonly string $visibility = 'public',
     ) {
         $instance = $this->instanceRef->get();
-        if ($this->visibility !== 'public' && $instance !== null) {
-            $this->reader = \Closure::bind(
-                static fn(object $target, string $propertyName): mixed => $target->{$propertyName},
-                null,
-                $instance,
-            );
-        }
+        if ($this->visibility === 'public' || $instance === null) return;
+        $this->reader = self::$propertyReaderCache[$instance::class] ??= \Closure::bind(
+            static fn(object $target, string $propertyName): mixed => $target->{$propertyName},
+            null,
+            $instance,
+        );
     }
 
     public function resolveOwner(): ?object

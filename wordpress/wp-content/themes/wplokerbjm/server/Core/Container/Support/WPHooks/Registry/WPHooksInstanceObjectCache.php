@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
 
 use Brick\VarExporter\VarExporter;
-use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Shared\Log\Logger;
@@ -15,8 +15,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookSca
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
-use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{InstanceRegistryDeferredHookManager, DeferredHookEntryHandler};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{InstanceRegistryDeferredHookManager, Handlers\DeferredHookEntryHandler};
 
 /**
  * File-backed metadata cache for runtime-registered hook sites.

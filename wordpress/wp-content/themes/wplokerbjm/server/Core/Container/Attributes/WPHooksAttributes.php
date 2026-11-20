@@ -6,6 +6,7 @@ namespace WPLokerBJM\Core\Container\Attributes;
 
 use Attribute;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 
 /**
@@ -46,7 +47,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * Closures execute in three very different moments:
  *
  * - `$hook`, `$tag`, `$deferRegisterUntilHook` → **eagerly**, during
- *   scan/registration (boot and cache generation). Keep them pure and cheap:
+ *   registration (boot and cache generation). Keep them pure and cheap:
  *   no I/O, no request-dependent state, deterministic result.
  * - `$registerIf` → at **registration** time, and again at **every** deferred
  *   activation attempt.
@@ -141,7 +142,7 @@ abstract class BaseHookAttribute
      *
      * @param string|(\Closure(TParams...): string) $hook Target WordPress hook name.
      * * A `string` is used verbatim.
-     * * A closure is evaluated **eagerly** at scan/registration time. Its
+     * * A closure is evaluated **eagerly** at registration time. Its
      *   parameters resolve from the DI container only — no hook arguments
      *   exist yet.
      * * It must return a non-empty string. `null`, `''` or a non-string aborts
@@ -209,12 +210,6 @@ abstract class BaseHookAttribute
      * * A non-bool result is treated as `false`.
      * ! A `false` gate is silent apart from a warning log — the hook simply
      * ! does not exist.
-     * ! Registry asymmetry on rejection: the container registry keeps the
-     * ! deferred trigger listener attached while the gate fails, so the next
-     * ! trigger fire re-tries. The instance registry removes its one-shot
-     * ! trigger listener after the first fire even when the entry was rejected —
-     * ! a deferred instance entry rejected by `registerIf` normally never
-     * ! activates.
      *
      * @param (\Closure(TParams...): array)|array $tag Tag(s) used by the
      *        activation / unregistration APIs (`activateDeferredByTags`,
@@ -226,29 +221,28 @@ abstract class BaseHookAttribute
      *   present (e.g. `['A', 'B']` → matches `A` or `B`).
      * * Duplicates are removed; string-backed enums are normalized to their
      *   `->value`.
-     * * A closure is evaluated **eagerly** at scan time (container parameters
+     * * A closure is evaluated **eagerly** at registration time (container parameters
      *   only) and must return a flat array — nested arrays are rejected.
      * ! Any other tag type (`int`, non-backed enum, object, nested array)
      * ! raises a `RuntimeException` while normalizing. The container registry
      * ! catches it per registration: that single hook is skipped and logged
      * ! as an ERROR — boot continues, nothing else is affected.
-     * ! Ignored entirely by the InstanceRegistry (it exposes no tag APIs).
+     * ! Ignored entirely by the InstanceRegistry.
      *
      * @param string|(\Closure(TParams...): string)|null $deferRegisterUntilHook
      *        Defer registration until the named trigger hook fires. Implies
      *        `deferRegister: true` (the constructor forces it).
      * * A closure is resolved like every other attribute closure (container
      *   parameters, must return a non-empty hook name).
-     * * A listener is attached to the trigger at `PHP_INT_MIN` priority and
-     *   activates **only this entry** — not every entry listening on the same
-     *   target hook, and not other entries sharing the same trigger.
+     * * A filter listener is attached to the trigger at `PHP_INT_MIN` priority
+     *   and activates **only this entry** — not every entry listening on the
+     *   same target hook, and not other entries sharing the same trigger. It
+     *   returns the trigger value unchanged, so an `apply_filters()` trigger
+     *   keeps its value while activation runs as a side effect.
      * * If the trigger already fired (`did_action($trigger) >= 1`) the entry is
      *   activated immediately (container path defers this to the end of
      *   `initialize()`).
-     * ! Only **actions** are detected as "already fired": `did_action()` is
-     * ! incremented by `do_action()`, not by `apply_filters()`.
-     * ! The trigger is resolved **once**, at registration: a closure that
-     * ! returns different names per request is a footgun.
+     * ! The trigger is resolved **once**, at registration
      * ! A trigger that never fires leaves the entry deferred forever, silently.
      *
      * @param bool $deferRegister Hold the registration in the deferred pool
@@ -292,11 +286,12 @@ abstract class BaseHookAttribute
      * ! if the owner dies first the chain event command cleanup still runs from the invoker's
      * ! destructor.
      * ! This assume no application smell code mutate global $wp_filter directly
-     * @param (\Closure(TParams...): void)|null $debugDeferredRegistration
-     *   Observability probe for the deferred-pool lifecycle. Invoked with a
-     *   {@see \WPLokerBJM\Core\Container\Support\WPHooks\Debug\DeferredRegistrationInfoDTO}
+     * 
+     * @param (\Closure(DeferredRegistrationInfoDTO|TParams...): void)|null $debugDeferredRegistration
+     *   Observability probe for the deferred-pool lifecycle. Invoked with {@see DeferredRegistrationInfoDTO}
      *   on every deferred phase (`queued`, `activation_attempt`,
      *   `activation_rejected`, `activated`, `activation_failed`, `released`).
+     *   ! At least must request DeferredRegistrationInfoDTO via parameter type-hint.
      * * Opt-in: `null` costs nothing — no DTO is built and no branch is taken
      *   beyond the null check.
      * * The DTO is transient: the framework keeps no reference. Call
@@ -311,20 +306,22 @@ abstract class BaseHookAttribute
      * * Never invoked from PHP destructors; release events come from explicit
      *   release paths only.
      * * A throwing probe is logged and never interrupts the hook lifecycle.
-     * @param (\Closure(TParams...): void)|null $debugLiveRegistration
-     *   Observability probe for live registrations. Invoked with a
-     *   {@see \WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveRegistrationInfoDTO}
+     * 
+     * @param (\Closure(LiveRegistrationInfoDTO|TParams...): void)|null $debugLiveRegistration
+     *   Observability probe for live registrations. Invoked with {@see LiveRegistrationInfoDTO}
      *   on `registered`, `dispatching`, `completed`, `failed` and `skipped`.
+     *   ! At least must request LiveRegistrationInfoDTO via parameter type-hint.
      * * Same opt-in, transient-DTO, resolution and `self`-construction rules
      *   as `$debugDeferredRegistration`.
      * * Executed synchronously on the dispatch path: keep it cheap, and never
      *   dispatch the same hook from inside the probe.
-     * @param (\Closure(TParams...): void)|null $debugLiveUnregistration
+     * 
+     * @param (\Closure(LiveUnregistrationInfoDTO|TParams..): void)|null $debugLiveUnregistration
      *   Observability probe for the unregistration/lifecycle side of a live
-     *   registration. Invoked with a
-     *   {@see \WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveUnregistrationInfoDTO}
+     *   registration. Invoked with {@see LiveUnregistrationInfoDTO}
      *   on `unregister_requested`, `unregistered`, `unregister_failed`,
      *   `once_consumed`, `owner_collected` and `proxy_released`.
+     *   ! At least must request LiveUnregistrationInfoDTO via parameter type-hint.
      * * Owner-optional emission: these phases may run while the owner or the
      *   container is being torn down. `self`/`static` parameters are NEVER
      *   resolved from the container — declare them `?self`; other dependencies

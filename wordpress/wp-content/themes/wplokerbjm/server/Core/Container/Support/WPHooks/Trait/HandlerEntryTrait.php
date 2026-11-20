@@ -11,7 +11,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     LiveUnregistrationResultDTO,
     UnregistrationSource,
 };
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{
     RuntimeRegistryHandlerEntry,
     ContainerRegistryHandlerEntry,
     WPHooksInstanceRegistry
@@ -20,6 +20,7 @@ use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
+
 /**
  * @mixin ContainerRegistryHandlerEntry&RuntimeRegistryHandlerEntry
  * @template TShape
@@ -126,21 +127,6 @@ trait HandlerEntryTrait
         return $result;
     }
 
-    /**
-     * Emit one unregistration phase through the invoker that owns the probe.
-     */
-    private function emitUnregistration(
-        LiveUnregistrationPhase $phase,
-        ?LiveUnregistrationResultDTO $result = null,
-    ): void {
-        $handler = $this->handler;
-        if ($handler === null) {
-            return;
-        }
-
-        $handler->emitLiveUnregistrationDebug($phase, $this->registered, $result);
-    }
-
     public function stillDispatchingSameHook(): bool
     {
         return match ($this->type) {
@@ -162,5 +148,20 @@ trait HandlerEntryTrait
             'action' => has_action($this->hook, $this->handler, $this->priority),
             'filter' => has_filter($this->hook, $this->handler, $this->priority),
         };
+    }
+
+    /**
+     * Emit one unregistration phase through the invoker that owns the probe.
+     */
+    private function emitUnregistration(
+        LiveUnregistrationPhase $phase,
+        ?LiveUnregistrationResultDTO $result = null,
+    ): void {
+        $handler = $this->handler;
+        if ($handler === null) {
+            return;
+        }
+
+        $handler->emitLiveUnregistrationDebug($phase, $this->registered, $result);
     }
 }

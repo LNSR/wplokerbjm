@@ -2,20 +2,17 @@
 
 declare(strict_types=1);
 
-namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager;
+namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{ContainerRegistryHandlerEntry, RuntimeRegistryHandlerEntry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HandlerEntryUniqueKey};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WeakReference;
-use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, InstanceHookMetadata, HookKey};
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
-    RuntimeRegistryHandlerEntry,
-    ContainerRegistryHandlerEntry
-};
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\{HookRegistration, InstanceHookMetadata, HookKey};
 use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
 
 /*======================================================================

@@ -74,6 +74,31 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
         self::assertSame(1, $anon->runs);
     }
 
+    public function testSchedulerIsAFilterAndPassesTriggerValueThrough(): void
+    {
+        $anon = new class {
+            public int $runs = 0;
+
+            #[Action('defer_filter_runtime_hook', 10, deferRegisterUntilHook: 'defer_filter_runtime_trigger')]
+            public function onDeferred(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        self::assertSame(
+            'kept',
+            \apply_filters('defer_filter_runtime_trigger', 'kept'),
+            'The runtime trigger listener must preserve the filtered value.',
+        );
+        self::assertNotNull($this->findRegisteredHook('action', 'defer_filter_runtime_hook'));
+
+        \do_action('defer_filter_runtime_hook');
+        self::assertSame(1, $anon->runs);
+    }
+
     public function testUnregisterByCallableLeavesDeferredEntriesIntact(): void
     {
         $anon = new class {

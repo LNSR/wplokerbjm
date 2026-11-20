@@ -9,6 +9,7 @@ use ReflectionFunction;
 use ReflectionMethod;
 use ReflectionNamedType;
 use WPLokerBJM\Core\Container\Attributes\Inject;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\CallableHookParams;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -18,7 +19,6 @@ use WPLokerBJM\Shared\Log\Logger;
  * invocation: plans are computed once at scan time and exported to the hooks
  * cache, so fire-time resolution never reflects.
  *
- * @phpstan-import-type CallableHookParams from \WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider
  * @phpstan-import-type CallablePlan from \WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider
  */
 final class CallablePlanFactory
@@ -85,24 +85,21 @@ final class CallablePlanFactory
             $isSelf = $type instanceof ReflectionNamedType
                 && \in_array($type->getName(), ['self', 'static'], true);
 
-            /** @var CallableHookParams $planParam */
-            $planParam = [
-                'name' => $param->getName(),
-                'type' => $paramType,
-                'hasDefault' => $hasDefault,
-                'default' => $default,
-                'isVariadic' => $param->isVariadic(),
-                'isSelf' => $isSelf,
-                'allowsNull' => $param->allowsNull(),
-            ];
-
-            // Non-exportable defaults (objects/resources) -> set to null.
+            // Non-exportable defaults (objects/resources) -> drop to null.
             if ($hasDefault && (is_object($default) || is_resource($default))) {
-                $planParam['hasDefault'] = false;
-                $planParam['default'] = null;
+                $hasDefault = false;
+                $default = null;
             }
 
-            $params[] = $planParam;
+            $params[] = new CallableHookParams(
+                name: $param->getName(),
+                type: $paramType,
+                hasDefault: $hasDefault,
+                default: $default,
+                isVariadic: $param->isVariadic(),
+                isSelf: $isSelf,
+                allowsNull: $param->allowsNull(),
+            );
         }
 
         return $this->callablePlanCache[$reflect] ??= [
@@ -191,7 +188,7 @@ final class CallablePlanFactory
     public function extractPropertyCallableParamNames(\ReflectionProperty $property, ?object $instance = null): array
     {
         return array_map(
-            static fn(array $param): string => $param['name'],
+            static fn(CallableHookParams $param): string => $param->name,
             $this->extractPropertyCallablePlan($property, $instance)['params'],
         );
     }

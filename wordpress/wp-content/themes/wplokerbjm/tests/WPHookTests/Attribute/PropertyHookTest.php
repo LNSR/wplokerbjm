@@ -17,7 +17,7 @@ use WPLokerBJM\Tests\Support\Fixtures\PropertyMultiPriorityService;
 use WPLokerBJM\Tests\Support\Fixtures\PropertyNonClosureService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookRegistration;
 
 /**
  * Test suite for property-closure hooks via #[Action]/#[Filter] attributes.

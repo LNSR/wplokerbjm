@@ -17,19 +17,23 @@ final class ContainerPropertyTarget implements InvocationTarget
 
     private ?\Closure $reader = null;
 
+    /**
+     * @param 'public'|'protected'|'private' $visibility
+     * @return void
+     */
     public function __construct(
         private readonly ContainerInterface $container,
         private readonly string $class,
         private readonly string $property,
         private readonly string $visibility = 'public',
     ) {
-        if ($this->visibility !== 'public') {
-            $this->reader = self::$readerCache[$this->class] ??= \Closure::bind(
-                static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
-                null,
-                $this->class,
-            );
-        }
+        if ($this->visibility === 'public') return;
+
+        $this->reader = self::$readerCache[$this->class] ??= \Closure::bind(
+            static fn(object $instance, string $propertyName): mixed => $instance->{$propertyName},
+            null,
+            $this->class,
+        );
     }
 
     public function resolveOwner(): ?object

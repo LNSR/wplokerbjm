@@ -285,9 +285,11 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
 
         $hookClasses = array_unique(array_column($registrations, 'class'));
 
-        $container = $this->createMock(ContainerInterface::class);
-        $container->expects(self::any())->method('has')->willReturnCallback(fn(string $class): bool => in_array($class, $hookClasses, true));
-        $container->expects(self::any())->method('get')->willReturnCallback($this->createMock(...));
+        $container = $this->createStub(ContainerInterface::class);
+        $container->method('has')
+            ->willReturnCallback(static fn(string $class): bool => in_array($class, $hookClasses, true));
+        $container->method('get')
+            ->willReturnCallback(fn(string $id): object => $this->createStub($id));
 
         $fixturesNs = 'WPLokerBJM\Tests\Support\Fixtures';
         $expectedRemoved = count(array_filter(
@@ -329,9 +331,9 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
 
         $hookClasses = array_unique(array_column($registrations, 'class'));
 
-        $container = $this->createMock(ContainerInterface::class);
-        $container->expects(self::any())->method('has')->willReturnCallback(fn(string $class): bool => in_array($class, $hookClasses, true));
-        $container->expects(self::any())->method('get')->willReturnCallback(fn(string $class): object => $this->createMock($class));
+        $container = $this->createStub(ContainerInterface::class);
+        $container->method('has')->willReturnCallback(fn(string $class): bool => in_array($class, $hookClasses, true));
+        $container->method('get')->willReturnCallback(fn(string $class): object => $this->createMock($class));
 
         // The fixtures live in ...\Support\Fixtures — a CHILD of the queried
         // namespace, so the parent query must reach its whole subtree.

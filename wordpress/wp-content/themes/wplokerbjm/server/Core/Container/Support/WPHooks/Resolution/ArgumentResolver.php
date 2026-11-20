@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Resolution;
 
 use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\CallableHookParams;
 use ReflectionFunction;
 use ReflectionNamedType;
 use RuntimeException;
@@ -17,7 +18,6 @@ use RuntimeException;
  * container by type, then the declared default. Also memoizes scope-bound
  * closures per (closure, target class).
  *
- * @phpstan-import-type CallableHookParams from \WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider
  * @phpstan-import-type CallablePlan from \WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider
  */
 final class ArgumentResolver
@@ -78,14 +78,14 @@ final class ArgumentResolver
             // whole remainder, letting the caller dissect it manually.
             // An unmatched variadic parameter captures nothing — it never
             // falls back to the container.
-            if (($param['isVariadic'] ?? false)) {
+            if (($param->isVariadic ?? false)) {
                 if (
                     $variadicHookArg !== null
-                    && $param['name'] === $variadicHookArg
-                    && isset($hookArgs[$param['name']])
-                    && is_array($hookArgs[$param['name']])
+                    && $param->name === $variadicHookArg
+                    && isset($hookArgs[$param->name])
+                    && is_array($hookArgs[$param->name])
                 ) {
-                    array_push($values, ...$hookArgs[$param['name']]);
+                    array_push($values, ...$hookArgs[$param->name]);
                 }
                 continue;
             }
@@ -93,8 +93,8 @@ final class ArgumentResolver
             // Exact parameter-name match wins — hook arguments are injected
             // by name (e.g. `string $search` receives the handler's $search
             // argument), removing any scalar-ambiguity.
-            if (array_key_exists($param['name'], $hookArgs)) {
-                $values[] = $hookArgs[$param['name']];
+            if (isset($param->name) && array_key_exists($param->name, $hookArgs)) {
+                $values[] = $hookArgs[$param->name];
                 continue;
             }
 
@@ -103,7 +103,7 @@ final class ArgumentResolver
              * for non extending Module but it's resolvable by container, continue to resolveCallableParam()
              */
             if (
-                ($param['type'] ?? null) === 'self'
+                ($param->type ?? null) === 'self'
                 && $instanceTarget !== null
             ) {
                 $values[] = $instanceTarget;
@@ -123,21 +123,21 @@ final class ArgumentResolver
      *
      * @throws RuntimeException when the parameter cannot be resolved
      */
-    public function resolveCallableParam(array $param, string $label = ''): mixed
+    public function resolveCallableParam(CallableHookParams $param, string $label = ''): mixed
     {
-        $type = $param['type'] ?? null;
+        $type = $param->type;
 
         if (is_string($type) && $type !== '' && $this->container->has($type)) {
             return $this->container->get($type);
         }
 
-        if (!empty($param['hasDefault'])) {
-            return array_key_exists('default', $param) ? $param['default'] : null;
+        if (!empty($param->hasDefault)) {
+            return $param->default ?? null;
         }
 
         throw new RuntimeException(sprintf(
             'Cannot resolve parameter $%s for condition closure in %s: Class not in container and no default value set.',
-            $param['name'] ?? 'unknown',
+            $param->name ?? 'unknown',
             $label
         ));
     }

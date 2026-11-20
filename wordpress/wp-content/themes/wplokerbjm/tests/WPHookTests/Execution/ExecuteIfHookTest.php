@@ -281,10 +281,10 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
 
         $this->assertTrue($plan['isStatic']);
         $this->assertCount(1, $plan['params']);
-        $this->assertSame('c', $plan['params'][0]['name']);
-        $this->assertSame(ContainerInterface::class, $plan['params'][0]['type']);
-        $this->assertFalse($plan['params'][0]['hasDefault']);
-        $this->assertNull($plan['params'][0]['default']);
+        $this->assertSame('c', $plan['params'][0]->name);
+        $this->assertSame(ContainerInterface::class, $plan['params'][0]->type);
+        $this->assertFalse($plan['params'][0]->hasDefault);
+        $this->assertNull($plan['params'][0]->default);
 
         // Builtin params carry no type but keep their default value.
         $builtin = (new WPHookPlanProvider($this->container()))->buildCallablePlan(
@@ -292,9 +292,9 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         );
         $this->assertTrue($builtin['isStatic']);
         $this->assertCount(1, $builtin['params']);
-        $this->assertNull($builtin['params'][0]['type']);
-        $this->assertTrue($builtin['params'][0]['hasDefault']);
-        $this->assertSame(5, $builtin['params'][0]['default']);
+        $this->assertNull($builtin['params'][0]->type);
+        $this->assertTrue($builtin['params'][0]->hasDefault);
+        $this->assertSame(5, $builtin['params'][0]->default);
 
         // No condition → empty plan.
         $empty = (new WPHookPlanProvider($this->container()))->buildCallablePlan(null);

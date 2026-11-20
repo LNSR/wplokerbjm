@@ -8,6 +8,7 @@ use DI\Container;
 use ReflectionMethod;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Attributes\Inject;
+use WPLokerBJM\Core\Container\Support\WPHooks\Provider\CallableHookParams;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Tests\Support\Fixtures\{PlanProviderDependency, PlanProviderScope};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -78,7 +79,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
             ['name' => 'dep', 'type' => PlanProviderDependency::class, 'hasDefault' => false, 'default' => null, 'isVariadic' => false, 'isSelf' => false, 'allowsNull' => false],
             ['name' => 'count', 'type' => null, 'hasDefault' => true, 'default' => 5, 'isVariadic' => false, 'isSelf' => false, 'allowsNull' => false],
             ['name' => 'rest', 'type' => null, 'hasDefault' => false, 'default' => null, 'isVariadic' => true, 'isSelf' => false, 'allowsNull' => false],
-        ], $plan['params']);
+        ], array_map(static fn(CallableHookParams $param): array => $param->toArray(), $plan['params']));
     }
 
     public function testPlanCapturesSelfAndNullabilityBeforeTypeNormalisation(): void
@@ -90,15 +91,15 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
 
         [$nullableSelf, $requiredSelf, $nullableString] = $plan['params'];
 
-        self::assertTrue($nullableSelf['isSelf']);
-        self::assertTrue($nullableSelf['allowsNull']);
-        self::assertSame(self::class, $nullableSelf['type'], 'self normalises to the declaring class for non-anonymous scopes.');
+        self::assertTrue($nullableSelf->isSelf);
+        self::assertTrue($nullableSelf->allowsNull);
+        self::assertSame(self::class, $nullableSelf->type, 'self normalises to the declaring class for non-anonymous scopes.');
 
-        self::assertTrue($requiredSelf['isSelf']);
-        self::assertFalse($requiredSelf['allowsNull']);
+        self::assertTrue($requiredSelf->isSelf);
+        self::assertFalse($requiredSelf->allowsNull);
 
-        self::assertFalse($nullableString['isSelf']);
-        self::assertTrue($nullableString['allowsNull']);
+        self::assertFalse($nullableString->isSelf);
+        self::assertTrue($nullableString->allowsNull);
     }
 
     public function testOwnerOptionalProbeReceivesNullForNullableSelfAndResolvesContainerDeps(): void
@@ -179,10 +180,10 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
         );
 
         $param = $plan['params'][0];
-        self::assertSame('conf', $param['name']);
-        self::assertSame(\stdClass::class, $param['type']);
-        self::assertFalse($param['hasDefault'], 'object defaults are not cache-exportable');
-        self::assertNull($param['default']);
+        self::assertSame('conf', $param->name);
+        self::assertSame(\stdClass::class, $param->type);
+        self::assertFalse($param->hasDefault, 'object defaults are not cache-exportable');
+        self::assertNull($param->default);
     }
 
     public function testSelfTypeResolvesToNamedScopeClass(): void
@@ -191,7 +192,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
 
         $plan = $this->provider->buildCallablePlan($closure);
 
-        self::assertSame(PlanProviderScope::class, $plan['params'][0]['type']);
+        self::assertSame(PlanProviderScope::class, $plan['params'][0]->type);
     }
 
     public function testSelfTypeInsideAnonymousScopeStaysLiteralSelf(): void
@@ -207,7 +208,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
 
         $plan = $this->provider->buildCallablePlan($host->makeGate());
 
-        self::assertSame('self', $plan['params'][0]['type']);
+        self::assertSame('self', $plan['params'][0]->type);
     }
 
     public function testInjectAttributeSuppliesTypeForUntypedParameter(): void
@@ -217,7 +218,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
             },
         );
 
-        self::assertSame(PlanProviderDependency::class, $plan['params'][0]['type']);
+        self::assertSame(PlanProviderDependency::class, $plan['params'][0]->type);
     }
 
     public function testReflectorPlanCapturesStaticMethodSignature(): void
@@ -227,8 +228,11 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
         );
 
         self::assertTrue($plan['isStatic']);
-        self::assertSame(['dep', 'items'], array_column($plan['params'], 'name'));
-        self::assertTrue($plan['params'][1]['isVariadic']);
+        self::assertSame(
+            ['dep', 'items'],
+            array_map(static fn(CallableHookParams $param): string => $param->name, $plan['params']),
+        );
+        self::assertTrue($plan['params'][1]->isVariadic);
     }
 
     public function testReflectorPlanCapturesInstanceMethodSignature(): void
@@ -238,9 +242,12 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
         );
 
         self::assertFalse($plan['isStatic']);
-        self::assertSame(['value', 'dep', 'count'], array_column($plan['params'], 'name'));
-        self::assertTrue($plan['params'][2]['hasDefault']);
-        self::assertSame(7, $plan['params'][2]['default']);
+        self::assertSame(
+            ['value', 'dep', 'count'],
+            array_map(static fn(CallableHookParams $param): string => $param->name, $plan['params']),
+        );
+        self::assertTrue($plan['params'][2]->hasDefault);
+        self::assertSame(7, $plan['params'][2]->default);
     }
 
     // ── callablePlan() ───────────────────────────────────────────────
@@ -249,7 +256,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
     {
         $closure = static fn (PlanProviderDependency $dep, int $n = 3): null => null;
 
-        self::assertSame(
+        self::assertEquals(
             $this->provider->buildCallablePlan($closure),
             $this->provider->callablePlan($closure),
         );
@@ -265,9 +272,12 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
 
         $plan = $this->provider->callablePlan($invokable);
 
-        self::assertSame(['dep', 'suffix'], array_column($plan['params'], 'name'));
-        self::assertSame(PlanProviderDependency::class, $plan['params'][0]['type']);
-        self::assertSame('!', $plan['params'][1]['default']);
+        self::assertSame(
+            ['dep', 'suffix'],
+            array_map(static fn(CallableHookParams $param): string => $param->name, $plan['params']),
+        );
+        self::assertSame(PlanProviderDependency::class, $plan['params'][0]->type);
+        self::assertSame('!', $plan['params'][1]->default);
     }
 
     public function testCallablePlanForArrayCallable(): void
@@ -275,7 +285,10 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
         $plan = $this->provider->callablePlan([PlanProviderScope::class, 'staticHandler']);
 
         self::assertTrue($plan['isStatic']);
-        self::assertSame(['dep', 'items'], array_column($plan['params'], 'name'));
+        self::assertSame(
+            ['dep', 'items'],
+            array_map(static fn(CallableHookParams $param): string => $param->name, $plan['params']),
+        );
     }
 
     public function testCallablePlanForObjectBackedArrayCallable(): void
@@ -283,22 +296,31 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
         $plan = $this->provider->callablePlan([new PlanProviderScope(), 'instanceHandler']);
 
         self::assertFalse($plan['isStatic']);
-        self::assertSame(['value', 'dep', 'count'], array_column($plan['params'], 'name'));
+        self::assertSame(
+            ['value', 'dep', 'count'],
+            array_map(static fn(CallableHookParams $param): string => $param->name, $plan['params']),
+        );
     }
 
     public function testCallablePlanForClassMethodString(): void
     {
         $plan = $this->provider->callablePlan(PlanProviderScope::class . '::staticHandler');
 
-        self::assertSame(['dep', 'items'], array_column($plan['params'], 'name'));
+        self::assertSame(
+            ['dep', 'items'],
+            array_map(static fn(CallableHookParams $param): string => $param->name, $plan['params']),
+        );
     }
 
     public function testCallablePlanForPlainFunctionString(): void
     {
         $plan = $this->provider->callablePlan('strlen');
 
-        self::assertSame(['string'], array_column($plan['params'], 'name'));
-        self::assertNull($plan['params'][0]['type']);
+        self::assertSame(
+            ['string'],
+            array_map(static fn(CallableHookParams $param): string => $param->name, $plan['params']),
+        );
+        self::assertNull($plan['params'][0]->type);
     }
 
     public function testCallablePlanForNonCallableReturnsEmptyPlan(): void
@@ -323,10 +345,13 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
             $service,
         );
 
-        self::assertSame(['name', 'dep', 'flag'], array_column($plan['params'], 'name'));
-        self::assertSame(PlanProviderDependency::class, $plan['params'][1]['type']);
-        self::assertTrue($plan['params'][2]['hasDefault']);
-        self::assertTrue($plan['params'][2]['default']);
+        self::assertSame(
+            ['name', 'dep', 'flag'],
+            array_map(static fn(CallableHookParams $param): string => $param->name, $plan['params']),
+        );
+        self::assertSame(PlanProviderDependency::class, $plan['params'][1]->type);
+        self::assertTrue($plan['params'][2]->hasDefault);
+        self::assertTrue($plan['params'][2]->default);
     }
 
     public function testPropertyHookPlanWithoutInstanceReturnsEmptyPlan(): void
@@ -366,7 +391,10 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
 
         self::assertSame(['first', 'second'], $this->provider->extractPropertyCallableParamNames($property, $service));
         self::assertSame(
-            array_column($this->provider->extractPropertyCallablePlan($property, $service)['params'], 'name'),
+            array_map(
+                static fn(CallableHookParams $param): string => $param->name,
+                $this->provider->extractPropertyCallablePlan($property, $service)['params'],
+            ),
             $this->provider->extractPropertyCallableParamNames($property, $service),
         );
     }
@@ -423,7 +451,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
     public function testResolveHookNameRejectsNonStringResult(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('must return string');
+        $this->expectExceptionMessageIsOrContains('must return string');
 
         $this->provider->resolveHookName(static fn (): int => 5, [], 'non_string_hook');
     }
@@ -460,7 +488,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
     public function testExecuteIfRejectsNonBoolResult(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('must return bool');
+        $this->expectExceptionMessageIsOrContains('must return bool');
 
         $this->provider->evaluateExecuteIf(static fn (): string => 'yes', [], 'bad_gate');
     }
@@ -594,7 +622,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
     public function testExecuteIfFailsWhenPlanlessParameterCannotBeResolved(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Cannot resolve parameter $unresolvable');
+        $this->expectExceptionMessageIsOrContains('Cannot resolve parameter $unresolvable');
 
         $this->provider->evaluateExecuteIf(
             static fn (\Countable $unresolvable): bool => true,
@@ -606,7 +634,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
     public function testPlanlessSelfTypedGateWithoutScopeFailsGracefully(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Cannot resolve parameter $self');
+        $this->expectExceptionMessageIsOrContains('Cannot resolve parameter $self');
 
         $this->provider->evaluateExecuteIf(plan_provider_scope_less_self_gate(), [], 'scope_less_self');
     }
@@ -627,7 +655,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
     public function testRegistrationGateRejectsNonBoolResult(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('registerIf gate for bad_register must return bool');
+        $this->expectExceptionMessageIsOrContains('registerIf gate for bad_register must return bool');
 
         $this->provider->evaluateRegistrationGate(static fn (): int => 1, [], 'bad_register');
     }
@@ -718,7 +746,7 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
     public function testResolveTagCallableRejectsNonArrayResult(): void
     {
         $this->expectException(\RuntimeException::class);
-        $this->expectExceptionMessage('Tag callable for bad_tag must return array');
+        $this->expectExceptionMessageIsOrContains('Tag callable for bad_tag must return array');
 
         $this->provider->resolveTagCallable(static fn (): string => 'nope', [], 'bad_tag');
     }

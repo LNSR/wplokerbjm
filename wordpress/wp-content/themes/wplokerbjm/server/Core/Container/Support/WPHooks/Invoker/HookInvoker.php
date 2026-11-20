@@ -170,18 +170,16 @@ final class HookInvoker
      */
     private function consumeLifetimeAndClean(): void
     {
-        $registered = match ($this->config->type) {
-            'action' => (bool) \has_action($this->config->hookName, $this, $this->config->priority),
-            'filter' => (bool) \has_filter($this->config->hookName, $this, $this->config->priority),
-            default => false,
-        };
-
         $this->removal->consumeLifetime(
             $this,
-            function (bool $removed, int $elapsedUs) use ($registered): void {
+            function (bool $removed, int $elapsedUs): void {
                 $this->emitLiveUnregistrationDebug(
                     LiveUnregistrationPhase::OwnerCollected,
-                    registered: $registered,
+                    registered: match ($this->config->type) {
+                        'action' => (bool) \has_action($this->config->hookName, $this, $this->config->priority),
+                        'filter' => (bool) \has_filter($this->config->hookName, $this, $this->config->priority),
+                        default => false,
+                    },
                     result: new LiveUnregistrationResultDTO(
                         requestedBy: UnregistrationSource::Lifetime,
                         removed: $removed,

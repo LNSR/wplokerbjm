@@ -4,11 +4,11 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Tests\WPHookTests\Registry;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryHandlerEntry;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\ContainerRegistryHandlerEntry;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**

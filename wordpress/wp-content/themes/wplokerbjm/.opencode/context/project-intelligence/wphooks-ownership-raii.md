@@ -54,8 +54,8 @@ Nested anticipation: when an inner handler runs, the cleaner immediately unregis
 
 - `server/Core/Container/Support/WPHooks/Trait/HookInvokerTrait.php` — destructor, `consumed`/`removed` guards, cleanup callback.
 - `server/Core/Container/Support/WPHooks/Trait/HandlerEntryTrait.php` — weak invoker getter/setter.
-- `server/Core/Container/Support/WPHooks/Registry/HookEntryHandlers.php` — active/deferred entries, owner weakrefs, destructors.
-- `server/Core/Container/Support/WPHooks/Registry/DeferredManager/DeferredHookEntryHandler.php` — strong deferred ownership + index/scheduler release.
+- `server/Core/Container/Support/WPHooks/Registry/Handlers/ContainerRegistryHandlerEntry.php` + `RuntimeRegistryHandlerEntry.php` — active/deferred entries, owner weakrefs, destructors.
+- `server/Core/Container/Support/WPHooks/Registry/DeferredManager/Handlers/DeferredHookEntryHandler.php` — strong deferred ownership + index/scheduler release.
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — `$handlers`, `$entriesByInvokers`, `$removeEntry`.
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — `$weakRegistry`, `$scanned`, `$removeRuntimeHook`, `unregisterHooksOn`.
 - `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` / `RuntimeHookInvoker.php` — lazy vs weak-owner execution.

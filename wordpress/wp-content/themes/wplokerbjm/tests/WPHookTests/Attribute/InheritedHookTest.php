@@ -50,7 +50,7 @@ class InheritedHookTest extends WplokerbjmTestCase
     /**
      * Scanner registrations filtered to a single fixture class.
      *
-     * @return array<int, \WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration>
+     * @return array<int, \WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookRegistration>
      */
     private function registrationsFor(string $class, array $registrations): array
     {
