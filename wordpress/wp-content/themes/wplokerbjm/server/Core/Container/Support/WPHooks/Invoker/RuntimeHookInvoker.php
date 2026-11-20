@@ -253,6 +253,7 @@ final class RuntimeInstanceHookInvoker
             $this->hookPlanProvider,
             $this->instanceRef,
         );
+        $this->argumentBag = new \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookArgumentBag($this->hookArgNames, $this->type);
 
         if ($this->visibility !== 'public') {
 
@@ -361,6 +362,7 @@ final class RuntimeInstancePropertyHookInvoker
             $this->hookPlanProvider,
             $this->instanceRef,
         );
+        $this->argumentBag = new \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookArgumentBag($this->hookArgNames, $this->type);
 
         if ($this->visibility !== 'public') {
             // Bind inside the instance's class scope so

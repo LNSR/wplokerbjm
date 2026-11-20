@@ -189,6 +189,7 @@ final class ContainerLazyHookInvoker
             $this->planProvider,
             null,
         );
+        $this->argumentBag = new \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookArgumentBag($this->hookArgNames, $this->type);
 
         if ($this->visibility !== 'public') {
             $this->invoker = self::$methodInvokerCache[$this->class] ??= \Closure::bind(
@@ -293,6 +294,7 @@ final class ContainerLazyPropertyHookInvoker
             $this->planProvider,
             null,
         );
+        $this->argumentBag = new \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookArgumentBag($this->hookArgNames, $this->type);
 
         if ($this->visibility !== 'public') {
             $this->reader = self::$classPropertyClosureCache[$this->class] ??= \Closure::bind(
