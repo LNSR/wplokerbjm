@@ -72,7 +72,7 @@ final class DeferredHookEntryHandler
      */
     public function __construct(
         public readonly string $hook,
-        public readonly ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
+        public readonly \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
         public readonly string $type,
         public readonly int $priority,
         public readonly int $acceptedArgs,

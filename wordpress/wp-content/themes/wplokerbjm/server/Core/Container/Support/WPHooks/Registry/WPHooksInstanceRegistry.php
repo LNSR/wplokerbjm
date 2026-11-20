@@ -101,7 +101,7 @@ class WPHooksInstanceRegistry
      * @var \WeakMap<object, list<RuntimeRegistryHandlerEntry>>
      */
     protected \WeakMap $weakRegistry;
-    /** @var \WeakMap<RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, RuntimeRegistryHandlerEntry> */
+    /** @var \WeakMap<\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, RuntimeRegistryHandlerEntry> */
     protected \WeakMap $entriesByInvokers;
     private bool $bridgeInitialized = false;
 
@@ -123,11 +123,6 @@ class WPHooksInstanceRegistry
         public readonly WPHooksInstanceObjectCache $cache,
 
     ) {
-        $this->instanceRegistryDeferredHookManager ??= new InstanceRegistryDeferredHookManager(
-            provider: $this->provider,
-            runtimeResolver: $this->runtimeResolver,
-            entriesIndexer: new EntriesIndexer()
-        );
         $this->weakRegistry = new \WeakMap();
         $this->scanned = new \WeakMap();
         $this->entriesByInvokers = new \WeakMap();
@@ -622,7 +617,7 @@ class WPHooksInstanceRegistry
     /**
      * @param bool $isDeferred
      * @return array{
-     *  RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, 
+     *  \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, 
      *  ($isDeferred is true ? DeferredHookEntryHandler : RuntimeRegistryHandlerEntry)
      * }
      */
@@ -761,12 +756,12 @@ class WPHooksInstanceRegistry
      * the callback never keeps the instance alive — only the record drop
      * touches it, and only when it still exists.
      * @internal
-     * @var (\Closure(RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, bool = false): void) $removeRuntimeHook
+     * @var (\Closure(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, bool = false): void) $removeRuntimeHook
      */
     private \Closure $removeRuntimeHook {
         get {
             return $this->removeRuntimeHook ??= function (
-                RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker,
+                \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker,
                 bool $invokerDied = false,
             ): void {
                 $entry = $this->queuedHooksCleaner->getEntry($invoker) ?? $this->entriesByInvokers[$invoker] ?? null;

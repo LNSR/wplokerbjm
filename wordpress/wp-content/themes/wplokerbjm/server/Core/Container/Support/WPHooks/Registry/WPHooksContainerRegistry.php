@@ -47,7 +47,7 @@ class WPHooksContainerRegistry
     protected array $handlers = [];
 
     /**
-     * @var \WeakMap<ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker, ContainerRegistryHandlerEntry>
+     * @var \WeakMap<\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker, ContainerRegistryHandlerEntry>
      */
     protected \WeakMap $entriesByInvokers;
 
@@ -712,11 +712,11 @@ class WPHooksContainerRegistry
      * first fire (consume-on-any-evaluation). Idempotent.
      * OR
      * Invoker expired
-     * @var (\Closure(ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $invoker, bool $invokerDied = false): void)
+     * @var (\Closure(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $invoker, bool $invokerDied = false): void)
      */
     private \Closure $removeEntry {
         get {
-            return $this->removeEntry ??= function (ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $invoker, bool $invokerDied = false): void {
+            return $this->removeEntry ??= function (\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $invoker, bool $invokerDied = false): void {
                 $entry = $this->queuedHooksCleaner->getEntry($invoker) ?? $this->entriesByInvokers[$invoker] ?? null;
                 if ($entry === null) return;
                 $key = $entry->toUniqueKey();
@@ -854,7 +854,7 @@ class WPHooksContainerRegistry
     }
 
     /**
-     * @return array{ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker, ContainerRegistryHandlerEntry|DeferredHookEntryHandler}
+     * @return array{\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker, ContainerRegistryHandlerEntry|DeferredHookEntryHandler}
      */
     private function createHandlerAndEntry(HookRegistration $registration, string $hookName, array $resolvedTags): array
     {

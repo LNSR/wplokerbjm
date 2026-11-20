@@ -21,7 +21,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredH
  * @phpstan-type HandlerEntry array{
  *  hook: string,
  *  key: HookKey,
- *  handler: ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker,
+ *  handler: \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker,
  *  type: 'action'|'filter',
  *  priority: int,
  *  acceptedArgs: int,
@@ -61,7 +61,7 @@ final class ContainerRegistryHandlerEntry
     public function __construct(
         public readonly string $hook,
         public readonly HookKey $key,
-        ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $handler,
+        \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $handler,
         public readonly string $type,
         public readonly int $priority,
         public readonly int $acceptedArgs,
@@ -131,7 +131,7 @@ final class ContainerRegistryHandlerEntry
  * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-type RuntimeHandlerEntry array{
  *     hook: string,
- *     handler: RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker,
+ *     handler: \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker,
  *     type: 'action'|'filter',
  *     priority: int,
  *     acceptedArgs: int,
@@ -168,7 +168,7 @@ final class RuntimeRegistryHandlerEntry
      */
     public function __construct(
         public readonly string $hook,
-        RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
+        \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
         public readonly string $type,
         public readonly int $priority,
         public readonly int $acceptedArgs,

@@ -26,7 +26,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry
  * Shared invoker mechanics used by BOTH the container-side lazy handlers and
  * the runtime instance handlers: the once/removal callback plumbing and the
  * named hook-args builder.
- * @mixin (ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker)
+ * @mixin (\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker)
  */
 trait HookInvokerTrait
 {
