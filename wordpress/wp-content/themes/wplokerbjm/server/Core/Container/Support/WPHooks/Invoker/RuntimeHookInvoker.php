@@ -128,41 +128,24 @@ trait RuntimeInstanceInvokerTrait
      */
     private function consumeLifetimeAndClean(): void
     {
-        if ($this->removed || $this->removeCallback === null) {
-            return;
-        }
-
-        $startedAt = \hrtime(true);
-
-        try {
-            $this->removed = true;
-            ($this->removeCallback)($this);
-        } catch (\Throwable $e) {
-            Logger::error(
-                __METHOD__,
-                'Error removing lifetime hook ' . $this->label . ': ',
-                [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                ],
-            );
-        } finally {
-            $this->emitLiveUnregistrationDebug(
-                LiveUnregistrationPhase::OwnerCollected,
-                registered: $this->type === 'action'
-                    ? \has_action($this->hookName, $this, $this->priority)
-                    : \has_filter($this->hookName, $this, $this->priority),
-                result: new LiveUnregistrationResultDTO(
-                    requestedBy: UnregistrationSource::Lifetime,
-                    removed: $this->removed,
-                    failureCount: 0,
-                    stillDispatching: $this->dispatching,
-                    elapsedUs: $this->elapsedUs($startedAt),
-                ),
-            );
-        }
+        $this->removal->consumeLifetime(
+            $this,
+            function (bool $removed, int $elapsedUs): void {
+                $this->emitLiveUnregistrationDebug(
+                    LiveUnregistrationPhase::OwnerCollected,
+                    registered: $this->type === 'action'
+                        ? \has_action($this->hookName, $this, $this->priority)
+                        : \has_filter($this->hookName, $this, $this->priority),
+                    result: new LiveUnregistrationResultDTO(
+                        requestedBy: UnregistrationSource::Lifetime,
+                        removed: $removed,
+                        failureCount: 0,
+                        stillDispatching: $this->dispatching,
+                        elapsedUs: $elapsedUs,
+                    ),
+                );
+            },
+        );
     }
 }
 
@@ -228,6 +211,7 @@ final class RuntimeInstanceHookInvoker
         $this->label = $instance instanceof ModuleClassHookMetadata
             ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->method;
+        $this->removal = new \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookRemovalController($this->label);
         $this->debugEmitter = new HookDebugEmitter(
             new HookDebugIdentity(
                 label: $this->label,
@@ -337,6 +321,7 @@ final class RuntimeInstancePropertyHookInvoker
         $this->label = $instance instanceof ModuleClassHookMetadata
             ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->property;
+        $this->removal = new \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookRemovalController($this->label);
         $this->debugEmitter = new HookDebugEmitter(
             new HookDebugIdentity(
                 label: $this->label,

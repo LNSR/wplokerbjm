@@ -164,6 +164,7 @@ final class ContainerLazyHookInvoker
         private readonly array $debugLiveUnregistrationParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->method;
+        $this->removal = new \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookRemovalController($this->label);
         $this->debugEmitter = new HookDebugEmitter(
             new HookDebugIdentity(
                 label: $this->label,
@@ -269,6 +270,7 @@ final class ContainerLazyPropertyHookInvoker
         private readonly array $debugLiveUnregistrationParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->property;
+        $this->removal = new \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookRemovalController($this->label);
         $this->debugEmitter = new HookDebugEmitter(
             new HookDebugIdentity(
                 label: $this->label,

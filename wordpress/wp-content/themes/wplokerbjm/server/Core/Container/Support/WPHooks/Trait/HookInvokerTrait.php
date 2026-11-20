@@ -21,7 +21,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     RuntimeInstancePropertyHookInvoker,
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry, WPHooksInstanceRegistry};
-use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Shared invoker mechanics used by BOTH the container-side lazy handlers and
@@ -43,19 +42,13 @@ trait HookInvokerTrait
     /** @var \Closure(): void  */
     public private(set) ?\Closure $onUnregisterDoCallback = null;
 
-    /** 
-     * @var (\Closure(static, bool = false): void)|null Callback that nukes this registration once consumed (once-hook) or the owner dies (lifetime scoping). 
-     * @see WPHooksContainerRegistry::$removeEntry
-     * @see WPHooksInstanceRegistry::$removeRuntimeHook
+    /**
+     * Removal/cleanup lifecycle collaborator, initialized by each invoker constructor.
      */
-    private ?\Closure $removeCallback = null;
-
+    private readonly \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookRemovalController $removal;
 
     /** Whether the once-hook has been consumed (first fire reached gate evaluation). */
     private bool $consumed = false;
-
-    /** Whether the removal callback has fired — idempotency guard. */
-    private bool $removed = false;
 
     /** destruction state */
     public private(set) bool $isDestructed = false;
@@ -147,7 +140,7 @@ trait HookInvokerTrait
      */
     public function setCleanupCallback(?\Closure $callback): void
     {
-        $this->removeCallback ??= $callback;
+        $this->removal->setCleanupCallback($callback);
     }
 
     /**
@@ -162,46 +155,25 @@ trait HookInvokerTrait
         }
         $this->isDestructed = true;
 
-        $startedAt = \hrtime(true);
-
-        try {
-            if (is_callable($this->onUnregisterDoCallback)) {
-                ($this->onUnregisterDoCallback)();
-            }
-        } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'onUnregisterDo failed for ' . $this->label, [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-        } finally {
-            try {
-                if (is_callable($this->removeCallback)) {
-                    ($this->removeCallback)($this, true);
-                }
-            } catch (\Throwable $e) {
-                Logger::error(__METHOD__, 'Removal callback failed for ' . $this->label, [
-                    'error' => $e->getMessage(),
-                    'trace' => $e->getTraceAsString(),
-                    'file' => $e->getFile(),
-                    'line' => $e->getLine(),
-                ]);
-            } finally {
+        $this->removal->release(
+            $this,
+            $this->onUnregisterDoCallback,
+            function (bool $removed, int $elapsedUs): void {
                 $this->emitLiveUnregistrationDebug(
                     LiveUnregistrationPhase::ProxyReleased,
                     registered: true,
                     result: new LiveUnregistrationResultDTO(
                         requestedBy: UnregistrationSource::Destructor,
-                        removed: $this->removed,
+                        removed: $removed,
                         failureCount: 0,
                         stillDispatching: $this->dispatching,
-                        elapsedUs: $this->elapsedUs($startedAt),
+                        elapsedUs: $elapsedUs,
                     ),
                 );
-                unset($this->onUnregisterDoCallback, $this->removeCallback);
-            }
-        }
+            },
+        );
+
+        unset($this->onUnregisterDoCallback);
     }
 
     /**
@@ -210,35 +182,23 @@ trait HookInvokerTrait
      */
     private function consumeOnceAndClean(): void
     {
-        if (!$this->once || $this->removed || $this->removeCallback === null) {
-            return;
-        }
-
-        $startedAt = \hrtime(true);
-
-        try {
-            $this->removed = true;
-            ($this->removeCallback)($this);
-        } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'Error removing once-hook ' . $this->label . ': ', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'file' => $e->getFile(),
-                'line' => $e->getLine(),
-            ]);
-        } finally {
-            $this->emitLiveUnregistrationDebug(
-                LiveUnregistrationPhase::OnceConsumed,
-                registered: true,
-                result: new LiveUnregistrationResultDTO(
-                    requestedBy: UnregistrationSource::Once,
-                    removed: $this->removed,
-                    failureCount: 0,
-                    stillDispatching: $this->dispatching,
-                    elapsedUs: $this->elapsedUs($startedAt),
-                ),
-            );
-        }
+        $this->removal->consumeOnce(
+            $this->once,
+            $this,
+            function (bool $removed, int $elapsedUs): void {
+                $this->emitLiveUnregistrationDebug(
+                    LiveUnregistrationPhase::OnceConsumed,
+                    registered: true,
+                    result: new LiveUnregistrationResultDTO(
+                        requestedBy: UnregistrationSource::Once,
+                        removed: $removed,
+                        failureCount: 0,
+                        stillDispatching: $this->dispatching,
+                        elapsedUs: $elapsedUs,
+                    ),
+                );
+            },
+        );
     }
 
     /**
