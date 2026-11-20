@@ -130,8 +130,10 @@ class QueuedHooksCleaner
                 $invoker = null;
                 if (
                     array_key_exists(0, $args) && (
+                        //Unified invoker
+                        $args[0] instanceof \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker
                         //Container Invokers
-                        $args[0] instanceof ContainerLazyHookInvoker
+                        || $args[0] instanceof ContainerLazyHookInvoker
                         || $args[0] instanceof ContainerLazyPropertyHookInvoker
                         //RuntimeInstance Invokers
                         || $args[0] instanceof RuntimeInstanceHookInvoker

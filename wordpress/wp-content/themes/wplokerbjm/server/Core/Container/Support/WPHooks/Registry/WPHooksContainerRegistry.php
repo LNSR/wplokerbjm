@@ -860,7 +860,7 @@ class WPHooksContainerRegistry
     {
 
         $handler = $registration->target === 'method'
-            ? new ContainerLazyHookInvoker(
+            ? \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::containerMethod(
                 container: $this->container,
                 planProvider: $this->planProvider,
                 hookName: $hookName,
@@ -883,7 +883,7 @@ class WPHooksContainerRegistry
                 debugLiveUnregistration: $registration->debugLiveUnregistration,
                 debugLiveUnregistrationParams: $registration->debugLiveUnregistrationParams
             )
-            : new ContainerLazyPropertyHookInvoker(
+            : \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::containerProperty(
                 container: $this->container,
                 planProvider: $this->planProvider,
                 hookName: $hookName,

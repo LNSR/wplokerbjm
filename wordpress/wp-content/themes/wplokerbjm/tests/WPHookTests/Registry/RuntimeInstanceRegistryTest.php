@@ -53,7 +53,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         $registered = $this->findRegisteredHook('action', 'runtime_action_test');
         $this->assertNotNull($registered);
-        $this->assertInstanceOf(RuntimeInstanceHookInvoker::class, $registered['callable']);
+        $this->assertInstanceOf(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::class, $registered['callable']);
 
         do_action('runtime_action_test', 'fired');
 
@@ -404,7 +404,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         $registered = $this->findRegisteredHook('action', 'rt_closure_hook');
         $this->assertNotNull($registered, 'Closure-resolved hook must be registered under the resolved name');
-        $this->assertInstanceOf(RuntimeInstanceHookInvoker::class, $registered['callable']);
+        $this->assertInstanceOf(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::class, $registered['callable']);
 
         do_action('rt_closure_hook', 'fired');
         $this->assertSame(['fired'], $captured);

@@ -233,7 +233,7 @@ class ContainerLazyHookInvokerTest extends WplokerbjmTestCase
         $this->assertNotNull($hook);
 
         $handler = $hook['callable'];
-        $this->assertInstanceOf(ContainerLazyHookInvoker::class, $handler);
+        $this->assertInstanceOf(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::class, $handler);
         $this->assertStringContainsString('onAction', $handler->label);
     }
 

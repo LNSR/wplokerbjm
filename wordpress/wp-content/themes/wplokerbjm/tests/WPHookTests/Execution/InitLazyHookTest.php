@@ -74,7 +74,7 @@ class InitLazyHookTest extends WplokerbjmTestCase
         // The hook must be registered...
         $reg = $this->findRegisteredHook('action', 'lazy_action_hook');
         $this->assertNotNull($reg, 'Hook should be registered');
-        $this->assertInstanceOf(ContainerLazyHookInvoker::class, $reg['callable'], 'Hook callable should be a ContainerLazyHookInvoker');
+        $this->assertInstanceOf(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::class, $reg['callable'], 'Hook callable should be a HookInvoker');
 
         // ...but the service MUST NOT have been instantiated yet.
         $this->assertSame(

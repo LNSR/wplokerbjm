@@ -638,7 +638,7 @@ class WPHooksInstanceRegistry
             attributeIndex: $attributeIndex,
         );
         $handler = match ($metadata->target) {
-            'method' => new RuntimeInstanceHookInvoker(
+            'method' => \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::runtimeMethod(
                 instanceRef: $weakRef,
                 hookName: $metadata->hook,
                 priority: $metadata->priority,
@@ -660,7 +660,7 @@ class WPHooksInstanceRegistry
                 debugLiveUnregistration: $metadata->debugLiveUnregistration,
                 debugLiveUnregistrationParams: $metadata->debugLiveUnregistrationParams,
             ),
-            'property', 'property-hook' => new RuntimeInstancePropertyHookInvoker(
+            'property', 'property-hook' => \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::runtimeProperty(
                 instanceRef: $weakRef,
                 hookName: $metadata->hook,
                 priority: $metadata->priority,

@@ -314,7 +314,7 @@ class PropertyHookTest extends WplokerbjmTestCase
         $this->assertNotNull($hook, 'Handler should be registered');
 
         $handler = $hook['callable'];
-        $this->assertInstanceOf(ContainerLazyPropertyHookInvoker::class, $handler, 'Property hooks should use ContainerLazyPropertyHookInvoker');
+        $this->assertInstanceOf(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::class, $handler, 'Property hooks should use HookInvoker');
         $this->assertStringContainsString(
             'appendSuffix',
             $handler->label,
