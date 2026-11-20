@@ -9,7 +9,7 @@ use ReflectionFunction;
 use ReflectionProperty;
 use Brick\VarExporter\VarExporter;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstancePropertyHookInvoker, RuntimeInstanceHookInvoker};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Shared\Log\Logger;
@@ -101,7 +101,7 @@ class WPHooksInstanceRegistry
      * @var \WeakMap<object, list<RuntimeRegistryHandlerEntry>>
      */
     protected \WeakMap $weakRegistry;
-    /** @var \WeakMap<\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, RuntimeRegistryHandlerEntry> */
+    /** @var \WeakMap<HookInvoker, RuntimeRegistryHandlerEntry> */
     protected \WeakMap $entriesByInvokers;
     private bool $bridgeInitialized = false;
 
@@ -211,7 +211,7 @@ class WPHooksInstanceRegistry
                 if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
                     $metadata[] = $entryMeta;
                 }
-
+                $this->provider->assertNullableSelfClosures($entryMeta, $instance);
                 $this->processMetadataEntry($entryMeta, $instance, $attributeIndex, $records);
             }
         );
@@ -255,7 +255,7 @@ class WPHooksInstanceRegistry
                 if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
                     $metadata[] = $entryMeta;
                 }
-
+                $this->provider->assertNullableSelfClosures($entryMeta, $instance);
                 $this->processMetadataEntry($entryMeta, $instance, $attributeIndex, $records);
             }
         );
@@ -526,46 +526,6 @@ class WPHooksInstanceRegistry
     }
 
     /**
-     * Instance-registry closures are bound to a WeakReference owner, so any
-     * `self`/`static` parameter must be nullable: null means the owner is gone
-     * or mid-teardown. Enforced for every plan-bearing attribute closure,
-     * including entries re-hydrated from the metadata cache (plans are rebuilt
-     * here so pre-flag cache entries cannot bypass the rule).
-     */
-    private function assertNullableSelfClosures(InstanceHookMetadata $metadata, object $instance): void
-    {
-        $ownerLabel = $instance instanceof ModuleClassHookMetadata
-            ? $instance->parentClassString . '->' . $instance->parentProperty
-            : $instance::class;
-
-        $label = $ownerLabel . '->' . $metadata->targetName . ' on ' . $metadata->hook;
-
-        $closures = [
-            'executeIf' => $metadata->executeIf,
-            'registerIf' => $metadata->registerIf,
-            'deferRegisterUntilHook' => $metadata->deferRegisterUntilHook instanceof \Closure
-                ? $metadata->deferRegisterUntilHook
-                : null,
-            'onUnregisterDo' => $metadata->onUnregisterDo,
-            'debugDeferredRegistration' => $metadata->debugDeferredRegistration,
-            'debugLiveRegistration' => $metadata->debugLiveRegistration,
-            'debugLiveUnregistration' => $metadata->debugLiveUnregistration,
-        ];
-
-        foreach ($closures as $role => $closure) {
-            if ($closure === null) {
-                continue;
-            }
-
-            foreach ($this->provider->buildCallablePlan($closure)['params'] as $param) {
-                if (($param['isSelf'] ?? false) && !($param['allowsNull'] ?? false)) {
-                    throw NonNullableSelfParameterException::forParameter($role, $label, $param['name']);
-                }
-            }
-        }
-    }
-
-    /**
      * Process an individual hook metadata entry: checks the registration gate, 
      * creates the handler and entry via createHandlerAndEntry, and registers 
      * or defers the hook.
@@ -576,8 +536,6 @@ class WPHooksInstanceRegistry
         int $attributeIndex,
         array &$records
     ): void {
-        $this->assertNullableSelfClosures($entryMeta, $instance);
-
         $isDeferred = $entryMeta->deferRegister || $entryMeta->deferRegisterUntilHook !== null;
 
         if (!$isDeferred) {
@@ -617,7 +575,7 @@ class WPHooksInstanceRegistry
     /**
      * @param bool $isDeferred
      * @return array{
-     *  \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, 
+     *  HookInvoker, 
      *  ($isDeferred is true ? DeferredHookEntryHandler : RuntimeRegistryHandlerEntry)
      * }
      */
@@ -638,7 +596,7 @@ class WPHooksInstanceRegistry
             attributeIndex: $attributeIndex,
         );
         $handler = match ($metadata->target) {
-            'method' => \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::runtimeMethod(
+            'method' => HookInvoker::runtimeMethod(
                 instanceRef: $weakRef,
                 hookName: $metadata->hook,
                 priority: $metadata->priority,
@@ -660,7 +618,7 @@ class WPHooksInstanceRegistry
                 debugLiveUnregistration: $metadata->debugLiveUnregistration,
                 debugLiveUnregistrationParams: $metadata->debugLiveUnregistrationParams,
             ),
-            'property', 'property-hook' => \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::runtimeProperty(
+            'property', 'property-hook' => HookInvoker::runtimeProperty(
                 instanceRef: $weakRef,
                 hookName: $metadata->hook,
                 priority: $metadata->priority,
@@ -756,12 +714,12 @@ class WPHooksInstanceRegistry
      * the callback never keeps the instance alive — only the record drop
      * touches it, and only when it still exists.
      * @internal
-     * @var (\Closure(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker, bool = false): void) $removeRuntimeHook
+     * @var (\Closure(HookInvoker, bool = false): void) $removeRuntimeHook
      */
     private \Closure $removeRuntimeHook {
         get {
             return $this->removeRuntimeHook ??= function (
-                \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker,
+                HookInvoker $invoker,
                 bool $invokerDied = false,
             ): void {
                 $entry = $this->queuedHooksCleaner->getEntry($invoker) ?? $this->entriesByInvokers[$invoker] ?? null;

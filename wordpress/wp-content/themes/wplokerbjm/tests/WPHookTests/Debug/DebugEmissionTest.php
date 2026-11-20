@@ -16,10 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
-    ContainerLazyHookInvoker,
-    RuntimeInstanceHookInvoker,
-};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryHandlerEntry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler;
@@ -72,7 +69,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             $payloads[] = $dto;
         };
 
-        $invoker = new ContainerLazyHookInvoker(
+        $invoker = HookInvoker::containerMethod(
             $container,
             $provider,
             'hookDebug',
@@ -118,7 +115,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
 
         $ref = \WeakReference::create($owner);
 
-        $invoker = new RuntimeInstanceHookInvoker(
+        $invoker = HookInvoker::runtimeMethod(
             $ref,
             'hookDebug',
             10,
@@ -160,7 +157,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             $payloads[] = $dto;
         };
 
-        $handler = new ContainerLazyHookInvoker(
+        $handler = HookInvoker::containerMethod(
             $container,
             $provider,
             'hookDebug',
@@ -253,7 +250,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             $payloads[] = $dto;
         };
 
-        $handler = new ContainerLazyHookInvoker(
+        $handler = HookInvoker::containerMethod(
             $container,
             $provider,
             'hookDebug',
@@ -339,7 +336,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             $payloads[] = $dto;
         };
 
-        $handler = new ContainerLazyHookInvoker(
+        $handler = HookInvoker::containerMethod(
             $container,
             $provider,
             'unregistration_debug',
@@ -400,7 +397,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             $payloads[] = $dto;
         };
 
-        $handler = new ContainerLazyHookInvoker(
+        $handler = HookInvoker::containerMethod(
             $container,
             $provider,
             'unregistration_debug_missing',
@@ -453,7 +450,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             $captured = [$owner, $dto];
         };
 
-        $handler = new ContainerLazyHookInvoker(
+        $handler = HookInvoker::containerMethod(
             $container,
             $provider,
             'unregistration_debug_destructor',
@@ -490,7 +487,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             $payloads[] = $dto;
         };
 
-        $invoker = new ContainerLazyHookInvoker(
+        $invoker = HookInvoker::containerMethod(
             $container,
             $provider,
             'unregistration_debug_once',
@@ -537,7 +534,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
 
         $ref = \WeakReference::create($owner);
 
-        $invoker = new RuntimeInstanceHookInvoker(
+        $invoker = HookInvoker::runtimeMethod(
             $ref,
             'unregistration_debug_lifetime',
             10,

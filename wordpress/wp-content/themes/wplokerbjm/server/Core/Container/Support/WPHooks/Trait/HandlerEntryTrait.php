@@ -6,12 +6,6 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use AvailaibleHandlerType;
 use WeakReference;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
-    ContainerLazyHookInvoker,
-    ContainerLazyPropertyHookInvoker,
-    RuntimeInstanceHookInvoker,
-    RuntimeInstancePropertyHookInvoker
-};
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     LiveUnregistrationPhase,
     LiveUnregistrationResultDTO,
@@ -25,21 +19,16 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 /**
  * @mixin ContainerRegistryHandlerEntry&RuntimeRegistryHandlerEntry
- * @phpstan-type AvailaibleHandlerType \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker
  * @template TShape
  */
 trait HandlerEntryTrait
 {
     /** @use TraitDataObject<TShape> */
     use TraitDataObject;
-
-    /**
-     * @var WeakReference<AvailaibleHandlerType>|AvailaibleHandlerType|null
-     */
-    public private(set) ?object $handler = null {
+    public private(set) null|WeakReference|HookInvoker $handler = null {
         get => $this->handler instanceof WeakReference ? $this->handler->get() : $this->handler = null;
         set => \is_object($value) ? WeakReference::create($value) : $value;
     }

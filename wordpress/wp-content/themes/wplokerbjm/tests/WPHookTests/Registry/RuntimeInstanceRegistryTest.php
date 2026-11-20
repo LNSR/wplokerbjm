@@ -7,8 +7,8 @@ namespace WPLokerBJM\Tests\WPHookTests\Registry;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Attributes\Filter;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use DI\ContainerBuilder;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
@@ -53,7 +53,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         $registered = $this->findRegisteredHook('action', 'runtime_action_test');
         $this->assertNotNull($registered);
-        $this->assertInstanceOf(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::class, $registered['callable']);
+        $this->assertInstanceOf(HookInvoker::class, $registered['callable']);
 
         do_action('runtime_action_test', 'fired');
 

@@ -6,7 +6,6 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry;
 
 use Brick\VarExporter\VarExporter;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{RuntimeInstancePropertyHookInvoker, RuntimeInstanceHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Shared\Log\Logger;

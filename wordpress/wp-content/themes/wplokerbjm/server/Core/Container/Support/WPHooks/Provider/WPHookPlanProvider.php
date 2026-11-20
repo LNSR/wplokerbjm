@@ -6,6 +6,8 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Provider;
 
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\HookDebugDispatcher;
+use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\NonNullableSelfParameterException;
+use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Plan\CallablePlanFactory;
 use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ArgumentResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ConditionEvaluator;
@@ -50,6 +52,47 @@ class WPHookPlanProvider
         $this->resolver = new ArgumentResolver($container);
         $this->conditions = new ConditionEvaluator($this->resolver);
         $this->debug = new HookDebugDispatcher($container, $this->resolver);
+    }
+
+    /**
+     * Instance-registry closures are bound to a WeakReference owner, so any
+     * `self`/`static` parameter must be nullable: null means the owner is gone
+     * or mid-teardown.
+     * ! Cached plan treated as trusted.
+     * ! Clear cache or use @see self::registerHooksOn() (param $forceNoCache)
+     * ! if you want to revalidate closures.
+     */
+    public function assertNullableSelfClosures(InstanceHookMetadata $metadata, object $instance): void
+    {
+        $ownerLabel = $instance instanceof ModuleClassHookMetadata
+            ? $instance->parentClassString . '->' . $instance->parentProperty
+            : $instance::class;
+
+        $label = $ownerLabel . '->' . $metadata->targetName . ' on ' . $metadata->hook;
+
+        $closures = [
+            'executeIf' => $metadata->executeIf,
+            'registerIf' => $metadata->registerIf,
+            'deferRegisterUntilHook' => $metadata->deferRegisterUntilHook instanceof \Closure
+                ? $metadata->deferRegisterUntilHook
+                : null,
+            'onUnregisterDo' => $metadata->onUnregisterDo,
+            'debugDeferredRegistration' => $metadata->debugDeferredRegistration,
+            'debugLiveRegistration' => $metadata->debugLiveRegistration,
+            'debugLiveUnregistration' => $metadata->debugLiveUnregistration,
+        ];
+
+        foreach ($closures as $role => $closure) {
+            if ($closure === null) {
+                continue;
+            }
+
+            foreach ($this->buildCallablePlan($closure)['params'] as $param) {
+                if (($param['isSelf'] ?? false) && !($param['allowsNull'] ?? false)) {
+                    throw NonNullableSelfParameterException::forParameter($role, $label, $param['name']);
+                }
+            }
+        }
     }
 
     /**

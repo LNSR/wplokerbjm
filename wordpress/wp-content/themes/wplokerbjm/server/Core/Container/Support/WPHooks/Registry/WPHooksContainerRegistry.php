@@ -10,10 +10,10 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, HookKey, Provider\WPHookPlanProvider};
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{ModuleClassHookMetadata};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
@@ -29,7 +29,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistr
 /**
  * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
  *
- * Stores all hook registrations as identifiable ContainerLazyHookInvoker instances,
+ * Stores all hook registrations as identifiable HookInvoker instances,
  * enabling unregistration by hook name, class, or specific class::method.
  * Service resolution is deferred to hook-fire time (lazy loading).
  * @phpstan-import-type HookType from HookRegistration
@@ -47,7 +47,7 @@ class WPHooksContainerRegistry
     protected array $handlers = [];
 
     /**
-     * @var \WeakMap<\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker, ContainerRegistryHandlerEntry>
+     * @var \WeakMap<HookInvoker, ContainerRegistryHandlerEntry>
      */
     protected \WeakMap $entriesByInvokers;
 
@@ -221,7 +221,7 @@ class WPHooksContainerRegistry
     /**
      * Activate all deferred handlers registered for a specific WordPress hook.
      *
-     * Moves matching ContainerLazyHookInvoker instances from $this->deferredHandlers
+     * Moves matching HookInvoker instances from $this->deferredHandlers
      * into $this->handlers and registers them with WordPress via add_action/add_filter.
      * Handlers that have already been activated are silently skipped.
      *
@@ -712,11 +712,11 @@ class WPHooksContainerRegistry
      * first fire (consume-on-any-evaluation). Idempotent.
      * OR
      * Invoker expired
-     * @var (\Closure(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $invoker, bool $invokerDied = false): void)
+     * @var (\Closure(HookInvoker $invoker, bool $invokerDied = false): void)
      */
     private \Closure $removeEntry {
         get {
-            return $this->removeEntry ??= function (\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $invoker, bool $invokerDied = false): void {
+            return $this->removeEntry ??= function (HookInvoker $invoker, bool $invokerDied = false): void {
                 $entry = $this->queuedHooksCleaner->getEntry($invoker) ?? $this->entriesByInvokers[$invoker] ?? null;
                 if ($entry === null) return;
                 $key = $entry->toUniqueKey();
@@ -752,7 +752,7 @@ class WPHooksContainerRegistry
 
     /**
      * Register hook registrations from the scanner.
-     * Pre-builds ContainerLazyHookInvoker instances and validates container existence.
+     * Pre-builds HookInvoker instances and validates container existence.
      *
      * @param list<HookRegistration> $registrations
      */
@@ -854,13 +854,13 @@ class WPHooksContainerRegistry
     }
 
     /**
-     * @return array{\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker, ContainerRegistryHandlerEntry|DeferredHookEntryHandler}
+     * @return array{HookInvoker, ContainerRegistryHandlerEntry|DeferredHookEntryHandler}
      */
     private function createHandlerAndEntry(HookRegistration $registration, string $hookName, array $resolvedTags): array
     {
 
         $handler = $registration->target === 'method'
-            ? \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::containerMethod(
+            ? HookInvoker::containerMethod(
                 container: $this->container,
                 planProvider: $this->planProvider,
                 hookName: $hookName,
@@ -883,7 +883,7 @@ class WPHooksContainerRegistry
                 debugLiveUnregistration: $registration->debugLiveUnregistration,
                 debugLiveUnregistrationParams: $registration->debugLiveUnregistrationParams
             )
-            : \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker::containerProperty(
+            : HookInvoker::containerProperty(
                 container: $this->container,
                 planProvider: $this->planProvider,
                 hookName: $hookName,

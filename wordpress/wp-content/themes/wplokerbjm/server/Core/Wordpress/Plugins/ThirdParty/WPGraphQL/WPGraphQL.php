@@ -64,7 +64,7 @@ final class WPGraphQL implements PluginConfigInterface
                  * @param 'public_introspection_enabled'|'debug_mode_enabled' $option_name
                  */
                 #[Filter('graphql_get_setting_section_field_value', \PHP_INT_MAX, 3)]
-                public function setSettings(?string $value, ?string $default_value, string $option_name): mixed
+                public function setSettings(mixed $value, mixed $default_value, string $option_name): mixed
                 {
                     return match ($option_name) {
                         'public_introspection_enabled' => SharedUtils::isDevelopment() ? 'on' : 'off',

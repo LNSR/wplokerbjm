@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HandlerEntryUniqueKey};
 use WPLokerBJM\Shared\Log\Logger;
@@ -11,7 +12,6 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, InstanceHookMetadata, HookKey};
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     RuntimeRegistryHandlerEntry,
     ContainerRegistryHandlerEntry
@@ -72,7 +72,7 @@ final class DeferredHookEntryHandler
      */
     public function __construct(
         public readonly string $hook,
-        public readonly \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
+        public readonly HookInvoker $handler,
         public readonly string $type,
         public readonly int $priority,
         public readonly int $acceptedArgs,

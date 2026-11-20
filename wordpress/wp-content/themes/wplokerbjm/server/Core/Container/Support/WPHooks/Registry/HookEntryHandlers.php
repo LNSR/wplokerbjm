@@ -12,8 +12,8 @@ use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\{HookRegistration, InstanceHookMetadata, HookKey};
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker, RuntimeInstanceHookInvoker, RuntimeInstancePropertyHookInvoker};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 
 /**
  * @phpstan-import-type HookType from HookRegistration
@@ -21,7 +21,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredH
  * @phpstan-type HandlerEntry array{
  *  hook: string,
  *  key: HookKey,
- *  handler: \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker,
+ *  handler: HookInvoker,
  *  type: 'action'|'filter',
  *  priority: int,
  *  acceptedArgs: int,
@@ -61,7 +61,7 @@ final class ContainerRegistryHandlerEntry
     public function __construct(
         public readonly string $hook,
         public readonly HookKey $key,
-        \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker $handler,
+        HookInvoker $handler,
         public readonly string $type,
         public readonly int $priority,
         public readonly int $acceptedArgs,
@@ -131,7 +131,7 @@ final class ContainerRegistryHandlerEntry
  * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-type RuntimeHandlerEntry array{
  *     hook: string,
- *     handler: \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker,
+ *     handler: \WPLokerBJM\Cor e\Container\Support\WPHooks\Invoker\HookInvoker,
  *     type: 'action'|'filter',
  *     priority: int,
  *     acceptedArgs: int,
@@ -168,7 +168,7 @@ final class RuntimeRegistryHandlerEntry
      */
     public function __construct(
         public readonly string $hook,
-        \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $handler,
+        HookInvoker $handler,
         public readonly string $type,
         public readonly int $priority,
         public readonly int $acceptedArgs,

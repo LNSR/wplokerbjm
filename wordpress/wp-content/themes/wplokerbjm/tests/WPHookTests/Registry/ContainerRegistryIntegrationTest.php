@@ -9,11 +9,7 @@ use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Tests\Support\Terminal;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
-    ContainerLazyHookInvoker,
-    ContainerLazyPropertyHookInvoker,
-    HookInvoker,
-};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 
@@ -135,8 +131,6 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
         $registered = array_values(array_filter(
             $registered,
             static fn(array $hookData) => $hookData['callable'] instanceof HookInvoker
-                || $hookData['callable'] instanceof ContainerLazyHookInvoker
-                || $hookData['callable'] instanceof ContainerLazyPropertyHookInvoker
         ));
         // Deferred hooks (deferRegister: true) are not auto-registered by initialize(),
         // so exclude them from the count assertion. RegisterIf-gated hooks whose
@@ -166,20 +160,20 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
         $this->assertCount(count($nonDeferred), $registered, 'All non-deferred registrations should produce a registered hook');
         $this->assertGreaterThan(0, $registered);
 
-        // Verify each registered hook has a matching registration and a ContainerLazyHookInvoker callable.
+        // Verify each registered hook has a matching registration and a HookInvoker callable.
         // Comparison is by hook name rather than index because WPHooksContainerRegistry
         // groups handlers by hook name internally, which changes iteration order.
         foreach ($registered as $hookData) {
-            // Each callable must be a ContainerLazyHookInvoker or ContainerLazyPropertyHookInvoker, not an anonymous closure
+            // Each callable must be a HookInvoker, not an anonymous closure
             $this->assertTrue(
-                $hookData['callable'] instanceof HookInvoker || $hookData['callable'] instanceof ContainerLazyHookInvoker || $hookData['callable'] instanceof ContainerLazyPropertyHookInvoker,
-                "Callable for {$hookData['hook']} should be ContainerLazyHookInvoker or ContainerLazyPropertyHookInvoker (not anonymous closure)"
+                $hookData['callable'] instanceof HookInvoker,
+                "Callable for {$hookData['hook']} should be HookInvoker (not anonymous closure)"
             );
 
             $this->assertIsInt($hookData['priority']);
         }
 
-        Terminal::out("  \033[0;32m•\033[0m All " . count($registrations) . " hooks use named ContainerLazyHookInvoker / ContainerLazyPropertyHookInvoker callables (ordered by hook name)\n");
+        Terminal::out("  \033[0;32m•\033[0m All " . count($registrations) . " hooks use named HookInvoker callables (ordered by hook name)\n");
 
         // Verify initialize() is idempotent
         $countBefore = count($this->registeredHooks());
@@ -422,8 +416,6 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
         $registeredHooks = array_filter(
             $this->registeredHooks(),
             static fn(array $hookData) => $hookData['callable'] instanceof HookInvoker
-                || $hookData['callable'] instanceof ContainerLazyHookInvoker
-                || $hookData['callable'] instanceof ContainerLazyPropertyHookInvoker
         );
         $registeredCount = count($registeredHooks);
 

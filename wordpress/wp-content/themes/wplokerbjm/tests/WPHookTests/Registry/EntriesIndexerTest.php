@@ -6,7 +6,7 @@ namespace WPLokerBJM\Tests\WPHookTests\Registry;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{ContainerLazyHookInvoker, ContainerLazyPropertyHookInvoker};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryHandlerEntry;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -50,8 +50,8 @@ final class EntriesIndexerTest extends WplokerbjmTestCase
         );
 
         $handler = $target === 'method'
-            ? new ContainerLazyHookInvoker($this->container(), $this->container()->get(WPHookPlanProvider::class), $hook, $priority, $class, $method)
-            : new ContainerLazyPropertyHookInvoker($this->container(), $this->container()->get(WPHookPlanProvider::class), $hook, $priority, $class, $method);
+            ? HookInvoker::containerMethod($this->container(), $this->container()->get(WPHookPlanProvider::class), $hook, $priority, $class, $method)
+            : HookInvoker::containerProperty($this->container(), $this->container()->get(WPHookPlanProvider::class), $hook, $priority, $class, $method);
 
         return new ContainerRegistryHandlerEntry(
             hook: $hook,

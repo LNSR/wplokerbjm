@@ -3,19 +3,11 @@
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Janitor;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\UnregistrationSource;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
-    ContainerLazyHookInvoker,
-    ContainerLazyPropertyHookInvoker,
-    RuntimeInstanceHookInvoker,
-    RuntimeInstancePropertyHookInvoker,
-};
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{ContainerRegistryHandlerEntry, RuntimeRegistryHandlerEntry};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
-/**
- * @template Invokers of \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker
- */
 class QueuedHooksCleaner
 {
     public private(set) bool $schedulerCleanerDispatched = false;
@@ -23,7 +15,7 @@ class QueuedHooksCleaner
     /** @var list<ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
     protected array $queuedRemovalEntry = [];
 
-    /** @var \WeakMap<Invokers, ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
+    /** @var \WeakMap<HookInvoker, ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
     protected \WeakMap $entries;
     private int $priority = \PHP_INT_MIN;
 
@@ -59,12 +51,12 @@ class QueuedHooksCleaner
         $this->cleanUpCallback($entry->handler);
     }
 
-    public function getEntry(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker): ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry|null
+    public function getEntry(HookInvoker $invoker): ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry|null
     {
         return $this->entries[$invoker] ?? null;
     }
 
-    public function cleanUpCallback(\WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker|ContainerLazyHookInvoker|ContainerLazyPropertyHookInvoker|RuntimeInstanceHookInvoker|RuntimeInstancePropertyHookInvoker $invoker): void
+    public function cleanUpCallback(HookInvoker $invoker): void
     {
         $entry = $this->entries[$invoker] ?? null;
         if ($entry === null) {
@@ -129,16 +121,8 @@ class QueuedHooksCleaner
                 $this->schedulerCleanerDispatched = $this->allHookActionCommand('has');
                 $invoker = null;
                 if (
-                    array_key_exists(0, $args) && (
-                        //Unified invoker
-                        $args[0] instanceof \WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker
-                        //Container Invokers
-                        || $args[0] instanceof ContainerLazyHookInvoker
-                        || $args[0] instanceof ContainerLazyPropertyHookInvoker
-                        //RuntimeInstance Invokers
-                        || $args[0] instanceof RuntimeInstanceHookInvoker
-                        || $args[0] instanceof RuntimeInstancePropertyHookInvoker
-                    )
+                    array_key_exists(0, $args)
+                    && $args[0] instanceof HookInvoker
                 ) {
                     $invoker = $args[0];
                 }
