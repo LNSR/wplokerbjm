@@ -12,6 +12,7 @@ use ReflectionNamedType;
 use RuntimeException;
 use WPLokerBJM\Core\Container\Attributes\Inject;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\HookDebugProbeException;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -227,10 +228,10 @@ class WPHookPlanProvider
                     return $this->callablePlanCache[$property] ??= $this->callablePlan($value);
                 }
             } catch (ReflectionException $e) {
-                // Logger::error(__METHOD__, 'Error getting property value', [
-                //     'message' => $e->getMessage(),
-                //     'trace' => $e->getTraceAsString(),
-                // ]);
+                Logger::error(__METHOD__, 'Error getting property value', [
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                ]);
             };
         }
 
@@ -384,13 +385,13 @@ class WPHookPlanProvider
 
                 return $onUnregisterDo(...$values);
             } catch (\Throwable $e) {
-                // Logger::error(__METHOD__, 'Failed to execute onUnregisterDo', [
-                //     'message' => $e->getMessage(),
-                //     'trace' => $e->getTraceAsString(),
-                //     'file' => $e->getFile(),
-                //     'line' => $e->getLine(),
-                //     'invokerLabel' => $label
-                // ]);
+                Logger::error(__METHOD__, 'Failed to execute onUnregisterDo', [
+                    'message' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                    'invokerLabel' => $label
+                ]);
                 return null;
             }
         };
@@ -405,6 +406,13 @@ class WPHookPlanProvider
      *  3. the DI container by type,
      *  4. the declared default.
      *
+     * In owner-optional mode (lifecycle emissions that may fire during
+     * teardown), a `self`/`static` parameter is NEVER satisfied from the
+     * container: it receives the live owner, `null` when declared `?self`, or
+     * the probe is skipped with a logged contract error. Other dependencies
+     * still resolve through the container, but a mid-teardown failure falls
+     * back to defaults instead of aborting the probe.
+     *
      * Variadic parameters are ignored. A missing owner means `self` falls
      * through to container resolution — which may CONSTRUCT the service; see
      * the attribute PHPDoc. Failures are logged and swallowed so a probe can
@@ -418,6 +426,7 @@ class WPHookPlanProvider
         object $dto,
         string $label = '',
         ?object $owner = null,
+        bool $ownerOptional = false,
     ): void {
         if ($debug === null) {
             return;
@@ -431,18 +440,19 @@ class WPHookPlanProvider
                 if ($param['isVariadic']) {
                     continue;
                 }
-                $values[] = $this->resolveDebugParameter($param, $dto, $label, $owner);
+                $values[] = $this->resolveDebugParameter($param, $dto, $label, $owner, $ownerOptional);
             }
 
             $callable(...$values);
         } catch (\Throwable $e) {
-            // Logger::error(self::class, 'Hook debug probe failed for ' . $label, [
-            //     'dto' => $dto::class,
-            //     'message' => $e->getMessage(),
-            //     'trace' => $e->getTraceAsString(),
-            //     'file' => $e->getFile(),
-            //     'line' => $e->getLine(),
-            // ]);
+            Logger::error(self::class, 'Hook debug probe failed for ' . $label, [
+                'dto' => $dto::class,
+                'ownerOptional' => $ownerOptional,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
         }
     }
 
@@ -451,12 +461,24 @@ class WPHookPlanProvider
      *
      * @param CallableHookParams $param
      */
-    private function resolveDebugParameter(array $param, object $dto, string $label, ?object $owner): mixed
-    {
+    private function resolveDebugParameter(
+        array $param,
+        object $dto,
+        string $label,
+        ?object $owner,
+        bool $ownerOptional = false,
+    ): mixed {
         $type = $param['type'] ?? null;
 
         if (\is_string($type) && $type !== '' && \is_a($dto, $type)) {
             return $dto;
+        }
+
+        $isSelf = (bool) ($param['isSelf'] ?? false);
+        $allowsNull = (bool) ($param['allowsNull'] ?? false);
+
+        if ($isSelf && $owner !== null) {
+            return $owner;
         }
 
         if (
@@ -468,6 +490,36 @@ class WPHookPlanProvider
             )
         ) {
             return $owner;
+        }
+
+        if ($ownerOptional) {
+            if ($isSelf) {
+                if ($allowsNull) {
+                    return null;
+                }
+
+                throw HookDebugProbeException::nonNullableSelf($label, $param['name'] ?? 'unknown');
+            }
+
+            if (\is_string($type) && $type !== '') {
+                try {
+                    if ($this->container->has($type)) {
+                        return $this->container->get($type);
+                    }
+                } catch (\Throwable) {
+                    // Container may be mid-teardown; fall through to defaults.
+                }
+            }
+
+            if (!empty($param['hasDefault'])) {
+                return $param['default'] ?? null;
+            }
+
+            if ($allowsNull) {
+                return null;
+            }
+
+            throw HookDebugProbeException::unresolved($label, $param['name'] ?? 'unknown', $type);
         }
 
         return $this->resolveCallableParam($param, $label);

@@ -41,7 +41,9 @@ trait ContainerLazyHookInvokerTrait
     {
 
         $debugStart = \hrtime(true);
-        $this->emitLiveDebug(LiveDebugPhase::Dispatching, registered: true);
+        $this->emitLiveDebug(LiveDebugPhase::Dispatching, registered: $this->type === 'action'
+            ? \has_action($this->hookName, $this, $this->priority)
+            : \has_filter($this->hookName, $this, $this->priority));
         try {
             $this->dispatching = true;
             if ($this->once) {
@@ -64,26 +66,26 @@ trait ContainerLazyHookInvokerTrait
                         $this->variadicHookArgName()
                     );
                 } catch (\RuntimeException $e) {
-                    // Logger::error(
-                    //     __METHOD__,
-                    //     'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
-                    //     [
-                    //         'message' => $e->getMessage(),
-                    //         'trace' => $e->getTraceAsString(),
-                    //         'file' => $e->getFile(),
-                    //         'line' => $e->getLine(),
-                    //     ]
-                    // );
+                    Logger::error(
+                        __METHOD__,
+                        'executeIf gate unresolvable for hook ' . $this->label . ' TREATED AS PASSED',
+                        [
+                            'message' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                        ]
+                    );
                     $gatePassed = true;
                     $this->emitLiveOutcome(LiveDebugPhase::Failed, 'failed', $debugStart, error: $e);
                     return $this->filterPassthrough($args);
                 }
 
                 if (!$gatePassed) {
-                    // Logger::info(
-                    //     __METHOD__,
-                    //     'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
-                    // );
+                    Logger::info(
+                        __METHOD__,
+                        'Skipping hook ' . $this->label . ' — executeIf gate returned false.'
+                    );
                     $this->emitLiveOutcome(LiveDebugPhase::Skipped, 'skipped', $debugStart, error: new \RuntimeException('executeIf returned false'));
                     return $this->filterPassthrough($args);
                 }
@@ -92,16 +94,16 @@ trait ContainerLazyHookInvokerTrait
             $instance = $this->container->get($this->class);
             $result = $this->invokeOn($instance, ...$args);
 
-            // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
+            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Hook invoke {$this->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times');
             $this->emitLiveOutcome(LiveDebugPhase::Completed, 'completed', $debugStart, result: $result, owner: $instance);
             return $result;
         } catch (\Throwable $e) {
-            // Logger::error(__METHOD__, "Error invoking hook {$this->label}: ", [
-            //     'error' => $e->getMessage(),
-            //     'trace' => $e->getTraceAsString(),
-            //     'file' => $e->getFile(),
-            //     'line' => $e->getLine(),
-            // ]);
+            Logger::error(__METHOD__, "Error invoking hook {$this->label}: ", [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
             $this->emitLiveOutcome(LiveDebugPhase::Failed, 'failed', $debugStart, error: $e);
             return $this->filterPassthrough($args);
         } finally {
@@ -157,7 +159,9 @@ final class ContainerLazyHookInvoker
         private readonly ?\Closure $debugDeferredRegistration = null,
         private readonly array $debugDeferredRegistrationParams = [],
         private readonly ?\Closure $debugLiveRegistration = null,
-        private readonly array $debugLiveRegistrationParams = []
+        private readonly array $debugLiveRegistrationParams = [],
+        private readonly ?\Closure $debugLiveUnregistration = null,
+        private readonly array $debugLiveUnregistrationParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->method;
         $this->debugClass = $this->class;
@@ -237,7 +241,9 @@ final class ContainerLazyPropertyHookInvoker
         private readonly ?\Closure $debugDeferredRegistration = null,
         private readonly array $debugDeferredRegistrationParams = [],
         private readonly ?\Closure $debugLiveRegistration = null,
-        private readonly array $debugLiveRegistrationParams = []
+        private readonly array $debugLiveRegistrationParams = [],
+        private readonly ?\Closure $debugLiveUnregistration = null,
+        private readonly array $debugLiveUnregistrationParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->property;
         $this->debugClass = $this->class;

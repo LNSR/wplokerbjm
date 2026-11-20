@@ -100,6 +100,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * | `$onUnregisterDo`         | yes               | yes                     |
  * | `$debugDeferredRegistration` | yes            | yes                     |
  * | `$debugLiveRegistration`  | yes               | yes                     |
+ * | `$debugLiveUnregistration` | yes              | yes                     |
  *
  * ---------------------------------------------------------------------------
  * ## Known limitations
@@ -318,6 +319,21 @@ abstract class BaseHookAttribute
      *   as `$debugDeferredRegistration`.
      * * Executed synchronously on the dispatch path: keep it cheap, and never
      *   dispatch the same hook from inside the probe.
+     * @param (\Closure(TParams...): void)|null $debugLiveUnregistration
+     *   Observability probe for the unregistration/lifecycle side of a live
+     *   registration. Invoked with a
+     *   {@see \WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveUnregistrationInfoDTO}
+     *   on `unregister_requested`, `unregistered`, `unregister_failed`,
+     *   `once_consumed`, `owner_collected` and `proxy_released`.
+     * * Owner-optional emission: these phases may run while the owner or the
+     *   container is being torn down. `self`/`static` parameters are NEVER
+     *   resolved from the container — declare them `?self`; other dependencies
+     *   still resolve through the container (with defaults as a mid-teardown
+     *   fallback).
+     * * `proxy_released` fires from the invoker destructor: keep the probe
+     *   synchronous and cheap, and do not rely on the request being active.
+     * * Same opt-in, transient-DTO and throwing-probe rules as the other
+     *   probes.
      */
     public function __construct(
         public readonly string|\Closure $hook,
@@ -332,6 +348,7 @@ abstract class BaseHookAttribute
         public readonly ?\Closure $onUnregisterDo = null,
         public readonly ?\Closure $debugDeferredRegistration = null,
         public readonly ?\Closure $debugLiveRegistration = null,
+        public readonly ?\Closure $debugLiveUnregistration = null,
     ) {
         $this->deferRegister = $deferRegisterUntilHook !== null ? true : $deferRegister;
     }

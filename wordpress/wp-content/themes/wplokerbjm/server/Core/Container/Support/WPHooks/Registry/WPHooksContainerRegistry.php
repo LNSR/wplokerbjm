@@ -200,16 +200,16 @@ class WPHooksContainerRegistry
                 $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes);
                 $this->entriesByInvokers[$entry->handler] = $entry;
             } catch (\Exception $e) {
-                // Logger::error(
-                //     __METHOD__,
-                //     "Error registering {$entry->invokerLabel}",
-                //     [
-                //         'message' => $e->getMessage(),
-                //         'trace' => $e->getTraceAsString(),
-                //         'file' => $e->getFile(),
-                //         'line' => $e->getLine(),
-                //     ]
-                // );
+                Logger::error(
+                    __METHOD__,
+                    "Error registering {$entry->invokerLabel}",
+                    [
+                        'message' => $e->getMessage(),
+                        'trace' => $e->getTraceAsString(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                    ]
+                );
             }
         }
 
@@ -702,7 +702,7 @@ class WPHooksContainerRegistry
                 $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes);
                 $entry->register();
                 $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
-                // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
+                SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
                 return true;
             };
         }
@@ -725,7 +725,7 @@ class WPHooksContainerRegistry
                     $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                     unset($this->handlers[$key]);
                     unset($this->entriesByInvokers[$invoker]);
-                    // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
+                    SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
                     return;
                 };
 
@@ -763,11 +763,11 @@ class WPHooksContainerRegistry
             $registration = $reg instanceof HookRegistration ? $reg : HookRegistration::fromArray($reg);
 
             if (!$this->container->has($registration->class)) {
-                // Logger::info(
-                //     __METHOD__,
-                //     'Skipping hook ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
-                //         . ' — class not in container: ' . $registration->class
-                // );
+                Logger::info(
+                    __METHOD__,
+                    'Skipping hook ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
+                        . ' — class not in container: ' . $registration->class
+                );
                 continue;
             }
 
@@ -779,12 +779,12 @@ class WPHooksContainerRegistry
                     $registration->class
                 );
             } catch (\RuntimeException $e) {
-                // Logger::error(
-                //     __METHOD__,
-                //     'Skipping hook for ' . $registration->class . '::' . $registration->method
-                //         . ' on ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
-                //         . ' — ' . $e->getMessage()
-                // );
+                Logger::error(
+                    __METHOD__,
+                    'Skipping hook for ' . $registration->class . '::' . $registration->method
+                        . ' on ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
+                        . ' — ' . $e->getMessage()
+                );
                 continue;
             }
 
@@ -797,17 +797,17 @@ class WPHooksContainerRegistry
                         $registration->class
                     );
                 } catch (\Throwable $e) {
-                    // Logger::error(
-                    //     __METHOD__,
-                    //     'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
-                    // );
+                    Logger::error(
+                        __METHOD__,
+                        'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
+                    );
                     continue;
                 }
                 if (!$allowed) {
-                    // Logger::info(
-                    //     __METHOD__,
-                    //     'Skipping hook ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — registerIf gate returned false.'
-                    // );
+                    Logger::info(
+                        __METHOD__,
+                        'Skipping hook ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — registerIf gate returned false.'
+                    );
                     continue;
                 }
             }
@@ -832,10 +832,10 @@ class WPHooksContainerRegistry
                     $resolvedTags
                 );
             } catch (\Throwable $e) {
-                // Logger::error(
-                //     __METHOD__,
-                //     'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
-                // );
+                Logger::error(
+                    __METHOD__,
+                    'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
+                );
                 continue;
             }
 
@@ -879,7 +879,9 @@ class WPHooksContainerRegistry
                 debugDeferredRegistration: $registration->debugDeferredRegistration,
                 debugDeferredRegistrationParams: $registration->debugDeferredRegistrationParams,
                 debugLiveRegistration: $registration->debugLiveRegistration,
-                debugLiveRegistrationParams: $registration->debugLiveRegistrationParams
+                debugLiveRegistrationParams: $registration->debugLiveRegistrationParams,
+                debugLiveUnregistration: $registration->debugLiveUnregistration,
+                debugLiveUnregistrationParams: $registration->debugLiveUnregistrationParams
             )
             : new ContainerLazyPropertyHookInvoker(
                 container: $this->container,
@@ -900,7 +902,9 @@ class WPHooksContainerRegistry
                 debugDeferredRegistration: $registration->debugDeferredRegistration,
                 debugDeferredRegistrationParams: $registration->debugDeferredRegistrationParams,
                 debugLiveRegistration: $registration->debugLiveRegistration,
-                debugLiveRegistrationParams: $registration->debugLiveRegistrationParams
+                debugLiveRegistrationParams: $registration->debugLiveRegistrationParams,
+                debugLiveUnregistration: $registration->debugLiveUnregistration,
+                debugLiveUnregistrationParams: $registration->debugLiveUnregistrationParams
             );
 
         $entry = ($registration->deferRegister || $registration->deferRegisterUntilHook !== null) ?

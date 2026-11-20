@@ -149,10 +149,10 @@ trait HookTargetResolverTrait
                 $refClass = new \ReflectionClass($callerObject);
                 foreach ($refClass->getProperties() as $property) {
                     if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
-                        // Logger::info(
-                        //     __METHOD__,
-                        //     "Anon class without extending ModuleClassHookMetadata, it's recommended to use 'ModuleClassHookMetadata'." . $refClass->getName() . "::" . $property->getName()
-                        // );
+                        Logger::info(
+                            __METHOD__,
+                            "Anon class without extending ModuleClassHookMetadata, it's recommended to use 'ModuleClassHookMetadata'." . $refClass->getName() . "::" . $property->getName()
+                        );
                         return [$refClass->getName(), $property->getName()];
                     }
                 }

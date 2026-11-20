@@ -9,6 +9,10 @@ use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     DeferredRegistrationInfoDTO,
     LiveRegistrationInfoDTO,
+    LiveUnregistrationInfoDTO,
+    LiveUnregistrationPhase,
+    LiveUnregistrationResultDTO,
+    UnregistrationSource,
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
@@ -17,8 +21,10 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     RuntimeInstanceHookInvoker,
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\ContainerRegistryHandlerEntry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\DeferredHookEntryHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\DeferredHooksTrait;
+use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 /**
  * End-to-end coverage of the Stage C emitters: probe closures must receive the
@@ -29,9 +35,9 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Trait\DeferredHooksTrait;
  * non-builtin parameter types; that is exactly how attribute probes declare
  * their payload parameter.
  */
-final class DebugEmissionTest extends TestCase
+final class DebugEmissionTest extends WplokerbjmTestCase
 {
-    private function container(): ContainerInterface
+    private function debugContainer(): ContainerInterface
     {
         return new class implements ContainerInterface {
             public object $service;
@@ -50,7 +56,7 @@ final class DebugEmissionTest extends TestCase
 
     public function testContainerLiveLifecycleEmitsDispatchingThenCompleted(): void
     {
-        $container = $this->container();
+        $container = $this->debugContainer();
         $owner = new class {
             public function debugHook(int $value): string
             {
@@ -97,7 +103,7 @@ final class DebugEmissionTest extends TestCase
 
     public function testRuntimeLiveSkipsWhenOwnerIsGone(): void
     {
-        $container = $this->container();
+        $container = $this->debugContainer();
         $owner = new class {
             public function debugHook(): void {}
         };
@@ -141,7 +147,7 @@ final class DebugEmissionTest extends TestCase
 
     public function testDeferredLifecycleEmitsQueuedThenActivated(): void
     {
-        $container = $this->container();
+        $container = $this->debugContainer();
         $owner = new class {
             public function debugHook(): void {}
         };
@@ -234,7 +240,7 @@ final class DebugEmissionTest extends TestCase
 
     public function testDeferredRejectedGateEmitsRejection(): void
     {
-        $container = $this->container();
+        $container = $this->debugContainer();
         $owner = new class {
             public function debugHook(): void {}
         };
@@ -316,5 +322,248 @@ final class DebugEmissionTest extends TestCase
         self::assertSame('register_if_false', $rejected->after->reason);
         self::assertTrue($rejected->before->hasRegisterIf);
         self::assertSame(['mail'], $rejected->before->tags);
+    }
+
+    public function testUnregistrationProbeEmitsRequestedThenUnregistered(): void
+    {
+        $container = $this->debugContainer();
+        $owner = new class {
+            public function debugHook(): void {}
+        };
+        $container->service = $owner;
+
+        $provider = new WPHookPlanProvider($container);
+        /** @var list<LiveUnregistrationInfoDTO> $payloads */
+        $payloads = [];
+        $probe = static function (LiveUnregistrationInfoDTO $dto) use (&$payloads): void {
+            $payloads[] = $dto;
+        };
+
+        $handler = new ContainerLazyHookInvoker(
+            $container,
+            $provider,
+            'unregistration_debug',
+            10,
+            $owner::class,
+            'debugHook',
+            acceptedArgs: 1,
+            debugLiveUnregistration: $probe,
+            debugLiveUnregistrationParams: $provider->buildCallablePlan($probe),
+        );
+
+        $entry = new ContainerRegistryHandlerEntry(
+            hook: 'unregistration_debug',
+            key: new HookKey($owner::class, 'debugHook', 'method', 'action', 10, 1),
+            handler: $handler,
+            type: 'action',
+            priority: 10,
+            acceptedArgs: 1,
+            tags: [],
+            registerIf: null,
+            registerIfParams: [],
+            executeIf: null,
+            executeIfParams: [],
+            once: false,
+            onUnregisterDo: null,
+            onUnregisterDoParams: [],
+        );
+
+        $entry->register();
+        self::assertTrue($entry->unregister(UnregistrationSource::Manual));
+
+        self::assertSame(['unregister_requested', 'unregistered'], array_map(
+            static fn(LiveUnregistrationInfoDTO $dto): string => $dto->phase->value,
+            $payloads,
+        ));
+
+        self::assertTrue($payloads[0]->before->registered);
+        self::assertFalse($payloads[0]->result?->removed);
+
+        $unregistered = $payloads[1];
+        self::assertFalse($unregistered->before->registered);
+        self::assertTrue($unregistered->result?->removed);
+        self::assertSame(UnregistrationSource::Manual, $unregistered->result->requestedBy);
+    }
+
+    public function testUnregisterOnMissingCallbackEmitsFailure(): void
+    {
+        $container = $this->debugContainer();
+        $owner = new class {
+            public function debugHook(): void {}
+        };
+        $container->service = $owner;
+
+        $provider = new WPHookPlanProvider($container);
+        /** @var list<LiveUnregistrationInfoDTO> $payloads */
+        $payloads = [];
+        $probe = static function (LiveUnregistrationInfoDTO $dto) use (&$payloads): void {
+            $payloads[] = $dto;
+        };
+
+        $handler = new ContainerLazyHookInvoker(
+            $container,
+            $provider,
+            'unregistration_debug_missing',
+            10,
+            $owner::class,
+            'debugHook',
+            acceptedArgs: 0,
+            debugLiveUnregistration: $probe,
+            debugLiveUnregistrationParams: $provider->buildCallablePlan($probe),
+        );
+
+        $entry = new ContainerRegistryHandlerEntry(
+            hook: 'unregistration_debug_missing',
+            key: new HookKey($owner::class, 'debugHook', 'method', 'action', 10, 0),
+            handler: $handler,
+            type: 'action',
+            priority: 10,
+            acceptedArgs: 0,
+            tags: [],
+            registerIf: null,
+            registerIfParams: [],
+            executeIf: null,
+            executeIfParams: [],
+            once: false,
+            onUnregisterDo: null,
+            onUnregisterDoParams: [],
+        );
+
+        self::assertFalse($entry->unregister(UnregistrationSource::Cleaner));
+
+        self::assertSame(['unregister_requested', 'unregister_failed'], array_map(
+            static fn(LiveUnregistrationInfoDTO $dto): string => $dto->phase->value,
+            $payloads,
+        ));
+        self::assertSame('callback_not_registered', $payloads[1]->result?->errorMessage);
+        self::assertSame(UnregistrationSource::Cleaner, $payloads[1]->result->requestedBy);
+    }
+
+    public function testProxyReleasedEmitsFromDestructorWithNullOwner(): void
+    {
+        $container = $this->debugContainer();
+        $owner = new class {
+            public function debugHook(): void {}
+        };
+        $container->service = $owner;
+
+        $provider = new WPHookPlanProvider($container);
+        $captured = null;
+        $probe = static function (?self $owner, LiveUnregistrationInfoDTO $dto) use (&$captured): void {
+            $captured = [$owner, $dto];
+        };
+
+        $handler = new ContainerLazyHookInvoker(
+            $container,
+            $provider,
+            'unregistration_debug_destructor',
+            10,
+            $owner::class,
+            'debugHook',
+            acceptedArgs: 0,
+            debugLiveUnregistration: $probe,
+            debugLiveUnregistrationParams: $provider->buildCallablePlan($probe),
+        );
+
+        unset($handler);
+
+        self::assertIsArray($captured);
+        self::assertNull($captured[0], 'A destructor emission must not fabricate the owner.');
+        /** @var LiveUnregistrationInfoDTO $dto */
+        $dto = $captured[1];
+        self::assertSame('proxy_released', $dto->phase->value);
+        self::assertSame(UnregistrationSource::Destructor, $dto->result?->requestedBy);
+    }
+
+    public function testOnceConsumptionEmitsOnceConsumed(): void
+    {
+        $container = $this->debugContainer();
+        $owner = new class {
+            public function debugHook(): void {}
+        };
+        $container->service = $owner;
+
+        $provider = new WPHookPlanProvider($container);
+        /** @var list<LiveUnregistrationInfoDTO> $payloads */
+        $payloads = [];
+        $probe = static function (LiveUnregistrationInfoDTO $dto) use (&$payloads): void {
+            $payloads[] = $dto;
+        };
+
+        $invoker = new ContainerLazyHookInvoker(
+            $container,
+            $provider,
+            'unregistration_debug_once',
+            10,
+            $owner::class,
+            'debugHook',
+            acceptedArgs: 0,
+            once: true,
+            debugLiveUnregistration: $probe,
+            debugLiveUnregistrationParams: $provider->buildCallablePlan($probe),
+        );
+
+        $cleaned = 0;
+        $invoker->setCleanupCallback(static function () use (&$cleaned): void {
+            $cleaned++;
+        });
+
+        $invoker();
+        $invoker();
+
+        self::assertSame(1, $cleaned);
+        self::assertSame(['once_consumed'], array_map(
+            static fn(LiveUnregistrationInfoDTO $dto): string => $dto->phase->value,
+            $payloads,
+        ));
+        self::assertSame(UnregistrationSource::Once, $payloads[0]->result?->requestedBy);
+        self::assertTrue($payloads[0]->before->consumed);
+    }
+
+    public function testOwnerCollectionEmitsOwnerCollected(): void
+    {
+        $container = $this->debugContainer();
+        $owner = new class {
+            public function debugHook(): void {}
+        };
+        $container->service = $owner;
+
+        $provider = new WPHookPlanProvider($container);
+        /** @var list<LiveUnregistrationInfoDTO> $payloads */
+        $payloads = [];
+        $probe = static function (LiveUnregistrationInfoDTO $dto) use (&$payloads): void {
+            $payloads[] = $dto;
+        };
+
+        $ref = \WeakReference::create($owner);
+
+        $invoker = new RuntimeInstanceHookInvoker(
+            $ref,
+            'unregistration_debug_lifetime',
+            10,
+            'debugHook',
+            acceptedArgs: 0,
+            hookPlanProvider: $provider,
+            debugLiveUnregistration: $probe,
+            debugLiveUnregistrationParams: $provider->buildCallablePlan($probe),
+        );
+
+        $cleaned = 0;
+        $invoker->setCleanupCallback(static function () use (&$cleaned): void {
+            $cleaned++;
+        });
+
+        $container->service = new \stdClass();
+        unset($owner);
+
+        $invoker();
+
+        self::assertSame(1, $cleaned);
+        self::assertSame(['owner_collected'], array_map(
+            static fn(LiveUnregistrationInfoDTO $dto): string => $dto->phase->value,
+            $payloads,
+        ));
+        self::assertSame(UnregistrationSource::Lifetime, $payloads[0]->result?->requestedBy);
+        self::assertFalse($payloads[0]->before->ownerAlive);
     }
 }

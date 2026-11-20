@@ -2,6 +2,7 @@
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Janitor;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\UnregistrationSource;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     ContainerLazyHookInvoker,
     ContainerLazyPropertyHookInvoker,
@@ -88,17 +89,17 @@ class QueuedHooksCleaner
                 ($this->scheduleCleanup)($invoker);
                 break;
             default:
-                $result = $entry->unregister();
+                $result = $entry->unregister(UnregistrationSource::Cleaner);
                 if (!$result && $hasCallbackRegistered) {
                     $this->queuedRemovalEntry[] = $entry;
                     !$this->schedulerCleanerDispatched && $this->allHookActionCommand('add');
                     break;
                 }
                 ($this->scheduleCleanup)($invoker);
-                // $result && SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned immediately: ', [
-                //     'InvokerLabel' => $invoker->label,
-                //     'CurrentHookContext' => current_filter(),
-                // ]);
+                $result && SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned immediately: ', [
+                    'InvokerLabel' => $invoker->label,
+                    'CurrentHookContext' => current_filter(),
+                ]);
                 break;
         }
         unset($this->entries[$invoker]);
@@ -148,17 +149,17 @@ class QueuedHooksCleaner
                         continue;
                     }
                     $capturedLabel = $entry->handler?->label ?? null;
-                    $result = $entry->unregister();
+                    $result = $entry->unregister(UnregistrationSource::Cleaner);
 
-                    // SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned at: ', [
-                    //     'CleanedEntryHandler' => $capturedLabel ?: "Invoker gone before cleanup. (cachedLabel: {$entry->invokerLabel})",
-                    //     'CleanedAtInvokersLabel' => $invoker?->label
-                    //         ? "via {$invoker?->label} (" . ($invoker?->isDestructed ? 'via destructor' : 'via cleanup') . ")"
-                    //         : 'all-hook scheduler',
-                    //     'unregistrationFailureCount' => $entry->unregistrationFailureCount,
-                    //     'CurrentHookContext' => \current_filter(),
-                    //     'resultUnregistration' => $result,
-                    // ]);
+                    SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned at: ', [
+                        'CleanedEntryHandler' => $capturedLabel ?: "Invoker gone before cleanup. (cachedLabel: {$entry->invokerLabel})",
+                        'CleanedAtInvokersLabel' => $invoker?->label
+                            ? "via {$invoker?->label} (" . ($invoker?->isDestructed ? 'via destructor' : 'via cleanup') . ")"
+                            : 'all-hook scheduler',
+                        'unregistrationFailureCount' => $entry->unregistrationFailureCount,
+                        'CurrentHookContext' => \current_filter(),
+                        'resultUnregistration' => $result,
+                    ]);
 
                     if (
                         $entry->handler === null ||

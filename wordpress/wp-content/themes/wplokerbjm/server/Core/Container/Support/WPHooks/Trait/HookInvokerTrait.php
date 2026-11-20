@@ -14,6 +14,10 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     LiveExecutionResultDTO,
     LiveRegistrationInfoDTO,
     LiveRegistrationSnapshotDTO,
+    LiveUnregistrationInfoDTO,
+    LiveUnregistrationPhase,
+    LiveUnregistrationResultDTO,
+    UnregistrationSource,
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
@@ -158,6 +162,65 @@ trait HookInvokerTrait
     }
 
     /**
+     * Emit one unregistration/lifecycle debug payload.
+     *
+     * Owner-optional: `self`/`static` parameters receive the live owner, null
+     * for `?self`, or the probe is skipped with a logged contract error. Other
+     * dependencies still resolve through the container.
+     */
+    public function emitLiveUnregistrationDebug(
+        LiveUnregistrationPhase $phase,
+        bool $registered = true,
+        ?LiveUnregistrationResultDTO $result = null,
+    ): void {
+        $debug = $this->debugLiveUnregistration ?? null;
+        if ($debug === null) return;
+        $provider = $this->debugProvider();
+        if ($provider === null) return;
+
+        $owner = $this->liveDebugOwner();
+
+        try {
+            $provider->invokeHookDebug(
+                $debug,
+                $this->debugLiveUnregistrationParams,
+                new LiveUnregistrationInfoDTO(
+                    phase: $phase,
+                    context: $this->debugContext($owner),
+                    before: new LiveRegistrationSnapshotDTO(
+                        registered: $registered,
+                        consumed: $this->consumed,
+                        executions: $this->numberExecutions,
+                        ownerAlive: $owner !== null || !property_exists($this, 'instanceRef'),
+                    ),
+                    result: $result,
+                ),
+                $this->label,
+                $owner,
+                ownerOptional: true,
+            );
+        } catch (\Throwable $e) {
+            Logger::error(__METHOD__, 'Failed emitting unregistration debug payload for ' . $this->label, [
+                'phase' => $phase->value,
+                'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+        }
+    }
+
+    /** Whether the once-hook has already been consumed. */
+    public function debugConsumed(): bool
+    {
+        return $this->consumed;
+    }
+
+    private function liveDebugOwner(): ?object
+    {
+        return property_exists($this, 'instanceRef') ? ($this->instanceRef->get() ?? null) : null;
+    }
+
+    /**
      * Container invokers carry `$planProvider`; runtime invokers `$hookPlanProvider`.
      */
     private function debugProvider(): ?WPHookPlanProvider
@@ -251,10 +314,51 @@ trait HookInvokerTrait
 
     public function __destruct()
     {
+        if ($this->isDestructed) {
+            return;
+        }
         $this->isDestructed = true;
-        if (is_callable($this->onUnregisterDoCallback)) ($this->onUnregisterDoCallback)();
-        if (is_callable($this->removeCallback)) ($this->removeCallback)($this, true);
-        unset($this->onUnregisterDoCallback, $this->removeCallback);
+
+        $startedAt = \hrtime(true);
+
+        try {
+            if (is_callable($this->onUnregisterDoCallback)) {
+                ($this->onUnregisterDoCallback)();
+            }
+        } catch (\Throwable $e) {
+            Logger::error(__METHOD__, 'onUnregisterDo failed for ' . $this->label, [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
+        } finally {
+            try {
+                if (is_callable($this->removeCallback)) {
+                    ($this->removeCallback)($this, true);
+                }
+            } catch (\Throwable $e) {
+                Logger::error(__METHOD__, 'Removal callback failed for ' . $this->label, [
+                    'error' => $e->getMessage(),
+                    'trace' => $e->getTraceAsString(),
+                    'file' => $e->getFile(),
+                    'line' => $e->getLine(),
+                ]);
+            } finally {
+                $this->emitLiveUnregistrationDebug(
+                    LiveUnregistrationPhase::ProxyReleased,
+                    registered: true,
+                    result: new LiveUnregistrationResultDTO(
+                        requestedBy: UnregistrationSource::Destructor,
+                        removed: $this->removed,
+                        failureCount: 0,
+                        stillDispatching: $this->dispatching,
+                        elapsedUs: $this->elapsedUs($startedAt),
+                    ),
+                );
+                unset($this->onUnregisterDoCallback, $this->removeCallback);
+            }
+        }
     }
 
     /**
@@ -267,6 +371,8 @@ trait HookInvokerTrait
             return;
         }
 
+        $startedAt = \hrtime(true);
+
         try {
             $this->removed = true;
             ($this->removeCallback)($this);
@@ -277,6 +383,18 @@ trait HookInvokerTrait
                 'file' => $e->getFile(),
                 'line' => $e->getLine(),
             ]);
+        } finally {
+            $this->emitLiveUnregistrationDebug(
+                LiveUnregistrationPhase::OnceConsumed,
+                registered: true,
+                result: new LiveUnregistrationResultDTO(
+                    requestedBy: UnregistrationSource::Once,
+                    removed: $this->removed,
+                    failureCount: 0,
+                    stillDispatching: $this->dispatching,
+                    elapsedUs: $this->elapsedUs($startedAt),
+                ),
+            );
         }
     }
 

@@ -101,6 +101,65 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
         self::assertTrue($nullableString['allowsNull']);
     }
 
+    public function testOwnerOptionalProbeReceivesNullForNullableSelfAndResolvesContainerDeps(): void
+    {
+        $captured = [];
+        $probe = function (?self $owner, PlanProviderDependency $dependency) use (&$captured): void {
+            $captured = [$owner, $dependency];
+        };
+
+        $this->provider->invokeHookDebug(
+            $probe,
+            $this->provider->buildCallablePlan($probe),
+            new \stdClass(),
+            'owner-optional',
+            null,
+            true,
+        );
+
+        self::assertArrayHasKey(0, $captured, 'Probe must still be invoked with a null owner.');
+        self::assertNull($captured[0]);
+        self::assertInstanceOf(PlanProviderDependency::class, $captured[1] ?? null);
+    }
+
+    public function testOwnerOptionalProbeSkipsNonNullableSelfInsteadOfConstructingOwner(): void
+    {
+        $called = false;
+        $probe = function (self $owner) use (&$called): void {
+            $called = true;
+        };
+
+        $this->provider->invokeHookDebug(
+            $probe,
+            $this->provider->buildCallablePlan($probe),
+            new \stdClass(),
+            'owner-optional-non-nullable',
+            null,
+            true,
+        );
+
+        self::assertFalse($called, 'A non-nullable self must never be fabricated from the container.');
+    }
+
+    public function testOwnerOptionalProbeReceivesTheLiveOwnerWhenPresent(): void
+    {
+        $captured = null;
+        $probe = function (?self $owner) use (&$captured): void {
+            $captured = $owner;
+        };
+
+        $this->provider->invokeHookDebug(
+            $probe,
+            $this->provider->buildCallablePlan($probe),
+            new \stdClass(),
+            'owner-optional-live',
+            $this,
+            true,
+        );
+
+        self::assertSame($this, $captured);
+    }
+
     public function testPlanDistinguishesStaticAndNonStaticClosures(): void
     {
         $static = $this->provider->buildCallablePlan(static function (): void {

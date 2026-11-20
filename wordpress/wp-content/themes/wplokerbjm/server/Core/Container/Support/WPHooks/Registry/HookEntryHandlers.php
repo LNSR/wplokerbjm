@@ -85,10 +85,10 @@ final class ContainerRegistryHandlerEntry
     public function __destruct()
     {
         if ($this->registered) {
-            $this->unregister();
-            // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Container Registry Handler Entry destroyed before explicit registry unregistration, removing entry indexes: ", [
-            //     'invokerLabel' => $this->invokerLabel,
-            // ]);
+            $this->unregister(\WPLokerBJM\Core\Container\Support\WPHooks\Debug\UnregistrationSource::Destructor);
+            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Container Registry Handler Entry destroyed before explicit registry unregistration, removing entry indexes: ", [
+                'invokerLabel' => $this->invokerLabel,
+            ]);
         }
         \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
         unset($this->removeEntryIndexCallback);

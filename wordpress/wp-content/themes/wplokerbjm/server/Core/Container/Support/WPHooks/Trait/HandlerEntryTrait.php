@@ -12,6 +12,11 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\{
     RuntimeInstanceHookInvoker,
     RuntimeInstancePropertyHookInvoker
 };
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
+    LiveUnregistrationPhase,
+    LiveUnregistrationResultDTO,
+    UnregistrationSource,
+};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     RuntimeRegistryHandlerEntry,
     ContainerRegistryHandlerEntry,
@@ -49,7 +54,7 @@ trait HandlerEntryTrait
     public function __destruct()
     {
         if (!$this->registered) return;
-        $this->unregister();
+        $this->unregister(UnregistrationSource::Destructor);
     }
 
     public function register(): static
@@ -63,35 +68,88 @@ trait HandlerEntryTrait
         try {
             $this->handler->initOnUnregisterDoCallback();
         } catch (\Throwable $e) {
-            // Logger::error(__METHOD__, 'Failed to prepare onUnregisterDo for ', [
-            //     'invokerLabel' => $this->handler->label,
-            //     'message' => $e->getMessage(),
-            //     'trace' => $e->getTraceAsString(),
-            //     'file' => $e->getFile(),
-            //     'line' => $e->getLine(),
-            // ]);
+            Logger::error(__METHOD__, 'Failed to prepare onUnregisterDo for ', [
+                'invokerLabel' => $this->handler->label,
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
+            ]);
         }
         $this->handler->emitLiveDebug(\WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveDebugPhase::Registered);
         return $this;
     }
 
-    public function unregister(): bool
+    public function unregister(UnregistrationSource $requestedBy = UnregistrationSource::Manual): bool
     {
-        if (!$this->hasCallbackRegisteredOnWordpress()) return false;
+        $startedAt = \hrtime(true);
+
+        $this->emitUnregistration(LiveUnregistrationPhase::UnregisterRequested, new LiveUnregistrationResultDTO(
+            requestedBy: $requestedBy,
+            removed: false,
+            failureCount: $this->unregistrationFailureCount,
+            stillDispatching: $this->stillDispatchingSameHook(),
+        ));
+
+        if (!$this->hasCallbackRegisteredOnWordpress()) {
+            $this->emitUnregistration(LiveUnregistrationPhase::UnregisterFailed, new LiveUnregistrationResultDTO(
+                requestedBy: $requestedBy,
+                removed: false,
+                failureCount: $this->unregistrationFailureCount,
+                stillDispatching: $this->stillDispatchingSameHook(),
+                elapsedUs: 0,
+                errorMessage: 'callback_not_registered',
+            ));
+            return false;
+        }
 
         $result = match ($this->type) {
             'action' => remove_action($this->hook, $this->handler, $this->priority),
             'filter' => remove_filter($this->hook, $this->handler, $this->priority),
         };
 
+        $elapsedUs = (int) ((\hrtime(true) - $startedAt) / 1000);
+
         if (!$result) {
             $this->unregistrationFailureCount++;
+            $this->emitUnregistration(LiveUnregistrationPhase::UnregisterFailed, new LiveUnregistrationResultDTO(
+                requestedBy: $requestedBy,
+                removed: false,
+                failureCount: $this->unregistrationFailureCount,
+                stillDispatching: $this->stillDispatchingSameHook(),
+                elapsedUs: $elapsedUs,
+                errorMessage: 'remove_callback_returned_false',
+            ));
             return $result;
         }
 
         $this->registered = false;
         if (is_callable($this->handler?->onUnregisterDoCallback ?? null)) ($this->handler->onUnregisterDoCallback)();
+
+        $this->emitUnregistration(LiveUnregistrationPhase::Unregistered, new LiveUnregistrationResultDTO(
+            requestedBy: $requestedBy,
+            removed: true,
+            failureCount: $this->unregistrationFailureCount,
+            stillDispatching: $this->stillDispatchingSameHook(),
+            elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
+        ));
+
         return $result;
+    }
+
+    /**
+     * Emit one unregistration phase through the invoker that owns the probe.
+     */
+    private function emitUnregistration(
+        LiveUnregistrationPhase $phase,
+        ?LiveUnregistrationResultDTO $result = null,
+    ): void {
+        $handler = $this->handler;
+        if ($handler === null) {
+            return;
+        }
+
+        $handler->emitLiveUnregistrationDebug($phase, $this->registered, $result);
     }
 
     public function stillDispatchingSameHook(): bool

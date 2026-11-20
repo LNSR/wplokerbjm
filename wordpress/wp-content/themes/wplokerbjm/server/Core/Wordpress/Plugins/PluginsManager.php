@@ -4,7 +4,7 @@ namespace WPLokerBJM\Core\Wordpress\Plugins;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, LiveRegistrationInfoDTO};
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
@@ -101,9 +101,6 @@ class PluginManager
         executeIf: static function (WPLokerBJMBootstrap $bootstrap, string $pluginPath): bool {
             return $pluginPath === $bootstrap->nameMUpluginFile;
         },
-        debugLiveRegistration: static function (LiveRegistrationInfoDTO $dto): void {
-            Logger::info(__CLASS__, 'Live Registration Info: ', $dto->toArray());
-        },
     )]
     private function boot(string $pluginPath): void
     {
@@ -148,12 +145,6 @@ class PluginManager
         2,
         deferRegister: true,
         once: true,
-        debugDeferredRegistration: static function (DeferredRegistrationInfoDTO $dto): void {
-            Logger::info(__CLASS__, 'Deferred Registration Info: ', $dto->toArray());
-        },
-        debugLiveRegistration: static function(LiveRegistrationInfoDTO $dto): void {
-            Logger::info(__CLASS__, 'Live Registration Info: ', $dto->toArray());
-        }
     )]
     public function lockPluginActionLinks(array $actions, string $pluginFile): array
     {

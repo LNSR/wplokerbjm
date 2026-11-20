@@ -138,6 +138,8 @@ class WPHooksScanner
                         debugDeferredRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugDeferredRegistration),
                         debugLiveRegistration: $attr->debugLiveRegistration,
                         debugLiveRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveRegistration),
+                        debugLiveUnregistration: $attr->debugLiveUnregistration,
+                        debugLiveUnregistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveUnregistration),
                     );
                 });
 
@@ -173,6 +175,8 @@ class WPHooksScanner
                         debugDeferredRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugDeferredRegistration),
                         debugLiveRegistration: $attr->debugLiveRegistration,
                         debugLiveRegistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveRegistration),
+                        debugLiveUnregistration: $attr->debugLiveUnregistration,
+                        debugLiveUnregistrationParams: $this->hookPlanProvider->buildCallablePlan($attr->debugLiveUnregistration),
                     );
                 });
             } catch (\RuntimeException $e) {

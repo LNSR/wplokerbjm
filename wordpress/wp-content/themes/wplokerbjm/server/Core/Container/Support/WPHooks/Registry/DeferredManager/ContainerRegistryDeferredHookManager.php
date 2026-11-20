@@ -417,7 +417,7 @@ class ContainerRegistryDeferredHookManager
         $this->deferredHandlers[$key]->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
             if (!\has_action($triggerHook, $cb, PHP_INT_MIN)) return;
             \remove_action($triggerHook, $cb, PHP_INT_MIN);
-            // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
         });
     }
 
@@ -436,17 +436,17 @@ class ContainerRegistryDeferredHookManager
                     $registration->class
                 );
             } catch (\RuntimeException $e) {
-                // Logger::error(
-                //     __METHOD__,
-                //     'Skipping hook for: ' . $entry->handler->label,
-                //     [
-                //         'message' => $e->getMessage(),
-                //         'trace'   => $e->getTraceAsString(),
-                //         'file' => $e->getFile(),
-                //         'line' => $e->getLine(),
-                //         'code' => $e->getCode(),
-                //     ]
-                // );
+                Logger::error(
+                    __METHOD__,
+                    'Skipping hook for: ' . $entry->handler->label,
+                    [
+                        'message' => $e->getMessage(),
+                        'trace'   => $e->getTraceAsString(),
+                        'file' => $e->getFile(),
+                        'line' => $e->getLine(),
+                        'code' => $e->getCode(),
+                    ]
+                );
             }
         }
         $this->addDeferred($entry);
@@ -478,18 +478,18 @@ class ContainerRegistryDeferredHookManager
                 $data->key->class
             );
         } catch (\Throwable $e) {
-            // Logger::error(
-            //     __METHOD__,
-            //     'Skipping deferred hook activation: ' . $data->handler->label .  ' — error ' . $e->getMessage()
-            // );
+            Logger::error(
+                __METHOD__,
+                'Skipping deferred hook activation: ' . $data->handler->label .  ' — error ' . $e->getMessage()
+            );
             return false;
         }
 
         if (!$allowed) {
-            // Logger::info(
-            //     __METHOD__,
-            //     'Skipping deferred hook activation: ' . $data->handler->label .  ' — registerIf gate returned false.'
-            // );
+            Logger::info(
+                __METHOD__,
+                'Skipping deferred hook activation: ' . $data->handler->label .  ' — registerIf gate returned false.'
+            );
             return false;
         }
 

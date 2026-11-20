@@ -204,6 +204,8 @@ class WPHooksInstanceRegistry
                     debugDeferredRegistrationParams: $this->provider->buildCallablePlan($attr->debugDeferredRegistration instanceof \Closure ? $attr->debugDeferredRegistration : null),
                     debugLiveRegistration: $attr->debugLiveRegistration,
                     debugLiveRegistrationParams: $this->provider->buildCallablePlan($attr->debugLiveRegistration instanceof \Closure ? $attr->debugLiveRegistration : null),
+                    debugLiveUnregistration: $attr->debugLiveUnregistration,
+                    debugLiveUnregistrationParams: $this->provider->buildCallablePlan($attr->debugLiveUnregistration instanceof \Closure ? $attr->debugLiveUnregistration : null),
                 );
 
                 if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
@@ -246,6 +248,8 @@ class WPHooksInstanceRegistry
                     debugDeferredRegistrationParams: $this->provider->buildCallablePlan($attr->debugDeferredRegistration instanceof \Closure ? $attr->debugDeferredRegistration : null),
                     debugLiveRegistration: $attr->debugLiveRegistration,
                     debugLiveRegistrationParams: $this->provider->buildCallablePlan($attr->debugLiveRegistration instanceof \Closure ? $attr->debugLiveRegistration : null),
+                    debugLiveUnregistration: $attr->debugLiveUnregistration,
+                    debugLiveUnregistrationParams: $this->provider->buildCallablePlan($attr->debugLiveUnregistration instanceof \Closure ? $attr->debugLiveUnregistration : null),
                 );
 
                 if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
@@ -485,7 +489,7 @@ class WPHooksInstanceRegistry
     private function scheduleAutoUnregister(object $instance, string $hook): void
     {
         if (\did_action($hook) >= 1) {
-            // Logger::warning(__METHOD__, 'Hook ' . $hook . ' has passed lifecycle execution, cannot schedule unregister there');
+            Logger::warning(__METHOD__, 'Hook ' . $hook . ' has passed lifecycle execution, cannot schedule unregister there');
             return;
         }
         $owner = \WeakReference::create($instance);
@@ -545,6 +549,7 @@ class WPHooksInstanceRegistry
             'onUnregisterDo' => $metadata->onUnregisterDo,
             'debugDeferredRegistration' => $metadata->debugDeferredRegistration,
             'debugLiveRegistration' => $metadata->debugLiveRegistration,
+            'debugLiveUnregistration' => $metadata->debugLiveUnregistration,
         ];
 
         foreach ($closures as $role => $closure) {
@@ -586,10 +591,10 @@ class WPHooksInstanceRegistry
                 $ownerLabel = $instance instanceof ModuleClassHookMetadata
                     ? $instance->parentClassString . '->' . $instance->parentProperty
                     : $instance::class;
-                // Logger::info(
-                //     __METHOD__,
-                //     'registerIf for ' . $ownerLabel . '->' . $entryMeta->targetName . ' with hook ' . $entryMeta->hook . ' and priority ' . (string) $entryMeta->priority . ' skipped'
-                // );
+                Logger::info(
+                    __METHOD__,
+                    'registerIf for ' . $ownerLabel . '->' . $entryMeta->targetName . ' with hook ' . $entryMeta->hook . ' and priority ' . (string) $entryMeta->priority . ' skipped'
+                );
                 return;
             }
         }
@@ -652,6 +657,8 @@ class WPHooksInstanceRegistry
                 debugDeferredRegistrationParams: $metadata->debugDeferredRegistrationParams,
                 debugLiveRegistration: $metadata->debugLiveRegistration,
                 debugLiveRegistrationParams: $metadata->debugLiveRegistrationParams,
+                debugLiveUnregistration: $metadata->debugLiveUnregistration,
+                debugLiveUnregistrationParams: $metadata->debugLiveUnregistrationParams,
             ),
             'property', 'property-hook' => new RuntimeInstancePropertyHookInvoker(
                 instanceRef: $weakRef,
@@ -672,6 +679,8 @@ class WPHooksInstanceRegistry
                 debugDeferredRegistrationParams: $metadata->debugDeferredRegistrationParams,
                 debugLiveRegistration: $metadata->debugLiveRegistration,
                 debugLiveRegistrationParams: $metadata->debugLiveRegistrationParams,
+                debugLiveUnregistration: $metadata->debugLiveUnregistration,
+                debugLiveUnregistrationParams: $metadata->debugLiveUnregistrationParams,
             ),
         };
         $entry = match ($isDeferred) {
@@ -734,7 +743,7 @@ class WPHooksInstanceRegistry
                 $this->weakRegistry[$owner] = $records;
                 $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
                 $this->entriesByInvokers[$record->handler] = $record;
-                // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
+                SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
 
                 return true;
             };
@@ -757,12 +766,12 @@ class WPHooksInstanceRegistry
             ): void {
                 $entry = $this->queuedHooksCleaner->getEntry($invoker) ?? $this->entriesByInvokers[$invoker] ?? null;
                 if ($entry === null) return;
-                
+
                 if ($invokerDied) {
                     unset($this->entriesByInvokers[$invoker]);
                     $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                     $this->cleanUpInstance($entry);
-                    // SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
+                    SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
                     return;
                 }
 
