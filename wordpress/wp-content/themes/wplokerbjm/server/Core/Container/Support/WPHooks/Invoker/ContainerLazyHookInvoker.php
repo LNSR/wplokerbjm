@@ -6,7 +6,7 @@ use Closure;
 use HookType;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\HookRegistration;
-use WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveDebugPhase;
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DebugProbes, HookDebugEmitter, HookDebugIdentity, LiveDebugPhase};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{WPHookPlanProvider};
@@ -164,9 +164,31 @@ final class ContainerLazyHookInvoker
         private readonly array $debugLiveUnregistrationParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->method;
-        $this->debugClass = $this->class;
-        $this->debugMember = $this->method;
-        $this->debugTarget = 'method';
+        $this->debugEmitter = new HookDebugEmitter(
+            new HookDebugIdentity(
+                label: $this->label,
+                hook: $this->hookName,
+                type: $this->type,
+                priority: $this->priority,
+                acceptedArgs: $this->acceptedArgs,
+                once: $this->once,
+                path: 'container',
+                class: $this->class,
+                member: $this->method,
+                target: 'method',
+                visibility: $this->visibility,
+            ),
+            new DebugProbes(
+                deferred: $this->debugDeferredRegistration,
+                deferredParams: $this->debugDeferredRegistrationParams,
+                live: $this->debugLiveRegistration,
+                liveParams: $this->debugLiveRegistrationParams,
+                unregistration: $this->debugLiveUnregistration,
+                unregistrationParams: $this->debugLiveUnregistrationParams,
+            ),
+            $this->planProvider,
+            null,
+        );
 
         if ($this->visibility !== 'public') {
             $this->invoker = self::$methodInvokerCache[$this->class] ??= \Closure::bind(
@@ -246,9 +268,31 @@ final class ContainerLazyPropertyHookInvoker
         private readonly array $debugLiveUnregistrationParams = []
     ) {
         $this->label = $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $this->class . '->' . $this->property;
-        $this->debugClass = $this->class;
-        $this->debugMember = $this->property;
-        $this->debugTarget = 'property';
+        $this->debugEmitter = new HookDebugEmitter(
+            new HookDebugIdentity(
+                label: $this->label,
+                hook: $this->hookName,
+                type: $this->type,
+                priority: $this->priority,
+                acceptedArgs: $this->acceptedArgs,
+                once: $this->once,
+                path: 'container',
+                class: $this->class,
+                member: $this->property,
+                target: 'property',
+                visibility: $this->visibility,
+            ),
+            new DebugProbes(
+                deferred: $this->debugDeferredRegistration,
+                deferredParams: $this->debugDeferredRegistrationParams,
+                live: $this->debugLiveRegistration,
+                liveParams: $this->debugLiveRegistrationParams,
+                unregistration: $this->debugLiveUnregistration,
+                unregistrationParams: $this->debugLiveUnregistrationParams,
+            ),
+            $this->planProvider,
+            null,
+        );
 
         if ($this->visibility !== 'public') {
             $this->reader = self::$classPropertyClosureCache[$this->class] ??= \Closure::bind(

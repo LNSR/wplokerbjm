@@ -6,7 +6,7 @@ use InstanceHookMetadataData;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{LiveDebugPhase, LiveUnregistrationPhase, LiveUnregistrationResultDTO, UnregistrationSource};
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DebugProbes, HookDebugEmitter, HookDebugIdentity, LiveDebugPhase, LiveUnregistrationPhase, LiveUnregistrationResultDTO, UnregistrationSource};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
@@ -228,9 +228,31 @@ final class RuntimeInstanceHookInvoker
         $this->label = $instance instanceof ModuleClassHookMetadata
             ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->method
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->method;
-        $this->debugClass = $instance instanceof ModuleClassHookMetadata ? $instance->parentClassString : $instance::class;
-        $this->debugMember = $instance instanceof ModuleClassHookMetadata ? $instance->parentProperty . '->' . $this->method : $this->method;
-        $this->debugTarget = 'method';
+        $this->debugEmitter = new HookDebugEmitter(
+            new HookDebugIdentity(
+                label: $this->label,
+                hook: $this->hookName,
+                type: $this->type,
+                priority: $this->priority,
+                acceptedArgs: $this->acceptedArgs,
+                once: $this->once,
+                path: 'runtime',
+                class: $instance instanceof ModuleClassHookMetadata ? $instance->parentClassString : $instance::class,
+                member: $instance instanceof ModuleClassHookMetadata ? $instance->parentProperty . '->' . $this->method : $this->method,
+                target: 'method',
+                visibility: $this->visibility,
+            ),
+            new DebugProbes(
+                deferred: $this->debugDeferredRegistration,
+                deferredParams: $this->debugDeferredRegistrationParams,
+                live: $this->debugLiveRegistration,
+                liveParams: $this->debugLiveRegistrationParams,
+                unregistration: $this->debugLiveUnregistration,
+                unregistrationParams: $this->debugLiveUnregistrationParams,
+            ),
+            $this->hookPlanProvider,
+            $this->instanceRef,
+        );
 
         if ($this->visibility !== 'public') {
 
@@ -314,9 +336,31 @@ final class RuntimeInstancePropertyHookInvoker
         $this->label = $instance instanceof ModuleClassHookMetadata
             ? $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $this->property
             : $this->type . '::' . $this->hookName . '::' . (string) $this->priority . '::' . (string) $this->acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $this->property;
-        $this->debugClass = $instance instanceof ModuleClassHookMetadata ? $instance->parentClassString : $instance::class;
-        $this->debugMember = $instance instanceof ModuleClassHookMetadata ? $instance->parentProperty . '->' . $this->property : $this->property;
-        $this->debugTarget = 'property';
+        $this->debugEmitter = new HookDebugEmitter(
+            new HookDebugIdentity(
+                label: $this->label,
+                hook: $this->hookName,
+                type: $this->type,
+                priority: $this->priority,
+                acceptedArgs: $this->acceptedArgs,
+                once: $this->once,
+                path: 'runtime',
+                class: $instance instanceof ModuleClassHookMetadata ? $instance->parentClassString : $instance::class,
+                member: $instance instanceof ModuleClassHookMetadata ? $instance->parentProperty . '->' . $this->property : $this->property,
+                target: 'property',
+                visibility: $this->visibility,
+            ),
+            new DebugProbes(
+                deferred: $this->debugDeferredRegistration,
+                deferredParams: $this->debugDeferredRegistrationParams,
+                live: $this->debugLiveRegistration,
+                liveParams: $this->debugLiveRegistrationParams,
+                unregistration: $this->debugLiveUnregistration,
+                unregistrationParams: $this->debugLiveUnregistrationParams,
+            ),
+            $this->hookPlanProvider,
+            $this->instanceRef,
+        );
 
         if ($this->visibility !== 'public') {
             // Bind inside the instance's class scope so
