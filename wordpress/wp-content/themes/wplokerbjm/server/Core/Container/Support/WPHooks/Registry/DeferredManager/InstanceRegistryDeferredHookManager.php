@@ -71,12 +71,8 @@ class InstanceRegistryDeferredHookManager
         $instanceId = (string) \spl_object_id($instance);
 
         foreach ($this->entriesIndexer->byClass[$instanceId] ?? [] as $key) {
-            $entry = $this->deferredHandlers[$key] ?? null;
+            $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
             if ($entry === null) continue;
-            if ($entry->instance?->get() !== $instance) {
-                unset($this->deferredHandlers[$key]);
-                continue;
-            }
             if (!$this->runtimeResolver->matchesCallableTarget($entry->key, $targetName)) continue;
             $keys[$key] = $key;
         }
@@ -102,12 +98,8 @@ class InstanceRegistryDeferredHookManager
         $instanceId = (string) \spl_object_id($instance);
 
         foreach ($this->entriesIndexer->byClass[$instanceId] ?? [] as $key) {
-            $entry = $this->deferredHandlers[$key] ?? null;
+            $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
             if ($entry === null) continue;
-            if ($entry->instance?->get() !== $instance) {
-                unset($this->deferredHandlers[$key]);
-                continue;
-            }
             $keys[$key] = $key;
         }
 
@@ -151,13 +143,8 @@ class InstanceRegistryDeferredHookManager
         $keys = [];
 
         foreach ($this->entriesIndexer->byHook[$hook] ?? [] as $key) {
-            $entry = $this->deferredHandlers[$key] ?? null;
+            $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
             if ($entry === null) continue;
-            if ($entry->instance?->get() === null) {
-                unset($this->deferredHandlers[$key]);
-                continue;
-            }
-            if ($entry->instance?->get() !== $instance) continue;
             $keys[$key] = $key;
         }
 
@@ -205,13 +192,8 @@ class InstanceRegistryDeferredHookManager
             if (!HookPattern::matches($hook, $pattern)) continue;
 
             foreach ($hookKeys as $key) {
-                $entry = $this->deferredHandlers[$key] ?? null;
+                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
                 if ($entry === null) continue;
-                if ($entry->instance?->get() === null) {
-                    unset($this->deferredHandlers[$key]);
-                    continue;
-                }
-                if ($entry->instance?->get() !== $instance) continue;
                 $keys[$key] = $key;
             }
         }
@@ -239,13 +221,8 @@ class InstanceRegistryDeferredHookManager
             if (!HookPattern::matches($hook, $pattern)) continue;
 
             foreach ($hookKeys as $key) {
-                $entry = $this->deferredHandlers[$key] ?? null;
+                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
                 if ($entry === null) continue;
-                if ($entry->instance?->get() === null) {
-                    unset($this->deferredHandlers[$key]);
-                    continue;
-                }
-                if ($entry->instance?->get() !== $instance) continue;
                 $keys[$key] = $key;
             }
         }
@@ -264,7 +241,7 @@ class InstanceRegistryDeferredHookManager
      * Activate deferred entries owned by one live instance carrying at least
      * one of the supplied tags.
      *
-     * @param array<int, string> $tags Tag list; matching is OR.
+     * @param array<int, string|\BackedEnum> $tags Tag list; matching is OR.
      * @param ActivateRuntimeEntry $activateEntry
      * @return int Number of newly activated entries.
      */
@@ -277,13 +254,8 @@ class InstanceRegistryDeferredHookManager
 
         foreach ($tags as $tag) {
             foreach ($this->entriesIndexer->byTag[$tag] ?? [] as $key) {
-                $entry = $this->deferredHandlers[$key] ?? null;
+                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
                 if ($entry === null) continue;
-                if ($entry->instance?->get() === null) {
-                    unset($this->deferredHandlers[$key]);
-                    continue;
-                }
-                if ($entry->instance?->get() !== $instance) continue;
                 $keys[$key] = $key;
             }
         }
@@ -299,7 +271,7 @@ class InstanceRegistryDeferredHookManager
      * Remove deferred entries owned by one live instance carrying at least
      * one of the supplied tags.
      *
-     * @param array<int, string> $tags Tag list; matching is OR.
+     * @param array<int, string|\BackedEnum> $tags Tag list; matching is OR.
      * @return int Number of removed deferred entries.
      */
     public function unregisterInstanceTagsDeferredEntries(object $instance, array $tags): int
@@ -311,13 +283,8 @@ class InstanceRegistryDeferredHookManager
 
         foreach ($tags as $tag) {
             foreach ($this->entriesIndexer->byTag[$tag] ?? [] as $key) {
-                $entry = $this->deferredHandlers[$key] ?? null;
+                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
                 if ($entry === null) continue;
-                if ($entry->instance?->get() === null) {
-                    unset($this->deferredHandlers[$key]);
-                    continue;
-                }
-                if ($entry->instance?->get() !== $instance) continue;
                 $keys[$key] = $key;
             }
         }
@@ -351,13 +318,8 @@ class InstanceRegistryDeferredHookManager
             if (!HookPattern::matchesAny([$tag], $patterns)) continue;
 
             foreach ($tagKeys as $key) {
-                $entry = $this->deferredHandlers[$key] ?? null;
+                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
                 if ($entry === null) continue;
-                if ($entry->instance?->get() === null) {
-                    unset($this->deferredHandlers[$key]);
-                    continue;
-                }
-                if ($entry->instance?->get() !== $instance) continue;
                 if (!HookPattern::matchesAny((array) ($entry->tags ?? []), $patterns)) continue;
                 $keys[$key] = $key;
             }
@@ -388,13 +350,8 @@ class InstanceRegistryDeferredHookManager
             if (!HookPattern::matchesAny([$tag], $patterns)) continue;
 
             foreach ($tagKeys as $key) {
-                $entry = $this->deferredHandlers[$key] ?? null;
+                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
                 if ($entry === null) continue;
-                if ($entry->instance?->get() === null) {
-                    unset($this->deferredHandlers[$key]);
-                    continue;
-                }
-                if ($entry->instance?->get() !== $instance) continue;
                 if (!HookPattern::matchesAny((array) ($entry->tags ?? []), $patterns)) continue;
                 $keys[$key] = $key;
             }
@@ -533,5 +490,29 @@ class InstanceRegistryDeferredHookManager
         }
 
         return true;
+    }
+
+    /**
+     * Resolve a live deferred entry owned by `$instance`, pruning stale/collected entries.
+     *
+     * @param string $key
+     */
+    private function resolveLiveInstanceDeferredEntry(string $key, object $instance): ?DeferredHookEntryHandler
+    {
+        $entry = $this->deferredHandlers[$key] ?? null;
+        if ($entry === null) {
+            return null;
+        }
+
+        if ($entry->instance?->get() === null) {
+            unset($this->deferredHandlers[$key]);
+            return null;
+        }
+
+        if ($entry->instance?->get() !== $instance) {
+            return null;
+        }
+
+        return $entry;
     }
 }

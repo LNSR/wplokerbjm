@@ -136,12 +136,18 @@ Every attribute parameter maps to a WordPress registration concern:
 | `priority`               | `int`                     | Execution order (default `10`)                                                                   |
 | `acceptedArgs`           | `int`                     | Number of arguments passed to the callable (default `1`)                                         |
 | `once`                   | `bool`                    | Self-removes after the first evaluation, whatever the gate result                                |
-| `deferRegister`          | `bool`                    | Holds the entry in the deferred pool. Container: `activateDeferredBy*`. Runtime/instance: `activateDeferredByCallableInLiveInstance()` |
+| `deferRegister`          | `bool`                    | Holds the entry in the deferred pool. Container: `activateDeferredBy*`. Runtime/instance: `activateDeferredBy*InLiveInstance()` |
 | `deferRegisterUntilHook` | `string\|\Closure\|null`  | Implies deferral; auto-activates when the trigger fires (or has already fired)                   |
 | `registerIf`             | `\Closure\|null`          | Registration gate — once for eager hooks, re-evaluated on every deferred activation attempt      |
 | `executeIf`              | `\Closure\|null`          | Per-fire gate, evaluated on every `do_action` / `apply_filters`                                  |
-| `tag`                    | `string\|array\|\Closure` | Grouping/selector tags (items: `string` or `BackedEnum`); an invalid tag skips that one hook     |
+| `tag`                    | `array\|\Closure`         | Grouping/selector tags; array items are `string` or string-backed `BackedEnum`. Invalid tags skip that one hook |
 | `onUnregisterDo`         | `\Closure\|null`          | Cleanup after unregistration — once-consume, explicit unregister, or owner GC                    |
+
+#### Tag semantics
+
+Tag matching is **OR** and duplicates are removed. Items may be strings or string-backed `BackedEnum` cases; enums normalize to `->value`, so `[HookTag::Lowongan, 'lowongan']` becomes `['lowongan']`. Invalid tag values in an attribute (`int`, `null`, int-backed enums, objects) fail that one registration and are logged; invalid selector input throws.
+
+Container tags resolve at registration. Runtime tag definitions are cached per hook site but resolved per live instance, so owner-specific tag closures never leak between sibling instances. Active and deferred entries are separate pools: use `unregisterByTags()` for active entries and `unregisterDeferredByTags()` for deferred ones; the runtime equivalents add the `...InLiveInstance()` suffix. Tag-pattern selectors take wildcard strings, not enum objects.
 
 #### Minimal Examples
 
@@ -222,12 +228,26 @@ public function graphqlSearch(string $search, \WP_Query $wp_query): string
 
 ```
 
-##### `tag` + selectors — group hooks, unregister by tag or pattern
+##### `tag` + selectors — group hooks, activate or unregister by tag or pattern
 
 ```php
-// Inside a service with the registry autowired:
-$this->hooksRegistry->unregisterByTags(['lowongan']);       // exact tag match
-$this->hooksRegistry->unregisterByHookPattern('posts_*');    // wildcard (prefix ≥ 2 chars)
+enum HookTag: string
+{
+    case Lowongan = 'lowongan';
+    case Search = 'search';
+}
+
+// Container registry (attribute-discovered service hooks)
+$this->hooksRegistry->activateDeferredByTags([HookTag::Lowongan]);
+$this->hooksRegistry->unregisterByTags([HookTag::Lowongan]);
+$this->hooksRegistry->unregisterByTagPattern(['lowongan_*']); // tag wildcard
+$this->hooksRegistry->unregisterByHookPattern('posts_*');      // hook-name wildcard
+
+// Runtime/instance registry — every selector is scoped to one live owner
+// $instanceRegistry: WPHooksInstanceRegistry, $service: the live owner instance
+$instanceRegistry->activateDeferredByTagsInLiveInstance($service, [HookTag::Lowongan]);
+$instanceRegistry->unregisterByTagsInLiveInstance($service, [HookTag::Lowongan]);
+$instanceRegistry->unregisterByTagPatternInLiveInstance($service, ['lowongan_*']);
 
 ```
 
@@ -389,7 +409,7 @@ flowchart TD
         C2 --> C3{"deferRegister?"}
         C3 -->|no| C4["RuntimeInstanceHookInvoker<br/>owner = WeakReference"]
         C3 -->|yes| C5["InstanceRegistryDeferredHookManager"]
-        C5 -.->|"trigger or callable-scoped API"| C6["activateDeferredByCallableInLiveInstance()"]
+        C5 -.->|"trigger or owner-scoped API"| C6["activateDeferredBy*InLiveInstance()"]
         C6 --> C4
         C4 --> B5
         C4 -.->|"owner GC → next dispatch"| G1["consumeLifetimeAndClean()"]
@@ -419,8 +439,8 @@ flowchart TD
 
 - **Two registration paths.** Container path: the `DependencyAutowireScanner` finds `#[Action]` / `#[Filter]` methods, and the `Init` service registers them as lazy `ContainerLazyHookInvoker`s when the container initializes — the service is resolved from the DI container only when the hook actually fires. Runtime path: `WPHooksInstanceRegistry::registerHooksOn($object)` registers the hooks of an already-instantiated object immediately (attribute closures resolved via the DI-container-backed `WPHookPlanProvider`, static closures required).
 - **Gates.** `registerIf` runs once for eager hooks, but is **re-evaluated on every deferred activation attempt** — a trigger that keeps firing can retry until the gate passes. `executeIf` runs on every fire — when it fails, filters pass the original value through unchanged and actions return `null`.
-- **Deferred pool.** `deferRegister` holds an entry out of `$wp_filter` until it is activated. Container path: `activateDeferredByHook()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()` / pattern variants. Runtime path (`WPHooksInstanceRegistry`): `activateDeferredByCallableInLiveInstance()` per member, or automatic activation when a `deferRegisterUntilHook` trigger fires. Active-pool selectors (`unregisterBy*`) never sweep deferred entries — use the matching `unregisterDeferredBy*` API for those; on the runtime path that is `unregisterDeferredByCallableInLiveInstance()`.
-- **Lifecycle.** `once` hooks self-remove after the first evaluation; `unregisterByCallable()` / `ByHook()` / `ByClass()` / `ByNamespace()` / `ByTags()` plus wildcard `unregisterByHookPattern()` / `unregisterByTagPattern()` tear active hooks down, while `onUnregisterDo` runs the cleanup side effect.
+- **Deferred pool.** `deferRegister` holds an entry out of `$wp_filter` until it is activated. Container path: `activateDeferredByHook()` / `ByHookPattern()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()` / `ByTagPattern()`. Runtime path (`WPHooksInstanceRegistry`): the same selector families with the owner-scoped `...InLiveInstance($instance, ...)` suffix; `deferRegisterUntilHook` can also auto-activate on its trigger. Active-pool selectors (`unregisterBy*`) never sweep deferred entries — use `unregisterDeferredBy*` (or the matching `...InLiveInstance()` method) instead.
+- **Lifecycle.** `once` hooks self-remove after the first evaluation; active hooks can be removed with `unregisterByHook()` / `ByHookPattern()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()` / `ByTagPattern()`; the runtime path uses the matching `...InLiveInstance($instance, ...)` methods. `onUnregisterDo` runs the cleanup side effect.
 - Static methods and inherited (non-declared) methods are skipped — declare hooks on the class that owns them. Stack attributes on one member for multi-priority registration.
 
 This approach keeps hook registration declarative and centralized.
@@ -465,6 +485,8 @@ If you are already inside the container, run PHPUnit directly:
 ### Test Files
 
 - `tests/WPHookTests/` — attribute-driven hook subsystem suite, split by domain: `Attribute/`, `Registration/`, `Execution/`, `Deferral/`, `Once/`, `Lifecycle/`, `Tag/`, `Registry/`, `Integration/`.
+- `tests/WPHookTests/Registry/` — container/runtime selector behavior, event bridge coverage, and owner-scoped tag/tag-pattern lifecycle.
+- `tests/WPHookTests/Tag/` — tag normalization, dynamic tag callables, and string-backed enum values.
 - `tests/ContainerDefinitionsTest.php` — PHP-DI container definition coverage.
 - `tests/DependencyInjectorTest.php` — autowiring and dependency injection behavior.
 - `tests/CacheTest.php` — cache behavior and WordPress cache mocks.

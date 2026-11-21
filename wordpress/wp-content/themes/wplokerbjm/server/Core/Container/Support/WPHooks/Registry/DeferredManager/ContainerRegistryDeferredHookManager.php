@@ -131,7 +131,7 @@ class ContainerRegistryDeferredHookManager
     /**
      * Activate all deferred handlers carrying at least one of the given tags.
      *
-     * @param array<string> $tags Tag or list of tags to activate.
+     * @param array<int, string> $tags Normalized tag list to activate.
      * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
      * @return int Number of handlers activated.
      */
@@ -319,7 +319,7 @@ class ContainerRegistryDeferredHookManager
      *
      * Only touches the deferred pool — active handlers are never affected.
      *
-     * @param array<string> $tags Tag or list of tags to unregister.
+     * @param array<int, string> $tags Normalized tag list to unregister.
      */
     public function unregisterDeferredByTags(array $tags): void
     {

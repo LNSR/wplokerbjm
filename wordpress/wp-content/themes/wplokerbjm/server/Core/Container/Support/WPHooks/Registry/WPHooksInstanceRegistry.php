@@ -413,7 +413,7 @@ class WPHooksInstanceRegistry
      *
      * @api
      * @param object $instance Live instance whose deferred registrations should activate.
-     * @param array<int, string> $tags Tag list.
+     * @param array<int, string|\BackedEnum> $tags Tag list.
      * @return int Number of newly activated registrations.
      */
     #[Action(self::ACTIVATE_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE, 10, 2)]
@@ -565,7 +565,7 @@ class WPHooksInstanceRegistry
      *
      * @api
      * @param object $instance Live instance whose deferred registrations should be dropped.
-     * @param array<int, string> $tags Tag list.
+     * @param array<int, string|\BackedEnum> $tags Tag list.
      * @return int Number of removed deferred registrations.
      */
     #[Action(self::UNREGISTER_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE, 10, 2)]
@@ -646,7 +646,7 @@ class WPHooksInstanceRegistry
      *
      * @api
      * @param object $instance Live instance whose active registrations should be removed.
-     * @param array<int, string> $tags Tag list.
+     * @param array<int, string|\BackedEnum> $tags Tag list.
      * @return int Number of removed active registrations.
      */
     #[Action(self::UNREGISTER_BY_TAGS_IN_LIVE_INSTANCE, 10, 2)]
@@ -952,18 +952,16 @@ class WPHooksInstanceRegistry
      */
     private function resolveInstanceTags(InstanceHookMetadata $metadata, object $instance): array
     {
-        if ($metadata->tagCallable !== null) {
-            return HookTagUtilities::normalizeTags(
-                $this->provider->resolveTagCallable(
-                    $metadata->tagCallable,
-                    $metadata->tagCallableParams ?? [],
-                    $metadata->targetName,
-                    $instance,
-                ),
-            );
-        }
+        if ($metadata->tagCallable === null) return HookTagUtilities::normalizeTags($metadata->tags ?? []);
 
-        return HookTagUtilities::normalizeTags($metadata->tags ?? []);
+        return HookTagUtilities::normalizeTags(
+            $this->provider->resolveTagCallable(
+                $metadata->tagCallable,
+                $metadata->tagCallableParams ?? [],
+                $metadata->targetName,
+                $instance,
+            ),
+        );
     }
 
     /**

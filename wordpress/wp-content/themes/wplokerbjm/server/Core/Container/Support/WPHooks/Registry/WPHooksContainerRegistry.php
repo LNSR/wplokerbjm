@@ -334,18 +334,17 @@ class WPHooksContainerRegistry
      * Activate all deferred handlers carrying at least one of the given tags.
      *
      * Scans the deferred handlers pool and transfers matching entries to the
-     * active pool, registering them immediately with WordPress. Accepts a
-     * single tag string or an array of tags — a hook matches when any of its
-     * tags intersects the query set. Already-active handlers are silently
-     * skipped.
+     * active pool, registering them immediately with WordPress. A hook matches
+     * when any of its tags intersects the query set. Already-active handlers
+     * are silently skipped.
      *
      * **Example:**
      * ```php
      * $registry->activateDeferredByTags(['cache', 'seo']);
-     * $registry->activateDeferredByTags('cache');
+     * $registry->activateDeferredByTags([HookTag::Cache]);
      * ```
      * @api
-     * @param array<string> $tags Tag or list of tags to activate.
+     * @param array<int, string|\BackedEnum> $tags Tag list to activate.
      * @return int Number of handlers activated.
      */
     public function activateDeferredByTags(array $tags): int
@@ -461,10 +460,9 @@ class WPHooksContainerRegistry
      * Unregister all deferred handlers carrying at least one of the given tags.
      *
      * Only touches the deferred pool — active handlers are never affected.
-     * Accepts a single tag string or an array of tags; a hook matches when any
-     * of its tags intersects the query set.
+     * A hook matches when any of its tags intersects the query set.
      * @api
-     * @param array<string> $tags Tag or list of tags to unregister.
+     * @param array<int, string|\BackedEnum> $tags Tag list to unregister.
      */
     public function unregisterDeferredByTags(array $tags): void
     {
@@ -597,10 +595,9 @@ class WPHooksContainerRegistry
      * Unregister all active handlers carrying at least one of the given tags.
      *
      * Only touches the active pool — deferred handlers are never affected.
-     * Accepts a single tag string or an array of tags; a hook matches when any
-     * of its tags intersects the query set.
+     * A hook matches when any of its tags intersects the query set.
      * @api
-     * @param array<string> $tags Tag or list of tags to unregister.
+     * @param array<int, string|\BackedEnum> $tags Tag list to unregister.
      */
     public function unregisterByTags(array $tags): void
     {

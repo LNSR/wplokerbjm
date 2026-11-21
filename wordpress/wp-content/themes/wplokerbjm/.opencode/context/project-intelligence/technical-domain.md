@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.8 | Updated: 2026-11-21 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.9 | Updated: 2026-11-21 -->
 
 # Technical Domain — Lowker Site Theme
 
@@ -157,8 +157,8 @@ public function registerTypes(): void
 ## Code Standards
 
 - DI container auto-discovers services via `DependencyAutowireScanner` (Reflection-based); services identified by `#[Action]`/`#[Filter]` attributes — no manual hook registration
-- Controllers return `\WP_REST_Response` or `\WP_Error`; never die/exit directly
-- Resolvers always wrap in try/catch, log errors via `Logger`, return empty/default on failure
+- Controllers return `\WP_REST_Response` or `\WP_Error` (never die/exit); resolvers wrap in try/catch, log via `Logger`, and return empty/default on failure
+- Prefer guard clauses (early returns) over nested conditionals for validation and error handling; keep the happy path at the lowest indentation
 - Cache invalidation via `Cache::deleteMultiple()` / `Cache::deletePattern()` with wildcards
 - Input sanitization: `sanitize_text_field()`, `wp_kses_post()`, custom `ControllerUtils` methods
 - All service classes use constructor-based DI (no `new` for services outside container); exception: anonymous child objects (`AsChildClass` subclasses) receive property injection via `#[Inject]` + `DependencyInjector::injectOn($this)` — a compiled alternative to constructor DI for anonymous-class private state

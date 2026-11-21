@@ -118,9 +118,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * - **Closures cannot capture `$this`.** Use a container service, or the
  *   instance registry, when instance state is required.
  * - **A deferred entry that nothing activates never registers**, silently.
- * - **`did_action()` counts only `do_action()`.** A trigger hook that was only
- *   ever dispatched through `apply_filters()` before registration is not
- *   detected as "already fired".
  * - **Scan-time work is boot-time work**: `hook`/`tag`/`deferRegisterUntilHook`
  *   closures run on every cold boot (and during cache generation).
  *
@@ -244,9 +241,7 @@ abstract class BaseHookAttribute
      *   same target hook, and not other entries sharing the same trigger. It
      *   returns the trigger value unchanged, so an `apply_filters()` trigger
      *   keeps its value while activation runs as a side effect.
-     * * If the trigger already fired (`did_action($trigger) >= 1`) the entry is
-     *   activated immediately (container path defers this to the end of
-     *   `initialize()`).
+     * * If the trigger already fired (`did_action($triggerHook) >= 1 || did_filter($triggerHook) >= 1`) the entry is activated immediately.
      * ! The trigger is resolved **once**, at registration
      * ! A trigger that never fires leaves the entry deferred forever, silently.
      *
