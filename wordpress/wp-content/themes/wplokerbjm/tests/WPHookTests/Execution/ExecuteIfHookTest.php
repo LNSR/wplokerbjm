@@ -171,6 +171,30 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $this->assertSame([], ExecuteIfActionService::$capturedValues);
     }
 
+    public function testOnceHookWithThrowingExecuteIfIsConsumedAndSkipped(): void
+    {
+        $registrations = [
+            $this->action(
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
+                'condition_once_gate_error',
+                once: true,
+                executeIf: static function (): bool {
+                    throw new \RuntimeException('Simulated once gate failure');
+                }
+            ),
+        ];
+
+        $registry = $this->createRegistry($registrations, $this->container);
+        $registry->initialize();
+
+        do_action('condition_once_gate_error', 'first');
+        do_action('condition_once_gate_error', 'second');
+
+        $this->assertSame(0, ExecuteIfActionService::$instantiationCount);
+        $this->assertSame([], ExecuteIfActionService::$capturedValues, 'A declined once-hook must not run on retry.');
+    }
+
     public function testRuntimeRegistryRegistersExecuteIfGatedHooksButGatesAtFireTime(): void
     {
         $registry = $this->container->make(WPHooksInstanceRegistry::class, [
@@ -374,7 +398,8 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         bool $deferRegister = false,
         array $executeIfParams = [],
         ?Closure $registerIf = null,
-        array $registerIfParams = []
+        array $registerIfParams = [],
+        bool $once = false
     ): array {
         return [
             'class' => $class,
@@ -384,6 +409,7 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
             'priority' => $priority,
             'acceptedArgs' => $acceptedArgs,
             'deferRegister' => $deferRegister,
+            'once' => $once,
             'executeIf' => $executeIf,
             'executeIfParams' => $executeIfParams,
             'registerIf' => $registerIf,

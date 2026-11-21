@@ -99,10 +99,10 @@ final class HookInvoker
                         $this->buildHookArgs($args),
                         $this->variadicHookArgName(),
                     );
-                } catch (\RuntimeException $e) {
+                } catch (\Throwable $e) {
                     Logger::error(
                         __METHOD__,
-                        'executeIf gate unresolvable for hook ' . $this->config->label . ' TREATED AS PASSED',
+                        'executeIf gate declined for hook ' . $this->config->label . ' — handler skipped.',
                         [
                             'message' => $e->getMessage(),
                             'trace' => $e->getTraceAsString(),
@@ -110,7 +110,7 @@ final class HookInvoker
                             'line' => $e->getLine(),
                         ]
                     );
-                    $this->emitLiveOutcome(LiveDebugPhase::Failed, 'failed', $startedAt, error: $e, owner: $instance);
+                    $this->emitLiveOutcome(LiveDebugPhase::Skipped, 'skipped', $startedAt, error: $e, owner: $instance);
                     return $this->filterPassthrough($args);
                 }
 

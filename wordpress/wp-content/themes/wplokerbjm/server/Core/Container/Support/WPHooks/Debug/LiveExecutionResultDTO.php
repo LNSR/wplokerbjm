@@ -10,7 +10,7 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
  * Outcome of one hook execution (`after` side of the live DTO).
  *
  * `status` mirrors the invoker outcome:
- * `completed`, `failed`, `skipped` (executeIf rejected), `passthrough`
+ * `completed`, `failed`, `skipped` (executeIf rejected or declined), `passthrough`
  * (error fallback: filters return the original value, actions return null).
  *
  * @phpstan-type LiveExecutionResultData array{

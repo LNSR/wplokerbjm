@@ -11,7 +11,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Debug;
  *  - Dispatching → the invoker body started
  *  - Completed → handler returned normally
  *  - Failed → handler threw (the invoker already applied its fallback)
- *  - Skipped → `executeIf` rejected the fire (filter passes through)
+ *  - Skipped → `executeIf` rejected or could not be evaluated (filter passes through)
  */
 enum LiveDebugPhase: string
 {

@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.9 | Updated: 2026-11-21 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.10 | Updated: 2026-11-21 -->
 
 # Technical Domain — Lowker Site Theme
 
@@ -54,7 +54,7 @@ wplokerbjm/ root → tests/  tools/Composer/Scripts/  cache/  composer.json (too
 
 - `#[Action(hook, priority?, acceptedArgs?, executeIf?, registerIf?, tag?, deferRegisterUntilHook?, deferRegister?, once?, onUnregisterDo?, debug*?)]` / `#[Filter(...)]` on methods and properties; attributes are inert, repeatable metadata and only declared members are scanned
 - `hook`: `string|\Closure` (resolved via container, must return string); `tag`: `string|array|\Closure` — items may be `BackedEnum`, all normalized to strings; invalid tag → that hook is logged + skipped
-- `registerIf`: registration gate — once for eager hooks, re-evaluated at deferred activation; `executeIf`: fire-time gate (false → action skipped / filter passes value through); a throwing gate skips without `once` and logs, unresolvable gate deps are treated as pass
+- `registerIf`: registration gate — once for eager hooks, re-evaluated at deferred activation; `executeIf`: fire-time gate — false or evaluation failure (throw, non-bool, unresolvable dep) is **declined**: action skipped, filter passes value through, ERROR logged; `once` is consumed either way
 - `deferRegister: true` → deferred pool: container activates via `activateDeferredBy*`, runtime via `activateDeferredByCallableInLiveInstance()`; adding `deferRegisterUntilHook: '<hook>'` auto-activates on the trigger (both paths). Runtime deferred removal: `unregisterDeferredByCallableInLiveInstance()`; active-pool `unregisterBy*` never sweeps deferred entries
 - Entries: `Registry/Handlers/` (`ContainerRegistryHandlerEntry` / `RuntimeRegistryHandlerEntry`) + `Trait/HandlerEntryTrait` (`register()` / `unregister()` / `isCurrentlyExecuting()`); `Indexers/EntriesIndexer` = O(K) lookup; `Janitor/QueuedHooksCleaner` = queued once-removal
 - Caches: scanner output → `cache/WPhooksRegistryContainerCache.php`; runtime instance metadata → `cache/WPHooksInstanceObjectCache.php`; `Registrations/` + `Provider/CallableHookParams.php` are readonly `AbstractDataObject` DTOs exported via `__set_state`

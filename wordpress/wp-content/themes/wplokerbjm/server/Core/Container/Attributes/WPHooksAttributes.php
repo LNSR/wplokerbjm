@@ -181,8 +181,11 @@ abstract class BaseHookAttribute
      * **Failure semantics — the important part:**
      * * gate returns `false` → handler skipped. With `once: true` the hook is
      *   **consumed anyway**; a false gate is final and never retried.
-     * * gate **throws** (or returns non-bool) → without `once` the handler is
-     *   skipped and an ERROR is logged; if gate dependencies unresolvable treated as PASS
+     * * gate **throws**, returns a non-bool, or cannot resolve a dependency
+     *   → handler is **declined** (skipped): filters pass the original value
+     *   through, actions are no-ops, and an ERROR is logged. A gate failure
+     *   never falls through as `true`; with `once: true` the hook is consumed
+     *   anyway, so that gate is never retried.
      *
      * ! Property-hook limitation: for a `get`-hooked property the callable is
      * ! produced lazily. To learn its parameter names the scanner would have to
@@ -379,8 +382,8 @@ class Action extends BaseHookAttribute {}
  * Marks an instance method or property as a WordPress **filter** callback.
  *
  * Dispatched by `apply_filters()`; the handler's return value replaces the
- * filtered value. If the handler is skipped (gate `false`, unresolvable
- * `executeIf`, exception) the incoming value passes through untouched.
+ * filtered value. If the handler is skipped (gate `false`, gate evaluation
+ * failure, exception) the incoming value passes through untouched.
  *
  * Repeatable: stack several attributes on one member to register several
  * hooks (multi-priority pattern).

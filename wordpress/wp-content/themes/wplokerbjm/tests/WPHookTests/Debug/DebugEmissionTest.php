@@ -99,6 +99,56 @@ final class DebugEmissionTest extends WplokerbjmTestCase
         self::assertGreaterThanOrEqual(0, $completed->after->elapsedUs);
     }
 
+    public function testExecuteIfFailureEmitsSkippedOutcomeWithError(): void
+    {
+        $container = $this->debugContainer();
+        $owner = new class {
+            public function debugHook(): string
+            {
+                return 'should-not-run';
+            }
+        };
+        $container->service = $owner;
+
+        $provider = new WPHookPlanProvider($container);
+        /** @var list<LiveRegistrationInfoDTO> $payloads */
+        $payloads = [];
+        $probe = static function (LiveRegistrationInfoDTO $dto) use (&$payloads): void {
+            $payloads[] = $dto;
+        };
+
+        $gate = static function (): bool {
+            throw new \RuntimeException('gate exploded');
+        };
+
+        $invoker = HookInvoker::containerMethod(
+            $container,
+            $provider,
+            'hookDebug',
+            10,
+            $owner::class,
+            'debugHook',
+            acceptedArgs: 0,
+            executeIf: $gate,
+            executeIfParams: $provider->buildCallablePlan($gate),
+            debugLiveRegistration: $probe,
+            debugLiveRegistrationParams: $provider->buildCallablePlan($probe),
+        );
+
+        self::assertNull($invoker());
+
+        self::assertSame(['dispatching', 'skipped'], array_map(
+            static fn(LiveRegistrationInfoDTO $dto): string => $dto->phase->value,
+            $payloads,
+        ));
+
+        $skipped = $payloads[1];
+        self::assertSame('skipped', $skipped->after?->status);
+        self::assertSame(\RuntimeException::class, $skipped->after?->errorClass);
+        self::assertSame('gate exploded', $skipped->after?->errorMessage);
+        self::assertSame('container', $skipped->context->path);
+    }
+
     public function testRuntimeLiveSkipsWhenOwnerIsGone(): void
     {
         $container = $this->debugContainer();
