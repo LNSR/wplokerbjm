@@ -20,7 +20,7 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 
 ## Runtime flow
 
-`WPHooksInstanceRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. Attribute closures (hook name, `registerIf`, `executeIf`) always resolve through the container-backed `WPHookPlanProvider` (named hook-argument injection first, then the container, then defaults). Plain `deferRegister` holds the entry in the deferred pool until `registerDeferredByCallableInLiveInstance()` activates it; `deferRegisterUntilHook` auto-activates when the trigger fires (with gate-retry on each fire).
+`WPHooksInstanceRegistry::registerHooksOn()` scans an existing object and registers its supported attributes immediately. Attribute closures (hook name, `registerIf`, `executeIf`) always resolve through the container-backed `WPHookPlanProvider` (named hook-argument injection first, then the container, then defaults). Plain `deferRegister` holds the entry in the deferred pool until a live-instance selector activates it; `deferRegisterUntilHook` auto-activates when the trigger fires (with gate-retry on each fire).
 
 ## Deferred pool (shared)
 
@@ -30,7 +30,7 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 - `activateMatchingDeferredEntries()` sweeps the pool, re-evaluates the registration gate via the abstract `gateDeferredActivation()`, and hands matches to an activate callback.
 - `unregisterMatchingDeferredEntries()` removes entries without touching active handlers.
 
-`ContainerRegistryDeferredHookManager` (container path) exposes the micromanage selectors; the instance path consumes the same mechanics through `InstanceRegistryDeferredHookManager` with `deferRegister` / `deferRegisterUntilHook` plus the callable-scoped `registerDeferredByCallableInLiveInstance()` / `unregisterDeferredByCallableInLiveInstance()` APIs.
+`ContainerRegistryDeferredHookManager` (container path) exposes the global micromanage selectors. The instance path consumes the same mechanics through `InstanceRegistryDeferredHookManager`, scoped to one live owner: hook (`...ByHookInLiveInstance()`), callable (`...ByCallableInLiveInstance()`), and owner-wide (`...ByClassInLiveInstance()`) activation/removal. Hook scope is the first ported selector; tag, pattern, class/namespace, and callable signature alignment remain follow-up work.
 
 ## The important boundary
 
@@ -39,7 +39,7 @@ WPHooks has two registration paths. The container path scans autoloaded classes 
 | Target lifetime | Resolved lazily at hook fire | Existing object held via `WeakMap`; handler self-nukes on owner GC |
 | Dynamic hook names | Supported through `WPHookPlanProvider` | Supported through `WPHookPlanProvider` |
 | Conditions | `registerIf` once; `executeIf` per fire | Attribute `registerIf`/`executeIf` resolved via provider |
-| Deferred hooks | `deferRegister` + `deferRegisterUntilHook`, many selectors | `deferRegister` + `deferRegisterUntilHook`; callable-scoped activate/remove |
+| Deferred hooks | `deferRegister` + `deferRegisterUntilHook`, many selectors | `deferRegister` + `deferRegisterUntilHook`; owner-scoped hook/callable/class activate/remove |
 | Anonymous classes | Use resolver metadata or `ModuleClassHookMetadata` | Direct instance handlers work naturally |
 
 ## Minimal shape

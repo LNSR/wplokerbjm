@@ -135,6 +135,55 @@ class InstanceRegistryDeferredHookManager
     }
 
     /**
+     * Activate deferred entries owned by one live instance for a specific
+     * WordPress hook name.
+     *
+     * The owner filter keeps sibling instances deferred even when they expose
+     * the same hook. Entries are re-gated through
+     * {@see gateDeferredActivation()} immediately before activation.
+     *
+     * @param ActivateRuntimeEntry $activateEntry
+     * @return int Number of newly activated entries.
+     */
+    public function activateInstanceHookDeferredEntries(object $instance, string $hook, callable $activateEntry): int
+    {
+        $keys = [];
+
+        foreach ($this->entriesIndexer->byHook[$hook] ?? [] as $key) {
+            $entry = $this->deferredHandlers[$key] ?? null;
+            if ($entry === null) continue;
+            if ($entry->instance?->get() !== $instance) continue;
+            $keys[$key] = $key;
+        }
+
+        return $this->activateMatchingDeferredEntries(
+            array_values($keys),
+            $activateEntry,
+            DeferredActivationSource::Manual,
+        );
+    }
+
+    /**
+     * Remove deferred entries owned by one live instance for a specific
+     * WordPress hook name.
+     *
+     * Only touches the deferred pool — active registrations are kept.
+     *
+     * @return int Number of removed deferred entries.
+     */
+    public function unregisterInstanceHookDeferredEntries(object $instance, string $hook): int
+    {
+        $before = \count($this->deferredHandlers);
+
+        $this->unregisterMatchingDeferredEntries(
+            $this->entriesIndexer->byHook[$hook] ?? [],
+            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+        );
+
+        return $before - \count($this->deferredHandlers);
+    }
+
+    /**
      * Register a deferRegisterUntilHook entry on the runtime path: the handler
      * is held in the deferred pool until the trigger hook fires, then activated
      * automatically — no manual activation API. The trigger listener is a

@@ -200,5 +200,82 @@ final class EventBridgeTest extends WplokerbjmTestCase
         self::assertSame(0, $dropped->runs);
     }
 
+    public function testInstanceHookEventsDriveDeferredAndActiveSelectors(): void
+    {
+        $container = $this->container();
+        $provider = new WPHookPlanProvider($container);
+
+        $registry = new WPHooksInstanceRegistry(
+            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver(), new EntriesIndexer()),
+            $provider,
+            $this->queuedHooksCleaner = new QueuedHooksCleaner(),
+            new InstanceRegistryRuntimeHookResolver(),
+            new WPHooksInstanceObjectCache(),
+        );
+        $registry->initEventBridge();
+
+        $activatee = new class {
+            public int $runs = 0;
+
+            #[Action('event_bridge_hook_activate', 10, deferRegister: true)]
+            public function onDeferred(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $dropped = new class {
+            public int $runs = 0;
+
+            #[Action('event_bridge_hook_drop', 10, deferRegister: true)]
+            public function onDeferred(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $removed = new class {
+            public int $runs = 0;
+
+            #[Action('event_bridge_hook_remove', 10)]
+            public function onActive(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        \do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $activatee);
+        \do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $dropped);
+        \do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $removed);
+
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_hook_activate'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_hook_drop'));
+        self::assertNotNull($this->findRegisteredHook('action', 'event_bridge_hook_remove'));
+
+        \do_action(
+            WPHooksInstanceRegistry::ACTIVATE_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE,
+            $activatee,
+            'event_bridge_hook_activate',
+        );
+        \do_action(
+            WPHooksInstanceRegistry::UNREGISTER_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE,
+            $dropped,
+            'event_bridge_hook_drop',
+        );
+        \do_action(
+            WPHooksInstanceRegistry::UNREGISTER_BY_HOOK_IN_LIVE_INSTANCE,
+            $removed,
+            'event_bridge_hook_remove',
+        );
+
+        self::assertNotNull($this->findRegisteredHook('action', 'event_bridge_hook_activate'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_hook_drop'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_hook_remove'));
+
+        \do_action('event_bridge_hook_activate');
+        self::assertSame(1, $activatee->runs);
+        self::assertSame(0, $dropped->runs);
+    }
+
     public function deferredBridgeTarget(): void {}
 }

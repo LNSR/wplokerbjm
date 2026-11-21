@@ -27,7 +27,11 @@
 | `unregisterByHookPattern($pattern)` / `unregisterByTagPattern($patterns)` | Wildcard removal of active entries. |
 | `unregisterDeferredByHookPattern($pattern)` / `unregisterDeferredByTagPattern($patterns)` | Wildcard removal of deferred entries only. |
 | `WPHooksInstanceRegistry::registerHooksOn()` | Scan one existing object once; attribute closures resolve through `WPHookPlanProvider`. |
-| `registerDeferredByCallableInLiveInstance()` / `unregisterDeferredByCallableInLiveInstance()` | Runtime callable-scoped deferred activation/removal for held `deferRegister` entries. |
+| `activateDeferredByHookInLiveInstance()` / `unregisterDeferredByHookInLiveInstance()` | Runtime hook-name-scoped deferred activation/removal for one live owner. |
+| `activateDeferredByCallableInLiveInstance()` / `unregisterDeferredByCallableInLiveInstance()` | Runtime callable-scoped deferred activation/removal for held `deferRegister` entries. |
+| `activateDeferredByClassInLiveInstance()` / `unregisterDeferredByClassInLiveInstance()` | Runtime owner-scoped deferred activation/removal for every member of one live instance. |
+| `unregisterByHookInLiveInstance()` | Remove active runtime registrations for one hook and one owner only; deferred entries are untouched. |
+| `unregisterByCallableInLiveInstance()` | Remove every active registration of one member on one live instance. |
 | `unregisterHooksOn()` | Remove every runtime handler owned by one object (incl. its deferred entries). |
 
 `ContainerRegistryDeferredHookManager` lives in `Registry/DeferredManager/`; `ContainerRegistryHookTargetResolver` in `Registry/Resolver/`. The resolver accepts array callables, `Class::method` strings, bound first-class callables, invokable objects, property-hook closures, and the anonymous-property metadata object.

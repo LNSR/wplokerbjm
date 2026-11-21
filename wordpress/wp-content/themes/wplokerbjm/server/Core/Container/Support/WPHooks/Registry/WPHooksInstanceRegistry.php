@@ -48,7 +48,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\
  *! `deferRegister` holds the entry in the deferred pool: together with
  *! `deferRegisterUntilHook` it activates automatically when the trigger
  *! fires; on its own it waits for
- *! {@see activateDeferredByCallableInLiveInstance()} (one member) or
+ *! {@see activateDeferredByHookInLiveInstance()} (one hook),
+ *! {@see activateDeferredByCallableInLiveInstance()} (one member), or
  *! {@see activateDeferredByClassInLiveInstance()} (every deferred member of
  *! the instance). Static methods are
  *! silently skipped.
@@ -70,6 +71,9 @@ class WPHooksInstanceRegistry
 
     public const REGISTER_HOOKS = 'wphooks_instance_register_runtime_hook';
     public const UNREGISTER_HOOKS = 'wphooks_instance_unregister_runtime_hook';
+    public const UNREGISTER_BY_HOOK_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_by_hook_in_live_instance';
+    public const UNREGISTER_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_deferred_by_hook_in_live_instance';
+    public const ACTIVATE_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE = 'wphooks_instance_activate_deferred_by_hook_in_live_instance';
     public const UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_by_callable_in_live_instance';
     public const UNREGISTER_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_deferred_by_callable_in_live_instance';
     public const ACTIVATE_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE = 'wphooks_instance_activate_deferred_by_callable_in_live_instance';
@@ -77,23 +81,45 @@ class WPHooksInstanceRegistry
     public const ACTIVATE_DEFERRED_BY_CLASS_IN_LIVE_INSTANCE = 'wphooks_instance_activate_deferred_by_class_in_live_instance';
 
     /**
-     * Raw control-plane bridge: event name → registry method (1 accepted arg).
+     * Raw control-plane bridge: event name → registry method.
      *
      * Every runtime API method is listed — including REGISTER_HOOKS — so the
      * optional raw bridge is a complete standalone registration path. In
      * production the same listeners come from the `#[Action]` attributes,
      * registered by the container scan, and this bridge is not booted.
      *
+     * Selectors that take `($instance, $selector)` register with two accepted
+     * arguments; see {@see self::EVENT_BRIDGE_ACCEPTED_ARGS}.
+     *
      * @var array<string, non-empty-string>
      */
     public const EVENT_BRIDGE_HOOKS = [
         self::REGISTER_HOOKS => 'registerHooksOn',
         self::UNREGISTER_HOOKS => 'unregisterHooksOn',
+        self::UNREGISTER_BY_HOOK_IN_LIVE_INSTANCE => 'unregisterByHookInLiveInstance',
+        self::UNREGISTER_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 'unregisterDeferredByHookInLiveInstance',
+        self::ACTIVATE_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 'activateDeferredByHookInLiveInstance',
         self::UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE => 'unregisterByCallableInLiveInstance',
         self::UNREGISTER_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE => 'unregisterDeferredByCallableInLiveInstance',
         self::ACTIVATE_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE => 'activateDeferredByCallableInLiveInstance',
         self::UNREGISTER_DEFERRED_BY_CLASS_IN_LIVE_INSTANCE => 'unregisterDeferredByClassInLiveInstance',
         self::ACTIVATE_DEFERRED_BY_CLASS_IN_LIVE_INSTANCE => 'activateDeferredByClassInLiveInstance',
+    ];
+
+    /**
+     * Accepted argument count for bridge listeners.
+     *
+     * `registerHooksOn()` additionally accepts the optional
+     * `$autoUnregisterAtHook` and `$forceNoCache`; the hook selectors receive
+     * the owner instance plus the hook name.
+     *
+     * @var array<string, positive-int>
+     */
+    private const EVENT_BRIDGE_ACCEPTED_ARGS = [
+        self::REGISTER_HOOKS => 3,
+        self::ACTIVATE_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 2,
+        self::UNREGISTER_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 2,
+        self::UNREGISTER_BY_HOOK_IN_LIVE_INSTANCE => 2,
     ];
 
     /**
@@ -297,6 +323,29 @@ class WPHooksInstanceRegistry
     }
 
     /**
+     * Activate every deferred registration owned by one live instance that
+     * targets the given WordPress hook name.
+     *
+     * Scoped to the owner: sibling instances keep their matching deferred
+     * entries parked. The `registerIf` gate is re-evaluated immediately
+     * before activation, exactly like the instance/callable-scoped variants.
+     *
+     * @api
+     * @param object $instance Live instance whose deferred registrations should activate.
+     * @param string $hook WordPress hook name.
+     * @return int Number of newly activated registrations.
+     */
+    #[Action(self::ACTIVATE_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE, 10, 2)]
+    public function activateDeferredByHookInLiveInstance(object $instance, string $hook): int
+    {
+        return $this->instanceRegistryDeferredHookManager->activateInstanceHookDeferredEntries(
+            $instance,
+            $hook,
+            $this->activateRuntimeEntry,
+        );
+    }
+
+    /**
      * Activate every deferred registration bound to one callable target of a
      * live instance (all priorities / attributes of that member).
      *
@@ -366,6 +415,68 @@ class WPHooksInstanceRegistry
     public function unregisterDeferredByClassInLiveInstance(object $target): int
     {
         return $this->instanceRegistryDeferredHookManager->unregisterInstanceClassDeferredEntries($target);
+    }
+
+    /**
+     * Remove every deferred registration owned by one live instance that
+     * targets the given WordPress hook name, keeping active registrations
+     * untouched.
+     *
+     * Only touches the deferred pool: already-active hooks stay live. Use
+     * {@see self::unregisterByHookInLiveInstance()} for the active pool.
+     *
+     * @api
+     * @param object $instance Live instance whose deferred registrations should be dropped.
+     * @param string $hook WordPress hook name.
+     * @return int Number of removed deferred registrations.
+     */
+    #[Action(self::UNREGISTER_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE, 10, 2)]
+    public function unregisterDeferredByHookInLiveInstance(object $instance, string $hook): int
+    {
+        return $this->instanceRegistryDeferredHookManager->unregisterInstanceHookDeferredEntries(
+            $instance,
+            $hook,
+        );
+    }
+
+    /**
+     * Remove every active registration owned by one live instance that
+     * targets the given WordPress hook name.
+     *
+     * @api
+     * @param object $instance Live instance whose active registrations should be removed.
+     * @param string $hook WordPress hook name.
+     * @return int Number of removed active registrations.
+     *
+     * ! Only touches the active pool — deferred entries are never swept and
+     * ! still activate when their trigger fires or when
+     * ! {@see self::activateDeferredByHookInLiveInstance()} is called. Use
+     * ! {@see self::unregisterDeferredByHookInLiveInstance()} for the deferred pool.
+     */
+    #[Action(self::UNREGISTER_BY_HOOK_IN_LIVE_INSTANCE, 10, 2)]
+    public function unregisterByHookInLiveInstance(object $instance, string $hook): int
+    {
+        $records = $this->weakRegistry[$instance] ?? [];
+        if ($records === []) {
+            return 0;
+        }
+
+        $count = 0;
+        $remaining = [];
+
+        foreach ($records as $record) {
+            if ($record->hook !== $hook) {
+                $remaining[] = $record;
+                continue;
+            }
+
+            $this->queuedHooksCleaner->immediatelyScheduleRemove($record);
+            $count++;
+        }
+
+        $this->weakRegistry[$instance] = $remaining;
+
+        return $count;
     }
 
     /**
@@ -461,10 +572,13 @@ class WPHooksInstanceRegistry
         $this->bridgeInitialized = true;
         $priority = (int) 10;
         foreach (self::EVENT_BRIDGE_HOOKS as $hook => $method) {
-            if ($hook === self::REGISTER_HOOKS) continue;
-            add_action($hook, [$this, $method], $priority, 1);
+            add_action(
+                $hook,
+                [$this, $method],
+                $priority,
+                self::EVENT_BRIDGE_ACCEPTED_ARGS[$hook] ?? 1,
+            );
         }
-        add_action(self::REGISTER_HOOKS, [$this, 'registerHooksOn'], $priority, 3);
     }
 
     /**
