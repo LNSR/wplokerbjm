@@ -240,9 +240,7 @@ class WPHooksInstanceRegistry
                 $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
 
                 $entryMeta = new InstanceHookMetadata(
-                    hook: $attr->hook instanceof \Closure
-                        ? $this->provider->resolveHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $targetName, $instance)
-                        : $attr->hook,
+                    hook: $attr->hook,
                     type: $type,
                     priority: $attr->priority,
                     acceptedArgs: $attr->acceptedArgs,
@@ -254,6 +252,7 @@ class WPHooksInstanceRegistry
                     registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
                     deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                     deferRegisterUntilHookParams: $this->provider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
+                    hookParams: $this->provider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                     hookArgNames: $this->provider->buildCallablePlanFromReflector($method)['params'],
                     tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                     tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
@@ -287,9 +286,7 @@ class WPHooksInstanceRegistry
                 $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
 
                 $entryMeta = new InstanceHookMetadata(
-                    hook: $attr->hook instanceof \Closure
-                        ? $this->provider->resolveHookName($attr->hook, $this->provider->buildCallablePlan($attr->hook), $targetName, $instance)
-                        : $attr->hook,
+                    hook: $attr->hook,
                     type: $type,
                     priority: $attr->priority,
                     acceptedArgs: $attr->acceptedArgs,
@@ -301,6 +298,7 @@ class WPHooksInstanceRegistry
                     registerIfParams: $this->provider->buildCallablePlan($attr->registerIf instanceof \Closure ? $attr->registerIf : null),
                     deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                     deferRegisterUntilHookParams: $this->provider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
+                    hookParams: $this->provider->buildCallablePlan($attr->hook instanceof \Closure ? $attr->hook : null),
                     hookArgNames: $this->provider->extractPropertyCallablePlan($property, $instance)['params'],
                     tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
                     tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
@@ -912,7 +910,7 @@ class WPHooksInstanceRegistry
                     : $instance::class;
                 Logger::info(
                     __METHOD__,
-                    'registerIf for ' . $ownerLabel . '->' . $entryMeta->targetName . ' with hook ' . $entryMeta->hook . ' and priority ' . (string) $entryMeta->priority . ' skipped'
+                    'registerIf for ' . $ownerLabel . '->' . $entryMeta->targetName . ' with hook ' . self::describeHook($entryMeta->hook) . ' and priority ' . (string) $entryMeta->priority . ' skipped'
                 );
                 return;
             }
@@ -923,7 +921,7 @@ class WPHooksInstanceRegistry
         } catch (\Throwable $e) {
             Logger::error(
                 __METHOD__,
-                'Skipping hook ' . $entryMeta->targetName . ' on ' . $entryMeta->hook . ' — ' . $e->getMessage(),
+                'Skipping hook ' . $entryMeta->targetName . ' on ' . self::describeHook($entryMeta->hook) . ' — ' . $e->getMessage(),
             );
 
             return;
@@ -940,6 +938,15 @@ class WPHooksInstanceRegistry
             $this->entriesByInvokers[$handler] = $record;
             $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
         }
+    }
+
+    /**
+     * Human-readable hook name for logs. Dynamic hooks are still closures at
+     * this point, so they cannot be interpolated directly.
+     */
+    private static function describeHook(string|\Closure $hook): string
+    {
+        return $hook instanceof \Closure ? '(closure)' : $hook;
     }
 
     /**
@@ -965,6 +972,28 @@ class WPHooksInstanceRegistry
     }
 
     /**
+     * Resolve a dynamic hook name against the live owner at registration time.
+     *
+     * Cached metadata keeps the raw closure and its callable plan, so sibling
+     * instances never inherit the first instance's resolved hook name.
+     */
+    private function resolveInstanceHookName(InstanceHookMetadata $metadata, object $instance): string
+    {
+        if (!$metadata->hook instanceof \Closure) return $metadata->hook;
+
+        $ownerLabel = $instance instanceof ModuleClassHookMetadata
+            ? $instance->parentClassString . '->' . $instance->parentProperty
+            : $instance::class;
+
+        return $this->provider->resolveHookName(
+            $metadata->hook,
+            $metadata->hookParams ?? [],
+            $ownerLabel . '->' . $metadata->targetName,
+            $instance,
+        );
+    }
+
+    /**
      * @param bool $isDeferred
      * @return array{
      *  HookInvoker, 
@@ -978,6 +1007,7 @@ class WPHooksInstanceRegistry
         bool $isDeferred = false
     ): array {
         $weakRef = \WeakReference::create($instance);
+        $hookName = $this->resolveInstanceHookName($metadata, $instance);
         $resolvedTags = $this->resolveInstanceTags($metadata, $instance);
         $hookKey = new HookKey(
             class: (string) \spl_object_id($instance),
@@ -991,7 +1021,7 @@ class WPHooksInstanceRegistry
         $handler = match ($metadata->target) {
             'method' => HookInvoker::runtimeMethod(
                 instanceRef: $weakRef,
-                hookName: $metadata->hook,
+                hookName: $hookName,
                 priority: $metadata->priority,
                 method: $metadata->targetName,
                 visibility: $metadata->visibility,
@@ -1013,7 +1043,7 @@ class WPHooksInstanceRegistry
             ),
             'property', 'property-hook' => HookInvoker::runtimeProperty(
                 instanceRef: $weakRef,
-                hookName: $metadata->hook,
+                hookName: $hookName,
                 priority: $metadata->priority,
                 property: $metadata->targetName,
                 visibility: $metadata->visibility,
@@ -1036,7 +1066,7 @@ class WPHooksInstanceRegistry
         };
         $entry = match ($isDeferred) {
             true => new DeferredHookEntryHandler(
-                hook: $metadata->hook,
+                hook: $hookName,
                 handler: $handler,
                 type: $metadata->type,
                 priority: $metadata->priority,
@@ -1053,7 +1083,7 @@ class WPHooksInstanceRegistry
                 instance: $weakRef,
             ),
             default => new RuntimeRegistryHandlerEntry(
-                hook: $metadata->hook,
+                hook: $hookName,
                 handler: $handler,
                 type: $metadata->type,
                 priority: $metadata->priority,

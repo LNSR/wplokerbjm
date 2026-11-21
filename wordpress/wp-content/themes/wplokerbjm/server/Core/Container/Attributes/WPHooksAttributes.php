@@ -118,8 +118,9 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * - **Closures cannot capture `$this`.** Use a container service, or the
  *   instance registry, when instance state is required.
  * - **A deferred entry that nothing activates never registers**, silently.
- * - **Scan-time work is boot-time work**: `hook`/`tag`/`deferRegisterUntilHook`
- *   closures run on every cold boot (and during cache generation).
+ * - **Registration-time work is boot-time work**: `hook`/`tag`/
+ *   `deferRegisterUntilHook` closures run on every cold boot during
+ *   registration. Keep them deterministic.
  *
  * Required PHP: >= 8.5.
  *
@@ -145,8 +146,9 @@ abstract class BaseHookAttribute
      *   exist yet.
      * * It must return a non-empty string. `null`, `''` or a non-string aborts
      *   that single registration with a warning (no exception, boot continues).
-     * ! Because it runs during boot/cache generation the result is baked into
-     * ! the hook cache: keep it deterministic (no request, user or DB state).
+     * ! The raw closure and its callable plan are retained in registration
+     * ! metadata/cache and resolved per registration: keep it deterministic
+     * ! (no request, user or DB state).
      *
      * @param int $priority Standard WordPress priority. Default 10.
      * ! `PHP_INT_MIN` is used internally for deferred-activation listeners;

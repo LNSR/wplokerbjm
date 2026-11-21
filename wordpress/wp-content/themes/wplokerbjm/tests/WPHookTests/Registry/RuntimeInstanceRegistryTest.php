@@ -860,6 +860,41 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $this->assertCount(2, $log->getArrayCopy(), 'Both instances must fire.');
     }
 
+    public function testCacheHitResolvesDynamicHookClosurePerInstance(): void
+    {
+        $cache = new WPHooksInstanceObjectCache();
+
+        $factory = static fn(string $hookName): ModuleClassHookMetadata => new class($hookName) extends ModuleClassHookMetadata {
+            public function __construct(private string $hookName)
+            {
+                parent::__construct('CachedDynamicHookHost', 'hooks');
+            }
+
+            #[Action(hook: static function (?self $self): string {
+                return $self?->hookName ?? 'owner_gone';
+            })]
+            public function onHook(): void {}
+        };
+
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
+        ]);
+
+        // First instance populates the cache (scan path).
+        $first = $factory('first_dynamic_hook');
+        $registry()->registerHooksOn($first);
+        self::assertNotNull($this->findRegisteredHook('action', 'first_dynamic_hook'));
+
+        // Second instance hits the same metadata site but must resolve the
+        // cached hook closure against its own owner state.
+        $second = $factory('second_dynamic_hook');
+        $registry()->registerHooksOn($second);
+
+        self::assertNotNull($this->findRegisteredHook('action', 'first_dynamic_hook'));
+        self::assertNotNull($this->findRegisteredHook('action', 'second_dynamic_hook'));
+    }
+
     public function testUnregisterHooksOnSweepsDeferredPool(): void
     {
         $anon = new class {

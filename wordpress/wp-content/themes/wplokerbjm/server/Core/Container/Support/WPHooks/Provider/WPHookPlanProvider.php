@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Provider;
 
 use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, HookDebugDispatcher, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
 use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\NonNullableSelfParameterException;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
@@ -59,7 +60,8 @@ class WPHookPlanProvider
             ? $instance->parentClassString . '->' . $instance->parentProperty
             : $instance::class;
 
-        $label = $ownerLabel . '->' . $metadata->targetName . ' on ' . $metadata->hook;
+        $hookLabel = $metadata->hook instanceof \Closure ? '(closure)' : $metadata->hook;
+        $label = $ownerLabel . '->' . $metadata->targetName . ' on ' . $hookLabel;
 
         foreach (get_object_vars($metadata) as $propertyName => $closure) {
             if (!$closure instanceof \Closure) {
