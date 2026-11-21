@@ -52,8 +52,7 @@ final class EntriesIndexerTest extends WplokerbjmTestCase
         $handler = $target === 'method'
             ? HookInvoker::containerMethod($this->container(), $this->container()->get(WPHookPlanProvider::class), $hook, $priority, $class, $method)
             : HookInvoker::containerProperty($this->container(), $this->container()->get(WPHookPlanProvider::class), $hook, $priority, $class, $method);
-
-        return new ContainerRegistryHandlerEntry(
+        $entry = new ContainerRegistryHandlerEntry(
             hook: $hook,
             key: $key,
             handler: $handler,
@@ -68,8 +67,9 @@ final class EntriesIndexerTest extends WplokerbjmTestCase
             once: false,
             onUnregisterDo: null,
             onUnregisterDoParams: [],
-            removeEntryIndexCallback: $this->entriesIndexer->removeIndexes(...)
         );
+        $entry->setOnEntryRemovalCallback($this->entriesIndexer->removeIndexes(...));
+        return $entry;
     }
 
     public function testIndexesEveryBucketForAMethodEntry(): void

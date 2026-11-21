@@ -241,10 +241,43 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             use DeferredHooksTrait;
 
             public EntriesIndexer $entriesIndexer;
+            /** @var array<string, DeferredHookEntryHandler> */
+            protected array $deferredHandlers = [];
 
             public function __construct()
             {
                 $this->entriesIndexer = new EntriesIndexer();
+            }
+
+            protected function deferredGet(string $key, ?object $owner = null): ?DeferredHookEntryHandler
+            {
+                return $this->deferredHandlers[$key] ?? null;
+            }
+
+            protected function deferredPut(string $key, DeferredHookEntryHandler $entry, ?object $owner = null): void
+            {
+                $this->deferredHandlers[$key] = $entry;
+            }
+
+            protected function deferredRemove(string $key, ?object $owner = null): void
+            {
+                unset($this->deferredHandlers[$key]);
+            }
+
+            protected function deferredCount(?object $owner = null): int
+            {
+                return \count($this->deferredHandlers);
+            }
+
+            protected function deferredEntries(?object $owner = null): array
+            {
+                return $this->deferredHandlers;
+            }
+
+            protected function afterDeferredAdded(DeferredHookEntryHandler $entry): void
+            {
+                $this->entriesIndexer->setIndexes($entry);
+                $entry->setOnEntryRemovalCallback($this->entriesIndexer->removeIndexes(...));
             }
 
             protected function gateDeferredActivation(DeferredHookEntryHandler $data): bool
@@ -338,10 +371,43 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             use DeferredHooksTrait;
 
             public EntriesIndexer $entriesIndexer;
+            /** @var array<string, DeferredHookEntryHandler> */
+            protected array $deferredHandlers = [];
 
             public function __construct()
             {
                 $this->entriesIndexer = new EntriesIndexer();
+            }
+
+            protected function deferredGet(string $key, ?object $owner = null): ?DeferredHookEntryHandler
+            {
+                return $this->deferredHandlers[$key] ?? null;
+            }
+
+            protected function deferredPut(string $key, DeferredHookEntryHandler $entry, ?object $owner = null): void
+            {
+                $this->deferredHandlers[$key] = $entry;
+            }
+
+            protected function deferredRemove(string $key, ?object $owner = null): void
+            {
+                unset($this->deferredHandlers[$key]);
+            }
+
+            protected function deferredCount(?object $owner = null): int
+            {
+                return \count($this->deferredHandlers);
+            }
+
+            protected function deferredEntries(?object $owner = null): array
+            {
+                return $this->deferredHandlers;
+            }
+
+            protected function afterDeferredAdded(DeferredHookEntryHandler $entry): void
+            {
+                $this->entriesIndexer->setIndexes($entry);
+                $entry->setOnEntryRemovalCallback($this->entriesIndexer->removeIndexes(...));
             }
 
             protected function gateDeferredActivation(DeferredHookEntryHandler $data): bool

@@ -98,6 +98,21 @@ $jobService =$container->get(JobService::class);
 - **Production**: Container compilation is enabled with caching for optimal performance
 - **APCu**: When available, definition caching is enabled for additional speed
 
+### Container Lifetimes
+
+WPHooks consumes the project container through PSR-11 `get()` only. It does not own, cache, or scope service instances, and it never calls PHP-DI `make()`.
+
+| Lifetime | How it is produced | What WPHooks receives |
+|----------|--------------------|-----------------------|
+| Shared / singleton | Default `DI\autowire(...)` definitions; PHP-DI caches resolved entries | Same instance for the container/request |
+| Lazy shared | `DI\autowire(...)->lazy()` | One proxy; target resolves once, then stays at container lifetime |
+| Transient | PHP-DI `make()` or a custom `get()` returning a new instance | WPHooks respects the custom `get()` result; it never calls `make()` |
+| Scoped | No first-class project container scope | WPHooks owner scope is hook-registration lifetime, not DI lifetime |
+
+When a closure attribute parameter is typed with a class, it is resolved through `$container->get($type)`. A shared service can therefore stay shared even when the hook is request-scoped, deferred, or owned by a short-lived instance. Pass per-fire/request state as a hook argument rather than assuming a transient lookup. `self` / `static` are the exception: a live owner wins, and `?self` resolves to `null` when the owner is gone.
+
+See `backend/concepts/container-lifetimes.md` for the detailed contract.
+
 ## 🔌 Hook Registration
 
 The server uses attribute-based hook registration for WordPress actions and filters. Instead of manually calling `add_action` or `add_filter`, you can use PHP attributes on your service methods. The attribute classes live in `server/Core/Container/Attributes/WPHooksAttributes.php`.
@@ -399,7 +414,7 @@ flowchart TD
         B1["WPHooksContainerRegistry::initialize()"] --> B2{"registerIf gate"}
         B2 -->|pass| B3["active pool"]
         B2 -->|deferRegister| B4["ContainerRegistryDeferredHookManager"]
-        B3 --> B5["ContainerLazyHookInvoker → add_action / add_filter"]
+        B3 --> B5["HookInvoker (container target) → add_action / add_filter"]
         B4 -.->|"deferRegisterUntilHook fires<br/>PHP_INT_MIN listener"| B6["activateDeferredBy*"]
         B6 --> B5
     end
@@ -407,7 +422,7 @@ flowchart TD
     subgraph RUNTIME["3 · Runtime path (existing object)"]
         C1["WPHooksInstanceRegistry::registerHooksOn(object)"] --> C2["scan attributes<br/>plan via WPHookPlanProvider"]
         C2 --> C3{"deferRegister?"}
-        C3 -->|no| C4["RuntimeInstanceHookInvoker<br/>owner = WeakReference"]
+        C3 -->|no| C4["HookInvoker (runtime target)<br/>owner = WeakReference"]
         C3 -->|yes| C5["InstanceRegistryDeferredHookManager"]
         C5 -.->|"trigger or owner-scoped API"| C6["activateDeferredBy*InLiveInstance()"]
         C6 --> C4
@@ -437,13 +452,35 @@ flowchart TD
 
 ### How Hook Registration Works
 
-- **Two registration paths.** Container path: the `DependencyAutowireScanner` finds `#[Action]` / `#[Filter]` methods, and the `Init` service registers them as lazy `ContainerLazyHookInvoker`s when the container initializes — the service is resolved from the DI container only when the hook actually fires. Runtime path: `WPHooksInstanceRegistry::registerHooksOn($object)` registers the hooks of an already-instantiated object immediately (attribute closures resolved via the DI-container-backed `WPHookPlanProvider`, static closures required).
+- **Two registration paths.** Container path: the `DependencyAutowireScanner` finds `#[Action]` / `#[Filter]` methods, and the `Init` service registers them as lazy `HookInvoker` instances (container target) when the container initializes — the service is resolved from the DI container only when the hook actually fires. Runtime path: `WPHooksInstanceRegistry::registerHooksOn($object)` registers the hooks of an already-instantiated object immediately (attribute closures resolved via the DI-container-backed `WPHookPlanProvider`, static closures required).
 - **Gates.** `registerIf` runs once for eager hooks, but is **re-evaluated on every deferred activation attempt** — a trigger that keeps firing can retry until the gate passes. `executeIf` runs on every fire — when it returns `false` or cannot be evaluated (throw, non-bool, unresolvable dependency), the handler is **declined**: filters pass the original value through unchanged, actions return `null`, and an ERROR is logged. With `once: true` the hook is consumed regardless of gate outcome.
 - **Deferred pool.** `deferRegister` holds an entry out of `$wp_filter` until it is activated. Container path: `activateDeferredByHook()` / `ByHookPattern()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()` / `ByTagPattern()`. Runtime path (`WPHooksInstanceRegistry`): the same selector families with the owner-scoped `...InLiveInstance($instance, ...)` suffix; `deferRegisterUntilHook` can also auto-activate on its trigger. Active-pool selectors (`unregisterBy*`) never sweep deferred entries — use `unregisterDeferredBy*` (or the matching `...InLiveInstance()` method) instead.
 - **Lifecycle.** `once` hooks self-remove after the first evaluation; active hooks can be removed with `unregisterByHook()` / `ByHookPattern()` / `ByClass()` / `ByNamespace()` / `ByCallable()` / `ByTags()` / `ByTagPattern()`; the runtime path uses the matching `...InLiveInstance($instance, ...)` methods. `onUnregisterDo` runs the cleanup side effect.
 - Static methods and inherited (non-declared) methods are skipped — declare hooks on the class that owns them. Stack attributes on one member for multi-priority registration.
 
 This approach keeps hook registration declarative and centralized.
+
+## 🪵 WPHooks Logger
+
+WPHooks has its own logger seam instead of calling the project's static `Shared\Log\Logger` directly.
+
+| Component | Role |
+|-----------|------|
+| `HookLoggerInterface` | Injected contract: `debug` / `info` / `warning` / `error` / `flush` |
+| `SharedLoggerAdapter` | Default DI binding; delegates to the existing shared logger |
+| `NullHookLogger` | No-op default for standalone construction and tests |
+
+The container binding lives in `server/Core/Container/Definitions/Core.php`:
+
+```php
+HookLoggerInterface::class => \DI\get(SharedLoggerAdapter::class),
+```
+
+To swap the backend, bind `HookLoggerInterface` to your own implementation in the container. WPHooks services resolve the interface through DI; they do not reach back to the project's static logger. A custom buffered logger must flush itself through the injected instance at shutdown.
+
+`ModuleHookMetadata` is intentionally still coupled to `Shared\Log\Logger` until it is decoupled from `AsInnerClass`.
+
+See `project-intelligence/wphooks-logger.md` for the full injection surface and boundaries.
 
 ## 🧪 Testing (PHPUnit)
 

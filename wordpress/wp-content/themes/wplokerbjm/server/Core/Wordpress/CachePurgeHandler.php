@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Core\Wordpress;
 
 use WPLokerBJM\Adapter\RedisAdapter;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Models\Schema\PostTypes;
 use WPLokerBJM\Shared\Log\Logger;
@@ -39,9 +39,9 @@ class CachePurgeHandler
      * @var class@anonymous::class
      */
     #[Action('init', 10, 0, once: true)]
-    public private(set) ?ModuleClassHookMetadata $invalidatePostCache {
+    public private(set) ?ModuleHookMetadata $invalidatePostCache {
         get {
-            return $this->invalidatePostCache ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+            return $this->invalidatePostCache ??= new class($this, __PROPERTY__) extends ModuleHookMetadata {
                 /** @var array<int, bool> */
                 public private(set) array $snapshotPostID = [];
 
@@ -81,7 +81,7 @@ class CachePurgeHandler
                             CacheKey::JOB_SCHEMA_PREFIX . $postId,
                         ]);
                     } catch (\Throwable $e) {
-                        Logger::error($this->constructCurrentClassIdentity, 'Error:', [
+                        Logger::error($this->ownershipPath, 'Error:', [
                             'message' => $e->getMessage(),
                             'trace' => $e->getTraceAsString(),
                             'code' => $e->getCode(),

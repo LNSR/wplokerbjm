@@ -3,7 +3,8 @@
 namespace WPLokerBJM\Core\Wordpress\Plugins\ThirdParty;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsInnerClass;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WPLokerBJM\Core\Wordpress\Plugins\PluginConfigInterface;
 use WPLokerBJM\Core\Wordpress\Plugins\PluginList;
@@ -31,8 +32,8 @@ final class MetaBox implements PluginConfigInterface
         }
     }
 
-    private ModuleClassHookMetadata $metaboxBugsPatch {
-        get => $this->metaboxBugsPatch ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+    private ModuleHookMetadata $metaboxBugsPatch {
+        get => $this->metaboxBugsPatch ??= new class(__CLASS__, __PROPERTY__) extends ModuleHookMetadata {
             /**
              * Fix blank WYSIWYG/TinyMCE editor on fresh post-editor load edit by viewing WYSIWYG/TinyMCE editor html code first
              */
@@ -46,30 +47,32 @@ final class MetaBox implements PluginConfigInterface
         };
     }
 
-    private ModuleClassHookMetadata $registerCustomModels {
-        get => $this->registerCustomModels ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
-            #[Inject]
-            private CustomFields $customFields;
-            #[Inject]
-            private Taxonomies $taxonomies;
-            #[Inject]
-            private PostTypes $postTypes;
+    private AsInnerClass $registerCustomModels {
+        get {
+            return $this->registerCustomModels ??= new class(__CLASS__, __PROPERTY__) extends AsInnerClass {
+                #[Inject]
+                private CustomFields $customFields;
+                #[Inject]
+                private Taxonomies $taxonomies;
+                #[Inject]
+                private PostTypes $postTypes;
 
-            #[Filter('rwmb_meta_boxes')]
-            public function registerCustomFields(array $meta_boxes): array
-            {
-                return $this->customFields->lowonganCustomFields($meta_boxes);
-            }
-            #[Action('init', once: true)]
-            public function registerPostTypes(): void
-            {
-                $this->postTypes->registerLowonganPostType();
-            }
-            #[Action('init', once: true)]
-            public function registerTaxonomies(): void
-            {
-                $this->taxonomies->registerAllTaxonomies();
-            }
-        };
+                #[Filter('rwmb_meta_boxes')]
+                public function registerCustomFields(array $meta_boxes): array
+                {
+                    return $this->customFields->lowonganCustomFields($meta_boxes);
+                }
+                #[Action('init', once: true)]
+                public function registerPostTypes(): void
+                {
+                    $this->postTypes->registerLowonganPostType();
+                }
+                #[Action('init', once: true)]
+                public function registerTaxonomies(): void
+                {
+                    $this->taxonomies->registerAllTaxonomies();
+                }
+            };
+        }
     }
 }

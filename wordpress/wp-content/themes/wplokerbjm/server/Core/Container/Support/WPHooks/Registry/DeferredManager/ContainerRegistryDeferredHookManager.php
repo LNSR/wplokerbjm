@@ -11,11 +11,11 @@ use ReflectionFunction;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\DeferredActivationSource;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{Registrations\HookRegistration, Registrations\HookKey, Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{ModuleClassHookMetadata};
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{ModuleHookMetadata};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait};
@@ -41,6 +41,9 @@ class ContainerRegistryDeferredHookManager
 {
     use DeferredHooksTrait;
 
+    /** @var array<string, DeferredHookEntryHandler> */
+    protected array $deferredHandlers = [];
+
     /**
      * @param WPHookPlanProvider  $planProvider Plan provider used for registerIf gates.
      * @param ContainerRegistryHookTargetResolver $resolverTarget 
@@ -49,8 +52,56 @@ class ContainerRegistryDeferredHookManager
     public function __construct(
         private WPHookPlanProvider $planProvider,
         private ContainerRegistryHookTargetResolver $resolverTarget = new ContainerRegistryHookTargetResolver(),
-        private EntriesIndexer $entriesIndexer = new EntriesIndexer()
-    ) {}
+        private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
+        private readonly HookLoggerInterface $logger = new NullHookLogger()
+    ) {
+        $this->self = \WeakReference::create($this);
+    }
+
+    private ?\Closure $destroyIndexes = null {
+        get {
+            if ($this->destroyIndexes !== null) return $this->destroyIndexes;
+            $entriesIndexer = $this->entriesIndexer;
+            $logger = $this->logger;
+            return $this->destroyIndexes = static function (DeferredHookEntryHandler $entry) use ($entriesIndexer, $logger): void {
+                SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry its indexes for: ' . $entry->handler->label);
+                $entriesIndexer->removeIndexes($entry);
+            };
+        }
+    }
+
+    protected function deferredGet(string $key, ?object $owner = null): ?DeferredHookEntryHandler
+    {
+        return $this->deferredHandlers[$key] ?? null;
+    }
+
+    protected function deferredPut(string $key, DeferredHookEntryHandler $entry, ?object $owner = null): void
+    {
+        $this->deferredHandlers[$key] = $entry;
+    }
+
+    protected function deferredRemove(string $key, ?object $owner = null): void
+    {
+        unset($this->deferredHandlers[$key]);
+    }
+
+    protected function deferredCount(?object $owner = null): int
+    {
+        return \count($this->deferredHandlers);
+    }
+
+    protected function deferredEntries(?object $owner = null): array
+    {
+        return $this->deferredHandlers;
+    }
+
+    protected function afterDeferredAdded(DeferredHookEntryHandler $entry): void
+    {
+        $entriesIndexer = $this->entriesIndexer;
+        $entriesIndexer->setIndexes($entry);
+        $entry->setOnEntryRemovalCallback($this->destroyIndexes);
+    }
+
 
     /**
      * Activate all deferred handlers registered for a specific WordPress hook.
@@ -61,9 +112,9 @@ class ContainerRegistryDeferredHookManager
      *                                                             newly activated, false when the
      *                                                             handler was already active.
      */
-    public function activateDeferredByHook(string $hook, \Closure $activateEntry): void
+    public function activateDeferredByHook(string $hook, \Closure $activateEntry): int
     {
-        $this->activateMatchingDeferredEntries(
+        return $this->activateMatchingDeferredEntries(
             $this->entriesIndexer->byHook[$hook] ?? [],
             $activateEntry,
             DeferredActivationSource::Manual,
@@ -76,9 +127,9 @@ class ContainerRegistryDeferredHookManager
      * @param class-string $class Fully qualified class name.
      * @param ActivateEntry $activateEntry Registry callback (see activateDeferredByHook).
      */
-    public function activateDeferredByClass(string $class, \Closure $activateEntry): void
+    public function activateDeferredByClass(string $class, \Closure $activateEntry): int
     {
-        $this->activateMatchingDeferredEntries(
+        return $this->activateMatchingDeferredEntries(
             $this->entriesIndexer->byClass[$class] ?? [],
             $activateEntry,
             DeferredActivationSource::Manual,
@@ -117,11 +168,11 @@ class ContainerRegistryDeferredHookManager
      *
      * @throws \InvalidArgumentException If the target cannot be resolved to a valid class and member.
      */
-    public function activateDeferredByCallable(callable|string|array $target, \Closure $activateEntry): void
+    public function activateDeferredByCallable(callable|string|array $target, \Closure $activateEntry): int
     {
         $key = $this->entriesIndexer->getCallable($this->resolverTarget->resolve($target));
 
-        $this->activateMatchingDeferredEntries(
+        return $this->activateMatchingDeferredEntries(
             $this->entriesIndexer->byCallable[$key] ?? [],
             $activateEntry,
             DeferredActivationSource::Manual,
@@ -243,17 +294,20 @@ class ContainerRegistryDeferredHookManager
      *
      * @param HookTargetResolve $target
      */
-    public function unregisterDeferredByCallable(callable|string|array $target): void
+    public function unregisterDeferredByCallable(callable|string|array $target): int
     {
         $keyCallable = $this->entriesIndexer->getCallable($this->resolverTarget->resolve($target));
         $entries = $this->entriesIndexer->byCallable[$keyCallable] ?? [];
+        $count = 0;
         foreach ($entries as $key) {
             if (!isset($this->deferredHandlers[$key])) {
                 continue;
             }
             $handler = $this->deferredHandlers[$key];
             unset($this->deferredHandlers[$key]);
+            $count++;
         }
+        return $count;
     }
 
     /**
@@ -261,16 +315,19 @@ class ContainerRegistryDeferredHookManager
      *
      * @param string $hook WordPress hook name.
      */
-    public function unregisterDeferredByHook(string $hook): void
+    public function unregisterDeferredByHook(string $hook): int
     {
         $entries = $this->entriesIndexer->byHook[$hook] ?? [];
+        $count = 0;
         foreach ($entries as $key) {
             if (!isset($this->deferredHandlers[$key])) {
                 continue;
             }
             $handler = $this->deferredHandlers[$key];
             unset($this->deferredHandlers[$key]);
+            $count++;
         }
+        return $count;
     }
 
     /**
@@ -278,16 +335,19 @@ class ContainerRegistryDeferredHookManager
      *
      * @param class-string $class Fully qualified class name.
      */
-    public function unregisterDeferredByClass(string $class): void
+    public function unregisterDeferredByClass(string $class): int
     {
         $entries = $this->entriesIndexer->byClass[$class] ?? [];
+        $count = 0;
         foreach ($entries as $key) {
             if (!isset($this->deferredHandlers[$key])) {
                 continue;
             }
             $handler = $this->deferredHandlers[$key];
             unset($this->deferredHandlers[$key]);
+            $count++;
         }
+        return $count;
     }
 
     /**
@@ -299,9 +359,10 @@ class ContainerRegistryDeferredHookManager
      *
      * @param string $namespace Fully qualified namespace prefix.
      */
-    public function unregisterDeferredByNamespace(string $namespace): void
+    public function unregisterDeferredByNamespace(string $namespace): int
     {
         $entries = $this->entriesIndexer->byNamespace[$namespace] ?? [];
+        $count = 0;
         foreach ($entries as $key) {
             $handler = $this->deferredHandlers[$key] ?? null;
             if ($handler === null) {
@@ -311,7 +372,9 @@ class ContainerRegistryDeferredHookManager
                 continue;
             }
             unset($this->deferredHandlers[$key]);
+            $count++;
         }
+        return $count;
     }
 
     /**
@@ -321,11 +384,12 @@ class ContainerRegistryDeferredHookManager
      *
      * @param array<int, string> $tags Normalized tag list to unregister.
      */
-    public function unregisterDeferredByTags(array $tags): void
+    public function unregisterDeferredByTags(array $tags): int
     {
         if ($tags === []) {
-            return;
+            return 0;
         }
+        $count = 0;
         foreach ($tags as $tag) {
             $entries = $this->entriesIndexer->byTag[$tag] ?? [];
             if (empty($entries)) {
@@ -338,8 +402,10 @@ class ContainerRegistryDeferredHookManager
                     continue;
                 }
                 unset($this->deferredHandlers[$key]);
+                $count++;
             }
         }
+        return $count;
     }
 
     /**
@@ -349,19 +415,22 @@ class ContainerRegistryDeferredHookManager
      *
      * @param string $pattern Wildcard hook-name pattern (see HookPattern).
      */
-    public function unregisterDeferredByHookPattern(string $pattern): void
+    public function unregisterDeferredByHookPattern(string $pattern): int
     {
         HookPattern::assertValid($pattern);
         $hooks = $this->entriesIndexer->byHook ?? [];
+        $count = 0;
         foreach ($hooks as $hook) {
             foreach ($hook as $key) {
                 $entry = $this->deferredHandlers[$key] ?? null;
                 if (!($entry instanceof DeferredHookEntryHandler)) continue;
                 if (HookPattern::matches($entry->hook, $pattern)) {
                     unset($this->deferredHandlers[$key]);
+                    $count++;
                 }
             }
         }
+        return $count;
     }
 
     /**
@@ -372,12 +441,13 @@ class ContainerRegistryDeferredHookManager
      *
      * @param array<string> $patterns Tag wildcard patterns.
      */
-    public function unregisterDeferredByTagPattern(array $patterns): void
+    public function unregisterDeferredByTagPattern(array $patterns): int
     {
         if ($patterns === []) {
-            return;
+            return 0;
         }
         HookPattern::assertValidAll($patterns);
+        $count = 0;
         $tags = $this->entriesIndexer->byTag ?? [];
         foreach ($tags as $keys) {
             foreach ($keys as $key) {
@@ -385,9 +455,11 @@ class ContainerRegistryDeferredHookManager
                 if (!($entry instanceof DeferredHookEntryHandler)) continue;
                 if (HookPattern::matchesAny($entry->tags, $patterns)) {
                     unset($this->deferredHandlers[$key]);
+                    $count++;
                 }
             }
         }
+        return $count;
     }
 
     /**
@@ -411,23 +483,38 @@ class ContainerRegistryDeferredHookManager
         }
 
         $cb = null;
-        add_filter($triggerHook, $cb = function (mixed $value = null) use ($triggerHook, $key, $activateEntry): mixed {
-            $entry = $this->deferredHandlers[$key] ?? null;
-            if ($entry === null) {
+        $self = $this->self;
+        add_filter($triggerHook, $cb = static function (mixed $value = null) use ($triggerHook, $key, $activateEntry, $self): mixed {
+            static $dispatchDepth = 0;
+            if ($dispatchDepth > 0) return $value;
+            try {
+                $dispatchDepth++;
+
+                $self = $self->get() ?? null;
+                $entry = $self?->deferredHandlers[$key] ?? null;
+                if ($entry === null) {
+                    remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                    return $value;
+                }
+                $activated = $self->activateMatchingDeferredEntries([$key], $activateEntry, DeferredActivationSource::Scheduler);
+                if ($activated === 0) return $value;
                 remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                unset($self->deferredHandlers[$key]);
                 return $value;
+            } finally {
+                $dispatchDepth--;
             }
-            $activated = $this->activateMatchingDeferredEntries([$key], $activateEntry, DeferredActivationSource::Scheduler);
-            if ($activated === 0) return $value;
-            remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-            unset($this->deferredHandlers[$key]);
-            return $value;
         }, PHP_INT_MIN, 1);
 
-        $this->deferredHandlers[$key]->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
+        $logger = $this->logger;
+        $entriesIndexer = $this->entriesIndexer;
+        // override entry removal callback
+        $this->deferredHandlers[$key]->setOnEntryRemovalCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb, $logger, $entriesIndexer): void {
+            $entriesIndexer->removeIndexes($entry);
+            SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry its indexes for: ' . $entry->handler->label);
             if (!\has_filter($triggerHook, $cb, PHP_INT_MIN)) return;
             \remove_filter($triggerHook, $cb, PHP_INT_MIN);
-            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+            SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
         });
     }
 
@@ -446,7 +533,7 @@ class ContainerRegistryDeferredHookManager
                     $registration->class
                 );
             } catch (\RuntimeException $e) {
-                Logger::error(
+                $this->logger->error(
                     __METHOD__,
                     'Skipping hook for: ' . $entry->handler->label,
                     [
@@ -488,7 +575,7 @@ class ContainerRegistryDeferredHookManager
                 $data->key->class
             );
         } catch (\Throwable $e) {
-            Logger::error(
+            $this->logger->error(
                 __METHOD__,
                 'Skipping deferred hook activation: ' . $data->handler->label .  ' — error ' . $e->getMessage()
             );
@@ -496,7 +583,7 @@ class ContainerRegistryDeferredHookManager
         }
 
         if (!$allowed) {
-            Logger::info(
+            $this->logger->info(
                 __METHOD__,
                 'Skipping deferred hook activation: ' . $data->handler->label .  ' — registerIf gate returned false.'
             );

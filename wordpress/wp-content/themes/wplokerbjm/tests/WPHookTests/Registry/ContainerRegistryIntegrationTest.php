@@ -37,7 +37,7 @@ final class ContainerRegistryIntegrationTest extends WplokerbjmTestCase
     private function createScanner(): WPHooksScanner
     {
         return new WPHooksScanner(
-            $this->testRobotLoader->getIndexedClasses(),
+            fn () => array_keys($this->testRobotLoader->getIndexedClasses()),
             new WPHookPlanProvider($this->container()),
             self::$NAMESPACE,
             '',

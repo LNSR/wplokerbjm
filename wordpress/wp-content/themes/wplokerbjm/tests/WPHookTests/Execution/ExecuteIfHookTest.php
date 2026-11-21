@@ -200,7 +200,8 @@ class ExecuteIfHookTest extends WplokerbjmTestCase
         $registry = $this->container->make(WPHooksInstanceRegistry::class, [
             'provider' => new WPHookPlanProvider($this->container())
         ]);
-        $registry->registerHooksOn(new RuntimeExecuteIfService());
+        $instance = new RuntimeExecuteIfService();
+        $registry->registerHooksOn($instance);
 
         $this->assertNotNull(
             $this->findRegisteredHook('action', 'runtime_executeIf_action'),

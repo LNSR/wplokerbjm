@@ -24,7 +24,8 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  *  - `QueuedHooksCleaner` once-entry tracking,
  *  - `EntriesIndexer` hook/class/callable/namespace/tag buckets,
  *  - and the `onUnregisterDo` side effect.
-  ** Note: No explicit \gc_collect_cycles() called. Circular reference may goes unnoticed.
+ ** Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed.
+ * 
  */
 final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
 {
@@ -40,7 +41,6 @@ final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
         $indexer = $this->privateValue($registry, 'entriesIndexer');
 
         self::assertCount(3, $this->privateValue($registry, 'handlers'));
-        self::assertCount(1, $this->privateValue($this->queuedHooksCleaner, 'entries'), 'the once entry is tracked by the cleaner');
         self::assertArrayHasKey('external_hook', $indexer->byHook);
 
         $hook = $this->findRegisteredHook('action', 'external_hook');
@@ -53,7 +53,6 @@ final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
         self::assertNull($reference->get(), 'WordPress must be the sole strong owner of active invokers');
         self::assertSame([], $this->privateValue($registry, 'handlers'));
         self::assertCount(0, $this->privateValue($registry, 'entriesByInvokers'));
-        self::assertCount(0, $this->privateValue($this->queuedHooksCleaner, 'entries'));
         self::assertSame([], $indexer->byHook);
         self::assertSame([], $indexer->byClass);
         self::assertSame([], $indexer->byCallable);
@@ -104,6 +103,40 @@ final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
         self::assertSame(1, $cleanups, 'external removal must run the cleanup exactly once');
     }
 
+    public function testUnsetContainerRegistryRemoveWordpressBookkeeping(): void
+    {
+        $registry = $this->createRegistry([
+            $this->registration('external_cleanup', 'onAlpha', 10)
+        ]);
+        $registerRef = \WeakReference::create($registry);
+        $registry->initialize();
+        self::assertNotNull($this->findRegisteredHook('action', 'external_cleanup'), 'the registry must register all hook when initialized');
+        unset($registry);
+        self::assertNull($registerRef->get(), 'the registry reference must be null');
+        self::assertNull($this->findRegisteredHook('action', 'external_cleanup'), 'the registry must unregister all hooks when unset');
+    }
+    public function testUnsetInstanceRegistryRemoveWordpressBookkeeping(): void
+    {
+        $service = new class {
+            public int $runs = 0;
+
+            #[Action('external_instance_hook', 10)]
+            #[Action('external_instance_hook', 20)]
+            public function onHook(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $registry = $this->instanceRegistry();
+        $registerRef = \WeakReference::create($registry);
+        $registry->registerHooksOn($service);
+        self::assertNotNull($this->findRegisteredHook('action', 'external_instance_hook'), 'the registry must register all hook in instance');
+        unset($registry);
+        self::assertNull($registerRef->get(), 'the registry reference must be null');
+        self::assertNull($this->findRegisteredHook('action', 'external_instance_hook'), 'the registry must unregister all hooks when unset');
+    }
+
     public function testRemoveAllActionsCleansInstanceRegistryBookkeeping(): void
     {
         $service = new class {
@@ -133,7 +166,6 @@ final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
         self::assertNull($reference->get());
         self::assertSame([], $this->privateValue($registry, 'weakRegistry')[$service] ?? []);
         self::assertCount(0, $this->privateValue($registry, 'entriesByInvokers'));
-        self::assertCount(0, $this->privateValue($this->queuedHooksCleaner, 'entries'));
 
         // Idempotent: the owner has no records left to release.
         $registry->unregisterHooksOn($service);
@@ -162,6 +194,41 @@ final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
 
         self::assertSame([], $this->privateValue($registry, 'weakRegistry')[$service] ?? []);
         self::assertCount(0, $this->privateValue($registry, 'entriesByInvokers'));
+    }
+
+    public function testOwnerGoneCleanInstanceRegistryBookkeeping(): void
+    { {
+            $service = new class {
+                public int $runs = 0;
+
+                #[Action('external_instance_hook', 10)]
+                #[Action('external_instance_hook', 20)]
+                public function onHook(): void
+                {
+                    $this->runs++;
+                }
+                #[Action('external_instance_hook_1', 10)]
+                #[Action('external_instance_hook_1', 20)]
+                public function onHook1(): void
+                {
+                    $this->runs++;
+                }
+            };
+
+            $registry = $this->instanceRegistry();
+            $registry->registerHooksOn($service);
+
+            self::assertCount(4, $this->privateValue($registry, 'weakRegistry')[$service] ?? []);
+            self::assertCount(4, $this->privateValue($registry, 'entriesByInvokers'));
+
+            self::assertNotNull($this->findRegisteredHook('action', 'external_instance_hook'));
+
+            unset($service);
+
+            self::assertNull($this->findRegisteredHook('action', 'external_instance_hook'));
+            self::assertCount(0, $this->privateValue($registry, 'weakRegistry'));
+            self::assertCount(0, $this->privateValue($registry, 'entriesByInvokers'));
+        }
     }
 
     // ── helpers ─────────────────────────────────────────────────────

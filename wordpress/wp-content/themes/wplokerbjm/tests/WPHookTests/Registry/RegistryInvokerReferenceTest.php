@@ -25,7 +25,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  * If any of these regress, the registry starts leaking invokers (and their
  * destructor-driven cleanup never runs).
  *
- ** Note: No explicit \gc_collect_cycles() called. Circular reference may goes unnoticed.
+ * @Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed.
  * ! Foundation for OnUnregisterDo tests relevancy
  */
 final class RegistryInvokerReferenceTest extends WplokerbjmTestCase

@@ -3,7 +3,7 @@
 namespace WPLokerBJM\Core\Wordpress\Plugins;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
@@ -106,13 +106,13 @@ class PluginManager
     {
         do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
 
-        $activeCount = $this->unregisterInactivePluginHooks();
+        $activeCount = self::unregisterInactivePluginHooks();
         if ($activeCount === 0) {
             do_action(WPHooksContainerRegistry::UNREGISTER_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
             do_action(WPHooksContainerRegistry::UNREGISTER_DEFERRED_BY_NAMESPACE, __NAMESPACE__ . '\\ThirdParty');
             return;
         }
-        do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CLASS, self::class);
+        do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CLASS, $this);
         do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $this->pluginEnvironmentCheck);
     }
 
@@ -121,7 +121,7 @@ class PluginManager
      * whose underlying WordPress plugins are inactive.
      * @return int number of active plugins
      */
-    private function unregisterInactivePluginHooks(): int
+    private static function unregisterInactivePluginHooks(): int
     {
         $activeCount = 0;
         foreach (self::THIRD_PARTY_INTEGRATIONS as $integrationClass) {
@@ -136,6 +136,7 @@ class PluginManager
         }
         return $activeCount;
     }
+    
     /**
      * Remove the "Deactivate" action link for required plugins.
      */
@@ -244,9 +245,9 @@ class PluginManager
      * activation hooks steps
      * @var class@anonymous::class
      */
-    private ?ModuleClassHookMetadata $pluginEnvironmentCheck {
+    private ?ModuleHookMetadata $pluginEnvironmentCheck {
         get {
-            return $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+            return $this->pluginEnvironmentCheck ??= new class(__CLASS__, __PROPERTY__) extends ModuleHookMetadata {
                 /**
                  * Temporarily disable specific plugins if in development environment.
                  */

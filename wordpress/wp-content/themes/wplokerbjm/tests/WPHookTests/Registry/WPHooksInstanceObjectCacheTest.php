@@ -47,10 +47,10 @@ class WPHooksInstanceObjectCacheTest extends WplokerbjmTestCase
         }
     }
 
-    private function sampleMetadata(): InstanceHookMetadata
+    private function sampleMetadata(string|\Closure $hook = 'my_hook'): InstanceHookMetadata
     {
         return new InstanceHookMetadata(
-            hook: 'my_hook',
+            hook: $hook,
             type: 'action',
             priority: 10,
             acceptedArgs: 1,
@@ -126,6 +126,53 @@ class WPHooksInstanceObjectCacheTest extends WplokerbjmTestCase
         $this->assertSame([$meta], $cache->get('Service', 'prop'));
         $this->assertNull($cache->get('Service', 'other'));
         $this->assertNull($cache->get('OtherService', 'prop'));
+    }
+
+    public function testNamedClassSetGetRoundTrip(): void
+    {
+        $cache = new WPHooksInstanceObjectCache($this->file);
+        $metadata = $this->sampleMetadata('named_hook');
+
+        $cache->setNamedClass('NamedService', [$metadata]);
+
+        $this->assertSame([$metadata], $cache->getNamedClass('NamedService'));
+        $this->assertNull($cache->getNamedClass('OtherService'));
+    }
+
+    public function testNamedClassAndModuleSiteCoexistAfterFlush(): void
+    {
+        $cache = new WPHooksInstanceObjectCache($this->file);
+        $cache->set('Service', 'prop', [$this->sampleMetadata('module_hook')]);
+        $cache->setNamedClass('Service', [$this->sampleMetadata('named_hook')]);
+
+        $cache->flush();
+
+        $fresh = new WPHooksInstanceObjectCache($this->file);
+        $moduleEntries = $fresh->get('Service', 'prop');
+        $namedEntries = $fresh->getNamedClass('Service');
+
+        $this->assertIsArray($moduleEntries);
+        $this->assertIsArray($namedEntries);
+        $this->assertSame('module_hook', $moduleEntries[0]->hook);
+        $this->assertSame('named_hook', $namedEntries[0]->hook);
+    }
+
+    public function testClosureHookRoundTripsThroughCache(): void
+    {
+        $cache = new WPHooksInstanceObjectCache($this->file);
+        $cache->set('Service', 'prop', [
+            $this->sampleMetadata(static fn(): string => 'closure_hook'),
+        ]);
+
+        $cache->flush();
+
+        $fresh = new WPHooksInstanceObjectCache($this->file);
+        $entries = $fresh->get('Service', 'prop');
+
+        $this->assertIsArray($entries);
+        $this->assertCount(1, $entries);
+        $this->assertInstanceOf(\Closure::class, $entries[0]->hook);
+        $this->assertSame('closure_hook', ($entries[0]->hook)());
     }
 
     public function testFlushWritesFileAndLoadRoundTrips(): void

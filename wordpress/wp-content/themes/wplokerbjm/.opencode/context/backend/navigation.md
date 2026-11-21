@@ -1,4 +1,4 @@
-<!-- Context: backend/nav | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+<!-- Context: backend/nav | Priority: high | Version: 1.2 | Updated: 2026-11-28 -->
 
 # Backend Context Navigation
 
@@ -16,6 +16,7 @@ backend/
 │   ├── hook-system.md
 │   ├── hook-provider-layer.md
 │   ├── wphooks-architecture.md
+│   ├── container-lifetimes.md
 │   ├── autoloading.md
 │   └── caching.md
 ├── examples/
@@ -47,7 +48,8 @@ backend/
 | `concepts/architecture.md` | DI container, bootstrap, directory layout | critical |
 | `concepts/hook-system.md` | Attribute-driven hooks, scanner, registry | critical |
 | `concepts/hook-provider-layer.md` | Plan core for gates, dynamic names, tag closures | high |
-| `concepts/wphooks-architecture.md` | Scanner, plans, lazy/runtime registries, invokers | high |
+| `concepts/wphooks-architecture.md` | Scanner, plans, unified invoker, registries, logger, owner-scoped deferred pools | high |
+| `concepts/container-lifetimes.md` | Container `get()` lifetime contract and closure-DI warnings | high |
 | `concepts/autoloading.md` | Nette RobotLoader integration | high |
 | `concepts/caching.md` | Redis cache, Cloudflare purge, keys | high |
 
@@ -69,9 +71,9 @@ backend/
 ### Lookup
 | File | Description | Priority |
 |------|-------------|----------|
-| `lookup/namespaces.md` | All namespaces map (33 namespaces) | high |
+| `lookup/namespaces.md` | All namespaces map (72 namespaces) | high |
 | `lookup/hooks.md` | Registered actions + filters | high |
-| `lookup/wphooks-api.md` | WPHooks classes, selectors, invokers, utilities | high |
+| `lookup/wphooks-api.md` | WPHooks classes, selectors, unified invoker, logger, utilities | high |
 | `lookup/dependencies.md` | Composer packages | medium |
 
 ### Errors

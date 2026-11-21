@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
-use AvailaibleHandlerType;
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveDebugPhase;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     LiveUnregistrationPhase,
@@ -14,12 +15,10 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{
     RuntimeRegistryHandlerEntry,
     ContainerRegistryHandlerEntry,
-    WPHooksInstanceRegistry
 };
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 
 /**
  * @mixin ContainerRegistryHandlerEntry&RuntimeRegistryHandlerEntry
@@ -37,14 +36,16 @@ trait HandlerEntryTrait
     public readonly string $invokerLabel;
     public private(set) int $unregistrationFailureCount = 0;
     public private(set) bool $registered = false;
+    /** @var ?\Closure(static $entry): void */
+    private ?\Closure $onEntryRemoval = null;
 
     /**
      * Automatically unregister handler when this entry have 0 reference, useful for @see WPHooksInstanceRegistry.
      */
     public function __destruct()
     {
-        if (!$this->registered) return;
-        $this->unregister(UnregistrationSource::Destructor);
+        \is_callable($this->onEntryRemoval) && ($this->onEntryRemoval)($this);
+        if (isset($this->onEntryRemoval)) unset($this->onEntryRemoval);
     }
 
     public function register(): static
@@ -58,7 +59,7 @@ trait HandlerEntryTrait
         try {
             $this->handler->initOnUnregisterDoCallback();
         } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'Failed to prepare onUnregisterDo for ', [
+            $this->logger->error(__METHOD__, 'Failed to prepare onUnregisterDo for ', [
                 'invokerLabel' => $this->handler->label,
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
@@ -66,7 +67,7 @@ trait HandlerEntryTrait
                 'line' => $e->getLine(),
             ]);
         }
-        $this->handler->emitLiveDebug(\WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveDebugPhase::Registered);
+        $this->handler->emitLiveDebug(LiveDebugPhase::Registered);
         return $this;
     }
 
@@ -92,10 +93,10 @@ trait HandlerEntryTrait
             ));
             return false;
         }
-
+        $handler = $this->handler;
         $result = match ($this->type) {
-            'action' => remove_action($this->hook, $this->handler, $this->priority),
-            'filter' => remove_filter($this->hook, $this->handler, $this->priority),
+            'action' => remove_action($this->hook, $handler, $this->priority),
+            'filter' => remove_filter($this->hook, $handler, $this->priority),
         };
 
         $elapsedUs = (int) ((\hrtime(true) - $startedAt) / 1000);
@@ -114,7 +115,7 @@ trait HandlerEntryTrait
         }
 
         $this->registered = false;
-        if (is_callable($this->handler?->onUnregisterDoCallback ?? null)) ($this->handler->onUnregisterDoCallback)();
+        if (is_callable($handler?->onUnregisterDoCallback ?? null)) ($handler->onUnregisterDoCallback)();
 
         $this->emitUnregistration(LiveUnregistrationPhase::Unregistered, new LiveUnregistrationResultDTO(
             requestedBy: $requestedBy,
@@ -123,7 +124,6 @@ trait HandlerEntryTrait
             stillDispatching: $this->stillDispatchingSameHook(),
             elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
         ));
-
         return $result;
     }
 
@@ -138,7 +138,7 @@ trait HandlerEntryTrait
 
     public function isCurrentlyExecuting(): bool
     {
-        return $this->handler?->dispatching ?? false;
+        return ($this->handler?->dispatchDepth ?? 0) >= 1;
     }
 
     public function hasCallbackRegisteredOnWordpress(): bool
@@ -148,6 +148,12 @@ trait HandlerEntryTrait
             'action' => has_action($this->hook, $this->handler, $this->priority),
             'filter' => has_filter($this->hook, $this->handler, $this->priority),
         };
+    }
+
+    /** @param \Closure(static): void $callback */
+    public function setOnEntryRemovalCallback(\Closure $callback): void
+    {
+        $this->onEntryRemoval = $callback;
     }
 
     /**

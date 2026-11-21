@@ -1,9 +1,9 @@
-<!-- Context: backend/lookup | Priority: high | Version: 1.1 | Updated: 2026-11-18 -->
+<!-- Context: backend/lookup | Priority: high | Version: 1.2 | Updated: 2026-11-27 -->
 
 # Lookup: Namespaces
 
-**Purpose**: Quick reference for all 62 PSR-4 namespaces under `WPLokerBJM\`
-**Last Updated**: 2026-11-18
+**Purpose**: Quick reference for all 72 PSR-4 namespaces under `WPLokerBJM\`
+**Last Updated**: 2026-11-27
 
 ## Full Namespace Map
 
@@ -20,13 +20,23 @@ Generated from `grep -h '^namespace ' server/**/*.php`. Directory column is the 
 | `Core\Container\Support\InstanceDiscovery\Abstract\` | `server/Core/Container/Support/InstanceDiscovery/Abstract/` | Core/Container/Support/InstanceDiscovery/Abstract |
 | `Core\Container\Support\WPHooks\` | `server/Core/Container/Support/WPHooks/` | Core/Container/Support/WPHooks |
 | `Core\Container\Support\WPHooks\Abstract\` | `server/Core/Container/Support/WPHooks/Abstract/` | Core/Container/Support/WPHooks/Abstract |
+| `Core\Container\Support\WPHooks\Attributes\` | `server/Core/Container/Support/WPHooks/Attributes/` | Core/Container/Support/WPHooks/Attributes |
+| `Core\Container\Support\WPHooks\Debug\` | `server/Core/Container/Support/WPHooks/Debug/` | Core/Container/Support/WPHooks/Debug |
+| `Core\Container\Support\WPHooks\Exceptions\` | `server/Core/Container/Support/WPHooks/Exceptions/` | Core/Container/Support/WPHooks/Exceptions |
 | `Core\Container\Support\WPHooks\Indexers\` | `server/Core/Container/Support/WPHooks/Indexers/` | Core/Container/Support/WPHooks/Indexers |
 | `Core\Container\Support\WPHooks\Invoker\` | `server/Core/Container/Support/WPHooks/Invoker/` | Core/Container/Support/WPHooks/Invoker |
+| `Core\Container\Support\WPHooks\Invoker\Target\` | `server/Core/Container/Support/WPHooks/Invoker/Target/` | Core/Container/Support/WPHooks/Invoker/Target |
 | `Core\Container\Support\WPHooks\Janitor\` | `server/Core/Container/Support/WPHooks/Janitor/` | Core/Container/Support/WPHooks/Janitor |
+| `Core\Container\Support\WPHooks\Logger\` | `server/Core/Container/Support/WPHooks/Logger/` | Core/Container/Support/WPHooks/Logger |
+| `Core\Container\Support\WPHooks\Plan\` | `server/Core/Container/Support/WPHooks/Plan/` | Core/Container/Support/WPHooks/Plan |
 | `Core\Container\Support\WPHooks\Provider\` | `server/Core/Container/Support/WPHooks/Provider/` | Core/Container/Support/WPHooks/Provider |
+| `Core\Container\Support\WPHooks\Registrations\` | `server/Core/Container/Support/WPHooks/Registrations/` | Core/Container/Support/WPHooks/Registrations |
 | `Core\Container\Support\WPHooks\Registry\` | `server/Core/Container/Support/WPHooks/Registry/` | Core/Container/Support/WPHooks/Registry |
 | `Core\Container\Support\WPHooks\Registry\DeferredManager\` | `server/Core/Container/Support/WPHooks/Registry/DeferredManager/` | Core/Container/Support/WPHooks/Registry/DeferredManager |
+| `Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\` | `server/Core/Container/Support/WPHooks/Registry/DeferredManager/Handlers/` | Core/Container/Support/WPHooks/Registry/DeferredManager/Handlers |
+| `Core\Container\Support\WPHooks\Registry\Handlers\` | `server/Core/Container/Support/WPHooks/Registry/Handlers/` | Core/Container/Support/WPHooks/Registry/Handlers |
 | `Core\Container\Support\WPHooks\Registry\Resolver\` | `server/Core/Container/Support/WPHooks/Registry/Resolver/` | Core/Container/Support/WPHooks/Registry/Resolver |
+| `Core\Container\Support\WPHooks\Resolution\` | `server/Core/Container/Support/WPHooks/Resolution/` | Core/Container/Support/WPHooks/Resolution |
 | `Core\Container\Support\WPHooks\Trait\` | `server/Core/Container/Support/WPHooks/Trait/` | Core/Container/Support/WPHooks/Trait |
 | `Core\Container\Support\WPHooks\Utilities\` | `server/Core/Container/Support/WPHooks/Utilities/` | Core/Container/Support/WPHooks/Utilities |
 | `Core\Redirect\` | `server/Core/Wordpress/Redirect/` | Core/Wordpress/Redirect |

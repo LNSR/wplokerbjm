@@ -14,8 +14,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  * Pins the `onUnregisterDo` lifecycle on the container registry path:
  * the cleanup side effect is released exactly once, lazily, and can never
  * abort registration, dispatch or the destructor.
- ** Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed.
- *
+ * @Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed. *
  * @see \WPLokerBJM\Core\Container\Attributes\BaseHookAttribute::$onUnregisterDo
  */
 final class OnUnregisterDoContainerRegistryTest extends WplokerbjmTestCase
@@ -273,7 +272,7 @@ final class OnUnregisterDoContainerRegistryTest extends WplokerbjmTestCase
                 },
             ]),
         ]);
-        
+
         $registry->initialize();
 
         $hook = $this->findRegisteredHook('action', 'on_unregister_hook');

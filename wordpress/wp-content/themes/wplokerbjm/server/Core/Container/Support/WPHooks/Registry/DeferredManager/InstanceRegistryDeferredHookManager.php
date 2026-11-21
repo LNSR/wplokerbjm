@@ -8,17 +8,13 @@ use ActivateRuntimeEntry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{
     WPHooksInstanceRegistry,
 };
-use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\RuntimeRegistryHandlerEntry;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler;
-
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\DeferredActivationSource;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Shared\Log\Logger;
-use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
-use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
+use WPLokerBJM\Core\Container\Support\WPHooks\Trait\DeferredHooksTrait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
 
 /**
@@ -28,11 +24,62 @@ class InstanceRegistryDeferredHookManager
 {
     use DeferredHooksTrait;
 
+    /** @var \WeakMap<object, array<string, DeferredHookEntryHandler>> */
+    protected \WeakMap $deferredHandlers;
+
     public function __construct(
         private WPHookPlanProvider $provider,
         private InstanceRegistryRuntimeHookResolver $runtimeResolver = new InstanceRegistryRuntimeHookResolver(),
-        private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
-    ) {}
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
+    ) {
+        $this->deferredHandlers = new \WeakMap();
+        $this->self = \WeakReference::create($this);
+    }
+
+    protected function deferredGet(string $key, ?object $owner = null): ?DeferredHookEntryHandler
+    {
+        if ($owner === null || !isset($this->deferredHandlers[$owner])) return null;
+
+        return $this->deferredHandlers[$owner][$key] ?? null;
+    }
+
+    protected function deferredPut(string $key, DeferredHookEntryHandler $entry, ?object $owner = null): void
+    {
+        if ($owner === null) return;
+
+        $bucket = isset($this->deferredHandlers[$owner]) ? $this->deferredHandlers[$owner] : [];
+        $bucket[$key] = $entry;
+        $this->deferredHandlers[$owner] = $bucket;
+    }
+
+    protected function deferredRemove(string $key, ?object $owner = null): void
+    {
+        if ($owner === null || !isset($this->deferredHandlers[$owner])) return;
+
+        $bucket = $this->deferredHandlers[$owner];
+        unset($bucket[$key]);
+
+        if ($bucket === []) {
+            unset($this->deferredHandlers[$owner]);
+            return;
+        }
+
+        $this->deferredHandlers[$owner] = $bucket;
+    }
+
+    protected function deferredCount(?object $owner = null): int
+    {
+        if ($owner === null || !isset($this->deferredHandlers[$owner])) return 0;
+
+        return \count($this->deferredHandlers[$owner]);
+    }
+
+    protected function deferredEntries(?object $owner = null): array
+    {
+        if ($owner === null || !isset($this->deferredHandlers[$owner])) return [];
+
+        return $this->deferredHandlers[$owner];
+    }
 
     /**
      * Remove deferred entries for one callable target of a live instance.
@@ -43,15 +90,21 @@ class InstanceRegistryDeferredHookManager
      */
     public function unregisterInstanceCallableDeferredEntries(object $instance, string $targetName): int
     {
-        $before = \count($this->deferredHandlers);
+        $before = $this->deferredCount($instance);
+        $keys = [];
+
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
+            if (!$this->runtimeResolver->matchesCallableTarget($entry->key, $targetName)) continue;
+            $keys[] = $key;
+        }
 
         $this->unregisterMatchingDeferredEntries(
-            $this->entriesIndexer->byClass[(string) \spl_object_id($instance)] ?? [],
-            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance
-                && $this->runtimeResolver->matchesCallableTarget($data->key, $targetName),
+            $keys,
+            static fn(DeferredHookEntryHandler $data): bool => true,
+            $instance,
         );
 
-        return $before - \count($this->deferredHandlers);
+        return $before - $this->deferredCount($instance);
     }
 
     /**
@@ -68,42 +121,40 @@ class InstanceRegistryDeferredHookManager
     public function activateInstanceCallableDeferredEntries(object $instance, string $targetName, callable $activateEntry): int
     {
         $keys = [];
-        $instanceId = (string) \spl_object_id($instance);
 
-        foreach ($this->entriesIndexer->byClass[$instanceId] ?? [] as $key) {
-            $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
-            if ($entry === null) continue;
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
             if (!$this->runtimeResolver->matchesCallableTarget($entry->key, $targetName)) continue;
-            $keys[$key] = $key;
+            $keys[] = $key;
         }
 
-        return $this->activateMatchingDeferredEntries(array_values($keys), $activateEntry, DeferredActivationSource::Manual);
+        return $this->activateMatchingDeferredEntries(
+            $keys,
+            $activateEntry,
+            DeferredActivationSource::Manual,
+            $instance,
+        );
     }
 
     /**
      * Activate every deferred entry owned by one live instance (all members).
      *
      * "Class-scoped" on the runtime path means the registration site of the
-     * given live object: runtime ownership is per instance (`spl_object_id`),
-     * so sibling instances of the same class stay untouched. Entries are
-     * re-gated through {@see gateDeferredActivation()} immediately before
-     * activation; a rejecting `registerIf` keeps them parked.
+     * given live object: runtime ownership is per instance, so sibling
+     * instances of the same class stay untouched. Entries are re-gated through
+     * {@see gateDeferredActivation()} immediately before activation; a
+     * rejecting `registerIf` keeps them parked.
      *
      * @param ActivateRuntimeEntry $activateEntry
      * @return int Number of newly activated entries.
      */
     public function activateInstanceClassDeferredEntries(object $instance, callable $activateEntry): int
     {
-        $keys = [];
-        $instanceId = (string) \spl_object_id($instance);
-
-        foreach ($this->entriesIndexer->byClass[$instanceId] ?? [] as $key) {
-            $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
-            if ($entry === null) continue;
-            $keys[$key] = $key;
-        }
-
-        return $this->activateMatchingDeferredEntries(array_values($keys), $activateEntry, DeferredActivationSource::Manual);
+        return $this->activateMatchingDeferredEntries(
+            \array_keys($this->ownedEntries($instance)),
+            $activateEntry,
+            DeferredActivationSource::Manual,
+            $instance,
+        );
     }
 
     /**
@@ -117,21 +168,23 @@ class InstanceRegistryDeferredHookManager
      */
     public function unregisterInstanceClassDeferredEntries(object $instance): int
     {
-        $before = \count($this->deferredHandlers);
+        $before = $this->deferredCount($instance);
+        $keys = \array_keys($this->ownedEntries($instance));
 
         $this->unregisterMatchingDeferredEntries(
-            $this->entriesIndexer->byClass[(string) \spl_object_id($instance)] ?? [],
-            static fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+            $keys,
+            static fn(DeferredHookEntryHandler $data): bool => true,
+            $instance,
         );
 
-        return $before - \count($this->deferredHandlers);
+        return $before - $this->deferredCount($instance);
     }
 
     /**
      * Activate deferred entries owned by one live instance for a specific
      * WordPress hook name.
      *
-     * The owner filter keeps sibling instances deferred even when they expose
+     * The owner bucket keeps sibling instances deferred even when they expose
      * the same hook. Entries are re-gated through
      * {@see gateDeferredActivation()} immediately before activation.
      *
@@ -142,16 +195,16 @@ class InstanceRegistryDeferredHookManager
     {
         $keys = [];
 
-        foreach ($this->entriesIndexer->byHook[$hook] ?? [] as $key) {
-            $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
-            if ($entry === null) continue;
-            $keys[$key] = $key;
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
+            if ($entry->hook !== $hook) continue;
+            $keys[] = $key;
         }
 
         return $this->activateMatchingDeferredEntries(
-            array_values($keys),
+            $keys,
             $activateEntry,
             DeferredActivationSource::Manual,
+            $instance,
         );
     }
 
@@ -165,14 +218,21 @@ class InstanceRegistryDeferredHookManager
      */
     public function unregisterInstanceHookDeferredEntries(object $instance, string $hook): int
     {
-        $before = \count($this->deferredHandlers);
+        $before = $this->deferredCount($instance);
+        $keys = [];
+
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
+            if ($entry->hook !== $hook) continue;
+            $keys[] = $key;
+        }
 
         $this->unregisterMatchingDeferredEntries(
-            $this->entriesIndexer->byHook[$hook] ?? [],
-            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+            $keys,
+            static fn(DeferredHookEntryHandler $data): bool => true,
+            $instance,
         );
 
-        return $before - \count($this->deferredHandlers);
+        return $before - $this->deferredCount($instance);
     }
 
     /**
@@ -185,23 +245,18 @@ class InstanceRegistryDeferredHookManager
     public function activateInstanceHookPatternDeferredEntries(object $instance, string $pattern, callable $activateEntry): int
     {
         HookPattern::assertValid($pattern);
-
         $keys = [];
 
-        foreach ($this->entriesIndexer->byHook as $hook => $hookKeys) {
-            if (!HookPattern::matches($hook, $pattern)) continue;
-
-            foreach ($hookKeys as $key) {
-                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
-                if ($entry === null) continue;
-                $keys[$key] = $key;
-            }
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
+            if (!HookPattern::matches($entry->hook, $pattern)) continue;
+            $keys[] = $key;
         }
 
         return $this->activateMatchingDeferredEntries(
-            array_values($keys),
+            $keys,
             $activateEntry,
             DeferredActivationSource::Manual,
+            $instance,
         );
     }
 
@@ -214,27 +269,21 @@ class InstanceRegistryDeferredHookManager
     public function unregisterInstanceHookPatternDeferredEntries(object $instance, string $pattern): int
     {
         HookPattern::assertValid($pattern);
-
+        $before = $this->deferredCount($instance);
         $keys = [];
 
-        foreach ($this->entriesIndexer->byHook as $hook => $hookKeys) {
-            if (!HookPattern::matches($hook, $pattern)) continue;
-
-            foreach ($hookKeys as $key) {
-                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
-                if ($entry === null) continue;
-                $keys[$key] = $key;
-            }
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
+            if (!HookPattern::matches($entry->hook, $pattern)) continue;
+            $keys[] = $key;
         }
 
-        $before = \count($this->deferredHandlers);
-
         $this->unregisterMatchingDeferredEntries(
-            array_values($keys),
-            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+            $keys,
+            static fn(DeferredHookEntryHandler $data): bool => true,
+            $instance,
         );
 
-        return $before - \count($this->deferredHandlers);
+        return $before - $this->deferredCount($instance);
     }
 
     /**
@@ -252,18 +301,16 @@ class InstanceRegistryDeferredHookManager
 
         $keys = [];
 
-        foreach ($tags as $tag) {
-            foreach ($this->entriesIndexer->byTag[$tag] ?? [] as $key) {
-                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
-                if ($entry === null) continue;
-                $keys[$key] = $key;
-            }
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
+            if (\array_intersect($tags, (array) ($entry->tags ?? [])) === []) continue;
+            $keys[] = $key;
         }
 
         return $this->activateMatchingDeferredEntries(
-            array_values($keys),
+            $keys,
             $activateEntry,
             DeferredActivationSource::Manual,
+            $instance,
         );
     }
 
@@ -279,24 +326,21 @@ class InstanceRegistryDeferredHookManager
         $tags = HookTagUtilities::normalizeTags($tags);
         if ($tags === []) return 0;
 
+        $before = $this->deferredCount($instance);
         $keys = [];
 
-        foreach ($tags as $tag) {
-            foreach ($this->entriesIndexer->byTag[$tag] ?? [] as $key) {
-                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
-                if ($entry === null) continue;
-                $keys[$key] = $key;
-            }
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
+            if (\array_intersect($tags, (array) ($entry->tags ?? [])) === []) continue;
+            $keys[] = $key;
         }
 
-        $before = \count($this->deferredHandlers);
-
         $this->unregisterMatchingDeferredEntries(
-            array_values($keys),
-            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+            $keys,
+            static fn(DeferredHookEntryHandler $data): bool => true,
+            $instance,
         );
 
-        return $before - \count($this->deferredHandlers);
+        return $before - $this->deferredCount($instance);
     }
 
     /**
@@ -314,21 +358,16 @@ class InstanceRegistryDeferredHookManager
 
         $keys = [];
 
-        foreach ($this->entriesIndexer->byTag as $tag => $tagKeys) {
-            if (!HookPattern::matchesAny([$tag], $patterns)) continue;
-
-            foreach ($tagKeys as $key) {
-                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
-                if ($entry === null) continue;
-                if (!HookPattern::matchesAny((array) ($entry->tags ?? []), $patterns)) continue;
-                $keys[$key] = $key;
-            }
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
+            if (!HookPattern::matchesAny((array) ($entry->tags ?? []), $patterns)) continue;
+            $keys[] = $key;
         }
 
         return $this->activateMatchingDeferredEntries(
-            array_values($keys),
+            $keys,
             $activateEntry,
             DeferredActivationSource::Manual,
+            $instance,
         );
     }
 
@@ -344,34 +383,29 @@ class InstanceRegistryDeferredHookManager
         if ($patterns === []) return 0;
         HookPattern::assertValidAll($patterns);
 
+        $before = $this->deferredCount($instance);
         $keys = [];
 
-        foreach ($this->entriesIndexer->byTag as $tag => $tagKeys) {
-            if (!HookPattern::matchesAny([$tag], $patterns)) continue;
-
-            foreach ($tagKeys as $key) {
-                $entry = $this->resolveLiveInstanceDeferredEntry($key, $instance);
-                if ($entry === null) continue;
-                if (!HookPattern::matchesAny((array) ($entry->tags ?? []), $patterns)) continue;
-                $keys[$key] = $key;
-            }
+        foreach ($this->ownedEntries($instance) as $key => $entry) {
+            if (!HookPattern::matchesAny((array) ($entry->tags ?? []), $patterns)) continue;
+            $keys[] = $key;
         }
 
-        $before = \count($this->deferredHandlers);
-
         $this->unregisterMatchingDeferredEntries(
-            array_values($keys),
-            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+            $keys,
+            static fn(DeferredHookEntryHandler $data): bool => true,
+            $instance,
         );
 
-        return $before - \count($this->deferredHandlers);
+        return $before - $this->deferredCount($instance);
     }
 
     /**
      * Register a deferRegisterUntilHook entry on the runtime path: the handler
-     * is held in the deferred pool until the trigger hook fires, then activated
-     * automatically — no manual activation API. The trigger listener is a
-     * filter callback, so apply_filters() keeps its value during activation.
+     * is held in the owner's deferred bucket until the trigger hook fires, then
+     * activated automatically. The trigger listener is a filter callback, so
+     * apply_filters() keeps its value during activation.
+     *
      * @param string|\Closure|null $deferRegisterUntilHook Trigger hook name or closure resolving to one.
      * @param ActivateRuntimeEntry $activateEntry
      */
@@ -380,9 +414,17 @@ class InstanceRegistryDeferredHookManager
         DeferredHookEntryHandler $entry,
         callable $activateEntry
     ): void {
+        $owner = $entry->instance?->get();
+        if ($owner === null) return;
+
         $triggerHook = $deferRegisterUntilHook;
         if ($triggerHook instanceof \Closure) {
-            $triggerHook = $this->provider->resolveHookName($triggerHook, $this->provider->buildCallablePlan($triggerHook), 'manual', $entry->instance?->get() ?? null);
+            $triggerHook = $this->provider->resolveHookName(
+                $triggerHook,
+                $this->provider->buildCallablePlan($triggerHook),
+                'manual',
+                $owner,
+            );
         }
 
         $this->addDeferred($entry);
@@ -394,40 +436,54 @@ class InstanceRegistryDeferredHookManager
                 [$deferredKey],
                 $activateEntry,
                 DeferredActivationSource::SchedulerImmediate,
+                $owner,
             );
             return;
         }
+
+        $ownerRef = $entry->instance;
         $cb = null;
-        \add_filter($triggerHook, $cb = function (mixed $value = null) use ($triggerHook, $deferredKey, $activateEntry): mixed {
-            $entry = $this->deferredHandlers[$deferredKey] ?? null;
-            if ($entry === null) {
+        $self = $this->self;
+        \add_filter($triggerHook, $cb = static function (mixed $value = null) use ($triggerHook, $deferredKey, $activateEntry, $ownerRef, $self): mixed {
+            static $dispatchDepth = 0;
+            if ($dispatchDepth > 0) return $value;
+            try {
+                $dispatchDepth++;
+
+                $owner = $ownerRef?->get();
+                $self = $self?->get();
+                if ($owner === null || $self === null) {
+                    \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                    return $value;
+                }
+
+                $entry = $self->deferredGet($deferredKey, $owner);
+                if ($entry === null) {
+                    \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                    return $value;
+                }
+
+                $activated = $self->activateMatchingDeferredEntries(
+                    [$deferredKey],
+                    $activateEntry,
+                    DeferredActivationSource::Scheduler,
+                    $owner,
+                );
+
+                if ($activated === 0) return $value;
+
                 \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
                 return $value;
+            } finally {
+                $dispatchDepth--;
             }
-
-            if ($entry->instance?->get() === null) {
-                unset($this->deferredHandlers[$deferredKey]);
-                \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-                return $value;
-            }
-
-            $activated = $this->activateMatchingDeferredEntries(
-                [$deferredKey],
-                $activateEntry,
-                DeferredActivationSource::Scheduler,
-            );
-
-            if ($activated === 0) return $value;
-
-            \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-            unset($this->deferredHandlers[$deferredKey]);
-            return $value;
         }, PHP_INT_MIN, 1);
 
-        $entry->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
+        $logger = $this->logger;
+        $entry->setOnEntryRemovalCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb, $logger): void {
             if (!\has_filter($triggerHook, $cb, PHP_INT_MIN)) return;
             \remove_filter($triggerHook, $cb, PHP_INT_MIN);
-            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+            SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
         });
     }
 
@@ -435,9 +491,10 @@ class InstanceRegistryDeferredHookManager
      * Hold a deferred entry for manual activation.
      *
      * With a trigger this delegates to {@see deferManualUntilHook()}; without
-     * one the entry simply sits in the pool until
+     * one the entry simply sits in the owner's pool until
      * {@see WPHooksInstanceRegistry::activateDeferredByCallableInLiveInstance()}
      * (or another deferred activation API) picks it up.
+     *
      * @param ActivateRuntimeEntry $activateEntry
      */
     public function deferManualRegistration(
@@ -454,22 +511,17 @@ class InstanceRegistryDeferredHookManager
     }
 
     /**
-     * Re-evaluate the registerIf registration gate when activating a
-     * deferred runtime entry. Without a provider there is no way to evaluate
-     * the gate, so the entry is allowed (mirrors the container path's defer
-     * semantics).
+     * Re-evaluate the registerIf registration gate when activating a deferred
+     * runtime entry. A dead owner can never activate.
      */
     private function gateDeferredActivation(DeferredHookEntryHandler $data): bool
     {
+        $owner = $data->instance?->get();
+        if ($owner === null) return false;
+
         $registerIf = $data->registerIf ?? null;
         if ($registerIf === null) {
             return true;
-        }
-
-        $owner = $data->instance?->get();
-        if ($owner === null) {
-            unset($this->deferredHandlers[$data->toUniqueKey()]);
-            return false;
         }
 
         try {
@@ -480,12 +532,12 @@ class InstanceRegistryDeferredHookManager
                 $owner,
             );
         } catch (\Throwable $e) {
-            Logger::warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate threw: ' . $e->getMessage());
+            $this->logger->warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate threw: ' . $e->getMessage());
             return false;
         }
 
         if (!$allowed) {
-            Logger::warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate returned false.');
+            $this->logger->warning(__METHOD__, 'Skipping deferred hook activation ' . $data->handler->label . ' — registerIf gate returned false.');
             return false;
         }
 
@@ -493,26 +545,21 @@ class InstanceRegistryDeferredHookManager
     }
 
     /**
-     * Resolve a live deferred entry owned by `$instance`, pruning stale/collected entries.
+     * Return the owner's live bucket, pruning entries whose owner reference
+     * no longer points at this instance.
      *
-     * @param string $key
+     * @return array<string, DeferredHookEntryHandler>
      */
-    private function resolveLiveInstanceDeferredEntry(string $key, object $instance): ?DeferredHookEntryHandler
+    private function ownedEntries(object $instance): array
     {
-        $entry = $this->deferredHandlers[$key] ?? null;
-        if ($entry === null) {
-            return null;
+        $entries = $this->deferredEntries($instance);
+
+        foreach ($entries as $key => $entry) {
+            if ($entry->instance?->get() === $instance) continue;
+            $this->deferredRemove($key, $instance);
+            unset($entries[$key]);
         }
 
-        if ($entry->instance?->get() === null) {
-            unset($this->deferredHandlers[$key]);
-            return null;
-        }
-
-        if ($entry->instance?->get() !== $instance) {
-            return null;
-        }
-
-        return $entry;
+        return $entries;
     }
 }

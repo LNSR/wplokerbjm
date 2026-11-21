@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\WPHookTests\Registry;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\{
     ContainerRegistryHookTargetResolver,
@@ -20,7 +20,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  * The runtime resolver must understand every callable shape the container
  * resolver does — array callables, first-class callables, PHP 8.4
  * property-hook closures, invokable objects (including anonymous classes and
- * ModuleClassHookMetadata hosts) — while mapping them onto a live instance
+ * ModuleHookMetadata hosts) — while mapping them onto a live instance
  * instead of a class-string.
  */
 final class LiveCallableTargetResolutionTest extends WplokerbjmTestCase
@@ -90,9 +90,25 @@ final class LiveCallableTargetResolutionTest extends WplokerbjmTestCase
         );
     }
 
-    public function testResolvesModuleClassHookMetadataInstanceToItselfAndInvoke(): void
+    public function testResolvesInvokableObjectFromPropertyHook(): void
     {
-        $module = new class('HostClass', 'hostProperty') extends ModuleClassHookMetadata {
+        $invokable = new class {
+            public $object {
+                get => $this->object ??= new class() {
+                    public function __invoke(): void {}
+                };
+            }
+        };
+
+        self::assertSame(
+            [$invokable->object, '__invoke'],
+            $this->runtimeResolver->resolveLiveCallableTarget($invokable->object),
+        );
+    }
+
+    public function testResolvesModuleHookMetadataInstanceToItselfAndInvoke(): void
+    {
+        $module = new class('HostClass', 'hostProperty') extends ModuleHookMetadata {
             public function __invoke(): void {}
         };
 
@@ -182,16 +198,6 @@ final class LiveCallableTargetResolutionTest extends WplokerbjmTestCase
         );
     }
 
-    public function testContainerResolverMapsModuleClassMetadataToItsParentSite(): void
-    {
-        $module = new class('ParentHost', 'optionActivePlugin') extends ModuleClassHookMetadata {};
-
-        self::assertSame(
-            ['ParentHost', 'optionActivePlugin'],
-            $this->containerResolver->resolve($module),
-        );
-    }
-
     // ── End-to-end: object callables on the runtime registry ────────────
 
     public function testInvokableObjectAttributeIsUnregisteredByCallable(): void
@@ -231,7 +237,7 @@ final class LiveCallableTargetResolutionTest extends WplokerbjmTestCase
 
     public function testModuleClassInvokeAttributeIsRemovableByCallable(): void
     {
-        $module = new class('RegistryHost', 'moduleProperty') extends ModuleClassHookMetadata {
+        $module = new class('RegistryHost', 'moduleProperty') extends ModuleHookMetadata {
             #[Action('live_module_hook', acceptedArgs: 0)]
             public function __invoke(): void {}
         };

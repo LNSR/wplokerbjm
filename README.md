@@ -130,13 +130,13 @@ wordpress/wp-content/themes/wplokerbjm/server/
 │   │   └── Support/           # Container support microframework
 │   │       ├── InstanceDiscovery/   # Autowiring & instance discovery
 │   │       │   ├── Abstract/
-│   │       │   │   └── AsChildClass.php
+│   │       │   │   └── AsInnerClass.php
 │   │       │   ├── DependencyAutowireScanner.php
 │   │       │   ├── DependencyInjector.php
 │   │       │   └── DTO.php
 │   │       └── WPHooks/             # WP hook scanning & invocation
 │   │           ├── Abstract/
-│   │           │   └── ModuleClassHookMetadata.php
+│   │           │   └── ModuleHookMetadata.php
 │   │           ├── DTO.php
 │   │           ├── Indexers/
 │   │           │   └── EntriesIndexer.php

@@ -16,10 +16,14 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
  * and re-hydrated into live handlers on subsequent requests. Only scan-derived
  * metadata lives here — per-instance state (owner instance, WeakReference,
  * remove callbacks) is intentionally NOT part of the DTO.
+ *
+ * Dynamic hook names stay as raw closures plus their callable plans and are
+ * resolved against the live owner at registration time, so cached metadata is
+ * safe to share between sibling instances.
  * @phpstan-import-type HookType from HookRegistration
  * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-type InstanceHookMetadataData array{
- *  hook: string,
+ *  hook: string|\Closure(...): string,
  *  type: 'action'|'filter',
  *  priority: int,
  *  acceptedArgs: int,
@@ -31,6 +35,7 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
  *  registerIfParams: CallablePlan,
  *  deferRegisterUntilHook: null|string|\Closure(...): string,
  *  deferRegisterUntilHookParams: CallablePlan,
+ *  hookParams: CallablePlan,
  *  hookArgNames: list<CallableHookParams>,
  *  tags: array,
  *  tagCallable: null|\Closure(...): array,
@@ -64,6 +69,7 @@ final readonly class InstanceHookMetadata extends AbstractDataObject
      * @param InstanceHookMetadataData['registerIfParams'] $registerIfParams
      * @param InstanceHookMetadataData['deferRegisterUntilHook'] $deferRegisterUntilHook
      * @param InstanceHookMetadataData['deferRegisterUntilHookParams'] $deferRegisterUntilHookParams
+     * @param InstanceHookMetadataData['hookParams'] $hookParams
      * @param InstanceHookMetadataData['hookArgNames'] $hookArgNames
      * @param InstanceHookMetadataData['tags'] $tags
      * @param InstanceHookMetadataData['tagCallable'] $tagCallable
@@ -81,7 +87,7 @@ final readonly class InstanceHookMetadata extends AbstractDataObject
      * @param InstanceHookMetadataData['debugLiveUnregistrationParams'] $debugLiveUnregistrationParams
      */
     public function __construct(
-        public string $hook,
+        public string|\Closure $hook,
         public string $type,
         public int $priority,
         public int $acceptedArgs,
@@ -92,6 +98,7 @@ final readonly class InstanceHookMetadata extends AbstractDataObject
         public array $registerIfParams = [],
         public string|\Closure|null $deferRegisterUntilHook = null,
         public array $deferRegisterUntilHookParams = [],
+        public array $hookParams = [],
         public array $hookArgNames = [],
         public array $tags = [],
         public ?\Closure $tagCallable = null,

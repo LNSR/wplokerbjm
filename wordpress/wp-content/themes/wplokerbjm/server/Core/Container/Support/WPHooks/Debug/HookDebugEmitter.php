@@ -6,7 +6,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Debug;
 
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 
 /**
  * Per-invoker debug emission collaborator.
@@ -24,6 +24,7 @@ final class HookDebugEmitter
         private readonly DebugProbes $probes,
         private readonly ?WPHookPlanProvider $provider,
         private readonly ?WeakReference $ownerRef,
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
     ) {}
 
     public function hasLive(): bool
@@ -163,7 +164,7 @@ final class HookDebugEmitter
                 ownerOptional: $ownerOptional,
             );
         } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'Failed emitting debug payload for ' . $this->identity->label, [
+            $this->logger->error(__METHOD__, 'Failed emitting debug payload for ' . $this->identity->label, [
                 'dto' => $dto::class,
                 'error' => $e->getMessage(),
                 'file' => $e->getFile(),

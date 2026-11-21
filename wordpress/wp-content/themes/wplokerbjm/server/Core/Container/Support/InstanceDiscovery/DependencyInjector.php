@@ -26,7 +26,7 @@ use TCacheKey;
 use TScopeAccessCallableResolver;
 use WPLokerBJM\Core\Container\Attributes\Action;
 use WPLokerBJM\Core\Container\Attributes\Inject;
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsInnerClass;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -34,17 +34,18 @@ use WPLokerBJM\Shared\Log\Logger;
  *
  * Reflection is used only when a plan is missing. The runtime path resolves
  * the already-compiled entries and reuses a closure bound to the child class scope to write private and protected members.
- * @template TClass of AsChildClass
+ * @template TClass of AsInnerClass
  * @phpstan-type ClassTarget TClass
  * @phpstan-type CompiledPlan array{properties: array<string, InjectionEntryDTO>}
  * @phpstan-type TSetterClosure Closure(ContainerInterface, ClassTarget, CompiledPlan['properties']): void
  */
-final class DependencyInjector
+class DependencyInjector
 {
     /**
      * @var array<string, TSetterClosure>
      */
     public private(set) array $cachedSetterClosure = [];
+    public const INJECT_ON = 'wplokerbjm_inject_on';
 
     public function __construct(
         private readonly ContainerInterface $container,
@@ -59,10 +60,11 @@ final class DependencyInjector
      * @return ClassTarget The same target, for fluent usage.
      * @throws InvalidArgumentException When the target or injection shape is invalid.
      */
-    public function injectOn(AsChildClass $target, bool $forceNoCache = false): AsChildClass
+    #[Action(self::INJECT_ON, 10, 1)]
+    public function injectOn(AsInnerClass $target, bool $forceNoCache = false): AsInnerClass
     {
         $this->assertTarget($target);
-        $cacheKey = $target->constructCurrentClassIdentity;
+        $cacheKey = $target->ownershipPath;
         $plan = $this->getOrCompilePlan($cacheKey, $target, $forceNoCache);
         if ($plan['properties'] === [])
             return $target;
@@ -78,7 +80,7 @@ final class DependencyInjector
      * @param ClassTarget $target
      * @return CompiledPlan
      */
-    private function getOrCompilePlan(string $cacheKey, AsChildClass $target, bool $forceNoCache = false): array
+    private function getOrCompilePlan(string $cacheKey, AsInnerClass $target, bool $forceNoCache = false): array
     {
         $plans = $this->planCache->loadPlans();
         $cachedPlan = $plans[$cacheKey] ?? null;
@@ -96,7 +98,7 @@ final class DependencyInjector
      * @throws InvalidArgumentException
      * @return void
      */
-    private function assertTarget(AsChildClass $target): void
+    private function assertTarget(AsInnerClass $target): void
     {
         if ($target->identifier === '') {
             throw new InvalidArgumentException('A child injection target must have a non-empty identifier.');
@@ -639,7 +641,7 @@ class ScopeAccessFactory
                  * @var TSetterClosure 
                  * @param CompiledPlan['properties'] $properties
                  */
-                static $setterTemplateClosure = static function (ContainerInterface $c, AsChildClass $target, array $properties) use ($resolver): void {
+                static $setterTemplateClosure = static function (ContainerInterface $c, AsInnerClass $target, array $properties) use ($resolver): void {
                     foreach ($properties as $property => $entry) {
                         $target->{$property} = $entry->kind !== null
                             ? $resolver($c, $entry)

@@ -7,8 +7,9 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver;
 use ReflectionFunction;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookTargetResolverTrait;
-use WPLokerBJM\Shared\Log\Logger;
+use WeakReference;
 
 /**
  * @internal
@@ -17,8 +18,11 @@ class InstanceRegistryRuntimeHookResolver
 {
     use HookTargetResolverTrait;
 
+    /**
+     * @var \WeakMap<object, array{WeakReference<object>, string}>
+     */
     private \WeakMap $weakMap;
-    public function __construct()
+    public function __construct(protected readonly HookLoggerInterface $logger = new NullHookLogger())
     {
         $this->weakMap = new \WeakMap();
     }
@@ -49,7 +53,7 @@ class InstanceRegistryRuntimeHookResolver
      *  - `[$liveInstance, 'member']` arrays (method or property name);
      *  - closures: first-class callables (`$service->method(...)`) and PHP 8.4
      *    property-hook accessor closures;
-     *  - invokable objects, including {@see \WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata}
+     *  - invokable objects, including {@see \WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata}
      *    hosts — the object is its own owner and the member is `__invoke`.
      *
      * `Class::method` strings cannot name a live instance and are rejected.
@@ -67,21 +71,31 @@ class InstanceRegistryRuntimeHookResolver
             $instance = $target[0] ?? null;
             $targetName = $target[1] ?? null;
         } elseif ($target instanceof \Closure) {
-            if (isset($this->weakMap[$target])) return $this->weakMap[$target];
+            if (isset($this->weakMap[$target]) && $this->weakMap[$target][0]->get() !== null) {
+                [$instanceRef, $targetName] = $this->weakMap[$target];
+                return [$instanceRef->get(), $targetName];
+            }
             $reflection = new \ReflectionFunction($target);
             $instance = $reflection->getClosureThis();
-            $targetName = $this->parsePropertyHookMemberName($reflection->getName())
-                ?? $reflection->getName();
-            $this->weakMap[$target] = [$instance, $targetName];
+            $targetName = $this->parsePropertyHookMemberName($reflection->getName()) ?? $reflection->getName();
+            if ($instance === null) {
+                $this->logger->warning(
+                    self::class,
+                    'unregisterByCallableInLiveInstance() expects [$liveInstance, \'member\'], a first-class callable/property-hook closure bound to the live instance, or an invokable object.',
+                );
+                return [null, null];
+            }
+
+            $this->weakMap[$target] = [WeakReference::create($instance), $targetName];
         } elseif (is_object($target) && is_callable($target)) {
-            // Invokable object (anonymous class / ModuleClassHookMetadata host):
+            // Invokable object (anonymous class / ModuleHookMetadata host):
             // the callable member is __invoke and the object owns its own hooks.
             $instance = $target;
             $targetName = '__invoke';
         }
 
         if (!is_object($instance) || !is_string($targetName) || $targetName === '') {
-            Logger::warning(
+            $this->logger->warning(
                 self::class,
                 'unregisterByCallableInLiveInstance() expects [$liveInstance, \'member\'], a first-class callable/property-hook closure bound to the live instance, or an invokable object.',
             );
@@ -89,6 +103,6 @@ class InstanceRegistryRuntimeHookResolver
             return [null, null];
         }
 
-        return [$instance, $targetName];
+        return [$instance instanceof WeakReference ? $instance->get() : $instance, $targetName];
     }
 }

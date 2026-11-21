@@ -5,10 +5,8 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
 use ReflectionFunction;
-use Spatie\Backtrace\Backtrace;
-use Spatie\Backtrace\Frame;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 
 /**
  * Shared callable → `[class, member]` target resolution.
@@ -18,13 +16,13 @@ use WPLokerBJM\Shared\Log\Logger;
  *  - array callables `[$object|class-string, 'member']`;
  *  - `'Class::method'` strings (static fallback, `__invoke` when omitted);
  *  - invokable objects — including anonymous classes and
- *    {@see ModuleClassHookMetadata} hosts;
+ *    {@see ModuleHookMetadata} hosts;
  *  - closures — first-class callables and PHP 8.4 property-hook accessor
  *    closures (`{closure:FQCN::$propertyName::get():line}`).
  *
  * The container registry consumes the stable `[class-string, member]` pair for
  * index lookups; the runtime registry maps the same members onto a live
- * instance. Anonymous classes that do not extend `ModuleClassHookMetadata`
+ * instance. Anonymous classes that do not extend `ModuleHookMetadata`
  * fall back to a bounded call-stack walk to find the owning property.
  *
  * @phpstan-import-type HookTargetResolve from \WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\ContainerRegistryDeferredHookManager
@@ -42,7 +40,8 @@ trait HookTargetResolverTrait
      */
     private \WeakMap $callableTargetCache;
 
-    public function __construct() {
+    public function __construct(protected readonly HookLoggerInterface $logger = new NullHookLogger())
+    {
         $this->callableTargetCache = new \WeakMap();
     }
 
@@ -87,79 +86,33 @@ trait HookTargetResolverTrait
         }
 
         // 3. Invokable Object Instance (anonymous class from a property)
-        if (!$target instanceof \Closure && is_object($target)) {
-            return $this->analyseObjectTarget($target);
+        if (!$target instanceof \Closure && is_object($target) && is_callable($target)) {
+            return [$target::class, '__invoke'];
         }
 
         // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
         /** @var \Closure $target */
         $ref = new ReflectionFunction($target);
-        $calledClass = $ref->getClosureThis() ?? null;
-
+        $calledClass = $ref->getClosureThis() ?? $ref->getClosureCalledClass()?->getName() ?? null;
         if ($calledClass === null) {
-            throw new \InvalidArgumentException('Callable target must be bound to an object instance.');
+            throw new \RuntimeException('Unable to resolve hook target for function ' . $ref->getName());
         }
 
         $name = $ref->getName();
+        $calledClass = \is_object($calledClass) ? \get_class($calledClass) : $calledClass;
 
         // Standard Instance Method ($service->method(...)) from FCC
         if (!str_contains($name, '{closure')) {
-            return [$calledClass::class, $name];
+            return [$calledClass, $name];
         }
 
         // PHP 8.4 Property Hook Anonymous Closure ("{closure:FQCN::$propertyName::get():line}")
         $memberName = $this->parsePropertyHookMemberName($name);
         if ($memberName !== null) {
-            return [$calledClass::class, $memberName];
+            return [$calledClass, $memberName];
         }
 
-        throw new \InvalidArgumentException('Unable to resolve hook target for class ' . $calledClass::class . '.');
-    }
-
-    /**
-     * Resolve an invokable object to its class + callable member.
-     *
-     * @return array{class-string, callable-string}
-     */
-    private function analyseObjectTarget(object $target): array
-    {
-        $className = $target::class;
-
-        // Anonymous class extending ModuleClassHookMetadata —
-        // reads parent class & property directly, no backtrace needed.
-        if ($target instanceof ModuleClassHookMetadata) {
-            return [$target->parentClassString, $target->parentProperty];
-        }
-
-        // Best-effort fallback for anonymous classes: walk the call stack
-        // to find which object's property holds this instance.
-        if (new \ReflectionClass($target)->isAnonymous()) {
-            $frames = Backtrace::create()
-                ->withArguments(false)
-                ->limit(10)
-                ->frames();
-
-            /** @var Frame $frame */
-            foreach ($frames as $frame) {
-                $callerObject = $frame->object;
-                if ($callerObject === null) {
-                    continue;
-                }
-
-                $refClass = new \ReflectionClass($callerObject);
-                foreach ($refClass->getProperties() as $property) {
-                    if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
-                        Logger::info(
-                            __METHOD__,
-                            "Anon class without extending ModuleClassHookMetadata, it's recommended to use 'ModuleClassHookMetadata'." . $refClass->getName() . "::" . $property->getName()
-                        );
-                        return [$refClass->getName(), $property->getName()];
-                    }
-                }
-            }
-        }
-
-        return [$className, '__invoke'];
+        throw new \InvalidArgumentException('Unable to resolve hook target for class ' . $calledClass . '.');
     }
 
     /**

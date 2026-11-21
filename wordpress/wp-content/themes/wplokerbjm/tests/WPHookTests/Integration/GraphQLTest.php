@@ -37,7 +37,7 @@ class GraphQLTest extends WplokerbjmTestCase
         ];
 
         foreach ($resolvers as $resolver) {
-            $this->container()->set($resolver, $this->createMock($resolver));
+            $this->container()->set($resolver, $this->createStub($resolver));
         }
 
         \Brain\Monkey\Functions\when('register_graphql_field')->alias(function ($type, $field, $config) {

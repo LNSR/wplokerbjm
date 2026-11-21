@@ -90,7 +90,6 @@ final class GraphQLHeadersPolicy
         if (!is_user_logged_in()) return $headers;
         $headers['Logged-In'] = 'true';
         $headers['X-WP-Nonce'] = \graphql_get_nonce();
-
         return $headers;
     }
 
@@ -134,12 +133,17 @@ final class GraphQLHeadersPolicy
 
     private function removeDuplicateValues(string $key): string
     {
-        return $key
-        |> (static fn($v) => explode(', ', $v))
-        |> (static fn($v) => array_map('trim', $v))
-        |> array_filter(...)
-        |> array_unique(...)
-        |> (static fn($v) => implode(', ', $v));
+        return implode(
+            ',',
+            array_unique(
+                array_filter(
+                    array_map(
+                        'trim',
+                        explode(',', $key)
+                    )
+                )
+            )
+        );
     }
 
     private function allowedOrigins(): array

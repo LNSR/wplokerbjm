@@ -63,7 +63,7 @@ class InheritedHookTest extends WplokerbjmTestCase
     public function testChildWithoutRedeclarationHasNoRegistration(): void
     {
         $scanner = new WPHooksScanner(
-            $this->robotLoader->getIndexedClasses(),
+            fn() => array_keys($this->robotLoader->getIndexedClasses()),
             $this->planProvider,
             'WPLokerBJM\Tests\Support\Fixtures',
             '',
@@ -88,7 +88,7 @@ class InheritedHookTest extends WplokerbjmTestCase
     public function testParentAndRedeclaringChildBothFire(): void
     {
         $scanner = new WPHooksScanner(
-            $this->robotLoader->getIndexedClasses(),
+            fn() => array_keys($this->robotLoader->getIndexedClasses()),
             $this->planProvider,
             'WPLokerBJM\Tests\Support\Fixtures',
             '',

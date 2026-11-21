@@ -1,18 +1,18 @@
 {
   "require": {
-    "brick/varexporter": "*",
-    "nette/robot-loader": "*",
-    "php-di/php-di": "*",
-    "php-standard-library/php-standard-library": "*",
-    "spatie/backtrace": "*"
+    "brick/varexporter": "^0.7.0",
+    "monolog/monolog": "^3.13",
+    "nette/robot-loader": "^4.1.4",
+    "php-di/php-di": "^7.1.1",
+    "php-standard-library/php-standard-library": "^6.4.2"
   },
   "require-dev": {
-    "brain/monkey": "*",
-    "nikic/php-parser": "*",
-    "php-parallel-lint/php-console-highlighter": "*",
-    "php-parallel-lint/php-parallel-lint": "*",
-    "phpunit/phpunit": "*",
-    "vlucas/phpdotenv": "*"
+    "brain/monkey": "^2.7.0",
+    "nikic/php-parser": "^5.9.0",
+    "php-parallel-lint/php-console-highlighter": "^1.0.0",
+    "php-parallel-lint/php-parallel-lint": "^1.4.0",
+    "phpunit/phpunit": "^13.4.8",
+    "vlucas/phpdotenv": "^5.8.1"
   },
   "config": {
     "sort-packages": true,

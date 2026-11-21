@@ -1,8 +1,8 @@
-<!-- Context: project-intelligence/wphooks-registry-events | Priority: high | Version: 1.2 | Updated: 2026-11-19 -->
+<!-- Context: project-intelligence/wphooks-registry-events | Priority: high | Version: 1.3 | Updated: 2026-11-27 -->
 
 # WPHooks Registry Event Bridge
 
-**Purpose**: How application code drives the hook registries through WordPress events — the "event adapter" moved out of the old `Core\Wordpress\*HookEvent` classes and into the registries themselves.
+**Purpose**: How application code drives the hook registries through WordPress events — the control-plane adapter moved out of the old `Core\Wordpress\*HookEvent` classes and into the registries themselves.
 
 ## Why It Lives in the Registry
 
@@ -17,23 +17,21 @@ The bridge is control-plane, not an application hook. Keeping it inside the regi
 
 | Registry | Default registration | Raw bridge |
 |---|---|---|
-| `WPHooksContainerRegistry` | always raw | `initEventBridge()` auto-booted by `initialize()`; `removeEventBridge()` to tear down |
-| `WPHooksInstanceRegistry` | `#[Action]` on each API method — the container scan registers them as lazy invokers | `initEventBridge()` / `removeEventBridge()` for standalone use |
+| `WPHooksContainerRegistry` | No bridge boot: `initialize()` only pulls `scanner->getHookRegistrations()` and indexes handlers | `initEventBridge()` explicit; internal/test/standalone only. `removeEventBridge()` tears down |
+| `WPHooksInstanceRegistry` | `#[Action]` on `REGISTER_HOOKS`; `#[Filter]` on the remaining API methods — scanner registers them as lazy invokers | `initEventBridge()` explicit; standalone/tests only. `removeEventBridge()` tears down |
 
-**Container**: `initialize()` (called by `Init` at bootstrap) registers all 21 selector listeners via `add_action($hook, [$this, $method], 10, 1)` before application hooks. Idempotent via `$bridgeInitialized`.
+The container registry has no hook attributes of its own, so `initialize()` never calls `initEventBridge()`. The instance registry's attributes are the production path; its raw bridge is only for callers that use the registry without the container scan.
 
-**Instance**: attributes stay the production path; the raw bridge exists for when the container registry is absent or the registry is used independently (tests, CLI tools). Call `initEventBridge()` once before dispatching.
-
-**Toggle**: both registries expose a reversible pair — `initEventBridge()` registers the listeners (no-op when already up), `removeEventBridge()` removes them and flips the internal `$bridgeInitialized` flag back to `false`, so the bridge can be booted again. Removal is exact (same array callables, priority 10) and leaves application hooks untouched.
+**Toggle**: both registries expose a reversible pair — `initEventBridge()` registers listeners (no-op when already up), `removeEventBridge()` removes them and flips `$bridgeInitialized` back to `false`. Removal is exact (same array callables, priority 10) and leaves application hooks untouched.
 
 ## Event Map
 
 Both registries expose `EVENT_BRIDGE_HOOKS` — `event name → registry method` — as the single source of truth (used by `initEventBridge()` and tests).
 
-- `WPHooksContainerRegistry::EVENT_BRIDGE_HOOKS` — 21 entries: 7 `ACTIVATE_DEFERRED_BY_*`, 7 `UNREGISTER_DEFERRED_BY_*`, 7 `UNREGISTER_BY_*`.
-- `WPHooksInstanceRegistry::EVENT_BRIDGE_HOOKS` — 7 entries: `REGISTER_HOOKS`, `UNREGISTER_HOOKS`, `UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE`, `UNREGISTER_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE`, `ACTIVATE_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE`, `UNREGISTER_DEFERRED_BY_CLASS_IN_LIVE_INSTANCE`, `ACTIVATE_DEFERRED_BY_CLASS_IN_LIVE_INSTANCE`.
+- `WPHooksContainerRegistry::EVENT_BRIDGE_HOOKS` — **21 entries**: 7 `ACTIVATE_DEFERRED_BY_*`, 7 `UNREGISTER_DEFERRED_BY_*`, 7 `UNREGISTER_BY_*`.
+- `WPHooksInstanceRegistry::EVENT_BRIDGE_HOOKS` — **20 entries**: `REGISTER_HOOKS` / `UNREGISTER_HOOKS`, active and deferred hook/pattern/tag/class/callable selectors, and the deferred class/callable scopes.
 
-Event names are constants (`wphooks_container_*`, `wphooks_instance_*`) — never hardcode strings.
+Selectors that take `($instance, $selector)` use `EVENT_BRIDGE_ACCEPTED_ARGS` (2 accepted arguments); `REGISTER_HOOKS` accepts 3. Event names are constants (`wphooks_container_*`, `wphooks_instance_*`) — never hardcode strings.
 
 ## Emitting
 
@@ -60,16 +58,17 @@ Runtime "class" scope is per **instance** (`spl_object_id` ownership): passing o
 
 ## Control-Plane Guarantees
 
-- Bridge listeners are **not** in `$handlers`, `$weakRegistry`, `entriesByInvokers`, or `EntriesIndexer` — `unregisterByClass()/ByNamespace()/ByTags()` and `unregisterHooksOn()` cannot sweep the control plane.
-- Bridged calls land on the registry's public API, so all ownership/RAII semantics still apply (`registerIf` re-evaluation, deferred indexes, `onUnregisterDo`, once-cleanup).
-- Consumers updated to registry constants: `PluginsManager`, `ModuleClassHookMetadata`, `GlobalHooks`, `CachePurgeHandler`, `RedirectHooks`, `CloudflareCachePurger`, `GraphQLHeadersPolicy`, `SearchJobHooks`, `WPGraphQL`, `RankMath`, `Litespeed`, `MetaBox`.
+- Bridge listeners are **not** in `$handlers`, `$weakRegistry`, `$entriesByInvokers`, or `EntriesIndexer` — selector sweeps cannot remove the control plane.
+- Bridged calls land on the registry's public API, so ownership/RAII semantics still apply (`registerIf` re-evaluation, deferred indexes, `onUnregisterDo`, once-cleanup).
+- Instance deferred entries live in an owner-keyed `WeakMap`; owner GC drops that bucket and its auto-scheduler before a bridged selector can see it.
+- Consumers updated to registry constants: `PluginsManager`, `ModuleHookMetadata`, `GlobalHooks`, `CachePurgeHandler`, `RedirectHooks`, `CloudflareCachePurger`, `GraphQLHeadersPolicy`, `SearchJobHooks`, `WPGraphQL`, `RankMath`, `Litespeed`, `MetaBox`.
 - Tests use `WplokerbjmTestCase::registeredApplicationHooks()` — registered hooks minus both bridges — when asserting "nothing was registered".
 
 ## 📂 Codebase References
 
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — `EVENT_BRIDGE_HOOKS`, `initEventBridge()` / `removeEventBridge()`, boot from `initialize()`.
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — `EVENT_BRIDGE_HOOKS`, `#[Action]` methods, optional `initEventBridge()` / `removeEventBridge()`.
-- `server/Core/Container/Init.php` — bootstrap calls `WPHooksContainerRegistry::initialize()`.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — `EVENT_BRIDGE_HOOKS` (21), explicit `initEventBridge()` / `removeEventBridge()`, `initialize()` scanner path.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — `EVENT_BRIDGE_HOOKS` (20), `#[Action]`/`#[Filter]` methods, `EVENT_BRIDGE_ACCEPTED_ARGS`, explicit bridge toggle.
+- `server/Core/Container/Init.php` — bootstrap calls `WPHooksContainerRegistry::initialize()` (no bridge boot).
 - `tests/WPHookTests/Registry/EventBridgeTest.php` — idempotent boot, deferred activation via event, bridge survives sweeps, standalone runtime bridge.
 - `tests/Support/WplokerbjmTestCase.php` — `registeredApplicationHooks()`.
 
@@ -77,3 +76,5 @@ Runtime "class" scope is per **instance** (`spl_object_id` ownership): passing o
 
 - `technical-domain.md` — WPHooks subsystem map and hook attribute surface
 - `wphooks-ownership-raii.md` — strong/weak ownership and cleanup chain
+- `wphooks-logger.md` — injected logger contract and DI wiring
+- `navigation.md` — context index and quick routes

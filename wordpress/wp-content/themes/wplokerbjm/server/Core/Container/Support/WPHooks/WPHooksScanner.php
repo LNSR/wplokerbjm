@@ -11,13 +11,13 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
 use ReflectionProperty;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookService;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookRegistration;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Shared\Log\Logger;
-use \CompiledContainer;
-use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
+use WPLokerBJM\Core\Container\Support\WPHooks\Attributes\WPHooksScannerPolicy;
 
 /**
  * Scans directories for WordPress hook attribute registrations.
@@ -38,16 +38,17 @@ class WPHooksScanner
     private ?array $cachedHookRegistrations = null;
 
     /**
-     * @param array $compiledContainerMap list of classes in compiled container
+     * @param \Closure(): list<class-string> $containerEntries candidate classes from the RobotLoader index, filtered to container entries
      * @param string $namespace namespace to scan
      * @param string $cacheLocation directory where cache file will be stored
      * @param WPHookPlanProvider $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
     public function __construct(
-        private array $compiledContainerMap,
+        private \Closure $containerEntries,
         private WPHookPlanProvider $hookPlanProvider,
         private string $namespace = 'WPLokerBJM',
         private string $cacheLocation = '',
+        private HookLoggerInterface $logger = new NullHookLogger(),
         public private(set) bool $forceNoCache = false
     ) {
         $this->namespace = trim($namespace, '\\');
@@ -99,15 +100,21 @@ class WPHooksScanner
 
         $namespacePrefix = $this->namespace . '\\';
 
-        foreach ($this->compiledContainerMap as $className => $entryGet) {
+        foreach (array_values(array_unique(($this->containerEntries)() ?? [])) as $className) {
             if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
                 continue;
             }
             try {
                 $reflection = new ReflectionClass($className);
+                if (!$reflection->isInstantiable() || $reflection->isEnum()) continue;
+                $policy = $reflection->getAttributes(WPHooksScannerPolicy::class);
+                $attribute = null;
+                if (!empty($policy)) $attribute = $policy[0]->newInstance();
+                if ($attribute instanceof WPHooksScannerPolicy && $attribute->skipContainerRegistryScan) continue;
+
                 /** @var array<string, int> $attributeOrdinals */
                 $attributeOrdinals = [];
-                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, &$attributeOrdinals): void {
+                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, &$attributeOrdinals, $reflection): void {
                     $ordinalKey = 'method:' . $method->getName();
                     $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                     $registrations[] = new HookRegistration(
@@ -144,7 +151,7 @@ class WPHooksScanner
                     );
                 });
 
-                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations, &$attributeOrdinals): void {
+                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations, &$attributeOrdinals, $reflection): void {
                     $ordinalKey = 'property:' . $property->getName();
                     $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                     $registrations[] = new HookRegistration(
@@ -181,13 +188,13 @@ class WPHooksScanner
                     );
                 });
             } catch (\RuntimeException $e) {
-                Logger::error(__METHOD__, 'Error scanning hooks for class ' . $className . ': ', [
+                $this->logger->error(__METHOD__, 'Error scanning hooks for class ' . $className . ': ', [
                     'message' => $e->getMessage(),
                     'line' => $e->getLine(),
                     'file' => $e->getFile(),
                     'trace' => $e->getTraceAsString(),
                 ]);
-                Logger::flush();
+                $this->logger->flush();
                 throw $e;
             }
         }
@@ -200,7 +207,7 @@ class WPHooksScanner
         $targetFile = $this->cacheLocation;
 
         if (empty($targetFile)) {
-            Logger::error(__METHOD__, 'Delete failed: No target file path provided.');
+            $this->logger->error(__METHOD__, 'Delete failed: No target file path provided.');
             return false;
         }
 
@@ -222,7 +229,7 @@ class WPHooksScanner
         $registrations = $this->cachedHookRegistrations ?? $this->cachedHookRegistrations = $this->performHookRegistrationScan();
 
         if (empty($targetFile)) {
-            Logger::error(__METHOD__, 'Export failed: No target file path provided.');
+            $this->logger->error(__METHOD__, 'Export failed: No target file path provided.');
             return false;
         }
 
@@ -230,13 +237,13 @@ class WPHooksScanner
 
         if (!is_dir($directory)) {
             if (!mkdir($directory, 0755, true)) {
-                Logger::error(__METHOD__, "Failed to create directory: {$directory}");
+                $this->logger->error(__METHOD__, "Failed to create directory: {$directory}");
                 return false;
             }
         }
 
         if (!is_writable($directory)) {
-            Logger::error(__METHOD__, "Directory is not writable: {$directory}");
+            $this->logger->error(__METHOD__, "Directory is not writable: {$directory}");
             return false;
         }
 

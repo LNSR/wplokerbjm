@@ -1,4 +1,4 @@
-<!-- Context: backend/concepts | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+<!-- Context: backend/concepts | Priority: high | Version: 1.1 | Updated: 2026-11-28 -->
 
 # Concept: Hook System
 
@@ -17,7 +17,7 @@ WPHooksScanner              WPHooksContainerRegistry
 discovers #[Action]   →    resolves service
   attributes              calls annotated method
      │                           │
-ContainerLazyHookInvoker            Service instantiated
+HookInvoker (container target)  Service instantiated
  stored in registry        at most once/request
 ```
 
@@ -55,7 +55,7 @@ public function search(string $sql, object $query): string { return $sql; }
 
 **Discovery & Registration**:
 - `server/Core/Container/Support/WPHooks/` — Scanner and Registry implementation
-- `server/Core/Container/Definitions/Factory.php` — ContainerLazyHookInvoker definitions
+- `server/Core/Container/Definitions/Factories.php` — lazy HookInvoker definitions
 
 **Usage Examples**:
 - `server/Models/Schema/PostTypes.php` — `#[Action('init')]` for post type registration

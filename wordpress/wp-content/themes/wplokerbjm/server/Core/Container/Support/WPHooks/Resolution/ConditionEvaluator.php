@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Resolution;
 
 use RuntimeException;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 
 /**
  * Hook-condition evaluation: dynamic hook names, executeIf/registerIf gates,
@@ -18,7 +18,20 @@ use WPLokerBJM\Shared\Log\Logger;
  */
 final class ConditionEvaluator
 {
-    public function __construct(private readonly ArgumentResolver $resolver) {}
+    private static bool $shutdownPhase = false;
+    /** @var \WeakReference<self> */
+    private readonly \WeakReference $self;
+    public function __construct(
+        private readonly ArgumentResolver $resolver,
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
+    ) {
+        $this->self = \WeakReference::create($this);
+        static $shutdownRegistered = false;
+        if ($shutdownRegistered) return;
+        $shutdownRegistered = true;
+
+        \register_shutdown_function(static fn() => self::$shutdownPhase = true);
+    }
 
     /**
      * Resolve the final hook name for a registration.
@@ -131,24 +144,22 @@ final class ConditionEvaluator
             $targetInstanceWeakRef = $targetClass;
             $instance = $targetClass->get();
             $targetClass = $instance !== null ? $instance::class : null;
-        } elseif (is_object($targetClass)) {
-            $targetInstanceWeakRef = \WeakReference::create($targetClass);
-            $targetClass = $targetClass::class;
         }
 
-        return function () use ($onUnregisterDo, $onUnregisterDoParams, $label, $targetClass, $targetInstanceWeakRef): mixed {
+        $weakSelf = $this->self;
+        return static function () use ($onUnregisterDo, $onUnregisterDoParams, $label, $targetClass, $targetInstanceWeakRef, $weakSelf): mixed {
             static $alreadyRun = false;
             if ($alreadyRun) return null;
             $alreadyRun = true;
-            if (did_action('shutdown') || doing_action('shutdown')) return null;
-
+            $self = $weakSelf->get();
+            if (self::$shutdownPhase || did_action('shutdown') || doing_action('shutdown') || $self === null) return null;
             try {
-                $onUnregisterDo = $this->resolver->bindToTarget($onUnregisterDo, $onUnregisterDoParams, $targetClass);
-                $values = $this->resolver->resolveCallableParameters($onUnregisterDo, $onUnregisterDoParams, $label, [], $targetInstanceWeakRef?->get() ?? null);
+                $onUnregisterDo = $self->resolver->bindToTarget($onUnregisterDo, $onUnregisterDoParams, $targetClass);
+                $values = $self->resolver->resolveCallableParameters($onUnregisterDo, $onUnregisterDoParams, $label, [], $targetInstanceWeakRef?->get() ?? null);
 
                 return $onUnregisterDo(...$values);
             } catch (\Throwable $e) {
-                Logger::error(__METHOD__, 'Failed to execute onUnregisterDo', [
+                $self->logger->error(__METHOD__, 'Failed to execute onUnregisterDo', [
                     'message' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                     'file' => $e->getFile(),

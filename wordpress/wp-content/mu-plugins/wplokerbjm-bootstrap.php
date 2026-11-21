@@ -47,6 +47,9 @@ class WPLokerBJMBootstrap
             ->reportParseErrors(defined('WP_DEBUG') && WP_DEBUG)
             ->register();
 
+        // Load Monolog before regular plugins can prepend their own autoloader
+        Logger::preload();
+
         $this->init();
     }
 
@@ -103,7 +106,10 @@ class WPLokerBJMBootstrap
                 ->get(Init::class)
                 ->initialize();
         } catch (\Throwable $e) {
-            error_log('MU-Plugin bootstrap fail' . $e->getMessage() . ' at ' . $e->getFile() . ':' . $e->getLine());
+            Logger::error(__METHOD__, 'Error occured during initialization MU-Plugin', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTrace()
+            ]);
         }
     }
 }

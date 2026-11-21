@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 2.0 | Updated: 2026-11-01 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 2.1 | Updated: 2026-11-24 -->
 
 # Technical Domain — Lowker Site Frontend
 
@@ -191,10 +191,10 @@ Use classes with `$state()` fields and methods; import them as singletons.
 
 ## Cloudflare Workers Deployment
 
-- Adapter: `@sveltejs/adapter-cloudflare@8`.
-- Config: `wrangler.jsonc` (compatibility date 2026-09-23, `nodejs_compat`, KV binding `wplokerbjm`, HTTPS dev port 8787).
-- Build output: `.svelte-kit/cloudflare/_worker.js` plus assets in `.svelte-kit/cloudflare`.
-- `sveltekit({ files: { assets: "public" } })` keeps static assets in `public/`; do not remove it.
+- Adapter: `@sveltejs/adapter-cloudflare@9`; it sets the Worker entry itself (`worker: true` default).
+- Config: `wrangler.jsonc` (compatibility date, `nodejs_compat`, KV `wplokerbjm`, HTTPS dev 8787). Do **not** set `main`/`assets` — v9 injects both and rejects a `main` under `.svelte-kit/cloudflare`.
+- Build output: `.svelte-kit/cloudflare/client/` (assets) + `.svelte-kit/cloudflare/worker/index.js`; generated `worker/wrangler.json` is used via `.wrangler/deploy/config.json`. Build with `CLOUDFLARE_ENV=production` to target `wplokerbjm-prod` (routes + KV); CI sets it and `wrangler deploy --env production` matches `targetEnvironment`.
+- `sveltekit({ files: { assets: "public" } })` keeps static assets in `public/`; do not remove it. Partytown files are copied to `.svelte-kit/cloudflare/client/~partytown`.
 - Cloudflare APIs are **not** on `platform`:
   - `env`, `ctx.waitUntil` → import from `cloudflare:workers`
   - `request.cf` → property on `Request`

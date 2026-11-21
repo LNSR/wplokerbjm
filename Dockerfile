@@ -43,7 +43,7 @@ RUN curl -o /usr/local/bin/wp -L https://raw.githubusercontent.com/wp-cli/builds
 RUN curl -sSLf -o /usr/local/bin/install-php-extensions https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions && \
     chmod +x /usr/local/bin/install-php-extensions
 
-RUN install-php-extensions redis imagick apcu igbinary msgpack yaml brotli bcmath calendar curl exif gd gettext gmp intl mbstring mysqli pcntl soap sockets sodium sysvmsg sysvsem sysvshm xml zip zstd psr fileinfo inotify
+RUN install-php-extensions redis imagick apcu igbinary msgpack yaml brotli bcmath calendar curl exif gd gettext gmp intl mbstring mysqli pcntl soap sockets sodium sysvmsg sysvsem sysvshm xml zip zstd fileinfo inotify
 
 
 FROM extension-builder AS development-builder

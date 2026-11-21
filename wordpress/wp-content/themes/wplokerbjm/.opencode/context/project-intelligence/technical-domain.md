@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.10 | Updated: 2026-11-21 -->
+<!-- Context: project-intelligence/technical | Priority: critical | Version: 3.11 | Updated: 2026-11-27 -->
 
 # Technical Domain — Lowker Site Theme
 
@@ -48,17 +48,17 @@ wplokerbjm/ root → tests/  tools/Composer/Scripts/  cache/  composer.json (too
 
 ## WP Hook Engine (Core Pattern)
 
-**Concept**: PHP 8 attributes replace manual `add_action()`/`add_filter()`. `#[Action]`/`#[Filter]` on methods AND properties → scanned by `WPHooksScanner` → compiled into callable plans → lazily registered via `Init` + DI container at boot. Lifecycle: scan → plan → register → fire, with gates, deferral, tags, and compiled caches. Two registries share the model: `WPHooksContainerRegistry` (attribute-discovered services) and `WPHooksInstanceRegistry` (runtime/programmatic hooks; renamed from `WPHooksRuntimeRegistry`).
+**Concept**: PHP 8 attributes replace manual `add_action()`/`add_filter()`. `#[Action]`/`#[Filter]` on methods AND properties → scanned by `WPHooksScanner` → compiled into callable plans → lazily registered via `Init` + DI container at boot. Discovery is stable file-based: RobotLoader index + `$container->getKnownEntryNames()`, deduped and filtered through `$container->has()`, never "classes instantiated this request". Lifecycle: scan → plan → register → fire, with gates, deferral, tags, compiled caches, and an injected `HookLoggerInterface`. Two registries share the model: `WPHooksContainerRegistry` (attribute-discovered services) and `WPHooksInstanceRegistry` (runtime/programmatic hooks; renamed from `WPHooksRuntimeRegistry`).
 
 **Key points**:
 
 - `#[Action(hook, priority?, acceptedArgs?, executeIf?, registerIf?, tag?, deferRegisterUntilHook?, deferRegister?, once?, onUnregisterDo?, debug*?)]` / `#[Filter(...)]` on methods and properties; attributes are inert, repeatable metadata and only declared members are scanned
 - `hook`: `string|\Closure` (resolved via container, must return string); `tag`: `string|array|\Closure` — items may be `BackedEnum`, all normalized to strings; invalid tag → that hook is logged + skipped
 - `registerIf`: registration gate — once for eager hooks, re-evaluated at deferred activation; `executeIf`: fire-time gate — false or evaluation failure (throw, non-bool, unresolvable dep) is **declined**: action skipped, filter passes value through, ERROR logged; `once` is consumed either way
-- `deferRegister: true` → deferred pool: container activates via `activateDeferredBy*`, runtime via `activateDeferredByCallableInLiveInstance()`; adding `deferRegisterUntilHook: '<hook>'` auto-activates on the trigger (both paths). Runtime deferred removal: `unregisterDeferredByCallableInLiveInstance()`; active-pool `unregisterBy*` never sweeps deferred entries
-- Entries: `Registry/Handlers/` (`ContainerRegistryHandlerEntry` / `RuntimeRegistryHandlerEntry`) + `Trait/HandlerEntryTrait` (`register()` / `unregister()` / `isCurrentlyExecuting()`); `Indexers/EntriesIndexer` = O(K) lookup; `Janitor/QueuedHooksCleaner` = queued once-removal
+- `deferRegister: true` → deferred pool: container activates via `activateDeferredBy*`, runtime via `activateDeferredByCallableInLiveInstance()`; adding `deferRegisterUntilHook: '<hook>'` auto-activates on the trigger (both paths). Container pool is a flat array + `EntriesIndexer`; instance pool is `WeakMap<owner, array<string, entry>>`, so owner GC drops its bucket and auto-scheduler immediately. Runtime deferred removal: `unregisterDeferredByCallableInLiveInstance()`; active-pool `unregisterBy*` never sweeps deferred entries
+- Entries: `Registry/Handlers/` (`ContainerRegistryHandlerEntry` / `RuntimeRegistryHandlerEntry`) + `Trait/HandlerEntryTrait` (`register()` / `unregister()` / `isCurrentlyExecuting()`); `HookInvokerTrait::$dispatchDepth` tracks reentrancy for safe cleanup; `Indexers/EntriesIndexer` = O(K) lookup; `Janitor/QueuedHooksCleaner` = queued once-removal
 - Caches: scanner output → `cache/WPhooksRegistryContainerCache.php`; runtime instance metadata → `cache/WPHooksInstanceObjectCache.php`; `Registrations/` + `Provider/CallableHookParams.php` are readonly `AbstractDataObject` DTOs exported via `__set_state`
-- `Abstract/ModuleClassHookMetadata` — anonymous self-registering hook hosts (was `AnonClassHookMetadata`); the instance registry auto-unregisters hooks of dead owners
+- Logging: WPHooks depends on `HookLoggerInterface` through DI; `SharedLoggerAdapter` delegates to `Shared\Log\Logger`, `NullHookLogger` is the standalone/test default. `Abstract/ModuleHookMetadata` (anonymous self-registering hosts; instance registry auto-unregisters dead owners) intentionally still uses the shared logger until decoupled from `AsInnerClass`
 - Static and inherited (non-declared) methods are SKIPPED; private/protected members work, `__invoke` is the only supported magic method, and stacked attributes provide multi-priority
 
 **Once-hooks & WP core #61263**: removing a callback while its own priority is dispatching makes `WP_Hook::resort_active_iterations()` skip the next priority whenever a *lower-priority* callback survives. Once-handlers therefore **never unregister mid-dispatch**: `isCurrentlyExecuting()` queues the entry in `QueuedHooksCleaner::$queuedRemovalEntry`, and the cleaner wipes previously-queued handlers as soon as the next invoker runs (remainder outside dispatch) — the consumed flag already prevents re-firing. See https://core.trac.wordpress.org/ticket/61263
@@ -88,11 +88,11 @@ public function registerCronWP(): void { ... }
 ```
 Support/WPHooks/
 ├── WPHooksScanner.php · Registrations/ · Provider/ · Plan/ · Resolution/ # scan → DTOs · plans · resolution
-├── Debug/ · Abstract/ · Trait/         # probes/DTOs · ModuleClassHookMetadata · shared traits
+├── Debug/ · Abstract/ · Trait/ · Logger/ # probes/DTOs · ModuleHookMetadata · shared traits · swappable logger
 ├── Registry/                           # WPHooksContainerRegistry · WPHooksInstanceRegistry · Handlers/
-│   ├── DeferredManager/Handlers/       # deferred pools · DeferredHookEntryHandler
+│   ├── DeferredManager/Handlers/       # flat container pool · owner WeakMap instance pool · DeferredHookEntryHandler
 │   └── Resolver/                       # ContainerRegistryHookTargetResolver · InstanceRegistryRuntimeHookResolver
-├── Invoker/                            # ContainerLazy + Runtime invokers (method/property variants)
+├── Invoker/HookInvoker.php · Target/   # unified invoker; container/runtime method/property targets
 ├── Janitor/QueuedHooksCleaner.php      # queued once/GC removal (WP #61263)
 └── Indexers/EntriesIndexer.php · Utilities/   # O(K) hook/class/tag/callable/namespace · HookPattern · Tag
 ```
@@ -161,16 +161,16 @@ public function registerTypes(): void
 - Prefer guard clauses (early returns) over nested conditionals for validation and error handling; keep the happy path at the lowest indentation
 - Cache invalidation via `Cache::deleteMultiple()` / `Cache::deletePattern()` with wildcards
 - Input sanitization: `sanitize_text_field()`, `wp_kses_post()`, custom `ControllerUtils` methods
-- All service classes use constructor-based DI (no `new` for services outside container); exception: anonymous child objects (`AsChildClass` subclasses) receive property injection via `#[Inject]` + `DependencyInjector::injectOn($this)` — a compiled alternative to constructor DI for anonymous-class private state
+- All service classes use constructor-based DI (no `new` for services outside container); exception: anonymous child objects (`AsInnerClass` subclasses) receive property injection via `#[Inject]` + `DependencyInjector::injectOn($this)` — a compiled alternative to constructor DI for anonymous-class private state
 
 ## InstanceDiscovery / Compiled Property Injection
 
-**Concept**: Anonymous `AsChildClass` objects get compiled property injection via custom `#[Inject]` + `DependencyInjector::injectOn($this)` — reflection runs once at compile; the hot path is reflection-free.
+**Concept**: Anonymous `AsInnerClass` objects get compiled property injection via custom `#[Inject]` + `DependencyInjector::injectOn($this)` — reflection runs once at compile; the hot path is reflection-free.
 
 **Key points**:
 
 - `#[Inject]` (`Core/Container/Attributes/AttributesDI.php`): targets property|method|parameter; `name` (string|array|null) + `lazy` (bool); project-owned, invisible to PHP-DI's scanner
-- `AsChildClass` (`Core/Container/Support/InstanceDiscovery/Abstract/`): readonly `parentClass` (string|object) + `identifier`; `ModuleClassHookMetadata` extends it
+- `AsInnerClass` (`Core/Container/Support/InstanceDiscovery/Abstract/`): readonly `parentClass` (string|object) + `identifier`; `ModuleHookMetadata` extends it
 - Callables `[Class::class, 'member']` cover methods AND class properties; `lazy: true` (methods only) injects a first-class callable into a `\Closure`-typed property
 - Compile-time validation: assignability, nullable rules, void/never + required-param methods, static/readonly/inherited-private properties, lazy-on-string. Plan cache at `cache/DependencyInjectorCache.php`; eager write; never exports live objects
 
@@ -186,7 +186,7 @@ public function registerTypes(): void
 
 ## 📂 Codebase References
 
-**Hook System**: `server/Core/Container/Attributes/WPHooksAttributes.php`, `server/Core/Container/Support/WPHooks/WPHooksScanner.php`, `server/Core/Container/Support/WPHooks/Registrations/`, `server/Core/Container/Support/WPHooks/Provider/{WPHookPlanProvider.php,CallableHookParams.php}`, `server/Core/Container/Support/WPHooks/Plan/`, `server/Core/Container/Support/WPHooks/Resolution/`, `server/Core/Container/Support/WPHooks/Debug/`, `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/Handlers/`, `server/Core/Container/Support/WPHooks/Registry/DeferredManager/*`, `server/Core/Container/Support/WPHooks/Registry/Resolver/*`, `server/Core/Container/Support/WPHooks/Invoker/*`, `server/Core/Container/Support/WPHooks/Janitor/QueuedHooksCleaner.php`, `server/Core/Container/Support/WPHooks/Indexers/EntriesIndexer.php`, `server/Core/Container/Support/WPHooks/Utilities/*`, `server/Core/Container/Support/WPHooks/Abstract/ModuleClassHookMetadata.php`, `server/Core/Container/Support/WPHooks/Trait/*`, `server/Core/Container/Init.php`, `server/Core/Wordpress/GlobalHooks.php`
+**Hook System**: `server/Core/Container/Attributes/WPHooksAttributes.php`, `server/Core/Container/Support/WPHooks/WPHooksScanner.php`, `server/Core/Container/Support/WPHooks/Registrations/`, `server/Core/Container/Support/WPHooks/Provider/{WPHookPlanProvider.php,CallableHookParams.php}`, `server/Core/Container/Support/WPHooks/Plan/`, `server/Core/Container/Support/WPHooks/Resolution/`, `server/Core/Container/Support/WPHooks/Debug/`, `server/Core/Container/Support/WPHooks/Logger/`, `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php`, `server/Core/Container/Support/WPHooks/Registry/Handlers/`, `server/Core/Container/Support/WPHooks/Registry/DeferredManager/*`, `server/Core/Container/Support/WPHooks/Registry/Resolver/*`, `server/Core/Container/Support/WPHooks/Invoker/*`, `server/Core/Container/Support/WPHooks/Janitor/QueuedHooksCleaner.php`, `server/Core/Container/Support/WPHooks/Indexers/EntriesIndexer.php`, `server/Core/Container/Support/WPHooks/Utilities/*`, `server/Core/Container/Support/WPHooks/Abstract/ModuleHookMetadata.php`, `server/Core/Container/Support/WPHooks/Trait/*`, `server/Core/Container/Init.php`, `server/Core/Wordpress/GlobalHooks.php`
 
 **REST**: `server/Transport/REST/Route/LowonganIngestRoute.php`, `server/Transport/REST/Controllers/Ingest/LowonganIngestControllers.php`
 
@@ -194,6 +194,6 @@ public function registerTypes(): void
 
 **Cache**: `server/Shared/Cache/Cache.php`, `server/Shared/Cache/CacheKey.php`
 
-**DI**: `server/Core/Container/Support/InstanceDiscovery/DependencyAutowireScanner.php`, `server/Core/Container/Definitions/Factories.php`, `server/Core/Container/Attributes/AttributesDI.php`, `server/Core/Container/Support/InstanceDiscovery/DependencyInjector.php`, `server/Core/Container/Support/InstanceDiscovery/Abstract/AsChildClass.php`, `cache/DependencyInjectorCache.php`
+**DI**: `server/Core/Container/Support/InstanceDiscovery/DependencyAutowireScanner.php`, `server/Core/Container/Definitions/Factories.php`, `server/Core/Container/Attributes/AttributesDI.php`, `server/Core/Container/Support/InstanceDiscovery/DependencyInjector.php`, `server/Core/Container/Support/InstanceDiscovery/Abstract/AsInnerClass.php`, `cache/DependencyInjectorCache.php`
 
 **Dev Workflows**: `tools/Composer/Scripts/autoloadwatcher.sh`, `tools/Composer/Scripts/test.sh`, `tools/Composer/Scripts/lint.sh`, `tests/WPHookTests/InitLazyHookTest.php`, `tests/WPHookTests/DeferredHookTest.php`, `tests/WPHookTests/TestTracTicket61263.php`

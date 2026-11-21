@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\WPHookTests\Registry;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -373,7 +373,7 @@ final class InstanceRegistryTagSelectorTest extends WplokerbjmTestCase
     {
         $cache = new WPHooksInstanceObjectCache();
 
-        $factory = static fn(array $tags): ModuleClassHookMetadata => new class ($tags) extends ModuleClassHookMetadata {
+        $factory = static fn(array $tags): ModuleHookMetadata => new class ($tags) extends ModuleHookMetadata {
             public function __construct(public array $tags)
             {
                 parent::__construct('CachedTagHost', 'hooks');

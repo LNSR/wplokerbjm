@@ -4,7 +4,6 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
-use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     DeferredActivationResultDTO,
     DeferredActivationSource,
@@ -19,37 +18,71 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\
 /**
  * Shared deferred-hook pool mechanics for hook registries.
  *
- * Owns the deferred pool storage plus the generic activation and
- * unregistration sweeps. The registration gate is re-evaluated at activation
- * time through {@see gateDeferredActivation()}, which each consuming class
- * implements with its own provider (WPHookPlanProvider on the container path,
- * RuntimeHookProvider on the runtime path).
+ * Owns the generic activation and unregistration sweeps. Storage is supplied
+ * by the consuming manager:
  *
- * The micromanage API (activateDeferredByHook/ByClass/ByTags/...,
- * unregisterDeferredBy*) stays on the container-side ContainerRegistryDeferredHookManager; the
- * runtime registry consumes the same mechanics behind an automatic-only
- * surface.
+ * - container registry: one flat array keyed by unique entry key;
+ * - instance registry: a WeakMap keyed by the owner object, with each bucket
+ *   keyed by unique entry key.
+ *
+ * The registration gate is re-evaluated at activation time through
+ * {@see gateDeferredActivation()}, which each consuming class implements with
+ * its own provider (WPHookPlanProvider on the container path, RuntimeHookProvider
+ * on the runtime path).
+ *
  * @phpstan-import-type CallablePlan from WPHookPlanProvider
  * @phpstan-import-type DeferredHookEntry from DeferredHookEntryHandler
  * @phpstan-import-type ActivateEntry from WPHooksContainerRegistry
  * @phpstan-import-type ActivateRuntimeEntry from WPHooksInstanceRegistry
  * @template TKey
  * @phpstan-type IndexedHandler array<TKey, DeferredHookEntryHandler>
- * @mixin EntriesIndexer
- * 
+ *
  * @internal
  */
 trait DeferredHooksTrait
 {
+    /** @var \WeakReference<static> */
+    private \WeakReference $self;
+    
     /**
-     * Deferred handlers pool, keyed directly by unique entry key (TKey).
+     * Get one deferred entry. Instance managers pass their owner; container
+     * managers pass null and use their flat pool.
      *
-     * @var IndexedHandler
+     * @param TKey $key
      */
-    protected array $deferredHandlers = [];
-    /** @var DeferredHookEntry['removeEntryIndexCallback'] */
-    protected ?\Closure $destroyIndexes = null;
+    abstract protected function deferredGet(string $key, ?object $owner = null): ?DeferredHookEntryHandler;
 
+    /**
+     * Store one deferred entry under its unique key.
+     *
+     * @param TKey $key
+     */
+    abstract protected function deferredPut(string $key, DeferredHookEntryHandler $entry, ?object $owner = null): void;
+
+    /**
+     * Remove one deferred entry.
+     *
+     * @param TKey $key
+     */
+    abstract protected function deferredRemove(string $key, ?object $owner = null): void;
+
+    /**
+     * Number of entries in the pool (owner bucket for instance managers).
+     */
+    abstract protected function deferredCount(?object $owner = null): int;
+
+    /**
+     * All entries in the pool (owner bucket for instance managers).
+     *
+     * @return IndexedHandler
+     */
+    abstract protected function deferredEntries(?object $owner = null): array;
+
+    /**
+     * Hook for managers that maintain secondary indexes. The container
+     * manager uses this for EntriesIndexer; the instance manager has none.
+     */
+    protected function afterDeferredAdded(DeferredHookEntryHandler $entry): void {}
 
     /**
      * Store a deferred hook entry under its unique key.
@@ -57,9 +90,13 @@ trait DeferredHooksTrait
      */
     private function addDeferred(DeferredHookEntryHandler $entry): void
     {
-        $this->deferredHandlers[$entry->toUniqueKey()] = $entry;
-        $this->entriesIndexer->setIndexes($entry);
-        $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes ??= $this->entriesIndexer->removeIndexes(...));
+        $owner = $entry->instance?->get();
+
+        // Instance-scoped entries cannot be tracked after their owner died.
+        if ($entry->instance instanceof \WeakReference && $owner === null) return;
+
+        $this->deferredPut($entry->toUniqueKey(), $entry, $owner);
+        $this->afterDeferredAdded($entry);
         $this->emitDeferredSnapshot($entry, DeferredDebugPhase::Queued);
     }
 
@@ -98,22 +135,25 @@ trait DeferredHooksTrait
      *
      * @param list<TKey> $keys
      * @param ActivateEntry&ActivateRuntimeEntry $activateEntry Moves an accepted entry to the active pool.
+     * @param DeferredActivationSource $source Why activation was attempted.
+     * @param object|null $owner Owner bucket for instance managers; null for container managers.
      * @return int Number of newly activated entries.
      */
     private function activateMatchingDeferredEntries(
         array $keys,
         callable $activateEntry,
         DeferredActivationSource $source = DeferredActivationSource::Manual,
-    ): int
-    {
+        ?object $owner = null,
+    ): int {
         $activated = 0;
         if ($keys === []) return $activated;
+
         foreach ($keys as $key) {
-            $entry = $this->deferredHandlers[$key] ?? null;
+            $entry = $this->deferredGet($key, $owner);
             if ($entry === null) continue;
 
             $startedAt = \hrtime(true);
-            $poolBefore = \count($this->deferredHandlers);
+            $poolBefore = $this->deferredCount($owner);
             $this->emitDeferredSnapshot($entry, DeferredDebugPhase::ActivationAttempt, source: $source);
 
             if (!$this->gateDeferredActivation($entry)) {
@@ -123,7 +163,7 @@ trait DeferredHooksTrait
                     reason: 'register_if_false',
                     elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
                     poolSizeBefore: $poolBefore,
-                    poolSizeAfter: \count($this->deferredHandlers),
+                    poolSizeAfter: $this->deferredCount($owner),
                 ), $source);
                 continue;
             }
@@ -134,19 +174,19 @@ trait DeferredHooksTrait
                     reason: 'activate_entry_returned_false',
                     elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
                     poolSizeBefore: $poolBefore,
-                    poolSizeAfter: \count($this->deferredHandlers),
+                    poolSizeAfter: $this->deferredCount($owner),
                 ), $source);
                 continue;
             }
             $activated++;
-            unset($this->deferredHandlers[$key]);
+            $this->deferredRemove($key, $owner);
             $this->emitDeferredSnapshot($entry, DeferredDebugPhase::Activated, new DeferredActivationResultDTO(
                 gatePassed: true,
                 activated: true,
                 reason: 'activated',
                 elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
                 poolSizeBefore: $poolBefore,
-                poolSizeAfter: \count($this->deferredHandlers),
+                poolSizeAfter: $this->deferredCount($owner),
             ), $source);
         }
         return $activated;
@@ -154,19 +194,22 @@ trait DeferredHooksTrait
 
     /**
      * Sweep the deferred pool and remove every entry matching the predicate.
+     *
      * @param list<TKey> $keys
      * @param callable(DeferredHookEntryHandler): bool $matches
+     * @param object|null $owner Owner bucket for instance managers; null for container managers.
      */
-    private function unregisterMatchingDeferredEntries(array $keys, callable $matches): void
+    private function unregisterMatchingDeferredEntries(array $keys, callable $matches, ?object $owner = null): void
     {
         if ($keys === []) return;
+
         foreach ($keys as $key) {
-            $entry = $this->deferredHandlers[$key] ?? null;
+            $entry = $this->deferredGet($key, $owner);
             if ($entry === null) continue;
             if (!$matches($entry)) {
                 continue;
             }
-            unset($this->deferredHandlers[$key]);
+            $this->deferredRemove($key, $owner);
             $this->emitDeferredSnapshot($entry, DeferredDebugPhase::Released);
         }
     }

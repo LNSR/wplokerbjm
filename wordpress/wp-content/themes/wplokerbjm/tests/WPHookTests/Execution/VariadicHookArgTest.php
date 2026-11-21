@@ -6,7 +6,7 @@ namespace WPLokerBJM\Tests\WPHookTests\Execution;
 
 use DI\Container;
 use DI\ContainerBuilder;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{CallableHookParams, WPHookPlanProvider};
 use WPLokerBJM\Tests\Support\Fixtures\VariadicHookService;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;

@@ -13,12 +13,12 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use \WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 {
-    private WPHooksInstanceRegistry $registry;
+    private ?WPHooksInstanceRegistry $registry = null;
 
     /** Mutable flag read by deferred-gate closures (attribute gates must be static). */
     public static bool $deferredGateOpen = false;
@@ -358,7 +358,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         $captured = [];
 
-        $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
+        $anon = new class($this, __FUNCTION__, $captured) extends ModuleHookMetadata {
             public function __construct(RuntimeInstanceRegistryTest $test, string $identifier, private array &$captured)
             {
                 parent::__construct($test, $identifier);
@@ -811,7 +811,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $log = new \ArrayObject();
         $cache = new WPHooksInstanceObjectCache();
 
-        $factory = static fn(\ArrayObject $log): ModuleClassHookMetadata => new class($log) extends ModuleClassHookMetadata {
+        $factory = static fn(\ArrayObject $log): ModuleHookMetadata => new class($log) extends ModuleHookMetadata {
             public function __construct(private \ArrayObject $log)
             {
                 parent::__construct('CachedDeferredGateHost', 'hooks');
@@ -837,11 +837,13 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         // First instance populates the cache (scan path).
         $first = $factory($log);
-        $registry()->registerHooksOn($first);
+        $l1 = $registry();
+        $l1->registerHooksOn($first);
 
         // Second instance takes the cache-hit path — it must NOT be gated eagerly.
         $second = $factory($log);
-        $registry()->registerHooksOn($second);
+        $l2 = $registry();
+        $l2->registerHooksOn($second);
 
         $this->assertNull(
             $this->findRegisteredHook('action', 'cached_gate_destination'),
@@ -858,6 +860,109 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         do_action('cached_gate_destination');
         $this->assertCount(2, $log->getArrayCopy(), 'Both instances must fire.');
+    }
+
+    public function testCacheHitResolvesDynamicHookClosurePerInstance(): void
+    {
+        $cache = new WPHooksInstanceObjectCache();
+
+        $factory = static fn(string $hookName): ModuleHookMetadata => new class($hookName) extends ModuleHookMetadata {
+            public function __construct(private string $hookName)
+            {
+                parent::__construct('CachedDynamicHookHost', 'hooks');
+            }
+
+            #[Action(hook: static function (?self $self): string {
+                return $self?->hookName ?? 'owner_gone';
+            })]
+            public function onHook(): void {}
+        };
+
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
+        ]);
+
+        // First instance populates the cache (scan path).
+        $first = $factory('first_dynamic_hook');
+        $l1 = $registry();
+        $l1->registerHooksOn($first);
+        self::assertNotNull($this->findRegisteredHook('action', 'first_dynamic_hook'));
+
+        // Second instance hits the same metadata site but must resolve the
+        // cached hook closure against its own owner state.
+        $second = $factory('second_dynamic_hook');
+        $l2 = $registry();
+        $l2->registerHooksOn($second);
+
+        self::assertNotNull($this->findRegisteredHook('action', 'first_dynamic_hook'));
+        self::assertNotNull($this->findRegisteredHook('action', 'second_dynamic_hook'));
+    }
+
+    public function testNamedClassUsesClassSiteCacheAcrossInstances(): void
+    {
+        $cache = new WPHooksInstanceObjectCache();
+
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
+        ]);
+
+        $first = new RuntimeNamedClassCacheHost('first');
+        $l1 = $registry();
+        $l1->registerHooksOn($first);
+
+        self::assertNotNull(
+            $cache->getNamedClass(RuntimeNamedClassCacheHost::class),
+            'A scanned named class must populate its class-site cache.',
+        );
+
+        $second = new RuntimeNamedClassCacheHost('second');
+        $l2 = $registry();
+        $l2->registerHooksOn($second);
+
+        do_action('rt_named_class_cache_hook', 'value');
+
+        self::assertSame(['first:value'], $first->captured);
+        self::assertSame(['second:value'], $second->captured);
+    }
+
+    public function testNamedClassForceNoCacheBypassesSiteCache(): void
+    {
+        $cache = new WPHooksInstanceObjectCache();
+
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
+        ]);
+
+        $instance = new RuntimeNamedClassCacheHost('force');
+        $l = $registry();
+        $l->registerHooksOn($instance, forceNoCache: true);
+
+        self::assertNull($cache->getNamedClass(RuntimeNamedClassCacheHost::class));
+        self::assertNotNull($this->findRegisteredHook('action', 'rt_named_class_cache_hook'));
+    }
+
+    public function testBareAnonymousClassIsNeverClassCached(): void
+    {
+        $cache = new WPHooksInstanceObjectCache();
+
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
+        ]);
+
+        $anon = new class {
+            #[Action(hook: 'rt_bare_anon_cache_hook')]
+            public function onHook(): void {}
+        };
+
+        $l = $registry();
+        $l->registerHooksOn($anon);
+
+        self::assertNull($cache->getNamedClass($anon::class));
+        self::assertNotNull($this->findRegisteredHook('action', 'rt_bare_anon_cache_hook'));
     }
 
     public function testUnregisterHooksOnSweepsDeferredPool(): void
@@ -882,7 +987,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
+        $anon = new class($this, __FUNCTION__, $captured) extends ModuleHookMetadata {
             public function __construct(RuntimeInstanceRegistryTest $parentClass, $identifier, private array &$captured)
             {
                 parent::__construct($parentClass, $identifier);
@@ -902,6 +1007,35 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         // Drop the only strong reference — the handler holds a WeakReference,
         // so the owner is garbage-collected and the hook nukes itself.
         unset($anon);
+
+        do_action('rt_lifetime_action', 'x');
+        $this->assertSame([], $captured);
+        $this->assertNull($this->findRegisteredHook('action', 'rt_lifetime_action'));
+    }
+
+    public function testRegistryDeathNukesActiveHooks(): void
+    {
+        $captured = [];
+
+        $anon = new class($this, __FUNCTION__, $captured) extends ModuleHookMetadata {
+            public function __construct(RuntimeInstanceRegistryTest $parentClass, $identifier, private array &$captured)
+            {
+                parent::__construct($parentClass, $identifier);
+            }
+
+            #[Action(hook: 'rt_lifetime_action', acceptedArgs: 1)]
+            public function doSomething(string $val): void
+            {
+                $this->captured[] = $val;
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_lifetime_action'));
+
+        
+        unset($this->registry);
 
         do_action('rt_lifetime_action', 'x');
         $this->assertSame([], $captured);
@@ -998,7 +1132,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
             public function __construct(private WPHooksInstanceRegistry $registry) {}
 
             public $optionActivePlugin {
-                get => $this->optionActivePlugin ??= new class($this->registry) extends ModuleClassHookMetadata {
+                get => $this->optionActivePlugin ??= new class($this->registry, __PROPERTY__) extends ModuleHookMetadata {
                     private const CONDITION = false;
                     public function __construct(private WPHooksInstanceRegistry $registry)
                     {
@@ -1033,29 +1167,12 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $result = apply_filters('option_active_plugins', ['a', 'b']);
         $this->assertSame(['a', 'b'], $result);
     }
-    public function testAutomaticUnregisterAtCertainHook(): void
-    {
-        $host = new class(__CLASS__, __METHOD__, $this->registry) extends ModuleClassHookMetadata {
-            #[Action('rt_trigger_something', once: true, executeIf: static function (): bool {
-                return true;
-            })]
-            public function test(): void {}
-        };
-
-        $this->registry->registerHooksOn($host, 'rt_automaticUnregister');
-
-        $this->assertNotNull($this->findRegisteredHook('action', 'rt_trigger_something'));
-
-        do_action('rt_automaticUnregister');
-
-        $this->assertNull($this->findRegisteredHook('action', 'rt_trigger_something'));
-    }
 
     /**
      * Regression guard for deferred registrations on the runtime cache-hit path.
      *
      * `registerHooksOn()` caches the reflected metadata of a
-     * ModuleClassHookMetadata site — including entries carrying
+     * ModuleHookMetadata site — including entries carrying
      * `deferRegisterUntilHook`. A later instance of the SAME site hits that
      * cache, so `registerCachedEntries()` must re-hydrate the deferral (rebuild
      * the deferred pool entry and its trigger listener) instead of registering
@@ -1073,7 +1190,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         // Two instances of the SAME anonymous class (same factory expression)
         // share one cache site:
         //   (CachedDeferredHost, hooks).
-        $factory = static fn(\ArrayObject $log): ModuleClassHookMetadata => new class($log) extends ModuleClassHookMetadata {
+        $factory = static fn(\ArrayObject $log): ModuleHookMetadata => new class($log) extends ModuleHookMetadata {
             public function __construct(private \ArrayObject $log)
             {
                 parent::__construct('CachedDeferredHost', 'hooks');
@@ -1100,7 +1217,8 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $first = $factory($log);
 
         // First instance populates the cache (reflection scan path).
-        $registry()->registerHooksOn($first);
+        $l1 = $registry();
+        $l1->registerHooksOn($first);
 
         self::assertNull(
             $this->findRegisteredHook('action', 'cached_deferred_destination'),
@@ -1113,7 +1231,8 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         // Second instance hits the cache.
         $second = $factory($log);
-        $registry()->registerHooksOn($second);
+        $l2 = $registry();
+        $l2->registerHooksOn($second);
 
         self::assertNull(
             $this->findRegisteredHook('action', 'cached_deferred_destination'),
@@ -1166,5 +1285,23 @@ class RuntimePropInvokable
     public static function transform(string $value): string
     {
         return strtoupper($value);
+    }
+}
+
+/**
+ * Named-class host proving class-site metadata is shared across instances
+ * while handler ownership remains per instance.
+ */
+final class RuntimeNamedClassCacheHost
+{
+    /** @var list<string> */
+    public array $captured = [];
+
+    public function __construct(private string $id) {}
+
+    #[Action(hook: 'rt_named_class_cache_hook', acceptedArgs: 1)]
+    public function onHook(string $value): void
+    {
+        $this->captured[] = $this->id . ':' . $value;
     }
 }

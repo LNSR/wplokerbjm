@@ -6,6 +6,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers;
 
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
@@ -73,6 +74,7 @@ final class RuntimeRegistryHandlerEntry
         public readonly array $onUnregisterDoParams,
         public readonly HookKey $hookKey,
         public readonly ?WeakReference $owner = null,
+        public readonly HookLoggerInterface $logger = new NullHookLogger(),
     ) {
         $this->handler = $handler;
         $this->invokerLabel = $handler->label;
@@ -99,7 +101,8 @@ final class RuntimeRegistryHandlerEntry
             onUnregisterDo: $entry->onUnregisterDo,
             onUnregisterDoParams: $entry->onUnregisterDoParams,
             hookKey: $entry->key,
-            owner: $entry->instance
+            owner: $entry->instance,
+            logger: $entry->logger,
         );
     }
 }

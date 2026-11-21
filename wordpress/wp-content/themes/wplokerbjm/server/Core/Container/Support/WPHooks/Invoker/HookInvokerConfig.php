@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\DebugProbes;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Plan\CallablePlanFactory;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{CallableHookParams, WPHookPlanProvider};
 
@@ -65,6 +66,7 @@ final readonly class HookInvokerConfig
         public ?\Closure $debugLiveUnregistration = null,
         public array $debugLiveUnregistrationParams = [],
         public ?WPHookPlanProvider $planProvider = null,
+        public HookLoggerInterface $logger = new NullHookLogger(),
     ) {}
 
     public function probes(): DebugProbes

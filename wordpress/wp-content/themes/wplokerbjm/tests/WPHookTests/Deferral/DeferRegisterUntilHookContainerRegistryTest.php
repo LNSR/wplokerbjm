@@ -255,6 +255,46 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
         self::assertSame(['dynamic'], ExecuteIfActionService::$capturedValues, 'Hook must be executed after activation.');
     }
 
+    public function testSchedulerRemovalOnSameHookDoesNotSkipAdjacentPriorities(): void
+    {
+        $registry = $this->createRegistry([
+            $this->action(
+                ExecuteIfActionService::class,
+                'onExecuteIfAction',
+                'same_hook_trigger',
+                priority: PHP_INT_MIN + 2,
+                registerIf: static fn(): bool => true,
+                deferRegisterUntilHook: 'same_hook_trigger',
+                hookArgs: ['value'],
+            ),
+        ]);
+        $registry->initialize();
+
+        $before = static function (): void {
+            ExecuteIfActionService::$capturedValues[] = 'before';
+        };
+        $after = static function (): void {
+            ExecuteIfActionService::$capturedValues[] = 'after';
+        };
+
+        add_action('same_hook_trigger', $before, PHP_INT_MIN + 1, 0);
+        add_action('same_hook_trigger', $after, PHP_INT_MIN + 3, 0);
+
+        do_action('same_hook_trigger', 'activated');
+
+        self::assertArrayNotHasKey(
+            PHP_INT_MIN,
+            $GLOBALS['wp_filter']['same_hook_trigger']->callbacks,
+            'The one-shot scheduler must remove itself without leaving its priority bucket behind.',
+        );
+
+        self::assertSame(
+            ['before', 'activated', 'after'],
+            ExecuteIfActionService::$capturedValues,
+            'Scheduler self-removal must not skip an adjacent priority; same-hook activation must run in place.',
+        );
+    }
+
     /**
      * Build a registration array for an action hook.
      */
