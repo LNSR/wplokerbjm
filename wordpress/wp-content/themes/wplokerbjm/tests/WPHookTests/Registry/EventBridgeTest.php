@@ -277,5 +277,94 @@ final class EventBridgeTest extends WplokerbjmTestCase
         self::assertSame(0, $dropped->runs);
     }
 
+    public function testInstanceHookPatternAndClassEventsDriveSelectors(): void
+    {
+        $container = $this->container();
+        $provider = new WPHookPlanProvider($container);
+
+        $registry = new WPHooksInstanceRegistry(
+            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver(), new EntriesIndexer()),
+            $provider,
+            $this->queuedHooksCleaner = new QueuedHooksCleaner(),
+            new InstanceRegistryRuntimeHookResolver(),
+            new WPHooksInstanceObjectCache(),
+        );
+        $registry->initEventBridge();
+
+        $deferred = new class {
+            public int $runs = 0;
+
+            #[Action('event_bridge_pattern_mail_one', 10, deferRegister: true)]
+            public function onMailOne(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('event_bridge_pattern_mail_two', 20, deferRegister: true)]
+            public function onMailTwo(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $dropped = new class {
+            #[Action('event_bridge_pattern_drop_one', 10, deferRegister: true)]
+            public function onDropOne(): void {}
+
+            #[Action('event_bridge_pattern_drop_two', 20, deferRegister: true)]
+            public function onDropTwo(): void {}
+        };
+
+        $active = new class {
+            public int $runs = 0;
+
+            #[Action('event_bridge_class_active_a', 10)]
+            public function onA(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('event_bridge_class_active_b', 20)]
+            public function onB(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        \do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $deferred);
+        \do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $dropped);
+        \do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $active);
+
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_pattern_mail_one'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_pattern_drop_one'));
+        self::assertNotNull($this->findRegisteredHook('action', 'event_bridge_class_active_a'));
+
+        \do_action(
+            WPHooksInstanceRegistry::ACTIVATE_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE,
+            $deferred,
+            'event_bridge_pattern_mail_*',
+        );
+        \do_action(
+            WPHooksInstanceRegistry::UNREGISTER_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE,
+            $dropped,
+            'event_bridge_pattern_drop_*',
+        );
+        \do_action(
+            WPHooksInstanceRegistry::UNREGISTER_BY_CLASS_IN_LIVE_INSTANCE,
+            $active,
+        );
+
+        self::assertNotNull($this->findRegisteredHook('action', 'event_bridge_pattern_mail_one'));
+        self::assertNotNull($this->findRegisteredHook('action', 'event_bridge_pattern_mail_two'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_pattern_drop_one'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_pattern_drop_two'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_class_active_a'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_class_active_b'));
+
+        \do_action('event_bridge_pattern_mail_one');
+        \do_action('event_bridge_pattern_mail_two');
+        self::assertSame(2, $deferred->runs);
+    }
+
     public function deferredBridgeTarget(): void {}
 }

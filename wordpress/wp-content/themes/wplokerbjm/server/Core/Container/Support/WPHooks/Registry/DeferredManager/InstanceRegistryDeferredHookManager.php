@@ -16,6 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
+use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\HookPattern;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
@@ -177,6 +178,70 @@ class InstanceRegistryDeferredHookManager
 
         $this->unregisterMatchingDeferredEntries(
             $this->entriesIndexer->byHook[$hook] ?? [],
+            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+        );
+
+        return $before - \count($this->deferredHandlers);
+    }
+
+    /**
+     * Activate deferred entries owned by one live instance whose hook name
+     * matches a wildcard pattern.
+     *
+     * @param ActivateRuntimeEntry $activateEntry
+     * @return int Number of newly activated entries.
+     */
+    public function activateInstanceHookPatternDeferredEntries(object $instance, string $pattern, callable $activateEntry): int
+    {
+        HookPattern::assertValid($pattern);
+
+        $keys = [];
+
+        foreach ($this->entriesIndexer->byHook as $hook => $hookKeys) {
+            if (!HookPattern::matches($hook, $pattern)) continue;
+
+            foreach ($hookKeys as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if ($entry === null) continue;
+                if ($entry->instance?->get() !== $instance) continue;
+                $keys[$key] = $key;
+            }
+        }
+
+        return $this->activateMatchingDeferredEntries(
+            array_values($keys),
+            $activateEntry,
+            DeferredActivationSource::Manual,
+        );
+    }
+
+    /**
+     * Remove deferred entries owned by one live instance whose hook name
+     * matches a wildcard pattern.
+     *
+     * @return int Number of removed deferred entries.
+     */
+    public function unregisterInstanceHookPatternDeferredEntries(object $instance, string $pattern): int
+    {
+        HookPattern::assertValid($pattern);
+
+        $keys = [];
+
+        foreach ($this->entriesIndexer->byHook as $hook => $hookKeys) {
+            if (!HookPattern::matches($hook, $pattern)) continue;
+
+            foreach ($hookKeys as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if ($entry === null) continue;
+                if ($entry->instance?->get() !== $instance) continue;
+                $keys[$key] = $key;
+            }
+        }
+
+        $before = \count($this->deferredHandlers);
+
+        $this->unregisterMatchingDeferredEntries(
+            array_values($keys),
             fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
         );
 

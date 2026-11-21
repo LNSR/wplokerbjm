@@ -285,6 +285,221 @@ final class InstanceRegistryHookSelectorTest extends WplokerbjmTestCase
         self::assertSame([0, 1], [$first->runs, $second->runs]);
     }
 
+    public function testActivateDeferredByHookPatternWakesOnlyMatchingHooksForOwner(): void
+    {
+        $factory = static fn(): object => new class {
+            public int $mailOne = 0;
+            public int $mailTwo = 0;
+            public int $news = 0;
+
+            #[Action('instance_pattern_mail_one', 10, deferRegister: true)]
+            public function onMailOne(): void
+            {
+                $this->mailOne++;
+            }
+
+            #[Action('instance_pattern_mail_two', 20, deferRegister: true)]
+            public function onMailTwo(): void
+            {
+                $this->mailTwo++;
+            }
+
+            #[Action('instance_pattern_news', 10, deferRegister: true)]
+            public function onNews(): void
+            {
+                $this->news++;
+            }
+        };
+
+        $first = $factory();
+        $second = $factory();
+
+        $this->registry->registerHooksOn($first);
+        $this->registry->registerHooksOn($second);
+
+        self::assertSame(
+            2,
+            $this->registry->activateDeferredByHookPatternInLiveInstance($first, 'instance_pattern_mail_*'),
+        );
+
+        \do_action('instance_pattern_mail_one');
+        \do_action('instance_pattern_mail_two');
+        \do_action('instance_pattern_news');
+
+        self::assertSame([1, 1, 0], [$first->mailOne, $first->mailTwo, $first->news]);
+        self::assertSame([0, 0, 0], [$second->mailOne, $second->mailTwo, $second->news]);
+
+        self::assertSame(
+            2,
+            $this->registry->activateDeferredByHookPatternInLiveInstance($second, 'instance_pattern_mail_*'),
+        );
+
+        \do_action('instance_pattern_mail_one');
+        \do_action('instance_pattern_mail_two');
+        \do_action('instance_pattern_news');
+
+        self::assertSame([2, 2, 0], [$first->mailOne, $first->mailTwo, $first->news]);
+        self::assertSame([1, 1, 0], [$second->mailOne, $second->mailTwo, $second->news]);
+    }
+
+    public function testUnregisterDeferredByHookPatternDropsOnlyMatchingDeferredHooks(): void
+    {
+        $instance = new class {
+            public int $runs = 0;
+
+            #[Action('instance_pattern_drop_mail', 10, deferRegister: true)]
+            public function onMail(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('instance_pattern_drop_news', 10, deferRegister: true)]
+            public function onNews(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('instance_pattern_drop_active', 10)]
+            public function onActive(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $this->registry->registerHooksOn($instance);
+
+        self::assertSame(
+            1,
+            $this->registry->unregisterDeferredByHookPatternInLiveInstance($instance, 'instance_pattern_drop_mail*'),
+        );
+
+        self::assertSame(
+            0,
+            $this->registry->activateDeferredByHookInLiveInstance($instance, 'instance_pattern_drop_mail'),
+        );
+        self::assertSame(
+            1,
+            $this->registry->activateDeferredByHookInLiveInstance($instance, 'instance_pattern_drop_news'),
+            'Deferred hooks outside the pattern must survive.',
+        );
+        self::assertNotNull(
+            $this->findRegisteredHook('action', 'instance_pattern_drop_active'),
+            'Active hooks are untouched by the deferred pattern selector.',
+        );
+    }
+
+    public function testUnregisterByHookPatternRemovesOnlyMatchingActiveHooks(): void
+    {
+        $instance = new class {
+            public int $runs = 0;
+
+            #[Action('instance_pattern_active_mail', 10)]
+            #[Action('instance_pattern_active_mail', 20)]
+            public function onMail(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('instance_pattern_active_news', 10)]
+            public function onNews(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('instance_pattern_active_mail_deferred', 10, deferRegister: true)]
+            public function onDeferredMail(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $this->registry->registerHooksOn($instance);
+
+        self::assertSame(
+            2,
+            $this->registry->unregisterByHookPatternInLiveInstance($instance, 'instance_pattern_active_mail*'),
+        );
+
+        self::assertNull($this->findRegisteredHook('action', 'instance_pattern_active_mail'));
+        self::assertNotNull($this->findRegisteredHook('action', 'instance_pattern_active_news'));
+        self::assertNull($this->findRegisteredHook('action', 'instance_pattern_active_mail_deferred'));
+
+        self::assertSame(
+            1,
+            $this->registry->activateDeferredByHookInLiveInstance($instance, 'instance_pattern_active_mail_deferred'),
+            'The active pattern selector must not sweep deferred entries.',
+        );
+    }
+
+    public function testUnregisterByClassInLiveInstanceRemovesEveryActiveRegistrationForOwner(): void
+    {
+        $instance = new class {
+            public int $runs = 0;
+
+            #[Action('instance_class_active_a', 10)]
+            #[Action('instance_class_active_a', 20)]
+            public function onA(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('instance_class_active_b', 10)]
+            public function onB(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('instance_class_deferred', 10, deferRegister: true)]
+            public function onDeferred(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $sibling = new class {
+            public int $runs = 0;
+
+            #[Action('instance_class_sibling_active', 10)]
+            public function onSibling(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $this->registry->registerHooksOn($instance);
+        $this->registry->registerHooksOn($sibling);
+
+        self::assertSame(3, $this->registry->unregisterByClassInLiveInstance($instance));
+
+        self::assertNull($this->findRegisteredHook('action', 'instance_class_active_a'));
+        self::assertNull($this->findRegisteredHook('action', 'instance_class_active_b'));
+        self::assertNull($this->findRegisteredHook('action', 'instance_class_deferred'));
+
+        self::assertSame(
+            1,
+            $this->registry->activateDeferredByHookInLiveInstance($instance, 'instance_class_deferred'),
+            'Class-scoped active removal must leave the deferred pool untouched.',
+        );
+
+        \do_action('instance_class_active_a');
+        \do_action('instance_class_sibling_active');
+        self::assertSame([0, 1], [$instance->runs, $sibling->runs], 'Only the addressed owner may be swept.');
+    }
+
+    public function testHookPatternSelectorsRejectInvalidPatterns(): void
+    {
+        $instance = new class {
+            #[Action('instance_pattern_invalid', 10, deferRegister: true)]
+            public function onDeferred(): void {}
+        };
+
+        $this->registry->registerHooksOn($instance);
+
+        $this->expectException(\InvalidArgumentException::class);
+
+        $this->registry->activateDeferredByHookPatternInLiveInstance($instance, 'invalid');
+    }
+
     public function testHookSelectorsReturnZeroForUnknownHook(): void
     {
         $instance = new class {
