@@ -24,6 +24,7 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
  *     type: 'action'|'filter',
  *     priority: int,
  *     acceptedArgs: int,
+ *     tags: array<int, string>,
  *     registerIf: \Closure(...): bool,
  *     registerIfParams: CallablePlan,
  *     executeIf: \Closure(...): bool,
@@ -45,6 +46,7 @@ final class RuntimeRegistryHandlerEntry
      * @param RuntimeHandlerEntry['type'] $type
      * @param RuntimeHandlerEntry['priority'] $priority
      * @param RuntimeHandlerEntry['acceptedArgs'] $acceptedArgs
+     * @param RuntimeHandlerEntry['tags'] $tags
      * @param RuntimeHandlerEntry['registerIf'] $registerIf
      * @param RuntimeHandlerEntry['registerIfParams'] $registerIfParams
      * @param RuntimeHandlerEntry['executeIf'] $executeIf
@@ -61,6 +63,7 @@ final class RuntimeRegistryHandlerEntry
         public readonly string $type,
         public readonly int $priority,
         public readonly int $acceptedArgs,
+        public readonly array $tags,
         public readonly ?\Closure $registerIf,
         public readonly array $registerIfParams,
         public readonly ?\Closure $executeIf,
@@ -87,6 +90,7 @@ final class RuntimeRegistryHandlerEntry
             type: $entry->type,
             priority: $entry->priority,
             acceptedArgs: $entry->acceptedArgs,
+            tags: (array) ($entry->tags ?? []),
             registerIf: $entry->registerIf,
             registerIfParams: $entry->registerIfParams,
             executeIf: $entry->executeIf,

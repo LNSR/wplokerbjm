@@ -62,6 +62,9 @@ class WPHooksInstanceObjectCacheTest extends WplokerbjmTestCase
             deferRegisterUntilHook: null,
             deferRegisterUntilHookParams: [],
             hookArgNames: ['c'],
+            tags: ['cache'],
+            tagCallable: static fn(): array => ['seo'],
+            tagCallableParams: [],
             target: 'method',
             targetName: 'onMyHook',
             visibility: 'public',
@@ -148,6 +151,8 @@ class WPHooksInstanceObjectCacheTest extends WplokerbjmTestCase
         $this->assertSame('action', $entries[0]->type);
         $this->assertSame('onMyHook', $entries[0]->targetName);
         $this->assertSame(['c'], $entries[0]->hookArgNames);
+        $this->assertSame(['cache'], $entries[0]->tags);
+        $this->assertSame(['seo'], ($entries[0]->tagCallable)());
         $this->assertTrue(($entries[0]->executeIf)());
     }
 

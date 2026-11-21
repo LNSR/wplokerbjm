@@ -16,7 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\HookPattern;
+use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
@@ -153,6 +153,10 @@ class InstanceRegistryDeferredHookManager
         foreach ($this->entriesIndexer->byHook[$hook] ?? [] as $key) {
             $entry = $this->deferredHandlers[$key] ?? null;
             if ($entry === null) continue;
+            if ($entry->instance?->get() === null) {
+                unset($this->deferredHandlers[$key]);
+                continue;
+            }
             if ($entry->instance?->get() !== $instance) continue;
             $keys[$key] = $key;
         }
@@ -203,6 +207,10 @@ class InstanceRegistryDeferredHookManager
             foreach ($hookKeys as $key) {
                 $entry = $this->deferredHandlers[$key] ?? null;
                 if ($entry === null) continue;
+                if ($entry->instance?->get() === null) {
+                    unset($this->deferredHandlers[$key]);
+                    continue;
+                }
                 if ($entry->instance?->get() !== $instance) continue;
                 $keys[$key] = $key;
             }
@@ -233,7 +241,161 @@ class InstanceRegistryDeferredHookManager
             foreach ($hookKeys as $key) {
                 $entry = $this->deferredHandlers[$key] ?? null;
                 if ($entry === null) continue;
+                if ($entry->instance?->get() === null) {
+                    unset($this->deferredHandlers[$key]);
+                    continue;
+                }
                 if ($entry->instance?->get() !== $instance) continue;
+                $keys[$key] = $key;
+            }
+        }
+
+        $before = \count($this->deferredHandlers);
+
+        $this->unregisterMatchingDeferredEntries(
+            array_values($keys),
+            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+        );
+
+        return $before - \count($this->deferredHandlers);
+    }
+
+    /**
+     * Activate deferred entries owned by one live instance carrying at least
+     * one of the supplied tags.
+     *
+     * @param array<int, string> $tags Tag list; matching is OR.
+     * @param ActivateRuntimeEntry $activateEntry
+     * @return int Number of newly activated entries.
+     */
+    public function activateInstanceTagsDeferredEntries(object $instance, array $tags, callable $activateEntry): int
+    {
+        $tags = HookTagUtilities::normalizeTags($tags);
+        if ($tags === []) return 0;
+
+        $keys = [];
+
+        foreach ($tags as $tag) {
+            foreach ($this->entriesIndexer->byTag[$tag] ?? [] as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if ($entry === null) continue;
+                if ($entry->instance?->get() === null) {
+                    unset($this->deferredHandlers[$key]);
+                    continue;
+                }
+                if ($entry->instance?->get() !== $instance) continue;
+                $keys[$key] = $key;
+            }
+        }
+
+        return $this->activateMatchingDeferredEntries(
+            array_values($keys),
+            $activateEntry,
+            DeferredActivationSource::Manual,
+        );
+    }
+
+    /**
+     * Remove deferred entries owned by one live instance carrying at least
+     * one of the supplied tags.
+     *
+     * @param array<int, string> $tags Tag list; matching is OR.
+     * @return int Number of removed deferred entries.
+     */
+    public function unregisterInstanceTagsDeferredEntries(object $instance, array $tags): int
+    {
+        $tags = HookTagUtilities::normalizeTags($tags);
+        if ($tags === []) return 0;
+
+        $keys = [];
+
+        foreach ($tags as $tag) {
+            foreach ($this->entriesIndexer->byTag[$tag] ?? [] as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if ($entry === null) continue;
+                if ($entry->instance?->get() === null) {
+                    unset($this->deferredHandlers[$key]);
+                    continue;
+                }
+                if ($entry->instance?->get() !== $instance) continue;
+                $keys[$key] = $key;
+            }
+        }
+
+        $before = \count($this->deferredHandlers);
+
+        $this->unregisterMatchingDeferredEntries(
+            array_values($keys),
+            fn(DeferredHookEntryHandler $data): bool => $data->instance?->get() === $instance,
+        );
+
+        return $before - \count($this->deferredHandlers);
+    }
+
+    /**
+     * Activate deferred entries owned by one live instance carrying at least
+     * one tag matching any supplied wildcard pattern.
+     *
+     * @param array<int, string> $patterns Tag wildcard patterns.
+     * @param ActivateRuntimeEntry $activateEntry
+     * @return int Number of newly activated entries.
+     */
+    public function activateInstanceTagPatternDeferredEntries(object $instance, array $patterns, callable $activateEntry): int
+    {
+        if ($patterns === []) return 0;
+        HookPattern::assertValidAll($patterns);
+
+        $keys = [];
+
+        foreach ($this->entriesIndexer->byTag as $tag => $tagKeys) {
+            if (!HookPattern::matchesAny([$tag], $patterns)) continue;
+
+            foreach ($tagKeys as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if ($entry === null) continue;
+                if ($entry->instance?->get() === null) {
+                    unset($this->deferredHandlers[$key]);
+                    continue;
+                }
+                if ($entry->instance?->get() !== $instance) continue;
+                if (!HookPattern::matchesAny((array) ($entry->tags ?? []), $patterns)) continue;
+                $keys[$key] = $key;
+            }
+        }
+
+        return $this->activateMatchingDeferredEntries(
+            array_values($keys),
+            $activateEntry,
+            DeferredActivationSource::Manual,
+        );
+    }
+
+    /**
+     * Remove deferred entries owned by one live instance carrying at least
+     * one tag matching any supplied wildcard pattern.
+     *
+     * @param array<int, string> $patterns Tag wildcard patterns.
+     * @return int Number of removed deferred entries.
+     */
+    public function unregisterInstanceTagPatternDeferredEntries(object $instance, array $patterns): int
+    {
+        if ($patterns === []) return 0;
+        HookPattern::assertValidAll($patterns);
+
+        $keys = [];
+
+        foreach ($this->entriesIndexer->byTag as $tag => $tagKeys) {
+            if (!HookPattern::matchesAny([$tag], $patterns)) continue;
+
+            foreach ($tagKeys as $key) {
+                $entry = $this->deferredHandlers[$key] ?? null;
+                if ($entry === null) continue;
+                if ($entry->instance?->get() === null) {
+                    unset($this->deferredHandlers[$key]);
+                    continue;
+                }
+                if ($entry->instance?->get() !== $instance) continue;
+                if (!HookPattern::matchesAny((array) ($entry->tags ?? []), $patterns)) continue;
                 $keys[$key] = $key;
             }
         }

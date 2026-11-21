@@ -138,7 +138,7 @@ final class DeferredHookEntryHandler
             type: $entry->type,
             priority: $entry->priority,
             acceptedArgs: $entry->acceptedArgs,
-            tags: [],
+            tags: $entry->tags,
             registerIf: $entry->registerIf,
             registerIfParams: $entry->registerIfParams,
             executeIf: $entry->executeIf,

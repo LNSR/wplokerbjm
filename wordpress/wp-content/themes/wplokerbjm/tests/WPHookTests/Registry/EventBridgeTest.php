@@ -366,5 +366,91 @@ final class EventBridgeTest extends WplokerbjmTestCase
         self::assertSame(2, $deferred->runs);
     }
 
+    public function testInstanceTagEventsDriveDeferredAndActiveSelectors(): void
+    {
+        $container = $this->container();
+        $provider = new WPHookPlanProvider($container);
+
+        $registry = new WPHooksInstanceRegistry(
+            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver(), new EntriesIndexer()),
+            $provider,
+            $this->queuedHooksCleaner = new QueuedHooksCleaner(),
+            new InstanceRegistryRuntimeHookResolver(),
+            new WPHooksInstanceObjectCache(),
+        );
+        $registry->initEventBridge();
+
+        $deferred = new class {
+            public int $runs = 0;
+
+            #[Action('event_bridge_tag_hook_a', 10, deferRegister: true, tag: ['event_bridge_tag'])]
+            public function onA(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('event_bridge_tag_hook_b', 20, deferRegister: true, tag: ['event_bridge_tag'])]
+            public function onB(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $dropped = new class {
+            #[Action('event_bridge_tag_drop', 10, deferRegister: true, tag: ['event_bridge_drop'])]
+            public function onDropped(): void {}
+        };
+
+        $active = new class {
+            public int $runs = 0;
+
+            #[Action('event_bridge_tag_active_a', 10, tag: ['event_bridge_active'])]
+            public function onA(): void
+            {
+                $this->runs++;
+            }
+
+            #[Action('event_bridge_tag_active_b', 20, tag: ['event_bridge_active'])]
+            public function onB(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        \do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $deferred);
+        \do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $dropped);
+        \do_action(WPHooksInstanceRegistry::REGISTER_HOOKS, $active);
+
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_tag_hook_a'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_tag_drop'));
+        self::assertNotNull($this->findRegisteredHook('action', 'event_bridge_tag_active_a'));
+
+        \do_action(
+            WPHooksInstanceRegistry::ACTIVATE_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE,
+            $deferred,
+            ['event_bridge_tag'],
+        );
+        \do_action(
+            WPHooksInstanceRegistry::UNREGISTER_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE,
+            $dropped,
+            ['event_bridge_drop'],
+        );
+        \do_action(
+            WPHooksInstanceRegistry::UNREGISTER_BY_TAG_PATTERN_IN_LIVE_INSTANCE,
+            $active,
+            ['event_bridge_active*'],
+        );
+
+        self::assertNotNull($this->findRegisteredHook('action', 'event_bridge_tag_hook_a'));
+        self::assertNotNull($this->findRegisteredHook('action', 'event_bridge_tag_hook_b'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_tag_drop'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_tag_active_a'));
+        self::assertNull($this->findRegisteredHook('action', 'event_bridge_tag_active_b'));
+
+        \do_action('event_bridge_tag_hook_a');
+        \do_action('event_bridge_tag_hook_b');
+        self::assertSame(2, $deferred->runs);
+    }
+
     public function deferredBridgeTarget(): void {}
 }

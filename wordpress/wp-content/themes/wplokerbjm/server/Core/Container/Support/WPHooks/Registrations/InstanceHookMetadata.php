@@ -32,6 +32,9 @@ use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
  *  deferRegisterUntilHook: null|string|\Closure(...): string,
  *  deferRegisterUntilHookParams: CallablePlan,
  *  hookArgNames: list<CallableHookParams>,
+ *  tags: array,
+ *  tagCallable: null|\Closure(...): array,
+ *  tagCallableParams: CallablePlan,
  *  target: 'method'|'property'|'property-hook'|'#manual',
  *  targetName: method-string|property-string|property-hook-string|'#manual-registration',
  *  visibility: 'public'|'protected'|'private',
@@ -62,6 +65,9 @@ final readonly class InstanceHookMetadata extends AbstractDataObject
      * @param InstanceHookMetadataData['deferRegisterUntilHook'] $deferRegisterUntilHook
      * @param InstanceHookMetadataData['deferRegisterUntilHookParams'] $deferRegisterUntilHookParams
      * @param InstanceHookMetadataData['hookArgNames'] $hookArgNames
+     * @param InstanceHookMetadataData['tags'] $tags
+     * @param InstanceHookMetadataData['tagCallable'] $tagCallable
+     * @param InstanceHookMetadataData['tagCallableParams'] $tagCallableParams
      * @param InstanceHookMetadataData['target'] $target
      * @param InstanceHookMetadataData['targetName'] $targetName
      * @param InstanceHookMetadataData['visibility'] $visibility
@@ -87,6 +93,9 @@ final readonly class InstanceHookMetadata extends AbstractDataObject
         public string|\Closure|null $deferRegisterUntilHook = null,
         public array $deferRegisterUntilHookParams = [],
         public array $hookArgNames = [],
+        public array $tags = [],
+        public ?\Closure $tagCallable = null,
+        public array $tagCallableParams = [],
         public string $target = 'method',
         public string $targetName = '',
         public string $visibility = 'public',

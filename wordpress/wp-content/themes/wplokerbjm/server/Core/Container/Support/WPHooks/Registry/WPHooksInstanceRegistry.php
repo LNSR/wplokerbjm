@@ -12,7 +12,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\HookPattern;
+use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
@@ -51,6 +51,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\
  *! fires; on its own it waits for
  *! {@see activateDeferredByHookInLiveInstance()} (one hook),
  *! {@see activateDeferredByHookPatternInLiveInstance()} (matching hooks),
+ *! {@see activateDeferredByTagsInLiveInstance()} (matching tags),
  *! {@see activateDeferredByCallableInLiveInstance()} (one member), or
  *! {@see activateDeferredByClassInLiveInstance()} (every deferred member of
  *! the instance). Static methods are
@@ -76,10 +77,16 @@ class WPHooksInstanceRegistry
     public const UNREGISTER_BY_HOOK_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_by_hook_in_live_instance';
     public const UNREGISTER_BY_HOOK_PATTERN_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_by_hook_pattern_in_live_instance';
     public const UNREGISTER_BY_CLASS_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_by_class_in_live_instance';
+    public const UNREGISTER_BY_TAGS_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_by_tags_in_live_instance';
+    public const UNREGISTER_BY_TAG_PATTERN_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_by_tag_pattern_in_live_instance';
     public const UNREGISTER_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_deferred_by_hook_in_live_instance';
     public const UNREGISTER_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_deferred_by_hook_pattern_in_live_instance';
+    public const UNREGISTER_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_deferred_by_tags_in_live_instance';
+    public const UNREGISTER_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_deferred_by_tag_pattern_in_live_instance';
     public const ACTIVATE_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE = 'wphooks_instance_activate_deferred_by_hook_in_live_instance';
     public const ACTIVATE_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE = 'wphooks_instance_activate_deferred_by_hook_pattern_in_live_instance';
+    public const ACTIVATE_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE = 'wphooks_instance_activate_deferred_by_tags_in_live_instance';
+    public const ACTIVATE_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE = 'wphooks_instance_activate_deferred_by_tag_pattern_in_live_instance';
     public const UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_by_callable_in_live_instance';
     public const UNREGISTER_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE = 'wphooks_instance_unregister_deferred_by_callable_in_live_instance';
     public const ACTIVATE_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE = 'wphooks_instance_activate_deferred_by_callable_in_live_instance';
@@ -105,10 +112,16 @@ class WPHooksInstanceRegistry
         self::UNREGISTER_BY_HOOK_IN_LIVE_INSTANCE => 'unregisterByHookInLiveInstance',
         self::UNREGISTER_BY_HOOK_PATTERN_IN_LIVE_INSTANCE => 'unregisterByHookPatternInLiveInstance',
         self::UNREGISTER_BY_CLASS_IN_LIVE_INSTANCE => 'unregisterByClassInLiveInstance',
+        self::UNREGISTER_BY_TAGS_IN_LIVE_INSTANCE => 'unregisterByTagsInLiveInstance',
+        self::UNREGISTER_BY_TAG_PATTERN_IN_LIVE_INSTANCE => 'unregisterByTagPatternInLiveInstance',
         self::UNREGISTER_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 'unregisterDeferredByHookInLiveInstance',
         self::UNREGISTER_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE => 'unregisterDeferredByHookPatternInLiveInstance',
+        self::UNREGISTER_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE => 'unregisterDeferredByTagsInLiveInstance',
+        self::UNREGISTER_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE => 'unregisterDeferredByTagPatternInLiveInstance',
         self::ACTIVATE_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 'activateDeferredByHookInLiveInstance',
         self::ACTIVATE_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE => 'activateDeferredByHookPatternInLiveInstance',
+        self::ACTIVATE_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE => 'activateDeferredByTagsInLiveInstance',
+        self::ACTIVATE_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE => 'activateDeferredByTagPatternInLiveInstance',
         self::UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE => 'unregisterByCallableInLiveInstance',
         self::UNREGISTER_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE => 'unregisterDeferredByCallableInLiveInstance',
         self::ACTIVATE_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE => 'activateDeferredByCallableInLiveInstance',
@@ -129,10 +142,16 @@ class WPHooksInstanceRegistry
         self::REGISTER_HOOKS => 3,
         self::ACTIVATE_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 2,
         self::ACTIVATE_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE => 2,
+        self::ACTIVATE_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE => 2,
+        self::ACTIVATE_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE => 2,
         self::UNREGISTER_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 2,
         self::UNREGISTER_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE => 2,
+        self::UNREGISTER_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE => 2,
+        self::UNREGISTER_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE => 2,
         self::UNREGISTER_BY_HOOK_IN_LIVE_INSTANCE => 2,
         self::UNREGISTER_BY_HOOK_PATTERN_IN_LIVE_INSTANCE => 2,
+        self::UNREGISTER_BY_TAGS_IN_LIVE_INSTANCE => 2,
+        self::UNREGISTER_BY_TAG_PATTERN_IN_LIVE_INSTANCE => 2,
     ];
 
     /**
@@ -236,6 +255,9 @@ class WPHooksInstanceRegistry
                     deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                     deferRegisterUntilHookParams: $this->provider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                     hookArgNames: $this->provider->buildCallablePlanFromReflector($method)['params'],
+                    tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
+                    tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
+                    tagCallableParams: $this->provider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                     target: 'method',
                     targetName: $targetName,
                     visibility: $visibility,
@@ -280,6 +302,9 @@ class WPHooksInstanceRegistry
                     deferRegisterUntilHook: $attr->deferRegisterUntilHook,
                     deferRegisterUntilHookParams: $this->provider->buildCallablePlan($attr->deferRegisterUntilHook instanceof \Closure ? $attr->deferRegisterUntilHook : null),
                     hookArgNames: $this->provider->extractPropertyCallablePlan($property, $instance)['params'],
+                    tags: $attr->tag instanceof \Closure ? [] : $attr->tag,
+                    tagCallable: $attr->tag instanceof \Closure ? $attr->tag : null,
+                    tagCallableParams: $this->provider->buildCallablePlan($attr->tag instanceof \Closure ? $attr->tag : null),
                     target: $target,
                     targetName: $targetName,
                     visibility: $visibility,
@@ -376,6 +401,46 @@ class WPHooksInstanceRegistry
         return $this->instanceRegistryDeferredHookManager->activateInstanceHookPatternDeferredEntries(
             $instance,
             $pattern,
+            $this->activateRuntimeEntry,
+        );
+    }
+
+    /**
+     * Activate every deferred registration owned by one live instance carrying
+     * at least one of the supplied tags.
+     *
+     * Tag matching is OR; tags are normalized through {@see HookTagUtilities}.
+     *
+     * @api
+     * @param object $instance Live instance whose deferred registrations should activate.
+     * @param array<int, string> $tags Tag list.
+     * @return int Number of newly activated registrations.
+     */
+    #[Action(self::ACTIVATE_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE, 10, 2)]
+    public function activateDeferredByTagsInLiveInstance(object $instance, array $tags): int
+    {
+        return $this->instanceRegistryDeferredHookManager->activateInstanceTagsDeferredEntries(
+            $instance,
+            $tags,
+            $this->activateRuntimeEntry,
+        );
+    }
+
+    /**
+     * Activate every deferred registration owned by one live instance carrying
+     * at least one tag matching any supplied wildcard pattern.
+     *
+     * @api
+     * @param object $instance Live instance whose deferred registrations should activate.
+     * @param array<int, string> $patterns Tag wildcard patterns.
+     * @return int Number of newly activated registrations.
+     */
+    #[Action(self::ACTIVATE_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE, 10, 2)]
+    public function activateDeferredByTagPatternInLiveInstance(object $instance, array $patterns): int
+    {
+        return $this->instanceRegistryDeferredHookManager->activateInstanceTagPatternDeferredEntries(
+            $instance,
+            $patterns,
             $this->activateRuntimeEntry,
         );
     }
@@ -494,6 +559,43 @@ class WPHooksInstanceRegistry
     }
 
     /**
+     * Remove every deferred registration owned by one live instance carrying
+     * at least one of the supplied tags, keeping active registrations
+     * untouched.
+     *
+     * @api
+     * @param object $instance Live instance whose deferred registrations should be dropped.
+     * @param array<int, string> $tags Tag list.
+     * @return int Number of removed deferred registrations.
+     */
+    #[Action(self::UNREGISTER_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE, 10, 2)]
+    public function unregisterDeferredByTagsInLiveInstance(object $instance, array $tags): int
+    {
+        return $this->instanceRegistryDeferredHookManager->unregisterInstanceTagsDeferredEntries(
+            $instance,
+            $tags,
+        );
+    }
+
+    /**
+     * Remove every deferred registration owned by one live instance carrying
+     * at least one tag matching any supplied wildcard pattern.
+     *
+     * @api
+     * @param object $instance Live instance whose deferred registrations should be dropped.
+     * @param array<int, string> $patterns Tag wildcard patterns.
+     * @return int Number of removed deferred registrations.
+     */
+    #[Action(self::UNREGISTER_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE, 10, 2)]
+    public function unregisterDeferredByTagPatternInLiveInstance(object $instance, array $patterns): int
+    {
+        return $this->instanceRegistryDeferredHookManager->unregisterInstanceTagPatternDeferredEntries(
+            $instance,
+            $patterns,
+        );
+    }
+
+    /**
      * Remove every active registration owned by one live instance that
      * targets the given WordPress hook name.
      *
@@ -535,6 +637,48 @@ class WPHooksInstanceRegistry
         return $this->removeActiveRecords(
             $instance,
             static fn(RuntimeRegistryHandlerEntry $record): bool => HookPattern::matches($record->hook, $pattern),
+        );
+    }
+
+    /**
+     * Remove every active registration owned by one live instance carrying at
+     * least one of the supplied tags.
+     *
+     * @api
+     * @param object $instance Live instance whose active registrations should be removed.
+     * @param array<int, string> $tags Tag list.
+     * @return int Number of removed active registrations.
+     */
+    #[Action(self::UNREGISTER_BY_TAGS_IN_LIVE_INSTANCE, 10, 2)]
+    public function unregisterByTagsInLiveInstance(object $instance, array $tags): int
+    {
+        $tags = HookTagUtilities::normalizeTags($tags);
+        if ($tags === []) return 0;
+
+        return $this->removeActiveRecords(
+            $instance,
+            static fn(RuntimeRegistryHandlerEntry $record): bool => \array_intersect($tags, $record->tags) !== [],
+        );
+    }
+
+    /**
+     * Remove every active registration owned by one live instance carrying at
+     * least one tag matching any supplied wildcard pattern.
+     *
+     * @api
+     * @param object $instance Live instance whose active registrations should be removed.
+     * @param array<int, string> $patterns Tag wildcard patterns.
+     * @return int Number of removed active registrations.
+     */
+    #[Action(self::UNREGISTER_BY_TAG_PATTERN_IN_LIVE_INSTANCE, 10, 2)]
+    public function unregisterByTagPatternInLiveInstance(object $instance, array $patterns): int
+    {
+        if ($patterns === []) return 0;
+        HookPattern::assertValidAll($patterns);
+
+        return $this->removeActiveRecords(
+            $instance,
+            static fn(RuntimeRegistryHandlerEntry $record): bool => HookPattern::matchesAny($record->tags, $patterns),
         );
     }
 
@@ -774,7 +918,16 @@ class WPHooksInstanceRegistry
             }
         }
 
-        [$handler, $record] = $this->createHandlerAndEntry($entryMeta, $instance, $attributeIndex, $isDeferred);
+        try {
+            [$handler, $record] = $this->createHandlerAndEntry($entryMeta, $instance, $attributeIndex, $isDeferred);
+        } catch (\Throwable $e) {
+            Logger::error(
+                __METHOD__,
+                'Skipping hook ' . $entryMeta->targetName . ' on ' . $entryMeta->hook . ' — ' . $e->getMessage(),
+            );
+
+            return;
+        }
 
         if ($isDeferred) {
             $this->instanceRegistryDeferredHookManager->deferManualRegistration(
@@ -787,6 +940,30 @@ class WPHooksInstanceRegistry
             $this->entriesByInvokers[$handler] = $record;
             $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
         }
+    }
+
+    /**
+     * Resolve the effective tag list for one metadata entry.
+     *
+     * Static tags and a tag closure are normalized/resolved per registration,
+     * so cached metadata stays safe for instance-specific tags.
+     *
+     * @return array<int, string>
+     */
+    private function resolveInstanceTags(InstanceHookMetadata $metadata, object $instance): array
+    {
+        if ($metadata->tagCallable !== null) {
+            return HookTagUtilities::normalizeTags(
+                $this->provider->resolveTagCallable(
+                    $metadata->tagCallable,
+                    $metadata->tagCallableParams ?? [],
+                    $metadata->targetName,
+                    $instance,
+                ),
+            );
+        }
+
+        return HookTagUtilities::normalizeTags($metadata->tags ?? []);
     }
 
     /**
@@ -803,6 +980,7 @@ class WPHooksInstanceRegistry
         bool $isDeferred = false
     ): array {
         $weakRef = \WeakReference::create($instance);
+        $resolvedTags = $this->resolveInstanceTags($metadata, $instance);
         $hookKey = new HookKey(
             class: (string) \spl_object_id($instance),
             method: $metadata->targetName,
@@ -865,7 +1043,7 @@ class WPHooksInstanceRegistry
                 type: $metadata->type,
                 priority: $metadata->priority,
                 acceptedArgs: $metadata->acceptedArgs,
-                tags: [],
+                tags: $resolvedTags,
                 registerIf: $metadata->registerIf,
                 registerIfParams: $metadata->registerIfParams,
                 executeIf: $metadata->executeIf,
@@ -882,6 +1060,7 @@ class WPHooksInstanceRegistry
                 type: $metadata->type,
                 priority: $metadata->priority,
                 acceptedArgs: $metadata->acceptedArgs,
+                tags: $resolvedTags,
                 registerIf: $metadata->registerIf,
                 registerIfParams: $metadata->registerIfParams,
                 once: $metadata->once,

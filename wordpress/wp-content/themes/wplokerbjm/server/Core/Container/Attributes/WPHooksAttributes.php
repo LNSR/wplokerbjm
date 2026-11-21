@@ -29,7 +29,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * - `WPHooksInstanceRegistry(secondary registry)` — **runtime instances**, normally anonymous
  *   classes extending {@see ModuleClassHookMetadata}. The handler keeps only a
  *   `WeakReference` to the live instance; when that instance is garbage
- *   collected the handler becomes inert and detaches itself.
+ *   collected the handler becomes inert and detaches itself. Supports tags,
+ *   deferred activation and owner-scoped selectors.
  *
  * The same member is scanned by exactly one registry — never both.
  *
@@ -92,7 +93,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * | Feature                   | ContainerRegistry | InstanceRegistry        |
  * |---------------------------|-------------------|-------------------------|
  * | `$hook` closure           | yes               | yes                     |
- * | `$tag`                    | yes               | **ignored**             |
+ * | `$tag`                    | yes               | yes                     |
  * | `$deferRegister`          | yes               | yes                     |
  * | `$deferRegisterUntilHook` | yes               | yes                     |
  * | `$registerIf`             | yes               | yes                     |
@@ -214,20 +215,24 @@ abstract class BaseHookAttribute
      * @param (\Closure(TParams...): array)|array $tag Tag(s) used by the
      *        activation / unregistration APIs (`activateDeferredByTags`,
      *        `activateDeferredByTagPattern`, `unregisterByTags`,
-     *        `unregisterDeferredByTags`, …).
+     *        `unregisterDeferredByTags`, and their `...InLiveInstance()`
+     *        counterparts).
      * * Accepts a flat array of `string` or string-backed `BackedEnum`, or a
      *   static closure returning such an array.
      * * Matching is **OR**: an entry matches when **any** supplied tag is
      *   present (e.g. `['A', 'B']` → matches `A` or `B`).
      * * Duplicates are removed; string-backed enums are normalized to their
      *   `->value`.
-     * * A closure is evaluated **eagerly** at registration time (container parameters
-     *   only) and must return a flat array — nested arrays are rejected.
+     * * A closure is evaluated **eagerly** at registration time and must
+     *   return a flat array — nested arrays are rejected. Container-path
+     *   parameters resolve from the DI container. Instance-path parameters may
+     *   also bind the live owner as `?self`; the tag callable is retained in
+     *   the instance metadata cache and resolved **per registration**, so
+     *   owner-specific tags never leak between sibling instances.
      * ! Any other tag type (`int`, non-backed enum, object, nested array)
-     * ! raises a `RuntimeException` while normalizing. The container registry
-     * ! catches it per registration: that single hook is skipped and logged
-     * ! as an ERROR — boot continues, nothing else is affected.
-     * ! Ignored entirely by the InstanceRegistry.
+     * ! raises a `RuntimeException` while normalizing. Both registries catch
+     * ! it per registration: that single hook is skipped and logged as an
+     * ! ERROR — boot continues, nothing else is affected.
      *
      * @param string|(\Closure(TParams...): string)|null $deferRegisterUntilHook
      *        Defer registration until the named trigger hook fires. Implies
@@ -253,9 +258,14 @@ abstract class BaseHookAttribute
      * * Forced to `true` whenever `$deferRegisterUntilHook` is set.
      * * `registerIf` is re-evaluated at activation time (not only at
      *   registration time).
-     * * Runtime path: activated per callable member through
-     *   `activateDeferredByCallableInLiveInstance()` and its unregister counterpart`
-     *   (or automatically when `$deferRegisterUntilHook` is also set).
+     * * Runtime path: activated through the owner-scoped
+     *   `activateDeferredByHookInLiveInstance()`,
+     *   `activateDeferredByHookPatternInLiveInstance()`,
+     *   `activateDeferredByTagsInLiveInstance()`,
+     *   `activateDeferredByTagPatternInLiveInstance()`,
+     *   `activateDeferredByCallableInLiveInstance()`, or
+     *   `activateDeferredByClassInLiveInstance()` family (or automatically
+     *   when `$deferRegisterUntilHook` is also set).
      * ! A deferred entry that nothing activates never registers; no warning is
      * ! emitted.
      *
