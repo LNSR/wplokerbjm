@@ -73,8 +73,7 @@ abstract class ModuleClassHookMetadata extends AsChildClass
         if (\defined('WPLOKERBJM_TEST_ENV') && WPLOKERBJM_TEST_ENV) return;
         \do_action(WPHooksInstanceRegistry::UNREGISTER_HOOKS, $this);
 
-        // ContainerRegister is exclusively for named class
-        if (!\method_exists($this, '__invoke') && \str_contains($this->parentClassString, '@anonymous')) return;
+        if (!\method_exists($this, '__invoke')) return;
         \do_action(WPHooksContainerRegistry::UNREGISTER_DEFERRED_BY_CALLABLE, [$this->parentClassString, $this->parentProperty]);
         \do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this->parentClassString, $this->parentProperty]);
     }

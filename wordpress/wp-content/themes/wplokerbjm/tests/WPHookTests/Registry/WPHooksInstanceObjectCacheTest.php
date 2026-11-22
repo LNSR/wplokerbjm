@@ -128,6 +128,35 @@ class WPHooksInstanceObjectCacheTest extends WplokerbjmTestCase
         $this->assertNull($cache->get('OtherService', 'prop'));
     }
 
+    public function testNamedClassSetGetRoundTrip(): void
+    {
+        $cache = new WPHooksInstanceObjectCache($this->file);
+        $metadata = $this->sampleMetadata('named_hook');
+
+        $cache->setNamedClass('NamedService', [$metadata]);
+
+        $this->assertSame([$metadata], $cache->getNamedClass('NamedService'));
+        $this->assertNull($cache->getNamedClass('OtherService'));
+    }
+
+    public function testNamedClassAndModuleSiteCoexistAfterFlush(): void
+    {
+        $cache = new WPHooksInstanceObjectCache($this->file);
+        $cache->set('Service', 'prop', [$this->sampleMetadata('module_hook')]);
+        $cache->setNamedClass('Service', [$this->sampleMetadata('named_hook')]);
+
+        $cache->flush();
+
+        $fresh = new WPHooksInstanceObjectCache($this->file);
+        $moduleEntries = $fresh->get('Service', 'prop');
+        $namedEntries = $fresh->getNamedClass('Service');
+
+        $this->assertIsArray($moduleEntries);
+        $this->assertIsArray($namedEntries);
+        $this->assertSame('module_hook', $moduleEntries[0]->hook);
+        $this->assertSame('named_hook', $namedEntries[0]->hook);
+    }
+
     public function testClosureHookRoundTripsThroughCache(): void
     {
         $cache = new WPHooksInstanceObjectCache($this->file);

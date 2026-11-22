@@ -895,6 +895,68 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         self::assertNotNull($this->findRegisteredHook('action', 'second_dynamic_hook'));
     }
 
+    public function testNamedClassUsesClassSiteCacheAcrossInstances(): void
+    {
+        $cache = new WPHooksInstanceObjectCache();
+
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
+        ]);
+
+        $first = new RuntimeNamedClassCacheHost('first');
+        $registry()->registerHooksOn($first);
+
+        self::assertNotNull(
+            $cache->getNamedClass(RuntimeNamedClassCacheHost::class),
+            'A scanned named class must populate its class-site cache.',
+        );
+
+        $second = new RuntimeNamedClassCacheHost('second');
+        $registry()->registerHooksOn($second);
+
+        do_action('rt_named_class_cache_hook', 'value');
+
+        self::assertSame(['first:value'], $first->captured);
+        self::assertSame(['second:value'], $second->captured);
+    }
+
+    public function testNamedClassForceNoCacheBypassesSiteCache(): void
+    {
+        $cache = new WPHooksInstanceObjectCache();
+
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
+        ]);
+
+        $instance = new RuntimeNamedClassCacheHost('force');
+        $registry()->registerHooksOn($instance, forceNoCache: true);
+
+        self::assertNull($cache->getNamedClass(RuntimeNamedClassCacheHost::class));
+        self::assertNotNull($this->findRegisteredHook('action', 'rt_named_class_cache_hook'));
+    }
+
+    public function testBareAnonymousClassIsNeverClassCached(): void
+    {
+        $cache = new WPHooksInstanceObjectCache();
+
+        $registry = fn() => $this->container()->make(WPHooksInstanceRegistry::class, [
+            'cache' => $cache,
+            'queuedHooksCleaner' => $this->queuedHooksCleaner = new QueuedHooksCleaner()
+        ]);
+
+        $anon = new class {
+            #[Action(hook: 'rt_bare_anon_cache_hook')]
+            public function onHook(): void {}
+        };
+
+        $registry()->registerHooksOn($anon);
+
+        self::assertNull($cache->getNamedClass($anon::class));
+        self::assertNotNull($this->findRegisteredHook('action', 'rt_bare_anon_cache_hook'));
+    }
+
     public function testUnregisterHooksOnSweepsDeferredPool(): void
     {
         $anon = new class {
@@ -1201,5 +1263,23 @@ class RuntimePropInvokable
     public static function transform(string $value): string
     {
         return strtoupper($value);
+    }
+}
+
+/**
+ * Named-class host proving class-site metadata is shared across instances
+ * while handler ownership remains per instance.
+ */
+final class RuntimeNamedClassCacheHost
+{
+    /** @var list<string> */
+    public array $captured = [];
+
+    public function __construct(private string $id) {}
+
+    #[Action(hook: 'rt_named_class_cache_hook', acceptedArgs: 1)]
+    public function onHook(string $value): void
+    {
+        $this->captured[] = $this->id . ':' . $value;
     }
 }

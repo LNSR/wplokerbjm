@@ -11,6 +11,7 @@ use ReflectionClass;
 use ReflectionFunction;
 use ReflectionMethod;
 use ReflectionProperty;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookService;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookRegistration;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
@@ -18,6 +19,7 @@ use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Shared\Log\Logger;
 use \CompiledContainer;
 use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Attributes\WPHooksScannerPolicy;
 
 /**
  * Scans directories for WordPress hook attribute registrations.
@@ -105,6 +107,11 @@ class WPHooksScanner
             }
             try {
                 $reflection = new ReflectionClass($className);
+                $policy = $reflection->getAttributes(WPHooksScannerPolicy::class);
+                $attribute = null;
+                if (!empty($policy)) $attribute = $policy[0]->newInstance();
+                if ($attribute instanceof WPHooksScannerPolicy && $attribute->skipContainerRegistryScan) continue;
+
                 /** @var array<string, int> $attributeOrdinals */
                 $attributeOrdinals = [];
                 $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, &$attributeOrdinals): void {

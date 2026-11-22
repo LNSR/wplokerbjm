@@ -130,19 +130,14 @@ class WPHooksContainerRegistry
     public function __construct(
         private readonly ContainerInterface $container,
         private array $hooksRegistration,
-        private ?WPHookPlanProvider $planProvider = null,
-        private ?ContainerRegistryDeferredHookManager $containerRegistryDeferredHookManager = null,
+        private WPHookPlanProvider $planProvider,
+        private ContainerRegistryDeferredHookManager $containerRegistryDeferredHookManager,
         private ContainerRegistryHookTargetResolver $resolverTarget = new ContainerRegistryHookTargetResolver(),
         private QueuedHooksCleaner $queuedHooksCleaner = new QueuedHooksCleaner(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
     ) {
         $this->entriesByInvokers = new \WeakMap();
         $this->planProvider ??= new WPHookPlanProvider($container);
-        $this->containerRegistryDeferredHookManager ??= new ContainerRegistryDeferredHookManager(
-            $this->planProvider,
-            $this->resolverTarget,
-            new EntriesIndexer()
-        );
         $this->destroyIndexes = $this->entriesIndexer->removeIndexes(...);
     }
 

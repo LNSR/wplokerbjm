@@ -39,12 +39,13 @@ use WPLokerBJM\Shared\Log\Logger;
  * @phpstan-type CompiledPlan array{properties: array<string, InjectionEntryDTO>}
  * @phpstan-type TSetterClosure Closure(ContainerInterface, ClassTarget, CompiledPlan['properties']): void
  */
-final class DependencyInjector
+class DependencyInjector
 {
     /**
      * @var array<string, TSetterClosure>
      */
     public private(set) array $cachedSetterClosure = [];
+    public const INJECT_ON = 'wplokerbjm_inject_on';
 
     public function __construct(
         private readonly ContainerInterface $container,
@@ -59,6 +60,7 @@ final class DependencyInjector
      * @return ClassTarget The same target, for fluent usage.
      * @throws InvalidArgumentException When the target or injection shape is invalid.
      */
+    #[Action(self::INJECT_ON, 10, 1)]
     public function injectOn(AsChildClass $target, bool $forceNoCache = false): AsChildClass
     {
         $this->assertTarget($target);

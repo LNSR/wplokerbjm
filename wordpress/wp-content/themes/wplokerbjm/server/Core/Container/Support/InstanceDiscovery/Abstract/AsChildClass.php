@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract;
 
-use WPLokerBJM\Core\Wordpress\DependencyInjectorEvent;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\DependencyInjector;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -69,7 +69,7 @@ abstract class AsChildClass
 
         if (\defined('WPLOKERBJM_TEST_ENV')) return;
 
-        do_action(DependencyInjectorEvent::INJECT_ON, $this);
+        do_action(DependencyInjector::INJECT_ON, $this);
     }
 
     /**

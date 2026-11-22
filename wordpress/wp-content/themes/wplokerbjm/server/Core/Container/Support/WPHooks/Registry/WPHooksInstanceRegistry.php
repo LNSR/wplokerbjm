@@ -220,8 +220,17 @@ class WPHooksInstanceRegistry
         $records = [];
         /** @var array<string, int> $attributeOrdinals */
         $attributeOrdinals = [];
-        if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
-            $cached = $this->cache->get($instance->parentClassString, $instance->parentProperty);
+        $isModuleSite = $instance instanceof ModuleClassHookMetadata;
+        $namedClass = !$isModuleSite && !\str_contains($instance::class, '@anonymous')
+            ? $instance::class
+            : null;
+        $canCache = !$forceNoCache && ($isModuleSite || $namedClass !== null);
+
+        if ($canCache) {
+            $cached = $isModuleSite
+                ? $this->cache->get($instance->parentClassString, $instance->parentProperty)
+                : ($namedClass !== null ? $this->cache->getNamedClass($namedClass) : null);
+
             if ($cached !== null) {
                 $this->scanned[$instance] = true;
                 $this->weakRegistry[$instance] = $this->registerCachedEntries($cached, $instance);
@@ -234,7 +243,7 @@ class WPHooksInstanceRegistry
 
         $this->scanMethodHooks(
             $ref,
-            function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records, &$metadata, $forceNoCache, &$attributeOrdinals): void {
+            function (\ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($instance, &$records, &$metadata, $canCache, &$attributeOrdinals): void {
                 $targetName = $method->getName();
                 $ordinalKey = 'method:' . $targetName;
                 $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
@@ -270,7 +279,7 @@ class WPHooksInstanceRegistry
                     debugLiveUnregistrationParams: $this->provider->buildCallablePlan($attr->debugLiveUnregistration instanceof \Closure ? $attr->debugLiveUnregistration : null),
                 );
 
-                if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
+                if ($canCache) {
                     $metadata[] = $entryMeta;
                 }
                 $this->provider->assertNullableSelfClosures($entryMeta, $instance);
@@ -280,7 +289,7 @@ class WPHooksInstanceRegistry
 
         $this->scanPropertyHooks(
             $ref,
-            function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records, &$metadata, $forceNoCache, &$attributeOrdinals): void {
+            function (\ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($instance, &$records, &$metadata, $canCache, &$attributeOrdinals): void {
                 $targetName = $property->getName();
                 $ordinalKey = 'property:' . $targetName;
                 $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
@@ -316,7 +325,7 @@ class WPHooksInstanceRegistry
                     debugLiveUnregistrationParams: $this->provider->buildCallablePlan($attr->debugLiveUnregistration instanceof \Closure ? $attr->debugLiveUnregistration : null),
                 );
 
-                if ($instance instanceof ModuleClassHookMetadata && !$forceNoCache) {
+                if ($canCache) {
                     $metadata[] = $entryMeta;
                 }
                 $this->provider->assertNullableSelfClosures($entryMeta, $instance);
@@ -327,8 +336,12 @@ class WPHooksInstanceRegistry
         $this->scanned[$instance] = true;
         $this->weakRegistry[$instance] = $records;
 
-        if ($instance instanceof ModuleClassHookMetadata && $metadata !== []) {
-            $this->cache->set($instance->parentClassString, $instance->parentProperty, $metadata);
+        if ($canCache && $metadata !== []) {
+            if ($isModuleSite) {
+                $this->cache->set($instance->parentClassString, $instance->parentProperty, $metadata);
+            } elseif ($namedClass !== null) {
+                $this->cache->setNamedClass($namedClass, $metadata);
+            }
         }
         \is_string($autoUnregisterAtHook) && $this->scheduleAutoUnregister($instance, $autoUnregisterAtHook);
     }
