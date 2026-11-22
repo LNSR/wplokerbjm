@@ -106,7 +106,7 @@ final class EventBridgeTest extends WplokerbjmTestCase
         $provider = new WPHookPlanProvider($container);
 
         $registry = new WPHooksInstanceRegistry(
-            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver(), new EntriesIndexer()),
+            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver()),
             $provider,
             $this->queuedHooksCleaner = new QueuedHooksCleaner(),
             new InstanceRegistryRuntimeHookResolver(),
@@ -153,7 +153,7 @@ final class EventBridgeTest extends WplokerbjmTestCase
         $provider = new WPHookPlanProvider($container);
 
         $registry = new WPHooksInstanceRegistry(
-            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver(), new EntriesIndexer()),
+            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver()),
             $provider,
             $this->queuedHooksCleaner = new QueuedHooksCleaner(),
             new InstanceRegistryRuntimeHookResolver(),
@@ -206,7 +206,7 @@ final class EventBridgeTest extends WplokerbjmTestCase
         $provider = new WPHookPlanProvider($container);
 
         $registry = new WPHooksInstanceRegistry(
-            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver(), new EntriesIndexer()),
+            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver()),
             $provider,
             $this->queuedHooksCleaner = new QueuedHooksCleaner(),
             new InstanceRegistryRuntimeHookResolver(),
@@ -283,7 +283,7 @@ final class EventBridgeTest extends WplokerbjmTestCase
         $provider = new WPHookPlanProvider($container);
 
         $registry = new WPHooksInstanceRegistry(
-            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver(), new EntriesIndexer()),
+            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver()),
             $provider,
             $this->queuedHooksCleaner = new QueuedHooksCleaner(),
             new InstanceRegistryRuntimeHookResolver(),
@@ -372,7 +372,7 @@ final class EventBridgeTest extends WplokerbjmTestCase
         $provider = new WPHookPlanProvider($container);
 
         $registry = new WPHooksInstanceRegistry(
-            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver(), new EntriesIndexer()),
+            new InstanceRegistryDeferredHookManager($provider, new InstanceRegistryRuntimeHookResolver()),
             $provider,
             $this->queuedHooksCleaner = new QueuedHooksCleaner(),
             new InstanceRegistryRuntimeHookResolver(),

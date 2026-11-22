@@ -40,7 +40,7 @@ class WPHooksScanner
     private ?array $cachedHookRegistrations = null;
 
     /**
-     * @param \Closure(): list<class-string> $containerEntries container its entries(list class in container)
+     * @param \Closure(): list<class-string> $containerEntries candidate classes from the RobotLoader index, filtered to container entries
      * @param string $namespace namespace to scan
      * @param string $cacheLocation directory where cache file will be stored
      * @param WPHookPlanProvider $hookPlanProvider plan builder for condition gates and dynamic hook names

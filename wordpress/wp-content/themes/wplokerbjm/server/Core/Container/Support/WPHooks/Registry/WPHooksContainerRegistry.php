@@ -108,7 +108,7 @@ class WPHooksContainerRegistry
     protected array $handlers = [];
 
     /**
-     * @var \WeakMap<HookInvoker, ContainerRegistryHandlerEntry>
+     * @var \WeakMap<HookInvoker, \WeakReference<ContainerRegistryHandlerEntry>>
      */
     protected \WeakMap $entriesByInvokers;
 
@@ -198,10 +198,11 @@ class WPHooksContainerRegistry
         $this->registerAll($this->scanner->getHookRegistrations());
         foreach ($this->handlers as $key => $entry) {
             try {
-                $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
+                $weakRef = \WeakReference::create($entry);
+                $this->queuedHooksCleaner->addContainerRegistryItsEntries([$weakRef]);
                 $this->entriesIndexer->setIndexes($entry);
                 $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes);
-                $this->entriesByInvokers[$entry->handler] = $entry;
+                $this->entriesByInvokers[$entry->handler] = $weakRef;
             } catch (\Exception $e) {
                 Logger::error(
                     __METHOD__,
@@ -698,11 +699,12 @@ class WPHooksContainerRegistry
                     return false;
                 }
                 $entry = $this->handlers[$uniqueKey] = ContainerRegistryHandlerEntry::fromDeferredEntry($data);
-                $this->entriesByInvokers[$data->handler] = $entry;
+                $weakRef = \WeakReference::create($entry);
+                $this->entriesByInvokers[$data->handler] = $weakRef;
                 $this->entriesIndexer->setIndexes($entry);
                 $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes);
                 $entry->register();
-                $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);
+                $this->queuedHooksCleaner->addContainerRegistryItsEntries([$weakRef]);
                 SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
                 return true;
             };
@@ -718,7 +720,10 @@ class WPHooksContainerRegistry
     private \Closure $removeEntry {
         get {
             return $this->removeEntry ??= function (HookInvoker $invoker, bool $invokerDied = false): void {
-                $entry = $this->queuedHooksCleaner->getEntry($invoker) ?? $this->entriesByInvokers[$invoker] ?? null;
+                $entry = $this->queuedHooksCleaner->getEntry($invoker)
+                    ?? isset($this->entriesByInvokers[$invoker])
+                    ? $this->entriesByInvokers[$invoker]->get() : null;
+
                 if ($entry === null) return;
                 $key = $entry->toUniqueKey();
 

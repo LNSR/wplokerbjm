@@ -61,10 +61,20 @@ class Core implements DefinitionProviderInterface
             ContainerRegistryHookTargetResolver::class => \DI\autowire(ContainerRegistryHookTargetResolver::class),
             InstanceRegistryRuntimeHookResolver::class => \DI\autowire(InstanceRegistryRuntimeHookResolver::class),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
-                static fn(Container $c) => $c->getKnownEntryNames(...),
+                static fn(Container $c): callable => static fn(): array => array_values(
+                    array_filter(
+                        array_unique(
+                            array_merge(
+                                array_keys($c->get(RobotLoader::class)->getIndexedClasses()),
+                                $c->getKnownEntryNames(),
+                            )
+                        ),
+                        $c->has(...),
+                    )
+                ),
                 \DI\get(WPHookPlanProvider::class),
                 $namespace,
-                static fn () => \defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache" : get_stylesheet_directory() . "/cache",
+                static fn() => \defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache" : get_stylesheet_directory() . "/cache",
             ),
             WPHooksInstanceObjectCache::class => \DI\autowire(WPHooksInstanceObjectCache::class)->constructor(
                 static fn(): string => \defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache/WPHooksInstanceObjectCache.php" : get_stylesheet_directory() . '/cache/WPHooksInstanceObjectCache.php'
@@ -72,7 +82,6 @@ class Core implements DefinitionProviderInterface
             InstanceRegistryDeferredHookManager::class => \DI\autowire(InstanceRegistryDeferredHookManager::class)->constructor(
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(InstanceRegistryRuntimeHookResolver::class),
-                static fn() => new EntriesIndexer(),
             ),
             WPHooksInstanceRegistry::class => \DI\autowire(WPHooksInstanceRegistry::class)->constructor(
                 \DI\get(InstanceRegistryDeferredHookManager::class),

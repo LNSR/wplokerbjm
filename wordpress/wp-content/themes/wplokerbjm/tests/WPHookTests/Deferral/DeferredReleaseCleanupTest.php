@@ -17,11 +17,12 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  * Pins the bookkeeping released with a DEFERRED entry.
  *
  * Releasing a deferred entry (explicit `unregisterDeferredBy*`,
- * `unregisterHooksOn()` or a dead-owner trigger) destroys
+ * `unregisterHooksOn()` or owner garbage collection) destroys
  * {@see \WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler},
  * whose destructor must:
- *  - remove every `EntriesIndexer` bucket entry (hook/class/callable/namespace/tag),
- *    so selectors never resolve a ghost entry,
+ *  - remove the container `EntriesIndexer` buckets (hook/class/callable/namespace/tag)
+ *    when the entry came from the container manager,
+ *  - remove the instance manager's owner bucket through its WeakMap,
  *  - remove the automatic `deferRegisterUntilHook` scheduler registered at
  *    `PHP_INT_MIN`, so the trigger never fires a removed entry,
  *  - and keep the destination hook unregistered.
@@ -97,17 +98,15 @@ final class DeferredReleaseCleanupTest extends WplokerbjmTestCase
         $registry->registerHooksOn($service);
 
         $manager = $this->privateValue($registry, 'instanceRegistryDeferredHookManager');
-        $indexer = $this->privateValue($manager, 'entriesIndexer');
 
-        self::assertCount(1, $this->privateValue($manager, 'deferredHandlers'));
+        self::assertCount(1, $this->privateValue($manager, 'deferredHandlers')[$service] ?? []);
         self::assertNotEmpty($this->schedulerCallbacks('inst_release_trigger'));
-        self::assertArrayHasKey((string) \spl_object_id($service), $indexer->byClass);
 
         $removed = $registry->unregisterDeferredByCallableInLiveInstance([$service, 'onDeferred']);
 
         self::assertSame(1, $removed);
 
-        $this->assertDeferredPoolAndIndexesAreEmpty($manager, $indexer);
+        self::assertCount(0, $this->privateValue($manager, 'deferredHandlers'));
         self::assertSame([], $this->schedulerCallbacks('inst_release_trigger'));
         self::assertSame(0, $registry->activateDeferredByCallableInLiveInstance([$service, 'onDeferred']));
 
@@ -131,16 +130,15 @@ final class DeferredReleaseCleanupTest extends WplokerbjmTestCase
         $registry->registerHooksOn($service);
 
         $manager = $this->privateValue($registry, 'instanceRegistryDeferredHookManager');
-        $indexer = $this->privateValue($manager, 'entriesIndexer');
 
-        self::assertCount(1, $this->privateValue($manager, 'deferredHandlers'));
+        self::assertCount(1, $this->privateValue($manager, 'deferredHandlers')[$service] ?? []);
         self::assertSame([], $this->schedulerCallbacks('inst_held_destination'), 'a trigger-less entry has no scheduler');
 
         $removed = $registry->unregisterDeferredByCallableInLiveInstance([$service, 'onHeld']);
 
         self::assertSame(1, $removed);
 
-        $this->assertDeferredPoolAndIndexesAreEmpty($manager, $indexer);
+        self::assertCount(0, $this->privateValue($manager, 'deferredHandlers'));
         self::assertSame(0, $registry->activateDeferredByCallableInLiveInstance([$service, 'onHeld']));
     }
 
@@ -160,16 +158,15 @@ final class DeferredReleaseCleanupTest extends WplokerbjmTestCase
         $registry->registerHooksOn($service);
 
         $manager = $this->privateValue($registry, 'instanceRegistryDeferredHookManager');
-        $indexer = $this->privateValue($manager, 'entriesIndexer');
-        self::assertCount(1, $this->privateValue($manager, 'deferredHandlers'));
+        self::assertCount(1, $this->privateValue($manager, 'deferredHandlers')[$service] ?? []);
 
         $registry->unregisterHooksOn($service);
 
-        $this->assertDeferredPoolAndIndexesAreEmpty($manager, $indexer);
+        self::assertCount(0, $this->privateValue($manager, 'deferredHandlers'));
         self::assertSame([], $this->schedulerCallbacks('inst_owner_release_trigger'));
     }
 
-    public function testOwnerGarbageCollectionReleasesDeferredSchedulerAndIndexesOnTrigger(): void
+    public function testOwnerGarbageCollectionReleasesDeferredSchedulerAndEntryImmediately(): void
     {
         $service = new class {
             public int $runs = 0;
@@ -185,17 +182,17 @@ final class DeferredReleaseCleanupTest extends WplokerbjmTestCase
         $registry->registerHooksOn($service);
 
         $manager = $this->privateValue($registry, 'instanceRegistryDeferredHookManager');
-        $indexer = $this->privateValue($manager, 'entriesIndexer');
-        self::assertCount(1, $this->privateValue($manager, 'deferredHandlers'));
+        self::assertCount(1, $this->privateValue($manager, 'deferredHandlers')[$service] ?? []);
         self::assertNotEmpty($this->schedulerCallbacks('inst_gc_release_trigger'));
 
         unset($service);
 
-        self::assertCount(1, $this->privateValue($manager, 'deferredHandlers'), 'a dead owner keeps the entry parked until the trigger runs');
+        self::assertCount(0, $this->privateValue($manager, 'deferredHandlers'), 'the WeakMap owner bucket must disappear with the owner');
+        self::assertSame([], $this->schedulerCallbacks('inst_gc_release_trigger'));
 
         \do_action('inst_gc_release_trigger');
 
-        $this->assertDeferredPoolAndIndexesAreEmpty($manager, $indexer);
+        self::assertCount(0, $this->privateValue($manager, 'deferredHandlers'));
         self::assertSame([], $this->schedulerCallbacks('inst_gc_release_trigger'));
         self::assertNull($this->findRegisteredHook('action', 'inst_gc_release_destination'));
     }

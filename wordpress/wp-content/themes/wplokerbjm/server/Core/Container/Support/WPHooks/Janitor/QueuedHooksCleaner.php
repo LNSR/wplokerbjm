@@ -15,7 +15,7 @@ class QueuedHooksCleaner
     /** @var list<ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
     protected array $queuedRemovalEntry = [];
 
-    /** @var \WeakMap<HookInvoker, ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
+    /** @var \WeakMap<HookInvoker, \WeakReference<ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry>> */
     protected \WeakMap $entries;
     private int $priority = \PHP_INT_MIN;
 
@@ -25,43 +25,46 @@ class QueuedHooksCleaner
     }
 
 
-    /** @param list<ContainerRegistryHandlerEntry> $entries */
+    /** @param list<\WeakReference<ContainerRegistryHandlerEntry>> $entries */
     public function addContainerRegistryItsEntries(array $entries): void
     {
-        foreach ($entries as $entry) {
+        foreach ($entries as $weakRef) {
+            $entry = $weakRef?->get() ?? null;
+            if ($entry === null) continue;
             if ($entry->handler === null || !$entry->registered) continue;
-            if (!($entry->handler?->once ?? false)) continue;
-            $this->entries[$entry->handler] = $entry;
+            if (!($entry->once ?? false)) continue;
+            $this->entries[$entry->handler] = $weakRef;
         }
     }
 
-    /** @param list<RuntimeRegistryHandlerEntry> $entries */
+    /** @param list<\WeakReference<RuntimeRegistryHandlerEntry>> $entries */
     public function addRuntimeRegistryItsEntries(array $entries): void
     {
-        foreach ($entries as $entry) {
+        foreach ($entries as $weakRef) {
+            $entry = $weakRef?->get() ?? null;
+            if ($entry === null) continue;
             if ($entry->handler === null || !$entry->registered) continue;
-            $this->entries[$entry->handler] = $entry;
+            $this->entries[$entry->handler] = $weakRef;
         }
     }
 
     public function immediatelyScheduleRemove(ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry $entry): void
     {
         if ($entry->handler === null || !$entry->registered) return;
-        $this->entries[$entry->handler] = $entry;
-        $this->cleanUpCallback($entry->handler);
+        $this->cleanUpCallback($entry->handler, $entry);
     }
 
     public function getEntry(HookInvoker $invoker): ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry|null
     {
-        return $this->entries[$invoker] ?? null;
+        if (isset($this->entries[$invoker]) && $this->entries[$invoker]->get() !== null) return $this->entries[$invoker]->get();
+        if (isset($this->entries[$invoker])) unset($this->entries[$invoker]);
+        return null;
     }
 
-    public function cleanUpCallback(HookInvoker $invoker): void
+    public function cleanUpCallback(?HookInvoker $invoker = null, ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry|null $entry = null): void
     {
-        $entry = $this->entries[$invoker] ?? null;
-        if ($entry === null) {
-            return;
-        }
+        $entry ??= $this->getEntry($invoker);
+        if ($entry === null) return;
         $hasCallbackRegistered = $entry->hasCallbackRegisteredOnWordpress();
         switch ($entry->isCurrentlyExecuting() && $hasCallbackRegistered) {
             case true:

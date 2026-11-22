@@ -55,7 +55,7 @@ abstract class AsChildClass
 
         if (is_object($this->parentClass) && !str_contains($this->parentClass::class, "@anonymous")) {
             $this->parentClassString = $this->parentClass::class;
-        } elseif ($this->parentClass instanceof static) {
+        } elseif ($this->parentClass instanceof static && isset($this->parentClass->constructCurrentClassIdentity)) {
             $this->parentClassString = $this->parentClass->constructCurrentClassIdentity;
         } elseif (\is_string($this->parentClass)) {
             $this->parentClassString = $this->parentClass;

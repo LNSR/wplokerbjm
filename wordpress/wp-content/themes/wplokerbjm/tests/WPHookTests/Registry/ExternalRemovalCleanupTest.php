@@ -24,7 +24,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  *  - `QueuedHooksCleaner` once-entry tracking,
  *  - `EntriesIndexer` hook/class/callable/namespace/tag buckets,
  *  - and the `onUnregisterDo` side effect.
-  ** Note: No explicit \gc_collect_cycles() called. Circular reference may goes unnoticed.
+ ** Note: No explicit \gc_collect_cycles() called. Circular reference may goes unnoticed.
  */
 final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
 {
@@ -162,6 +162,42 @@ final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
 
         self::assertSame([], $this->privateValue($registry, 'weakRegistry')[$service] ?? []);
         self::assertCount(0, $this->privateValue($registry, 'entriesByInvokers'));
+    }
+
+    public function testOwnerGoneCleanInstanceRegistryBookkeeping(): void
+    { {
+            $service = new class {
+                public int $runs = 0;
+
+                #[Action('external_instance_hook', 10)]
+                #[Action('external_instance_hook', 20)]
+                public function onHook(): void
+                {
+                    $this->runs++;
+                }
+                #[Action('external_instance_hook_1', 10)]
+                #[Action('external_instance_hook_1', 20)]
+                public function onHook1(): void
+                {
+                    $this->runs++;
+                }
+            };
+
+            $registry = $this->instanceRegistry();
+            $registry->registerHooksOn($service);
+
+            self::assertCount(4, $this->privateValue($registry, 'weakRegistry')[$service] ?? []);
+            self::assertCount(4, $this->privateValue($registry, 'entriesByInvokers'));
+
+            self::assertNotNull($this->findRegisteredHook('action', 'external_instance_hook'));
+
+            unset($service);
+
+            self::assertNull($this->findRegisteredHook('action', 'external_instance_hook'));
+            self::assertCount(0, $this->privateValue($registry, 'weakRegistry'));
+            self::assertCount(0, $this->privateValue($registry, 'entriesByInvokers'));
+            self::assertCount(0, $this->privateValue($this->queuedHooksCleaner, 'entries'));
+        }
     }
 
     // ── helpers ─────────────────────────────────────────────────────

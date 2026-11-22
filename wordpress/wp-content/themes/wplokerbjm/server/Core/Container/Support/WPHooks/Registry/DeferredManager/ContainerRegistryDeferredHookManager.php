@@ -41,6 +41,10 @@ class ContainerRegistryDeferredHookManager
 {
     use DeferredHooksTrait;
 
+    /** @var array<string, DeferredHookEntryHandler> */
+    protected array $deferredHandlers = [];
+    private ?\Closure $destroyIndexes = null;
+
     /**
      * @param WPHookPlanProvider  $planProvider Plan provider used for registerIf gates.
      * @param ContainerRegistryHookTargetResolver $resolverTarget 
@@ -51,6 +55,39 @@ class ContainerRegistryDeferredHookManager
         private ContainerRegistryHookTargetResolver $resolverTarget = new ContainerRegistryHookTargetResolver(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer()
     ) {}
+
+    protected function deferredGet(string $key, ?object $owner = null): ?DeferredHookEntryHandler
+    {
+        return $this->deferredHandlers[$key] ?? null;
+    }
+
+    protected function deferredPut(string $key, DeferredHookEntryHandler $entry, ?object $owner = null): void
+    {
+        $this->deferredHandlers[$key] = $entry;
+    }
+
+    protected function deferredRemove(string $key, ?object $owner = null): void
+    {
+        unset($this->deferredHandlers[$key]);
+    }
+
+    protected function deferredCount(?object $owner = null): int
+    {
+        return \count($this->deferredHandlers);
+    }
+
+    protected function deferredEntries(?object $owner = null): array
+    {
+        return $this->deferredHandlers;
+    }
+
+    protected function afterDeferredAdded(DeferredHookEntryHandler $entry): void
+    {
+        $this->entriesIndexer->setIndexes($entry);
+        $entry->setOnEntryRemovalRemoveIndexesCallback(
+            $this->destroyIndexes ??= $this->entriesIndexer->removeIndexes(...)
+        );
+    }
 
     /**
      * Activate all deferred handlers registered for a specific WordPress hook.

@@ -59,10 +59,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\
  *! Hooks are instance-lifetime scoped: the registry keeps only a weak
  *! reference to the owner, so when the instance is garbage-collected the
  *! handler nukes itself from the pool and wp_filter (GC-aware auto-cleanup).
- *! Closures in attribute parameters (hook name, registerIf, executeIf) ARE
- *! supported: per PHP 8.1 RFC 'Closures in constant expressions' they must be
- *! static closures, scoped to the declaring class — private members resolve
- *! via self:: and the closure is invoked directly (no instance binding).
  *! The WPHookPlanProvider resolves closure parameters (hook args by name,
  *! then the container, then defaults) — identical semantics to the container
  *! registry.
@@ -161,7 +157,7 @@ class WPHooksInstanceRegistry
      * @var \WeakMap<object, list<RuntimeRegistryHandlerEntry>>
      */
     protected \WeakMap $weakRegistry;
-    /** @var \WeakMap<HookInvoker, RuntimeRegistryHandlerEntry> */
+    /** @var \WeakMap<HookInvoker, \WeakReference<RuntimeRegistryHandlerEntry>> */
     protected \WeakMap $entriesByInvokers;
     private bool $bridgeInitialized = false;
 
@@ -195,14 +191,21 @@ class WPHooksInstanceRegistry
      * are registered via add_action() / add_filter() immediately. Calling
      * this on an already-registered instance is a no-op.
      *
+     * ```
+     * !DO NOT DROP TEMPORAL OBJECT:
+     * !WRONG
+     * @example
+     * ```php
+     * $runtimeRegistry->registerHooksOn(new Something(...)); // immediately unregistered after scope exit
+     * ```
+     * *CORRECT
      * @example
      * ```php
      * $service = new class(...$args) {
      *     #[Action(hook: 'init')]
      *     public function init(): void { ... }
-     * };
+     * }; // retain reference
      * $runtimeRegistry->registerHooksOn($service); // register hooks
-     * ```
      * @api
      * @param object|ModuleClassHookMetadata $instance An instantiated object with hook-annotated methods/properties.
      * @param ?string $autoUnregisterAtHook automatic removal of whole hooks in object at certain hook lifecycle
@@ -948,8 +951,9 @@ class WPHooksInstanceRegistry
             );
         } else {
             $records[] = $record->register();
-            $this->entriesByInvokers[$handler] = $record;
-            $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
+            $weakRefRecord = \WeakReference::create($record);
+            $this->entriesByInvokers[$handler] = $weakRefRecord;
+            $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$weakRefRecord]);
         }
     }
 
@@ -1132,12 +1136,13 @@ class WPHooksInstanceRegistry
                 }
 
                 $record = RuntimeRegistryHandlerEntry::fromDeferredEntryDTO($data);
+                $weakRefRecord = \WeakReference::create($record);
 
                 $records = $this->weakRegistry[$owner] ?? [];
                 $records[] = $record->register();
                 $this->weakRegistry[$owner] = $records;
-                $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$record]);
-                $this->entriesByInvokers[$record->handler] = $record;
+                $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$weakRefRecord]);
+                $this->entriesByInvokers[$record->handler] = $weakRefRecord;
                 SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
 
                 return true;
@@ -1159,7 +1164,9 @@ class WPHooksInstanceRegistry
                 HookInvoker $invoker,
                 bool $invokerDied = false,
             ): void {
-                $entry = $this->queuedHooksCleaner->getEntry($invoker) ?? $this->entriesByInvokers[$invoker] ?? null;
+                $entry = $this->queuedHooksCleaner->getEntry($invoker)
+                    ?? isset($this->entriesByInvokers[$invoker])
+                    ? $this->entriesByInvokers[$invoker]->get() : null;
                 if ($entry === null) return;
 
                 if ($invokerDied) {
