@@ -40,7 +40,7 @@ final class EventBridgeTest extends WplokerbjmTestCase
         $deferredManager = new ContainerRegistryDeferredHookManager($planProvider, $targetResolver, $entriesIndexer);
         $registry = new WPHooksContainerRegistry(
             $container,
-            [],
+            $this->scannerReturning([], $planProvider),
             $planProvider,
             $deferredManager,
             $targetResolver,

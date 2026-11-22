@@ -13,6 +13,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksContainerRegistry
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{ContainerRegistryDeferredHookManager,InstanceRegistryDeferredHookManager};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 
 abstract class WplokerbjmTestCase extends TestCase
 {
@@ -246,6 +247,19 @@ abstract class WplokerbjmTestCase extends TestCase
     }
 
     /**
+     * Scanner stub for tests that seed raw registrations directly.
+     *
+     * @param array<int, mixed> $registrations
+     */
+    protected function scannerReturning(array $registrations, ?WPHookPlanProvider $planProvider = null): WPHooksScanner
+    {
+        return new ArrayHookScanner(
+            $registrations,
+            $planProvider ?? new WPHookPlanProvider($this->container()),
+        );
+    }
+
+    /**
      * Central factory for building the container-backed hook registry.
      *
      * Holds the full collaborator wiring (plan provider, deferred-hook
@@ -263,7 +277,7 @@ abstract class WplokerbjmTestCase extends TestCase
 
         $registry = new WPHooksContainerRegistry(
             $container,
-            $registrations,
+            $this->scannerReturning($registrations, $planProvider),
             $planProvider,
             new ContainerRegistryDeferredHookManager($planProvider, $resolver, $entriesIndexer),
             $resolver,

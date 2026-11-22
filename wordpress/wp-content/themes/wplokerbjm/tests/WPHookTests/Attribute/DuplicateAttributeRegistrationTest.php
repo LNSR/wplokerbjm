@@ -91,7 +91,7 @@ final class DuplicateAttributeRegistrationTest extends WplokerbjmTestCase
     public function testScannerAssignsDistinctAttributeIndexesToStackedAttributes(): void
     {
         $scanner = new WPHooksScanner(
-            [DuplicateAttributeService::class => static fn(): object => new DuplicateAttributeService()],
+            static fn () => [DuplicateAttributeService::class],
             new WPHookPlanProvider($this->container()),
             'WPLokerBJM\\Tests\\WPHookTests',
         );

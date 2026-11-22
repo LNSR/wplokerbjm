@@ -13,7 +13,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Shared\Log\Logger;
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\{Registrations\HookRegistration, Registrations\HookKey, Provider\WPHookPlanProvider};
+use WPLokerBJM\Core\Container\Support\WPHooks\{Registrations\HookRegistration, Registrations\HookKey, Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{ModuleClassHookMetadata};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
@@ -42,22 +42,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistr
  */
 class WPHooksContainerRegistry
 {
-    /**
-     * @var array<TKey, ContainerRegistryHandlerEntry>
-     */
-    protected array $handlers = [];
-
-    /**
-     * @var \WeakMap<HookInvoker, ContainerRegistryHandlerEntry>
-     */
-    protected \WeakMap $entriesByInvokers;
-
-    public private(set) bool $initialized = false;
-    private bool $bridgeInitialized = false;
-    /**
-     * @var HandlerEntry['removeEntryIndexCallback']
-     */
-    private ?\Closure $destroyIndexes = null;
 
     #region deferred handlers activation hooks
     public const ACTIVATE_DEFERRED_BY_HOOK = 'wphooks_container_activate_deferred_by_hook';
@@ -118,10 +102,27 @@ class WPHooksContainerRegistry
         self::UNREGISTER_BY_TAG_PATTERN => 'unregisterByTagPattern',
     ];
 
+    /**
+     * @var array<TKey, ContainerRegistryHandlerEntry>
+     */
+    protected array $handlers = [];
+
+    /**
+     * @var \WeakMap<HookInvoker, ContainerRegistryHandlerEntry>
+     */
+    protected \WeakMap $entriesByInvokers;
+
+    public private(set) bool $initialized = false;
+    private bool $bridgeInitialized = false;
+    /**
+     * @var HandlerEntry['removeEntryIndexCallback']
+     */
+    private ?\Closure $destroyIndexes = null;
+
 
     /**
      * @param ContainerInterface $container
-     * @param HookRegistration[] $hooksRegistration
+     * @param WPHooksScanner $scanner Discovers hook registrations from the live container entries.
      * @param WPHookPlanProvider $planProvider Plan provider for condition/hook-name resolution.
      * @param ContainerRegistryDeferredHookManager $containerRegistryDeferredHookManager Deferred hook manager.
      * @param ContainerRegistryHookTargetResolver $resolverTarget Resolves callable targets to class/method pairs.
@@ -129,7 +130,7 @@ class WPHooksContainerRegistry
      */
     public function __construct(
         private readonly ContainerInterface $container,
-        private array $hooksRegistration,
+        private WPHooksScanner $scanner,
         private WPHookPlanProvider $planProvider,
         private ContainerRegistryDeferredHookManager $containerRegistryDeferredHookManager,
         private ContainerRegistryHookTargetResolver $resolverTarget = new ContainerRegistryHookTargetResolver(),
@@ -194,7 +195,7 @@ class WPHooksContainerRegistry
             return;
         }
         $this->initEventBridge();
-        $this->registerAll($this->hooksRegistration);
+        $this->registerAll($this->scanner->getHookRegistrations());
         foreach ($this->handlers as $key => $entry) {
             try {
                 $this->queuedHooksCleaner->addContainerRegistryItsEntries([$entry]);

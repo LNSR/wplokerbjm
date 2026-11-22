@@ -40,13 +40,13 @@ class WPHooksScanner
     private ?array $cachedHookRegistrations = null;
 
     /**
-     * @param array $compiledContainerMap list of classes in compiled container
+     * @param \Closure(): list<class-string> $containerEntries container its entries(list class in container)
      * @param string $namespace namespace to scan
      * @param string $cacheLocation directory where cache file will be stored
      * @param WPHookPlanProvider $hookPlanProvider plan builder for condition gates and dynamic hook names
      */
     public function __construct(
-        private array $compiledContainerMap,
+        private \Closure $containerEntries,
         private WPHookPlanProvider $hookPlanProvider,
         private string $namespace = 'WPLokerBJM',
         private string $cacheLocation = '',
@@ -101,7 +101,7 @@ class WPHooksScanner
 
         $namespacePrefix = $this->namespace . '\\';
 
-        foreach ($this->compiledContainerMap as $className => $entryGet) {
+        foreach (array_values(array_unique(($this->containerEntries)() ?? [])) as $className) {
             if (!str_starts_with($className, $namespacePrefix) || !class_exists($className)) {
                 continue;
             }

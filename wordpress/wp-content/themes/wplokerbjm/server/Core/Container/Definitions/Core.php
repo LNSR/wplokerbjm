@@ -59,8 +59,9 @@ class Core implements DefinitionProviderInterface
             QueuedHooksCleaner::class => \DI\autowire(QueuedHooksCleaner::class),
             WPHookPlanProvider::class => \DI\autowire(WPHookPlanProvider::class)->constructor(\DI\get(ContainerInterface::class)),
             ContainerRegistryHookTargetResolver::class => \DI\autowire(ContainerRegistryHookTargetResolver::class),
+            InstanceRegistryRuntimeHookResolver::class => \DI\autowire(InstanceRegistryRuntimeHookResolver::class),
             WPHooksScanner::class => \DI\autowire(WPHooksScanner::class)->constructor(
-                static fn() => \CompiledContainer::METHOD_MAPPING,
+                static fn(Container $c) => $c->getKnownEntryNames(...),
                 \DI\get(WPHookPlanProvider::class),
                 $namespace,
                 static fn () => \defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache" : get_stylesheet_directory() . "/cache",
@@ -87,7 +88,7 @@ class Core implements DefinitionProviderInterface
             ),
             WPHooksContainerRegistry::class => \DI\autowire(WPHooksContainerRegistry::class)->constructor(
                 \DI\get(ContainerInterface::class),
-                static fn(WPHooksScanner $scanner): array => $scanner->getHookRegistrations(),
+                \DI\get(WPHooksScanner::class),
                 \DI\get(WPHookPlanProvider::class),
                 \DI\get(ContainerRegistryDeferredHookManager::class),
                 \DI\get(ContainerRegistryHookTargetResolver::class),
