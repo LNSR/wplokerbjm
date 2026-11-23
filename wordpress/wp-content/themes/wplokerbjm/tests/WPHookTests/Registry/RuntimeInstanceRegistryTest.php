@@ -18,7 +18,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 {
-    private WPHooksInstanceRegistry $registry;
+    private ?WPHooksInstanceRegistry $registry = null;
 
     /** Mutable flag read by deferred-gate closures (attribute gates must be static). */
     public static bool $deferredGateOpen = false;
@@ -837,11 +837,13 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         // First instance populates the cache (scan path).
         $first = $factory($log);
-        $registry()->registerHooksOn($first);
+        $l1 = $registry();
+        $l1->registerHooksOn($first);
 
         // Second instance takes the cache-hit path — it must NOT be gated eagerly.
         $second = $factory($log);
-        $registry()->registerHooksOn($second);
+        $l2 = $registry();
+        $l2->registerHooksOn($second);
 
         $this->assertNull(
             $this->findRegisteredHook('action', 'cached_gate_destination'),
@@ -883,13 +885,15 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         // First instance populates the cache (scan path).
         $first = $factory('first_dynamic_hook');
-        $registry()->registerHooksOn($first);
+        $l1 = $registry();
+        $l1->registerHooksOn($first);
         self::assertNotNull($this->findRegisteredHook('action', 'first_dynamic_hook'));
 
         // Second instance hits the same metadata site but must resolve the
         // cached hook closure against its own owner state.
         $second = $factory('second_dynamic_hook');
-        $registry()->registerHooksOn($second);
+        $l2 = $registry();
+        $l2->registerHooksOn($second);
 
         self::assertNotNull($this->findRegisteredHook('action', 'first_dynamic_hook'));
         self::assertNotNull($this->findRegisteredHook('action', 'second_dynamic_hook'));
@@ -905,7 +909,8 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         ]);
 
         $first = new RuntimeNamedClassCacheHost('first');
-        $registry()->registerHooksOn($first);
+        $l1 = $registry();
+        $l1->registerHooksOn($first);
 
         self::assertNotNull(
             $cache->getNamedClass(RuntimeNamedClassCacheHost::class),
@@ -913,7 +918,8 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         );
 
         $second = new RuntimeNamedClassCacheHost('second');
-        $registry()->registerHooksOn($second);
+        $l2 = $registry();
+        $l2->registerHooksOn($second);
 
         do_action('rt_named_class_cache_hook', 'value');
 
@@ -931,7 +937,8 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         ]);
 
         $instance = new RuntimeNamedClassCacheHost('force');
-        $registry()->registerHooksOn($instance, forceNoCache: true);
+        $l = $registry();
+        $l->registerHooksOn($instance, forceNoCache: true);
 
         self::assertNull($cache->getNamedClass(RuntimeNamedClassCacheHost::class));
         self::assertNotNull($this->findRegisteredHook('action', 'rt_named_class_cache_hook'));
@@ -951,7 +958,8 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
             public function onHook(): void {}
         };
 
-        $registry()->registerHooksOn($anon);
+        $l = $registry();
+        $l->registerHooksOn($anon);
 
         self::assertNull($cache->getNamedClass($anon::class));
         self::assertNotNull($this->findRegisteredHook('action', 'rt_bare_anon_cache_hook'));
@@ -999,6 +1007,35 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         // Drop the only strong reference — the handler holds a WeakReference,
         // so the owner is garbage-collected and the hook nukes itself.
         unset($anon);
+
+        do_action('rt_lifetime_action', 'x');
+        $this->assertSame([], $captured);
+        $this->assertNull($this->findRegisteredHook('action', 'rt_lifetime_action'));
+    }
+
+    public function testRegistryDeathNukesActiveHooks(): void
+    {
+        $captured = [];
+
+        $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
+            public function __construct(RuntimeInstanceRegistryTest $parentClass, $identifier, private array &$captured)
+            {
+                parent::__construct($parentClass, $identifier);
+            }
+
+            #[Action(hook: 'rt_lifetime_action', acceptedArgs: 1)]
+            public function doSomething(string $val): void
+            {
+                $this->captured[] = $val;
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        $this->assertNotNull($this->findRegisteredHook('action', 'rt_lifetime_action'));
+
+        
+        unset($this->registry);
 
         do_action('rt_lifetime_action', 'x');
         $this->assertSame([], $captured);
@@ -1197,7 +1234,8 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $first = $factory($log);
 
         // First instance populates the cache (reflection scan path).
-        $registry()->registerHooksOn($first);
+        $l1 = $registry();
+        $l1->registerHooksOn($first);
 
         self::assertNull(
             $this->findRegisteredHook('action', 'cached_deferred_destination'),
@@ -1210,7 +1248,8 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         // Second instance hits the cache.
         $second = $factory($log);
-        $registry()->registerHooksOn($second);
+        $l2 = $registry();
+        $l2->registerHooksOn($second);
 
         self::assertNull(
             $this->findRegisteredHook('action', 'cached_deferred_destination'),

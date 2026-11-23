@@ -126,31 +126,6 @@ class WPHooksInstanceRegistry
     ];
 
     /**
-     * Accepted argument count for bridge listeners.
-     *
-     * `registerHooksOn()` additionally accepts the optional
-     * `$autoUnregisterAtHook` and `$forceNoCache`; the hook selectors receive
-     * the owner instance plus the hook name.
-     *
-     * @var array<string, positive-int>
-     */
-    private const EVENT_BRIDGE_ACCEPTED_ARGS = [
-        self::REGISTER_HOOKS => 3,
-        self::ACTIVATE_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 2,
-        self::ACTIVATE_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE => 2,
-        self::ACTIVATE_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE => 2,
-        self::ACTIVATE_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE => 2,
-        self::UNREGISTER_DEFERRED_BY_HOOK_IN_LIVE_INSTANCE => 2,
-        self::UNREGISTER_DEFERRED_BY_HOOK_PATTERN_IN_LIVE_INSTANCE => 2,
-        self::UNREGISTER_DEFERRED_BY_TAGS_IN_LIVE_INSTANCE => 2,
-        self::UNREGISTER_DEFERRED_BY_TAG_PATTERN_IN_LIVE_INSTANCE => 2,
-        self::UNREGISTER_BY_HOOK_IN_LIVE_INSTANCE => 2,
-        self::UNREGISTER_BY_HOOK_PATTERN_IN_LIVE_INSTANCE => 2,
-        self::UNREGISTER_BY_TAGS_IN_LIVE_INSTANCE => 2,
-        self::UNREGISTER_BY_TAG_PATTERN_IN_LIVE_INSTANCE => 2,
-    ];
-
-    /**
      * Every registration — attribute-discovered — is owned by
      * exactly one object; unregisterHooksOn($owner) removes all of them at once.
      *
@@ -167,7 +142,8 @@ class WPHooksInstanceRegistry
      * @var \WeakMap<object, bool>
      */
     protected \WeakMap $scanned;
-
+    /** @var \WeakReference<self> */
+    private \WeakReference $self;
     /**
      * @param WPHookPlanProvider $provider resolves closure parameters from the container
      */
@@ -182,6 +158,7 @@ class WPHooksInstanceRegistry
         $this->weakRegistry = new \WeakMap();
         $this->scanned = new \WeakMap();
         $this->entriesByInvokers = new \WeakMap();
+        $this->self = \WeakReference::create($this);
     }
 
     /**
@@ -206,6 +183,7 @@ class WPHooksInstanceRegistry
      *     public function init(): void { ... }
      * }; // retain reference
      * $runtimeRegistry->registerHooksOn($service); // register hooks
+     * ```
      * @api
      * @param object|ModuleClassHookMetadata $instance An instantiated object with hook-annotated methods/properties.
      * @param ?string $autoUnregisterAtHook automatic removal of whole hooks in object at certain hook lifecycle
@@ -829,15 +807,7 @@ class WPHooksInstanceRegistry
             return;
         }
         $this->bridgeInitialized = true;
-        $priority = (int) 10;
-        foreach (self::EVENT_BRIDGE_HOOKS as $hook => $method) {
-            add_action(
-                $hook,
-                [$this, $method],
-                $priority,
-                self::EVENT_BRIDGE_ACCEPTED_ARGS[$hook] ?? 1,
-            );
-        }
+        $this->registerHooksOn($this);
     }
 
     /**
@@ -856,9 +826,7 @@ class WPHooksInstanceRegistry
         }
         $this->bridgeInitialized = false;
 
-        foreach (self::EVENT_BRIDGE_HOOKS as $hook => $method) {
-            remove_action($hook, [$this, $method], 10);
-        }
+        $this->unregisterHooksOn($this);
     }
 
     private function scheduleAutoUnregister(object $instance, string $hook): void
@@ -868,10 +836,10 @@ class WPHooksInstanceRegistry
             return;
         }
         $owner = \WeakReference::create($instance);
-
-        \add_action($hook, function () use ($owner, $hook): void {
+        $self = $this->self;
+        \add_action($hook, static function () use ($owner, $hook, $self): void {
             if (($instance = $owner->get()) !== null) {
-                $this->unregisterHooksOn($instance);
+                $self->get()?->unregisterHooksOn($instance);
             }
             \remove_action($hook, \Closure::getCurrent(), PHP_INT_MIN);
         }, PHP_INT_MIN, 0);
@@ -1127,22 +1095,24 @@ class WPHooksInstanceRegistry
      * @var ActivateRuntimeEntry
      * @return bool True when the entry was activated.
      */
-    private \Closure $activateRuntimeEntry {
+    private ?\Closure $activateRuntimeEntry = null {
         get {
-            return $this->activateRuntimeEntry ??= function (DeferredHookEntryHandler $data): bool {
+            if ($this->activateRuntimeEntry !== null && $this->self->get() === $this) return $this->activateRuntimeEntry;
+            $self = $this->self;
+            return $this->activateRuntimeEntry = static function (DeferredHookEntryHandler $data) use ($self): bool {
+                $self = $self->get() ?? null;
+                if ($self === null) return false;
                 $owner = $data->instance?->get();
-                if ($owner === null) {
-                    return false;
-                }
+                if ($owner === null) return false;
 
                 $record = RuntimeRegistryHandlerEntry::fromDeferredEntryDTO($data);
                 $weakRefRecord = \WeakReference::create($record);
 
-                $records = $this->weakRegistry[$owner] ?? [];
+                $records = $self->weakRegistry[$owner] ?? [];
                 $records[] = $record->register();
-                $this->weakRegistry[$owner] = $records;
-                $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$weakRefRecord]);
-                $this->entriesByInvokers[$record->handler] = $weakRefRecord;
+                $self->weakRegistry[$owner] = $records;
+                $self->queuedHooksCleaner->addRuntimeRegistryItsEntries([$weakRefRecord]);
+                $self->entriesByInvokers[$record->handler] = $weakRefRecord;
                 SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
 
                 return true;
@@ -1158,21 +1128,25 @@ class WPHooksInstanceRegistry
      * @internal
      * @var (\Closure(HookInvoker, bool = false): void) $removeRuntimeHook
      */
-    private \Closure $removeRuntimeHook {
+    private ?\Closure $removeRuntimeHook = null {
         get {
-            return $this->removeRuntimeHook ??= function (
+            if ($this->removeRuntimeHook !== null && $this->self->get() === $this) return $this->removeRuntimeHook;
+            $self = $this->self;
+            return $this->removeRuntimeHook = static function (
                 HookInvoker $invoker,
                 bool $invokerDied = false,
-            ): void {
-                $entry = $this->queuedHooksCleaner->getEntry($invoker)
-                    ?? isset($this->entriesByInvokers[$invoker])
-                    ? $this->entriesByInvokers[$invoker]->get() : null;
+            ) use ($self): void {
+                $self = $self->get() ?? null;
+                if ($self === null) return;
+                $entry = $self->queuedHooksCleaner->getEntry($invoker)
+                    ?? isset($self->entriesByInvokers[$invoker])
+                    ? $self->entriesByInvokers[$invoker]->get() : null;
                 if ($entry === null) return;
 
                 if ($invokerDied) {
-                    unset($this->entriesByInvokers[$invoker]);
-                    $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
-                    $this->cleanUpInstance($entry);
+                    unset($self->entriesByInvokers[$invoker]);
+                    $self->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+                    $self->cleanUpInstance($entry);
                     SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
                     return;
                 }
@@ -1187,8 +1161,8 @@ class WPHooksInstanceRegistry
                  * safely linger in $wp_filter until the next invoker order or beginning hook(all).
                  * @link https://core.trac.wordpress.org/ticket/64653
                  */
-                $this->queuedHooksCleaner->cleanUpCallback($invoker);
-                $this->cleanUpInstance($entry);
+                $self->queuedHooksCleaner->cleanUpCallback($invoker);
+                $self->cleanUpInstance($entry);
             };
         }
     }

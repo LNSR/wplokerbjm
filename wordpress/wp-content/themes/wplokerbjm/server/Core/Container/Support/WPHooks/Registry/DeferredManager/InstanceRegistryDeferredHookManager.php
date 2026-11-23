@@ -32,6 +32,7 @@ class InstanceRegistryDeferredHookManager
         private InstanceRegistryRuntimeHookResolver $runtimeResolver = new InstanceRegistryRuntimeHookResolver(),
     ) {
         $this->deferredHandlers = new \WeakMap();
+        $this->self = \WeakReference::create($this);
     }
 
     protected function deferredGet(string $key, ?object $owner = null): ?DeferredHookEntryHandler
@@ -441,20 +442,22 @@ class InstanceRegistryDeferredHookManager
 
         $ownerRef = $entry->instance;
         $cb = null;
-        \add_filter($triggerHook, $cb = function (mixed $value = null) use ($triggerHook, $deferredKey, $activateEntry, $ownerRef): mixed {
+        $self = $this->self;
+        \add_filter($triggerHook, $cb = static function (mixed $value = null) use ($triggerHook, $deferredKey, $activateEntry, $ownerRef, $self): mixed {
             $owner = $ownerRef?->get();
-            if ($owner === null) {
+            $self = $self?->get();
+            if ($owner === null || $self === null) {
                 \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
                 return $value;
             }
 
-            $entry = $this->deferredGet($deferredKey, $owner);
+            $entry = $self->deferredGet($deferredKey, $owner);
             if ($entry === null) {
                 \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
                 return $value;
             }
 
-            $activated = $this->activateMatchingDeferredEntries(
+            $activated = $self->activateMatchingDeferredEntries(
                 [$deferredKey],
                 $activateEntry,
                 DeferredActivationSource::Scheduler,

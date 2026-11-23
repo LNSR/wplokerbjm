@@ -138,7 +138,7 @@ trait HandlerEntryTrait
 
     public function isCurrentlyExecuting(): bool
     {
-        return $this->handler?->dispatching ?? false;
+        return ($this->handler?->dispatchDepth ?? 0) >= 1;
     }
 
     public function hasCallbackRegisteredOnWordpress(): bool

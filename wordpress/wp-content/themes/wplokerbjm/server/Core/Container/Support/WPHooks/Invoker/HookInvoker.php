@@ -71,7 +71,7 @@ final class HookInvoker
         $this->emitLiveDebug(LiveDebugPhase::Dispatching, registered: true);
 
         try {
-            $this->dispatching = true;
+            $this->dispatchDepth++;
 
             $instance = $this->target->isLifetimeScoped() ? $this->target->resolveOwner() : null;
             if ($this->target->isLifetimeScoped() && $instance === null) {
@@ -146,8 +146,11 @@ final class HookInvoker
             $this->emitLiveOutcome(LiveDebugPhase::Failed, 'failed', $startedAt, error: $e);
             return $this->filterPassthrough($args);
         } finally {
-            $this->consumeOnceAndClean();
-            $this->dispatching = false;
+            try {
+                $this->consumeOnceAndClean();
+            } finally {
+                $this->dispatchDepth--;
+            }
         }
     }
 

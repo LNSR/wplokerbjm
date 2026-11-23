@@ -35,7 +35,11 @@ trait HookInvokerTrait
     public readonly bool $once;
     /** Current hook callback execution */
     public private(set) int $numberExecutions = 0;
-    public private(set) bool $dispatching = false;
+    /** Re-entrant dispatch depth for the current callback stack. */
+    public private(set) int $dispatchDepth = 0;
+    public bool $dispatching {
+        get => $this->dispatchDepth >= 1;
+    }
 
     /** @var \Closure(): void  */
     public private(set) ?\Closure $onUnregisterDoCallback = null;

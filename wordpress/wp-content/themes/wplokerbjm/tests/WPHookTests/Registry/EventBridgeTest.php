@@ -64,7 +64,8 @@ final class EventBridgeTest extends WplokerbjmTestCase
         ]]);
 
         $registry->initialize();
-        $registry->initialize(); // idempotent boot — no duplicate listeners
+        $registry->initEventBridge();
+        $registry->initEventBridge(); // idempotent
 
         foreach (\array_keys(WPHooksContainerRegistry::EVENT_BRIDGE_HOOKS) as $bridgeHook) {
             self::assertCount(

@@ -104,6 +104,40 @@ final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
         self::assertSame(1, $cleanups, 'external removal must run the cleanup exactly once');
     }
 
+    public function testUnsetContainerRegistryRemoveWordpressBookkeeping(): void
+    {
+        $registry = $this->createRegistry([
+            $this->registration('external_cleanup', 'onAlpha', 10)
+        ]);
+        $registerRef = \WeakReference::create($registry);
+        $registry->initialize();
+        self::assertNotNull($this->findRegisteredHook('action', 'external_cleanup'), 'the registry must register all hook when initialized');
+        unset($registry);
+        self::assertNull($registerRef->get(), 'the registry reference must be null');
+        self::assertNull($this->findRegisteredHook('action', 'external_cleanup'), 'the registry must unregister all hooks when unset');
+    }
+    public function testUnsetInstanceRegistryRemoveWordpressBookkeeping(): void
+    {
+        $service = new class {
+            public int $runs = 0;
+
+            #[Action('external_instance_hook', 10)]
+            #[Action('external_instance_hook', 20)]
+            public function onHook(): void
+            {
+                $this->runs++;
+            }
+        };
+
+        $registry = $this->instanceRegistry();
+        $registerRef = \WeakReference::create($registry);
+        $registry->registerHooksOn($service);
+        self::assertNotNull($this->findRegisteredHook('action', 'external_instance_hook'), 'the registry must register all hook in instance');
+        unset($registry);
+        self::assertNull($registerRef->get(), 'the registry reference must be null');
+        self::assertNull($this->findRegisteredHook('action', 'external_instance_hook'), 'the registry must unregister all hooks when unset');
+    }
+
     public function testRemoveAllActionsCleansInstanceRegistryBookkeeping(): void
     {
         $service = new class {

@@ -41,6 +41,9 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\
  */
 trait DeferredHooksTrait
 {
+    /** @var \WeakReference<static> */
+    private \WeakReference $self;
+    
     /**
      * Get one deferred entry. Instance managers pass their owner; container
      * managers pass null and use their flat pool.

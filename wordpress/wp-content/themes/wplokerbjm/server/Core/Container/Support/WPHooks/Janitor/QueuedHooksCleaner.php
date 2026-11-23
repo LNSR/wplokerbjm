@@ -18,12 +18,20 @@ class QueuedHooksCleaner
     /** @var \WeakMap<HookInvoker, \WeakReference<ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry>> */
     protected \WeakMap $entries;
     private int $priority = \PHP_INT_MIN;
+    /** @var \WeakReference<self> */
+    private \WeakReference $self;
 
     public function __construct()
     {
         $this->entries = new \WeakMap();
+        $this->self = \WeakReference::create($this);
     }
 
+    public function __destruct()
+    {
+        $this->allHookActionCommand('remove');
+        $this->scheduleCleanup = null;
+    }
 
     /** @param list<\WeakReference<ContainerRegistryHandlerEntry>> $entries */
     public function addContainerRegistryItsEntries(array $entries): void
@@ -118,10 +126,14 @@ class QueuedHooksCleaner
         }
     }
 
-    private \Closure $scheduleCleanup {
+    private ?\Closure $scheduleCleanup = null {
         get {
-            return $this->scheduleCleanup ??= function (mixed ...$args): void {
-                $this->schedulerCleanerDispatched = $this->allHookActionCommand('has');
+            if ($this->scheduleCleanup !== null && $this->self->get() === $this) return $this->scheduleCleanup;
+            $self = $this->self;
+            return $this->scheduleCleanup = static function (mixed ...$args) use ($self): void {
+                $self = $self->get();
+                if ($self === null) return;
+                $self->schedulerCleanerDispatched = $self->allHookActionCommand('has');
                 $invoker = null;
                 if (
                     array_key_exists(0, $args)
@@ -133,7 +145,7 @@ class QueuedHooksCleaner
                 /**
                  * * 'all' hook is in different active stack it's ok to indiscriminately remove invokers immediately
                  */
-                foreach ($this->queuedRemovalEntry as $idx => $entry) {
+                foreach ($self->queuedRemovalEntry as $idx => $entry) {
                     if ($entry->handler === $invoker) {
                         continue;
                     }
@@ -156,11 +168,11 @@ class QueuedHooksCleaner
                         !$entry->hasCallbackRegisteredOnWordpress() ||
                         $entry->unregistrationFailureCount >= 3
                     ) {
-                        unset($this->queuedRemovalEntry[$idx]);
+                        unset($self->queuedRemovalEntry[$idx]);
                     }
                 }
-                if ($this->queuedRemovalEntry !== []) return;
-                if ($this->schedulerCleanerDispatched) $this->allHookActionCommand('remove') && $this->schedulerCleanerDispatched = false;
+                if ($self->queuedRemovalEntry !== []) return;
+                if ($self->schedulerCleanerDispatched) $self->allHookActionCommand('remove') && $self->schedulerCleanerDispatched = false;
                 // \gc_collect_cycles(); // make sure circular-reference, or self-reference purged
             };
         }
