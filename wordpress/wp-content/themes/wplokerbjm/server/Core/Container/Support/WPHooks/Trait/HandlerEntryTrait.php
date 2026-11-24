@@ -16,10 +16,9 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{
     ContainerRegistryHandlerEntry,
     WPHooksInstanceRegistry
 };
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
-use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 
 /**
  * @mixin ContainerRegistryHandlerEntry&RuntimeRegistryHandlerEntry
@@ -58,7 +57,7 @@ trait HandlerEntryTrait
         try {
             $this->handler->initOnUnregisterDoCallback();
         } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'Failed to prepare onUnregisterDo for ', [
+            $this->logger->error(__METHOD__, 'Failed to prepare onUnregisterDo for ', [
                 'invokerLabel' => $this->handler->label,
                 'message' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),

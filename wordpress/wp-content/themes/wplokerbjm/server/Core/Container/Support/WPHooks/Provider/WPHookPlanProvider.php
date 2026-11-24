@@ -8,6 +8,7 @@ use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, HookDebugDispatcher, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
 use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\NonNullableSelfParameterException;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Plan\CallablePlanFactory;
 use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ArgumentResolver;
@@ -38,12 +39,14 @@ class WPHookPlanProvider
     private readonly ConditionEvaluator $conditions;
     private readonly HookDebugDispatcher $debug;
 
-    public function __construct(ContainerInterface $container)
-    {
-        $this->planFactory = new CallablePlanFactory();
+    public function __construct(
+        ContainerInterface $container,
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
+    ) {
+        $this->planFactory = new CallablePlanFactory($this->logger);
         $this->resolver = new ArgumentResolver($container);
-        $this->conditions = new ConditionEvaluator($this->resolver);
-        $this->debug = new HookDebugDispatcher($container, $this->resolver);
+        $this->conditions = new ConditionEvaluator($this->resolver, $this->logger);
+        $this->debug = new HookDebugDispatcher($container, $this->resolver, $this->logger);
     }
 
     /**

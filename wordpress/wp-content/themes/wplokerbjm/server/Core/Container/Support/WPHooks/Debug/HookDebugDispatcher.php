@@ -7,8 +7,8 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Debug;
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\{CallableHookParams, WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\HookDebugProbeException;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Resolution\ArgumentResolver;
-use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * Dispatches opt-in hook debug probes with an already built DTO.
@@ -31,6 +31,7 @@ final class HookDebugDispatcher
     public function __construct(
         private readonly ContainerInterface $container,
         private readonly ArgumentResolver $resolver,
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
     ) {}
 
     /**
@@ -71,7 +72,7 @@ final class HookDebugDispatcher
 
             $callable(...$values);
         } catch (\Throwable $e) {
-            Logger::error(self::class, 'Hook debug probe failed for ' . $label, [
+            $this->logger->error(self::class, 'Hook debug probe failed for ' . $label, [
                 'dto' => $dto::class,
                 'ownerOptional' => $ownerOptional,
                 'message' => $e->getMessage(),

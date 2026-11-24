@@ -5,10 +5,10 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{ContainerRegistryHandlerEntry, RuntimeRegistryHandlerEntry};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{HandlerEntryTrait, HandlerEntryUniqueKey};
-use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\DataObject\AbstractDataObject;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 use WeakReference;
@@ -85,13 +85,14 @@ final class DeferredHookEntryHandler
         public readonly ?WeakReference $instance = null,
         private ?\Closure $removeEntryIndexCallback = null,
         private ?\Closure $removeAutoSchedulerCallback = null,
+        public readonly HookLoggerInterface $logger = new NullHookLogger(),
     ) {}
 
     public function __destruct()
     {
         \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
         \is_callable($this->removeAutoSchedulerCallback) && ($this->removeAutoSchedulerCallback)($this);
-        SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Deferred entry destroyed; removing entry indexes: ", [
+        SharedUtils::isDevelopment() && $this->logger->debug(__METHOD__, "Deferred entry destroyed; removing entry indexes: ", [
             'invokerLabel' => $this->handler->label,
         ]);
         unset($this->removeEntryIndexCallback, $this->removeAutoSchedulerCallback);
@@ -126,6 +127,7 @@ final class DeferredHookEntryHandler
             once: $entry->once,
             onUnregisterDo: $entry->onUnregisterDo,
             onUnregisterDoParams: $entry->onUnregisterDoParams,
+            logger: $entry->logger,
         );
     }
 
@@ -146,7 +148,8 @@ final class DeferredHookEntryHandler
             once: $entry->once,
             onUnregisterDo: $entry->onUnregisterDo,
             onUnregisterDoParams: $entry->onUnregisterDoParams,
-            instance: $entry->owner
+            instance: $entry->owner,
+            logger: $entry->logger,
         );
     }
 }

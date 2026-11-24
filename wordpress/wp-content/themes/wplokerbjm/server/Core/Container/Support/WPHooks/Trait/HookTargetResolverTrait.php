@@ -8,7 +8,7 @@ use ReflectionFunction;
 use Spatie\Backtrace\Backtrace;
 use Spatie\Backtrace\Frame;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 
 /**
  * Shared callable → `[class, member]` target resolution.
@@ -42,7 +42,10 @@ trait HookTargetResolverTrait
      */
     private \WeakMap $callableTargetCache;
 
-    public function __construct() {
+    protected readonly HookLoggerInterface $logger;
+
+    public function __construct(HookLoggerInterface $logger = new NullHookLogger()) {
+        $this->logger = $logger;
         $this->callableTargetCache = new \WeakMap();
     }
 
@@ -149,7 +152,7 @@ trait HookTargetResolverTrait
                 $refClass = new \ReflectionClass($callerObject);
                 foreach ($refClass->getProperties() as $property) {
                     if ($property->isInitialized($callerObject) && $property->getValue($callerObject) === $target) {
-                        Logger::info(
+                        $this->logger->info(
                             __METHOD__,
                             "Anon class without extending ModuleClassHookMetadata, it's recommended to use 'ModuleClassHookMetadata'." . $refClass->getName() . "::" . $property->getName()
                         );

@@ -6,6 +6,7 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers;
 
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\InstanceHookMetadata;
@@ -13,7 +14,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookRegistration;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryTrait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HandlerEntryUniqueKey;
-use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
@@ -74,7 +74,8 @@ final class ContainerRegistryHandlerEntry
         public readonly bool $once,
         public readonly ?\Closure $onUnregisterDo,
         public readonly array $onUnregisterDoParams,
-        private ?\Closure $removeEntryIndexCallback = null
+        private ?\Closure $removeEntryIndexCallback = null,
+        public readonly HookLoggerInterface $logger = new NullHookLogger(),
     ) {
         $this->handler = $handler;
         $this->invokerLabel = $handler->label;
@@ -87,7 +88,7 @@ final class ContainerRegistryHandlerEntry
     {
         if ($this->registered) {
             $this->unregister(\WPLokerBJM\Core\Container\Support\WPHooks\Debug\UnregistrationSource::Destructor);
-            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Container Registry Handler Entry destroyed before explicit registry unregistration, removing entry indexes: ", [
+            SharedUtils::isDevelopment() && $this->logger->debug(__METHOD__, "Container Registry Handler Entry destroyed before explicit registry unregistration, removing entry indexes: ", [
                 'invokerLabel' => $this->invokerLabel,
             ]);
         }
@@ -118,6 +119,7 @@ final class ContainerRegistryHandlerEntry
             once: $deferredEntry->once,
             onUnregisterDo: $deferredEntry->onUnregisterDo,
             onUnregisterDoParams: $deferredEntry->onUnregisterDoParams,
+            logger: $deferredEntry->logger,
         );
     }
     public function toDeferredEntryDTO(): DeferredHookEntryHandler

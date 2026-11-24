@@ -57,33 +57,26 @@ final class SearchJobHooks
         4,
         tag: ['graphql'],
         deferRegister: true,
-        onUnregisterDo: static function (self $self): void {
-            /** @suppresswarnings PHP1416 */
-            $self->filterPostsSearch = null;
-        },
         executeIf: static function (ResolveInfo $info): bool {
             return $info->fieldName === JobRegistrationTypes::TYPE_SEARCH_JOBS;
-        },
+        }
     )]
-    #[Filter('posts_search', acceptedArgs: 2, deferRegister: true)]
-    public private(set) ?\Closure $filterPostsSearch = static function (
+    protected function boot(
         mixed $source,
         array $args,
         AppContext $context,
         ResolveInfo $info,
     ) {
-        \do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [__CLASS__, 'filterPostsSearch']);
-        \do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CALLABLE, [__CLASS__, 'filterPostsSearch']);
-    } {
-        get => $this->filterPostsSearch ??=
-            /**
-             * @param string        $search   The current search SQL fragment (may be empty).
-             * @param \WP_Query     $wp_query The WP_Query object being executed.
-             * @return string Modified search SQL fragment.
-             */
-            fn(string $search, \WP_Query $wp_query): string => JobQuery::buildPostsSearchSql(
-                $this->wpdb,
-                (string) ($wp_query->query_vars['s'] ?? '')
-            );
+        \do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
+        \do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CLASS, $this);
+    }
+
+    #[Filter('posts_search', acceptedArgs: 2, deferRegister: true)]
+    public function filterPostsSearch(string $search, \WP_Query $wp_query): string
+    {
+        return JobQuery::buildPostsSearchSql(
+            $this->wpdb,
+            (string) ($wp_query->query_vars['s'] ?? '')
+        );
     }
 }

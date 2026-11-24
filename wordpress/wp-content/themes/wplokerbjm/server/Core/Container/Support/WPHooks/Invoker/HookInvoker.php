@@ -22,8 +22,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\Target\{
     RuntimePropertyTarget,
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookInvokerTrait;
-use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 /**
@@ -35,15 +35,18 @@ final class HookInvoker
 {
     use HookInvokerTrait;
 
+    public readonly HookLoggerInterface $logger;
+
     public function __construct(
         private readonly HookInvokerConfig $config,
         private readonly InvocationTarget $target,
     ) {
+        $this->logger = $config->logger;
         $this->label = $config->label;
         $this->type = $config->type;
         $this->once = $config->once;
 
-        $this->removal = new HookRemovalController($config->label);
+        $this->removal = new HookRemovalController($config->label, $this->logger);
         $this->debugEmitter = new HookDebugEmitter(
             new HookDebugIdentity(
                 label: $config->label,
@@ -61,6 +64,7 @@ final class HookInvoker
             $config->probes(),
             $config->planProvider,
             $target->ownerRef(),
+            $config->logger,
         );
         $this->argumentBag = new HookArgumentBag($config->hookArgNames, $config->type);
     }
@@ -100,7 +104,7 @@ final class HookInvoker
                         $this->variadicHookArgName(),
                     );
                 } catch (\Throwable $e) {
-                    Logger::error(
+                    $this->logger->error(
                         __METHOD__,
                         'executeIf gate declined for hook ' . $this->config->label . ' — handler skipped.',
                         [
@@ -115,7 +119,7 @@ final class HookInvoker
                 }
 
                 if (!$gatePassed) {
-                    Logger::info(__METHOD__, 'Skipping hook ' . $this->config->label . ' — executeIf gate returned false.');
+                    $this->logger->info(__METHOD__, 'Skipping hook ' . $this->config->label . ' — executeIf gate returned false.');
                     $this->emitLiveOutcome(LiveDebugPhase::Skipped, 'skipped', $startedAt, error: new \RuntimeException('executeIf returned false'), owner: $instance);
                     return $this->filterPassthrough($args);
                 }
@@ -129,7 +133,7 @@ final class HookInvoker
 
             $result = $this->target->invoke($instance, $args);
 
-            SharedUtils::isDevelopment() && Logger::debug(
+            SharedUtils::isDevelopment() && $this->logger->debug(
                 __METHOD__,
                 "Hook invoke {$this->config->label}" . ' executed successfully ' . ++$this->numberExecutions . ' times'
             );
@@ -137,7 +141,7 @@ final class HookInvoker
             $this->emitLiveOutcome(LiveDebugPhase::Completed, 'completed', $startedAt, result: $result, owner: $instance);
             return $result;
         } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'Error invoking hook ' . $this->config->label . ': ', [
+            $this->logger->error(__METHOD__, 'Error invoking hook ' . $this->config->label . ': ', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),
@@ -221,6 +225,7 @@ final class HookInvoker
         array $debugLiveRegistrationParams = [],
         ?\Closure $debugLiveUnregistration = null,
         array $debugLiveUnregistrationParams = [],
+        HookLoggerInterface $logger = new NullHookLogger(),
     ): self {
         $label = $type . '::' . $hookName . '::' . (string) $priority . '::' . (string) $acceptedArgs . '::' . $class . '->' . $method;
 
@@ -249,6 +254,7 @@ final class HookInvoker
                 debugLiveUnregistration: $debugLiveUnregistration,
                 debugLiveUnregistrationParams: $debugLiveUnregistrationParams,
                 planProvider: $planProvider,
+                logger: $logger,
             ),
             new ContainerMethodTarget($container, $class, $method, $visibility),
         );
@@ -276,6 +282,7 @@ final class HookInvoker
         array $debugLiveRegistrationParams = [],
         ?\Closure $debugLiveUnregistration = null,
         array $debugLiveUnregistrationParams = [],
+        HookLoggerInterface $logger = new NullHookLogger(),
     ): self {
         $label = $type . '::' . $hookName . '::' . (string) $priority . '::' . (string) $acceptedArgs . '::' . $class . '->' . $property;
 
@@ -304,6 +311,7 @@ final class HookInvoker
                 debugLiveUnregistration: $debugLiveUnregistration,
                 debugLiveUnregistrationParams: $debugLiveUnregistrationParams,
                 planProvider: $planProvider,
+                logger: $logger,
             ),
             new ContainerPropertyTarget($container, $class, $property, $visibility),
         );
@@ -330,6 +338,7 @@ final class HookInvoker
         array $debugLiveRegistrationParams = [],
         ?\Closure $debugLiveUnregistration = null,
         array $debugLiveUnregistrationParams = [],
+        HookLoggerInterface $logger = new NullHookLogger(),
     ): self {
         $instance = $instanceRef->get();
         $objectId = \spl_object_id($instance);
@@ -366,6 +375,7 @@ final class HookInvoker
                 debugLiveUnregistration: $debugLiveUnregistration,
                 debugLiveUnregistrationParams: $debugLiveUnregistrationParams,
                 planProvider: $hookPlanProvider,
+                logger: $logger,
             ),
             new RuntimeMethodTarget($instanceRef, $method, $visibility),
         );
@@ -392,6 +402,7 @@ final class HookInvoker
         array $debugLiveRegistrationParams = [],
         ?\Closure $debugLiveUnregistration = null,
         array $debugLiveUnregistrationParams = [],
+        HookLoggerInterface $logger = new NullHookLogger(),
     ): self {
         $instance = $instanceRef->get();
         $objectId = \spl_object_id($instance);
@@ -428,6 +439,7 @@ final class HookInvoker
                 debugLiveUnregistration: $debugLiveUnregistration,
                 debugLiveUnregistrationParams: $debugLiveUnregistrationParams,
                 planProvider: $hookPlanProvider,
+                logger: $logger,
             ),
             new RuntimePropertyTarget($instanceRef, $property, $visibility),
         );

@@ -10,7 +10,7 @@ use ReflectionMethod;
 use ReflectionNamedType;
 use WPLokerBJM\Core\Container\Attributes\Inject;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\CallableHookParams;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 
 /**
  * Reflection → callable-plan factory.
@@ -26,8 +26,9 @@ final class CallablePlanFactory
     /** @var \WeakMap<object, CallablePlan> */
     private \WeakMap $callablePlanCache;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
+    ) {
         $this->callablePlanCache = new \WeakMap();
     }
 
@@ -163,7 +164,7 @@ final class CallablePlanFactory
                     return $this->callablePlanCache[$property] ??= $this->callablePlan($value);
                 }
             } catch (ReflectionException $e) {
-                Logger::error(__METHOD__, 'Error getting property value', [
+                $this->logger->error(__METHOD__, 'Error getting property value', [
                     'message' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                 ]);

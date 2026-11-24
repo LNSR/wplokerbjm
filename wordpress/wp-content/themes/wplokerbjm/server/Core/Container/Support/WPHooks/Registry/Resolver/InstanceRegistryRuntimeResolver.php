@@ -7,8 +7,8 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver;
 use ReflectionFunction;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookTargetResolverTrait;
-use WPLokerBJM\Shared\Log\Logger;
 
 /**
  * @internal
@@ -18,8 +18,9 @@ class InstanceRegistryRuntimeHookResolver
     use HookTargetResolverTrait;
 
     private \WeakMap $weakMap;
-    public function __construct()
+    public function __construct(HookLoggerInterface $logger = new NullHookLogger())
     {
+        $this->logger = $logger;
         $this->weakMap = new \WeakMap();
     }
 
@@ -81,7 +82,7 @@ class InstanceRegistryRuntimeHookResolver
         }
 
         if (!is_object($instance) || !is_string($targetName) || $targetName === '') {
-            Logger::warning(
+            $this->logger->warning(
                 self::class,
                 'unregisterByCallableInLiveInstance() expects [$liveInstance, \'member\'], a first-class callable/property-hook closure bound to the live instance, or an invokable object.',
             );

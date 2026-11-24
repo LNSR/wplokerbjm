@@ -11,7 +11,7 @@ use ReflectionFunction;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{Registrations\HookRegistration, Registrations\HookKey, Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
@@ -138,6 +138,7 @@ class WPHooksContainerRegistry
         private ContainerRegistryHookTargetResolver $resolverTarget = new ContainerRegistryHookTargetResolver(),
         private QueuedHooksCleaner $queuedHooksCleaner = new QueuedHooksCleaner(),
         private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
     ) {
         $this->entriesByInvokers = new \WeakMap();
         $this->planProvider ??= new WPHookPlanProvider($container);
@@ -206,7 +207,7 @@ class WPHooksContainerRegistry
                 $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes);
                 $this->entriesByInvokers[$entry->handler] = $weakRef;
             } catch (\Exception $e) {
-                Logger::error(
+                $this->logger->error(
                     __METHOD__,
                     "Error registering {$entry->invokerLabel}",
                     [
@@ -752,7 +753,7 @@ class WPHooksContainerRegistry
                 $entry->setOnEntryRemovalRemoveIndexesCallback($self->destroyIndexes);
                 $entry->register();
                 $self->queuedHooksCleaner->addContainerRegistryItsEntries([$weakRef]);
-                SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
+                SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
                 return true;
             };
         }
@@ -782,7 +783,7 @@ class WPHooksContainerRegistry
                     $self->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                     unset($self->handlers[$key]);
                     unset($self->entriesByInvokers[$invoker]);
-                    SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
+                    SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, "Entry Died: {$invoker->label}");
                     return;
                 };
 
@@ -820,7 +821,7 @@ class WPHooksContainerRegistry
             $registration = $reg instanceof HookRegistration ? $reg : HookRegistration::fromArray($reg);
 
             if (!$this->container->has($registration->class)) {
-                Logger::info(
+                $this->logger->info(
                     __METHOD__,
                     'Skipping hook ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
                         . ' — class not in container: ' . $registration->class
@@ -836,7 +837,7 @@ class WPHooksContainerRegistry
                     $registration->class
                 );
             } catch (\RuntimeException $e) {
-                Logger::error(
+                $this->logger->error(
                     __METHOD__,
                     'Skipping hook for ' . $registration->class . '::' . $registration->method
                         . ' on ' . ($registration->hook instanceof \Closure ? '(closure)' : $registration->hook . '::' . (string) $registration->priority)
@@ -854,14 +855,14 @@ class WPHooksContainerRegistry
                         $registration->class
                     );
                 } catch (\Throwable $e) {
-                    Logger::error(
+                    $this->logger->error(
                         __METHOD__,
                         'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
                     );
                     continue;
                 }
                 if (!$allowed) {
-                    Logger::info(
+                    $this->logger->info(
                         __METHOD__,
                         'Skipping hook ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — registerIf gate returned false.'
                     );
@@ -889,7 +890,7 @@ class WPHooksContainerRegistry
                     $resolvedTags
                 );
             } catch (\Throwable $e) {
-                Logger::error(
+                $this->logger->error(
                     __METHOD__,
                     'Skipping hook for ' . $registration->class . '->' . $registration->method . ' on ' . $hookName . '::' . (string) $registration->priority . ' — error ' . $e->getMessage()
                 );
@@ -938,7 +939,8 @@ class WPHooksContainerRegistry
                 debugLiveRegistration: $registration->debugLiveRegistration,
                 debugLiveRegistrationParams: $registration->debugLiveRegistrationParams,
                 debugLiveUnregistration: $registration->debugLiveUnregistration,
-                debugLiveUnregistrationParams: $registration->debugLiveUnregistrationParams
+                debugLiveUnregistrationParams: $registration->debugLiveUnregistrationParams,
+                logger: $this->logger,
             )
             : HookInvoker::containerProperty(
                 container: $this->container,
@@ -961,7 +963,8 @@ class WPHooksContainerRegistry
                 debugLiveRegistration: $registration->debugLiveRegistration,
                 debugLiveRegistrationParams: $registration->debugLiveRegistrationParams,
                 debugLiveUnregistration: $registration->debugLiveUnregistration,
-                debugLiveUnregistrationParams: $registration->debugLiveUnregistrationParams
+                debugLiveUnregistrationParams: $registration->debugLiveUnregistrationParams,
+                logger: $this->logger,
             );
 
         $entry = ($registration->deferRegister || $registration->deferRegisterUntilHook !== null) ?
@@ -980,6 +983,7 @@ class WPHooksContainerRegistry
                 onUnregisterDo: $registration->onUnregisterDo,
                 onUnregisterDoParams: $registration->onUnregisterDoParams,
                 key: HookKey::fromRegistration($registration),
+                logger: $this->logger,
             ) : new ContainerRegistryHandlerEntry(
                 hook: $hookName,
                 key: HookKey::fromRegistration($registration),
@@ -994,7 +998,8 @@ class WPHooksContainerRegistry
                 executeIfParams: $registration->executeIfParams,
                 once: $registration->once,
                 onUnregisterDo: $registration->onUnregisterDo,
-                onUnregisterDoParams: $registration->onUnregisterDoParams
+                onUnregisterDoParams: $registration->onUnregisterDoParams,
+                logger: $this->logger,
             );
 
         $handler->setCleanupCallback($this->removeEntry);

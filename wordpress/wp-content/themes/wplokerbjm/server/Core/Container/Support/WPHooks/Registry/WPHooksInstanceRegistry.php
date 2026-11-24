@@ -12,8 +12,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
-use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
@@ -153,7 +153,7 @@ class WPHooksInstanceRegistry
         private QueuedHooksCleaner $queuedHooksCleaner,
         private InstanceRegistryRuntimeHookResolver $runtimeResolver,
         public readonly WPHooksInstanceObjectCache $cache,
-
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
     ) {
         $this->weakRegistry = new \WeakMap();
         $this->scanned = new \WeakMap();
@@ -832,7 +832,7 @@ class WPHooksInstanceRegistry
     private function scheduleAutoUnregister(object $instance, string $hook): void
     {
         if (\did_action($hook) >= 1) {
-            Logger::warning(__METHOD__, 'Hook ' . $hook . ' has passed lifecycle execution, cannot schedule unregister there');
+            $this->logger->warning(__METHOD__, 'Hook ' . $hook . ' has passed lifecycle execution, cannot schedule unregister there');
             return;
         }
         $owner = \WeakReference::create($instance);
@@ -892,7 +892,7 @@ class WPHooksInstanceRegistry
                 $ownerLabel = $instance instanceof ModuleClassHookMetadata
                     ? $instance->parentClassString . '->' . $instance->parentProperty
                     : $instance::class;
-                Logger::info(
+                $this->logger->info(
                     __METHOD__,
                     'registerIf for ' . $ownerLabel . '->' . $entryMeta->targetName . ' with hook ' . self::describeHook($entryMeta->hook) . ' and priority ' . (string) $entryMeta->priority . ' skipped'
                 );
@@ -903,7 +903,7 @@ class WPHooksInstanceRegistry
         try {
             [$handler, $record] = $this->createHandlerAndEntry($entryMeta, $instance, $attributeIndex, $isDeferred);
         } catch (\Throwable $e) {
-            Logger::error(
+            $this->logger->error(
                 __METHOD__,
                 'Skipping hook ' . $entryMeta->targetName . ' on ' . self::describeHook($entryMeta->hook) . ' — ' . $e->getMessage(),
             );
@@ -1025,6 +1025,7 @@ class WPHooksInstanceRegistry
                 debugLiveRegistrationParams: $metadata->debugLiveRegistrationParams,
                 debugLiveUnregistration: $metadata->debugLiveUnregistration,
                 debugLiveUnregistrationParams: $metadata->debugLiveUnregistrationParams,
+                logger: $this->logger,
             ),
             'property', 'property-hook' => HookInvoker::runtimeProperty(
                 instanceRef: $weakRef,
@@ -1047,6 +1048,7 @@ class WPHooksInstanceRegistry
                 debugLiveRegistrationParams: $metadata->debugLiveRegistrationParams,
                 debugLiveUnregistration: $metadata->debugLiveUnregistration,
                 debugLiveUnregistrationParams: $metadata->debugLiveUnregistrationParams,
+                logger: $this->logger,
             ),
         };
         $entry = match ($isDeferred) {
@@ -1066,6 +1068,7 @@ class WPHooksInstanceRegistry
                 onUnregisterDoParams: $metadata->onUnregisterDoParams,
                 key: $hookKey,
                 instance: $weakRef,
+                logger: $this->logger,
             ),
             default => new RuntimeRegistryHandlerEntry(
                 hook: $hookName,
@@ -1083,6 +1086,7 @@ class WPHooksInstanceRegistry
                 onUnregisterDoParams: $metadata->onUnregisterDoParams,
                 hookKey: $hookKey,
                 owner: $weakRef,
+                logger: $this->logger,
             ),
         };
         $handler->setCleanupCallback($this->removeRuntimeHook);
@@ -1113,7 +1117,7 @@ class WPHooksInstanceRegistry
                 $self->weakRegistry[$owner] = $records;
                 $self->queuedHooksCleaner->addRuntimeRegistryItsEntries([$weakRefRecord]);
                 $self->entriesByInvokers[$record->handler] = $weakRefRecord;
-                SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
+                SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
 
                 return true;
             };
@@ -1147,7 +1151,7 @@ class WPHooksInstanceRegistry
                     unset($self->entriesByInvokers[$invoker]);
                     $self->queuedHooksCleaner->immediatelyScheduleRemove($entry);
                     $self->cleanUpInstance($entry);
-                    SharedUtils::isDevelopment() && Logger::debug(__METHOD__, "Entry Died: {$invoker->label}");
+                    SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, "Entry Died: {$invoker->label}");
                     return;
                 }
 

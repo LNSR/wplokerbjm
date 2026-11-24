@@ -99,6 +99,42 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
         self::assertSame(1, $anon->runs);
     }
 
+    public function testSchedulerRemovalOnSameHookDoesNotSkipAdjacentPriorities(): void
+    {
+        $anon = new class {
+            /** @var list<string> */
+            public array $order = [];
+
+            #[Action('inst_same_hook_trigger', 10, deferRegisterUntilHook: 'inst_same_hook_trigger')]
+            public function onDeferred(): void
+            {
+                $this->order[] = 'activated';
+            }
+        };
+
+        $this->registry->registerHooksOn($anon);
+
+        add_action('inst_same_hook_trigger', static function () use ($anon): void {
+            $anon->order[] = 'before';
+        }, 5, 0);
+        add_action('inst_same_hook_trigger', static function () use ($anon): void {
+            $anon->order[] = 'after';
+        }, 15, 0);
+
+        \do_action('inst_same_hook_trigger');
+
+        self::assertSame(
+            ['before', 'activated', 'after'],
+            $anon->order,
+            'Scheduler self-removal must not skip an adjacent priority; same-hook activation must run in place.',
+        );
+        self::assertArrayNotHasKey(
+            PHP_INT_MIN,
+            $GLOBALS['wp_filter']['inst_same_hook_trigger']->callbacks,
+            'The one-shot scheduler must remove itself without leaving its priority bucket behind.',
+        );
+    }
+
     public function testUnregisterByCallableLeavesDeferredEntriesIntact(): void
     {
         $anon = new class {

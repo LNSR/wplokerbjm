@@ -4,8 +4,8 @@ namespace WPLokerBJM\Core\Container\Support\WPHooks\Janitor;
 
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\UnregistrationSource;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{ContainerRegistryHandlerEntry, RuntimeRegistryHandlerEntry};
-use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
 
 class QueuedHooksCleaner
@@ -21,8 +21,9 @@ class QueuedHooksCleaner
     /** @var \WeakReference<self> */
     private \WeakReference $self;
 
-    public function __construct()
-    {
+    public function __construct(
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
+    ) {
         $this->entries = new \WeakMap();
         $this->self = \WeakReference::create($this);
     }
@@ -99,7 +100,7 @@ class QueuedHooksCleaner
                     break;
                 }
                 ($this->scheduleCleanup)($invoker);
-                $result && SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned immediately: ', [
+                $result && SharedUtils::isDevelopment() && $this->logger->debug(static::class, 'Handler cleaned immediately: ', [
                     'InvokerLabel' => $invoker->label,
                     'CurrentHookContext' => current_filter(),
                 ]);
@@ -152,7 +153,7 @@ class QueuedHooksCleaner
                     $capturedLabel = $entry->handler?->label ?? null;
                     $result = $entry->unregister(UnregistrationSource::Cleaner);
 
-                    SharedUtils::isDevelopment() && Logger::debug(static::class, 'Handler cleaned at: ', [
+                    SharedUtils::isDevelopment() && $self->logger->debug(static::class, 'Handler cleaned at: ', [
                         'CleanedEntryHandler' => $capturedLabel ?: "Invoker gone before cleanup. (cachedLabel: {$entry->invokerLabel})",
                         'CleanedAtInvokersLabel' => $invoker?->label
                             ? "via {$invoker?->label} (" . ($invoker?->isDestructed ? 'via destructor' : 'via cleanup') . ")"

@@ -11,7 +11,7 @@ use ReflectionFunction;
 use ReflectionProperty;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\DeferredActivationSource;
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{Registrations\HookRegistration, Registrations\HookKey, Provider\WPHookPlanProvider};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
@@ -53,7 +53,8 @@ class ContainerRegistryDeferredHookManager
     public function __construct(
         private WPHookPlanProvider $planProvider,
         private ContainerRegistryHookTargetResolver $resolverTarget = new ContainerRegistryHookTargetResolver(),
-        private EntriesIndexer $entriesIndexer = new EntriesIndexer()
+        private EntriesIndexer $entriesIndexer = new EntriesIndexer(),
+        private readonly HookLoggerInterface $logger = new NullHookLogger()
     ) {
         $this->self = \WeakReference::create($this);
     }
@@ -486,10 +487,11 @@ class ContainerRegistryDeferredHookManager
             return $value;
         }, PHP_INT_MIN, 1);
 
-        $this->deferredHandlers[$key]->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb): void {
+        $logger = $this->logger;
+        $this->deferredHandlers[$key]->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb, $logger): void {
             if (!\has_filter($triggerHook, $cb, PHP_INT_MIN)) return;
             \remove_filter($triggerHook, $cb, PHP_INT_MIN);
-            SharedUtils::isDevelopment() && Logger::debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
+            SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);
         });
     }
 
@@ -508,7 +510,7 @@ class ContainerRegistryDeferredHookManager
                     $registration->class
                 );
             } catch (\RuntimeException $e) {
-                Logger::error(
+                $this->logger->error(
                     __METHOD__,
                     'Skipping hook for: ' . $entry->handler->label,
                     [
@@ -550,7 +552,7 @@ class ContainerRegistryDeferredHookManager
                 $data->key->class
             );
         } catch (\Throwable $e) {
-            Logger::error(
+            $this->logger->error(
                 __METHOD__,
                 'Skipping deferred hook activation: ' . $data->handler->label .  ' — error ' . $e->getMessage()
             );
@@ -558,7 +560,7 @@ class ContainerRegistryDeferredHookManager
         }
 
         if (!$allowed) {
-            Logger::info(
+            $this->logger->info(
                 __METHOD__,
                 'Skipping deferred hook activation: ' . $data->handler->label .  ' — registerIf gate returned false.'
             );

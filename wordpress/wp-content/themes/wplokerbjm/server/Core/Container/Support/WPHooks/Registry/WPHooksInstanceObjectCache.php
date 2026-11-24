@@ -8,7 +8,7 @@ use Brick\VarExporter\VarExporter;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
@@ -52,8 +52,10 @@ class WPHooksInstanceObjectCache
     /**
      * @param string|null $file file path cache to configure
      */
-    public function __construct(private ?string $file = null)
-    {
+    public function __construct(
+        private ?string $file = null,
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
+    ) {
         $file !== null && $this->cacheState->loadCache();
     }
 
@@ -140,7 +142,7 @@ class WPHooksInstanceObjectCache
             try {
                 unlink($this->file);
             } catch (\Throwable $th) {
-                Logger::Error(__METHOD__, 'Failed to clear cache file: ' . $th->getMessage());
+                $this->logger->error(__METHOD__, 'Failed to clear cache file: ' . $th->getMessage());
             }
         }
     }

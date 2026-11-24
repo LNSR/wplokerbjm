@@ -16,9 +16,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookRegistration;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookScannerTrait;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Shared\Log\Logger;
-use \CompiledContainer;
-use Psr\Container\ContainerInterface;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Attributes\WPHooksScannerPolicy;
 
 /**
@@ -50,6 +48,7 @@ class WPHooksScanner
         private WPHookPlanProvider $hookPlanProvider,
         private string $namespace = 'WPLokerBJM',
         private string $cacheLocation = '',
+        private HookLoggerInterface $logger = new NullHookLogger(),
         public private(set) bool $forceNoCache = false
     ) {
         $this->namespace = trim($namespace, '\\');
@@ -188,13 +187,13 @@ class WPHooksScanner
                     );
                 });
             } catch (\RuntimeException $e) {
-                Logger::error(__METHOD__, 'Error scanning hooks for class ' . $className . ': ', [
+                $this->logger->error(__METHOD__, 'Error scanning hooks for class ' . $className . ': ', [
                     'message' => $e->getMessage(),
                     'line' => $e->getLine(),
                     'file' => $e->getFile(),
                     'trace' => $e->getTraceAsString(),
                 ]);
-                Logger::flush();
+                $this->logger->flush();
                 throw $e;
             }
         }
@@ -207,7 +206,7 @@ class WPHooksScanner
         $targetFile = $this->cacheLocation;
 
         if (empty($targetFile)) {
-            Logger::error(__METHOD__, 'Delete failed: No target file path provided.');
+            $this->logger->error(__METHOD__, 'Delete failed: No target file path provided.');
             return false;
         }
 
@@ -229,7 +228,7 @@ class WPHooksScanner
         $registrations = $this->cachedHookRegistrations ?? $this->cachedHookRegistrations = $this->performHookRegistrationScan();
 
         if (empty($targetFile)) {
-            Logger::error(__METHOD__, 'Export failed: No target file path provided.');
+            $this->logger->error(__METHOD__, 'Export failed: No target file path provided.');
             return false;
         }
 
@@ -237,13 +236,13 @@ class WPHooksScanner
 
         if (!is_dir($directory)) {
             if (!mkdir($directory, 0755, true)) {
-                Logger::error(__METHOD__, "Failed to create directory: {$directory}");
+                $this->logger->error(__METHOD__, "Failed to create directory: {$directory}");
                 return false;
             }
         }
 
         if (!is_writable($directory)) {
-            Logger::error(__METHOD__, "Directory is not writable: {$directory}");
+            $this->logger->error(__METHOD__, "Directory is not writable: {$directory}");
             return false;
         }
 

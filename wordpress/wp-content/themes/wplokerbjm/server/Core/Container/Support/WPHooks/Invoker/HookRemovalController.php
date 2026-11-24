@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 
 /**
  * Owns the removal/cleanup lifecycle of a hook invoker.
@@ -27,7 +27,10 @@ final class HookRemovalController
     private bool $removed = false;
     private bool $released = false;
 
-    public function __construct(private readonly string $label) {}
+    public function __construct(
+        private readonly string $label,
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
+    ) {}
 
     /**
      * @param (\Closure(object, bool = false): void)|null $callback
@@ -59,7 +62,7 @@ final class HookRemovalController
             $this->removed = true;
             ($this->removeCallback)($invoker);
         } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'Error removing once-hook ' . $this->label . ': ', [
+            $this->logger->error(__METHOD__, 'Error removing once-hook ' . $this->label . ': ', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),
@@ -87,7 +90,7 @@ final class HookRemovalController
             $this->removed = true;
             ($this->removeCallback)($invoker);
         } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'Error removing lifetime hook ' . $this->label . ': ', [
+            $this->logger->error(__METHOD__, 'Error removing lifetime hook ' . $this->label . ': ', [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),
@@ -117,7 +120,7 @@ final class HookRemovalController
                 $onUnregisterDo();
             }
         } catch (\Throwable $e) {
-            Logger::error(__METHOD__, 'onUnregisterDo failed for ' . $this->label, [
+            $this->logger->error(__METHOD__, 'onUnregisterDo failed for ' . $this->label, [
                 'error' => $e->getMessage(),
                 'trace' => $e->getTraceAsString(),
                 'file' => $e->getFile(),
@@ -129,7 +132,7 @@ final class HookRemovalController
                     ($this->removeCallback)($invoker, true);
                 }
             } catch (\Throwable $e) {
-                Logger::error(__METHOD__, 'Removal callback failed for ' . $this->label, [
+                $this->logger->error(__METHOD__, 'Removal callback failed for ' . $this->label, [
                     'error' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                     'file' => $e->getFile(),

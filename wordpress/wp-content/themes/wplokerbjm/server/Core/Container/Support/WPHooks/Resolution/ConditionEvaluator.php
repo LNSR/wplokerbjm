@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Resolution;
 
 use RuntimeException;
-use WPLokerBJM\Shared\Log\Logger;
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 
 /**
  * Hook-condition evaluation: dynamic hook names, executeIf/registerIf gates,
@@ -18,7 +18,10 @@ use WPLokerBJM\Shared\Log\Logger;
  */
 final class ConditionEvaluator
 {
-    public function __construct(private readonly ArgumentResolver $resolver) {}
+    public function __construct(
+        private readonly ArgumentResolver $resolver,
+        private readonly HookLoggerInterface $logger = new NullHookLogger(),
+    ) {}
 
     /**
      * Resolve the final hook name for a registration.
@@ -148,7 +151,7 @@ final class ConditionEvaluator
 
                 return $onUnregisterDo(...$values);
             } catch (\Throwable $e) {
-                Logger::error(__METHOD__, 'Failed to execute onUnregisterDo', [
+                $this->logger->error(__METHOD__, 'Failed to execute onUnregisterDo', [
                     'message' => $e->getMessage(),
                     'trace' => $e->getTraceAsString(),
                     'file' => $e->getFile(),
