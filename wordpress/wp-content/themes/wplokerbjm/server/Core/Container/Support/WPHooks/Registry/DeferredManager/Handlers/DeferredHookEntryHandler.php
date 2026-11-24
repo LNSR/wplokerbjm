@@ -22,10 +22,9 @@ use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
 /**
  * @phpstan-import-type HookType from HookRegistration
  * @phpstan-import-type CallablePlan from WPHookPlanProvider
- * @phpstan-import-type AvailaibleHandlerType from HandlerEntryTrait
  * @phpstan-type DeferredHookEntry array{
  *     hook: string,
- *     handler: AvailaibleHandlerType,
+ *     handler: HookInvoker,
  *     type: 'action'|'filter',
  *     priority: int,
  *     acceptedArgs: int,

@@ -9,6 +9,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registrations\HookKey;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\HookTargetResolverTrait;
+use WeakReference;
 
 /**
  * @internal
@@ -17,10 +18,12 @@ class InstanceRegistryRuntimeHookResolver
 {
     use HookTargetResolverTrait;
 
+    /**
+     * @var \WeakMap<object, array{WeakReference<object>, string}>
+     */
     private \WeakMap $weakMap;
-    public function __construct(HookLoggerInterface $logger = new NullHookLogger())
+    public function __construct(protected readonly HookLoggerInterface $logger = new NullHookLogger())
     {
-        $this->logger = $logger;
         $this->weakMap = new \WeakMap();
     }
 
@@ -68,12 +71,22 @@ class InstanceRegistryRuntimeHookResolver
             $instance = $target[0] ?? null;
             $targetName = $target[1] ?? null;
         } elseif ($target instanceof \Closure) {
-            if (isset($this->weakMap[$target])) return $this->weakMap[$target];
+            if (isset($this->weakMap[$target]) && $this->weakMap[$target][0]->get() !== null) {
+                [$instanceRef, $targetName] = $this->weakMap[$target];
+                return [$instanceRef->get(), $targetName];
+            }
             $reflection = new \ReflectionFunction($target);
             $instance = $reflection->getClosureThis();
-            $targetName = $this->parsePropertyHookMemberName($reflection->getName())
-                ?? $reflection->getName();
-            $this->weakMap[$target] = [$instance, $targetName];
+            $targetName = $this->parsePropertyHookMemberName($reflection->getName()) ?? $reflection->getName();
+            if ($instance === null) {
+                $this->logger->warning(
+                    self::class,
+                    'unregisterByCallableInLiveInstance() expects [$liveInstance, \'member\'], a first-class callable/property-hook closure bound to the live instance, or an invokable object.',
+                );
+                return [null, null];
+            }
+
+            $this->weakMap[$target] = [WeakReference::create($instance), $targetName];
         } elseif (is_object($target) && is_callable($target)) {
             // Invokable object (anonymous class / ModuleClassHookMetadata host):
             // the callable member is __invoke and the object owns its own hooks.
@@ -90,6 +103,6 @@ class InstanceRegistryRuntimeHookResolver
             return [null, null];
         }
 
-        return [$instance, $targetName];
+        return [$instance instanceof WeakReference ? $instance->get() : $instance, $targetName];
     }
 }

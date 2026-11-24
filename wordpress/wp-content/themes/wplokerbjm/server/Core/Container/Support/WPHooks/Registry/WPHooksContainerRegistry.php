@@ -114,10 +114,6 @@ class WPHooksContainerRegistry
 
     public private(set) bool $initialized = false;
     private bool $bridgeInitialized = false;
-    /**
-     * @var HandlerEntry['removeEntryIndexCallback']
-     */
-    private ?\Closure $destroyIndexes = null;
     /** @var \WeakReference<self> */
     private \WeakReference $self;
 
@@ -142,7 +138,6 @@ class WPHooksContainerRegistry
     ) {
         $this->entriesByInvokers = new \WeakMap();
         $this->planProvider ??= new WPHookPlanProvider($container);
-        $this->destroyIndexes = $entriesIndexer->removeIndexes(...);
         $this->self = \WeakReference::create($this);
     }
 
@@ -163,7 +158,7 @@ class WPHooksContainerRegistry
         $this->bridgeInitialized = true;
 
         foreach (self::EVENT_BRIDGE_HOOKS as $hook => $method) {
-            \add_action($hook, [$this, $method], 10, 1);
+            (void) \add_action($hook, [$this, $method], 10, 1);
         }
     }
 
@@ -202,9 +197,8 @@ class WPHooksContainerRegistry
         foreach ($this->handlers as $key => $entry) {
             try {
                 $weakRef = \WeakReference::create($entry);
-                $this->queuedHooksCleaner->addContainerRegistryItsEntries([$weakRef]);
                 $this->entriesIndexer->setIndexes($entry);
-                $entry->setOnEntryRemovalRemoveIndexesCallback($this->destroyIndexes);
+                $entry->setOnEntryRemovalCallback($this->entryRemovalCommand);
                 $this->entriesByInvokers[$entry->handler] = $weakRef;
             } catch (\Exception $e) {
                 $this->logger->error(
@@ -543,7 +537,7 @@ class WPHooksContainerRegistry
             if ($entry === null) {
                 continue;
             }
-            $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+            $this->queuedHooksCleaner->scheduleCleanUpCallback($entry);
             unset($this->handlers[$uniqueKey]);
             $count++;
         }
@@ -565,7 +559,7 @@ class WPHooksContainerRegistry
             if ($entry === null) {
                 continue;
             }
-            $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+            $this->queuedHooksCleaner->scheduleCleanUpCallback($entry);
             unset($this->handlers[$uniqueKey]);
             $count++;
         }
@@ -588,7 +582,7 @@ class WPHooksContainerRegistry
             if ($entry === null) {
                 continue;
             }
-            $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+            $this->queuedHooksCleaner->scheduleCleanUpCallback($entry);
             unset($this->handlers[$uniqueKey]);
             $count++;
         }
@@ -614,7 +608,7 @@ class WPHooksContainerRegistry
             if ($entry === null) {
                 continue;
             }
-            $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+            $this->queuedHooksCleaner->scheduleCleanUpCallback($entry);
             unset($this->handlers[$uniqueKey]);
             $count++;
         }
@@ -649,7 +643,7 @@ class WPHooksContainerRegistry
                     continue;
                 }
                 $entry = $this->handlers[$key];
-                $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+                $this->queuedHooksCleaner->scheduleCleanUpCallback($entry);
                 unset($this->handlers[$key]);
                 $count++;
             }
@@ -682,7 +676,7 @@ class WPHooksContainerRegistry
                 if ($entry === null) {
                     continue;
                 }
-                $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+                $this->queuedHooksCleaner->scheduleCleanUpCallback($entry);
                 unset($this->handlers[$uniqueKey]);
                 $count++;
             }
@@ -720,7 +714,7 @@ class WPHooksContainerRegistry
                 if (!HookPattern::matchesAny($entry->tags, $patterns)) {
                     continue;
                 }
-                $this->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+                $this->queuedHooksCleaner->scheduleCleanUpCallback($entry);
                 unset($this->handlers[$uniqueKey]);
                 $count++;
             }
@@ -750,9 +744,8 @@ class WPHooksContainerRegistry
                 $weakRef = \WeakReference::create($entry);
                 $self->entriesByInvokers[$data->handler] = $weakRef;
                 $self->entriesIndexer->setIndexes($entry);
-                $entry->setOnEntryRemovalRemoveIndexesCallback($self->destroyIndexes);
+                $entry->setOnEntryRemovalCallback($self->entryRemovalCommand);
                 $entry->register();
-                $self->queuedHooksCleaner->addContainerRegistryItsEntries([$weakRef]);
                 SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
                 return true;
             };
@@ -772,15 +765,15 @@ class WPHooksContainerRegistry
             return $this->removeEntry = static function (HookInvoker $invoker, bool $invokerDied = false) use ($self) {
                 $self = $self->get() ?? null;
                 if ($self === null) return;
-                $entry = $self->queuedHooksCleaner->getEntry($invoker)
-                    ?? isset($self->entriesByInvokers[$invoker])
-                    ? $self->entriesByInvokers[$invoker]->get() : null;
+                $entry = isset($self->entriesByInvokers[$invoker])
+                    ? $self->entriesByInvokers[$invoker]->get()
+                    : null;
 
                 if ($entry === null) return;
                 $key = $entry->toUniqueKey();
 
                 if ($invokerDied) {
-                    $self->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+                    $self->queuedHooksCleaner->scheduleCleanUpCallback($entry);
                     unset($self->handlers[$key]);
                     unset($self->entriesByInvokers[$invoker]);
                     SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, "Entry Died: {$invoker->label}");
@@ -801,9 +794,23 @@ class WPHooksContainerRegistry
                  * safely linger in $wp_filter until the next invoker order or beginning hook(all).
                  * @link https://core.trac.wordpress.org/ticket/64653
                  */
-                $self->queuedHooksCleaner->cleanUpCallback($invoker);
-                unset($self->entriesByInvokers[$entry->handler]);
+                $self->queuedHooksCleaner->scheduleCleanUpCallback($entry);
+                unset($self->entriesByInvokers[$invoker]);
                 unset($self->handlers[$key]);
+            };
+        }
+    }
+
+    /** @var ?\Closure(ContainerRegistryHandlerEntry $entry): void */
+    private ?\Closure $entryRemovalCommand = null {
+        get {
+            if ($this->entryRemovalCommand !== null) return $this->entryRemovalCommand;
+            $entriesIndexer = $this->entriesIndexer;
+            $cleaner = $this->queuedHooksCleaner;
+            return $this->entryRemovalCommand = static function (ContainerRegistryHandlerEntry $entry) use ($entriesIndexer, $cleaner): void {
+                if (!$entry->registered) return;
+                $entriesIndexer->removeIndexes($entry);
+                $cleaner->scheduleCleanUpCallback($entry);
             };
         }
     }

@@ -51,32 +51,29 @@ final class SearchJobHooks
      * @see InstrumentSchema::wrap_fields
      * @see Tracing::init
      */
-    #[Action(
-        'graphql_before_resolve_field',
-        10,
-        4,
-        tag: ['graphql'],
-        deferRegister: true,
-        executeIf: static function (ResolveInfo $info): bool {
-            return $info->fieldName === JobRegistrationTypes::TYPE_SEARCH_JOBS;
-        }
-    )]
-    protected function boot(
-        mixed $source,
-        array $args,
-        AppContext $context,
-        ResolveInfo $info,
-    ) {
-        \do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, [$this, __FUNCTION__]);
-        \do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CLASS, $this);
-    }
+    #[Action('graphql_before_resolve_field', 10, 4, tag: ['graphql'], deferRegister: true)]
+    #[Filter('posts_search', 11, 2, deferRegister: true)]
+    public private(set) \Closure $filterPostsSearch {
+        get => $this->filterPostsSearch ??= function (
+            mixed $source,
+            array $args,
+            AppContext $context,
+            ResolveInfo $info,
+        ): void {
+            if ($info->fieldName !== JobRegistrationTypes::TYPE_SEARCH_JOBS) return;
+            \do_action(WPHooksContainerRegistry::UNREGISTER_BY_CALLABLE, \Closure::getCurrent());
+            \do_action(WPHooksContainerRegistry::ACTIVATE_DEFERRED_BY_CALLABLE, \Closure::getCurrent());
 
-    #[Filter('posts_search', acceptedArgs: 2, deferRegister: true)]
-    public function filterPostsSearch(string $search, \WP_Query $wp_query): string
-    {
-        return JobQuery::buildPostsSearchSql(
-            $this->wpdb,
-            (string) ($wp_query->query_vars['s'] ?? '')
-        );
+
+            /**
+             * @param string        $search   The current search SQL fragment (may be empty).
+             * @param \WP_Query     $wp_query The WP_Query object being executed.
+             * @return string Modified search SQL fragment.
+             */
+            $this->filterPostsSearch = fn(string $search, \WP_Query $wp_query) => JobQuery::buildPostsSearchSql(
+                $this->wpdb,
+                (string) ($wp_query->query_vars['s'] ?? '')
+            );
+        };
     }
 }

@@ -1,29 +1,33 @@
 {
-  "version": 1,
+  "version": 2,
   "skills": {
     "daisyui": {
       "source": "saadeghi/daisyui",
       "sourceType": "github",
       "skillPath": "skills/daisyui/SKILL.md",
-      "computedHash": "f70b06883160802b5b04db0504647cc140bd38cf7eb941183a38f44a179b27ca"
+      "computedHash": "4dfba5cd295d5ee38d352fc40649eb89b550975d8951a323e3de7922eac467d2",
+      "commit": "43bc54e9ea25a0f26d85392c169dae6b9839d6e5"
     },
     "svelte-code-writer": {
       "source": "sveltejs/ai-tools",
       "sourceType": "github",
       "skillPath": "plugins/claude/svelte/skills/svelte-code-writer/SKILL.md",
-      "computedHash": "abe888cce357ab0fa0104ff2266edaf9c3a8382320b303f920cd777762a6bc85"
+      "computedHash": "8eccb2e23091d482aeaca1c95db6c5aa34d055ac2d0c9797efbbecbe5a8e4fd0",
+      "commit": "f9d22f2f7f7cd5e4596eef5d108a69ac8f0dd48d"
     },
     "svelte5-best-practices": {
       "source": "ejirocodes/agent-skills",
       "sourceType": "github",
       "skillPath": "svelte/skills/svelte5-best-practices/SKILL.md",
-      "computedHash": "bfcbba3d355aede6f6be9720f195206d4dcaa7c152787ea00c06cb4a1ac44ba4"
+      "computedHash": "c359b90d6dac172ce05639f3391e505512135f7b208c6496f0897504f03e0684",
+      "commit": "6e805e4cc8a4378444c791d4a08e304347152bd0"
     },
     "sveltekit-structure": {
       "source": "spences10/svelte-skills-kit",
       "sourceType": "github",
       "skillPath": "plugins/svelte-skills/skills/sveltekit-structure/SKILL.md",
-      "computedHash": "eef66314ca437f13272afc3db7e149b0e39a8b734040d4b0affa01697352e511"
+      "computedHash": "7d82bc73da1f75949e6ff18519bc9a00457dffbbbc79ad859ed23960423c84dd",
+      "commit": "5fe49891cf19b451c846ed613712c4d9545dd24f"
     }
   }
 }

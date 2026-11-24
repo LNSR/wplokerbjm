@@ -42,10 +42,8 @@ trait HookTargetResolverTrait
      */
     private \WeakMap $callableTargetCache;
 
-    protected readonly HookLoggerInterface $logger;
-
-    public function __construct(HookLoggerInterface $logger = new NullHookLogger()) {
-        $this->logger = $logger;
+    public function __construct(protected readonly HookLoggerInterface $logger = new NullHookLogger())
+    {
         $this->callableTargetCache = new \WeakMap();
     }
 
@@ -97,26 +95,22 @@ trait HookTargetResolverTrait
         // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
         /** @var \Closure $target */
         $ref = new ReflectionFunction($target);
-        $calledClass = $ref->getClosureThis() ?? null;
-
-        if ($calledClass === null) {
-            throw new \InvalidArgumentException('Callable target must be bound to an object instance.');
-        }
+        $calledClass = $ref->getClosureCalledClass()?->getName() ?? null;
 
         $name = $ref->getName();
 
         // Standard Instance Method ($service->method(...)) from FCC
         if (!str_contains($name, '{closure')) {
-            return [$calledClass::class, $name];
+            return [$calledClass, $name];
         }
 
         // PHP 8.4 Property Hook Anonymous Closure ("{closure:FQCN::$propertyName::get():line}")
         $memberName = $this->parsePropertyHookMemberName($name);
         if ($memberName !== null) {
-            return [$calledClass::class, $memberName];
+            return [$calledClass, $memberName];
         }
 
-        throw new \InvalidArgumentException('Unable to resolve hook target for class ' . $calledClass::class . '.');
+        throw new \InvalidArgumentException('Unable to resolve hook target for class ' . $calledClass . '.');
     }
 
     /**
@@ -131,7 +125,8 @@ trait HookTargetResolverTrait
         // Anonymous class extending ModuleClassHookMetadata —
         // reads parent class & property directly, no backtrace needed.
         if ($target instanceof ModuleClassHookMetadata) {
-            return [$target->parentClassString, $target->parentProperty];
+            $outerclass = ($this->getOuterClass)($target);
+            return [is_string($outerclass) ? $outerclass : get_class($outerclass), $target->parentProperty];
         }
 
         // Best-effort fallback for anonymous classes: walk the call stack
@@ -189,5 +184,13 @@ trait HookTargetResolverTrait
         $memberName = substr($name, $start, $end - $start);
 
         return $memberName !== '' ? $memberName : null;
+    }
+
+    private \Closure $getOuterClass {
+        get => $this->getOuterClass ??= \Closure::bind(
+            static fn(ModuleClassHookMetadata $metadata): string|object => $metadata->parentClass,
+            null,
+            ModuleClassHookMetadata::class
+        );
     }
 }

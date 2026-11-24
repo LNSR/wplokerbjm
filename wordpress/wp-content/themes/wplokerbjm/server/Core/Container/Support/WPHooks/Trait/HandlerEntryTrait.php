@@ -36,14 +36,15 @@ trait HandlerEntryTrait
     public readonly string $invokerLabel;
     public private(set) int $unregistrationFailureCount = 0;
     public private(set) bool $registered = false;
+    /** @var ?\Closure(static $entry): void */
+    private ?\Closure $onEntryRemoval = null;
 
     /**
      * Automatically unregister handler when this entry have 0 reference, useful for @see WPHooksInstanceRegistry.
      */
     public function __destruct()
     {
-        if (!$this->registered) return;
-        $this->unregister(UnregistrationSource::Destructor);
+        \is_callable($this->onEntryRemoval) && ($this->onEntryRemoval)($this);
     }
 
     public function register(): static
@@ -147,6 +148,12 @@ trait HandlerEntryTrait
             'action' => has_action($this->hook, $this->handler, $this->priority),
             'filter' => has_filter($this->hook, $this->handler, $this->priority),
         };
+    }
+
+    /** @param \Closure(static): void $callback */
+    public function setOnEntryRemovalCallback(\Closure $callback): void
+    {
+        $this->onEntryRemoval = $callback;
     }
 
     /**

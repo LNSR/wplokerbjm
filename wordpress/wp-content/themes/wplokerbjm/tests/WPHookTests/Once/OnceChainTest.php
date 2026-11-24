@@ -98,7 +98,6 @@ final class OnceChainTest extends WplokerbjmTestCase
         }
 
         \do_action(self::HOOK, $assertions);
-
         self::assertSame(range(0, 9), $this->onceChainService->fired);
 
         // The last priority is still queued because no further invoker ran.

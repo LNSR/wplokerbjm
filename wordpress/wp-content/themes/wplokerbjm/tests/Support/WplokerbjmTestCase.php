@@ -213,7 +213,7 @@ abstract class WplokerbjmTestCase extends TestCase
                 if ($queued === []) return;
 
                 foreach ($queued as $idx => $entry) {
-                    $cleaner->immediatelyScheduleRemove($entry);
+                    $cleaner->scheduleCleanUpCallback($entry);
                 }
             }, null, $this->queuedHooksCleaner);
         }

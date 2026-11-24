@@ -90,6 +90,22 @@ final class LiveCallableTargetResolutionTest extends WplokerbjmTestCase
         );
     }
 
+    public function testResolvesInvokableObjectFromPropertyHook(): void
+    {
+        $invokable = new class {
+            public $object {
+                get => $this->object ??= new class() {
+                    public function __invoke(): void {}
+                };
+            }
+        };
+
+        self::assertSame(
+            [$invokable->object, '__invoke'],
+            $this->runtimeResolver->resolveLiveCallableTarget($invokable->object),
+        );
+    }
+
     public function testResolvesModuleClassHookMetadataInstanceToItselfAndInvoke(): void
     {
         $module = new class('HostClass', 'hostProperty') extends ModuleClassHookMetadata {

@@ -49,11 +49,11 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\
  *! `deferRegister` holds the entry in the deferred pool: together with
  *! `deferRegisterUntilHook` it activates automatically when the trigger
  *! fires; on its own it waits for
- *! {@see activateDeferredByHookInLiveInstance()} (one hook),
- *! {@see activateDeferredByHookPatternInLiveInstance()} (matching hooks),
- *! {@see activateDeferredByTagsInLiveInstance()} (matching tags),
- *! {@see activateDeferredByCallableInLiveInstance()} (one member), or
- *! {@see activateDeferredByClassInLiveInstance()} (every deferred member of
+ *! {@see self::activateDeferredByHookInLiveInstance()} (one hook),
+ *! {@see self::activateDeferredByHookPatternInLiveInstance()} (matching hooks),
+ *! {@see self::activateDeferredByTagsInLiveInstance()} (matching tags),
+ *! {@see self::activateDeferredByCallableInLiveInstance()} (one member), or
+ *! {@see self::activateDeferredByClassInLiveInstance()} (every deferred member of
  *! the instance). Static methods are
  *! silently skipped.
  *! Hooks are instance-lifetime scoped: the registry keeps only a weak
@@ -144,6 +144,10 @@ class WPHooksInstanceRegistry
     protected \WeakMap $scanned;
     /** @var \WeakReference<self> */
     private \WeakReference $self;
+
+    /** @var callable(RuntimeRegistryHandlerEntry $entry): void */
+    private ?\Closure $entryRemovalCommand;
+
     /**
      * @param WPHookPlanProvider $provider resolves closure parameters from the container
      */
@@ -159,6 +163,7 @@ class WPHooksInstanceRegistry
         $this->scanned = new \WeakMap();
         $this->entriesByInvokers = new \WeakMap();
         $this->self = \WeakReference::create($this);
+        $this->entryRemovalCommand = $queuedHooksCleaner->scheduleCleanUpCallback(...);
     }
 
     /**
@@ -345,7 +350,7 @@ class WPHooksInstanceRegistry
         }
 
         foreach ($this->weakRegistry[$instance] as $record) {
-            $this->queuedHooksCleaner->immediatelyScheduleRemove($record);
+            $this->queuedHooksCleaner->scheduleCleanUpCallback($record);
         }
 
         unset($this->weakRegistry[$instance]);
@@ -452,10 +457,18 @@ class WPHooksInstanceRegistry
      * @param array{0: object, 1: string}|\Closure|object $target `[$instance, 'member']`,
      *        a first-class callable/property-hook closure bound to the live instance,
      *        or an invokable object (targets its `__invoke`).
+     *
+     * @example
+     * ```php
+     * $registry->activateDeferredByCallableInLiveInstance($this->onInit(...)); // FCC
+     * $registry->activateDeferredByCallableInLiveInstance($this->closure); // Closure
+     * $registry->activateDeferredByCallableInLiveInstance($this); // class its __invoke() itself
+     * $registry->activateDeferredByCallableInLiveInstance([$this->instance, 'method']); // Array
+     * ```
      * @return int Number of newly activated registrations.
      */
     #[Action(self::ACTIVATE_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE)]
-    public function activateDeferredByCallableInLiveInstance(object|callable|array|string $target): int
+    public function activateDeferredByCallableInLiveInstance(object|callable|array $target): int
     {
         [$instance, $targetName] = $this->runtimeResolver->resolveLiveCallableTarget($target);
 
@@ -710,9 +723,16 @@ class WPHooksInstanceRegistry
      * ! still activate when their trigger fires or when
      * ! {@see self::activateDeferredByCallableInLiveInstance()} is called. Use
      * ! {@see self::unregisterDeferredByCallableInLiveInstance()} for the deferred pool.
+     * @example
+     * ```php
+     * $registry->unregisterByCallableInLiveInstance($this->onInit(...)); // FCC
+     * $registry->unregisterByCallableInLiveInstance($this->closure); // Closure
+     * $registry->unregisterByCallableInLiveInstance($this); // class its __invoke() itself
+     * $registry->unregisterByCallableInLiveInstance([$this->instance, 'method']); // Array
+     * ```
      */
     #[Action(self::UNREGISTER_BY_CALLABLE_IN_LIVE_INSTANCE)]
-    public function unregisterByCallableInLiveInstance(object|callable|array|string $target): int
+    public function unregisterByCallableInLiveInstance(object|callable|array $target): int
     {
         [$instance, $targetName] = $this->runtimeResolver->resolveLiveCallableTarget($target);
 
@@ -751,7 +771,7 @@ class WPHooksInstanceRegistry
                 continue;
             }
 
-            $this->queuedHooksCleaner->immediatelyScheduleRemove($record);
+            $this->queuedHooksCleaner->scheduleCleanUpCallback($record);
             $count++;
         }
 
@@ -772,10 +792,17 @@ class WPHooksInstanceRegistry
      * @param array{0: object, 1: string}|\Closure|object $target `[$instance, 'member']`,
      *        a first-class callable/property-hook closure bound to the live instance,
      *        or an invokable object (targets its `__invoke`).
+     * @example
+     * ```php
+     * $registry->unregisterDeferredByCallableInLiveInstance($this->onInit(...)); // FCC
+     * $registry->unregisterDeferredByCallableInLiveInstance($this->closure); // Closure
+     * $registry->unregisterDeferredByCallableInLiveInstance($this); // class its __invoke() itself
+     * $registry->unregisterDeferredByCallableInLiveInstance([$this->instance, 'method']); // Array
+     * ```
      * @return int Number of removed deferred registrations.
      */
     #[Action(self::UNREGISTER_DEFERRED_BY_CALLABLE_IN_LIVE_INSTANCE)]
-    public function unregisterDeferredByCallableInLiveInstance(object|callable|array|string $target): int
+    public function unregisterDeferredByCallableInLiveInstance(object|callable|array $target): int
     {
         [$instance, $targetName] = $this->runtimeResolver->resolveLiveCallableTarget($target);
 
@@ -918,10 +945,10 @@ class WPHooksInstanceRegistry
                 activateEntry: $this->activateRuntimeEntry
             );
         } else {
+            $record->setOnEntryRemovalCallback($this->entryRemovalCommand);
             $records[] = $record->register();
             $weakRefRecord = \WeakReference::create($record);
             $this->entriesByInvokers[$handler] = $weakRefRecord;
-            $this->queuedHooksCleaner->addRuntimeRegistryItsEntries([$weakRefRecord]);
         }
     }
 
@@ -1113,9 +1140,9 @@ class WPHooksInstanceRegistry
                 $weakRefRecord = \WeakReference::create($record);
 
                 $records = $self->weakRegistry[$owner] ?? [];
+                $record->setOnEntryRemovalCallback($self->entryRemovalCommand);
                 $records[] = $record->register();
                 $self->weakRegistry[$owner] = $records;
-                $self->queuedHooksCleaner->addRuntimeRegistryItsEntries([$weakRefRecord]);
                 $self->entriesByInvokers[$record->handler] = $weakRefRecord;
                 SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, 'Activated deferred hook ' . $data->handler->label);
 
@@ -1142,14 +1169,14 @@ class WPHooksInstanceRegistry
             ) use ($self): void {
                 $self = $self->get() ?? null;
                 if ($self === null) return;
-                $entry = $self->queuedHooksCleaner->getEntry($invoker)
-                    ?? isset($self->entriesByInvokers[$invoker])
-                    ? $self->entriesByInvokers[$invoker]->get() : null;
+                $entry = isset($self->entriesByInvokers[$invoker])
+                    ? $self->entriesByInvokers[$invoker]->get()
+                    : null;
                 if ($entry === null) return;
 
                 if ($invokerDied) {
                     unset($self->entriesByInvokers[$invoker]);
-                    $self->queuedHooksCleaner->immediatelyScheduleRemove($entry);
+                    $self->queuedHooksCleaner->scheduleCleanUpCallback($entry);
                     $self->cleanUpInstance($entry);
                     SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, "Entry Died: {$invoker->label}");
                     return;
@@ -1165,7 +1192,7 @@ class WPHooksInstanceRegistry
                  * safely linger in $wp_filter until the next invoker order or beginning hook(all).
                  * @link https://core.trac.wordpress.org/ticket/64653
                  */
-                $self->queuedHooksCleaner->cleanUpCallback($invoker);
+                $self->queuedHooksCleaner->scheduleCleanUpCallback($entry);
                 $self->cleanUpInstance($entry);
             };
         }

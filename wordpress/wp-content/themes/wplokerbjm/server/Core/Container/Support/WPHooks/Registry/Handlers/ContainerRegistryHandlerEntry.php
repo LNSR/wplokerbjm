@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers;
 
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\UnregistrationSource;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
@@ -34,7 +35,6 @@ use WPLokerBJM\Shared\Utilities\SharedUtils;
  *  once: bool,
  *  onUnregisterDo: \Closure(...): void,
  *  onUnregisterDoParams: CallablePlan,
- *  removeEntryIndexCallback: (callable(static $entry): void)|null
  * }
  */
 final class ContainerRegistryHandlerEntry
@@ -57,7 +57,6 @@ final class ContainerRegistryHandlerEntry
      * @param HandlerEntry['executeIfParams'] $executeIfParams
      * @param HandlerEntry['once'] $once
      * @param HandlerEntry['onUnregisterDo'] $onUnregisterDo
-     * @param HandlerEntry['removeEntryIndexCallback'] $removeEntryIndexCallback
      */
     public function __construct(
         public readonly string $hook,
@@ -74,32 +73,10 @@ final class ContainerRegistryHandlerEntry
         public readonly bool $once,
         public readonly ?\Closure $onUnregisterDo,
         public readonly array $onUnregisterDoParams,
-        private ?\Closure $removeEntryIndexCallback = null,
         public readonly HookLoggerInterface $logger = new NullHookLogger(),
     ) {
         $this->handler = $handler;
         $this->invokerLabel = $handler->label;
-    }
-
-    /**
-     * Override @see HandlerEntryTrait::__destruct
-     */
-    public function __destruct()
-    {
-        if ($this->registered) {
-            $this->unregister(\WPLokerBJM\Core\Container\Support\WPHooks\Debug\UnregistrationSource::Destructor);
-            SharedUtils::isDevelopment() && $this->logger->debug(__METHOD__, "Container Registry Handler Entry destroyed before explicit registry unregistration, removing entry indexes: ", [
-                'invokerLabel' => $this->invokerLabel,
-            ]);
-        }
-        \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
-        unset($this->removeEntryIndexCallback);
-    }
-
-    /** @param HandlerEntry['removeEntryIndexCallback'] $callback */
-    public function setOnEntryRemovalRemoveIndexesCallback(\Closure $callback): void
-    {
-        $this->removeEntryIndexCallback = $callback;
     }
 
     public static function fromDeferredEntry(DeferredHookEntryHandler $deferredEntry): self

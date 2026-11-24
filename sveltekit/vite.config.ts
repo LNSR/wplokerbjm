@@ -89,7 +89,13 @@ export default defineConfig((configEnv: ConfigEnv): UserConfig => {
       analyzerMode: "static",
     }),
     copyPartytownAssets(
-      resolve(import.meta.dirname, ".svelte-kit", "cloudflare", "~partytown"),
+      resolve(
+        import.meta.dirname,
+        ".svelte-kit",
+        "cloudflare",
+        "client",
+        "~partytown",
+      ),
     ),
   ];
 
