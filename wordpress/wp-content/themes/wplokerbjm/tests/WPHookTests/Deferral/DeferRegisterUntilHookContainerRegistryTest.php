@@ -262,7 +262,7 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
                 ExecuteIfActionService::class,
                 'onExecuteIfAction',
                 'same_hook_trigger',
-                priority: 10,
+                priority: PHP_INT_MIN + 2,
                 registerIf: static fn(): bool => true,
                 deferRegisterUntilHook: 'same_hook_trigger',
                 hookArgs: ['value'],
@@ -277,20 +277,21 @@ class DeferRegisterUntilHookContainerRegistryTest extends WplokerbjmTestCase
             ExecuteIfActionService::$capturedValues[] = 'after';
         };
 
-        add_action('same_hook_trigger', $before, 5, 0);
-        add_action('same_hook_trigger', $after, 15, 0);
+        add_action('same_hook_trigger', $before, PHP_INT_MIN + 1, 0);
+        add_action('same_hook_trigger', $after, PHP_INT_MIN + 3, 0);
 
         do_action('same_hook_trigger', 'activated');
+
+        self::assertArrayNotHasKey(
+            PHP_INT_MIN,
+            $GLOBALS['wp_filter']['same_hook_trigger']->callbacks,
+            'The one-shot scheduler must remove itself without leaving its priority bucket behind.',
+        );
 
         self::assertSame(
             ['before', 'activated', 'after'],
             ExecuteIfActionService::$capturedValues,
             'Scheduler self-removal must not skip an adjacent priority; same-hook activation must run in place.',
-        );
-        self::assertArrayNotHasKey(
-            PHP_INT_MIN,
-            $GLOBALS['wp_filter']['same_hook_trigger']->callbacks,
-            'The one-shot scheduler must remove itself without leaving its priority bucket behind.',
         );
     }
 

@@ -106,6 +106,7 @@ class WPHooksScanner
             }
             try {
                 $reflection = new ReflectionClass($className);
+                if (!$reflection->isInstantiable() || $reflection->isEnum()) continue;
                 $policy = $reflection->getAttributes(WPHooksScannerPolicy::class);
                 $attribute = null;
                 if (!empty($policy)) $attribute = $policy[0]->newInstance();
@@ -113,7 +114,7 @@ class WPHooksScanner
 
                 /** @var array<string, int> $attributeOrdinals */
                 $attributeOrdinals = [];
-                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, &$attributeOrdinals): void {
+                $this->scanMethodHooks($reflection, function (ReflectionMethod $method, Action|Filter $attr, string $visibility, string $type) use ($className, &$registrations, &$attributeOrdinals, $reflection): void {
                     $ordinalKey = 'method:' . $method->getName();
                     $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                     $registrations[] = new HookRegistration(
@@ -150,7 +151,7 @@ class WPHooksScanner
                     );
                 });
 
-                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations, &$attributeOrdinals): void {
+                $this->scanPropertyHooks($reflection,  function (ReflectionProperty $property, Action|Filter $attr, string $visibility, string $type, string $target) use ($className, &$registrations, &$attributeOrdinals, $reflection): void {
                     $ordinalKey = 'property:' . $property->getName();
                     $attributeIndex = $attributeOrdinals[$ordinalKey] = ($attributeOrdinals[$ordinalKey] ?? -1) + 1;
                     $registrations[] = new HookRegistration(

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Attributes;
 
 use Attribute;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 
@@ -27,7 +27,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  *   until the hook actually fires. Supports tags, deferred activation and the
  *   batch activation/unregistration APIs.
  * - `WPHooksInstanceRegistry(secondary registry)` — **runtime instances**, normally anonymous
- *   classes extending {@see ModuleClassHookMetadata}. The handler keeps only a
+ *   classes extending {@see ModuleHookMetadata}. The handler keeps only a
  *   `WeakReference` to the live instance; when that instance is garbage
  *   collected the handler becomes inert and detaches itself. Supports tags,
  *   deferred activation and owner-scoped selectors.
@@ -130,7 +130,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * @see WPHooksScanner
  * @see \WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry
  * @see \WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry
- * @see ModuleClassHookMetadata
+ * @see ModuleHookMetadata
  *
  * @template TParams
  */
@@ -326,7 +326,7 @@ abstract class BaseHookAttribute
      * * Executed synchronously on the dispatch path: keep it cheap, and never
      *   dispatch the same hook from inside the probe.
      * 
-     * @param (\Closure(LiveUnregistrationInfoDTO|TParams..): void)|null $debugLiveUnregistration
+     * @param (\Closure(LiveUnregistrationInfoDTO|TParams...): void)|null $debugLiveUnregistration
      *   Observability probe for the unregistration/lifecycle side of a live
      *   registration. Invoked with {@see LiveUnregistrationInfoDTO}
      *   on `unregister_requested`, `unregistered`, `unregister_failed`,

@@ -3,7 +3,8 @@
 namespace WPLokerBJM\Core\Wordpress\Plugins\ThirdParty\WPGraphQL;
 
 use GraphQL\Executor\ExecutionResult;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsInnerClass;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Wordpress\Plugins\PluginConfigInterface;
 use WPLokerBJM\Shared\Log\Logger;
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter, Inject};
@@ -51,9 +52,9 @@ final class WPGraphQL implements PluginConfigInterface
      * @phpstan-ignore-next-line
      * @var class@anonymous::class
      */
-    private ?ModuleClassHookMetadata $graphQlPluginSettings {
+    private ?ModuleHookMetadata $graphQlPluginSettings = null {
         get {
-            return $this->graphQlPluginSettings ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+            return $this->graphQlPluginSettings ??= new class(__CLASS__, __PROPERTY__) extends ModuleHookMetadata {
                 /**
                  * @see get_graphql_setting
                  * @see \WPGraphQL\Admin\Settings\Settings::register_settings() => {
@@ -84,9 +85,9 @@ final class WPGraphQL implements PluginConfigInterface
      * @phpstan-ignore-next-line
      * @var class@anonymous::class
      */
-    private ?ModuleClassHookMetadata $bootGraphqlRequest {
+    private ?AsInnerClass $bootGraphqlRequest {
         get {
-            return $this->bootGraphqlRequest ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+            return $this->bootGraphqlRequest ??= new class(__CLASS__, __PROPERTY__) extends AsInnerClass {
                 #[Inject]
                 private LiteSpeedGraphQLIntegration $liteSpeedIntegration;
                 #[Inject]

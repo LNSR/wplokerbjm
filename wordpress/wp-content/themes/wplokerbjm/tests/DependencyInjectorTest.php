@@ -10,7 +10,7 @@ use DI\Container;
 use DI\ContainerBuilder;
 use RuntimeException;
 use WPLokerBJM\Core\Container\Attributes\{Inject, Injectable};
-use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsChildClass;
+use WPLokerBJM\Core\Container\Support\InstanceDiscovery\Abstract\AsInnerClass;
 use WPLokerBJM\Core\Container\Support\InstanceDiscovery\{DependencyInjector, PlanCache, PlanCompiler, ScopeAccessFactory};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
@@ -41,7 +41,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $plugins = ['plugin-a/plugin-a.php'];
         $scopeAccessFactory = new ScopeAccessFactory();
         $container = $this->containerReturning(['active.plugins' => $plugins, ScopeAccessFactory::class => $scopeAccessFactory]);
-        $target = new class (self::class, 'plugins') extends AsChildClass {
+        $target = new class (self::class, 'plugins') extends AsInnerClass {
             #[Inject('active.plugins')]
             private array $plugins;
 
@@ -93,7 +93,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsStaticPropertyInjection(): void
     {
-        $target = new class (self::class, 'static') extends AsChildClass {
+        $target = new class (self::class, 'static') extends AsInnerClass {
             #[Inject]
             private static object $dependency;
         };
@@ -106,7 +106,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsReadonlyPropertyInjection(): void
     {
-        $target = new class (self::class, 'readonly') extends AsChildClass {
+        $target = new class (self::class, 'readonly') extends AsInnerClass {
             #[Inject]
             private readonly object $dependency;
         };
@@ -119,7 +119,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsUntypedBuiltinPropertyWithoutExplicitEntry(): void
     {
-        $target = new class (self::class, 'unsupported') extends AsChildClass {
+        $target = new class (self::class, 'unsupported') extends AsInnerClass {
             #[Inject]
             private string $dependency;
         };
@@ -146,7 +146,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $scopeAccessFactory = new ScopeAccessFactory();
         $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
-        $target = new class (self::class, 'callable') extends AsChildClass {
+        $target = new class (self::class, 'callable') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'secret'], lazy: true)]
             private \Closure $secret;
 
@@ -166,7 +166,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $scopeAccessFactory = new ScopeAccessFactory();
         $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
-        $target = new class (self::class, 'callable-public') extends AsChildClass {
+        $target = new class (self::class, 'callable-public') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'publicValue'], lazy: true)]
             private \Closure $publicValue;
 
@@ -183,7 +183,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsArrayCallableOnNonClosureProperty(): void
     {
-        $target = new class (self::class, 'bad-callable') extends AsChildClass {
+        $target = new class (self::class, 'bad-callable') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'secret'], lazy: true)]
             private object $dependency;
         };
@@ -196,7 +196,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsArrayCallableWithUnknownMethod(): void
     {
-        $target = new class (self::class, 'bad-method') extends AsChildClass {
+        $target = new class (self::class, 'bad-method') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'nope'])]
             private \Closure $dependency;
         };
@@ -212,7 +212,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $scopeAccessFactory = new ScopeAccessFactory();
         $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
-        $target = new class (self::class, 'prop-public') extends AsChildClass {
+        $target = new class (self::class, 'prop-public') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'publicClosure'])]
             private \Closure $factory;
 
@@ -232,7 +232,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $scopeAccessFactory = new ScopeAccessFactory();
         $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
-        $target = new class (self::class, 'prop-private') extends AsChildClass {
+        $target = new class (self::class, 'prop-private') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'privateClosure'])]
             private \Closure $factory;
 
@@ -252,11 +252,11 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $scopeAccessFactory = new ScopeAccessFactory();
         $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
-        $target = new class (self::class, 'prop-child') extends AsChildClass {
+        $target = new class (self::class, 'prop-child') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'publicChild'])]
-            private AsChildClass $child;
+            private AsInnerClass $child;
 
-            public function child(): AsChildClass
+            public function child(): AsInnerClass
             {
                 return $this->child;
             }
@@ -269,7 +269,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsPropertyTargetTypeMismatch(): void
     {
-        $target = new class (self::class, 'bad-prop-type') extends AsChildClass {
+        $target = new class (self::class, 'bad-prop-type') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'publicChild'])]
             private \stdClass $child;
         };
@@ -285,7 +285,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $scopeAccessFactory = new ScopeAccessFactory();
         $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
-        $target = new class (self::class, 'callable-value') extends AsChildClass {
+        $target = new class (self::class, 'callable-value') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'secretValue'])]
             private int $secretValue;
 
@@ -305,7 +305,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $scopeAccessFactory = new ScopeAccessFactory();
         $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
-        $target = new class (self::class, 'callable-closure') extends AsChildClass {
+        $target = new class (self::class, 'callable-closure') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'closureFactory'])]
             private \Closure $factory;
 
@@ -325,11 +325,11 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $provider = new CallableProvider();
         $scopeAccessFactory = new ScopeAccessFactory();
         $container = $this->containerReturning([CallableProvider::class => $provider, ScopeAccessFactory::class => $scopeAccessFactory]);
-        $target = new class (self::class, 'callable-child') extends AsChildClass {
+        $target = new class (self::class, 'callable-child') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'childInstance'])]
-            private AsChildClass $child;
+            private AsInnerClass $child;
 
-            public function child(): AsChildClass
+            public function child(): AsInnerClass
             {
                 return $this->child;
             }
@@ -342,7 +342,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsValueTypeMismatch(): void
     {
-        $target = new class (self::class, 'bad-value-type') extends AsChildClass {
+        $target = new class (self::class, 'bad-value-type') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'secretValue'])]
             private string $secretValue;
         };
@@ -355,7 +355,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsVoidReturnValueInjection(): void
     {
-        $target = new class (self::class, 'bad-void') extends AsChildClass {
+        $target = new class (self::class, 'bad-void') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'nothing'])]
             private mixed $nothing;
         };
@@ -368,7 +368,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsRequiredParamValueInjection(): void
     {
-        $target = new class (self::class, 'bad-params') extends AsChildClass {
+        $target = new class (self::class, 'bad-params') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'secret'])]
             private int $secret;
         };
@@ -381,7 +381,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsLazyOnStringEntry(): void
     {
-        $target = new class (self::class, 'bad-lazy-string') extends AsChildClass {
+        $target = new class (self::class, 'bad-lazy-string') extends AsInnerClass {
             #[Inject('active.plugins', lazy: true)]
             private \Closure $plugins;
         };
@@ -394,7 +394,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsEmptyIdentifier(): void
     {
-        $target = new class (self::class, '') extends AsChildClass {
+        $target = new class (self::class, '') extends AsInnerClass {
             #[Inject]
             private \stdClass $dependency;
         };
@@ -407,7 +407,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testReturnsTargetUnchangedWhenNoInjectableProperties(): void
     {
-        $target = new class (self::class, 'noop') extends AsChildClass {
+        $target = new class (self::class, 'noop') extends AsInnerClass {
             public function ping(): string
             {
                 return 'pong';
@@ -425,7 +425,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $service = new \stdClass();
         $container = $this->containerReturning([\stdClass::class => $service]);
-        $target = new class (self::class, 'nullable') extends AsChildClass {
+        $target = new class (self::class, 'nullable') extends AsInnerClass {
             #[Inject]
             private ?\stdClass $dependency;
 
@@ -444,7 +444,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $service = new \ArrayObject();
         $container = $this->containerReturning([\ArrayAccess::class => $service]);
-        $target = new class (self::class, 'iface-type') extends AsChildClass {
+        $target = new class (self::class, 'iface-type') extends AsInnerClass {
             #[Inject]
             private \ArrayAccess $dependency;
 
@@ -464,7 +464,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $service = new \stdClass();
         $plugins = ['plugin-a/plugin-a.php'];
         $container = $this->containerReturning([\stdClass::class => $service, 'plugins' => $plugins]);
-        $target = new class (self::class, 'multi') extends AsChildClass {
+        $target = new class (self::class, 'multi') extends AsInnerClass {
             #[Inject]
             private \stdClass $alpha;
 
@@ -512,7 +512,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
         $cacheFile = $this->newCacheFile();
         $service = new \stdClass();
         $injector = $this->injector($this->containerReturning([\stdClass::class => $service]), $cacheFile);
-        $first = new class (self::class, 'shared') extends AsChildClass {
+        $first = new class (self::class, 'shared') extends AsInnerClass {
             #[Inject]
             private \stdClass $dependency;
 
@@ -521,7 +521,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
                 return $this->dependency;
             }
         };
-        $second = new class (self::class, 'shared') extends AsChildClass {
+        $second = new class (self::class, 'shared') extends AsInnerClass {
             #[Inject]
             private \stdClass $dependency;
 
@@ -565,7 +565,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsEmptyStringEntry(): void
     {
-        $target = new class (self::class, 'empty-entry') extends AsChildClass {
+        $target = new class (self::class, 'empty-entry') extends AsInnerClass {
             #[Inject('')]
             private string $dependency;
         };
@@ -578,7 +578,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsMalformedCallableEntry(): void
     {
-        $target = new class (self::class, 'bad-callable-shape') extends AsChildClass {
+        $target = new class (self::class, 'bad-callable-shape') extends AsInnerClass {
             #[Inject([CallableProvider::class])]
             private int $dependency;
         };
@@ -591,7 +591,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsCallableEntryWithUnknownClass(): void
     {
-        $target = new class (self::class, 'unknown-class') extends AsChildClass {
+        $target = new class (self::class, 'unknown-class') extends AsInnerClass {
             #[Inject([\Nonexistent\MissingProvider::class, 'provide'])]
             private int $dependency;
         };
@@ -606,7 +606,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
-        $target = new class (self::class, 'lazy-prop-live') extends AsChildClass {
+        $target = new class (self::class, 'lazy-prop-live') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'counter'], lazy: true)]
             private \Closure $counter;
 
@@ -628,7 +628,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
-        $target = new class (self::class, 'lazy-prop-private') extends AsChildClass {
+        $target = new class (self::class, 'lazy-prop-private') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'secretCounter'], lazy: true)]
             private \Closure $secretCounter;
 
@@ -647,7 +647,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new GreetingProvider();
         $container = $this->containerReturning([GreetingProviderInterface::class => $provider]);
-        $target = new class (self::class, 'iface-method') extends AsChildClass {
+        $target = new class (self::class, 'iface-method') extends AsInnerClass {
             #[Inject([GreetingProviderInterface::class, 'greeting'])]
             private string $greeting;
 
@@ -666,7 +666,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new GreetingProvider();
         $container = $this->containerReturning([GreetingProviderInterface::class => $provider]);
-        $target = new class (self::class, 'iface-lazy') extends AsChildClass {
+        $target = new class (self::class, 'iface-lazy') extends AsInnerClass {
             #[Inject([GreetingProviderInterface::class, 'greeting'], lazy: true)]
             private \Closure $greeting;
 
@@ -685,7 +685,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
-        $target = new class (self::class, 'untyped-prop') extends AsChildClass {
+        $target = new class (self::class, 'untyped-prop') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'publicClosure'])]
             private $factory;
 
@@ -702,7 +702,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsValueInjectionIntoUntypedProperty(): void
     {
-        $target = new class (self::class, 'untyped-value') extends AsChildClass {
+        $target = new class (self::class, 'untyped-value') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'secretValue'])]
             private $secretValue;
         };
@@ -716,7 +716,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     public function testPropagatesMissingCallableProviderFailure(): void
     {
         $container = $this->containerReturning([]);
-        $target = new class (self::class, 'missing-provider') extends AsChildClass {
+        $target = new class (self::class, 'missing-provider') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'secretValue'])]
             private int $secretValue;
         };
@@ -731,7 +731,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
-        $target = new class (self::class, 'object-target') extends AsChildClass {
+        $target = new class (self::class, 'object-target') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'publicChild'])]
             private object $child;
 
@@ -750,7 +750,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
-        $target = new class (self::class, 'mixed-target') extends AsChildClass {
+        $target = new class (self::class, 'mixed-target') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'secretValue'])]
             private mixed $secretValue;
 
@@ -769,7 +769,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
-        $target = new class (self::class, 'iterable-target') extends AsChildClass {
+        $target = new class (self::class, 'iterable-target') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'items'])]
             private iterable $items;
 
@@ -786,7 +786,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsBuiltinIntoObjectTypedProperty(): void
     {
-        $target = new class (self::class, 'builtin-object') extends AsChildClass {
+        $target = new class (self::class, 'builtin-object') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'stringValue'])]
             private object $dependency;
         };
@@ -799,7 +799,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsNullableReturnIntoNonNullableProperty(): void
     {
-        $target = new class (self::class, 'nullable-mismatch') extends AsChildClass {
+        $target = new class (self::class, 'nullable-mismatch') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'maybeSecretValue'])]
             private int $maybeSecretValue;
         };
@@ -814,7 +814,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
-        $target = new class (self::class, 'nullable-ok') extends AsChildClass {
+        $target = new class (self::class, 'nullable-ok') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'maybeSecretValue'])]
             private ?int $maybeSecretValue;
 
@@ -831,7 +831,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsUnionTypedPropertyWithoutExplicitEntry(): void
     {
-        $target = new class (self::class, 'union-no-entry') extends AsChildClass {
+        $target = new class (self::class, 'union-no-entry') extends AsInnerClass {
             #[Inject]
             private \stdClass|\ArrayObject $dependency;
         };
@@ -846,7 +846,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $provider = new CallableProvider();
         $container = $this->containerReturning([CallableProvider::class => $provider]);
-        $target = new class (self::class, 'union-ok') extends AsChildClass {
+        $target = new class (self::class, 'union-ok') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'intOrString'])]
             private int|string $value;
 
@@ -863,7 +863,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsNeverReturnValueInjection(): void
     {
-        $target = new class (self::class, 'bad-never') extends AsChildClass {
+        $target = new class (self::class, 'bad-never') extends AsInnerClass {
             #[Inject([CallableProvider::class, 'neverReturns'])]
             private mixed $neverReturns;
         };
@@ -876,7 +876,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     public function testRejectsVirtualHookedPropertyInjection(): void
     {
-        $target = new class (self::class, 'virtual') extends AsChildClass {
+        $target = new class (self::class, 'virtual') extends AsInnerClass {
             #[Inject]
             private \stdClass $dependency {
                 get => throw new \LogicException('never read');
@@ -893,7 +893,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     {
         $service = new \stdClass();
         $container = $this->containerReturning([\stdClass::class => $service]);
-        $target = new class (self::class, 'hooked') extends AsChildClass {
+        $target = new class (self::class, 'hooked') extends AsInnerClass {
             #[Inject]
             private \stdClass $dependency {
                 set {
@@ -1029,7 +1029,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
 
     private function typedChild(string $identifier = 'dependency'): object
     {
-        return new class (self::class, $identifier) extends AsChildClass {
+        return new class (self::class, $identifier) extends AsInnerClass {
             #[Inject]
             private \stdClass $dependency;
 
@@ -1069,7 +1069,7 @@ final class DependencyInjectorTest extends WplokerbjmTestCase
     }
 }
 
-final class NamedDependencyChild extends AsChildClass
+final class NamedDependencyChild extends AsInnerClass
 {
 }
 
@@ -1086,7 +1086,7 @@ final class GreetingProvider implements GreetingProviderInterface
     }
 }
 
-class ProtectedInjectParent extends AsChildClass
+class ProtectedInjectParent extends AsInnerClass
 {
     #[Inject]
     protected \stdClass $dep;
@@ -1097,7 +1097,7 @@ class ProtectedInjectParent extends AsChildClass
     }
 }
 
-class PrivateInjectParent extends AsChildClass
+class PrivateInjectParent extends AsInnerClass
 {
     #[Inject]
     private \stdClass $dep;
@@ -1114,13 +1114,13 @@ final class CallableProvider
 
     private \Closure $privateClosure;
 
-    public AsChildClass $publicChild;
+    public AsInnerClass $publicChild;
 
     public function __construct()
     {
         $this->publicClosure = static fn(int $value): int => $value + 1000;
         $this->privateClosure = static fn(int $value): int => $value + 2000;
-        $this->publicChild = new class ('Provider', 'child') extends AsChildClass {
+        $this->publicChild = new class ('Provider', 'child') extends AsInnerClass {
             public function greet(): string
             {
                 return 'hello';
@@ -1148,9 +1148,9 @@ final class CallableProvider
         return static fn(int $value): int => $value + 100;
     }
 
-    public function childInstance(): AsChildClass
+    public function childInstance(): AsInnerClass
     {
-        return new class ('Provider', 'child') extends AsChildClass {
+        return new class ('Provider', 'child') extends AsInnerClass {
             public function greet(): string
             {
                 return 'hello';

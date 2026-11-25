@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Trait;
 
-use AvailaibleHandlerType;
+use WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveDebugPhase;
+use WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry;
 use WeakReference;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     LiveUnregistrationPhase,
@@ -14,7 +15,6 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Handlers\{
     RuntimeRegistryHandlerEntry,
     ContainerRegistryHandlerEntry,
-    WPHooksInstanceRegistry
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\Invoker\HookInvoker;
 use WPLokerBJM\Shared\Utilities\DataObject\TraitDataObject;
@@ -45,6 +45,7 @@ trait HandlerEntryTrait
     public function __destruct()
     {
         \is_callable($this->onEntryRemoval) && ($this->onEntryRemoval)($this);
+        if (isset($this->onEntryRemoval)) unset($this->onEntryRemoval);
     }
 
     public function register(): static
@@ -66,7 +67,7 @@ trait HandlerEntryTrait
                 'line' => $e->getLine(),
             ]);
         }
-        $this->handler->emitLiveDebug(\WPLokerBJM\Core\Container\Support\WPHooks\Debug\LiveDebugPhase::Registered);
+        $this->handler->emitLiveDebug(LiveDebugPhase::Registered);
         return $this;
     }
 
@@ -92,10 +93,10 @@ trait HandlerEntryTrait
             ));
             return false;
         }
-
+        $handler = $this->handler;
         $result = match ($this->type) {
-            'action' => remove_action($this->hook, $this->handler, $this->priority),
-            'filter' => remove_filter($this->hook, $this->handler, $this->priority),
+            'action' => remove_action($this->hook, $handler, $this->priority),
+            'filter' => remove_filter($this->hook, $handler, $this->priority),
         };
 
         $elapsedUs = (int) ((\hrtime(true) - $startedAt) / 1000);
@@ -114,7 +115,7 @@ trait HandlerEntryTrait
         }
 
         $this->registered = false;
-        if (is_callable($this->handler?->onUnregisterDoCallback ?? null)) ($this->handler->onUnregisterDoCallback)();
+        if (is_callable($handler?->onUnregisterDoCallback ?? null)) ($handler->onUnregisterDoCallback)();
 
         $this->emitUnregistration(LiveUnregistrationPhase::Unregistered, new LiveUnregistrationResultDTO(
             requestedBy: $requestedBy,
@@ -123,7 +124,6 @@ trait HandlerEntryTrait
             stillDispatching: $this->stillDispatchingSameHook(),
             elapsedUs: (int) ((\hrtime(true) - $startedAt) / 1000),
         ));
-
         return $result;
     }
 

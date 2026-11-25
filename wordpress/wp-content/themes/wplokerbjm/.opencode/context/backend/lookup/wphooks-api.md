@@ -1,4 +1,4 @@
-<!-- Context: backend/lookup | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+<!-- Context: backend/lookup | Priority: high | Version: 1.1 | Updated: 2026-11-27 -->
 
 # WPHooks API Lookup
 
@@ -8,19 +8,21 @@
 
 | Type | File | Use |
 |---|---|---|
-| `WPHooksScanner` | `server/Core/Container/Support/WPHooks/WPHooksScanner.php` | `getHookRegistrations()` scans or loads the cache; constructor `(array $compiledContainerMap, WPHookPlanProvider $provider, string $namespace, string $cacheLocation)`. |
+| `WPHooksScanner` | `server/Core/Container/Support/WPHooks/WPHooksScanner.php` | `getHookRegistrations()` scans or loads the cache. Constructor: `(\Closure $containerEntries, WPHookPlanProvider $provider, string $namespace = 'WPLokerBJM', string $cacheLocation = '', HookLoggerInterface $logger = new NullHookLogger(), bool $forceNoCache = false)`. The closure returns RobotLoader-indexed candidates merged with known container entries, then filtered by `container->has()`. |
 | `HookScannerTrait` | `server/Core/Container/Support/WPHooks/Trait/HookScannerTrait.php` | Scans declared non-static methods/properties and reports visibility plus action/filter type. |
-| `HookRegistration` | `server/Core/Container/Support/WPHooks/Registrations/HookRegistration.php` | Immutable metadata DTO; hydrates via `fromArray()` and exports through VarExporter `__set_state`. |
+| `HookRegistration` | `server/Core/Container/Support/WPHooks/Registrations/HookRegistration.php` | Immutable container-registration DTO; hydrates via `fromArray()` and exports through VarExporter `__set_state`. |
 | `HookKey` | `server/Core/Container/Support/WPHooks/Registrations/HookKey.php` | Canonical identity: class, member, target, type, priority, accepted args; supports class/callable/namespace matching. |
-| `InstanceHookMetadata` | `server/Core/Container/Support/WPHooks/Registrations/InstanceHookMetadata.php` | Runtime hook-site metadata, including static tags and the tag callable/plan; hydrates via `fromArray()` and exports via `__set_state`. |
-| `CallableHookParams` | `server/Core/Container/Support/WPHooks/Provider/CallableHookParams.php` | Per-parameter plan DTO; extends `AbstractDataObject`, so VarExporter emits `__set_state`. |
-| `WPHookPlanProvider` | `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` | Builds callable plans; resolves dynamic names, registration gates, execution gates, and dynamic tags. Single provider for BOTH container and runtime paths (non-nullable `ContainerInterface`). |
+| `InstanceHookMetadata` | `server/Core/Container/Support/WPHooks/Registrations/InstanceHookMetadata.php` | Runtime hook-site metadata, including raw hook/tag closures and plans; hydrates via `fromArray()` and exports via `__set_state`. |
+| `CallableHookParams` | `server/Core/Container/Support/WPHooks/Provider/CallableHookParams.php` | Per-parameter plan DTO; `CallablePlan` is `array{isStatic: bool, params: list<CallableHookParams>}`. |
+| `HookLoggerInterface` | `server/Core/Container/Support/WPHooks/Logger/HookLoggerInterface.php` | Swappable WPHooks logger: `debug/info/warning/error($category, $message, $context)` + `flush()`. DI binds `SharedLoggerAdapter`; `NullHookLogger` is the no-op default. |
+| `WPHookPlanProvider` | `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` | Backwards-compatible facade over `CallablePlanFactory`, `ArgumentResolver`, `ConditionEvaluator`, and `HookDebugDispatcher`. |
+| `ModuleHookMetadata` | `server/Core/Container/Support/WPHooks/Abstract/ModuleHookMetadata.php` | Anonymous/inner owner metadata: `outerClassString`, `identifier`, `ownershipPath`. |
 
 ## Registries and selectors
 
 | API | Purpose / constraint |
 |---|---|
-| `WPHooksContainerRegistry::initialize()` | Idempotently resolves and registers active entries; deferred entries stay in `ContainerRegistryDeferredHookManager`. |
+| `WPHooksContainerRegistry::initialize()` | Idempotently asks the injected `WPHooksScanner` for registrations, registers active entries, and indexes handlers. It does **not** auto-boot the event bridge; `initEventBridge()` is explicit/standalone/test-only. |
 | `activateDeferredByHook/Class/Namespace/Callable/Tags()` | Move matching deferred entries into WordPress; activation re-checks `registerIf`. |
 | `activateDeferredByHookPattern($pattern)` / `activateDeferredByTagPattern($patterns)` | Wildcard activation; pattern rules from `HookPattern`. |
 | `unregisterByHook/Class/Namespace/Callable/Tags()` | Remove active entries only; use the `unregisterDeferredBy*` family for deferred entries. |
@@ -28,41 +30,38 @@
 | `unregisterDeferredByHookPattern($pattern)` / `unregisterDeferredByTagPattern($patterns)` | Wildcard removal of deferred entries only. |
 | `WPHooksInstanceRegistry::registerHooksOn()` | Scan one existing object once; attribute closures resolve through `WPHookPlanProvider`. |
 | `activateDeferredByHookInLiveInstance()` / `unregisterDeferredByHookInLiveInstance()` | Runtime hook-name-scoped deferred activation/removal for one live owner. |
-| `activateDeferredByHookPatternInLiveInstance()` / `unregisterDeferredByHookPatternInLiveInstance()` | Runtime hook-pattern-scoped deferred activation/removal for one live owner; pattern rules from `HookPattern`. |
-| `activateDeferredByTagsInLiveInstance()` / `unregisterDeferredByTagsInLiveInstance()` | Runtime tag-scoped deferred activation/removal for one live owner; tags are resolved per instance and OR-matched. |
-| `activateDeferredByTagPatternInLiveInstance()` / `unregisterDeferredByTagPatternInLiveInstance()` | Runtime tag-pattern-scoped deferred activation/removal for one live owner. |
+| `activateDeferredByHookPatternInLiveInstance()` / `unregisterDeferredByHookPatternInLiveInstance()` | Runtime hook-pattern-scoped deferred activation/removal for one live owner. |
+| `activateDeferredByTagsInLiveInstance()` / `unregisterDeferredByTagsInLiveInstance()` | Runtime tag-scoped deferred activation/removal; tags resolve per instance and OR-match. |
+| `activateDeferredByTagPatternInLiveInstance()` / `unregisterDeferredByTagPatternInLiveInstance()` | Runtime tag-pattern-scoped deferred activation/removal. |
 | `activateDeferredByCallableInLiveInstance()` / `unregisterDeferredByCallableInLiveInstance()` | Runtime callable-scoped deferred activation/removal for held `deferRegister` entries. |
 | `activateDeferredByClassInLiveInstance()` / `unregisterDeferredByClassInLiveInstance()` | Runtime owner-scoped deferred activation/removal for every member of one live instance. |
-| `unregisterByHookInLiveInstance()` / `unregisterByHookPatternInLiveInstance()` | Remove matching active runtime registrations for one owner only; deferred entries are untouched. |
-| `unregisterByTagsInLiveInstance()` / `unregisterByTagPatternInLiveInstance()` | Remove active runtime registrations carrying matching tags for one owner only; deferred entries are untouched. |
-| `unregisterByClassInLiveInstance()` | Remove every active runtime registration owned by one live instance; its deferred entries are untouched. |
+| `unregisterByHookInLiveInstance()` / `unregisterByHookPatternInLiveInstance()` | Remove matching active runtime registrations for one owner only. |
+| `unregisterByTagsInLiveInstance()` / `unregisterByTagPatternInLiveInstance()` | Remove active runtime registrations carrying matching tags for one owner only. |
+| `unregisterByClassInLiveInstance()` | Remove every active runtime registration owned by one live instance. |
 | `unregisterByCallableInLiveInstance()` | Remove every active registration of one member on one live instance. |
-| `unregisterHooksOn()` | Remove every runtime handler owned by one object (incl. its deferred entries). |
+| `unregisterHooksOn()` | Remove every runtime handler owned by one object (including deferred entries). |
 
-`ContainerRegistryDeferredHookManager` lives in `Registry/DeferredManager/`; `ContainerRegistryHookTargetResolver` in `Registry/Resolver/`. The resolver accepts array callables, `Class::method` strings, bound first-class callables, invokable objects, property-hook closures, and the anonymous-property metadata object.
+`ContainerRegistryDeferredHookManager` lives in `Registry/DeferredManager/`; `ContainerRegistryHookTargetResolver` and `InstanceRegistryRuntimeHookResolver` live in `Registry/Resolver/`.
 
 ## Invokers and utilities
 
-- `ContainerLazyHookInvoker` / `ContainerLazyPropertyHookInvoker` — resolve services at fire time; support `executeIf` and private/protected access (`Invoker/ContainerLazyHookInvoker.php`).
-- `RuntimeInstanceHookInvoker` / `RuntimeInstancePropertyHookInvoker` — retain an existing object and invoke its member; `WeakReference` owner with GC self-cleanup (`Invoker/RuntimeHookInvoker.php`).
-- `HookInvokerTrait` — shared once/removal plumbing (`setCleanupCallback`, `consumed`/`removed` guards), `buildHookArgs` named args, `filterPassthrough` (`Trait/HookInvokerTrait.php`).
-- `RuntimeInstanceInvokerTrait` — runtime `__invoke` pipeline + `consumeLifetimeAndClean()` GC nuke (`Invoker/RuntimeHookInvoker.php`).
-- `DeferredHooksTrait` — shared deferred pool: `addDeferred`, `activateMatchingDeferredEntries`, `unregisterMatchingDeferredEntries`, abstract `gateDeferredActivation` (`Trait/DeferredHooksTrait.php`).
-- `WPHookPlanProvider` — plan core + container-backed closure resolution for both paths: `buildCallablePlan`, `resolveHookName`, `evaluateExecuteIf`, `evaluateRegistrationGate`, `resolveTagCallable`, `callableParamNames` (`Provider/WPHookPlanProvider.php`).
-- `InstanceRegistryRuntimeHookResolver` — live-instance target resolution (`resolveLiveCallableTarget`, `matchesCallableTarget`), method param names (`resolveHookArgNames`) — in `Registry/WPHooksInstanceRegistry.php`.
-- `HookPattern` — wildcard validation/matching: exactly one trailing asterisk, literal prefix ≥ 2 chars, else `InvalidArgumentException`; `matches` / `matchesAny` (`Utilities/HookPattern.php`).
-- `HookTagUtilities::normalizeTags()` / `normalizeTagValue()` — accept strings or string-backed enums and deduplicate tags.
-- Tags are strings or backed enums; `HookTagUtilities` normalizes and deduplicates them (`Utilities/Tag.php`).
-- `ModuleClassHookMetadata` — stores `parentClass` and `parentProperty`; filename is `Abstract/ModuleClassHookMetadata.php`.
+- `HookInvoker` — one unified invoker for container/runtime and method/property paths (`Invoker/HookInvoker.php`), configured by `HookInvokerConfig`.
+- `Invoker\Target\InvocationTarget` — strategy interface with `ContainerMethodTarget`, `ContainerPropertyTarget`, `RuntimeMethodTarget`, and `RuntimePropertyTarget`.
+- `HookInvokerTrait` — once/removal plumbing, named hook args, filter passthrough, and `dispatchDepth` reentrancy tracking (`Trait/HookInvokerTrait.php`).
+- `HookRemovalController` — once-consume and lifetime/proxy removal (`Invoker/HookRemovalController.php`); `HookArgumentBag` shapes named/variadic args.
+- `DeferredHooksTrait` — shared deferred mechanics via abstract `deferredGet/Put/Remove/Count/Entries` + `afterDeferredAdded`; container manager uses a flat pool + `EntriesIndexer`, instance manager uses `WeakMap<owner, entries>` (`Trait/DeferredHooksTrait.php`).
+- `WPHookPlanProvider` — facade for `buildCallablePlan`, `buildCallablePlanFromReflector`, `extractPropertyCallablePlan`, `resolveHookName`, `evaluateExecuteIf`, `evaluateRegistrationGate`, `resolveTagCallable`, `resolveOnUnregisterDo`, `assertNullableSelfClosures`.
+- `InstanceRegistryRuntimeHookResolver` — live-instance target resolution (`resolveLiveCallableTarget`, `matchesCallableTarget`) in `Registry/Resolver/InstanceRegistryRuntimeResolver.php`.
+- `QueuedHooksCleaner` — `WeakMap` of pending entries; immediate unregister or queue until the `all` boundary (`Janitor/QueuedHooksCleaner.php`).
+- `HookPattern` — wildcard validation/matching (`Utilities/HookPattern.php`); `HookTagUtilities` / `Tag` normalize strings and string-backed enums (`Utilities/Tag.php`).
 
 ## 📂 Codebase References
 
 - `server/Core/Container/Support/WPHooks/Registry/WPHooksContainerRegistry.php` — container registry, deferred manager, and target resolver.
-- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — runtime registry + `InstanceRegistryRuntimeHookResolver`.
-- `server/Core/Container/Support/WPHooks/Invoker/RuntimeHookInvoker.php` — runtime handlers + `RuntimeInstanceInvokerTrait`.
-- `server/Core/Container/Support/WPHooks/Invoker/ContainerLazyHookInvoker.php` — lazy handlers + `ContainerLazyHookInvokerTrait`.
-- `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — closure resolution (both paths).
-- `server/Core/Container/Support/WPHooks/Utilities/HookPattern.php` — wildcard patterns.
-- `server/Core/Container/Support/WPHooks/Utilities/Tag.php` — tag normalization.
-- `server/Core/Container/Support/WPHooks/Trait/HookInvokerTrait.php` — invoker plumbing; `Trait/DeferredHooksTrait.php` — deferred pool.
-- `server/Core/Container/Support/WPHooks/Abstract/ModuleClassHookMetadata.php` — anonymous property-hook metadata base class.
+- `server/Core/Container/Support/WPHooks/Registry/WPHooksInstanceRegistry.php` — runtime registry + owner-scoped selectors.
+- `server/Core/Container/Support/WPHooks/Invoker/HookInvoker.php` — unified invoker; `Invoker/HookInvokerConfig.php`, `Invoker/HookRemovalController.php`, `Invoker/HookArgumentBag.php`, `Invoker/Target/*`.
+- `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — façade; `Plan/CallablePlanFactory.php`, `Resolution/ArgumentResolver.php`, `Resolution/ConditionEvaluator.php`, `Debug/HookDebugDispatcher.php`.
+- `server/Core/Container/Support/WPHooks/Logger/` — logger contract, shared adapter, null logger.
+- `server/Core/Container/Support/WPHooks/Utilities/HookPattern.php` — wildcard patterns; `Utilities/Tag.php` — tag normalization.
+- `server/Core/Container/Support/WPHooks/Trait/HookInvokerTrait.php` — invoker plumbing; `Trait/DeferredHooksTrait.php` — deferred storage hooks.
+- `server/Core/Container/Support/WPHooks/Abstract/ModuleHookMetadata.php` — anonymous property-hook metadata base class.

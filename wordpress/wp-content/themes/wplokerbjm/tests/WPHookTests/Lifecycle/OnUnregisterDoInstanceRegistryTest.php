@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\WPHookTests\Lifecycle;
 
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
@@ -344,32 +344,32 @@ final class OnUnregisterDoInstanceRegistryTest extends WplokerbjmTestCase
         $cleanup = new class() {
             public int $cleanups = 0;
         };
-        $owner = new class($cleanup, __FUNCTION__) extends ModuleClassHookMetadata {
+        $owner = new class($cleanup, __FUNCTION__) extends ModuleHookMetadata {
             #[Action('test_onUnregisterDoCleanupDoesntRun', 11, deferRegisterUntilHook: 'shutdown', onUnregisterDo: static function (?self $self) {
                 if ($self !== null) {
-                    $self->parentClass->cleanups++;
+                    $self->outerClass->cleanups++;
                 }
             })]
             private function onShutdown0()
             {
-                $this->parentClass->cleanups++;
+                $this->outerClass->cleanups++;
             }
             #[Action('test_onUnregisterDoCleanupDoesntRun', 10, onUnregisterDo: static function (?self $self) {
                 if ($self !== null) {
-                    $self->parentClass->cleanups++;
+                    $self->outerClass->cleanups++;
                 }
             })]
             private function onShutdown1()
             {
-                $this->parentClass->cleanups++;
+                $this->outerClass->cleanups++;
             }
 
             #[Action('test_onUnregisterDoCleanupDoesntRun', 12, deferRegister: true, onUnregisterDo: static function (?self $self) {
                 if ($self !== null) {
-                    $self->parentClass->cleanups++;
+                    $self->outerClass->cleanups++;
                 }
             })]
-            public ?\Closure $onShutdown2 { get => $this->onShutdown2 ??= fn() => $this->parentClass->cleanups++; }
+            public ?\Closure $onShutdown2 { get => $this->onShutdown2 ??= fn() => $this->outerClass->cleanups++; }
         };
         $callbackCount = static fn(): int => array_sum(array_map('count', $GLOBALS['wp_filter']['test_onUnregisterDoCleanupDoesntRun']->callbacks ?? []));
         $this->registry->registerHooksOn($owner, forceNoCache: true);

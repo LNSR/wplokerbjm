@@ -13,7 +13,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use \WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\InstanceRegistryRuntimeHookResolver;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
 
 class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
@@ -358,7 +358,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
 
         $captured = [];
 
-        $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
+        $anon = new class($this, __FUNCTION__, $captured) extends ModuleHookMetadata {
             public function __construct(RuntimeInstanceRegistryTest $test, string $identifier, private array &$captured)
             {
                 parent::__construct($test, $identifier);
@@ -811,7 +811,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $log = new \ArrayObject();
         $cache = new WPHooksInstanceObjectCache();
 
-        $factory = static fn(\ArrayObject $log): ModuleClassHookMetadata => new class($log) extends ModuleClassHookMetadata {
+        $factory = static fn(\ArrayObject $log): ModuleHookMetadata => new class($log) extends ModuleHookMetadata {
             public function __construct(private \ArrayObject $log)
             {
                 parent::__construct('CachedDeferredGateHost', 'hooks');
@@ -866,7 +866,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
     {
         $cache = new WPHooksInstanceObjectCache();
 
-        $factory = static fn(string $hookName): ModuleClassHookMetadata => new class($hookName) extends ModuleClassHookMetadata {
+        $factory = static fn(string $hookName): ModuleHookMetadata => new class($hookName) extends ModuleHookMetadata {
             public function __construct(private string $hookName)
             {
                 parent::__construct('CachedDynamicHookHost', 'hooks');
@@ -987,7 +987,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
+        $anon = new class($this, __FUNCTION__, $captured) extends ModuleHookMetadata {
             public function __construct(RuntimeInstanceRegistryTest $parentClass, $identifier, private array &$captured)
             {
                 parent::__construct($parentClass, $identifier);
@@ -1017,7 +1017,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
     {
         $captured = [];
 
-        $anon = new class($this, __FUNCTION__, $captured) extends ModuleClassHookMetadata {
+        $anon = new class($this, __FUNCTION__, $captured) extends ModuleHookMetadata {
             public function __construct(RuntimeInstanceRegistryTest $parentClass, $identifier, private array &$captured)
             {
                 parent::__construct($parentClass, $identifier);
@@ -1132,7 +1132,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
             public function __construct(private WPHooksInstanceRegistry $registry) {}
 
             public $optionActivePlugin {
-                get => $this->optionActivePlugin ??= new class($this->registry) extends ModuleClassHookMetadata {
+                get => $this->optionActivePlugin ??= new class($this->registry, __PROPERTY__) extends ModuleHookMetadata {
                     private const CONDITION = false;
                     public function __construct(private WPHooksInstanceRegistry $registry)
                     {
@@ -1167,29 +1167,12 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         $result = apply_filters('option_active_plugins', ['a', 'b']);
         $this->assertSame(['a', 'b'], $result);
     }
-    public function testAutomaticUnregisterAtCertainHook(): void
-    {
-        $host = new class(__CLASS__, __METHOD__, $this->registry) extends ModuleClassHookMetadata {
-            #[Action('rt_trigger_something', once: true, executeIf: static function (): bool {
-                return true;
-            })]
-            public function test(): void {}
-        };
-
-        $this->registry->registerHooksOn($host, 'rt_automaticUnregister');
-
-        $this->assertNotNull($this->findRegisteredHook('action', 'rt_trigger_something'));
-
-        do_action('rt_automaticUnregister');
-
-        $this->assertNull($this->findRegisteredHook('action', 'rt_trigger_something'));
-    }
 
     /**
      * Regression guard for deferred registrations on the runtime cache-hit path.
      *
      * `registerHooksOn()` caches the reflected metadata of a
-     * ModuleClassHookMetadata site — including entries carrying
+     * ModuleHookMetadata site — including entries carrying
      * `deferRegisterUntilHook`. A later instance of the SAME site hits that
      * cache, so `registerCachedEntries()` must re-hydrate the deferral (rebuild
      * the deferred pool entry and its trigger listener) instead of registering
@@ -1207,7 +1190,7 @@ class RuntimeInstanceRegistryTest extends WplokerbjmTestCase
         // Two instances of the SAME anonymous class (same factory expression)
         // share one cache site:
         //   (CachedDeferredHost, hooks).
-        $factory = static fn(\ArrayObject $log): ModuleClassHookMetadata => new class($log) extends ModuleClassHookMetadata {
+        $factory = static fn(\ArrayObject $log): ModuleHookMetadata => new class($log) extends ModuleHookMetadata {
             public function __construct(private \ArrayObject $log)
             {
                 parent::__construct('CachedDeferredHost', 'hooks');

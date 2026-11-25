@@ -52,7 +52,7 @@ final class SearchJobHooks
      * @see Tracing::init
      */
     #[Action('graphql_before_resolve_field', 10, 4, tag: ['graphql'], deferRegister: true)]
-    #[Filter('posts_search', 11, 2, deferRegister: true)]
+    #[Filter('posts_search', 11, 2, deferRegister: true, once: true)]
     public private(set) \Closure $filterPostsSearch {
         get => $this->filterPostsSearch ??= function (
             mixed $source,

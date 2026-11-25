@@ -36,7 +36,7 @@ class Logger
     public const LEVEL_ERROR = 'ERROR';
 
     /** Maximum number of buffered records before an automatic flush */
-    private const BUFFER_LIMIT = 1000;
+    private const BUFFER_LIMIT = \PHP_INT_MAX;
 
     private static ?MonologLogger $logger = null;
 

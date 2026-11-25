@@ -4,7 +4,7 @@ namespace WPLokerBJM\Core\Wordpress\Theme;
 
 use WPLokerBJM\Shared\Cache\{Cache, CacheKey};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Shared\Log\Logger;
 
 /**
@@ -73,9 +73,9 @@ class ThemeHooks
      * @var class@anonymous::class
      */
     #[Filter('site_icon_meta_tags', once: true)]
-    public private(set) ?ModuleClassHookMetadata $addSiteIconMetaTags {
+    public private(set) ?object $addSiteIconMetaTags = null {
         get {
-            return $this->addSiteIconMetaTags ??= new class(__CLASS__, __PROPERTY__) extends ModuleClassHookMetadata {
+            return $this->addSiteIconMetaTags ??= new class() {
                 private array $additionalSizes = [48, 96, 144, 256, 384, 512];
 
                 public function __invoke(array $meta_tags): array

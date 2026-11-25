@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Provider;
 
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, HookDebugDispatcher, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
 use WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\NonNullableSelfParameterException;
 use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
@@ -59,8 +59,8 @@ class WPHookPlanProvider
      */
     public function assertNullableSelfClosures(InstanceHookMetadata $metadata, object $instance): void
     {
-        $ownerLabel = $instance instanceof ModuleClassHookMetadata
-            ? $instance->parentClassString . '->' . $instance->parentProperty
+        $ownerLabel = $instance instanceof ModuleHookMetadata
+            ? $instance->outerClassString . '->' . $instance->identifier
             : $instance::class;
 
         $hookLabel = $metadata->hook instanceof \Closure ? '(closure)' : $metadata->hook;

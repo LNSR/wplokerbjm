@@ -1,4 +1,4 @@
-<!-- Context: project-intelligence/nav | Priority: high | Version: 1.9 | Updated: 2026-11-21 -->
+<!-- Context: project-intelligence/nav | Priority: high | Version: 2.0 | Updated: 2026-11-27 -->
 
 # Project Intelligence
 
@@ -11,7 +11,8 @@
 ├── navigation.md              # This file - quick overview
 ├── technical-domain.md        # Stack, architecture, technical decisions
 ├── wphooks-ownership-raii.md  # Hook ownership, weak refs, RAII cleanup chain
-└── wphooks-registry-events.md # Registry event bridge (control-plane selectors)
+├── wphooks-registry-events.md # Registry event bridge (control-plane selectors)
+└── wphooks-logger.md          # Swappable WPHooks logger contract and DI wiring
 ```
 
 ## Quick Routes
@@ -21,6 +22,7 @@
 | Understand the "how" | `technical-domain.md` | Stack, architecture, code standards (guard clauses), WPHooks DTOs/patterns |
 | Hook ownership / cleanup | `wphooks-ownership-raii.md` | Strong vs weak owners, RAII destructor chain, leak rules |
 | Registry events / adapters | `wphooks-registry-events.md` | Event bridge, `EVENT_BRIDGE_HOOKS`, boot modes |
+| Hook logging / backend swap | `wphooks-logger.md` | `HookLoggerInterface`, adapters, DI binding, flush semantics |
 | All of the above | Read all files | Full project intelligence |
 
 ## Usage
@@ -28,12 +30,13 @@
 **New Team Member / Agent**:
 1. Start with `navigation.md` (this file)
 2. Read `technical-domain.md` for stack and architecture
-3. Drill into `wphooks-ownership-raii.md` for lifecycle/cleanup and `wphooks-registry-events.md` when calling registries through WordPress events
+3. Drill into `wphooks-ownership-raii.md` for lifecycle/cleanup, `wphooks-registry-events.md` when calling registries through WordPress events, and `wphooks-logger.md` when changing logging or replacing the backend
 
 **Quick Reference**:
 - Technical focus → `technical-domain.md`
 - Hook ownership / cleanup → `wphooks-ownership-raii.md`
 - Registry events → `wphooks-registry-events.md`
+- Hook logging → `wphooks-logger.md`
 
 ## Parent Context
 

@@ -18,10 +18,17 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullH
  */
 final class ConditionEvaluator
 {
+    private static bool $shutdownPhase = false;
     public function __construct(
         private readonly ArgumentResolver $resolver,
         private readonly HookLoggerInterface $logger = new NullHookLogger(),
-    ) {}
+    ) {
+        static $shutdownRegistered = false;
+        if ($shutdownRegistered) return;
+        $shutdownRegistered = true;
+
+        \register_shutdown_function(static fn() => self::$shutdownPhase = true);
+    }
 
     /**
      * Resolve the final hook name for a registration.
@@ -134,16 +141,13 @@ final class ConditionEvaluator
             $targetInstanceWeakRef = $targetClass;
             $instance = $targetClass->get();
             $targetClass = $instance !== null ? $instance::class : null;
-        } elseif (is_object($targetClass)) {
-            $targetInstanceWeakRef = \WeakReference::create($targetClass);
-            $targetClass = $targetClass::class;
         }
 
         return function () use ($onUnregisterDo, $onUnregisterDoParams, $label, $targetClass, $targetInstanceWeakRef): mixed {
             static $alreadyRun = false;
             if ($alreadyRun) return null;
             $alreadyRun = true;
-            if (did_action('shutdown') || doing_action('shutdown')) return null;
+            if (self::$shutdownPhase || did_action('shutdown') || doing_action('shutdown')) return null;
 
             try {
                 $onUnregisterDo = $this->resolver->bindToTarget($onUnregisterDo, $onUnregisterDoParams, $targetClass);

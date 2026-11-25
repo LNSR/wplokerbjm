@@ -133,7 +133,7 @@ class Core implements DefinitionProviderInterface
             PlanCompiler::class => \DI\autowire(PlanCompiler::class),
             ScopeAccessFactory::class => \DI\autowire(ScopeAccessFactory::class),
             PlanCache::class => \DI\autowire(PlanCache::class)->constructor(
-                static fn(): string => defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache/DependencyInjectorCache.php" : get_stylesheet_directory() . "/cache/DependencyInjectorCache.php"
+                static fn(): string => \defined('WPLOKERBJM_TEST_ENV') ? get_stylesheet_directory() . "/tests/cache/DependencyInjectorCache.php" : get_stylesheet_directory() . "/cache/DependencyInjectorCache.php"
             ),
             DependencyInjector::class => \DI\autowire(DependencyInjector::class)->constructor(
                 \DI\get(ContainerInterface::class),

@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Tests\WPHookTests\Deferral;
 
 use WPLokerBJM\Core\Container\Attributes\Action;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\{WPHooksInstanceObjectCache, WPHooksInstanceRegistry};
 use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
@@ -105,7 +105,7 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
             /** @var list<string> */
             public array $order = [];
 
-            #[Action('inst_same_hook_trigger', 10, deferRegisterUntilHook: 'inst_same_hook_trigger')]
+            #[Action('inst_same_hook_trigger', \PHP_INT_MIN + 2, deferRegisterUntilHook: 'inst_same_hook_trigger')]
             public function onDeferred(): void
             {
                 $this->order[] = 'activated';
@@ -116,22 +116,23 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
 
         add_action('inst_same_hook_trigger', static function () use ($anon): void {
             $anon->order[] = 'before';
-        }, 5, 0);
+        }, \PHP_INT_MIN + 1, 0);
         add_action('inst_same_hook_trigger', static function () use ($anon): void {
             $anon->order[] = 'after';
-        }, 15, 0);
+        }, \PHP_INT_MIN + 3, 0);
 
         \do_action('inst_same_hook_trigger');
+
+        self::assertArrayNotHasKey(
+            PHP_INT_MIN,
+            $GLOBALS['wp_filter']['inst_same_hook_trigger']->callbacks,
+            'The one-shot scheduler must remove itself without leaving its priority bucket behind.',
+        );
 
         self::assertSame(
             ['before', 'activated', 'after'],
             $anon->order,
             'Scheduler self-removal must not skip an adjacent priority; same-hook activation must run in place.',
-        );
-        self::assertArrayNotHasKey(
-            PHP_INT_MIN,
-            $GLOBALS['wp_filter']['inst_same_hook_trigger']->callbacks,
-            'The one-shot scheduler must remove itself without leaving its priority bucket behind.',
         );
     }
 
@@ -368,7 +369,7 @@ final class DeferRegisterInstanceRegistryTest extends WplokerbjmTestCase
     {
         $cache = new WPHooksInstanceObjectCache();
 
-        $factory = static fn(): ModuleClassHookMetadata => new class extends ModuleClassHookMetadata {
+        $factory = static fn(): ModuleHookMetadata => new class extends ModuleHookMetadata {
             public function __construct()
             {
                 parent::__construct('DeferRegisterCacheHost', 'hooks');

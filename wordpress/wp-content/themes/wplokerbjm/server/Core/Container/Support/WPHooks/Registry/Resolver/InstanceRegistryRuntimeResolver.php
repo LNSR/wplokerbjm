@@ -53,7 +53,7 @@ class InstanceRegistryRuntimeHookResolver
      *  - `[$liveInstance, 'member']` arrays (method or property name);
      *  - closures: first-class callables (`$service->method(...)`) and PHP 8.4
      *    property-hook accessor closures;
-     *  - invokable objects, including {@see \WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata}
+     *  - invokable objects, including {@see \WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata}
      *    hosts — the object is its own owner and the member is `__invoke`.
      *
      * `Class::method` strings cannot name a live instance and are rejected.
@@ -88,7 +88,7 @@ class InstanceRegistryRuntimeHookResolver
 
             $this->weakMap[$target] = [WeakReference::create($instance), $targetName];
         } elseif (is_object($target) && is_callable($target)) {
-            // Invokable object (anonymous class / ModuleClassHookMetadata host):
+            // Invokable object (anonymous class / ModuleHookMetadata host):
             // the callable member is __invoke and the object owns its own hooks.
             $instance = $target;
             $targetName = '__invoke';

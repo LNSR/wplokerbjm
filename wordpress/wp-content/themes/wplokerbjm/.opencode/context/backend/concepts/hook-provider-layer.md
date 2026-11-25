@@ -1,33 +1,49 @@
-<!-- Context: backend/concepts | Priority: high | Version: 1.0 | Updated: 2026-11-18 -->
+<!-- Context: backend/concepts | Priority: high | Version: 1.1 | Updated: 2026-11-27 -->
 
 # Concept: Hook Provider Layer
 
 **Purpose**: Explain how condition gates, dynamic hook names, and tag closures get DI-powered parameter resolution without reflection on the hot path.
 
-## Core Idea
+## Core idea
 
-`WPHookPlanProvider` is the single DI resolution core for BOTH paths — container and runtime (the former `HookProviderTrait` was merged into it, and `RuntimeWPHookProvider` removed). It requires a non-nullable `ContainerInterface`. Callable metadata is captured into a serializable **plan at scan time**; the plan is exported to the hooks cache and resolved at fire time, so the hot path never needs reflection unless a plan is missing (stale cache / unexportable defaults).
+`WPHookPlanProvider` is a backwards-compatible facade over four collaborators:
+
+- `Plan/CallablePlanFactory` — reflection → plan arrays and per-callable caches;
+- `Resolution/ArgumentResolver` — container-backed parameter resolution and scope binding;
+- `Resolution/ConditionEvaluator` — hook names, `executeIf`/`registerIf`, tags, `onUnregisterDo`;
+- `Debug/HookDebugDispatcher` — debug-probe dispatch and owner-optional parameter policy.
+
+The provider is constructed with `ContainerInterface` plus an optional `HookLoggerInterface`; it passes the logger to the plan factory, condition evaluator, and debug dispatcher. New code should inject the collaborator it needs instead of the facade.
 
 ## Plan model
 
+A `CallablePlan` is precomputed once per closure and exported to the hooks cache:
+
 ```php
-// CallablePlan (phpstan): precomputed once per closure
+// array{isStatic: bool, params: list<CallableHookParams>}
 [
-  'isStatic'   => true,               // closure-level metadata
-  'scopeClass' => 'WPLokerBJM\...',   // declaring class
-  'params'     => [                   // parameter metadata
-    ['name' => 'search', 'type' => null, 'hasDefault' => false, 'default' => null],
-  ],
+    'isStatic' => true,
+    'params' => [
+        new CallableHookParams(
+            name: 'search',
+            type: null,
+            hasDefault: false,
+            default: null,
+            isVariadic: false,
+            isSelf: false,
+        ),
+    ],
 ]
 ```
 
-## Key Points
+## Key points
 
-- `buildCallablePlan()` returns an empty-shaped plan for null callables or non-exportable defaults (objects/resources) — callers fall back to reflection.
-- `resolveCallableParameters()` injects **by exact parameter name** from named hook args first, then the container, then defaults.
-- `evaluateExecuteIf()` / `evaluateRegistrationGate()` require bool returns; zero-parameter gates take a direct fast path.
-- `bindToTarget()` scope-binds closures to the target class (WeakMap-memoized per closure+class pair); static attribute closures only need a scope-only bind.
-- `resolveTagCallable()` resolves dynamic tag lists at registration time and must return an array.
+- `buildCallablePlan()` returns an empty-shaped plan for null callables or non-exportable defaults (objects/resources); callers fall back to reflection.
+- `buildCallablePlanFromReflector()` and `extractPropertyCallablePlan()` capture method/property parameters.
+- `ArgumentResolver::resolveCallableParameters()` injects by exact parameter name from named hook args first, then the container, then defaults.
+- `ConditionEvaluator` requires bool gate returns; zero-parameter gates take a direct fast path. `resolveTagCallable()` returns the full dynamic tag list.
+- `bindToTarget()` scope-binds closures to the target class; `assertNullableSelfClosures()` rejects non-nullable `self` parameters on instance-registry plans.
+- `resolveOnUnregisterDo()` and `invokeHookDebug()` are exposed through the facade.
 
 ## Minimal example
 
@@ -35,8 +51,7 @@
 #[Filter('posts_search', acceptedArgs: 2)]
 public function search(string $sql, object $query): string
 {
-    // Parameters matching hook args are injected by name;
-    // other typed params resolve from the container.
+    // Matching hook args inject by name; other typed params resolve from the container.
     return $sql;
 }
 ```
@@ -44,9 +59,14 @@ public function search(string $sql, object $query): string
 ## Related
 
 - `concepts/wphooks-architecture.md` — where plans are consumed
-- `lookup/wphooks-api.md` — provider and trait API rows
+- `lookup/wphooks-api.md` — provider and collaborator API rows
 - `guides/wphooks-lifecycle.md` — scan-time plan build vs fire-time resolution
 
 ## 📂 Codebase References
 
-- `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — the single provider (plan core + container-backed closure resolution for both paths): `buildCallablePlan`, `resolveHookName`, `resolveCallableParameters`, `evaluateExecuteIf`, `evaluateRegistrationGate`, `resolveTagCallable`, `callablePlan`, `extractPropertyCallableParamNames`.
+- `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` — facade and public API.
+- `server/Core/Container/Support/WPHooks/Plan/CallablePlanFactory.php` — plan building and caches.
+- `server/Core/Container/Support/WPHooks/Resolution/ArgumentResolver.php` — parameter resolution and binding.
+- `server/Core/Container/Support/WPHooks/Resolution/ConditionEvaluator.php` — gates, names, tags, cleanup callables.
+- `server/Core/Container/Support/WPHooks/Debug/HookDebugDispatcher.php` — debug probe dispatch.
+- `server/Core/Container/Support/WPHooks/Logger/HookLoggerInterface.php` — injected logging seam.

@@ -15,7 +15,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullH
 use Psr\Container\ContainerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\{Registrations\HookRegistration, Registrations\HookKey, Provider\WPHookPlanProvider, WPHooksScanner};
 use WPLokerBJM\Core\Container\Support\WPHooks\Utilities\{HookPattern, HookTagUtilities};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{ModuleClassHookMetadata};
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\{ModuleHookMetadata};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
 use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait};
@@ -26,9 +26,10 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{
 };
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\Handlers\DeferredHookEntryHandler;
 use WPLokerBJM\Core\Container\Support\WPHooks\Registry\Resolver\ContainerRegistryHookTargetResolver;
+use WeakReference;
 
 /**
- * Registry for WordPress hooks discovered via #[Action] and #[Filter] attributes.
+ * Registry for WordPress hooks discovered via #[Filter] and #[Filter] attributes.
  *
  * Stores all hook registrations as identifiable HookInvoker instances,
  * enabling unregistration by hook name, class, or specific class::method.
@@ -147,7 +148,8 @@ class WPHooksContainerRegistry
      * Idempotent; {@see removeEventBridge()} clears the flag so the bridge can
      * be re-registered. Array callables keep every listener removable.
      *
-     * @internal Subject to change
+     * @internal For internal test only, for production register via scanner itself(container should has this class as service)
+     * !Registering via this method couples this class refCount to global $wp_filter
      * @private
      */
     public function initEventBridge(): void
@@ -169,7 +171,7 @@ class WPHooksContainerRegistry
      * boot the bridge again — the pair is a reversible toggle, not a one-way
      * switch.
      *
-     * @internal Subject to change
+     * @internal For internal test purpose
      * @private
      */
     public function removeEventBridge(): void
@@ -234,7 +236,7 @@ class WPHooksContainerRegistry
      * @api
      * @param string $hook WordPress hook name.
      */
-    #[Action(self::ACTIVATE_DEFERRED_BY_HOOK, 10, 1)]
+    #[Filter(self::ACTIVATE_DEFERRED_BY_HOOK, 10, 1)]
     public function activateDeferredByHook(string $hook): int
     {
         return $this->containerRegistryDeferredHookManager->activateDeferredByHook(
@@ -256,7 +258,7 @@ class WPHooksContainerRegistry
      * @api
      * @param class-string|object $class Fully qualified class name.
      */
-    #[Action(self::ACTIVATE_DEFERRED_BY_CLASS, 10, 1)]
+    #[Filter(self::ACTIVATE_DEFERRED_BY_CLASS, 10, 1)]
     public function activateDeferredByClass(string|object $class): int
     {
         return $this->containerRegistryDeferredHookManager->activateDeferredByClass(
@@ -275,40 +277,14 @@ class WPHooksContainerRegistry
      *
      * Already-activated handlers are silently skipped to prevent duplicate registrations.
      *
-     * **Usage Examples:**
-     *
-     ** 1. First-Class Callable (Recommended for External Orchestrators):
-     * Provides full IDE autocompletion, type safety, and static refactoring support.
+     * @example
      * ```php
-     *! $registry->activateDeferredByCallable($this->graphQL->setCacheHeader(...));
-     * ```
-     *
-     ** 2. Self-Referencing Array (Recommended for Internal Method Self-Activation):
-     * Fast-path resolution when a method manages its own hook status. DRY and refactor-proof via `__FUNCTION__` or `__PROPERTY__`.
-     * ```php
-     *! $registry->activateDeferredByCallable([$this, __FUNCTION__]);
-     *! $registry->activateDeferredByCallable([$this->parentClassString,$this->parentProperty]);
-     * ```
-     *
-     ** 3. String Identifier (Class::method):**
-     * Useful for static activation or when an active instance reference is not readily available.
-     * ```php
-     *! $registry->activateDeferredByCallable(GraphQLService::class . '::setCacheHeader');
-     * ```
-     *
-     ** 4. Array Lookup (`[$object, 'method']`):**
-     * Traditional PHP callable array syntax for instance method target resolution.
-     * ```php
-     *! $registry->activateDeferredByCallable([$this->graphQL, 'setCacheHeader']);
-     * ```
-     *
-     ** 5. PHP 8.4 Property Hooks & Dynamic Invokables & PHP 8.5 inline closure constant expression:**
-     * Activates closures or invokable objects held within class properties.
-     * On property: 
-     * ```php
-     * private $disableNoCacheHeaders = static function() { return false; };
-     *
-     *! $registry->activateDeferredByCallable($this->graphQL->disableNoCacheHeaders);
+     * $registry->activateDeferredByCallable($this->graphQL->setCacheHeader(...)); // FCC
+     * $registry->activateDeferredByCallable([$this, 'method']); // array callable
+     * $registry->activateDeferredByCallable([$this, 'invocableObject']); // invocable object via property slot
+     * $registry->activateDeferredByCallable(GraphQLService::class . '::setCacheHeader'); // string
+     * $registry->activateDeferredByCallable($this); // instance its own __invoke
+     * $registry->activateDeferredByCallable($this->closure); // cached closure via property-hook
      * ```
      *
      * @param HookTargetResolve $target First-class callable, array `[$object, 'method']`,
@@ -318,7 +294,7 @@ class WPHooksContainerRegistry
      * @return void
      * @throws \InvalidArgumentException If the target cannot be resolved to a valid class and member.
      */
-    #[Action(self::ACTIVATE_DEFERRED_BY_CALLABLE, 10, 1)]
+    #[Filter(self::ACTIVATE_DEFERRED_BY_CALLABLE, 10, 1)]
     public function activateDeferredByCallable(callable|string|array $target): int
     {
         return $this->containerRegistryDeferredHookManager->activateDeferredByCallable(
@@ -344,7 +320,7 @@ class WPHooksContainerRegistry
      * @param array<int, string|\BackedEnum> $tags Tag list to activate.
      * @return int Number of handlers activated.
      */
-    #[Action(self::ACTIVATE_DEFERRED_BY_TAGS, 10, 1)]
+    #[Filter(self::ACTIVATE_DEFERRED_BY_TAGS, 10, 1)]
     public function activateDeferredByTags(array $tags): int
     {
         $tags = HookTagUtilities::normalizeTags($tags);
@@ -364,7 +340,7 @@ class WPHooksContainerRegistry
      * @param string $namespace Fully qualified namespace prefix.
      * @return int Number of handlers activated.
      */
-    #[Action(self::ACTIVATE_DEFERRED_BY_NAMESPACE, 10, 1)]
+    #[Filter(self::ACTIVATE_DEFERRED_BY_NAMESPACE, 10, 1)]
     public function activateDeferredByNamespace(string $namespace): int
     {
         return $this->containerRegistryDeferredHookManager->activateDeferredByNamespace(
@@ -383,7 +359,7 @@ class WPHooksContainerRegistry
      * @param string $pattern Wildcard hook-name pattern.
      * @return int Number of handlers activated.
      */
-    #[Action(self::ACTIVATE_DEFERRED_BY_HOOK_PATTERN, 10, 1)]
+    #[Filter(self::ACTIVATE_DEFERRED_BY_HOOK_PATTERN, 10, 1)]
     public function activateDeferredByHookPattern(string $pattern): int
     {
         return $this->containerRegistryDeferredHookManager->activateDeferredByHookPattern(
@@ -402,7 +378,7 @@ class WPHooksContainerRegistry
      * @param array<string> $patterns Tag wildcard patterns.
      * @return int Number of handlers activated.
      */
-    #[Action(self::ACTIVATE_DEFERRED_BY_TAG_PATTERN, 10, 1)]
+    #[Filter(self::ACTIVATE_DEFERRED_BY_TAG_PATTERN, 10, 1)]
     public function activateDeferredByTagPattern(array $patterns): int
     {
         return $this->containerRegistryDeferredHookManager->activateDeferredByTagPattern(
@@ -417,10 +393,19 @@ class WPHooksContainerRegistry
      * Unregister a deferred hook using a first-class callable, array lookup,
      * or class-string identifier.
      * ! sweep all attribute attached to property or method
+     * @example
+     * ```php
+     * $registry->unregisterDeferredByCallable($this->graphQL->setCacheHeader(...)); // FCC
+     * $registry->unregisterDeferredByCallable([$this, 'method']); // array callable
+     * $registry->unregisterDeferredByCallable([$this, 'invocableObject']); // invocable object via property slot
+     * $registry->unregisterDeferredByCallable(GraphQLService::class . '::setCacheHeader'); // string
+     * $registry->unregisterDeferredByCallable($this); // instance its own __invoke
+     * $registry->unregisterDeferredByCallable($this->closure); // cached closure via property-hook
+     * ```
      * @param HookTargetResolve $target
      * @api
      */
-    #[Action(self::UNREGISTER_DEFERRED_BY_CALLABLE, 10, 1)]
+    #[Filter(self::UNREGISTER_DEFERRED_BY_CALLABLE, 10, 1)]
     public function unregisterDeferredByCallable(callable|string|array $target): int
     {
         return $this->containerRegistryDeferredHookManager->unregisterDeferredByCallable($target);
@@ -431,7 +416,7 @@ class WPHooksContainerRegistry
      * @api
      * @param string $hook WordPress hook name.
      */
-    #[Action(self::UNREGISTER_DEFERRED_BY_HOOK, 10, 1)]
+    #[Filter(self::UNREGISTER_DEFERRED_BY_HOOK, 10, 1)]
     public function unregisterDeferredByHook(string $hook): int
     {
         return $this->containerRegistryDeferredHookManager->unregisterDeferredByHook($hook);
@@ -442,7 +427,7 @@ class WPHooksContainerRegistry
      * @api
      * @param class-string|object $class Fully qualified class name.
      */
-    #[Action(self::UNREGISTER_DEFERRED_BY_CLASS, 10, 1)]
+    #[Filter(self::UNREGISTER_DEFERRED_BY_CLASS, 10, 1)]
     public function unregisterDeferredByClass(string|object $class): int
     {
         return $this->containerRegistryDeferredHookManager->unregisterDeferredByClass(\is_object($class) ? get_class($class) : $class);
@@ -455,7 +440,7 @@ class WPHooksContainerRegistry
      * @api
      * @param string $namespace Fully qualified namespace prefix.
      */
-    #[Action(self::UNREGISTER_DEFERRED_BY_NAMESPACE, 10, 1)]
+    #[Filter(self::UNREGISTER_DEFERRED_BY_NAMESPACE, 10, 1)]
     public function unregisterDeferredByNamespace(string $namespace): int
     {
         return $this->containerRegistryDeferredHookManager->unregisterDeferredByNamespace($namespace);
@@ -469,7 +454,7 @@ class WPHooksContainerRegistry
      * @api
      * @param array<int, string|\BackedEnum> $tags Tag list to unregister.
      */
-    #[Action(self::UNREGISTER_DEFERRED_BY_TAGS, 10, 1)]
+    #[Filter(self::UNREGISTER_DEFERRED_BY_TAGS, 10, 1)]
     public function unregisterDeferredByTags(array $tags): int
     {
         return $this->containerRegistryDeferredHookManager->unregisterDeferredByTags(HookTagUtilities::normalizeTags($tags));
@@ -485,7 +470,7 @@ class WPHooksContainerRegistry
      * @api
      * @param string $pattern Wildcard hook-name pattern (see HookPattern).
      */
-    #[Action(self::UNREGISTER_DEFERRED_BY_HOOK_PATTERN, 10, 1)]
+    #[Filter(self::UNREGISTER_DEFERRED_BY_HOOK_PATTERN, 10, 1)]
     public function unregisterDeferredByHookPattern(string $pattern): int
     {
         return $this->containerRegistryDeferredHookManager->unregisterDeferredByHookPattern($pattern);
@@ -503,7 +488,7 @@ class WPHooksContainerRegistry
      * each entry in array is its own family to to unregister
      * @param array<string> $patterns Tag wildcard patterns.
      */
-    #[Action(self::UNREGISTER_DEFERRED_BY_TAG_PATTERN, 10, 1)]
+    #[Filter(self::UNREGISTER_DEFERRED_BY_TAG_PATTERN, 10, 1)]
     public function unregisterDeferredByTagPattern(array $patterns): int
     {
         return $this->containerRegistryDeferredHookManager->unregisterDeferredByTagPattern($patterns);
@@ -522,11 +507,19 @@ class WPHooksContainerRegistry
      * ! {@see ContainerRegistryDeferredHookManager::unregisterDeferredByCallable()}
      * ! (or unregisterDeferredByHook/ByClass/ByNamespace) for the deferred
      * ! pool.
-     *
+     * @example
+     * ```php
+     * $registry->unregisterByCallable($this->graphQL->setCacheHeader(...)); // FCC
+     * $registry->unregisterByCallable([$this, 'method']); // array callable
+     * $registry->unregisterByCallable([$this, 'invocableObject']); // invocable object via property slot
+     * $registry->unregisterByCallable(GraphQLService::class . '::setCacheHeader'); // string
+     * $registry->unregisterByCallable($this); // instance its own __invoke
+     * $registry->unregisterByCallable($this->closure); // cached closure via property-hook
+     * ```
      * @api
      * @param HookTargetResolve $target
      */
-    #[Action(self::UNREGISTER_BY_CALLABLE, 10, 1)]
+    #[Filter(self::UNREGISTER_BY_CALLABLE, 10, 1)]
     public function unregisterByCallable(callable|string|array $target): int
     {
         $keyCallable = $this->entriesIndexer->getCallable($this->resolverTarget->resolve($target));
@@ -549,7 +542,7 @@ class WPHooksContainerRegistry
      * @api 
      * @param string $hook WordPress hook name.
      */
-    #[Action(self::UNREGISTER_BY_HOOK, 10, 1)]
+    #[Filter(self::UNREGISTER_BY_HOOK, 10, 1)]
     public function unregisterByHook(string $hook): int
     {
         $entries = $this->entriesIndexer->byHook[$hook] ?? [];
@@ -571,7 +564,7 @@ class WPHooksContainerRegistry
      * @api
      * @param class-string|object $class Fully qualified class name.
      */
-    #[Action(self::UNREGISTER_BY_CLASS, 10, 1)]
+    #[Filter(self::UNREGISTER_BY_CLASS, 10, 1)]
     public function unregisterByClass(string|object $class): int
     {
         $className = \is_object($class) ? get_class($class) : $class;
@@ -598,7 +591,7 @@ class WPHooksContainerRegistry
      * @api 
      * @param string $namespace Fully qualified namespace prefix.
      */
-    #[Action(self::UNREGISTER_BY_NAMESPACE, 10, 1)]
+    #[Filter(self::UNREGISTER_BY_NAMESPACE, 10, 1)]
     public function unregisterByNamespace(string $namespace): int
     {
         $entries = $this->entriesIndexer->byNamespace[$namespace] ?? [];
@@ -623,7 +616,7 @@ class WPHooksContainerRegistry
      * @api
      * @param array<int, string|\BackedEnum> $tags Tag list to unregister.
      */
-    #[Action(self::UNREGISTER_BY_TAGS, 10, 1)]
+    #[Filter(self::UNREGISTER_BY_TAGS, 10, 1)]
     public function unregisterByTags(array $tags): int
     {
         $tags = HookTagUtilities::normalizeTags($tags);
@@ -661,7 +654,7 @@ class WPHooksContainerRegistry
      * @api
      * @param string $pattern Wildcard hook-name pattern (see HookPattern).
      */
-    #[Action(self::UNREGISTER_BY_HOOK_PATTERN, 10, 1)]
+    #[Filter(self::UNREGISTER_BY_HOOK_PATTERN, 10, 1)]
     public function unregisterByHookPattern(string $pattern): int
     {
         HookPattern::assertValid($pattern);
@@ -696,7 +689,7 @@ class WPHooksContainerRegistry
      * each entry in array is its own family to to unregister
      * @param array<string> $patterns Tag wildcard patterns.
      */
-    #[Action(self::UNREGISTER_BY_TAG_PATTERN, 10, 1)]
+    #[Filter(self::UNREGISTER_BY_TAG_PATTERN, 10, 1)]
     public function unregisterByTagPattern(array $patterns): int
     {
         $count = 0;
@@ -805,11 +798,13 @@ class WPHooksContainerRegistry
     private ?\Closure $entryRemovalCommand = null {
         get {
             if ($this->entryRemovalCommand !== null) return $this->entryRemovalCommand;
-            $entriesIndexer = $this->entriesIndexer;
+            $entriesIndexerRef = WeakReference::create($this->entriesIndexer);
             $cleaner = $this->queuedHooksCleaner;
-            return $this->entryRemovalCommand = static function (ContainerRegistryHandlerEntry $entry) use ($entriesIndexer, $cleaner): void {
+            $logger = $this->logger;
+            return $this->entryRemovalCommand = static function (ContainerRegistryHandlerEntry $entry) use ($entriesIndexerRef, $cleaner, $logger): void {
+                SharedUtils::isDevelopment() && $logger->debug(__METHOD__, "Removing entry and its indexes: " . $entry->invokerLabel);
+                $entriesIndexerRef->get()?->removeIndexes($entry);
                 if (!$entry->registered) return;
-                $entriesIndexer->removeIndexes($entry);
                 $cleaner->scheduleCleanUpCallback($entry);
             };
         }

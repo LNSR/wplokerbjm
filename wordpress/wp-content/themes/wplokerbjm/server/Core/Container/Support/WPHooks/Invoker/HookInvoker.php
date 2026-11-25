@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace WPLokerBJM\Core\Container\Support\WPHooks\Invoker;
 
 use Psr\Container\ContainerInterface;
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{
     HookDebugEmitter,
     HookDebugIdentity,
@@ -343,11 +343,11 @@ final class HookInvoker
         $instance = $instanceRef->get();
         $objectId = \spl_object_id($instance);
 
-        $class = $instance instanceof ModuleClassHookMetadata ? $instance->parentClassString : $instance::class;
-        $member = $instance instanceof ModuleClassHookMetadata ? $instance->parentProperty . '->' . $method : $method;
+        $class = $instance instanceof ModuleHookMetadata ? $instance->outerClassString : $instance::class;
+        $member = $instance instanceof ModuleHookMetadata ? $instance->identifier . '->' . $method : $method;
 
-        $label = $instance instanceof ModuleClassHookMetadata
-            ? $type . '::' . $hookName . '::' . (string) $priority . '::' . (string) $acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $method
+        $label = $instance instanceof ModuleHookMetadata
+            ? $type . '::' . $hookName . '::' . (string) $priority . '::' . (string) $acceptedArgs . '::' . $instance->outerClassString . '#' . $objectId . '->' . $instance->identifier . '->' . $method
             : $type . '::' . $hookName . '::' . (string) $priority . '::' . (string) $acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $method;
 
         return new self(
@@ -407,11 +407,11 @@ final class HookInvoker
         $instance = $instanceRef->get();
         $objectId = \spl_object_id($instance);
 
-        $class = $instance instanceof ModuleClassHookMetadata ? $instance->parentClassString : $instance::class;
-        $member = $instance instanceof ModuleClassHookMetadata ? $instance->parentProperty . '->' . $property : $property;
+        $class = $instance instanceof ModuleHookMetadata ? $instance->outerClassString : $instance::class;
+        $member = $instance instanceof ModuleHookMetadata ? $instance->identifier . '->' . $property : $property;
 
-        $label = $instance instanceof ModuleClassHookMetadata
-            ? $type . '::' . $hookName . '::' . (string) $priority . '::' . (string) $acceptedArgs . '::' . $instance->parentClassString . '#' . $objectId . '->' . $instance->parentProperty . '->' . $property
+        $label = $instance instanceof ModuleHookMetadata
+            ? $type . '::' . $hookName . '::' . (string) $priority . '::' . (string) $acceptedArgs . '::' . $instance->outerClassString . '#' . $objectId . '->' . $instance->identifier . '->' . $property
             : $type . '::' . $hookName . '::' . (string) $priority . '::' . (string) $acceptedArgs . '::' . $instance::class . '#' . $objectId . '->' . $property;
 
         return new self(

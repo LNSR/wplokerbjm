@@ -10,7 +10,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Janitor\QueuedHooksCleaner;
 use WPLokerBJM\Core\Container\Support\WPHooks\Provider\WPHookPlanProvider;
 use WPLokerBJM\Core\Container\Support\WPHooks\Logger\{HookLoggerInterface, NullHookLogger};
 use WPLokerBJM\Core\Container\Attributes\{Action, Filter};
-use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleClassHookMetadata;
+use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Trait\{DeferredHooksTrait, HookScannerTrait};
 use WPLokerBJM\Core\Container\Support\WPHooks\Indexers\EntriesIndexer;
 use WPLokerBJM\Shared\Utilities\SharedUtils;
@@ -21,7 +21,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\Registry\DeferredManager\{Instance
 /**
  * File-backed metadata cache for runtime-registered hook sites.
  *
- * Anonymous hook classes extending ModuleClassHookMetadata carry a
+ * Anonymous hook classes extending ModuleHookMetadata carry a
  * stable (parentClass, parentProperty) pair that uniquely identifies the
  * property-hook site. Named classes use their class name as the site identity.
  * The reflected metadata (hook closures/plans, hook-arg names) for either site

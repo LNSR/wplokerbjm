@@ -209,9 +209,9 @@ abstract class WplokerbjmTestCase extends TestCase
     private ?\Closure $flushQueuedRemovals = null {
         get {
             return $this->flushQueuedRemovals ??= \Closure::bind(static function (QueuedHooksCleaner $cleaner) {
-                $queued = $cleaner->queuedRemovalEntry ?? [];
+                $queued = $cleaner->scheduler->queuedRemovalEntry ?? [];
                 if ($queued === []) return;
-
+                
                 foreach ($queued as $idx => $entry) {
                     $cleaner->scheduleCleanUpCallback($entry);
                 }

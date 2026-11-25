@@ -4,8 +4,7 @@
     "monolog/monolog": "^3.13",
     "nette/robot-loader": "^4.1.4",
     "php-di/php-di": "^7.1.1",
-    "php-standard-library/php-standard-library": "^6.4.2",
-    "spatie/backtrace": "^1.8.2"
+    "php-standard-library/php-standard-library": "^6.4.2"
   },
   "require-dev": {
     "brain/monkey": "^2.7.0",
