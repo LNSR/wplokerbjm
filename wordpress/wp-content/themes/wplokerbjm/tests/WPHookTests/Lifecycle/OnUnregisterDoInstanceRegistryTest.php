@@ -31,7 +31,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  *  - a throwing cleanup never escapes the destructor;
  *  - a `registerIf`-rejected registration has no cleanup to run.
  *
- ** Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed. *
+ * @Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed.
  * @see \WPLokerBJM\Core\Container\Attributes\BaseHookAttribute::$onUnregisterDo
  */
 final class OnUnregisterDoInstanceRegistryTest extends WplokerbjmTestCase

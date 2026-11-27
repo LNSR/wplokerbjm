@@ -445,34 +445,42 @@ class InstanceRegistryDeferredHookManager
         $cb = null;
         $self = $this->self;
         \add_filter($triggerHook, $cb = static function (mixed $value = null) use ($triggerHook, $deferredKey, $activateEntry, $ownerRef, $self): mixed {
-            $owner = $ownerRef?->get();
-            $self = $self?->get();
-            if ($owner === null || $self === null) {
+            static $dispatchDepth = 0;
+            if ($dispatchDepth > 0) return $value;
+            try {
+                $dispatchDepth++;
+
+                $owner = $ownerRef?->get();
+                $self = $self?->get();
+                if ($owner === null || $self === null) {
+                    \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                    return $value;
+                }
+
+                $entry = $self->deferredGet($deferredKey, $owner);
+                if ($entry === null) {
+                    \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                    return $value;
+                }
+
+                $activated = $self->activateMatchingDeferredEntries(
+                    [$deferredKey],
+                    $activateEntry,
+                    DeferredActivationSource::Scheduler,
+                    $owner,
+                );
+
+                if ($activated === 0) return $value;
+
                 \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
                 return $value;
+            } finally {
+                $dispatchDepth--;
             }
-
-            $entry = $self->deferredGet($deferredKey, $owner);
-            if ($entry === null) {
-                \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-                return $value;
-            }
-
-            $activated = $self->activateMatchingDeferredEntries(
-                [$deferredKey],
-                $activateEntry,
-                DeferredActivationSource::Scheduler,
-                $owner,
-            );
-
-            if ($activated === 0) return $value;
-
-            \remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-            return $value;
         }, PHP_INT_MIN, 1);
 
         $logger = $this->logger;
-        $entry->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb, $logger): void {
+        $entry->setOnEntryRemovalCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb, $logger): void {
             if (!\has_filter($triggerHook, $cb, PHP_INT_MIN)) return;
             \remove_filter($triggerHook, $cb, PHP_INT_MIN);
             SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);

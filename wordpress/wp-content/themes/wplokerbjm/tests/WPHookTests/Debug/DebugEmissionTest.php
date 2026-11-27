@@ -277,7 +277,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             protected function afterDeferredAdded(DeferredHookEntryHandler $entry): void
             {
                 $this->entriesIndexer->setIndexes($entry);
-                $entry->setOnEntryRemovalRemoveIndexesCallback($this->entriesIndexer->removeIndexes(...));
+                $entry->setOnEntryRemovalCallback($this->entriesIndexer->removeIndexes(...));
             }
 
             protected function gateDeferredActivation(DeferredHookEntryHandler $data): bool
@@ -407,7 +407,7 @@ final class DebugEmissionTest extends WplokerbjmTestCase
             protected function afterDeferredAdded(DeferredHookEntryHandler $entry): void
             {
                 $this->entriesIndexer->setIndexes($entry);
-                $entry->setOnEntryRemovalRemoveIndexesCallback($this->entriesIndexer->removeIndexes(...));
+                $entry->setOnEntryRemovalCallback($this->entriesIndexer->removeIndexes(...));
             }
 
             protected function gateDeferredActivation(DeferredHookEntryHandler $data): bool

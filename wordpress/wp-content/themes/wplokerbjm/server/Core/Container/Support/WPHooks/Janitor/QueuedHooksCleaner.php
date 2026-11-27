@@ -22,7 +22,7 @@ class QueuedHooksCleaner
         $hasCallbackRegistered = $entry->hasCallbackRegisteredOnWordpress();
         switch ($entry->isCurrentlyExecuting() && $hasCallbackRegistered) {
             case true:
-                $this->scheduler->queuedRemovalEntry[$entry->handler] = $entry;
+                $this->scheduler::$queuedRemovalEntry[$entry->handler] = $entry;
 
                 /**
                  * 'all' hook is the only place inbetween end of last priority hook stack and beginning of new named hook dispatch
@@ -49,7 +49,7 @@ class QueuedHooksCleaner
                         'hasCallbackRegisteredOnWordpress' => $hasCallbackRegistered,
                     ]);
                 } elseif (!$result && $hasCallbackRegistered) {
-                    $this->scheduler->queuedRemovalEntry[$handler] = $entry;
+                    $this->scheduler::$queuedRemovalEntry[$handler] = $entry;
                     !$this->scheduler->schedulerCleanerDispatched && $this->scheduler->allHookActionCommand('add');
                 }
 
@@ -66,13 +66,15 @@ class QueuedHooksCleaner
         get {
             return $this->scheduler ??= new class($this->logger, __CLASS__, __PROPERTY__) {
                 /** @var \WeakMap<HookInvoker, ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry> */
-                public \WeakMap $queuedRemovalEntry;
+                public static \WeakMap $queuedRemovalEntry;
                 public private(set) bool $schedulerCleanerDispatched = false;
                 public const int HOOK_PRIORITY = \PHP_INT_MIN;
 
+                private int $dispatchDepth = 0;
+
                 public function __construct(private HookLoggerInterface $logger, private string $outerclass, private string $outerProperty)
                 {
-                    $this->queuedRemovalEntry = new \WeakMap();
+                    self::$queuedRemovalEntry ??= new \WeakMap();
                 }
 
                 public function __destruct()
@@ -86,47 +88,53 @@ class QueuedHooksCleaner
 
                 public function __invoke(mixed ...$args): void
                 {
-                    $this->schedulerCleanerDispatched = $this->allHookActionCommand('has');
-                    if (\count($this->queuedRemovalEntry) === 0) return;
-                    $invoker = null;
-                    if (
-                        array_key_exists(0, $args)
-                        && $args[0] instanceof HookInvoker
-                    ) {
-                        $invoker = $args[0];
-                    }
-
-                    /**
-                     * * 'all' hook is in different active stack it's ok to indiscriminately remove invokers immediately
-                     */
-                    foreach ($this->queuedRemovalEntry as $ivk => $entry) {
-                        if ($invoker instanceof HookInvoker && $ivk === $invoker) {
-                            continue;
-                        }
-                        $hasCallbackRegistered = $entry->hasCallbackRegisteredOnWordpress();
-                        $result = $entry->unregister(UnregistrationSource::Cleaner);
-
-                        SharedUtils::isDevelopment() && $this->logger->debug($this->outerclass . '::$' . $this->outerProperty . '::' . __FUNCTION__, 'Handler cleaned at: ', [
-                            'CleanedEntryHandler' => $ivk->label,
-                            'CleanedAtInvokersLabel' => $invoker?->label
-                                ? "via {$invoker?->label} (" . ($invoker?->isDestructed ? 'via destructor' : 'via cleanup') . ")"
-                                : 'all-hook scheduler',
-                            'unregistrationFailureCount' => $entry->unregistrationFailureCount,
-                            'hasCallbackRegisteredOnWordpressBeforeClean' => $hasCallbackRegistered,
-                            'CurrentHookContext' => \current_filter(),
-                            'resultUnregistration' => $result,
-                        ]);
-
+                    if ($this->dispatchDepth > 0) return;
+                    try {
+                        $this->dispatchDepth++;
+                        $this->schedulerCleanerDispatched = $this->allHookActionCommand('has');
+                        if (\count(self::$queuedRemovalEntry) === 0) return;
+                        $invoker = null;
                         if (
-                            $result ||
-                            !$hasCallbackRegistered ||
-                            $entry->unregistrationFailureCount >= 3
+                            array_key_exists(0, $args)
+                            && $args[0] instanceof HookInvoker
                         ) {
-                            unset($this->queuedRemovalEntry[$ivk]);
+                            $invoker = $args[0];
                         }
+
+                        /**
+                         * * 'all' hook is in different active stack it's ok to indiscriminately remove invokers immediately
+                         */
+                        foreach (self::$queuedRemovalEntry as $ivk => $entry) {
+                            if ($invoker instanceof HookInvoker && $ivk === $invoker) {
+                                continue;
+                            }
+                            $hasCallbackRegistered = $entry->hasCallbackRegisteredOnWordpress();
+                            $result = $entry->unregister(UnregistrationSource::Cleaner);
+
+                            SharedUtils::isDevelopment() && $this->logger->debug($this->outerclass . '::$' . $this->outerProperty . '::' . __FUNCTION__, 'Handler cleaned at: ', [
+                                'CleanedEntryHandler' => $ivk->label,
+                                'CleanedAtInvokersLabel' => $invoker?->label
+                                    ? "via {$invoker?->label} (" . ($invoker?->isDestructed ? 'via destructor' : 'via cleanup') . ")"
+                                    : 'all-hook scheduler',
+                                'unregistrationFailureCount' => $entry->unregistrationFailureCount,
+                                'hasCallbackRegisteredOnWordpressBeforeClean' => $hasCallbackRegistered,
+                                'CurrentHookContext' => \current_filter(),
+                                'resultUnregistration' => $result,
+                            ]);
+
+                            if (
+                                $result ||
+                                !$hasCallbackRegistered ||
+                                $entry->unregistrationFailureCount >= 3
+                            ) {
+                                unset(self::$queuedRemovalEntry[$ivk]);
+                            }
+                        }
+                        if (\count(self::$queuedRemovalEntry) !== 0) return;
+                        if ($this->schedulerCleanerDispatched) $this->allHookActionCommand('remove') && $this->schedulerCleanerDispatched = false;
+                    } finally {
+                        $this->dispatchDepth--;
                     }
-                    if (\count($this->queuedRemovalEntry) !== 0) return;
-                    if ($this->schedulerCleanerDispatched) $this->allHookActionCommand('remove') && $this->schedulerCleanerDispatched = false;
                 }
                 /** 
                  * @param 'add'|'remove'|'has' $command 

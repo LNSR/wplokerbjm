@@ -86,9 +86,14 @@ class ContainerRegistryDeferredHookManager
 
     protected function afterDeferredAdded(DeferredHookEntryHandler $entry): void
     {
-        $this->entriesIndexer->setIndexes($entry);
-        $entry->setOnEntryRemovalRemoveIndexesCallback(
-            $this->destroyIndexes ??= $this->entriesIndexer->removeIndexes(...)
+        $entriesIndexer = $this->entriesIndexer;
+        $logger = $this->logger;
+        $entriesIndexer->setIndexes($entry);
+        $entry->setOnEntryRemovalCallback(
+            $this->destroyIndexes ??= static function (DeferredHookEntryHandler $entry) use ($entriesIndexer, $logger): void {
+                SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry its indexes for: ' . $entry->handler->label);
+                $entriesIndexer->removeIndexes($entry);
+            }
         );
     }
 
@@ -474,21 +479,33 @@ class ContainerRegistryDeferredHookManager
         $cb = null;
         $self = $this->self;
         add_filter($triggerHook, $cb = static function (mixed $value = null) use ($triggerHook, $key, $activateEntry, $self): mixed {
-            $self = $self->get() ?? null;
-            $entry = $self?->deferredHandlers[$key] ?? null;
-            if ($entry === null) {
+            static $dispatchDepth = 0;
+            if ($dispatchDepth > 0) return $value;
+            try {
+                $dispatchDepth++;
+
+                $self = $self->get() ?? null;
+                $entry = $self?->deferredHandlers[$key] ?? null;
+                if ($entry === null) {
+                    remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                    return $value;
+                }
+                $activated = $self->activateMatchingDeferredEntries([$key], $activateEntry, DeferredActivationSource::Scheduler);
+                if ($activated === 0) return $value;
                 remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
+                unset($self->deferredHandlers[$key]);
                 return $value;
+            } finally {
+                $dispatchDepth--;
             }
-            $activated = $self->activateMatchingDeferredEntries([$key], $activateEntry, DeferredActivationSource::Scheduler);
-            if ($activated === 0) return $value;
-            remove_filter($triggerHook, \Closure::getCurrent(), PHP_INT_MIN);
-            unset($self->deferredHandlers[$key]);
-            return $value;
         }, PHP_INT_MIN, 1);
 
         $logger = $this->logger;
-        $this->deferredHandlers[$key]->setOnEntryRemovalRemoveSchedulerCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb, $logger): void {
+        $entriesIndexer = $this->entriesIndexer;
+        // override entry removal callback
+        $this->deferredHandlers[$key]->setOnEntryRemovalCallback(static function (DeferredHookEntryHandler $entry) use ($triggerHook, $cb, $logger, $entriesIndexer): void {
+            $entriesIndexer->removeIndexes($entry);
+            SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry its indexes for: ' . $entry->handler->label);
             if (!\has_filter($triggerHook, $cb, PHP_INT_MIN)) return;
             \remove_filter($triggerHook, $cb, PHP_INT_MIN);
             SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry scheduler from: ' . $entry->handler->label);

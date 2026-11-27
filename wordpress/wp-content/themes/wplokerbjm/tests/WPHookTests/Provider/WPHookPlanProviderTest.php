@@ -598,6 +598,110 @@ final class WPHookPlanProviderTest extends WplokerbjmTestCase
         ));
     }
 
+    public function testNamedSelfPlanUsesOwnerInsteadOfTransientContainerService(): void
+    {
+        $constructed = 0;
+        $this->planContainer->set(PlanProviderScope::class, static function () use (&$constructed): PlanProviderScope {
+            $constructed++;
+            return new PlanProviderScope();
+        });
+
+        $owner = new PlanProviderScope();
+        $captured = null;
+        $closure = \Closure::bind(
+            static function (self $self) use (&$captured): bool {
+                $captured = $self;
+                return true;
+            },
+            null,
+            PlanProviderScope::class,
+        );
+
+        self::assertTrue($this->provider->evaluateExecuteIf(
+            $closure,
+            $this->provider->buildCallablePlan($closure),
+            'named_self_owner',
+            $owner,
+        ));
+        self::assertSame($owner, $captured);
+        self::assertSame(0, $constructed, 'transient container service must not replace the owner');
+    }
+
+    public function testNamedSelfReflectionFallbackUsesOwnerInsteadOfTransientContainerService(): void
+    {
+        $constructed = 0;
+        $this->planContainer->set(PlanProviderScope::class, static function () use (&$constructed): PlanProviderScope {
+            $constructed++;
+            return new PlanProviderScope();
+        });
+
+        $owner = new PlanProviderScope();
+        $captured = null;
+        $closure = \Closure::bind(
+            static function (self $self) use (&$captured): bool {
+                $captured = $self;
+                return true;
+            },
+            null,
+            PlanProviderScope::class,
+        );
+
+        self::assertTrue($this->provider->evaluateExecuteIf($closure, [], 'named_self_fallback', $owner));
+        self::assertSame($owner, $captured);
+        self::assertSame(0, $constructed, 'transient container service must not replace the owner');
+    }
+
+    public function testNullableSelfWithoutOwnerResolvesToNullInsteadOfTransientService(): void
+    {
+        $constructed = 0;
+        $this->planContainer->set(PlanProviderScope::class, static function () use (&$constructed): PlanProviderScope {
+            $constructed++;
+            return new PlanProviderScope();
+        });
+
+        $captured = 'sentinel';
+        $closure = \Closure::bind(
+            static function (?self $self) use (&$captured): bool {
+                $captured = $self;
+                return $self === null;
+            },
+            null,
+            PlanProviderScope::class,
+        );
+
+        self::assertTrue($this->provider->evaluateExecuteIf(
+            $closure,
+            $this->provider->buildCallablePlan($closure),
+            'nullable_self_without_owner',
+            null,
+        ));
+        self::assertNull($captured);
+        self::assertSame(0, $constructed, 'nullable self must not construct a replacement service');
+    }
+
+    public function testNullableSelfReflectionFallbackWithoutOwnerResolvesToNull(): void
+    {
+        $constructed = 0;
+        $this->planContainer->set(PlanProviderScope::class, static function () use (&$constructed): PlanProviderScope {
+            $constructed++;
+            return new PlanProviderScope();
+        });
+
+        $captured = 'sentinel';
+        $closure = \Closure::bind(
+            static function (?self $self) use (&$captured): bool {
+                $captured = $self;
+                return $self === null;
+            },
+            null,
+            PlanProviderScope::class,
+        );
+
+        self::assertTrue($this->provider->evaluateExecuteIf($closure, [], 'nullable_self_fallback_without_owner', null));
+        self::assertNull($captured);
+        self::assertSame(0, $constructed, 'nullable self must not construct a replacement service');
+    }
+
     public function testExecuteIfBindsTargetScopeForPrivateStaticAccess(): void
     {
         $closure = static fn (): bool => self::$secret === 'hidden';

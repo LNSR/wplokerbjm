@@ -26,7 +26,7 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  *  - remove the automatic `deferRegisterUntilHook` scheduler registered at
  *    `PHP_INT_MIN`, so the trigger never fires a removed entry,
  *  - and keep the destination hook unregistered.
- ** Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed.
+ * @Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed.
  */
 final class DeferredReleaseCleanupTest extends WplokerbjmTestCase
 {

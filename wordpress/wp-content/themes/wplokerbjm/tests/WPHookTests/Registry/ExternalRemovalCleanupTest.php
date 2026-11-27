@@ -24,7 +24,8 @@ use WPLokerBJM\Tests\Support\WplokerbjmTestCase;
  *  - `QueuedHooksCleaner` once-entry tracking,
  *  - `EntriesIndexer` hook/class/callable/namespace/tag buckets,
  *  - and the `onUnregisterDo` side effect.
- ** Note: No explicit \gc_collect_cycles() called. Circular reference may goes unnoticed.
+ ** Note: No explicit \gc_collect_cycles() called otherwise circular reference may goes unnoticed.
+ * 
  */
 final class ExternalRemovalCleanupTest extends WplokerbjmTestCase
 {

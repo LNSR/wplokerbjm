@@ -63,8 +63,7 @@ final class DeferredHookEntryHandler
      * @param DeferredHookEntry['onUnregisterDoParams'] $onUnregisterDoParams
      * @param DeferredHookEntry['key'] $key
      * @param DeferredHookEntry['instance'] $instance Exclusive for @see WPHooksInstanceRegistry owner
-     * @param DeferredHookEntry['removeEntryIndexCallback'] $removeEntryIndexCallback
-     * @param DeferredHookEntry['removeAutoSchedulerCallback'] $removeAutoSchedulerCallback
+     * @param DeferredHookEntry['onEntryRemovalCallback'] $onEntryRemovalCallback
      */
     public function __construct(
         public readonly string $hook,
@@ -82,31 +81,20 @@ final class DeferredHookEntryHandler
         public readonly array $onUnregisterDoParams,
         public readonly HookKey $key,
         public readonly ?WeakReference $instance = null,
-        private ?\Closure $removeEntryIndexCallback = null,
-        private ?\Closure $removeAutoSchedulerCallback = null,
+        private ?\Closure $onEntryRemovalCallback = null,
         public readonly HookLoggerInterface $logger = new NullHookLogger(),
     ) {}
 
     public function __destruct()
     {
-        \is_callable($this->removeEntryIndexCallback) && ($this->removeEntryIndexCallback)($this);
-        \is_callable($this->removeAutoSchedulerCallback) && ($this->removeAutoSchedulerCallback)($this);
-        SharedUtils::isDevelopment() && $this->logger->debug(__METHOD__, "Deferred entry destroyed; removing entry indexes: ", [
-            'invokerLabel' => $this->handler->label,
-        ]);
-        unset($this->removeEntryIndexCallback, $this->removeAutoSchedulerCallback);
-    }
-
-    /** @param DeferredHookEntry['removeEntryIndexCallback'] $callback */
-    public function setOnEntryRemovalRemoveIndexesCallback(\Closure $callback): void
-    {
-        $this->removeEntryIndexCallback = $callback;
+        \is_callable($this->onEntryRemovalCallback) && ($this->onEntryRemovalCallback)($this);
+        unset($this->onEntryRemovalCallback);
     }
 
     /** @param DeferredHookEntry['removeAutoSchedulerCallback'] $callback */
-    public function setOnEntryRemovalRemoveSchedulerCallback(\Closure $callback): void
+    public function setOnEntryRemovalCallback(\Closure $callback): void
     {
-        $this->removeAutoSchedulerCallback = $callback;
+        $this->onEntryRemovalCallback = $callback;
     }
 
     public static function fromContainerRegistryHandlerEntry(ContainerRegistryHandlerEntry $entry): self

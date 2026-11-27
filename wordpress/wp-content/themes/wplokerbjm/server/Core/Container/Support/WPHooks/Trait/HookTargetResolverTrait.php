@@ -93,9 +93,13 @@ trait HookTargetResolverTrait
         // 4. Closure (First-class callable or PHP 8.4 property hook accessor)
         /** @var \Closure $target */
         $ref = new ReflectionFunction($target);
-        $calledClass = $ref->getClosureCalledClass()?->getName() ?? null;
+        $calledClass = $ref->getClosureThis() ?? $ref->getClosureCalledClass()?->getName() ?? null;
+        if ($calledClass === null) {
+            throw new \RuntimeException('Unable to resolve hook target for function ' . $ref->getName());
+        }
 
         $name = $ref->getName();
+        $calledClass = \is_object($calledClass) ? \get_class($calledClass) : $calledClass;
 
         // Standard Instance Method ($service->method(...)) from FCC
         if (!str_contains($name, '{closure')) {

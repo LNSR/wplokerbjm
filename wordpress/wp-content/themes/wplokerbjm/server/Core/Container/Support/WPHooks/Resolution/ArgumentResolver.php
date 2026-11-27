@@ -69,7 +69,7 @@ final class ArgumentResolver
     ): array {
         $params = $plan['params'] ?? [];
 
-        if ($params === []) return $this->resolveCallableFallback($callable, $label);
+        if ($params === []) return $this->resolveCallableFallback($callable, $label, $instanceTarget);
 
         $values = [];
         foreach ($params as $param) {
@@ -99,14 +99,18 @@ final class ArgumentResolver
             }
 
             /**
-             * for `self` type in closure attribute
-             * for non extending Module but it's resolvable by container, continue to resolveCallableParam()
+             * `self` and `static` parameters are the hook owner, not a
+             * container lookup: the supplied live instance must win even when
+             * the service is transient. `?self` without an owner resolves to
+             * null instead of constructing a replacement service.
              */
-            if (
-                ($param->type ?? null) === 'self'
-                && $instanceTarget !== null
-            ) {
+            if (($param->isSelf ?? false) && $instanceTarget !== null) {
                 $values[] = $instanceTarget;
+                continue;
+            }
+
+            if (($param->isSelf ?? false) && ($param->allowsNull ?? false)) {
+                $values[] = null;
                 continue;
             }
 
@@ -149,41 +153,53 @@ final class ArgumentResolver
      *
      * @throws RuntimeException when a parameter cannot be resolved
      */
-    private function resolveCallableFallback(\Closure $callable, string $label = ''): array
+    private function resolveCallableFallback(\Closure $callable, string $label = '', ?object $instanceTarget = null): array
     {
         $reflect = new ReflectionFunction($callable);
         $values = [];
 
         foreach ($reflect->getParameters() as $param) {
             $type = $param->getType();
-            $resolved = false;
+            $isSelf = $type instanceof ReflectionNamedType
+                && \in_array($type->getName(), ['self', 'static'], true);
 
-            if ($type instanceof ReflectionNamedType && $type->getName() === 'self') {
+            // The live owner wins for self/static, even when the scope class
+            // is registered as a transient container service.
+            if ($isSelf && $instanceTarget !== null) {
+                $values[] = $instanceTarget;
+                continue;
+            }
+
+            // A nullable self/static parameter with no owner must stay null;
+            // constructing a replacement service would silently change the
+            // hook's owner.
+            if ($isSelf && $type->allowsNull()) {
+                $values[] = null;
+                continue;
+            }
+
+            $className = null;
+            if ($isSelf) {
                 $className = $reflect->getClosureScopeClass()?->getName();
-
-                if ($className !== null && $this->container->has($className)) {
-                    $values[] = $this->container->get($className);
-                    $resolved = true;
-                }
             } elseif ($type instanceof ReflectionNamedType && !$type->isBuiltin()) {
                 $className = $type->getName();
-                if ($this->container->has($className)) {
-                    $values[] = $this->container->get($className);
-                    $resolved = true;
-                }
             }
 
-            if (!$resolved) {
-                if ($param->isDefaultValueAvailable()) {
-                    $values[] = $param->getDefaultValue();
-                } else {
-                    throw new RuntimeException(sprintf(
-                        'Cannot resolve parameter $%s for condition closure in %s: Class not in container and no default value set.',
-                        $param->getName(),
-                        $label
-                    ));
-                }
+            if ($className !== null && $this->container->has($className)) {
+                $values[] = $this->container->get($className);
+                continue;
             }
+
+            if ($param->isDefaultValueAvailable()) {
+                $values[] = $param->getDefaultValue();
+                continue;
+            }
+
+            throw new RuntimeException(sprintf(
+                'Cannot resolve parameter $%s for condition closure in %s: Class not in container and no default value set.',
+                $param->getName(),
+                $label
+            ));
         }
 
         return $values;
