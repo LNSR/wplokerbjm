@@ -19,10 +19,11 @@ class QueuedHooksCleaner
     public function scheduleCleanUpCallback(ContainerRegistryHandlerEntry|RuntimeRegistryHandlerEntry $entry): void
     {
         if ($entry->handler === null) return;
+        $handler = $entry->handler;
         $hasCallbackRegistered = $entry->hasCallbackRegisteredOnWordpress();
         switch ($entry->isCurrentlyExecuting() && $hasCallbackRegistered) {
             case true:
-                $this->scheduler::$queuedRemovalEntry[$entry->handler] = $entry;
+                $this->scheduler::$queuedRemovalEntry[$handler] = $entry;
 
                 /**
                  * 'all' hook is the only place inbetween end of last priority hook stack and beginning of new named hook dispatch
@@ -30,17 +31,9 @@ class QueuedHooksCleaner
                  */
                 !$this->scheduler->schedulerCleanerDispatched && $this->scheduler->allHookActionCommand('add');
 
-                /**
-                 * This is ideal for sequential adjacent `once` priorities on the same hook:
-                 * wipe the previous priority's callback at the next priority, closing the
-                 * re-entrancy window even though the invoker is already logically guarded.
-                 */
-                ($this->scheduler)($entry->handler);
                 break;
             default:
-                $handler = $entry->handler; // hold temporary until out of scope
                 $result = $entry->unregister(UnregistrationSource::Cleaner);
-
                 if ($result) {
                     SharedUtils::isDevelopment() && $this->logger->debug(static::class, 'Handler cleaned immediately: ', [
                         'InvokerLabel' => $handler->label,
@@ -52,10 +45,15 @@ class QueuedHooksCleaner
                     $this->scheduler::$queuedRemovalEntry[$handler] = $entry;
                     !$this->scheduler->schedulerCleanerDispatched && $this->scheduler->allHookActionCommand('add');
                 }
-
-                ($this->scheduler)($handler); // drain opportunity
                 break;
         }
+
+        /**
+         * This is ideal for sequential adjacent `once` priorities on the same hook:
+         * wipe the previous priority's callback at the next priority, closing the
+         * re-entrancy window even though the invoker is already logically guarded.
+         */
+        ($this->scheduler)($handler);
     }
 
     /** 
@@ -75,15 +73,6 @@ class QueuedHooksCleaner
                 public function __construct(private HookLoggerInterface $logger, private string $outerclass, private string $outerProperty)
                 {
                     self::$queuedRemovalEntry ??= new \WeakMap();
-                }
-
-                public function __destruct()
-                {
-                    // last line of defense, when transient registry and its services cease to exist
-                    // $wp_filter will become sole owner of this scheduler refcount.
-                    // released after self-unregistration at all-hook's end.
-                    // normally unneeded and negligble on normal DI singleton path.
-                    \gc_collect_cycles();
                 }
 
                 public function __invoke(mixed ...$args): void
@@ -121,14 +110,7 @@ class QueuedHooksCleaner
                                 'CurrentHookContext' => \current_filter(),
                                 'resultUnregistration' => $result,
                             ]);
-
-                            if (
-                                $result ||
-                                !$hasCallbackRegistered ||
-                                $entry->unregistrationFailureCount >= 3
-                            ) {
-                                unset(self::$queuedRemovalEntry[$ivk]);
-                            }
+                            if ($result || !$hasCallbackRegistered) unset(self::$queuedRemovalEntry[$ivk]);
                         }
                         if (\count(self::$queuedRemovalEntry) !== 0) return;
                         if ($this->schedulerCleanerDispatched) $this->allHookActionCommand('remove') && $this->schedulerCleanerDispatched = false;

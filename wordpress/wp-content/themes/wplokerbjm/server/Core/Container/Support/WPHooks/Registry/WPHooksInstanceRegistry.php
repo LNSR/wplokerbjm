@@ -1165,7 +1165,6 @@ class WPHooksInstanceRegistry
                 if ($entry === null) return;
 
                 if ($invokerDied) {
-                    unset($self->entriesByInvokers[$invoker]);
                     $self->queuedHooksCleaner->scheduleCleanUpCallback($entry);
                     $self->cleanUpInstance($entry);
                     SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, "Entry Died: {$invoker->label}");
@@ -1196,5 +1195,6 @@ class WPHooksInstanceRegistry
             $this->weakRegistry[$owner],
             static fn(RuntimeRegistryHandlerEntry $record): bool => $record !== $entry,
         );
+        if (isset($this->entriesByInvokers[$entry->handler])) unset($this->entriesByInvokers[$entry->handler]);
     }
 }

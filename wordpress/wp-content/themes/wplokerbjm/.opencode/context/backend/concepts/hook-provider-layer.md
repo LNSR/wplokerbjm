@@ -1,4 +1,4 @@
-<!-- Context: backend/concepts | Priority: high | Version: 1.1 | Updated: 2026-11-27 -->
+<!-- Context: backend/concepts | Priority: high | Version: 1.2 | Updated: 2026-11-28 -->
 
 # Concept: Hook Provider Layer
 
@@ -45,6 +45,12 @@ A `CallablePlan` is precomputed once per closure and exported to the hooks cache
 - `bindToTarget()` scope-binds closures to the target class; `assertNullableSelfClosures()` rejects non-nullable `self` parameters on instance-registry plans.
 - `resolveOnUnregisterDo()` and `invokeHookDebug()` are exposed through the facade.
 
+## Container lifetime boundary
+
+`ArgumentResolver` is a PSR-11 consumer: it calls `ContainerInterface::get()`, never `make()`, and never owns or caches service instances. **The upstream container's `get()` decides lifetime.** Default project `DI\autowire(...)` entries are shared/singleton per container; `->lazy()` is still one lazy resolved target. There is no first-class project scope API — WPHooks owner scope is hook-registration lifetime, not DI scope.
+
+Typed closure parameters can therefore be shared even when the hook owner is short-lived. `self` / `static` are the exception: the live owner wins, and `?self` becomes `null` when the owner is gone. Pass per-fire/request state as a hook argument instead of assuming a transient container lookup. See `concepts/container-lifetimes.md`.
+
 ## Minimal example
 
 ```php
@@ -58,6 +64,7 @@ public function search(string $sql, object $query): string
 
 ## Related
 
+- `concepts/container-lifetimes.md` — upstream container `get()` vs `make()`, WPHooks boundary
 - `concepts/wphooks-architecture.md` — where plans are consumed
 - `lookup/wphooks-api.md` — provider and collaborator API rows
 - `guides/wphooks-lifecycle.md` — scan-time plan build vs fire-time resolution

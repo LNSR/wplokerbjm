@@ -43,7 +43,6 @@ class ContainerRegistryDeferredHookManager
 
     /** @var array<string, DeferredHookEntryHandler> */
     protected array $deferredHandlers = [];
-    private ?\Closure $destroyIndexes = null;
 
     /**
      * @param WPHookPlanProvider  $planProvider Plan provider used for registerIf gates.
@@ -57,6 +56,18 @@ class ContainerRegistryDeferredHookManager
         private readonly HookLoggerInterface $logger = new NullHookLogger()
     ) {
         $this->self = \WeakReference::create($this);
+    }
+
+    private ?\Closure $destroyIndexes = null {
+        get {
+            if ($this->destroyIndexes !== null) return $this->destroyIndexes;
+            $entriesIndexer = $this->entriesIndexer;
+            $logger = $this->logger;
+            return $this->destroyIndexes = static function (DeferredHookEntryHandler $entry) use ($entriesIndexer, $logger): void {
+                SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry its indexes for: ' . $entry->handler->label);
+                $entriesIndexer->removeIndexes($entry);
+            };
+        }
     }
 
     protected function deferredGet(string $key, ?object $owner = null): ?DeferredHookEntryHandler
@@ -87,15 +98,10 @@ class ContainerRegistryDeferredHookManager
     protected function afterDeferredAdded(DeferredHookEntryHandler $entry): void
     {
         $entriesIndexer = $this->entriesIndexer;
-        $logger = $this->logger;
         $entriesIndexer->setIndexes($entry);
-        $entry->setOnEntryRemovalCallback(
-            $this->destroyIndexes ??= static function (DeferredHookEntryHandler $entry) use ($entriesIndexer, $logger): void {
-                SharedUtils::isDevelopment() && $logger->debug(__METHOD__, 'Removing deferred entry its indexes for: ' . $entry->handler->label);
-                $entriesIndexer->removeIndexes($entry);
-            }
-        );
+        $entry->setOnEntryRemovalCallback($this->destroyIndexes);
     }
+
 
     /**
      * Activate all deferred handlers registered for a specific WordPress hook.

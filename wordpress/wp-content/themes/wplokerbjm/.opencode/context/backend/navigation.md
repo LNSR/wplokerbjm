@@ -1,4 +1,4 @@
-<!-- Context: backend/nav | Priority: high | Version: 1.1 | Updated: 2026-11-27 -->
+<!-- Context: backend/nav | Priority: high | Version: 1.2 | Updated: 2026-11-28 -->
 
 # Backend Context Navigation
 
@@ -16,6 +16,7 @@ backend/
 │   ├── hook-system.md
 │   ├── hook-provider-layer.md
 │   ├── wphooks-architecture.md
+│   ├── container-lifetimes.md
 │   ├── autoloading.md
 │   └── caching.md
 ├── examples/
@@ -48,6 +49,7 @@ backend/
 | `concepts/hook-system.md` | Attribute-driven hooks, scanner, registry | critical |
 | `concepts/hook-provider-layer.md` | Plan core for gates, dynamic names, tag closures | high |
 | `concepts/wphooks-architecture.md` | Scanner, plans, unified invoker, registries, logger, owner-scoped deferred pools | high |
+| `concepts/container-lifetimes.md` | Container `get()` lifetime contract and closure-DI warnings | high |
 | `concepts/autoloading.md` | Nette RobotLoader integration | high |
 | `concepts/caching.md` | Redis cache, Cloudflare purge, keys | high |
 

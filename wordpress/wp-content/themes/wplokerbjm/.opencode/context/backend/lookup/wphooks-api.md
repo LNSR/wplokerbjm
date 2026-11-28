@@ -1,4 +1,4 @@
-<!-- Context: backend/lookup | Priority: high | Version: 1.1 | Updated: 2026-11-27 -->
+<!-- Context: backend/lookup | Priority: high | Version: 1.2 | Updated: 2026-11-28 -->
 
 # WPHooks API Lookup
 
@@ -17,6 +17,10 @@
 | `HookLoggerInterface` | `server/Core/Container/Support/WPHooks/Logger/HookLoggerInterface.php` | Swappable WPHooks logger: `debug/info/warning/error($category, $message, $context)` + `flush()`. DI binds `SharedLoggerAdapter`; `NullHookLogger` is the no-op default. |
 | `WPHookPlanProvider` | `server/Core/Container/Support/WPHooks/Provider/WPHookPlanProvider.php` | Backwards-compatible facade over `CallablePlanFactory`, `ArgumentResolver`, `ConditionEvaluator`, and `HookDebugDispatcher`. |
 | `ModuleHookMetadata` | `server/Core/Container/Support/WPHooks/Abstract/ModuleHookMetadata.php` | Anonymous/inner owner metadata: `outerClassString`, `identifier`, `ownershipPath`. |
+
+## Lifetime warning
+
+Closure attribute parameters resolve by exact hook-argument name, then the live owner for `self`/`static`, then `ContainerInterface::get($type)`, then defaults. WPHooks never calls `make()` and never owns dependency instances; the upstream container's `get()` decides singleton/transient/scoped behavior. Default `DI\autowire(...)` entries are shared per container. Do not assume a typed closure dependency follows the hook/owner lifetime — pass per-fire state as a hook argument. See `concepts/container-lifetimes.md`.
 
 ## Registries and selectors
 

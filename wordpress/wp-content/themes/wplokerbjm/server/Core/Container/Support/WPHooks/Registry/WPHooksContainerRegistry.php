@@ -196,25 +196,6 @@ class WPHooksContainerRegistry
             return;
         }
         $this->registerAll($this->scanner->getHookRegistrations());
-        foreach ($this->handlers as $key => $entry) {
-            try {
-                $weakRef = \WeakReference::create($entry);
-                $this->entriesIndexer->setIndexes($entry);
-                $entry->setOnEntryRemovalCallback($this->entryRemovalCommand);
-                $this->entriesByInvokers[$entry->handler] = $weakRef;
-            } catch (\Exception $e) {
-                $this->logger->error(
-                    __METHOD__,
-                    "Error registering {$entry->invokerLabel}",
-                    [
-                        'message' => $e->getMessage(),
-                        'trace' => $e->getTraceAsString(),
-                        'file' => $e->getFile(),
-                        'line' => $e->getLine(),
-                    ]
-                );
-            }
-        }
 
         $this->initialized = true;
     }
@@ -769,7 +750,7 @@ class WPHooksContainerRegistry
                     $self->queuedHooksCleaner->scheduleCleanUpCallback($entry);
                     unset($self->handlers[$key]);
                     unset($self->entriesByInvokers[$invoker]);
-                    SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, "Entry Died: {$invoker->label}");
+                    SharedUtils::isDevelopment() && $self->logger->debug(__METHOD__, "Unregistration via invoker destruction: {$entry->invokerLabel}");
                     return;
                 };
 
@@ -902,7 +883,24 @@ class WPHooksContainerRegistry
             [$handler, $entry] = $this->createHandlerAndEntry($registration, $hookName, $resolvedTags);
 
             if (!$registration->deferRegister && $registration->deferRegisterUntilHook === null && $entry instanceof ContainerRegistryHandlerEntry) {
-                $this->handlers[$entry->toUniqueKey()] = $entry->register();
+                try {
+                    $weakRef = WeakReference::create($entry);
+                    $this->entriesIndexer->setIndexes($entry);
+                    $entry->setOnEntryRemovalCallback($this->entryRemovalCommand);
+                    $this->entriesByInvokers[$entry->handler] = $weakRef;
+                    $this->handlers[$entry->toUniqueKey()] = $entry->register();
+                } catch (\Throwable $e) {
+                    $this->logger->error(
+                        __METHOD__,
+                        "Error registering {$entry->invokerLabel}",
+                        [
+                            'message' => $e->getMessage(),
+                            'trace' => $e->getTraceAsString(),
+                            'file' => $e->getFile(),
+                            'line' => $e->getLine(),
+                        ]
+                    );
+                }
             } else {
                 $this->containerRegistryDeferredHookManager->deferRegistration(
                     $registration,

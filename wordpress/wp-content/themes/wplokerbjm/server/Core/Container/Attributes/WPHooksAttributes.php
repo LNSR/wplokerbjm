@@ -7,6 +7,7 @@ namespace WPLokerBJM\Core\Container\Attributes;
 use Attribute;
 use WPLokerBJM\Core\Container\Support\WPHooks\Abstract\ModuleHookMetadata;
 use WPLokerBJM\Core\Container\Support\WPHooks\Debug\{DeferredRegistrationInfoDTO, LiveRegistrationInfoDTO, LiveUnregistrationInfoDTO};
+use WPLokerBJM\Core\Container\Support\WPHooks\Logger\HookLoggerInterface;
 use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
 
 /**
@@ -59,6 +60,22 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * default, then throw. A parameter typed with a non-class type (`string`,
  * `int`, `array`, …) and no default is therefore unresolvable.
  *
+ * **Container lifetime is owned upstream.** This is a PSR-11 `get()` lookup,
+ * not WPHooks instantiation:
+ *
+ * - default project `DI\autowire(...)` entries are shared/singleton per
+ *   container; `->lazy()` remains one lazy target, not one instance per fire;
+ * - WPHooks never calls PHP-DI `make()` and never snapshots or caches
+ *   dependencies itself;
+ * - a custom container whose `get()` is transient is respected as-is;
+ * - there is no first-class project container scope. WPHooks owner scope is
+ *   hook-registration lifetime, **not** DI service lifetime.
+ *
+ * A typed closure parameter can therefore be shared even when the hook is
+ * short-lived, deferred, or owned by an instance. Pass per-fire/request state
+ * as a hook argument instead of assuming a transient lookup. See
+ * `backend/concepts/container-lifetimes.md`.
+ *
  * **InstanceRegistry contract:** every owner parameter on an instance-registry
  * closure MUST be declared `?self`. The owner lives behind a `WeakReference`
  * and may already be gone (or be mid-teardown) when a deferred gate,
@@ -66,7 +83,8 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * parameters are rejected at registration time with
  * {@see \WPLokerBJM\Core\Container\Support\WPHooks\Exceptions\NonNullableSelfParameterException},
  * and `self` is never fabricated from the container on the instance path.
- * Container-backed closures keep the documented `self` → container fallback.
+ * When a live owner exists it wins for `self`/`static`; container fallback is
+ * only for registrations with no live owner (the container path).
  *
  * ---------------------------------------------------------------------------
  * ## Scanning rules
@@ -128,6 +146,7 @@ use WPLokerBJM\Core\Container\Support\WPHooks\WPHooksScanner;
  * ! plugin registers its own hooks.
  *
  * @see WPHooksScanner
+ * @see HookLoggerInterface
  * @see \WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksContainerRegistry
  * @see \WPLokerBJM\Core\Container\Support\WPHooks\Registry\WPHooksInstanceRegistry
  * @see ModuleHookMetadata
@@ -307,12 +326,13 @@ abstract class BaseHookAttribute
      * * The DTO is transient: the framework keeps no reference. Call
      *   `$dto->toArray()` if you need to retain the snapshot.
      * * Parameters resolve from the DTO (by type), `self`/the live owner,
-     *   then the DI container, then defaults. `LoggerInterface` works when
-     *   the application binds it upstream — the hook system ships no logger
-     *   binding of its own.
-     * ! `self` injection may **construct the service** when it is resolved
-     * ! from the container. Prefer `?self` (null before an owner exists) or
-     * ! pass the values you actually need.
+     *   then the DI container, then defaults. `HookLoggerInterface` is bound by
+     *   the hook system DI definition (`SharedLoggerAdapter` by default);
+     *   `NullHookLogger` is the standalone/test default. Other logger
+     *   interfaces work only when the application binds them upstream.
+     * ! When no live owner exists (container-path registration), `self`/`static`
+     * ! may **construct the service** through the container. Prefer `?self`
+     * ! (null before an owner exists) or pass the values you actually need.
      * * Never invoked from PHP destructors; release events come from explicit
      *   release paths only.
      * * A throwing probe is logged and never interrupts the hook lifecycle.

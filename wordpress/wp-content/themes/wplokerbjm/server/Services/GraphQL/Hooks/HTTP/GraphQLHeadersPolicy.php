@@ -90,7 +90,6 @@ final class GraphQLHeadersPolicy
         if (!is_user_logged_in()) return $headers;
         $headers['Logged-In'] = 'true';
         $headers['X-WP-Nonce'] = \graphql_get_nonce();
-
         return $headers;
     }
 
